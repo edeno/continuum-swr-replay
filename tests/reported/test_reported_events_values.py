@@ -1294,7 +1294,9 @@ def test_restriction_figure_statistics_are_the_tagged_values():
     windows = _restriction_windows()
     time_sums = _immobile_time_sums()
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
-    decoders, parts = builder.restriction_figure_statistics(windows, time_sums, bin_s)
+    decoders, parts = builder.restriction_totals.restriction_figure_statistics(
+        windows, time_sums, bin_s
+    )
     numbers = _numbers(builder.restriction_immobile_values(time_sums, bin_s, "s"))
     for measure in builder.RESTRICTION_FIGURE_DECODERS:
         assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(

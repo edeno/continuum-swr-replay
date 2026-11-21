@@ -1915,19 +1915,30 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
     """Panel g draws the restriction rows the events summary tags with it, by
     the summary's own definitions; participation is panel h; the held-out
     tetrode values are the supplementary figure's."""
+    from continuum_swr_replay.analysis.event_evidence import restriction_totals
     from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
+    # one definition of the drawn statistic and its choices, in the analysis
+    # layer, used by both
     assert (
-        figure02.restriction_figure_statistics is events.restriction_figure_statistics
+        figure02.restriction_figure_statistics
+        is restriction_totals.restriction_figure_statistics
     )
-    assert events.RESTRICTION_FIGURE == {
-        "parts": ["outside_swr"],
-        "families": ["filter"],
-        "contrasts": ["full_minus_swr"],
-        "units": ["per_spike"],
-        "kinds": ["event"],
-    }
+    for name in (
+        "RESTRICTION_FIGURE_DECODERS",
+        "RESTRICTION_FIGURE_FAMILY",
+        "RESTRICTION_FIGURE_GROUPS",
+    ):
+        assert getattr(figure02, name) is getattr(restriction_totals, name), name
+    for name in (
+        "RESTRICTION_FIGURE",
+        "RESTRICTION_FIGURE_DECODERS",
+        "RESTRICTION_FIGURE_DIFFERENCE",
+        "RESTRICTION_FIGURE_FAMILY",
+        "RESTRICTION_FIGURE_GROUPS",
+    ):
+        assert getattr(events, name) is getattr(restriction_totals, name), name
     assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)
     assert list(figure02.PART_X) == list(events.RESTRICTION_FIGURE_GROUPS)
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)

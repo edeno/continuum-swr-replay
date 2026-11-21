@@ -42,8 +42,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         a dashed line at zero
         (``restriction_windows.restriction_window_statistics``). Both from
         ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its events
-        and time sums) by the events summary's
-        ``restriction_figure_statistics``. The held-out
+        and time sums) by ``restriction_totals.restriction_figure_statistics``,
+        which the events summary's values share. The held-out
         tetrode gain over local coding is a supplementary figure
         (``generate_supp_heldout_tetrode.py``).
     h — Tetrode participation (the share of tetrodes with a spike) of each
@@ -74,7 +74,7 @@ the stored counts by the functions the events summary uses
 events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
 held-out decode that start inside a well visit, and the time inside a well
-visit) and by its function (``restriction_figure_statistics``), refused when
+visit) and by ``restriction_totals.restriction_figure_statistics``, refused when
 the restriction run is not the fold fit on folds of whole trials, when the
 held-out event run was not made from the current restriction run or per-bin
 facts run, or when the per-bin facts, which give the time and the events' start
@@ -157,6 +157,12 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    RESTRICTION_FIGURE_DECODERS,
+    RESTRICTION_FIGURE_FAMILY,
+    RESTRICTION_FIGURE_GROUPS,
+    restriction_figure_statistics,
+)
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
@@ -206,13 +212,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.events import (
-    RESTRICTION_FIGURE_DECODERS,
-    RESTRICTION_FIGURE_FAMILY,
-    RESTRICTION_FIGURE_GROUPS,
-    read_heldout_restriction,
-    restriction_figure_statistics,
-)
+from continuum_swr_replay.reported.events import read_heldout_restriction
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.runs.io import (
     ok_epochs,
@@ -1185,8 +1185,7 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     for the SWR-only decoder, the Non-Local state's green for the full one),
     the same animal's two dots joined by a thin gray line, and a dashed line at
     zero, the local-only decoder (``restriction_totals.immobile_gain_statistics``,
-    the events summary's
-    :data:`~continuum_swr_replay.reported.events.RESTRICTION_FIGURE_DECODERS`).
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`).
 
     Parameters
     ----------
@@ -1235,8 +1234,8 @@ def draw_part_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     For each, a dot per animal in panel d's color and, beside them, the animals'
     mean with its 95 % interval in black (drawn by
     ``heldout_gain_panels.draw_animal_gain``), with a dashed line at zero
-    (``restriction_windows.restriction_window_statistics`` with the events
-    summary's :data:`~continuum_swr_replay.reported.events.RESTRICTION_FIGURE`).
+    (``restriction_windows.restriction_window_statistics`` with
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE`).
 
     Parameters
     ----------

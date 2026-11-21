@@ -141,6 +141,13 @@ from continuum_swr_replay.analysis.event_evidence import (
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FAMILY_SUFFIX,
 )
+from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    RESTRICTION_FIGURE,
+    RESTRICTION_FIGURE_DECODERS,
+    RESTRICTION_FIGURE_DIFFERENCE,
+    RESTRICTION_FIGURE_FAMILY,
+    RESTRICTION_FIGURE_GROUPS,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     BASELINE_GROUP,
     SPIKE_EVIDENCE_METRICS,
@@ -1880,65 +1887,6 @@ _RESTRICTION_KINDS = {
     "event": ("events", "events"),
     "control": ("controls", "matched Local-rest controls"),
 }
-#: Figure 2g, the decoders compared, in one score family (its values carry the
-#: panel's tag; the other family's do not).
-RESTRICTION_FIGURE_FAMILY = "filter"
-#: Figure 2g's first axis, "All immobile time": each decoder's gain over the
-#: local-only decoder per spike of the immobile time inside a well visit, by its
-#: measure (``restriction_totals.IMMOBILE_MEASURES``), in drawing order
-#: (SWR-only, Full), and the measure of their difference, which the line
-#: joining an animal's two dots shows.
-RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
-RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
-#: Figure 2g's second axis, "Immobile time outside SWR bounds": the window
-#: statistic's choice (``restriction_windows.restriction_window_statistics``'
-#: keywords), the full decoder minus the SWR-only decoder per spike over the
-#: bins outside SWRs of the events detected from the held-out decode, and its
-#: groups in drawing order (events with no SWR, then the time outside the SWR of
-#: the events that overlap one).
-RESTRICTION_FIGURE = {
-    "parts": ["outside_swr"],
-    "families": [RESTRICTION_FIGURE_FAMILY],
-    "contrasts": ["full_minus_swr"],
-    "units": ["per_spike"],
-    "kinds": ["event"],
-}
-RESTRICTION_FIGURE_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
-
-
-def restriction_figure_statistics(
-    windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Figure 2g's two axes, as the events summary computes them.
-
-    Parameters
-    ----------
-    windows : pd.DataFrame
-        The held-out event run's events of every epoch
-        (``scripts/event_evidence/detect_heldout_events.py``), those that start
-        inside a well visit (``starts_in_well_visit``).
-    time_sums : pd.DataFrame
-        The held-out event run's time sums of every epoch
-        (``restriction_totals.restriction_time_sums``).
-    bin_s : pd.Series
-        Each epoch's decode time step (s), indexed by ``epoch_id``.
-
-    Returns
-    -------
-    decoders : pd.DataFrame
-        ``restriction_totals.immobile_gain_statistics`` over the immobile time
-        inside a well visit, indexed by ``family`` and ``measure``.
-    parts : pd.DataFrame
-        ``restriction_windows.restriction_window_statistics`` with
-        :data:`RESTRICTION_FIGURE` over ``windows``, indexed by ``group``.
-    """
-    decoders = restriction_totals.immobile_gain_statistics(
-        restriction_totals.epoch_immobile_gains(time_sums, bin_s)
-    ).set_index(["family", "measure"])
-    parts = restriction_windows.restriction_window_statistics(
-        windows, **RESTRICTION_FIGURE
-    ).set_index("group")
-    return decoders, parts
 
 
 def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str | None:
