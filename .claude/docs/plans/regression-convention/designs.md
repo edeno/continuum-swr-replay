@@ -179,11 +179,19 @@ def reml_and_derivatives(lik, X, y, aux, blocks, rho, beta0):
     return V, g, Hs, fit
 ```
 
-Gaussian: profile the scale. With `D_p = ||y - X b||^2 + b' S b` and `M_p` the dimension of the penalty
-null space (unpenalized columns plus null spaces of the `S_j`),
-`V(rho, phi) = D_p/(2 phi) + (n - M_p)/2 log(2 pi phi) - 1/2 log|S/phi|_+ + 1/2 log|(X'X + S)/phi|`
-(Wood 2011, eq. 4), minimized jointly over `(rho, log phi)`. Check against mgcv's `gam(..., method = "REML")`
-scale estimate on the hand case of Phase 1.
+Gaussian: profile the scale. As built (`regression/reml.py`, equal to mgcv to 1e-12): with
+`D_p = ||y - X b||^2 + b' S b`, `M_p` the dimension of the penalty null space, and `rho` the log of mgcv's
+`sp` (the penalty is on the residual-sum-of-squares scale), each session's scale is profiled in closed form,
+`phi = D_p / (n - M_p)`, and `V` is Wood (2011) eq. 4 with unscaled determinants:
+`V = D_p/(2 phi) + (n - M_p)/2 log(2 pi phi) - 1/2 log|S|_+ + 1/2 log|X'X + S|`. (An earlier version of
+this section scaled the determinants by `1/phi` as well, which counts `M_p` twice.)
+
+As built, the outer search adds two rules: a log penalty that sits at a bound with its gradient pointing
+outward is held fixed and left out of the Newton step and of the stopping rule; and after the stopping
+rule passes, one last Newton step is taken if `V` does not rise. `at_boundary` (within 0.5 of a bound)
+does not catch a term shrunk to its null space, because the gradient decays like `exp(-rho)` and the
+search stops on the plateau; report a term as shrunk to its null space from its edf (within 0.01 of the
+penalty's null dimension), not from `at_boundary`.
 
 Tests (Phase 1): the gradient and Hessian against central finite differences of `V` (relative error below
 1e-5) for every family with one, two and three penalties; `V` against mgcv on the stored fixtures.
