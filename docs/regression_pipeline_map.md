@@ -484,6 +484,36 @@ The raised-cosine history basis and the projection of a lag matrix onto it.
 
 `raised_cosine_history_basis`, `reward_basis_from_lags`
 
+### `src/continuum_swr_replay/analysis/regression/constants.py`
+
+The shared fitter's numerical rules, in one place.
+
+_No module-level public symbols._
+
+### `src/continuum_swr_replay/analysis/regression/likelihoods.py`
+
+Log-likelihoods of the shared fitter and their derivatives on the eta scale.
+
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`
+
+### `src/continuum_swr_replay/analysis/regression/newton.py`
+
+Penalized Newton fit at fixed penalty strengths, in float64.
+
+`NewtonFit`, `running_away_columns`, `penalized_newton`
+
+### `src/continuum_swr_replay/analysis/regression/pspline.py`
+
+Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
+
+`ConstrainedSmooth`, `PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
+
+### `src/continuum_swr_replay/analysis/regression/reml.py`
+
+Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
+
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
@@ -759,6 +789,24 @@ Report whether every fitted artifact is still current for the tables it read.
 Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
+
+### `scripts/checks/compare_regression_to_current_fitters.py`
+
+Compare the shared fitter without a penalty with the current fitters on real sessions.
+
+`per_bin_coefficients`, `content_coefficients`, `largest_relative_difference`, `main`
+
+### `scripts/checks/compare_regression_to_mgcv.py`
+
+Compare the shared regression fitter with mgcv on small synthetic data sets.
+
+`stop_bins`, `make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
+
+### `scripts/checks/compare_regression_to_neurospatial.py`
+
+Fit a one-term Poisson model with neurospatial's REML and write the fixture.
+
+`make_data`, `main`
 
 ### `scripts/checks/compare_to_golden_baseline.py`
 
@@ -1226,12 +1274,6 @@ Model-free event-start rates on the three visit clocks, per kind and animal.
 
 `input_paths`, `output_path`, `session_port_experiences`, `session_bins`, `main`
 
-### `scripts/replay_models/rate/fit_cross_history_rate.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`main`
-
 ### `scripts/replay_models/rate/fit_cross_history_ridge_cv.py`
 
 Ridge cross-validated comparison of self vs self+cross history, per animal.
@@ -1345,12 +1387,6 @@ The per-event SWR-power model: an event's ripple power against the behavioral co
 Which sessions of a rung pair can be compared by an information criterion.
 
 `why_not_comparable`, `pair_rung_fits`
-
-### `src/continuum_swr_replay/analysis/replay_models/rate/cross_history.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`fit_direction`, `fit_cross_history`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/history_kernel_statistics.py`
 

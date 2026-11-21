@@ -766,6 +766,20 @@ module kept its place; one file was renamed. Paths are under `src/continuum_swr_
 The PFC cohort records keep their key `n_analysed`: the records on disk carry it, and
 `reported/mpfc/population.py` reads it.
 
+## The all-bins cross-history model removed, 2026-11-20
+
+The older cross-history runner, which fit `MODEL_CROSS_HISTORY_RATE` per session with every bin of a
+stop at risk, was removed; nothing reported it. The rungs stay in `model_specs.py`: the duration-aware
+model fits them as its onset-only comparison. Its stored output,
+`models_per_bin_rate/cross_history_models.pkl`, is left on disk and nothing reads it. The module path is under
+`src/continuum_swr_replay/`.
+
+| Old path | New home |
+|---|---|
+| `analysis/replay_models/rate/cross_history.py` (removed: retired) | none |
+| `scripts/replay_models/rate/fit_cross_history_rate.py` (removed: retired) | none |
+| `tests/analysis/replay_models/rate/test_cross_history.py` (removed: retired) | none |
+
 ## The well visit in the tables, 2026-11-20
 
 The well visit (first nose-poke in to final poke-out) became the tables' unit: the stop,

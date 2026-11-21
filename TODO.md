@@ -175,3 +175,46 @@ Work that is deferred on purpose. Each item says when it should be done.
   (`@v4`), which the action's owner can move.
   *When:* before the repository is made public, or before a workflow gets a
   secret or deploys anything.
+
+## Regression fitter
+
+Follow-ups of the 2026-11-21 cleanup of `analysis/regression/`. The timings are a
+reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
+
+- [ ] **Prepare each session once per search.** Today every evaluation validates the
+  inputs, checks identifiability, rotates the design into the penalties' eigenbasis
+  and reduces it to the active columns, and three layers each map back the
+  coefficients, `A`, the covariance, the step and the running-away columns. Do the
+  preparation once per session and search, with one pair of maps back to the given
+  columns. Measured: the rotation takes 28 ms and the two checks 10.5 ms of a 109 ms
+  score-only evaluation.
+  *When:* before the fitter runs the real models' searches.
+- [ ] **A step cap that does not depend on column scaling.** The cap is in coefficient
+  units, so it depends on how the columns are scaled, and three rules exist because of
+  it (the Gaussian's exemption, the capped-steps rule for a fit with no finite maximum,
+  the step history). A cap on the change of the linear predictor, or no cap with
+  backtracking, may remove them. It changes iteration counts and perhaps statuses, so
+  prototype it on the saved failure reproductions first.
+  *When:* after the session preparation above, before the fitter is frozen.
+- [ ] **Who refits the set-aside sessions.** Refitting a set-aside session with columns
+  left out is model policy. Decide whether it belongs to the caller, which owns the
+  support rule, with the search returning the set-aside sessions and their directions.
+  *When:* when the first model's caller is written.
+- [ ] **The Hessian's trace terms by leverages.** For the diagonal families the trace
+  terms can use leverages (`sum_i lev_i * (...)`) instead of two Gram products and a
+  solve per pair of penalties. Measured: 22.0 ms to 6.6 ms per pair, with a relative
+  difference of 8e-14.
+  *When:* when a search's cost matters.
+- [ ] **Smaller savings in the search.** Seed the grid's first fits from the screen's
+  fits; score a halving candidate before computing its derivatives; cache `X'X` and
+  `X'y` for the Gaussian.
+  *When:* with the trace terms above.
+- [ ] **The Gaussian in the Newton loop.** The Gaussian goes through the loop and is
+  exempted from its step rules at three places. One exact step does not replace the
+  loop: the loop's second step refines the first. A reviewer measured, on a design with
+  two nearly equal columns, a largest coefficient error of 3.9e-8 with one step and
+  2.9e-11 with the loop, each against a stable least-squares solution; one step also
+  returned "converged" for an objective that was not finite. A direct solve needs a
+  refinement step and that check. Outside the penalty search, a Gaussian fit stops by an
+  absolute tolerance, so an outcome with a very large spread ends at the step limit.
+  *When:* with the step cap above.

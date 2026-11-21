@@ -91,7 +91,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 ## `replay_models/rate/` — event-rate models and their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders ([../docs/rate_models.md](../docs/rate_models.md)).
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
-- `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
+- `fit_uncertainty_rate.py` — the MU rate models.
 - `fit_cross_history_ridge_cv.py` — ridge cross-validated comparison of self vs self+cross history, per animal.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
@@ -137,6 +137,9 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `table_parity.py` — rebuild every canonical table into a scratch root, and diff two roots table by table.
 - `mutation_check.py` — AST mutation check on the covariate builders (`docs/design/builder_test_floor.md`).
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into one table.
+- `compare_regression_to_mgcv.py` (with `compare_regression_to_mgcv.R`) — the shared regression fitter beside mgcv on four synthetic data sets; rewrites the fixtures in `tests/analysis/regression/data/mgcv/` ([../docs/design/regression_fitter.md](../docs/design/regression_fitter.md)).
+- `compare_regression_to_neurospatial.py` — run with neurospatial's own interpreter: its REML penalty selection on one synthetic term, written to `tests/analysis/regression/data/neurospatial/`.
+- `compare_regression_to_current_fitters.py` — the shared fitter without a penalty beside the current per-bin and content fitters on three real sessions.
 - `write_pipeline_map.py` — regenerates `docs/regression_pipeline_map.md`; `--check` fails on drift.
 - `write_epoch_register_doc.py` — rewrites the generated parts of `docs/epoch_register.md`; `--check` fails on drift.
 - `summarize_stage6_fdr.py` — Stage 6's per-role cross-session FDR table for any saved stay/leave fit.
