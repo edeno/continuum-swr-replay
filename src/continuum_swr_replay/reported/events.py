@@ -90,7 +90,12 @@ held-out event run when it read another restriction run, per-bin facts run or
 event table than the current ones (:func:`read_heldout_restriction`); and those
 that read the well visits through the per-bin facts (the time sums inside a
 visit, the held-out events' start, the window counts after a visit) when the
-facts run was not made from the current session cache (``prepare_data.session_cache_staleness``). The held-out tetrode values and
+facts run was not made from the current session cache (``prepare_data.session_cache_staleness``).
+Every restriction value, over the canonical windows or the held-out events and
+time, is also pending when the restriction run's recorded decode frames or SWR
+source are not the current ones (:func:`restriction_input_staleness`: the
+source by name, the decode frames against the event features run's record of
+them). The held-out tetrode values and
 the restriction window values are against Local-rest controls inside one well
 visit (:data:`CONTROL_SUBSET`): their runs must have read the current
 participation tables, and they are pending, as the participation values are,
@@ -2034,6 +2039,71 @@ class HeldoutRestriction:
     """The run was not made from the current event table."""
 
 
+def restriction_input_staleness(
+    manifest: dict,
+    decode_sha256: Mapping[str, str],
+    epoch_ids: Iterable[str],
+    what: str,
+) -> str | None:
+    """Why the restriction run was not made from the current decode frames and
+    SWR source, or None.
+
+    The run's settings record the SWR source by name (``swr_source``, which
+    names the SWR inventory run and the artifact run) and each epoch's record
+    the SHA-256 of the decode frame it read (``epoch_inputs.data_over_time``).
+    The current source is ``swr_source.swr_source_name()``. The current decode
+    frames are the ones the event features run records (``decode_sha256``),
+    which the figures also take as the decodes (``generate_figure02.py``'s
+    ``checked_reference``); no decode frame is hashed here, so a decode remade
+    without a new event features run is not seen.
+
+    Parameters
+    ----------
+    manifest : dict
+        The restriction run's manifest.
+    decode_sha256 : Mapping of str to str
+        Each epoch's decode frame's SHA-256, as the event features run records it.
+    epoch_ids : iterable of str
+        The epochs read; one the run has no record of, or the features run no
+        digest of, counts as another decode.
+    what : str
+        The restriction run, for the note.
+    """
+    notes = []
+    recorded = manifest.get("settings", {}).get("swr_source")
+    current = swr_source.swr_source_name()
+    if recorded != current:
+        notes.append(
+            f"its settings record the SWR source {recorded!r}, not the current "
+            f"{current!r}"
+        )
+    records = manifest.get("epochs", {})
+
+    def recorded_decode(epoch_id: str) -> str | None:
+        inputs = records.get(epoch_id, {}).get("epoch_inputs", {})
+        return inputs.get("data_over_time", {}).get("sha256")
+
+    differ = sorted(
+        epoch_id
+        for epoch_id in epoch_ids
+        if recorded_decode(epoch_id) is None
+        or recorded_decode(epoch_id) != decode_sha256.get(epoch_id)
+    )
+    if differ:
+        notes.append(
+            f"{len(differ)} of its epochs record another decode frame than the "
+            f"one event features run {EVENT_FEATURES_RUN} records (e.g. "
+            f"{differ[:3]})"
+        )
+    if not notes:
+        return None
+    return (
+        f"{what} was not made from the current decodes and SWR source "
+        f"({'; '.join(notes)}); rerun scripts/event_evidence/"
+        "score_nonlocal_restriction.py and the runs made from it before citing"
+    )
+
+
 def read_heldout_restriction(
     heldout_dir: Path,
     restriction_dir: Path,
@@ -3246,7 +3316,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     events = select_visit_context(table)
     # the time masks read the visits themselves: they and the labels must agree
     run = inputs.event_features_run
-    run_epochs = ok_epochs(read_manifest(run))
+    features_manifest = read_manifest(run)
+    run_epochs = ok_epochs(features_manifest)
     visits = {identifier: well_visit_times(identifier) for identifier in run_epochs}
     check_visit_context_starts(table, visits)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
@@ -3668,6 +3739,18 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     heldout = read_heldout_restriction(
         heldout_dir, restriction_dir, inputs.bin_facts, analyzed, current_sha256
     )
+    # every restriction value reads the restriction run: pending when it was not
+    # made from the current decode frames (as the event features run records
+    # them) and SWR source
+    restriction_inputs = restriction_input_staleness(
+        read_output_manifest(restriction_dir),
+        {
+            epoch_id: record.get("decode", {}).get("sha256")
+            for epoch_id, record in features_manifest["epochs"].items()
+        },
+        analyzed,
+        rel(restriction_dir),
+    )
     # the run holds the windows of every event: those of the selected events
     # (and their controls, under their event's id) are read
     restriction_windows_table = select_events_in(
@@ -3696,6 +3779,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             windows_manifest, restriction_windows_dir, "bin_facts", inputs.bin_facts
         ),
         window_run_note_staleness(windows_manifest, rel(restriction_windows_dir)),
+        restriction_inputs,
     )
     restriction_source = (
         f"{rel(restriction_windows_dir)} "
@@ -3728,7 +3812,11 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     heldout_selected = heldout.events
     restriction_time_sums = heldout.time_sums
     restriction_bin_s = heldout.bin_s
-    heldout_runs_stale = (heldout.restriction_run, heldout.bin_facts_run)
+    heldout_runs_stale = (
+        heldout.restriction_run,
+        heldout.bin_facts_run,
+        restriction_inputs,
+    )
     heldout_stale = (heldout.event_table, *heldout_runs_stale, heldout.session_cache)
     heldout_source = (
         f"{rel(heldout_dir)} (scripts/event_evidence/detect_heldout_events.py, from "

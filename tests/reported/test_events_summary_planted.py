@@ -204,6 +204,38 @@ def _read_complete_run(folder, name, epochs) -> pd.DataFrame:
     }.get(name, _per_event_run)()
 
 
+DECODE = "d" * 64
+"""Each epoch's current decode frame's SHA-256, as the event features run
+records it."""
+
+
+def _restriction_settings(**changes) -> dict:
+    """The restriction run's settings: the fold fit on folds of whole trials,
+    under the current SWR source, with ``changes``."""
+    return {
+        "n_folds": 5,
+        "fit": "folds",
+        "fold_design": "trials",
+        "em": {"max_iter": 20},
+        "swr_source": builder.swr_source.swr_source_name(),
+        **changes,
+    }
+
+
+def _restriction_records(**decodes) -> dict:
+    """The restriction run's records, each with the decode frame it read: the
+    current one, or ``decodes[epoch]`` (None: a record without
+    ``epoch_inputs``)."""
+    records = {}
+    for epoch in EPOCHS:
+        record = {"status": "ok", "bin_s": BIN_S}
+        sha256 = decodes.get(epoch, DECODE)
+        if sha256 is not None:
+            record["epoch_inputs"] = {"data_over_time": {"sha256": sha256}}
+        records[epoch] = record
+    return records
+
+
 class _Run:
     """The inputs laid out under ``root``, the spies, and the manifests the
     summary reads (``changes`` alters one folder's)."""
@@ -244,16 +276,13 @@ class _Run:
         ):
             (root / folder).mkdir(parents=True, exist_ok=True)
             self.manifests[folder] = json.loads(json.dumps(fresh))
-        # the restriction run is the fold fit: its settings record the fit
+        # the restriction run is the fold fit: its settings record the fit and
+        # the current SWR source, its records the current decode frames
         (root / EVENT_NONLOCAL_RESTRICTION_DIR).mkdir(parents=True, exist_ok=True)
         self.manifests[EVENT_NONLOCAL_RESTRICTION_DIR] = {
             **json.loads(json.dumps(fresh)),
-            "settings": {
-                "n_folds": 5,
-                "fit": "folds",
-                "fold_design": "trials",
-                "em": {"max_iter": 20},
-            },
+            "settings": _restriction_settings(),
+            "epochs": _restriction_records(),
         }
         # the held-out tetrode run is held out in folds of whole trials
         self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
@@ -414,8 +443,11 @@ class _Run:
             "content_along_arms_bins": along,
             "check_visit_context_starts": check,
             "read_swr_table": lambda path: _table(),
+            # the event features run, with the decode frames it read
             "read_manifest": lambda run: {
-                "epochs": dict.fromkeys(EPOCHS, {"status": "ok"})
+                "epochs": dict.fromkeys(
+                    EPOCHS, {"status": "ok", "decode": {"sha256": DECODE}}
+                )
             },
             "well_visit_times": lambda identifier: VISITS[identifier],
             "analyzed_epoch_ids": lambda: EPOCHS,
@@ -666,6 +698,57 @@ def test_an_output_off_the_subset_or_stale_makes_its_values_pending(
     if folder == "state_evidence":
         # a split not over the subset has no bout counts to report
         assert "heldout_bout_values" not in run.seen
+
+
+def test_nothing_is_pending_when_every_output_is_current(
+    processed_data_root, monkeypatch
+):
+    values = _Run(processed_data_root, monkeypatch).summarize()
+    assert values and not [key for key, value in values.items() if value.pending]
+
+
+#: The restriction values, every one of which reads the restriction run
+RESTRICTION_VALUES = WINDOW_VALUES | HELDOUT_RUN_VALUES
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (
+            ("settings", _restriction_settings(swr_source="kay@old+artifacts@none")),
+            "its settings record the SWR source 'kay@old+artifacts@none', not the "
+            "current",
+        ),
+        (
+            ("epochs", _restriction_records(ad1_e2_HPC="e" * 64)),
+            "1 of its epochs record another decode frame than the one event "
+            "features run",
+        ),
+        (
+            ("epochs", _restriction_records(ad1_e1_HPC=None, bd1_e1_HPC=None)),
+            "2 of its epochs record another decode frame",
+        ),
+    ],
+    ids=["another SWR source", "another decode", "no decode recorded"],
+)
+def test_a_restriction_run_off_the_current_decodes_or_swr_source_is_pending(
+    processed_data_root, monkeypatch, change, message
+):
+    """A restriction run made from other decode frames or another SWR source
+    than the current ones makes every restriction value pending (the window
+    run's and the held-out event run's, over events and over time), with a
+    note naming the run and what differs; no other value."""
+    run = _Run(
+        processed_data_root, monkeypatch, {EVENT_NONLOCAL_RESTRICTION_DIR: change}
+    )
+    values = run.summarize()
+    pending = {key: value for key, value in values.items() if value.pending}
+    assert set(pending) == RESTRICTION_VALUES
+    for value in pending.values():
+        assert f"{EVENT_NONLOCAL_RESTRICTION_DIR} was not made from the current " in (
+            value.pending
+        )
+        assert message in value.pending
 
 
 def test_a_table_whose_labels_disagree_with_the_visits_is_refused(
