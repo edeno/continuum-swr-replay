@@ -1428,11 +1428,20 @@ def generate_figure(
     check_visit_context_starts(
         table, {identifier: well_visit_times(identifier) for identifier in event_epochs}
     )
+    # its controls are Local rest inside the current visits only when its
+    # settings record the subset and it read the current session cache
+    participation_dir = data_dir / EVENT_PARTICIPATION_DIR
+    manifest = read_output_manifest(participation_dir)
+    note = time_mask_staleness(
+        {**manifest, "subset": manifest.get("settings", {}).get("subset")},
+        event_epochs,
+        f"the participation run ({participation_dir})",
+    )
+    if note is not None:
+        raise ValueError(note)
     participation = participation_statistics(
         select_events_in(
-            read_complete_run(
-                data_dir / EVENT_PARTICIPATION_DIR, "participation", event_epochs
-            ),
+            read_complete_run(participation_dir, "participation", event_epochs),
             events["event_id"],
         )
     )

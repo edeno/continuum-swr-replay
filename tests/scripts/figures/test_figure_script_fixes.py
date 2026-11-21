@@ -1843,11 +1843,17 @@ class _Figure02Read(Exception):
 
 def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     """The figure module with its eight events in a visit and a ninth on the
-    track, every reader before the held-out tetrode run's stubbed."""
+    track, every reader before the held-out tetrode run's stubbed, and a
+    participation run over the subset and the current session cache."""
     import joblib
 
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        ANALYZED_SUBSET,
+    )
+    from continuum_swr_replay.analysis.event_tables import prepare_data
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
+        EVENT_PARTICIPATION_DIR,
         NONLOCAL_BY_RIPPLE_POWER_DIR,
         processed_data_dir,
         replay_content_dir,
@@ -1873,6 +1879,19 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     ):
         (tmp_path / folder).mkdir()
         pd.DataFrame({"epoch_id": ["e"]}).to_parquet(tmp_path / folder / name)
+    monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", tmp_path / "cache")
+    entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
+    entry.parent.mkdir(parents=True)
+    entry.write_bytes(b"the visits")
+    (tmp_path / EVENT_PARTICIPATION_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json").write_text(
+        json.dumps(
+            {
+                "settings": {"subset": ANALYZED_SUBSET},
+                "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
+            }
+        )
+    )
     # each stored per-event table holds a row of every event, the ninth too
     rows = pd.DataFrame({"event_id": [*range(8), 99]})
     for name, value in {
@@ -1921,6 +1940,50 @@ def test_figure02_reads_participation_over_the_selected_events(
     with pytest.raises(_Figure02Read):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert sorted(seen[0]["event_id"]) == list(range(8))
+
+
+@pytest.mark.parametrize(
+    "problem",
+    ["no subset", "another subset", "no session cache", "another session cache"],
+)
+def test_figure02_refuses_a_participation_run_off_the_subset_or_the_visits(
+    offline, tmp_path, monkeypatch, problem
+):
+    """Participation's controls are Local rest inside the current well visits:
+    a run whose settings record no subset or another, or that records no
+    session cache or another than the current one, is refused by name."""
+    from continuum_swr_replay.analysis.event_tables import prepare_data
+    from continuum_swr_replay.paths import EVENT_PARTICIPATION_DIR
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    path = tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json"
+    manifest = json.loads(path.read_text())
+    if problem == "no subset":
+        manifest["settings"].pop("subset")
+    elif problem == "another subset":
+        manifest["settings"]["subset"] = "whole_epoch"
+    elif problem == "no session cache":
+        manifest["inputs"].pop("session_cache")
+    path.write_text(json.dumps(manifest))
+    if problem == "another session cache":
+        prepare_data.behavioral_context_cache_path({"session_id": "e"}).write_bytes(
+            b"other visits"
+        )
+    note = {
+        "no subset": "was not made over the events that start inside a well visit",
+        "another subset": "was not made over the events that start inside a well visit",
+        "no session cache": "records no session-cache SHA-256",
+        "another session cache": "other well visits than the current",
+    }[problem]
+    monkeypatch.setattr(figure02, "participation_statistics", _refuse_drawing)
+    with pytest.raises(
+        ValueError, match=f"participation run .*{EVENT_PARTICIPATION_DIR}.*{note}"
+    ):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+
+
+def _refuse_drawing(table):
+    raise AssertionError("the participation run was read without its check")
 
 
 def test_figure02_checks_every_event_s_label_against_the_visits(
