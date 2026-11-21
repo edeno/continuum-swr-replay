@@ -1,5 +1,6 @@
 """Novel-arm controls accompany every recency term in regression inputs."""
 
+from continuum_swr_replay.analysis.behavior import design_constants
 from continuum_swr_replay.analysis.replay_models import model_specs as specs
 from continuum_swr_replay.analysis.replay_models.covariate_timing import timing_of
 
@@ -10,7 +11,7 @@ def _has_recency(predictors) -> bool:
         p in predictors
         for p in (
             "visit_recency_trials_event_leaf_centered",
-            *specs.RECENCY_SPLINE_COLUMNS,
+            *design_constants.RECENCY_SPLINE_COLUMNS,
         )
     )
 
@@ -19,14 +20,14 @@ def test_arm_hierarchy_adds_novelty_main_effect_with_recency():
     for name in ("M4", "M5", "M6", "Mv", "Mu", "Mvu"):
         assert any(
             c in specs.MODEL_HIERARCHY[name].predictors
-            for c in specs.RECENCY_SPLINE_COLUMNS
+            for c in design_constants.RECENCY_SPLINE_COLUMNS
         )
         assert (
             "is_candidate_arm_never_visited" in specs.MODEL_HIERARCHY[name].predictors
         )
     assert any(
         f"swr_x_{c}" in specs.MODEL_HIERARCHY["M6"].predictors
-        for c in specs.RECENCY_SPLINE_COLUMNS
+        for c in design_constants.RECENCY_SPLINE_COLUMNS
     )
     # The sparse interaction remains materialized for sensitivity analyses but
     # is not in the primary ladder: it makes five otherwise estimable shipped

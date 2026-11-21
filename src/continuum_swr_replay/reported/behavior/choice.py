@@ -224,7 +224,8 @@ def stay_leave_values(
             cohort["n_at_well_with_stay"],
             "count",
             "count",
-            "at_well stops carrying an is_stay (Stage 6's population)",
+            "at_well stops carrying an is_stay (with the mixed ones, Stage 6's "
+            "population)",
         ),
     ]
     return values

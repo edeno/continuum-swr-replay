@@ -17,15 +17,17 @@ import logging
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+    TMAX,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..fit_comparability import why_not_comparable
 from ..model_specs import (
     MODEL_CROSS_HISTORY_RATE,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
-    RATE_BIN_S,
-    TMAX,
     longest_history_window_s,
 )
 from ..per_bin_design import POPULATIONS, aggregate_to_timebins

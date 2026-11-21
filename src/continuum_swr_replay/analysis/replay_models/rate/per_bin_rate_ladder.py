@@ -20,19 +20,21 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    ARRIVAL_CLOCK_COLUMN,
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+    TMAX,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..cohort_audit import fitted_cohort_record, stop_own_missing
 from ..covariate_timing import DERIVED_COVARIATE_SOURCES
 from ..model_specs import (
-    ARRIVAL_CLOCK_COLUMN,
     MODEL_PER_BIN_RATE,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     PER_BIN_DESIGN,
-    RATE_BIN_S,
     STOP_COVARIATES,
-    TMAX,
     longest_history_window_s,
 )
 from ..per_bin_design import POPULATIONS, aggregate_to_timebins

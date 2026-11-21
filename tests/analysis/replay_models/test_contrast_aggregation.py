@@ -21,6 +21,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+)
 from continuum_swr_replay.analysis.replay_models import contrast_aggregation
 from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
@@ -30,9 +33,6 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     session_se,
     std_factor,
     typical_session_se,
-)
-from continuum_swr_replay.analysis.replay_models.model_specs import (
-    REWARD_HISTORY_COLUMNS,
 )
 from continuum_swr_replay.runs.fit_provenance import (
     load_fit_time_sd_reference,

@@ -6,6 +6,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RECENCY_SPLINE_COLUMNS,
+)
 from continuum_swr_replay.analysis.contfrag.tables import (
     _CONTFRAG_TRAJECTORY_COLUMNS,
 )
@@ -27,9 +30,6 @@ from continuum_swr_replay.analysis.event_tables.event_table import (
 from continuum_swr_replay.analysis.event_tables.trajectory import (
     NONLOCAL_ONLY_COLUMNS,
     SHARED_TRAJECTORY_COLUMNS,
-)
-from continuum_swr_replay.analysis.replay_models.model_specs import (
-    RECENCY_SPLINE_COLUMNS,
 )
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 

@@ -363,7 +363,6 @@ CANONICAL_TABLES: tuple[str, ...] = (
     "stop",
     "qvals",
     "event_onset",
-    "stop_timebin",
 )
 """The canonical tables, by covariate-registry key, in the order every
 freeze, manifest and parity sweep iterates them. The one list: the registry's
@@ -384,7 +383,7 @@ QVALS_STANDARDIZATION_REFERENCE = "qvals_standardization_reference.json"
 """``qvals_table``'s ``_z`` standardization reference, beside it at the root."""
 
 
-def table_path(name: str, root: Path | None = None, *, fmt: str = "parquet") -> Path:
+def table_path(name: str, root: Path | None = None) -> Path:
     """Return the file of canonical table `name` under `root`.
 
     Every canonical table sits at `root`, so a pipeline root (the canonical
@@ -397,10 +396,6 @@ def table_path(name: str, root: Path | None = None, *, fmt: str = "parquet") -> 
     root : Path, optional
         The replay-content root; :func:`replay_content_dir` when None, resolved
         at the call.
-    fmt : str, optional
-        The file suffix without its dot: ``"parquet"``, or ``"pkl"`` for a
-        retired pickle (only ``scripts/tables/convert_tables_to_parquet.py``
-        reads those, with ``pandas.read_pickle``).
 
     Returns
     -------
@@ -416,4 +411,4 @@ def table_path(name: str, root: Path | None = None, *, fmt: str = "parquet") -> 
             f"{name!r} is not a canonical table; expected one of "
             f"{CANONICAL_TABLE_BASENAMES}"
         )
-    return (replay_content_dir() if root is None else root) / f"{name}.{fmt}"
+    return (replay_content_dir() if root is None else root) / f"{name}.parquet"

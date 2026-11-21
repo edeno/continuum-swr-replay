@@ -786,7 +786,7 @@ def test_runner_smoke():
     ``uncertainty_rate_smoke.pkl`` and checks the tidy schema carries every
     uncertainty/value coefficient across the three populations.
     """
-    from continuum_swr_replay.analysis.replay_models.model_specs import (
+    from continuum_swr_replay.analysis.behavior.design_constants import (
         REWARD_HISTORY_COLUMNS,
     )
     from continuum_swr_replay.analysis.replay_models.per_bin_design import (

@@ -271,6 +271,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     event_mask = frame["event_id"].eq(0)
     frame.loc[event_mask, "occupancy_state"] = "in_transit"
     frame.loc[event_mask, "at_well"] = False
+    frame.loc[event_mask, "visit_context"] = "track_leaf_arm"
     frame.loc[event_mask, ["occupancy_well_id", "occupancy_well_arm"]] = np.nan
     frame.loc[event_mask, "is_current_arm"] = 0.0
     write_table(frame, input_dir / "event_arm_table.parquet")
@@ -281,7 +282,9 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
-    with pytest.raises(ValueError, match="one-hot at wells and NaN off-well"):
+    with pytest.raises(
+        ValueError, match="one-hot for events that start inside a well visit"
+    ):
         runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()

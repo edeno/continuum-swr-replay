@@ -18,9 +18,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RATE_BIN_S,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
-from ..model_specs import POST_OUTCOME_COVARIATES, RATE_BIN_S, PerBinRateModelSpec
+from ..model_specs import (
+    POST_OUTCOME_COVARIATES,
+    PerBinRateModelSpec,
+)
 from .per_bin_rate_model import _design_columns
 
 #: The bin gate's rule, recorded on each gated fit. Stored fits carry this

@@ -201,7 +201,6 @@ def test_registry_is_the_one_parity_reads():
         "stop_table",
         "qvals_table",
         "event_onset_table",
-        "stop_timebin_table",
     )
 
 
@@ -217,18 +216,16 @@ def test_the_one_table_list_names_the_registry_row_keys_and_swr_tables():
         "event_sequence",
         "stop",
         "event_onset",
-        "stop_timebin",
     }
 
 
 @pytest.mark.parametrize("name", paths.CANONICAL_TABLE_BASENAMES)
-@pytest.mark.parametrize("fmt", ["parquet", "pkl"])
-def test_table_path_for_every_registry_name(name, fmt):
+def test_table_path_for_every_registry_name(name):
     # Every canonical table, qvals_table included, sits at the root it names.
-    file = f"{name}.{fmt}"
-    assert paths.table_path(name, fmt=fmt) == RC / file
+    file = f"{name}.parquet"
+    assert paths.table_path(name) == RC / file
     root = Path("/staging/root")
-    assert paths.table_path(name, root, fmt=fmt) == root / file
+    assert paths.table_path(name, root) == root / file
 
 
 def test_table_path_defaults_to_parquet_under_replay_content():

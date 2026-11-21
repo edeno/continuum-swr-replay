@@ -32,6 +32,10 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_stop_table as _build_contfrag_stop_table,
 )
+from tests.support._decode_frame_fixtures import (
+    TrackEnvStub,
+    with_trajectory_inputs,
+)
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 
@@ -57,18 +61,9 @@ def build_contfrag_stop_table(dot, trials, graph, **kwargs):
     )
 
 
-class _EnvStub:
-    """Minimal Environment stand-in: 2 place bins per real arm (0-8)."""
-
-    class _Df:
-        _arm_lp = np.arange(18, dtype=float)
-        _arm_eid = np.repeat(np.arange(9), 2).astype(int)
-        d = {"linear_position": _arm_lp, "edge_id": _arm_eid}
-
-        def __getitem__(self, k):
-            return self.d[k]
-
-    place_bin_centers_nodes_df_ = _Df()
+def _EnvStub() -> TrackEnvStub:
+    """Two place bins per real arm (0-8), no junction bins."""
+    return TrackEnvStub(n_junction_bins=0)
 
 
 def _bandit_graph() -> nx.Graph:
@@ -157,7 +152,7 @@ def _two_event_dot() -> pd.DataFrame:
     for lo, hi in ((a0, a1), (b0, b1), (e0, e1)):
         dot.iloc[lo:hi, mp] = 0.0
         dot.iloc[lo:hi, ts] = 0.0
-    return dot
+    return with_trajectory_inputs(dot)
 
 
 def test_movement_spanning_event_excluded_invariant_holds():

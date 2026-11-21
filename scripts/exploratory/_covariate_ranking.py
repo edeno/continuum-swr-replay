@@ -41,13 +41,15 @@ import pandas as pd  # noqa: E402
 from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     add_uncertainty_covariates,
 )
-from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.design_constants import (  # noqa: E402
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
     RATE_BIN_S,
-    STOP_COVARIATES,
     TMAX,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    STOP_COVARIATES,
     PerBinRateModelSpec,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402  # noqa: E402

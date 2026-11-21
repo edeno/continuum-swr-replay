@@ -38,7 +38,14 @@ from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._decode_frame_fixtures import (
+    TrackEnvStub as _EnvStub,
+)
+from tests.support._decode_frame_fixtures import with_trajectory_inputs
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def _experiences(trials):
@@ -46,12 +53,14 @@ def _experiences(trials):
 
 
 def build_contfrag_event_table(dot, env, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_contfrag_event_table(
         dot, env, trials, _experiences(trials), graph, **kwargs
     )
 
 
 def build_contfrag_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_contfrag_event_arm_table(
         event_table,
         dot,
@@ -70,30 +79,6 @@ def arm_history(function, times, trials, graph):
         _experiences(trials),
         build_well_to_arm_map(graph),
     )
-
-
-class _EnvStub:
-    """Minimal ``Environment`` stand-in.
-
-    ``place_bin_centers_nodes_df_`` holds 2 bins per real arm (0-8)
-    plus 3 junction bins (edge_id = -1) so the ContFrag builder's
-    junction-bin filter has something to exclude.
-    """
-
-    class _Df:
-        _arm_lp = np.arange(18, dtype=float)
-        _arm_eid = np.repeat(np.arange(9), 2).astype(int)
-        _junc_lp = np.array([100.0, 101.0, 102.0])
-        _junc_eid = np.array([-1, -1, -1])
-        d = {
-            "linear_position": np.concatenate([_arm_lp, _junc_lp]),
-            "edge_id": np.concatenate([_arm_eid, _junc_eid]),
-        }
-
-        def __getitem__(self, k):
-            return self.d[k]
-
-    place_bin_centers_nodes_df_ = _Df()
 
 
 def _bandit_graph() -> nx.Graph:
@@ -182,7 +167,7 @@ def _build_dot(
     # ``track_segment_id`` supplies the independent physical-arm diagnostic.
     arm_with_most_bins = max(leaf_bins, key=leaf_bins.get) if leaf_bins else 0
     dot.loc[rows, "track_segment_id"] = float(arm_with_most_bins)
-    return dot
+    return with_trajectory_inputs(dot)
 
 
 def _build_three_event_dot() -> pd.DataFrame:
@@ -209,7 +194,7 @@ def _build_three_event_dot() -> pd.DataFrame:
         dot.loc[rows, "head_speed"] = 1.0
         dot.loc[rows, "map_estimate"] = float(arm * 2)
         dot.loc[rows, "track_segment_id"] = float(arm)
-    return dot
+    return with_trajectory_inputs(dot)
 
 
 def _three_trial_history() -> pd.DataFrame:

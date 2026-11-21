@@ -30,6 +30,10 @@ from continuum_swr_replay.data_loaders.trials import (
     make_trials_df_from_well_visits,
     make_well_visits_df,
 )
+from tests.support._decode_frame_fixtures import (
+    TrackEnvStub as _EnvStub,
+)
+from tests.support._decode_frame_fixtures import with_trajectory_inputs
 
 # One task visit per row: (well, poke-in, poke-out, pump onset or None).
 # Four movement trials over three wells; the third visit is the omission.
@@ -118,26 +122,7 @@ def _data_over_time() -> pd.DataFrame:
     dot.loc[event, "non_local_event"] = 1
     dot.loc[event, "Non-Local_Continuous_prob"] = 0.95
     dot.loc[event, "map_estimate"] = 2.0  # first bin of arm 1
-    return dot
-
-
-class _EnvStub:
-    """Minimal ``Environment`` stand-in: two bins per arm plus junction bins."""
-
-    class _Df:
-        _d = {
-            "linear_position": np.concatenate(
-                [np.arange(18, dtype=float), np.array([100.0, 101.0, 102.0])]
-            ),
-            "edge_id": np.concatenate(
-                [np.repeat(np.arange(9), 2).astype(int), np.array([-1, -1, -1])]
-            ),
-        }
-
-        def __getitem__(self, key):
-            return self._d[key]
-
-    place_bin_centers_nodes_df_ = _Df()
+    return with_trajectory_inputs(dot)
 
 
 def _conditional_posterior(dot: pd.DataFrame) -> xr.DataArray:

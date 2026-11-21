@@ -13,11 +13,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay_models.model_specs import (
-    PER_BIN_HISTORY_COLUMNS,
+from continuum_swr_replay.analysis.behavior.design_constants import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    PER_BIN_HISTORY_COLUMNS,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (
     reward_kernel_weights,

@@ -29,6 +29,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    TMAX,
+)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_stop_cohort,
 )
@@ -39,16 +46,11 @@ from ...behavior.covariates import add_uncertainty_covariates
 from ..cohort_audit import fitted_cohort_record, stop_own_missing, term_diagnostics
 from ..contrast_aggregation import aggregate_contrast, sd_reference
 from ..model_specs import (
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     PER_BIN_DESIGN,
     POST_OUTCOME_COHORT,
     POST_OUTCOME_COVARIATES,
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
-    RATE_BIN_S,
-    REWARD_HISTORY_COLUMNS,
-    TMAX,
     longest_history_window_s,
 )
 from ..model_specs import SWR_CONTRAST_RATE_G_SPECS as G_SPECS

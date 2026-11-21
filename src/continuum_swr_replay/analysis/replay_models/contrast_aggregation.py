@@ -41,6 +41,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
@@ -83,7 +86,6 @@ from .cohort_audit import HAS_QVALS_ROW, qvals_gap_event_ids
 from .fitting import parse_unidentified_terms
 from .model_specs import (
     LEAF_ONLY_N_CATEGORIES,
-    REWARD_HISTORY_COLUMNS,
     add_arm_fixed_effects,
 )
 

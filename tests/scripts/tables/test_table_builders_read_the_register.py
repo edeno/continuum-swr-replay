@@ -1,7 +1,7 @@
 """The table builders take their sessions from the epoch register, not the disk.
 
-``_table_runner.find_sessions`` serves ``prepare_replay_content_data.py``,
-``build_timebin_tables.py`` and ``regenerate_stop_table.py``; the ContFrag
+``_table_runner.find_sessions`` serves ``prepare_replay_content_data.py`` and
+``build_timebin_tables.py``; the ContFrag
 build has its own, ``_table_runner.find_contfrag_sessions``, which the
 behavioral-covariate refresh also uses. Each lists the register's analyzed
 epochs, and refuses to start when one of them has no decode, rather than

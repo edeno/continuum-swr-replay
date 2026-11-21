@@ -39,6 +39,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.behavior.design_constants import (  # noqa: E402
+    RATE_BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_LAGS,
+    TMAX,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
@@ -56,10 +62,6 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (  
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
     MODEL_PER_BIN_RATE,
-    RATE_BIN_S,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_LAGS,
-    TMAX,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
     POPULATIONS,

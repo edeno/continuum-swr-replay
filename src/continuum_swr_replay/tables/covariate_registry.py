@@ -93,13 +93,6 @@ _ROW_KEYS: dict[str, tuple[str, ...]] = {
         "event_type",
         "onset_time",
     ),
-    "stop_timebin": (
-        "animal",
-        "session_date",
-        "epoch",
-        "stop_id",
-        "bin_in_stop",
-    ),
 }
 
 

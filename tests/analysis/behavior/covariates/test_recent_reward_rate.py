@@ -30,11 +30,13 @@ def _trials():
     return pd.DataFrame(
         {
             "movement_start_time": np.arange(n, dtype=float),
+            "destination_first_poke_in_time": np.arange(n, dtype=float) + 0.5,
             "end_time": np.arange(n, dtype=float) + 0.5,
             "from_well": [0, 1, 2, 3, 4, 5],
             "to_well": [1, 2, 3, 4, 5, 0],  # arm 1 visited first, then 2,3,4,5,0
             "is_reward": [True, False, True, False, True, False],
             "is_patch_change": [False, True, False, True, False, True],
+            "outcome_known_time": np.arange(n, dtype=float) + 0.5,
         }
     )
 

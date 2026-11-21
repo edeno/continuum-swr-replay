@@ -318,9 +318,9 @@ Scientific table contracts beyond the generic covariate schema stamp.
 
 ### `src/continuum_swr_replay/analysis/event_tables/timebin_tables.py`
 
-Within-stop time-binned tables (Part B).
+Within-stop event-onset table.
 
-`build_event_onset_table`, `build_stop_timebin_table`, `concat_session_timebin_tables`
+`build_event_onset_table`
 
 ### `src/continuum_swr_replay/tables/event_ids.py`
 
@@ -378,7 +378,7 @@ Diagnostic per-animal fitted-alpha leaky-Q learner.
 
 Reward-history covariates: rolling reward counts and recent reward rates over an arm's last visits, plus stop-level reward histories.
 
-`rolling_reward_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
+`rolling_reward_count_all_events`, `log1p_known_visit_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
 
 ### `src/continuum_swr_replay/analysis/behavior/covariates/history/value_block.py`
 
@@ -518,7 +518,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/duration_aware_history.py`
 
@@ -616,15 +616,9 @@ Assemble disjoint Replay table shards into one canonical candidate bundle.
 
 ### `scripts/tables/build_timebin_tables.py`
 
-Build the Part B within-stop time-binned tables over all sessions.
+Build the within-stop event-onset table over all sessions.
 
 `build_one`, `validate`, `main`
-
-### `scripts/tables/convert_tables_to_parquet.py`
-
-Convert the materialized canonical tables from pickle to parquet.
-
-`canonical_tables`, `convert`, `main`
 
 ### `scripts/tables/prepare_contfrag_replay_content_data.py`
 
@@ -643,12 +637,6 @@ Build the four canonical replay-content tables across all sessions.
 Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
 `refresh_contfrag_behavioral_covariates`, `main`
-
-### `scripts/tables/regenerate_stop_table.py`
-
-Regenerate ``stop_table`` with the new count columns.
-
-`build_one`, `validate`, `main`
 
 ### `scripts/tables/write_regeneration_manifest.py`
 
@@ -1214,6 +1202,12 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 `build_parser`, `main`
 
+### `scripts/replay_models/rate/describe_visit_clocks.py`
+
+Model-free event-start rates on the three visit clocks, per kind and animal.
+
+`input_paths`, `output_path`, `session_port_experiences`, `session_bins`, `main`
+
 ### `scripts/replay_models/rate/fit_cross_history_rate.py`
 
 Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
@@ -1284,7 +1278,7 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 Where an event or a stop lies relative to the well visits.
 
-`window_visit_context`, `visit_context_of_samples`
+`window_visit_context`, `visit_context_of_samples`, `stop_visit_columns`, `event_visit_columns`, `assign_visit_current_arm`
 
 ### `src/continuum_swr_replay/analysis/replay_models/coefficient_statistics.py`
 
@@ -1381,6 +1375,18 @@ The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 `drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_clock_curves.py`
+
+Model-free event-start rates on the three visit clocks, and how stops end.
+
+`visit_clock_rate_curves`, `stop_end_kind_counts`
+
+### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
+
+The well-visit time-bin design of the event-rate models.
+
+`arrival_spanning_stop_ids`, `shift_reward_lags_at_outcome`, `interval_coverage_by_bin`, `visit_timebins`
 
 ### `src/continuum_swr_replay/decoding/encoding_model.py`
 
