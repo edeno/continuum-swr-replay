@@ -17,9 +17,9 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `f79f2722d629` | yes | 32 | 0 |
 | `detection.json` | `f79f2722d629` | yes | 172 | 0 |
-| `events.json` | `f79f2722d629` | yes | 694 | 0 |
-| `behavior.json` | `f79f2722d629` | yes | 922 | 0 |
-| `mpfc.json` | `f79f2722d629` | yes | 604 | 0 |
+| `events.json` | `cef86e754c05` | yes | 694 | 0 |
+| `behavior.json` | `cef86e754c05` | yes | 922 | 0 |
+| `mpfc.json` | `cef86e754c05` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
