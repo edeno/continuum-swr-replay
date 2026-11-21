@@ -151,23 +151,6 @@ def test_outside_swr_shares_are_on_the_bins_inside_a_visit():
     )
 
 
-def test_outside_swr_gains_over_all_time():
-    epochs = rt.epoch_outside_swr_gains(
-        _time_sums(), _bin_s(), _windows(), in_well_visit_only=False
-    )
-    np.testing.assert_array_equal(epochs["n_spikes"], [16, 10, 2])
-    np.testing.assert_allclose(epochs["full_minus_swr"], [110.0, 10.0, -2.0])
-    np.testing.assert_allclose(epochs["gain_per_s"], [11.0, 2.0, -1.0])
-    # a1's rest: 16 bins, 12 spikes, 104 nats
-    np.testing.assert_allclose(
-        epochs["outside_events_gain_per_spike"], [104 / 12, 1.0, -1.0]
-    )
-    # the windows' sums over all their bins outside SWRs
-    np.testing.assert_allclose(
-        epochs["share_in_no_swr_events"], [3.5 / 110, 0.1, np.nan]
-    )
-
-
 def test_immobile_gains_inside_a_visit_per_spike_and_per_second():
     epochs = rt.epoch_immobile_gains(_time_sums(), _bin_s())
     assert list(epochs["epoch_id"]) == ["a1", "a2", "b1"]
@@ -185,16 +168,6 @@ def test_immobile_gains_inside_a_visit_per_spike_and_per_second():
         epochs["share_captured_by_swr_only"], [6 / 17, 0.0, np.nan]
     )
     assert epochs["full_above_swr_only"].tolist() == [True, True, False]
-
-
-def test_immobile_gains_over_all_time():
-    epochs = rt.epoch_immobile_gains(_time_sums(), _bin_s(), in_well_visit_only=False)
-    # a1: 24 bins, 20 spikes, swr 56, full 167
-    np.testing.assert_array_equal(epochs["n_spikes"], [20, 10, 4])
-    np.testing.assert_allclose(epochs["full_minus_swr_per_s"], [111 / 12, 2.0, -1.0])
-    np.testing.assert_allclose(
-        epochs["share_captured_by_swr_only"], [56 / 167, 0.0, np.nan]
-    )
 
 
 def test_immobile_statistics_count_the_epochs_with_full_above_swr_only():

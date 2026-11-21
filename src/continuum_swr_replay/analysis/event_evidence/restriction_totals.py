@@ -4,9 +4,9 @@ The windows of :mod:`.restriction_windows` are the decoder's own events, so a
 gain read on them is read on time the decoder chose. This module reads the
 contrasts (:mod:`.nonlocal_restriction`) over time chosen without the decoder:
 the bins of the immobile categories, set by speed and ripple detection only
-(:func:`.nonlocal_restriction.bin_categories`), and, by default, only those
-inside a well visit (``event_definition.well_visits.in_well_visit``), the time
-subset of Figures 2 to 5.
+(:func:`.nonlocal_restriction.bin_categories`), and only those inside a well
+visit (``event_definition.well_visits.in_well_visit``), the time subset of
+Figures 2 to 5.
 
 **The time sums.** Per epoch, :func:`restriction_time_sums` sums the per-bin
 scores, bins and spikes (the per-bin facts, :mod:`.bin_facts`) of each
@@ -45,11 +45,6 @@ non-local states buy outside SWRs:
   no event window of any group (``in_event_window`` false): every event the
   time sums were given counts, whichever events the shares are given.
 
-With ``in_well_visit_only=False`` each measure is read over all of its time,
-inside a visit or not, and the shares over each window's
-``immobile_outside_swr`` bins (``*_outside_swr``): the reading on all immobile
-time.
-
 Over the cohort (:func:`outside_swr_gain_statistics`,
 :func:`immobile_gain_statistics`) each measure is reduced
 as the window statistics are
@@ -81,7 +76,6 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     IN_VISIT_SUFFIX,
-    OUTSIDE_SWR_SUFFIX,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -186,17 +180,15 @@ def restriction_time_sums(
 def _chosen_time(
     time_sums: pd.DataFrame,
     categories: tuple[str, ...],
-    in_well_visit_only: bool,
     *,
     outside_events: bool = False,
 ) -> pd.DataFrame:
-    """Each epoch's sums over the rows of ``categories`` (inside a well visit
-    only, and outside every event window only, when asked): ``n_bins``,
+    """Each epoch's sums over the rows of ``categories`` inside a well visit
+    (and outside every event window only, when asked): ``n_bins``,
     ``n_spikes`` and the scores, indexed by ``epoch_id``, every epoch of
     ``time_sums`` included."""
     rows = time_sums["category"].isin(categories)
-    if in_well_visit_only:
-        rows &= time_sums["in_well_visit"].astype(bool)
+    rows &= time_sums["in_well_visit"].astype(bool)
     if outside_events:
         rows &= ~time_sums["in_event_window"].astype(bool)
     columns = ["n_bins", "n_spikes", *SCORE_COLUMNS]
@@ -220,11 +212,9 @@ def epoch_outside_swr_gains(
     time_sums: pd.DataFrame,
     bin_s: pd.Series,
     windows: pd.DataFrame,
-    *,
-    in_well_visit_only: bool = True,
 ) -> pd.DataFrame:
-    """Each epoch's ``full - swr`` over its immobile bins outside SWRs (inside a
-    well visit by default), per spike and per second, the share of it in the
+    """Each epoch's ``full - swr`` over its immobile bins outside SWRs inside a
+    well visit, per spike and per second, the share of it in the
     given events, and the rest outside every event, both score families.
 
     Parameters
@@ -241,8 +231,6 @@ def epoch_outside_swr_gains(
         ``group``, ``n_bins_excluded`` and the sums over the bins outside SWRs.
         Only the ``"event"`` windows count. An epoch with no window adds 0 to
         its shares' numerators.
-    in_well_visit_only : bool, optional
-        Only the bins inside a well visit (the default), or every bin.
 
     Returns
     -------
@@ -265,13 +253,10 @@ def epoch_outside_swr_gains(
         If an epoch has a row of the time sums twice or no time step.
     """
     _check_time_sums(time_sums, bin_s)
-    total = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,), in_well_visit_only)
-    rest = _chosen_time(
-        time_sums, (IMMOBILE_OUTSIDE_SWR,), in_well_visit_only, outside_events=True
-    )
-    part = IN_VISIT_SUFFIX if in_well_visit_only else OUTSIDE_SWR_SUFFIX
+    total = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,))
+    rest = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,), outside_events=True)
     models = [
-        f"{model}{suffix}{part}"
+        f"{model}{suffix}{IN_VISIT_SUFFIX}"
         for suffix in FAMILY_SUFFIX.values()
         for model in ("full", "swr")
     ]
@@ -301,8 +286,8 @@ def epoch_outside_swr_gains(
         rest_gain = (rest[f"full{suffix}"] - rest[f"swr{suffix}"]).to_numpy()
         no_swr, flanks = (
             (
-                by_group[group][f"full{suffix}{part}"]
-                - by_group[group][f"swr{suffix}{part}"]
+                by_group[group][f"full{suffix}{IN_VISIT_SUFFIX}"]
+                - by_group[group][f"swr{suffix}{IN_VISIT_SUFFIX}"]
             ).to_numpy()
             for group in ("no_swr", "swr")
         )
@@ -325,11 +310,8 @@ def epoch_outside_swr_gains(
     return out
 
 
-def epoch_immobile_gains(
-    time_sums: pd.DataFrame, bin_s: pd.Series, *, in_well_visit_only: bool = True
-) -> pd.DataFrame:
-    """Each epoch's decoders over all its immobile time (inside a well visit by
-    default): the SWR-only and full decoders' gains over the local-only decoder
+def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFrame:
+    """Each epoch's decoders over all its immobile time inside a well visit: the SWR-only and full decoders' gains over the local-only decoder
     per spike and per second, their difference, and the share of the full
     decoder's gain the SWR-only decoder captures.
 
@@ -339,8 +321,6 @@ def epoch_immobile_gains(
         The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
     bin_s : pd.Series
         Each epoch's decode time step (s), indexed by ``epoch_id``.
-    in_well_visit_only : bool, optional
-        Only the bins inside a well visit (the default), or every immobile bin.
 
     Returns
     -------
@@ -361,9 +341,7 @@ def epoch_immobile_gains(
         If an epoch has a row of the time sums twice or no time step.
     """
     _check_time_sums(time_sums, bin_s)
-    total = _chosen_time(
-        time_sums, (IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR), in_well_visit_only
-    )
+    total = _chosen_time(time_sums, (IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR))
     animals = time_sums.groupby("epoch_id")["animal"].first()
     seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
     spikes = total["n_spikes"].to_numpy()
