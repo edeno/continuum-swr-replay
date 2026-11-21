@@ -29,12 +29,12 @@ slice. For each session, in order:
    removed as in step 2 and the steps run again from step 2 on the rows then
    kept.
 
-A session with no rows, or no events, left is not fitted: its record says why
-and the loop goes on. When the refit ends because its fit has no finite
-maximum along the intercept, nothing is dropped or left out: the session gets
-the not-fitted record with that cause. A refit that ends along a penalty
-direction, after too many rounds or with any other status leaves the session
-without a fit, with its cause. Every cause is a code of a closed set
+A session with no rows, or no events, left is not fitted (``NOT_FITTED``: no
+fit was tried); its record says why and the loop goes on. A fit that was tried
+and not kept, because the refit ends along the intercept (nothing is dropped or
+left out for it), along a penalty direction, after too many rounds or with any
+other status, keeps the last fit's status and the true counts, with NaN
+coefficients and its cause. Every cause is a code of a closed set
 (:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term;
 :func:`.record.describe` gives their words).
 
@@ -62,7 +62,6 @@ from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
 from .record import FitRecord, NoFit
 from .reml import (
     PenaltyBlock,
-    RefitEnd,
     RemlScore,
     SessionData,
     SessionRefit,
@@ -75,8 +74,8 @@ __all__ = ["NOT_FITTED", "SessionKey", "fit_sessions"]
 
 SessionKey = tuple[str, str, str]
 
-#: The status of a session left without a fit before any fit: no rows, or no
-#: events of the kind, are left.
+#: The status of a session for which no fit was tried: no rows, or no events
+#: of the kind, are left.
 NOT_FITTED = "not fitted"
 
 # Why a row of a session is not in its fit (0: it is).
@@ -418,8 +417,6 @@ def _fit_session(
             return _record(session, identity, why)
         refit = session.fit(first)
         first = False
-        if refit.ended == RefitEnd.ALONG_THE_INTERCEPT:
-            return _record(session, identity, NoFit.ALONG_THE_INTERCEPT)
         if not session.apply(refit):
             return _record(session, identity, session.no_fit, refit)
 
@@ -430,14 +427,15 @@ def _record(
     no_fit: str,
     refit: SessionRefit | None = None,
 ) -> FitRecord:
-    """The session's :class:`.record.FitRecord`: of its last fit, or, with no
-    ``refit``, of a session left without a fit before any fit."""
+    """The session's :class:`.record.FitRecord`: of its last fit, kept or not,
+    or, with no ``refit``, of a session for which no fit was tried."""
     design = session.design
     kept = session.kept
     p = len(design.coef_names)
     beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)  # no fit tried
     collinearity, edf = {}, {}
-    status, decrement, n_iter, n_events = NOT_FITTED, float("nan"), 0, 0.0
+    status, decrement, n_iter = NOT_FITTED, float("nan"), 0
+    n_events = _n_events(session.lik, session.y[kept], session.unit[kept])
     if refit is not None:
         data, block_terms = session.fitted_with
         last = refit.refits[-1]
@@ -445,7 +443,6 @@ def _record(
             last = last.without_fit(len(block_terms))
         status = str(last.fit.status)
         decrement, n_iter = float(last.fit.newton_decrement), int(last.fit.n_iter)
-        n_events = _n_events(session.lik, data.y, session.unit[kept])
         beta, vcov = last.fit.beta, last.covariance
         if refit.fitted:
             collinearity = term_collinearity(

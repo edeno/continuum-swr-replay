@@ -112,8 +112,9 @@ class FitRecord:
     n_rows, n_units : int
         The rows the fit saw, and its units (visits, events or units).
     n_events : float
-        The events it saw: the count total (Poisson, Bernoulli), the events
-        (grouped softmax), the rows (Gaussian).
+        The events in the rows it saw, a fit kept or not: the count total
+        (Poisson, Bernoulli), the events (grouped softmax), the rows
+        (Gaussian).
     cohort_counts : dict
         Rows left out before the fit, by reason: ``rows_missing_values``,
         ``rows_dropped`` (level coefficient -> its rows, the support rule's
@@ -134,8 +135,9 @@ class FitRecord:
         Term -> effective degrees of freedom (an unpenalized term: its active
         columns; a term left out: 0); empty for a session without a fit.
     status : str
-        The last fit's ``NewtonFit.status``; only "converged" is a fit. "not
-        fitted" for a session with no rows, or no events, left to fit.
+        The last fit's ``NewtonFit.status``; only "converged" is a kept fit.
+        "not fitted" when no fit was tried: no rows, or no events, left to
+        fit.
     newton_decrement : float
     n_iter : int
         The last fit's Newton steps.

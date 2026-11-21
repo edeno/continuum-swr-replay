@@ -535,11 +535,12 @@ def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
             assert column in record.left_out
 
 
-def test_no_finite_maximum_along_the_intercept_is_not_fitted() -> None:
+def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
     """The reference level has 10 visits and no event, two other levels have
     events: the fit has no finite maximum along the intercept. Nothing is
-    dropped or made inactive; the session is not fitted, with the true reason,
-    and the loop goes on."""
+    dropped or made inactive. A fit was tried, so the session is not "not
+    fitted": its record keeps the last fit's status, its true counts and NaN
+    coefficients, with the cause; the loop goes on."""
     rng = np.random.default_rng(1)
     rows = []
     for visit in range(40):
@@ -568,8 +569,37 @@ def test_no_finite_maximum_along_the_intercept_is_not_fitted() -> None:
         response="count",
         unit="visit",
     )
-    assert first.status == "not fitted"
+    assert first.status == "no finite maximum"
     assert first.no_fit == NoFit.ALONG_THE_INTERCEPT
+    assert first.n_rows == len(frame) and first.n_units == 40
+    assert first.n_events == frame["count"].sum() > 0
+    assert first.n_iter > 0 and first.edf == {} and first.collinearity == {}
     assert first.left_out == {} and first.cohort_counts["rows_dropped"] == {}
     assert np.isnan(first.coef).all()
     assert second.status == "converged"
+
+
+def test_a_fit_along_a_penalty_direction_keeps_the_fit_tried() -> None:
+    """A content session whose response is each event's row of smallest clock
+    has no finite maximum along the smooth's own line, which cannot be left
+    out: its record keeps the last fit's status and its true counts, with NaN
+    coefficients and the cause."""
+    from .conftest import content_rows
+
+    frames = [content_rows(seed) for seed in range(3)]
+    first = frames[0]
+    smallest = first.groupby("event_id")["clock_s"].transform("min")
+    first["share"] = (first["clock_s"] == smallest) * 1.0
+    sessions = by_session(frames)
+    design = build_design(
+        [ROLE, Smooth("clock_s", 0.0, 20.0, 8, 6.0)],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    record = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )[0]
+    assert record.status == "no finite maximum"
+    assert record.no_fit == NoFit.ALONG_A_PENALTY
+    assert (record.n_rows, record.n_units, record.n_events) == (600, 150, 150.0)
+    assert np.isnan(record.coef).all() and record.edf == {}
