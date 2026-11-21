@@ -107,9 +107,11 @@ class TestBoutStartContextNoLeak:
         assert pd.isna(row["did_last_completed_trip_switch_patch"]), (
             f"is_after_switch leaked: {row['did_last_completed_trip_switch_patch']}"
         )
-        assert pd.isna(row["occupancy_well_arm"]), (
-            f"occupancy_well_arm leaked: {row['occupancy_well_arm']}"
-        )
+        # The stop starts inside the starting port's visit (well 1, poked in
+        # at t=0, final poke-out at t=1) and crosses its final poke-out, so its
+        # current arm is that visit's well, known at the stop's start: arm 0.
+        assert row["visit_context"] == "spans_visit_end"
+        assert row["occupancy_well_arm"] == 0.0
         # The bout-start clocks are the same leak surface: the trip completes
         # at t=1.5, inside the bout, so a NaN-skipping first would report its
         # arrival/outcome times as if the animal had already been sitting at

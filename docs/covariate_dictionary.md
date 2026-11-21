@@ -568,11 +568,12 @@ predictive covariates (`covariate_timing.FUTURE_REFERENCING`).
   counted in visits (defined for every event). `completed_trial_id` counts
   completed trials instead.
 
-**Current arm of an event that crosses the final poke-out.** Its whole-window
-location is `mixed`, so the window gives no current arm; it starts inside a
-visit, so `occupancy_well_arm`, `current_patch` and `is_stay` are those of the
-visit's well (`visit_context.assign_visit_current_arm`), and the event × arm and
-event × patch indicators (`is_current_arm`, `is_same_patch_as_current`,
+**Current arm of an event or stop that crosses the final poke-out.** Its
+whole-window location is `mixed`, so the window gives no current arm; it starts
+inside a visit, so `occupancy_well_arm`, `current_patch` and `is_stay` are those
+of the visit's well (`visit_context.assign_visit_current_arm`; the event and stop
+tables, non-local and ContFrag, alike), and the event × arm and event × patch
+indicators (`is_current_arm`, `is_same_patch_as_current`,
 `is_current_patch`, the distance and rank, the recency spline and the products)
 follow. `occupancy_well_id` stays the whole-window location (missing). The
 content table contract defines the current arm exactly for the events that start
@@ -645,9 +646,9 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   with the column True). At the event grain the cohort is the column
   ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)). `modal_observed_track_segment_id` is
   the modal observed track segment, including trunks.
-  `occupancy_well_arm` is NaN off-well, except for an event that starts inside a
-  visit and crosses its final poke-out (`spans_visit_end`), which takes the
-  visit's well (F.5); there is no trunk-to-destination fallback.
+  `occupancy_well_arm` is NaN off-well, except for an event or stop that starts
+  inside a visit and crosses its final poke-out (`spans_visit_end`), which takes
+  the visit's well (F.5); there is no trunk-to-destination fallback.
   9.10 % of events are off-well on the regenerated tables — see
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
 - `visit_context` / `well_visit_id` / `last_completed_well_visit_id` /

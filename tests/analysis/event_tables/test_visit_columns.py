@@ -216,6 +216,28 @@ def test_spans_visit_end_current_arm_is_the_visit_well(tables):
     ]
 
 
+def test_spans_visit_end_stop_takes_the_visit_well(tables):
+    """A stop that starts inside a visit and crosses its final poke-out takes
+    the visit's well, as its events do: stop 2 starts in visit 1 (well 1, arm
+    1, patch 1) and the next trip goes to well 2 (patch 2). The stop that
+    starts before a poke-in keeps its whole-window location (none)."""
+    stops = tables["stop"]
+    assert stops["occupancy_state"].tolist()[2] == "mixed"
+    assert np.isnan(stops["occupancy_well_id"].iloc[2])
+    np.testing.assert_array_equal(
+        stops["occupancy_well_arm"], [1.0, 1.0, 1.0, np.nan, np.nan]
+    )
+    np.testing.assert_array_equal(
+        stops["current_patch"], [1.0, 1.0, 1.0, np.nan, np.nan]
+    )
+    np.testing.assert_array_equal(stops["is_stay"], [0.0, 0.0, 0.0, np.nan, np.nan])
+    # the stop and the event it holds agree
+    event = tables["event"].iloc[1]
+    stop = stops.loc[stops["stop_id"] == event["stop_id"]].iloc[0]
+    for column in ("occupancy_well_arm", "current_patch", "is_stay"):
+        assert stop[column] == event[column], column
+
+
 def test_in_visit_immobile_seconds():
     starts = np.array([s for s, _ in _STOPS])
     ends = np.array([e for _, e in _STOPS])

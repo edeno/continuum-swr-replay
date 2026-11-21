@@ -241,11 +241,22 @@ def test_the_visit_columns_are_the_nonlocal_tables_on_the_same_session(event_sou
     pd.testing.assert_frame_equal(
         events[event_columns], nonlocal_events[event_columns], check_exact=True
     )
+    stop_columns = [
+        *STOP_VISIT_COLUMNS,
+        "well_visit_id",
+        "occupancy_well_arm",
+        "current_patch",
+        "is_stay",
+    ]
     pd.testing.assert_frame_equal(
-        stops[list(STOP_VISIT_COLUMNS)],
-        nonlocal_stops[list(STOP_VISIT_COLUMNS)],
-        check_exact=True,
+        stops[stop_columns], nonlocal_stops[stop_columns], check_exact=True
     )
+    # the stop that crosses the final poke-out takes the visit's well
+    crossing = stops["visit_context"].eq("spans_visit_end").to_numpy()
+    assert crossing.sum() == 1
+    assert stops.loc[
+        crossing, ["occupancy_well_arm", "current_patch", "is_stay"]
+    ].to_numpy().tolist() == [[1.0, 1.0, 0.0]]
     arm_columns = [
         "candidate_arm",
         "is_current_arm",

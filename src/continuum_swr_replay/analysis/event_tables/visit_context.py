@@ -552,20 +552,21 @@ def assign_visit_current_arm(
     port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
 ) -> pd.DataFrame:
-    """Give an event that crosses the final poke-out its visit's arm and patch.
+    """Give an event or stop that crosses the final poke-out its visit's arm.
 
-    The whole-window location of a ``spans_visit_end`` event is ``mixed``, so
-    its window gives no current arm. It starts inside a visit, and an event
-    belongs to the time when it starts, so its current arm
+    The whole-window location of a ``spans_visit_end`` event or stop is
+    ``mixed``, so its window gives no current arm. It starts inside a visit,
+    and a row belongs to the time when it starts, so its current arm
     (``occupancy_well_arm``) and patch (``current_patch``) are those of the
     visit's well, and ``is_stay`` compares the next arm with that arm. Every
-    other event keeps its own. ``occupancy_well_id`` stays the whole-window
-    location (missing for these events).
+    other row keeps its own. ``occupancy_well_id`` stays the whole-window
+    location (missing for these rows). The event and stop tables, non-local
+    and ContFrag, all apply it.
 
     Parameters
     ----------
     per_event : pd.DataFrame
-        One row per event, with ``visit_context``, ``well_visit_id``,
+        One row per event or stop, with ``visit_context``, ``well_visit_id``,
         ``occupancy_well_arm``, ``current_patch``, ``next_arm`` and ``is_stay``.
     port_experiences : pd.DataFrame
         The session's port experiences (one per visit).

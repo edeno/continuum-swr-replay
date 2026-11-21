@@ -751,7 +751,10 @@ def build_contfrag_stop_table(
     helper, ``bouts.bout_start_context``). The well-visit context
     (``visit_context`` and its four companion columns,
     ``event_tables.visit_context.visit_context_of_samples``) reads the same
-    rows: a stop wholly inside excluded time is ``no_analyzed_samples``.
+    rows: a stop wholly inside excluded time is ``no_analyzed_samples``. A
+    ``spans_visit_end`` stop takes the visit's well (its
+    ``occupancy_well_arm``, ``current_patch`` and ``is_stay``), as in the
+    NonLocal stop table.
 
     The table carries every column the shared per-stop rate ladder
     (``MODEL_PER_STOP_RATE``) reads: the reward-history basis
@@ -898,6 +901,9 @@ def build_contfrag_stop_table(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_bout[column] = visit[column].array
+    # A stop that starts inside a visit and crosses its final poke-out takes
+    # the visit's well, as its events do.
+    per_bout = assign_visit_current_arm(per_bout, port_experiences, track_graph)
     stop_visit = stop_visit_columns(bout_starts, bout_ends, port_experiences, excluded)
     for column in STOP_VISIT_COLUMNS:
         per_bout[column] = stop_visit[column].array

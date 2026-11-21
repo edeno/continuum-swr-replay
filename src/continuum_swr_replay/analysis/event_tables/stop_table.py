@@ -60,6 +60,7 @@ from .bouts import (
 from .visit_context import (
     STOP_VISIT_COLUMNS,
     VISIT_CONTEXT_COLUMNS,
+    assign_visit_current_arm,
     stop_visit_columns,
     visit_context_of_samples,
 )
@@ -96,7 +97,11 @@ def build_stop_table(
     ``last_completed_well_visit_id``, ``time_since_last_poke_out_s``,
     ``time_until_next_poke_in_s``; ``visit_context.window_visit_context``)
     reads the same rows as the location summaries: a stop wholly inside
-    excluded time is ``no_analyzed_samples``. The visit the stop overlaps
+    excluded time is ``no_analyzed_samples``. A stop that starts inside a visit
+    and crosses its final poke-out (``spans_visit_end``) takes the visit's
+    well, as its events do: its ``occupancy_well_arm``, ``current_patch`` and
+    ``is_stay`` are the visit's (``visit_context.assign_visit_current_arm``),
+    and ``occupancy_well_id`` stays the whole-stop location (missing). The visit the stop overlaps
     (``overlapping_visit_id``, ``visit_first_poke_in_s``,
     ``visit_last_poke_out_s``, ``in_visit_immobile_s``,
     ``visit_stretch_index``, ``stop_end_kind``;
@@ -282,6 +287,9 @@ def build_stop_table(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_bout[column] = visit[column].array
+    # A stop that starts inside a visit and crosses its final poke-out takes
+    # the visit's well, as its events do.
+    per_bout = assign_visit_current_arm(per_bout, port_experiences, track_graph)
     # The visit the stop overlaps, its poke times, the stop's seconds inside
     # the visits and how the stop ends.
     stop_visit = stop_visit_columns(bout_starts, bout_ends, port_experiences, excluded)
