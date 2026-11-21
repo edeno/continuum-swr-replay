@@ -50,7 +50,10 @@ from continuum_swr_replay.visualization.session_tables.responses import (
     _plot_mismatch_pointers,
     _plot_trial_rail,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
@@ -58,12 +61,14 @@ def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(dot, trials, _experiences(trials))
 
 
 def _compute_mismatch_table(
     event_table: pd.DataFrame, trials: pd.DataFrame, track_graph
 ) -> pd.DataFrame:
+    trials = with_outcome_known_time(trials)
     return _production_compute_mismatch_table(
         event_table, trials, _experiences(trials), track_graph
     )
@@ -93,6 +98,7 @@ def _ctx_with_trials(
     trials: pd.DataFrame, window: tuple[float, float]
 ) -> _PanelContext:
     """Build a minimal context for ``_plot_trial_rail`` isolation."""
+    trials = with_outcome_known_time(trials)
     return _PanelContext(
         data={},
         detector=None,
@@ -296,6 +302,7 @@ def _ctx_for_debug(
     trials: pd.DataFrame,
     window: tuple[float, float],
 ) -> _PanelContext:
+    trials = with_outcome_known_time(trials)
     return _PanelContext(
         data={},
         detector=None,
@@ -750,6 +757,7 @@ def _public_plot_inputs() -> dict:
             "is_patch_change": [False, False],
         }
     )
+    trials = with_outcome_known_time(trials)
     return {
         "data": {},
         "detector": SimpleNamespace(environments=[None]),
@@ -1360,6 +1368,7 @@ class TestPublicPlotSessionTables:
                 "is_patch_change": [False, False, True],
             }
         )
+        trials = with_outcome_known_time(trials)
 
         port_experiences = _experiences(trials)
         stop_table = build_stop_table(dot, trials, port_experiences, graph)
@@ -1545,7 +1554,7 @@ class TestPublicPlotSessionTables:
         for frame_name, columns in (
             ("event_table", ("event_start_s", "event_end_s", "event_midpoint_s")),
             ("event_arm_table", ("event_start_s", "event_end_s")),
-            ("trials", ("movement_start_time", "end_time")),
+            ("trials", ("movement_start_time", "end_time", "outcome_known_time")),
             (
                 "port_experiences",
                 ("arrival_time", "departure_time", "outcome_known_time"),
