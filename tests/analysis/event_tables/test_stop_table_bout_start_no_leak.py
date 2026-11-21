@@ -76,6 +76,7 @@ def _trials_starting_at_t1() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "movement_start_time": [1.0],
+            "destination_first_poke_in_time": [1.5],
             "end_time": [1.5],
             "from_well": [1],
             "to_well": [0],

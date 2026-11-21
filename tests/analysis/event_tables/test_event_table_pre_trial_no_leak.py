@@ -102,6 +102,7 @@ def _trials_starting_after_event() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "movement_start_time": [2.5],
+            "destination_first_poke_in_time": [3.0],
             "end_time": [3.0],
             "from_well": [1],
             "to_well": [0],
@@ -165,6 +166,7 @@ class TestEventStartContextNoLeak:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [1.0],
+                "destination_first_poke_in_time": [2.5],
                 "end_time": [2.5],
                 "from_well": [1],
                 "to_well": [0],

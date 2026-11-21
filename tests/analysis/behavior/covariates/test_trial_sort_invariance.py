@@ -35,6 +35,9 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.behavior.covariates import (
     visit_recency_all_events as _visit_recency_all_events,
 )
+from continuum_swr_replay.analysis.behavior.covariates.clocks import (
+    trial_arrival_times,
+)
 from tests.support._port_experience_fixtures import (
     port_experiences_from_trials,
     with_outcome_known_time,
@@ -77,6 +80,7 @@ def _toy_trials(n: int = 6) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "movement_start_time": np.arange(n, dtype=float),
+            "destination_first_poke_in_time": np.arange(n, dtype=float) + 0.5,
             "end_time": np.arange(n, dtype=float) + 0.5,
             "from_well": [0, 1, 2, 3, 4, 5][:n],
             "to_well": [1, 2, 3, 4, 5, 0][:n],
@@ -252,120 +256,22 @@ class TestNoPastTrialsContract:
         assert context.loc[2.2, "is_rewarded_outcome"] == 1.0
         assert context.loc[2.2, "last_rewarded_well"] == 2.0
 
-    def test_history_cutoffs_fall_back_to_end_time_without_arrival_column(self):
-        """When ``trials`` lacks ``destination_first_poke_in_time`` (older
-        pipelines), the helpers must fall back to ``end_time``
-        cutoffs without crashing — preserving the legacy contract."""
+    def test_arrival_clock_requires_the_destination_poke_in(self):
+        """A trial frame without ``destination_first_poke_in_time`` is refused:
+        every loaded trial frame carries it, and ``end_time`` (the final
+        poke-out) is not the arrival."""
+        trials = _toy_trials().drop(columns="destination_first_poke_in_time")
+        with pytest.raises(ValueError, match="destination_first_poke_in_time"):
+            trial_arrival_times(trials)
+
+    @pytest.mark.parametrize("value", [np.nan, np.inf])
+    def test_arrival_clock_refuses_a_missing_or_infinite_poke_in(self, value):
+        """A trial whose destination poke-in is NaN or infinite is refused,
+        not given its ``end_time``."""
         trials = _toy_trials()
-        assert "destination_first_poke_in_time" not in trials.columns
-        event_times = np.array([0.5, 2.5, 4.5])
-        # Just confirm they run and return the expected shape.
-        vr = visit_recency_all_events(event_times, trials, _well_to_arm())
-        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
-        rrr = recent_reward_rate_all_events(event_times, trials, _well_to_arm())
-        assert vr.shape == (3, 9)
-        assert cr.shape == (3, 9)
-        assert rrr.shape == (3, 9)
-
-    def test_add_trial_context_per_row_fallback_for_nan_arrival(self):
-        """``add_trial_context`` must apply the same per-row
-        ``destination_first_poke_in_time`` → ``end_time`` fallback that the
-        history helpers use, so all four trial-derived columns
-        (``last_rewarded_well``, ``_goal_arrival_time``,
-        ``_last_reward_time``, plus the history covariates) stay
-        aligned even when individual trials have NaN
-        ``destination_first_poke_in_time``.
-
-        Pre-fix ``add_trial_context`` indexed
-        ``trials["destination_first_poke_in_time"]`` directly, broadcasting NaN
-        into ``reward_timestamps`` (so a NaN-goal-arrival rewarded
-        trial sorted to the end of ``np.searchsorted`` and either
-        was missed entirely or stamped NaN into the dot column).
-        Post-fix destination context routes through the arrival clock, while
-        reward context routes through the outcome clock; both conservatively
-        fall back to ``end_time`` for this legacy-shaped fixture.
-        """
-        trials = pd.DataFrame(
-            [
-                # Trial 0: rewarded but with NaN destination_first_poke_in_time.
-                # Cutoff falls back to end_time = 1.0.
-                {
-                    "movement_start_time": 0.0,
-                    "end_time": 1.0,
-                    "destination_first_poke_in_time": np.nan,
-                    "from_well": 0,
-                    "to_well": 1,
-                    "is_reward": True,
-                    "is_patch_change": False,
-                },
-                # Trial 1: finite destination_first_poke_in_time = 2.5.
-                {
-                    "movement_start_time": 1.5,
-                    "end_time": 3.5,
-                    "destination_first_poke_in_time": 2.5,
-                    "from_well": 1,
-                    "to_well": 2,
-                    "is_reward": True,
-                    "is_patch_change": True,
-                },
-            ]
-        )
-        # Event at t=2.0: trial 0 is past (cutoff=end_time=1.0 ≤ 2.0);
-        # trial 1's movement_start_time has passed (so ``next_well``
-        # evaluates) but its cutoff=2.5 > 2.0.
-        event_times = np.array([2.0])
-        dot = pd.DataFrame(index=event_times)
-        dot = add_trial_context(dot, trials)
-        # Trial 0's reward (well 1) is past → last_rewarded_well = 1.
-        assert dot["last_rewarded_well"].iloc[0] == 1.0, (
-            f"last_rewarded_well={dot['last_rewarded_well'].iloc[0]} — "
-            "trial 0's NaN destination_first_poke_in_time should fall back to "
-            "end_time=1.0, making the trial visible to the reward-time "
-            "search. Pre-fix this stamped NaN."
-        )
-        # _last_reward_time uses the same arrival_times array → 1.0.
-        assert dot["_last_reward_time"].iloc[0] == 1.0
-        # And the history helpers must agree: trial 0 contributed.
-        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
-        vr = visit_recency_all_events(event_times, trials, _well_to_arm())
-        assert cr[0, 1] == 1.0
-        assert vr[0, 1] == 1.0  # 1 trial ago
-
-    def test_history_cutoffs_per_row_fallback_for_nan_arrival(self):
-        """Per-row NaN ``destination_first_poke_in_time`` falls back to
-        ``end_time`` for that trial — matches
-        ``add_trial_context``'s same-condition fallback."""
-        trials = pd.DataFrame(
-            [
-                # Trial 0 has NaN destination_first_poke_in_time; cutoff = end_time = 1.0.
-                {
-                    "movement_start_time": 0.5,
-                    "end_time": 1.0,
-                    "destination_first_poke_in_time": np.nan,
-                    "from_well": 0,
-                    "to_well": 1,
-                    "is_reward": True,
-                    "is_patch_change": False,
-                },
-                # Trial 1 has finite destination_first_poke_in_time = 2.5.
-                {
-                    "movement_start_time": 1.5,
-                    "end_time": 3.5,
-                    "destination_first_poke_in_time": 2.5,
-                    "from_well": 1,
-                    "to_well": 2,
-                    "is_reward": True,
-                    "is_patch_change": False,
-                },
-            ]
-        )
-        # Event at t=2.0: trial 0 is past (cutoff=1.0 ≤ 2.0); trial 1
-        # is future (cutoff=2.5 > 2.0).
-        event_times = np.array([2.0])
-        cr = rolling_reward_count_all_events(event_times, trials, _well_to_arm())
-        # arm 1 is rewarded by trial 0 → 1; arm 2 is not yet rewarded.
-        assert cr[0, 1] == 1.0
-        assert cr[0, 2] == 0.0
+        trials.loc[0, "destination_first_poke_in_time"] = value
+        with pytest.raises(ValueError, match="destination_first_poke_in_time"):
+            trial_arrival_times(trials)
 
     def test_zero_trials_returns_all_nan(self):
         # ``n_trials_total == 0`` early-return path: pre-fix returned

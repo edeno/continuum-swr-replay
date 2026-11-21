@@ -378,6 +378,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
             pd.DataFrame(
                 {
                     "movement_start_time": [0.0, 2.0],
+                    "destination_first_poke_in_time": [3.0, 4.0],
                     "end_time": [3.0, 4.0],
                     "from_well": [0, 1],
                     "to_well": [1, 2],
@@ -391,6 +392,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
             pd.DataFrame(
                 {
                     "movement_start_time": [2.0],
+                    "destination_first_poke_in_time": [1.0],
                     "end_time": [1.0],
                     "from_well": [0],
                     "to_well": [1],
