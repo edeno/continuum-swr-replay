@@ -178,6 +178,7 @@ def test_fixed_penalties_skip_selection() -> None:
     result = fit_at_penalties(lik, [data], blocks, rho)
 
     assert result.search is None
+    assert result.gradient is None  # not computed: nothing uses it
     np.testing.assert_array_equal(result.rho, rho)
     S = assemble_penalty(blocks, rho, data.X.shape[1])
     direct = penalized_newton(lik, data.X, data.y, data.aux, S, np.zeros(S.shape[0]))
@@ -670,3 +671,4 @@ def test_an_input_error_names_the_session() -> None:
     bad = SessionData(second.X, second.y, offset, name="peanut_02")
     with pytest.raises(ValueError, match=r"session 1 \(peanut_02\).*zero exposure"):
         select_penalties(lik, [first, bad], blocks)
+

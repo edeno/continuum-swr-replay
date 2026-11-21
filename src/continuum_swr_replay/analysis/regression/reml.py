@@ -1015,6 +1015,8 @@ def fit_at_penalties(
 ) -> PooledFit:
     """The sessions' fits at given log penalties, without a search.
 
+    The score's gradient and Hessian are not computed (``gradient`` is None).
+
     Raises
     ------
     ValueError
@@ -1022,7 +1024,7 @@ def fit_at_penalties(
         says why.
     """
     rho = np.asarray(rho, dtype=float)
-    pooled = pooled_reml(lik, sessions, blocks, rho)
+    pooled = pooled_reml(lik, sessions, blocks, rho, derivatives=False)
     if not np.isfinite(pooled.score):
         raise ValueError(
             f"an inner fit did not converge at log penalties {rho}: {pooled.failure}"
