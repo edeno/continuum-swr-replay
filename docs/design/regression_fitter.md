@@ -534,6 +534,14 @@ so does a fit that ends with any other status. The penalty search's refit of a s
 set aside calls this function, and so does the per-session loop, so the rule is in one
 place.
 
+A direction that includes the intercept is different: leaving the intercept out would fit
+another model. When a session's fit in the per-session loop has no finite maximum along
+such a direction (the rows of the reference level, or of the baseline, hold no event of
+the kind), nothing is dropped and no column is made inactive: the session is not fitted,
+its record gives that reason, and the loop goes on. (`refit_session` itself does not know
+which column is the intercept; in the penalty search's path a set-aside session whose
+intercept runs away is still refitted without it.)
+
 Such a session is reported with those terms missing (the lead, sixteenth round of the
 design). It is not left out of a summary, because leaving it out would depend on the
 outcome: the sessions that fail are those with no events in one condition. Its record

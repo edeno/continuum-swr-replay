@@ -519,3 +519,43 @@ def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
     for column, entry in record.support.items():
         if not entry["passes"]:
             assert column in record.left_out
+
+
+def test_no_finite_maximum_along_the_intercept_is_not_fitted() -> None:
+    """The reference level has 10 visits and no event, two other levels have
+    events: the fit has no finite maximum along the intercept. Nothing is
+    dropped or made inactive; the session is not fitted, with the true reason,
+    and the loop goes on."""
+    rng = np.random.default_rng(1)
+    rows = []
+    for visit in range(40):
+        level = "A" if visit < 10 else ("B" if visit < 25 else "C")
+        x = rng.normal()
+        for _ in range(30):
+            count = 0.0 if level == "A" else float(rng.poisson(0.2))
+            rows.append(
+                {"visit": visit, "cat": level, "x": x, "exposure": 0.1, "count": count}
+            )
+    frame = pd.DataFrame(rows)
+    other = frame.assign(count=np.random.default_rng(2).poisson(0.2, len(frame)) * 1.0)
+    design = build_design(
+        [
+            Category("cat", ("A", "B", "C"), reference="A"),
+            Slope("x"),
+            Offset("exposure"),
+        ],
+        frame,
+        intercept=True,
+    )
+    first, second = _fit(
+        design,
+        {("sim", "1", "02_r1"): frame, ("sim", "2", "02_r1"): other},
+        Poisson(),
+        response="count",
+        unit="visit",
+    )
+    assert first.status == "not fitted"
+    assert "no finite maximum along the intercept" in first.fit_reason
+    assert first.left_out == {} and first.cohort_counts["rows_dropped"] == {}
+    assert np.isnan(first.coef).all()
+    assert second.status == "converged"
