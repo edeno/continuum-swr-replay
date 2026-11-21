@@ -194,7 +194,7 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_gain_statistics`, `immobile_gain_statistics`
+`restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
