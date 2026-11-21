@@ -376,32 +376,13 @@ rate.
 
 ## Terms and their names
 
-A model is a list of terms (`terms.py`) and, for the diagonal families, an intercept:
-
-- `Smooth(column, lo, hi, n_basis, penalty, by=None, levels=None)`: a cubic P-spline over
-  a fixed range, clamped beyond it, with one sum-to-zero constraint. With `by`, one
-  smooth for each of `levels` of a category, zero on the other levels' rows, each with
-  its own constraint and penalty.
-- `LinearFunctional(lag_columns, lags, lo, hi, n_basis, penalty)`: a smooth curve over
-  log lag; column `b` is `sum_l B_b(log l) r_l`. It has no sum-to-zero constraint.
-- `Category(column, levels, reference)`: one 0/1 column for each level but the reference.
-  The reference level must have rows in every session; a session without them is not
-  identified, and its first fit is an error that names the session and the coefficients
-  involved.
-- `Slope(column, by=None, levels=None)`: one column, or one for each level of a category.
-- `Offset(column)`: the Poisson offset, `log` of an exposure column.
-
-A smooth's penalty is required: `"none"` (the same basis, unpenalized) or a fixed log
-penalty. The rule for a smooth term in a per-session fit is open with the lead (the
-design's fifteenth round), so no penalty is chosen from the data here.
-
-`build_design(terms, pooled_rows, intercept=...)` computes, once, from the pooled rows
-of the model and kind, what every session shares: the knots, the sum-to-zero
-constraints, the penalty blocks and the standardizations. `Design.session(rows)` maps
-one session's rows to its design matrix and offset. A row with a missing value the
-design reads is refused there; `Design.missing_rows` finds such rows.
-
-Every term and coefficient is named by one rule:
+A model is a list of terms (`terms.py`: `Smooth`, `LinearFunctional`, `Category`, `Slope`,
+`Offset`) and, for the diagonal families, an intercept. `build_design` computes once,
+from the pooled rows of the model and kind, what every session shares: the knots, the
+sum-to-zero constraints, the penalty blocks and the standardizations. `Design.build`
+maps a set of rows to its design matrix and offset, with NaN where a value read is
+missing. The module docstring states what each term builds and the rule that names every
+term and coefficient:
 
 | Term | Term name | Coefficient names |
 | --- | --- | --- |
@@ -412,181 +393,118 @@ Every term and coefficient is named by one rule:
 | intercept | `(Intercept)` | `(Intercept)` |
 
 A smooth or a slope fitted for one level of a category appends `:<by column>=<level>`
-to its term name, for example `s(clock_s):role=current` or `reward_fraction:role=current`.
-The declared estimands name their terms by this rule.
+to its term name, for example `s(clock_s):role=current`. The declared estimands name
+their terms by this rule.
+
+A built design describes each term once, as a `DesignTerm`: its kind (intercept, level,
+0/1 slope, continuous slope, smooth, lag functional), its columns, its level, its
+covariate, its penalty block and, for a level, the terms that leave a session with it.
+The support rule, the design check and the per-session loop read these descriptions.
+
+A smooth's penalty is required: `"none"` or a fixed log penalty. No penalty is chosen
+from the data in a per-session fit: the rule for a smooth term there is open with the
+lead.
 
 ## Standardization
 
-Each covariate of a design has one scale and one centering reference. Both are computed
-once, over the pooled rows of every level on which any slope of the design reads the
-covariate (all rows for a slope without `by`), so "per SD" means the same for every term
-of the covariate. A covariate that is 0/1 on those rows enters as it is. Any other is
-divided by its pooled standard deviation, in the population form (`ddof = 0`). A slope
-fitted for each level of a category is an interaction, so it is also centered at the
-pooled mean, the fixed reference; a slope alone is not centered. The record holds, per
-covariate, its SD, its reference and the terms centered at it.
+Each covariate has one scale and one centering reference, computed once over the pooled
+rows of every level on which any slope of the design reads it, so that "per SD" means
+the same for every term of the covariate. The rule is in `terms.py`'s docstring
+(`standardization`); the record holds, per covariate, its SD, `ddof` (0), its reference
+and the terms centered at it.
 
 ## The design check
 
 The fit limits each Newton step to `MAX_STEP_LENGTH` in coefficient units, so a column
-whose values are all very small needs a coefficient too large to reach in the steps
-allowed. A column's size is its largest absolute value over the rows, and the threshold
-is `SMALLEST_COLUMN_SIZE = 1e-2`. A smooth's columns are measured together, as one term:
-one of them can be tiny in a session that covers a small part of its range (0.0015 on
-the synthetic fixtures) while the term is not. The check is made at two levels:
+whose values are all very small ends at the step limit. A term's size is its largest
+absolute value over the rows, a smooth's columns measured together; the threshold is
+`SMALLEST_COLUMN_SIZE = 1e-2`. On the pooled rows that are not missing, a term below it is
+the caller's error and `build_design` refuses it; in one session it fails the support
+rule there. The rule, and which terms are measured, is in `terms.py`'s docstring.
 
-- on the pooled rows, when the design is built: a term below the threshold is the
-  caller's error (a units problem), and `build_design` raises, naming it. It is measured
-  on the pooled rows that are not missing, so that one missing value does not hide it;
-- in one session: a term below the threshold on that session's rows, which hold no
-  missing value (they are dropped first), fails the support rule there (for example a
-  slope centered at its pooled mean, nearly constant at that mean in the session). It is made inactive, the reason is recorded in its support entry, and the
-  recount of the support rule applies.
+Measured results:
 
-A column zero on every row of a session is not small: the support rule's counts make it
-inactive.
-
-The threshold was measured on simulated designs of 600 rows (an intercept, three N(0,1)
-columns and a P-spline of 7 columns; Poisson, Bernoulli and grouped softmax; five seeds),
-with each N(0,1) column multiplied in turn by 1e-4 to 1e-2 and fitted at log penalty 2.
-Every case whose column was at most 3.3e-3 in absolute value ended at the step limit in
-at least one fit. Every case at 6.0e-3 or more converged. The threshold is three times
-the largest that failed.
+- The threshold, on simulated designs of 600 rows (an intercept, three N(0,1) columns and
+  a P-spline of 7 columns; Poisson, Bernoulli and grouped softmax; five seeds), with each
+  N(0,1) column multiplied in turn by 1e-4 to 1e-2 and fitted at log penalty 2: every
+  case whose column was at most 3.3e-3 ended at the step limit in at least one fit, and
+  every case at 6.0e-3 or more converged. The threshold is three times the largest that
+  failed (`terms.SMALLEST_COLUMN_SIZE`).
+- A smooth is measured as one term because one of its columns can be tiny in a session
+  that covers a small part of its range (0.0015 on the synthetic fixtures) while the term
+  is not (`test_terms.py::test_a_smooth_is_measured_as_one_term`).
+- A 0/1 slope and a level hold only 0 and 1 and are not measured. A continuous slope is,
+  although standardized: two constructed cases are below the threshold on the pooled
+  rows that are not missing, a slope sharing its scale with a slope of the covariate on
+  another level (3.4e-6) and a plain slope whose spread lies on rows missing for another
+  term (8.2e-4) (`test_terms.py::test_a_slope_is_measured_after_its_standardization`).
 
 ## Collinearity
 
-`collinearity.py` measures each term on the quantity the likelihood sees. The design is
-weighted so that `X~' X~` is the information at the fit. For the Poisson and the
-Bernoulli, `X~ = diag(sqrt(w)) X`. For the Gaussian, `X~ = X`. For the grouped softmax,
-each event's rows are centered at its probabilities and weighted by its response total:
-`X~_g = sqrt(n_g) diag(sqrt(p_g)) (X_g - 1 p_g' X_g)`.
+`collinearity.py` measures each term on what the likelihood sees: the design weighted so
+that `X~' X~` is the information at the fit, the intercept projected out first, then
+mgcv's three concurvity measures (`concurvity(full = TRUE)`: observed, worst, estimate)
+for a term of several columns and the R² and VIF for a term of one. The module docstring
+states the weighting, the measures and when a term is separable (`MAX_EXPLAINED = 0.8`)
+or not measured (`VARIES_TOL`).
 
-When the design has an intercept, it is projected out of every other column first.
-Without that, a 0/1 column whose mean is 0.85 would count as 85 % explained by the
-intercept alone. Then for each term, with its columns `Xi` and the other terms' columns
-`X0`, the three measures of mgcv's `concurvity(full = TRUE)` are computed: `observed`
-(with the fitted coefficients), `worst` and `estimate`. `R0i` is taken in an orthonormal
-basis of the range of `X0`, so a column zero in a session adds no direction. For a term
-of one column the three equal its R² on the others, and the record stores `r2` and
-`VIF = 1 / (1 - R²)`. For a term of several columns it stores the three measures. A
-term whose columns keep at most `VARIES_TOL = 1e-10` of their own squared size once the
-intercept is projected out (a column constant in the session, or zero) is not measured:
-NaN, with the reason in `not_measured`, and not separable. The VIF is infinite at R² 1.
-
-A term is separable when the others explain less than `MAX_EXPLAINED = 0.8` of it (a VIF
-of 5): `r2` is read for a term of one column, `estimate` for a term of several. On the
-mgcv fixtures, at unit weights, the smooths' three measures equal mgcv's to 3.5e-12
-(measured 2026-11-21). mgcv's "para" term keeps the intercept, so it is not compared.
+On the mgcv fixtures, at unit weights, the smooths' three measures equal mgcv's to
+3.5e-12 (measured 2026-11-21, `test_collinearity.py::test_matches_mgcv_concurvity`).
+mgcv's "para" term keeps the intercept, so it is not compared.
 
 ## The support rule
 
 `support.py` decides from the rows, before the fit, whether a session can estimate an
-unpenalized column. A unit is what the data hold independent replicates of: a visit for a
-rate model, an event for a content model. A row holds an event when its response is above
-zero (Poisson, Bernoulli); every row does under the grouped softmax and the Gaussian.
+unpenalized term: a level of a category passes on the units with an event on its rows, a
+0/1 slope and a continuous slope when both of their sides reach `MIN_UNITS = 5` units with
+an event. The rule, the units and what a row holding an event is are in its docstring. A
+term that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit leaves
+the per-session model (`terms_failing_share`).
 
-- A level of a category: `n_high` counts the units with an event on a row of the level
-  (for a role category, the events with a candidate in the role). The level passes on
-  that count alone; `n_low`, the units with an event on a row of another level, is
-  recorded only.
-- A 0/1 slope: `n_high` counts the units with an event on a row where the column is 1,
-  `n_low` those with an event on a row where it is 0.
-- A continuous slope: over the rows of its level, among the rows that hold an event,
-  `n_high` counts the units with a row above their median and `n_low` those with a row
-  below it. Ties count on neither side, so a column constant there fails.
-
-A slope passes when both its counts are at least `MIN_UNITS = 5`, a level when its own
-count is. Smooth terms carry a penalty and have no support rule.
-
-A column that fails is made inactive in that session. When it is a level of a category,
-the session's rows of that level are dropped from its fit and counted. They are not
-merged into the reference level: in simulation, merging inflated the belief variance's
-false positives, to 20 % in one case. Every term fitted for that level leaves the session
-with it, its penalty block included. Under the grouped softmax, an event whose response
-was all on dropped rows is dropped too, and counted (`events_emptied_by_dropped_rows`,
-apart from `events_without_response`, the events given with no response). The other events' shares are not
-renormalized: the likelihood is the conditional one over the candidates kept.
-
-The levels are decided first, and only accumulate: their support is counted on the rows
-kept, the rows of each thin level are dropped, and this repeats until no level fails
-(each round removes a level, so it ends). Every other term is then judged once, on the
-final rows, and that judgment alone decides whether it is active: a slope split at the
-median can pass once a level's rows are gone, and it is then fitted. A term's `left_out`
-entry and its `passes` flag always agree, and the result does not depend on the order of
-the terms. The record holds the counts on the final rows, and for a dropped level the
-counts that made it fail. After a level is left out for having no finite maximum, the
-two steps run again on the rows then kept. A session with no rows, or no events of the kind, left
-after this is not fitted (below).
-
-A column that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit
-leaves the per-session model (`terms_failing_share`).
+A level that fails is removed with its rows, which are dropped and counted, not merged
+into the reference level: in simulation, merging inflated the belief variance's false
+positives, to 20 % in one case. The terms fitted for the level leave with it. How the
+loop applies the rule (the levels to a fixed point, then every other term once on the
+final rows) is in `sessions.py`'s docstring.
 
 ## Sessions without a finite maximum
 
-`reml.refit_session` fits a session at given log penalties. While the fit has no finite
-maximum along unpenalized design columns only, it makes the columns running away
-inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds. It records the round in
-which each column was left out. A direction through a penalty block (a smooth's own line,
-or its penalized coordinates) cannot be left out, and the session stays without a fit;
-so does a fit that ends with any other status, and one still without a finite maximum
-after the rounds. The intercept is never made inactive: a session fitted without it is a
-fit of another model. When the columns running away include the intercept (the rows of
-the reference level, or of the baseline, hold no event of the kind), no column is made
-inactive and the session stays without a fit, with the reason "no finite maximum along
-the intercept" (`ALONG_THE_INTERCEPT`). The intercept is found from the data: a design
-column with the same nonzero value on every row. A grouped-softmax design has none (such
-a column is constant within every group, which the fitter refuses as not identified).
+`reml.refit_session` fits a session at given log penalties and, while the fit has no
+finite maximum along unpenalized design columns only, makes the columns running away
+inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds; a direction through a penalty
+block, any other status, or the intercept among the columns running away leaves the
+session without a fit. Its docstring states the rule. The penalty search's refit of a
+session it set aside and the per-session loop both call it, so the rule is in one place.
 
-The penalty search's refit of a session it set aside calls this function, and so does the
-per-session loop, so the rule is in one place. In the search such a session counts among
-the sessions without a fit (`PenaltySearch.share_without_fit` and the
-`MAX_FAILING_SHARE` gate). In the per-session loop, nothing is dropped for it: it gets
-the not-fitted record with that reason, and the loop goes on.
-
-Such a session is reported with those terms missing (the lead, sixteenth round of the
-design). It is not left out of a summary, because leaving it out would depend on the
-outcome: the sessions that fail are those with no events in one condition. Its record
-names each column left out with the reason, for example `no finite maximum (round 1)`,
-and holds NaN for those coefficients and their covariance.
+A session with columns left out is reported with those terms missing, not left out of a
+summary, because leaving it out would depend on the outcome: the sessions that fail are
+those with no events in one condition. Its record names each column left out with the
+reason and the round, and holds NaN for those coefficients and their covariance.
 
 ## The per-session loop
 
 `sessions.fit_sessions(design, sessions, lik, model=..., kind=..., response=..., unit=...,
-table_sha256=...)` fits every session alone and returns one record per session. For each
-session:
+table_sha256=...)` fits every session alone and returns one record per session. Its
+module docstring states the steps: missing rows; the levels to a fixed point; every other
+term once on the final rows; the fit; a level the refit leaves out is removed and the
+steps run again.
 
-1. The rows with a missing value the design reads are dropped and counted. A missing
-   category value (None or NaN) makes its row missing; any other value outside the
-   levels is an error.
-2. The design is built and the support rule is applied: the levels first, dropping the
-   rows of each thin level until no level fails, then every other term once on the final
-   rows, as above.
-3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
-   of a category left out there for having no finite maximum drops its rows as the
-   support rule does (with the recount), and the session is fitted again with every
-   column left out so far inactive.
-4. The collinearity of each term is measured at the fit, and the record is built.
-
-At the session's first fit, a design not identified or a numerical failure is an error
-that names the session. In a refit, a direction through a penalty block or any other
-status leaves the session without a fit, with the reason in words. Under the grouped
-softmax, the unit column is the group id.
+A session's design is built once, on all its rows; one mask with one reason code per row
+removed says which rows are kept, and the kept rows' design is a slice. Measured on
+2026-11-21 on a busy machine (load 20 to 23; medians), against the loop that rebuilt the
+design on every pass and stacked the pooled design for the check: four Poisson sessions
+of 50,000 rows and 54 columns, 2.65 s to 1.33 s; `build_design` at 1,000,000 rows, 6.84 s
+to 2.26 s; its peak resident memory at 2,000,000 rows, 2.25 GB to 1.09 GB (0.44 GB before
+the build).
 
 ## The fit record
 
-`record.FitRecord` is one row per (model, kind, session). It holds the identity; the
-likelihood; the rows, units and events the fit saw; the rows dropped and why
-(`cohort_counts`, to which a caller adds its own cohort counts); the coefficients with
-their names and the Bayesian covariance `(H + S)^-1`; how each smooth's penalty was set
-(`fixed` with its value, or `none`); the edf of each term; the last fit's status, Newton
-decrement and step count; the columns left out and why; the support counts; the
-collinearity measures; each smooth's basis (knots, degree, range, constraint, clamp);
-the standardizations; the hashes of the tables read; and `fit_reason`, how the fit ended
-when columns were left out or the session has no fit. A session with no rows left to
-fit (none given, or all missing), or no events of the kind, is not fitted: its record
-has the status "not fitted", NaN coefficients and the reason in words, and the loop
-goes on. A record whose status is not "converged" is kept; its readers flag it. `write_records` writes a parquet table
-atomically, the structured fields as JSON strings, and `read_records` reads it back.
+`record.FitRecord` is one row per (model, kind, session); its docstring lists every field.
+A session with no rows, or no events of the kind, left is not fitted: its record has the
+status "not fitted", NaN coefficients and the reason, and the loop goes on. A record whose
+status is not "converged" is kept; its readers flag it. `write_records` and
+`read_records` store the records through `tables.io` (`write_table`, `read_table`), the
+structured fields as JSON strings.
 
 ## Contrasts
 
