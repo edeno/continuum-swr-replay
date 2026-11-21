@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -14,6 +15,7 @@ from continuum_swr_replay.analysis.regression import reml
 from continuum_swr_replay.analysis.regression.constants import (
     LOG_PENALTY_BOUNDS,
     NULL_SPACE_EDF_TOL,
+    REFIT_MAX_ROUNDS,
 )
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
@@ -1152,6 +1154,32 @@ def test_refit_session_does_not_make_the_intercept_inactive() -> None:
     assert refit_session(Poisson(), doubled, blocks, [6.0]).ended == (
         reml.RefitEnd.ALONG_THE_INTERCEPT
     )
+
+
+def test_the_intercept_is_named_before_the_rounds_run_out(monkeypatch) -> None:
+    """Scripted fits: each round runs away along one new column, and the fit
+    of the last round allowed along the intercept. The refit ends along the
+    intercept, which no further round could leave out, not after too many
+    rounds."""
+
+    def running_away(columns: list[int]) -> SimpleNamespace:
+        fit = SimpleNamespace(
+            converged=False, status=NO_FINITE_MAXIMUM, running_away=np.array(columns)
+        )
+        directions = tuple(reml.FreeDirection(None, c, True) for c in columns)
+        return SimpleNamespace(fit=fit, running_away_directions=directions)
+
+    fits = iter(
+        [running_away([k]) for k in range(1, REFIT_MAX_ROUNDS + 1)]
+        + [running_away([0])]
+    )
+    monkeypatch.setattr(reml, "_labeled_score", lambda *args: next(fits))
+    rng = np.random.default_rng(0)
+    X = np.column_stack([np.ones(40), rng.normal(size=(40, REFIT_MAX_ROUNDS))])
+    refit = refit_session(Poisson(), SessionData(X, np.ones(40), np.zeros(40)), [], [])
+    assert len(refit.refits) == REFIT_MAX_ROUNDS + 1
+    assert refit.ended == reml.RefitEnd.ALONG_THE_INTERCEPT
+    assert refit.left_out.tolist() == list(range(1, REFIT_MAX_ROUNDS + 1))
 
 
 def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:

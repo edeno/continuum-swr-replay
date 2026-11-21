@@ -1586,7 +1586,8 @@ def refit_session(
     without a fit; so does a fit that ends with any other status. The
     intercept is never made inactive: a session fitted without it is a fit of
     another model. When the columns running away include it, the session
-    stays without a fit, with the reason :data:`ALONG_THE_INTERCEPT`. The
+    stays without a fit, with the reason :data:`ALONG_THE_INTERCEPT`, also
+    in the last round allowed (no further round could leave it out). The
     intercept is found from the data: a design column with the same nonzero
     value on every row. A grouped-softmax design has none (such a column is
     constant within every group, which the fitter refuses as not
@@ -1639,15 +1640,15 @@ def refit_session(
                 + "), whose columns cannot be made inactive"
             )
             break
+        if np.intersect1d(last.fit.running_away, _intercepts(data.X)).size:
+            ended, reason = RefitEnd.ALONG_THE_INTERCEPT, ALONG_THE_INTERCEPT
+            break
         if len(refits) > REFIT_MAX_ROUNDS:
             ended = RefitEnd.TOO_MANY_ROUNDS
             reason = (
                 f"no finite maximum after {REFIT_MAX_ROUNDS} rounds of columns "
                 f"made inactive (still running away: {last.fit.running_away.tolist()})"
             )
-            break
-        if np.intersect1d(last.fit.running_away, _intercepts(data.X)).size:
-            ended, reason = RefitEnd.ALONG_THE_INTERCEPT, ALONG_THE_INTERCEPT
             break
         new = [int(c) for c in last.fit.running_away if active[c]]
         active[new] = False
