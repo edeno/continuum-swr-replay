@@ -45,12 +45,15 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   curve, summarized by ``analysis.decode_quality.quality_metrics``;
 - the non-local restriction run (``Processed-Data/event_nonlocal_restriction``,
   from ``scripts/event_evidence/score_nonlocal_restriction.py``): each epoch's
-  summed scores of the local-only, SWR-only and full decoders by category of
-  bins, and their sums over the windows of Figure 2g's second axis
-  (``Processed-Data/event_nonlocal_restriction_windows``, from
-  ``scripts/event_evidence/sum_nonlocal_restriction_windows.py``), summarized by
+  per-bin scores of the local-only, SWR-only and full decoders, summed over the
+  windows of Figure 2g's second axis and by category of bins, well visit and
+  event window (``Processed-Data/event_nonlocal_restriction_windows``, from
+  ``scripts/event_evidence/sum_nonlocal_restriction_windows.py``, with each
+  bin's spikes and well-visit flag from ``Processed-Data/event_bin_facts``,
+  ``scripts/event_evidence/measure_bin_facts.py``), summarized by
   ``analysis.event_evidence.restriction_windows`` and
-  ``analysis.event_evidence.restriction_totals``.
+  ``analysis.event_evidence.restriction_totals`` on the events that start
+  inside a well visit and the time inside a well visit.
 
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
@@ -81,6 +84,9 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
     participation,
@@ -116,6 +122,7 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
+    EVENT_BIN_FACTS_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -237,6 +244,7 @@ class EventsInputs:
     tetrode_holdout: Path
     nonlocal_restriction: Path
     nonlocal_restriction_windows: Path
+    bin_facts: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -264,6 +272,7 @@ def default_inputs() -> EventsInputs:
         nonlocal_restriction=processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR,
         nonlocal_restriction_windows=processed_data_dir()
         / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+        bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
     )
 
 
@@ -1555,43 +1564,102 @@ _RESTRICTION_KINDS = {
     "event": ("events", "events"),
     "control": ("controls", "matched Local-rest controls"),
 }
+#: The data subset of every restriction value, in words: the events that start
+#: inside a well visit (``cohort_selection.select_visit_context``'s default) and
+#: the time inside a well visit (``well_visits.in_well_visit``).
+_RESTRICTION_EVENT_SUBSET = (
+    "of the events that start inside a well visit (from the first poke-in at a "
+    "well to the final poke-out there)"
+)
+_RESTRICTION_TIME_SUBSET = "inside a well visit"
 #: Figure 2g, the decoders compared, in one score family (its values carry the
 #: panel's tag; the other family's do not).
 RESTRICTION_FIGURE_FAMILY = "filter"
 #: Figure 2g's first axis, "All immobile time": each decoder's gain over the
-#: local-only decoder per second of immobile time, by its measure
-#: (``restriction_totals.IMMOBILE_MEASURES``), in drawing order (SWR-only, Full),
-#: and the measure of their difference, which the line joining an animal's two
-#: dots shows.
-RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_s", "full_minus_none_per_s")
-RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_s"
+#: local-only decoder per spike of the immobile time inside a well visit, by its
+#: measure (``restriction_totals.IMMOBILE_MEASURES``), in drawing order
+#: (SWR-only, Full), and the measure of their difference, which the line
+#: joining an animal's two dots shows.
+RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
+RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
 #: Figure 2g's second axis, "Immobile time outside SWR bounds": the window
 #: statistic's choice (``restriction_windows.restriction_window_statistics``'
-#: keywords), the full decoder minus the SWR-only decoder per second over the
+#: keywords), the full decoder minus the SWR-only decoder per spike over the
 #: events' bins outside SWRs, and its groups in drawing order (events with no
 #: SWR, then the time outside the SWR of the events that overlap one).
 RESTRICTION_FIGURE = {
     "parts": ["outside_swr"],
     "families": [RESTRICTION_FIGURE_FAMILY],
     "contrasts": ["full_minus_swr"],
-    "units": ["per_s"],
+    "units": ["per_spike"],
     "kinds": ["event"],
 }
 RESTRICTION_FIGURE_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
 
 
-def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]:
+def _restriction_selected(table: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
+    """The rows of a per-event table (an event's windows, its control's too:
+    a control carries its event's id) whose event starts inside a well visit."""
+    # cohort_selection.select_events_in (on another branch) replaces this filter
+    selected = select_visit_context(events)["event_id"]
+    return table[table["event_id"].isin(selected)].reset_index(drop=True)
+
+
+def restriction_figure_statistics(
+    windows: pd.DataFrame,
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    events: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Figure 2g's two axes, as the events summary computes them.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The window run's windows of every epoch.
+    time_sums : pd.DataFrame
+        The window run's time sums of every epoch
+        (``restriction_totals.restriction_time_sums``).
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+    events : pd.DataFrame
+        The canonical event table, with ``visit_context``.
+
+    Returns
+    -------
+    decoders : pd.DataFrame
+        ``restriction_totals.immobile_gain_statistics`` over the immobile time
+        inside a well visit, indexed by ``family`` and ``measure``.
+    parts : pd.DataFrame
+        ``restriction_windows.restriction_window_statistics`` with
+        :data:`RESTRICTION_FIGURE` over the windows of the events that start
+        inside a well visit, indexed by ``group``.
+    """
+    decoders = restriction_totals.immobile_gain_statistics(
+        restriction_totals.epoch_immobile_gains(time_sums, bin_s)
+    ).set_index(["family", "measure"])
+    parts = restriction_windows.restriction_window_statistics(
+        _restriction_selected(windows, events), **RESTRICTION_FIGURE
+    ).set_index("group")
+    return decoders, parts
+
+
+def restriction_window_values(
+    windows: pd.DataFrame, events: pd.DataFrame, source: str
+) -> list[Value]:
     """Question 2c.3: the three restriction decoders compared per spike over the
-    events and their Local-rest controls, in both score families, and the full
-    decoder against the SWR-only decoder per second over the events' bins
-    outside SWRs. The latter in :data:`RESTRICTION_FIGURE_FAMILY` is drawn on
-    Figure 2g's second axis and carries that panel's tag."""
+    events that start inside a well visit and their Local-rest controls, in both
+    score families, and the full decoder against the SWR-only decoder per spike
+    and per second over the events' bins outside SWRs. The latter per spike in
+    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2g's second axis and
+    carries that panel's tag."""
     make_text = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction"]
     )
     make_figure = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction_figure"]
     )
+    windows = _restriction_selected(windows, events)
     statistics = restriction_windows.restriction_window_statistics(windows).set_index(
         ["family", "contrast", "unit", "kind", "group"]
     )
@@ -1613,9 +1681,9 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
                 row,
                 f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
                 f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
-                f"summed over each of the {group} {label} and divided by its "
-                "spikes: mean over animals of each animal's median over epochs of "
-                "each epoch's median",
+                f"summed over each of the {group} {label} {_RESTRICTION_EVENT_SUBSET} "
+                "and divided by its spikes: mean over animals of each animal's "
+                "median over epochs of each epoch's median",
                 style="sig2",
             )
             values.append(
@@ -1627,56 +1695,99 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
                     "animals whose value is above zero",
                 )
             )
-    # Figure 2g's second axis: full - swr per second over the events' bins
-    # outside SWRs
+    # Figure 2g's second axis: full - swr per spike over the events' bins
+    # outside SWRs; per second, a value of the text
     outside = restriction_windows.restriction_window_statistics(
-        windows, **{**RESTRICTION_FIGURE, "families": list(FAMILY_SUFFIX)}
-    ).set_index(["family", "group"])
+        windows,
+        **{
+            **RESTRICTION_FIGURE,
+            "families": list(FAMILY_SUFFIX),
+            "units": ["per_spike", "per_s"],
+        },
+    ).set_index(["family", "unit", "group"])
+    counts = restriction_windows.outside_swr_window_counts(windows)
     a, b = restriction_windows.CONTRASTS["full_minus_swr"]
     for family, suffix in FAMILY_SUFFIX.items():
-        make = make_figure if family == RESTRICTION_FIGURE_FAMILY else make_text
-        for group in RESTRICTION_FIGURE_GROUPS:
-            row = outside.loc[(family, group)]
-            word = group_words[group]
-            key = f"restriction_{word}_events_outside_swr_full_minus_swr{suffix}_per_s"
-            where = (
-                "over each of the events with no SWR (its bins outside SWRs: all "
-                "but a few inside an SWR the SWR-only decoder used)"
-                if group == SWR_LABELS[False]
-                else "over the bins outside the SWR of each of the events that "
-                "overlap an SWR"
-            )
-            values += _per_spike_interval(
-                make,
-                key,
-                row,
-                f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
-                f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
-                f"summed {where} and divided by their duration: mean over animals "
-                "of each animal's median over epochs of each epoch's median",
-                style="sig2",
-                unit="nats per s",
-            )
-            values.append(
-                make(
-                    f"{key}_animals_positive",
-                    row["n_animals_positive"],
-                    "count",
-                    "count",
-                    "animals whose value is above zero",
+        for unit, divided in (
+            ("per_spike", "their spikes"),
+            ("per_s", "their duration"),
+        ):
+            drawn = family == RESTRICTION_FIGURE_FAMILY and unit == "per_spike"
+            make = make_figure if drawn else make_text
+            for group in RESTRICTION_FIGURE_GROUPS:
+                row = outside.loc[(family, unit, group)]
+                word = group_words[group]
+                key = (
+                    f"restriction_{word}_events_outside_swr_full_minus_swr{suffix}"
+                    f"_{unit}"
                 )
-            )
-            if family == RESTRICTION_FIGURE_FAMILY:
+                where = (
+                    "over each of the events with no SWR "
+                    f"{_RESTRICTION_EVENT_SUBSET} (its bins outside SWRs: all but a "
+                    "few inside an SWR the SWR-only decoder used)"
+                    if group == SWR_LABELS[False]
+                    else "over the bins outside the SWR of each of the events that "
+                    f"overlap an SWR, {_RESTRICTION_EVENT_SUBSET}"
+                )
+                values += _per_spike_interval(
+                    make,
+                    key,
+                    row,
+                    f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
+                    f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
+                    f"summed {where} and divided by {divided}: mean over animals "
+                    "of each animal's median over epochs of each epoch's median",
+                    style="sig2",
+                    unit="nats per spike" if unit == "per_spike" else "nats per s",
+                )
                 values.append(
                     make(
-                        f"restriction_{word}_events_outside_swr_scored",
-                        row["n_scored"],
+                        f"{key}_animals_positive",
+                        row["n_animals_positive"],
                         "count",
                         "count",
-                        f"{group} events with immobile bins outside SWRs (a value "
-                        "per second there)",
+                        "animals whose value is above zero",
                     )
                 )
+                if family == RESTRICTION_FIGURE_FAMILY:
+                    values.append(
+                        make(
+                            f"restriction_{word}_events_outside_swr_scored"
+                            + ("_per_spike" if unit == "per_spike" else ""),
+                            row["n_scored"],
+                            "count",
+                            "count",
+                            f"{group} events {_RESTRICTION_EVENT_SUBSET} with a value "
+                            + (
+                                "per spike outside SWRs (immobile bins there and a "
+                                "spike in them)"
+                                if unit == "per_spike"
+                                else "per second outside SWRs (immobile bins there)"
+                            ),
+                        )
+                    )
+    for group in RESTRICTION_FIGURE_GROUPS:
+        row = counts.loc[("event", group)]
+        word = group_words[group]
+        values += [
+            make_figure(
+                f"restriction_{word}_events_outside_swr_without_spikes",
+                row["n_without_spikes_outside_swr"],
+                "count",
+                "count",
+                f"{group} events {_RESTRICTION_EVENT_SUBSET} with immobile bins "
+                "outside SWRs but no spike in them: no value per spike there",
+            ),
+            make_text(
+                f"restriction_{word}_events_outside_swr_after_visit",
+                row["n_with_bins_outside_swr_outside_visit"],
+                "count",
+                "count",
+                f"{group} events {_RESTRICTION_EVENT_SUBSET} with immobile bins "
+                "outside SWRs after the final poke-out of their visit (left out of "
+                "the shares of immobile time inside a well visit)",
+            ),
+        ]
     # the windows and those with spikes are the same for every contrast and family
     for kind, (kind_word, label) in _RESTRICTION_KINDS.items():
         for word, group in _RUN_GROUPS.items():
@@ -1687,14 +1798,15 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
                     row["n_events"],
                     "count",
                     "count",
-                    f"{group} {label} summed",
+                    f"{group} {label} summed, {_RESTRICTION_EVENT_SUBSET}",
                 ),
                 make_text(
                     f"restriction_{word}_{kind_word}_scored",
                     row["n_scored"],
                     "count",
                     "count",
-                    f"{group} {label} with a per-spike value (at least one spike)",
+                    f"{group} {label} {_RESTRICTION_EVENT_SUBSET} with a per-spike "
+                    "value (at least one spike)",
                 ),
             ]
     values.append(
@@ -1710,16 +1822,24 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
 
 
 def restriction_outside_swr_values(
-    sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame, source: str
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    windows: pd.DataFrame,
+    events: pd.DataFrame,
+    source: str,
 ) -> list[Value]:
-    """Question 2c.3: the full decoder against the SWR-only decoder over all
-    immobile time outside SWRs (time chosen by speed and ripple detection, not
-    by the decoder), per second, and the share of it in the events with no SWR."""
+    """Question 2c.3: the full decoder against the SWR-only decoder over the
+    immobile time outside SWRs inside a well visit (time chosen by speed, ripple
+    detection and the well visits, not by the decoder), per spike and per
+    second, the share of it in the events that start inside a well visit, and
+    the rest outside every event."""
     make = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
     )
     statistics = restriction_totals.outside_swr_gain_statistics(
-        restriction_totals.epoch_outside_swr_gains(sums, bin_s, windows)
+        restriction_totals.epoch_outside_swr_gains(
+            time_sums, bin_s, _restriction_selected(windows, events)
+        )
     ).set_index(["family", "measure"])
     reduction = (
         "mean over animals of each animal's median over its epochs; 95 % interval "
@@ -1729,147 +1849,124 @@ def restriction_outside_swr_values(
     full_minus_swr = (
         f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
     )
+    time = f"every immobile bin outside SWRs {_RESTRICTION_TIME_SUBSET} of the epoch"
     values = []
     for family, suffix in FAMILY_SUFFIX.items():
         key = f"restriction_outside_swr_full_minus_swr{suffix}"
-        row = statistics.loc[(family, "gain_per_s")]
-        unit = "nats per s"
-        values += [
-            make(
-                f"{key}_per_s",
-                row["estimate"],
-                "quantity",
-                "sig2",
-                f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, "
-                f"{full_minus_swr}, summed over every immobile bin outside SWRs "
-                "of the epoch and divided by their duration: "
-                f"{reduction}",
-                unit,
-            ),
-            make(
-                f"{key}_per_s_ci_low",
-                row["ci_low"],
-                "quantity",
-                "sig2",
-                "lower bound of its 95 % interval",
-                unit,
-            ),
-            make(
-                f"{key}_per_s_ci_high",
-                row["ci_high"],
-                "quantity",
-                "sig2",
-                "upper bound of that interval",
-                unit,
-            ),
-            make(
-                f"{key}_per_s_animals_positive",
-                row["n_animals_positive"],
-                "count",
-                "count",
-                "animals whose value is above zero",
-            ),
-            make(
-                f"{key}_epochs_positive",
-                row["n_epochs_positive"],
-                "count",
-                "count",
-                "epochs whose gain per second is above zero",
-            ),
-            make(
-                f"{key}_epochs",
-                row["n_epochs"],
-                "count",
-                "count",
-                "epochs with immobile bins outside SWRs",
-            ),
-        ]
-        row = statistics.loc[(family, "outside_events_gain_per_s")]
-        values += _per_spike_interval(
-            make,
-            f"{key}_outside_events_per_s",
-            row,
-            f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, "
-            f"{full_minus_swr}, summed over the epoch's immobile bins outside SWRs "
-            "that no non-local event holds and divided by their duration: "
-            f"{reduction}",
-            style="sig2",
-            unit=unit,
-        )
-        values.append(
-            make(
-                f"{key}_outside_events_per_s_animals_positive",
-                row["n_animals_positive"],
-                "count",
-                "count",
-                "animals whose value is above zero",
+        scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
+        for unit, divided, words in (
+            ("per_spike", "their spikes", "nats per spike"),
+            ("per_s", "their duration", "nats per s"),
+        ):
+            row = statistics.loc[(family, f"gain_{unit}")]
+            values += _per_spike_interval(
+                make,
+                f"{key}_{unit}",
+                row,
+                f"{scored}, {full_minus_swr}, summed over {time} and divided by "
+                f"{divided}: {reduction}",
+                style="sig2",
+                unit=words,
             )
-        )
-        row = statistics.loc[(family, "share_in_swr_events_outside_swr")]
-        values += [
-            make(
-                f"{key}_share_in_swr_events_outside_swr",
-                row["estimate"],
-                "fraction",
-                "pct",
-                f"share of that gain ({family} score), summed over the epoch's "
-                "immobile bins outside SWRs, that lies in the time outside the SWR "
-                f"of its events that overlap an SWR: {reduction}",
+            values.append(
+                make(
+                    f"{key}_{unit}_animals_positive",
+                    row["n_animals_positive"],
+                    "count",
+                    "count",
+                    "animals whose value is above zero",
+                )
+            )
+            if unit == "per_s":
+                values += [
+                    make(
+                        f"{key}_epochs_positive",
+                        row["n_epochs_positive"],
+                        "count",
+                        "count",
+                        "epochs whose gain per second is above zero",
+                    ),
+                    make(
+                        f"{key}_epochs",
+                        row["n_epochs"],
+                        "count",
+                        "count",
+                        f"epochs with immobile bins outside SWRs {_RESTRICTION_TIME_SUBSET}",
+                    ),
+                ]
+            row = statistics.loc[(family, f"outside_events_gain_{unit}")]
+            values += _per_spike_interval(
+                make,
+                f"{key}_outside_events_{unit}",
+                row,
+                f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
+                f"outside SWRs {_RESTRICTION_TIME_SUBSET} that no non-local event "
+                f"holds and divided by {divided}: {reduction}",
+                style="sig2",
+                unit=words,
+            )
+            values.append(
+                make(
+                    f"{key}_outside_events_{unit}_animals_positive",
+                    row["n_animals_positive"],
+                    "count",
+                    "count",
+                    "animals whose value is above zero",
+                )
+            )
+        for measure, name, part in (
+            (
+                "share_in_swr_events_outside_swr",
+                "share_in_swr_events_outside_swr",
+                "the time outside the SWR of its events that overlap an SWR",
             ),
-            make(
-                f"{key}_share_in_swr_events_outside_swr_ci_low",
-                row["ci_low"],
-                "fraction",
-                "pct",
-                "lower bound of its 95 % interval",
+            (
+                "share_in_no_swr_events",
+                "share_in_non_swr_events",
+                "its events with no SWR",
             ),
-            make(
-                f"{key}_share_in_swr_events_outside_swr_ci_high",
-                row["ci_high"],
-                "fraction",
-                "pct",
-                "upper bound of that interval",
-            ),
-        ]
-        row = statistics.loc[(family, "share_in_no_swr_events")]
-        values += [
-            make(
-                f"{key}_share_in_non_swr_events",
-                row["estimate"],
-                "fraction",
-                "pct",
-                f"share of that gain ({family} score), summed over the epoch's "
-                "immobile bins outside SWRs, that lies in its events with no SWR "
-                "(the events' summed gain over the immobile bins' summed gain): "
-                f"{reduction}",
-            ),
-            make(
-                f"{key}_share_in_non_swr_events_ci_low",
-                row["ci_low"],
-                "fraction",
-                "pct",
-                "lower bound of its 95 % interval",
-            ),
-            make(
-                f"{key}_share_in_non_swr_events_ci_high",
-                row["ci_high"],
-                "fraction",
-                "pct",
-                "upper bound of that interval",
-            ),
-        ]
+        ):
+            row = statistics.loc[(family, measure)]
+            values += [
+                make(
+                    f"{key}_{name}",
+                    row["estimate"],
+                    "fraction",
+                    "pct",
+                    f"share of that gain ({family} score), summed over {time}, that "
+                    f"lies in {part} {_RESTRICTION_EVENT_SUBSET}: the events' gain "
+                    "over the same kind of bins (immobile, outside SWRs, inside a "
+                    "well visit; an event that runs past the final poke-out adds "
+                    f"its bins before it only) over the epoch's: {reduction}",
+                ),
+                make(
+                    f"{key}_{name}_ci_low",
+                    row["ci_low"],
+                    "fraction",
+                    "pct",
+                    "lower bound of its 95 % interval",
+                ),
+                make(
+                    f"{key}_{name}_ci_high",
+                    row["ci_high"],
+                    "fraction",
+                    "pct",
+                    "upper bound of that interval",
+                ),
+            ]
     return values
 
 
 def restriction_immobile_values(
-    sums: pd.DataFrame, bin_s: pd.Series, source: str
+    time_sums: pd.DataFrame, bin_s: pd.Series, source: str
 ) -> list[Value]:
     """Question 2c.3: the SWR-only and full decoders against the local-only
-    decoder over all immobile time (time chosen by speed alone, not by the
-    decoder or the SWRs), per second, their difference, and the share of the
-    full decoder's gain the SWR-only decoder captures. The gains and their
-    difference in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's
-    first axis and carry that panel's tag."""
+    decoder over all immobile time inside a well visit (time chosen by speed and
+    the well visits, not by the decoder or the SWRs), per spike and per second,
+    their difference, and the share of the full decoder's gain the SWR-only
+    decoder captures. The gains per spike and their difference in
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's first axis and
+    carry that panel's tag."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
     )
@@ -1877,7 +1974,7 @@ def restriction_immobile_values(
         restriction_immobile_values, source, TAGS["nonlocal_restriction_figure"]
     )
     statistics = restriction_totals.immobile_gain_statistics(
-        restriction_totals.epoch_immobile_gains(sums, bin_s)
+        restriction_totals.epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
     reduction = (
         "mean over animals of each animal's median over its epochs; 95 % interval "
@@ -1889,32 +1986,38 @@ def restriction_immobile_values(
     for family, suffix in FAMILY_SUFFIX.items():
         scored = (
             f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, summed over "
-            "every immobile bin of the epoch (inside and outside SWRs)"
+            f"every immobile bin {_RESTRICTION_TIME_SUBSET} of the epoch (inside "
+            "and outside SWRs)"
         )
-        for measure in drawn:
-            row = statistics.loc[(family, measure)]
-            make = make_figure if family == RESTRICTION_FIGURE_FAMILY else make_text
-            contrast = measure.removesuffix("_per_s")
-            a, b = restriction_windows.CONTRASTS[contrast]
-            key = f"restriction_immobile_{contrast}{suffix}_per_s"
-            values += _per_spike_interval(
-                make,
-                key,
-                row,
-                f"{scored}, under {_RESTRICTION_MODELS[a]} minus under "
-                f"{_RESTRICTION_MODELS[b]}, divided by their duration: {reduction}",
-                style="sig2",
-                unit="nats per s",
-            )
-            values.append(
-                make(
-                    f"{key}_animals_positive",
-                    row["n_animals_positive"],
-                    "count",
-                    "count",
-                    "animals whose value is above zero",
+        for unit, divided, words in (
+            ("per_spike", "their spikes", "nats per spike"),
+            ("per_s", "their duration", "nats per s"),
+        ):
+            for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr"):
+                measure = f"{contrast}_{unit}"
+                row = statistics.loc[(family, measure)]
+                figure = family == RESTRICTION_FIGURE_FAMILY and measure in drawn
+                make = make_figure if figure else make_text
+                a, b = restriction_windows.CONTRASTS[contrast]
+                key = f"restriction_immobile_{contrast}{suffix}_{unit}"
+                values += _per_spike_interval(
+                    make,
+                    key,
+                    row,
+                    f"{scored}, under {_RESTRICTION_MODELS[a]} minus under "
+                    f"{_RESTRICTION_MODELS[b]}, divided by {divided}: {reduction}",
+                    style="sig2",
+                    unit=words,
                 )
-            )
+                values.append(
+                    make(
+                        f"{key}_animals_positive",
+                        row["n_animals_positive"],
+                        "count",
+                        "count",
+                        "animals whose value is above zero",
+                    )
+                )
         row = statistics.loc[(family, RESTRICTION_FIGURE_DIFFERENCE)]
         make = make_figure if family == RESTRICTION_FIGURE_FAMILY else make_text
         values.append(
@@ -1923,8 +2026,9 @@ def restriction_immobile_values(
                 row["n_epochs_full_above_swr_only"],
                 "count",
                 "count",
-                f"epochs whose summed score ({family}) over their immobile bins is "
-                f"higher under {_RESTRICTION_MODELS['full']} than under "
+                f"epochs whose summed score ({family}) over their immobile bins "
+                f"{_RESTRICTION_TIME_SUBSET} is higher under "
+                f"{_RESTRICTION_MODELS['full']} than under "
                 f"{_RESTRICTION_MODELS['swr']}",
             )
         )
@@ -1962,7 +2066,8 @@ def restriction_immobile_values(
             row["n_epochs"],
             "count",
             "count",
-            "epochs with immobile bins in the restriction comparison",
+            f"epochs with immobile bins {_RESTRICTION_TIME_SUBSET} in the "
+            "restriction comparison",
         )
     )
     return values
@@ -2936,8 +3041,11 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # Figure 2g reads the windows' bins outside SWRs, which a window run made
     # before they were summed lacks: refuse with what to rerun
     restriction_windows.require_outside_swr_sums(restriction_windows_table)
-    restriction_sums = read_complete_run(
-        restriction_dir, "nonlocal_restriction", analyzed_epoch_ids()
+    restriction_windows.require_bin_fact_sums(restriction_windows_table)
+    # the time sums by category, well visit and event window, which the window
+    # run writes beside its windows
+    restriction_time_sums = read_complete_run(
+        restriction_windows_dir, "nonlocal_restriction_time_sums", analyzed
     )
     windows_manifest = read_output_manifest(restriction_windows_dir)
     # each epoch's decode time step, as the window run read it from the per-bin
@@ -2965,55 +3073,61 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         participation_staleness(restriction_windows_dir),
         run_staleness("tetrode_holdout", inputs.tetrode_holdout),
         run_staleness("nonlocal_restriction", restriction_dir),
+        run_staleness("bin_facts", inputs.bin_facts),
         window_run_note_staleness(windows_manifest, rel(restriction_windows_dir)),
     )
     restriction_source = (
         f"{rel(restriction_windows_dir)} "
         "(scripts/event_evidence/sum_nonlocal_restriction_windows.py, from "
-        f"{rel(restriction_dir)}, scripts/event_evidence/score_nonlocal_restriction.py)"
+        f"{rel(restriction_dir)}, scripts/event_evidence/score_nonlocal_restriction.py, "
+        f"and {rel(inputs.bin_facts)}, scripts/event_evidence/measure_bin_facts.py)"
     )
     summary.add(
         *pend(
-            restriction_window_values(restriction_windows_table, restriction_source),
+            restriction_window_values(
+                restriction_windows_table, events, restriction_source
+            ),
             *restriction_stale,
         )
     )
     summary.add(
         *pend(
             restriction_outside_swr_values(
-                restriction_sums,
+                restriction_time_sums,
                 restriction_bin_s,
                 restriction_windows_table,
-                f"{rel(restriction_dir)} (its per-epoch category sums) and "
-                f"{restriction_source}",
+                events,
+                f"{restriction_source} (its windows and time sums)",
             ),
             *restriction_stale,
         )
     )
+    # over immobile time only: no event table or held-out tetrode run enters
     summary.add(
         *pend(
             restriction_immobile_values(
-                restriction_sums,
+                restriction_time_sums,
                 restriction_bin_s,
-                f"{rel(restriction_dir)} (its per-epoch category sums; the time "
-                f"step from {rel(restriction_windows_dir)})",
+                f"{restriction_source} (its time sums)",
             ),
             run_staleness("nonlocal_restriction", restriction_dir),
+            run_staleness("bin_facts", inputs.bin_facts),
         )
     )
     summary.inputs += [
-        files_record(
-            "*_nonlocal_restriction.parquet",
-            ok_table_paths(restriction_dir, "nonlocal_restriction"),
-            ROOT_DIR,
-        ),
         file_record(restriction_dir / "manifest.json", ROOT_DIR),
         files_record(
             "*_nonlocal_restriction_windows.parquet",
             ok_table_paths(restriction_windows_dir, "nonlocal_restriction_windows"),
             ROOT_DIR,
         ),
+        files_record(
+            "*_nonlocal_restriction_time_sums.parquet",
+            ok_table_paths(restriction_windows_dir, "nonlocal_restriction_time_sums"),
+            ROOT_DIR,
+        ),
         file_record(restriction_windows_dir / "manifest.json", ROOT_DIR),
+        file_record(inputs.bin_facts / "manifest.json", ROOT_DIR),
     ]
 
     folder = inputs.decoder_quality

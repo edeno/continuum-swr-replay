@@ -1754,8 +1754,8 @@ def _immobile_statistics(swr_only: list[float], full: list[float]) -> pd.DataFra
     rows = {}
     for family, scale in (("filter", 1.0), ("two_sided", 2.0)):
         for measure, animals in (
-            ("swr_minus_none_per_s", swr_only),
-            ("full_minus_none_per_s", full),
+            ("swr_minus_none_per_spike", swr_only),
+            ("full_minus_none_per_spike", full),
         ):
             values = scale * np.asarray(animals)
             rows[(family, measure)] = {
@@ -1776,7 +1776,10 @@ def test_figure02_panel_g_left_draws_each_decoders_gain_joined_by_animal(offline
     from matplotlib.colors import to_rgba
 
     figure02 = offline("scripts.figures.generate_figure02")
-    swr_only, full = [32.4, 17.7, 23.7, 33.9, 10.9], [40.8, 22.7, 31.8, 45.3, 14.3]
+    swr_only, full = (
+        [0.096, 0.089, 0.074, 0.128, 0.084],
+        [0.118, 0.112, 0.104, 0.17, 0.109],
+    )
     fig, ax = plt.subplots()
     figure02.draw_decoder_gains(ax, _immobile_statistics(swr_only, full))
     fig.canvas.draw()
@@ -1800,7 +1803,7 @@ def test_figure02_panel_g_left_draws_each_decoders_gain_joined_by_animal(offline
     assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-only", "Full"]
     assert [t.get_text() for t in ax.texts] == ["local-only"]
     assert ax.get_title() == "All immobile time"
-    assert ax.get_ylabel() == "Gain over local-only\ndecoder (nats/s)"
+    assert ax.get_ylabel() == "Gain over local-only\ndecoder (nats/spike)"
     low, high = ax.get_ylim()
     assert low < 0 < max(full) < high
     plt.close(fig)
@@ -1851,7 +1854,7 @@ def test_figure02_panel_g_right_draws_the_full_minus_swr_only_by_event_time(
         "Events partly\nin an SWR:\ntime outside\nthe SWR",
     ]
     assert ax.get_title() == "Immobile time outside\nSWR bounds"
-    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/s)"
+    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/spike)"
     plt.close(fig)
 
 
@@ -1862,12 +1865,14 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
     from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
-    assert figure02.RESTRICTION_FIGURE is events.RESTRICTION_FIGURE
+    assert (
+        figure02.restriction_figure_statistics is events.restriction_figure_statistics
+    )
     assert events.RESTRICTION_FIGURE == {
         "parts": ["outside_swr"],
         "families": ["filter"],
         "contrasts": ["full_minus_swr"],
-        "units": ["per_s"],
+        "units": ["per_spike"],
         "kinds": ["event"],
     }
     assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)

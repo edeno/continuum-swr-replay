@@ -27,17 +27,19 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         (Local and No-Spike states only), the SWR-only decoder (non-local states
         only inside SWRs) and the full decoder. Left, "All immobile time": each
         epoch's gain of the SWR-only and of the full decoder over the local-only
-        decoder, summed over every immobile bin and divided by its duration; a
-        dot per animal (the median over its epochs), an animal's two dots joined,
-        and a dashed line at zero, the local-only decoder
-        (``restriction_totals.immobile_gain_statistics``;
-        ``Processed-Data/event_nonlocal_restriction``). Right, "Immobile time
-        outside SWR bounds": the full decoder minus the SWR-only decoder per
-        second over the immobile bins outside SWRs of each event with no SWR,
-        and of each event partly in an SWR (its time outside the SWR); a dot per
-        animal, the animals' mean with its interval, and a dashed line at zero
-        (``restriction_windows.restriction_window_statistics``;
-        ``Processed-Data/event_nonlocal_restriction_windows``). The held-out
+        decoder, summed over every immobile bin inside a well visit and divided
+        by the spikes in them; a dot per animal (the median over its epochs), an
+        animal's two dots joined, and a dashed line at zero, the local-only
+        decoder (``restriction_totals.immobile_gain_statistics``). Right,
+        "Immobile time outside SWR bounds": the full decoder minus the SWR-only
+        decoder per spike over the immobile bins outside SWRs of each event with
+        no SWR, and of each event partly in an SWR (its time outside the SWR),
+        of the events that start inside a well visit; a dot per animal, the
+        animals' mean with its interval, and a dashed line at zero
+        (``restriction_windows.restriction_window_statistics``). Both from
+        ``Processed-Data/event_nonlocal_restriction_windows`` (its windows and
+        time sums) by the events summary's
+        ``restriction_figure_statistics``. The held-out
         tetrode gain over local coding is a supplementary figure
         (``generate_supp_heldout_tetrode.py``).
     h — Tetrode participation (the share of tetrodes with a spike) of each
@@ -64,11 +66,10 @@ features run the summary reads; i's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; j from
 the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
-``nonlocal_below_threshold_statistics``); g from the restriction run's category
-sums and its window run by the functions the events summary uses
-(``restriction_totals.immobile_gain_statistics``,
-``restriction_windows.restriction_window_statistics`` with the summary's
-``RESTRICTION_FIGURE``). Panel i is a
+``nonlocal_below_threshold_statistics``); g from the restriction window run's
+windows and time sums by the events summary's own function
+(``reported.events.restriction_figure_statistics``: the events that start
+inside a well visit and the time inside a well visit). Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -130,13 +131,6 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
-from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
-    epoch_immobile_gains,
-    immobile_gain_statistics,
-)
-from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
-    restriction_window_statistics,
-)
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
@@ -170,7 +164,6 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
-    EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
@@ -180,10 +173,10 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.events import (
-    RESTRICTION_FIGURE,
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
+    restriction_figure_statistics,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.runs.io import read_complete_run, read_manifest
@@ -1029,7 +1022,7 @@ DECODER_LABELS = dict(
 )
 DECODER_COLORS = dict(zip(RESTRICTION_FIGURE_DECODERS, (C_SWR_ONLY, C_NL), strict=True))
 PANEL_G_DECODERS_TITLE = "All immobile time"
-PANEL_G_DECODERS_YLABEL = "Gain over local-only\ndecoder (nats/s)"
+PANEL_G_DECODERS_YLABEL = "Gain over local-only\ndecoder (nats/spike)"
 PANEL_G_REFERENCE = "local-only"
 PART_X = dict(zip(RESTRICTION_FIGURE_GROUPS, (0.0, 1.0), strict=True))
 """Panel g, right: each kind of event time's position on the x axis."""
@@ -1042,7 +1035,7 @@ PART_COLORS = {"no SWR": C_NO_SWR, "SWR": C_SWR_PARTIAL}
 PANEL_G_PARTS_TITLE = "Immobile time outside\nSWR bounds"
 """On two lines: on one it is wider than its axis and meets the left axis'
 title and h's tick labels."""
-PANEL_G_PARTS_YLABEL = "Full minus SWR-only\ndecoder (nats/s)"
+PANEL_G_PARTS_YLABEL = "Full minus SWR-only\ndecoder (nats/spike)"
 GAIN_FLOOR = 0.13
 """Panel g: each axis' floor below zero, as a share of its top."""
 
@@ -1100,7 +1093,7 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
 
 def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     """Panel g, left: the SWR-only and full decoders' gains over the local-only
-    decoder per second of immobile time.
+    decoder per spike of the immobile time inside a well visit.
 
     A dot per animal for each decoder (the median over its epochs; dark gray
     for the SWR-only decoder, the Non-Local state's green for the full one),
@@ -1148,9 +1141,10 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
 
 
 def draw_part_gains(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel g, right: the full decoder minus the SWR-only decoder per second,
+    """Panel g, right: the full decoder minus the SWR-only decoder per spike,
     over the immobile bins outside SWRs of the events with no SWR and of the
-    events partly in an SWR (their time outside the SWR).
+    events partly in an SWR (their time outside the SWR), of the events that
+    start inside a well visit.
 
     For each, a dot per animal in panel d's color and, beside them, the animals'
     mean with its 95 % interval in black (drawn by
@@ -1507,7 +1501,7 @@ def generate_figure(
         )
     )
     # the events summary's restriction values: the same runs, cohorts, time
-    # steps and functions
+    # steps, subset and function
     windows_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
     restriction_bin_s = pd.Series(
         {
@@ -1515,20 +1509,12 @@ def generate_figure(
             for epoch_id, record in read_manifest(windows_dir)["epochs"].items()
         }
     )
-    restriction_decoders = immobile_gain_statistics(
-        epoch_immobile_gains(
-            read_complete_run(
-                data_dir / EVENT_NONLOCAL_RESTRICTION_DIR,
-                "nonlocal_restriction",
-                analyzed_epoch_ids(),
-            ),
-            restriction_bin_s,
-        )
-    ).set_index(["family", "measure"])
-    restriction_parts = restriction_window_statistics(
+    restriction_decoders, restriction_parts = restriction_figure_statistics(
         read_complete_run(windows_dir, "nonlocal_restriction_windows", event_epochs),
-        **RESTRICTION_FIGURE,
-    ).set_index("group")
+        read_complete_run(windows_dir, "nonlocal_restriction_time_sums", event_epochs),
+        restriction_bin_s,
+        events,
+    )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
