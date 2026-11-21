@@ -25,8 +25,8 @@ A column that fails is made inactive in that session. When it is a level of a
 category, the session's rows of that level are dropped from its fit and
 counted, not merged into the reference level (merging inflated the belief
 variance's false positives in simulation, to 20 % in one case), and every term
-by that level leaves the session with them (:func:`level_rows_dropped`,
-from the level's ``DesignTerm.dependents``). The
+by that level leaves the session with them (the level's
+``DesignTerm.dependents``; :mod:`.sessions` applies the rule). The
 same row rule holds for a level made inactive because the session has no
 finite maximum along it.
 
@@ -37,7 +37,7 @@ the sessions with a fit leaves the per-session model
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple, Protocol
 
 import numpy as np
@@ -51,7 +51,6 @@ __all__ = [
     "Support",
     "binary_support",
     "design_support",
-    "level_rows_dropped",
     "level_support",
     "slope_support",
     "terms_failing_share",
@@ -208,45 +207,6 @@ def design_support(
     for name, reason in small.items():  # the smooths and lag functionals
         out[name] = Support(None, None, False, reason)
     return out
-
-
-def level_rows_dropped(
-    design: Design, level_rows: Mapping[tuple, np.ndarray], inactive: Iterable[str]
-) -> tuple[np.ndarray, dict[str, int], dict[str, str]]:
-    """The row rule for the levels of a category made inactive.
-
-    Parameters
-    ----------
-    design : Design
-    level_rows : mapping of tuple to np.ndarray of bool, shape (n_rows,)
-        Each level's rows in the session.
-    inactive : iterable of str
-        Term names made inactive; those that are levels of a category drop
-        their rows.
-
-    Returns
-    -------
-    keep : np.ndarray of bool, shape (n_rows,)
-        The rows kept.
-    dropped : dict of str to int
-        Level name -> its rows dropped.
-    with_them : dict of str to str
-        Coefficient name -> the level it leaves with, for every column of a
-        term by a dropped level (zero on the rows kept).
-    """
-    inactive = set(inactive)
-    n_rows = next(iter(level_rows.values())).size if level_rows else 0
-    keep = np.ones(n_rows, dtype=bool)
-    dropped, with_them = {}, {}
-    for term in design.terms:
-        if term.kind == "level" and term.name in inactive:
-            level = level_rows[term.level]
-            dropped[term.name] = int((level & keep).sum())
-            keep &= ~level
-            for name in term.dependents:
-                for j in design.by_name[name].columns:
-                    with_them[design.coef_names[j]] = term.name
-    return keep, dropped, with_them
 
 
 class _Record(Protocol):

@@ -1,4 +1,4 @@
-"""The support rule, its share over sessions and the row rule for a level."""
+"""The support rule and its share over sessions."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from continuum_swr_replay.analysis.regression.support import (
     Support,
     binary_support,
     design_support,
-    level_rows_dropped,
     slope_support,
     terms_failing_share,
 )
@@ -109,28 +108,6 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
         np.ones(int(previous.sum()), dtype=bool),
     )
     assert not support["reward_fraction:role=previous"].passes
-
-
-def test_an_inactive_role_drops_its_rows_and_its_terms(content_sessions) -> None:
-    """A role level made inactive drops that role's rows (counted) and takes
-    the terms by that role with it; the other levels are untouched."""
-    pooled = pd.concat(content_sessions.values(), ignore_index=True)
-    role = Category("role", ROLES, reference="other")
-    design = build_design(
-        [role, Slope("reward_fraction", by=role, levels=("current", "previous"))],
-        pooled,
-        intercept=False,
-    )
-    rows = next(iter(content_sessions.values()))
-    keep, dropped, with_them = level_rows_dropped(
-        design,
-        design.build(rows).level_rows,
-        ["role[previous]", "reward_fraction:role=current"],
-    )
-    previous = (rows["role"] == "previous").to_numpy()
-    np.testing.assert_array_equal(keep, ~previous)
-    assert dropped == {"role[previous]": int(previous.sum())}
-    assert with_them == {"reward_fraction:role=previous": "role[previous]"}
 
 
 def test_failing_share_rule() -> None:
