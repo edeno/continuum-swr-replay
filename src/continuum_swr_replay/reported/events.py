@@ -2070,9 +2070,11 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     make = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction"]
     )
-    statistics = restriction_windows.restriction_window_statistics(windows).set_index(
-        ["family", "contrast", "unit", "kind", "group"]
-    )
+    # only the per-spike rows are read; each row's bootstrap is seeded on its
+    # own, so the rows do not depend on which others are computed
+    statistics = restriction_windows.restriction_window_statistics(
+        windows, units=["per_spike"]
+    ).set_index(["family", "contrast", "unit", "kind", "group"])
     values, after_visit = [], []
     for family, suffix in FAMILY_SUFFIX.items():
         for kind, group, contrast in _RESTRICTION_WINDOWS:
