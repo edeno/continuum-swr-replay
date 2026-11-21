@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "96fc11f4e81d",
+ "commit": "6d9c06b78fcb",
  "code": {
-  "head": "96fc11f4e81d204a89565433cb9032aa5696bb32",
+  "head": "6d9c06b78fcbd6bf19dbccf388808230c51c9dcd",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -210,9 +210,21 @@
     "sha256": "2954482100df7f5ba699a11621080512a8902a72f74a8af1074c764d63db404f",
     "code_sha256": "5614fe932b5e718f9523f7ef02f2bdc54f2cc029835f648d38d20a3f22fb918c"
    },
+   "src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py": {
+    "sha256": "c0048214db297e6e4c3cd32f3039e08d801e7bb7537d3281098bb1c96cde95f5",
+    "code_sha256": "4385ade5314825e79883a003ced1f34e563de9a825bc4dd4285c33ac664cc74d"
+   },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
     "sha256": "40c27e985de510155ab2461da1a0d4a36eab6631f856532f0c8469c89aaca33c",
     "code_sha256": "14435d7b79ab74767ded70f70b4e6a074674d888fde3f98b2fa5897f3d23eec2"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
+    "sha256": "3192fd8909784a2082fc842e896d34f6e145943ca4ba53e11875905cc65cf625",
+    "code_sha256": "b5989a390ab7d1af224e7e4c262e0af60385b5f8d3dd00bbad6870ddd47cc668"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
+    "sha256": "14d6d05ccd3d2611eede0c7ea2021f9466c2df1ae2a93e0b711b9020d9a18c36",
+    "code_sha256": "4e9b1e292a01db42a52a070d2c5da472e31ab6894155983e039ac26a165f3838"
    },
    "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
     "sha256": "ae4a23860afe8190562d90a7b7bfff60f99763740f6945bc08694230fc1b4cff",
@@ -235,16 +247,16 @@
     "code_sha256": "8c514b0525e8b77812b22a6fc2aac9271659da81f26bea0fa2c36a8d415c9de5"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
-    "sha256": "45f1f9d94509c428e371ae682ed25f4b36c9c3b6eeab7cdb981e2bc8c8d525e5",
-    "code_sha256": "bb8ba2d938d37eccaad4007334c7447affe9fc08a0030086cc2d7fe1bfce9d17"
+    "sha256": "2ff95f1fe7faf3f56928984be814e73e457f3ca6e4ec3bd17043686a26b6d7ce",
+    "code_sha256": "d1c86fcf13159783faba00c4972c880ee6aec76f1846328ca9bf1aedd043ec56"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
-    "sha256": "354619aec9bda951e099c8f8c04f69936f2c1e9e0e6400fb662966780e36eb10",
-    "code_sha256": "1fc931468622cc2a38cf74614fae0c1a2ca3d1dcd03681b230c4511950d81c4e"
+    "sha256": "8a15e4c88f5cfad35297d01ffb9c7d783c2dca841117aebd0190312c6292ffd5",
+    "code_sha256": "5287a678cd0925a5783ccfabc8650caadd3423e7f338781acb8ea144f7006e42"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
-    "sha256": "69386604489db6c17220d3b2c5487985aba2b3b121fcb731f44e19704f679f40",
-    "code_sha256": "695588b4c3a03e40243d92b77d9c87a6f534df412b1cc02d70f868d45edf3231"
+    "sha256": "8424accbd1a8af745c24536cc76364d589fdb743649caafde81a663162200f96",
+    "code_sha256": "a38ecdfe34a643f329eca259b4d91aa1582ab11ff5b0fd6469b53a4cc95fb5b5"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
@@ -331,16 +343,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "e47174c87512da6a3ea19e7eda09682265041cd2468c305531aa8584b6756db5",
-    "code_sha256": "e7f0b6faf0bce1487c45fabd50b5c119ba1c8f213299f14e73276d3bcb50058a"
+    "sha256": "f025a381ad89e9955dd2415816780afed12872c3a568529491d8b131b609225a",
+    "code_sha256": "760fd51a8d95f3d7175da1d93d07d3df2fd4c9ea12216b10663bb5c06987abb4"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "de9c90213e3818411fa6b46666663ff5302d1dc4c9f0a62e8d1f9e2b2d070723",
-    "code_sha256": "5baaa8afc8f33c654225b1353f61d79db04c23638c8914eacdc38d6b0d88f94d"
+    "sha256": "85b52ae82c7687af26c35c1a494b407cbebdb4ce5067a84cf1a58f21c03267f7",
+    "code_sha256": "769fe5acdc3eb06886db6304fbf423a9e2562aec359e90c0b19cd5445cb17cab"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -521,6 +533,24 @@
   {
    "path": "Processed-Data/event_likelihood_advantage/manifest.json",
    "sha256": "d676417edf77ab7bfd7801be4ba87db7647a69ef7b79670b38d13ec9932abd8a"
+  },
+  {
+   "path": "Processed-Data/event_nonlocal_restriction/*_nonlocal_restriction.parquet",
+   "n_files": 242,
+   "sha256": "742f8e3bdf2cc9ad295dd5b3dc4852659fd0a827031f63505730af292629a72e"
+  },
+  {
+   "path": "Processed-Data/event_nonlocal_restriction/manifest.json",
+   "sha256": "681d515d32c6ed8801040b5a7ccabb262ffa0e56819bcbd6e4423f75e5c28fd2"
+  },
+  {
+   "path": "Processed-Data/event_nonlocal_restriction_windows/*_nonlocal_restriction_windows.parquet",
+   "n_files": 242,
+   "sha256": "bbcfa6714723ffcf17414487676725cedc2a994c56b695f7e5b73e0f236dd73d"
+  },
+  {
+   "path": "Processed-Data/event_nonlocal_restriction_windows/manifest.json",
+   "sha256": "10984abbba5ecd9b2705869d1dbbc7ddf4c6a31ece896ebb3b8d67521ada60d6"
   },
   {
    "path": "Processed-Data/decoder_quality/sessions.parquet",
@@ -4325,6 +4355,1056 @@
    "figures": [],
    "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
+   "pending": null
+  },
+  "restriction_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the restriction comparison",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls": {
+   "value": 42969,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR matched Local-rest controls summed",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_per_spike": {
+   "value": -0.0026001859440803626,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the no SWR matched Local-rest controls and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_per_spike_ci_high": {
+   "value": -0.002216343244281315,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_per_spike_ci_low": {
+   "value": -0.00298402864387941,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_two_sided_per_spike": {
+   "value": -0.00016930254728153902,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the no SWR matched Local-rest controls and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_two_sided_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_two_sided_per_spike_ci_high": {
+   "value": -8.708910123679573e-05,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_full_minus_swr_two_sided_per_spike_ci_low": {
+   "value": -0.0002515159933262823,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_controls_scored": {
+   "value": 42837,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR matched Local-rest controls with a per-spike value (at least one spike)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR events summed",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_per_spike": {
+   "value": 0.4107718983570921,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the no SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_per_spike_ci_high": {
+   "value": 0.5218695256285243,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_per_spike_ci_low": {
+   "value": 0.29967427108565986,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_two_sided_per_spike": {
+   "value": 0.5543386672574396,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the no SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_two_sided_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_two_sided_per_spike_ci_high": {
+   "value": 0.711436026923751,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_full_minus_swr_two_sided_per_spike_ci_low": {
+   "value": 0.3972413075911283,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_non_swr_events_scored": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR events with a per-spike value (at least one spike)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with immobile bins outside SWRs",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_epochs_positive": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose gain per second is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_per_s": {
+   "value": 7.534488475684722,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every immobile bin outside SWRs of the epoch and divided by their duration: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_per_s_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_per_s_ci_high": {
+   "value": 10.682925460126679,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_per_s_ci_low": {
+   "value": 4.386051491242766,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "lower bound of its 95 % interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_share_in_non_swr_events": {
+   "value": 0.6883108848836709,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of that gain (filter score), summed over the epoch's immobile bins outside SWRs, that lies in its events with no SWR (the events' summed gain over the immobile bins' summed gain): mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_share_in_non_swr_events_ci_high": {
+   "value": 0.823349370923212,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_share_in_non_swr_events_ci_low": {
+   "value": 0.5532723988441297,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lower bound of its 95 % interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with immobile bins outside SWRs",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_epochs_positive": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose gain per second is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_per_s": {
+   "value": 10.736297627735464,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every immobile bin outside SWRs of the epoch and divided by their duration: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_per_s_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_per_s_ci_high": {
+   "value": 15.254308538101121,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_per_s_ci_low": {
+   "value": 6.218286717369808,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "lower bound of its 95 % interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_share_in_non_swr_events": {
+   "value": 0.6065030990931725,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of that gain (two_sided score), summed over the epoch's immobile bins outside SWRs, that lies in its events with no SWR (the events' summed gain over the immobile bins' summed gain): mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_share_in_non_swr_events_ci_high": {
+   "value": 0.7172734673644485,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_outside_swr_full_minus_swr_two_sided_share_in_non_swr_events_ci_low": {
+   "value": 0.49573273082189645,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lower bound of its 95 % interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction (its per-epoch category sums) and Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_outside_swr_values",
+   "pending": null
+  },
+  "restriction_swr_controls": {
+   "value": 32698,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR matched Local-rest controls summed",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_per_spike": {
+   "value": -0.00246205974047515,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the SWR matched Local-rest controls and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_per_spike_ci_high": {
+   "value": -0.0020472917580400484,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_per_spike_ci_low": {
+   "value": -0.0028768277229102514,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_two_sided_per_spike": {
+   "value": -0.00018520325888144452,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the SWR matched Local-rest controls and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_two_sided_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_two_sided_per_spike_ci_high": {
+   "value": -8.487267697743621e-05,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_full_minus_swr_two_sided_per_spike_ci_low": {
+   "value": -0.0002855338407854528,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_controls_scored": {
+   "value": 32677,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR matched Local-rest controls with a per-spike value (at least one spike)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR events summed",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_per_spike": {
+   "value": 0.730211219883695,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the local-only decoder (Local and No-Spike states at every bin), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_per_spike_ci_high": {
+   "value": 0.9002631603895361,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_per_spike_ci_low": {
+   "value": 0.5601592793778538,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_two_sided_per_spike": {
+   "value": 0.8099743470904821,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the local-only decoder (Local and No-Spike states at every bin), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_two_sided_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_two_sided_per_spike_ci_high": {
+   "value": 0.9955100058208768,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_none_two_sided_per_spike_ci_low": {
+   "value": 0.6244386883600874,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_per_spike": {
+   "value": -0.02864060902629917,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_per_spike_ci_high": {
+   "value": -0.018523250152727086,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_per_spike_ci_low": {
+   "value": -0.03875796789987125,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_two_sided_per_spike": {
+   "value": 0.0016713621520797043,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_two_sided_per_spike_animals_positive": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_two_sided_per_spike_ci_high": {
+   "value": 0.007549755843254844,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_full_minus_swr_two_sided_per_spike_ci_low": {
+   "value": -0.004207031539095435,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_scored": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR events with a per-spike value (at least one spike)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_per_spike": {
+   "value": 0.7340507088645757,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with encodings held out in time (five folds of whole trials balanced by destination well), under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere) minus under the local-only decoder (Local and No-Spike states at every bin), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_per_spike_ci_high": {
+   "value": 0.9014619631547519,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_per_spike_ci_low": {
+   "value": 0.5666394545743995,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_two_sided_per_spike": {
+   "value": 0.7582315989209236,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin), with encodings held out in time (five folds of whole trials balanced by destination well), under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere) minus under the local-only decoder (Local and No-Spike states at every bin), summed over each of the SWR events and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_two_sided_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_two_sided_per_spike_ci_high": {
+   "value": 0.9295999436582286,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
+   "pending": null
+  },
+  "restriction_swr_events_swr_minus_none_two_sided_per_spike_ci_low": {
+   "value": 0.5868632541836186,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_windows (scripts/event_evidence/sum_nonlocal_restriction_windows.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py)",
+   "function": "restriction_window_values",
    "pending": null
   },
   "reversals_animals_in_direction": {
