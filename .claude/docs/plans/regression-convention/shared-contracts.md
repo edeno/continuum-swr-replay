@@ -211,7 +211,7 @@ written by one function (new, `analysis/regression/record.py`, Phase 2):
 | `edf` | JSON: term -> effective degrees of freedom |
 | `status`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3: the fit's `NewtonFit.status` (one of the six statuses of `newton.FitStatus`; only "converged" is a fit) |
 | `left_out` | JSON: coefficient name -> why it is inactive in this session (`support`, or `no finite maximum` with the refit round); its `coef` and `vcov` entries are NaN |
-| `support` | JSON: term -> {`n_low`, `n_high`, `passes`} from the support rule |
+| `support` | JSON: coefficient name (a column of an unpenalized term; a smooth term's name when the term is too small in the session) -> {`n_low`, `n_high`, `passes`, `reason`} from the support rule, counted on the rows the fit used |
 | `collinearity` | JSON: term -> {`r2`, `vif`} or {`observed`, `worst`, `estimate`} |
 | `basis` | JSON: term -> {`kind`, `knots`, `degree`, `range`, `constraint`, `clamp`} |
 | `standardization` | JSON: covariate -> {`sd`, `ddof`: 0, `reference`} |
@@ -252,7 +252,7 @@ difference: 36 tests**. Q5b has two members, the belief variance and the sample 
 model with the trial number and the smooth reward fraction ("Yes"). Q4a is read from the smooth reward
 fraction ([designs.md#content-design](designs.md#content-design)). (The design's "ten estimands ... 30 tests"
 predates the Q3, Q4 and Q7 splits and the uncertainty changes.) The code reads the list from one place (new
-`analysis/regression/declared_tests.py`, Phase 2), so the count is not hard-coded anywhere else. If Phase
+`analysis/replay_models/declared_tests.py`, Phase 2: it names roles and visits, so it is outside the fitter package), so the count is not hard-coded anywhere else. If Phase
 6a's gate changes how a member is fitted, the member keeps its id and the change is made before any real
 fit (the family is still declared before the fits).
 

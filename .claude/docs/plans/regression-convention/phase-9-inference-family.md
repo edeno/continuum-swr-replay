@@ -12,7 +12,7 @@ tests, the leave-one-animal-out check, and the curve bands Figure 4 draws.
 **Inputs to read first:**
 
 - The design, section 4.5 (inference) and the "What would make this a failure" list of section 1.
-- `analysis/regression/declared_tests.py` (the list, fixed before Phase 5a), `analysis/regression/bands.py`,
+- `analysis/replay_models/declared_tests.py` (the list, fixed before Phase 5a), `analysis/regression/bands.py`,
   `analysis/shared_statistics.py` (`estimand_summary`, `benjamini_hochberg` `:75`,
   `nested_bootstrap_draws` `:377`, `bootstrap_interval` `:456`).
 - The estimand modules of Phases 5a, 6a and 7 (`visit_rate_statistics.py`, `role_content_statistics.py`)

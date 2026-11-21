@@ -155,6 +155,13 @@ Decided from the data before the fit, per unpenalized declared term and session 
   `proto_uncertainty_measures/REPORT.md`): merging inflated the belief variance's false positives, to 20 %
   in one case. The same row rule holds for a role column made inactive because the session has no finite
   maximum ([Phase 2](phase-2-convention-tools.md)).
+- As built (after the phase's independent review): a category level passes on its own count alone, and
+  only a thin level's own rows are dropped. After any rows are dropped, the support is counted again on the
+  rows kept, until nothing changes, and the record holds the counts the fit used. A term whose column is
+  below the design check's threshold in one session fails the support rule there (on the pooled rows it is
+  the caller's error). A session left with no rows or no events is recorded as not fitted, with the reason,
+  and the loop goes on. A category's reference level must have rows in every session; otherwise the design
+  is not identified and the fit raises, naming the session.
 - The minimum count (5) is defined in `analysis/regression/support.py`, the module that reads it; the
   fitter's `constants.py` does not hold it.
 
