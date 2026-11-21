@@ -59,6 +59,18 @@ the stored counts by the functions the events summary uses
 stored output holds, computed from the aggregated decode frames (cached), whose
 event counts by SWR overlap must equal the canonical table's.
 
+Every event panel is over the events that start inside a well visit (the first
+poke-in at a well to the final poke-out): the canonical table is checked
+against the frames whole and then selected once
+(``cohort_selection.select_visit_context``), the stored per-event tables are read
+over the selected events (``cohort_selection.select_events_in``), and i's
+averages are over the frames' rows of those events
+(``triggered_analysis.triggering_events_in``). The SWRs and the other detectors'
+events of c and e are those whose first sample is inside a visit, against the
+selected non-local events (``nonlocal_comparison.read_comparison``); i's
+quiet-rest line and j count only the time inside a visit (their producers' in-visit
+mask).
+
 Usage
 -----
     python scripts/figures/generate_figure02.py
@@ -103,6 +115,11 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
     swr_intervals,
 )
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+    select_events_in,
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_state_probability,
 )
@@ -132,6 +149,11 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
+    triggering_events_in,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    behavioral_context_cache_path,
+    well_visit_times,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
@@ -161,7 +183,8 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import read_complete_run, read_manifest
+from continuum_swr_replay.runs.io import ok_epochs, read_complete_run, read_manifest
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -188,7 +211,9 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 # other reason; git history holds what each earlier bump was for.
 # 14: j's share by ripple power left the bundle; it is drawn from the stored
 #     counts (``Processed-Data/nonlocal_by_ripple_power``).
-FIGURE02_CACHE_VERSION = 14
+# 15: i's averages and c and e's comparison are over the events that start
+#     inside a well visit.
+FIGURE02_CACHE_VERSION = 15
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -359,12 +384,23 @@ def _stat_fingerprint(files: Sequence[Path]) -> str:
 
 
 def _comparison_fingerprint() -> str:
-    """A stat fingerprint of the detector comparison's files; a run without a
-    manifest is fingerprinted as missing (``detector_comparison`` then raises)."""
+    """A stat fingerprint of the detector comparison's files, of the canonical
+    event table (the selected events) and of the session cache's entries (the
+    well visits); a run without a manifest is fingerprinted as missing
+    (``detector_comparison`` then raises)."""
     run = event_features_root() / EVENT_FEATURES_RUN
     if not (run / "manifest.json").exists():
         return _stat_fingerprint([run / "manifest.json"])
-    return _stat_fingerprint(nonlocal_comparison.comparison_files(run))
+    return _stat_fingerprint(
+        [
+            *nonlocal_comparison.comparison_files(run),
+            table_path("event_table", replay_content_dir()),
+            *(
+                behavioral_context_cache_path({"session_id": identifier})
+                for identifier in ok_epochs(read_manifest(run))
+            ),
+        ]
+    )
 
 
 def _settings_fingerprint() -> str:
@@ -398,23 +434,31 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     )
 
 
-def checked_reference(reference: pd.DataFrame, name: str) -> pd.DataFrame:
+def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
     """A per-epoch measurement (the brain-state reference, the counts by ripple
-    power), if it was made from the decodes the event features run records for
-    every analyzed epoch.
+    power), if it was made over the time inside the well visits and from the
+    decodes the event features run records for every analyzed epoch.
 
     Parameters
     ----------
     reference : pd.DataFrame
         The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
+    folder : Path
+        Its folder, whose ``manifest.json`` records the subset it is over.
     name : str
         What it is, for the error.
 
     Raises
     ------
     ValueError
-        If an analyzed epoch is missing or extra, or its decode hash differs.
+        If it was not made over the analyses' subset, an analyzed epoch is
+        missing or extra, or its decode hash differs.
     """
+    if read_output_manifest(folder).get("subset") != ANALYZED_SUBSET:
+        raise ValueError(
+            f"the {name} ({folder}) was not made over the time inside the well "
+            "visits; rerun its producer"
+        )
     manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     expected = {
         epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
@@ -435,13 +479,17 @@ def checked_reference(reference: pd.DataFrame, name: str) -> pd.DataFrame:
     return reference
 
 
-def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) -> dict:
+def _compute_figure_inputs(
+    nwb_file_name: str, epoch_name: str, data_dir: Path, events: pd.DataFrame
+) -> dict:
     """Run the expensive loads and derivations; return the cached render inputs.
 
     The example session's ``data``/``results``/``detector``/``env`` (panels a
-    and b), the triggered-average curves (i) and the frames' immobile non-local
-    events by SWR overlap, which the canonical event table is checked against. The multi-GB
-    ``data_over_time`` is consumed here and not returned.
+    and b), the triggered-average curves (i) over the frames' rows of
+    ``events`` (the selected events), the frames' immobile non-local events by
+    SWR overlap, which the canonical event table is checked against, and the
+    detector comparison (c and e). The multi-GB ``data_over_time`` is consumed
+    here and not returned.
     """
     logging.info(f"Loading session {nwb_file_name} {epoch_name}...")
     # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
@@ -467,14 +515,14 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     logging.info("Computing the triggered averages (panel i)...")
     triggered_curves = compute_triggered_average_curves(
         data_over_time,
-        event_types,
+        triggering_events_in(event_types, events),
         TRIGGERED_SIGNALS,
         time_col="start_time",
         window_sec=TRIGGERED_WINDOW_S,
     )
     del data_over_time
     logging.info("Reading the detector comparison (panels c and e)...")
-    comparison = detector_comparison()
+    comparison = detector_comparison(events)
     return {
         "nwb_file_name": nwb_file_name,
         "epoch_name": epoch_name,
@@ -561,8 +609,12 @@ def example_windows(
     return windows
 
 
-def detector_comparison() -> dict:
+def detector_comparison(events: pd.DataFrame) -> dict:
     """Panels c and e: the event features run's comparison, as the summary reads it.
+
+    Over the other detectors' events whose first sample is inside a well visit
+    (each ok epoch's visits from the session cache) and the non-local events of
+    ``events``, the selected events.
 
     Returns
     -------
@@ -575,7 +627,8 @@ def detector_comparison() -> dict:
         content class (c).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
-    comparison = nonlocal_comparison.read_comparison(run)
+    visits = {i: well_visit_times(i) for i in ok_epochs(read_manifest(run))}
+    comparison = nonlocal_comparison.read_comparison(run, visits)
     others, directional = comparison.others, comparison.directional
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
@@ -583,7 +636,9 @@ def detector_comparison() -> dict:
             others, "kay"
         ),
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
-            nonlocal_comparison.nonlocal_event_memberships(run, directional),
+            nonlocal_comparison.nonlocal_event_memberships(
+                run, directional, events["event_id"]
+            ),
             tuple(DETECTOR_LABELS),
         ),
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
@@ -1313,24 +1368,29 @@ def generate_figure(
     """
     if data_dir is None:
         data_dir = processed_data_dir()
-    cache_path = _figure02_cache_path(nwb_file_name, epoch_name, data_dir)
-    if use_cache and cache_path.exists():
-        logging.info(f"Loading cached render inputs from {cache_path}...")
-        inputs = joblib.load(cache_path)
-    else:
-        inputs = _compute_figure_inputs(nwb_file_name, epoch_name, data_dir)
-        logging.info(f"Caching render inputs to {cache_path}...")
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(inputs, cache_path)
-
-    events = read_swr_table(
+    table = read_swr_table(
         table_path(
             "event_table",
             data_dir / replay_content_dir().relative_to(processed_data_dir()),
         )
     )
+    # the one selection: the events that start inside a well visit
+    events = select_visit_context(table)
+    cache_path = _figure02_cache_path(nwb_file_name, epoch_name, data_dir)
+    if use_cache and cache_path.exists():
+        logging.info(f"Loading cached render inputs from {cache_path}...")
+        inputs = joblib.load(cache_path)
+    else:
+        inputs = _compute_figure_inputs(nwb_file_name, epoch_name, data_dir, events)
+        logging.info(f"Caching render inputs to {cache_path}...")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(inputs, cache_path)
+
+    # the frames hold every event: the whole table is checked against them
+    check_table_against_frames(
+        overlap_class_statistics(table), inputs["frame_event_counts"]
+    )
     classes = overlap_class_statistics(events)
-    check_table_against_frames(classes, inputs["frame_event_counts"])
     animal, day = parse_nwb_filename(nwb_file_name)
     session_events = events[
         (events["animal"] == animal)
@@ -1344,6 +1404,7 @@ def generate_figure(
     reference = reference_medians(
         checked_reference(
             pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
+            data_dir / BRAIN_STATE_REFERENCE_DIR,
             "brain-state reference",
         ),
         ["ripple", "mua", "theta"],
@@ -1351,14 +1412,18 @@ def generate_figure(
     power_counts = animal_power_counts(
         checked_reference(
             pd.read_parquet(data_dir / NONLOCAL_BY_RIPPLE_POWER_DIR / "counts.parquet"),
+            data_dir / NONLOCAL_BY_RIPPLE_POWER_DIR,
             "counts by ripple power",
         )
     )
     # every analyzed epoch with an event: an epoch with none has no table
-    event_epochs = event_table_epochs(events, analyzed_epoch_ids())
+    event_epochs = event_table_epochs(table, analyzed_epoch_ids())
     participation = participation_statistics(
-        read_complete_run(
-            data_dir / EVENT_PARTICIPATION_DIR, "participation", event_epochs
+        select_events_in(
+            read_complete_run(
+                data_dir / EVENT_PARTICIPATION_DIR, "participation", event_epochs
+            ),
+            events["event_id"],
         )
     )
     heldout = window_scores(

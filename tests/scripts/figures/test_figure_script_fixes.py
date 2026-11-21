@@ -330,6 +330,7 @@ def _figure02_events() -> pd.DataFrame:
             "epoch": "e1",
             "overlap_class": ["swr_contained", "swr_partial", "swr_partial"]
             + ["non_swr"] * 5,
+            "visit_context": "in_visit",
             "whole_event_speed_eligible": True,
             "event_start_s": [0.0025, -0.25, 1.0, 3.0, 4.0, 5.0, 6.0, 7.0],
             "event_end_s": [0.25, -0.0045, 2.0, 3.1, 4.1, 5.1, 6.1, 7.1],
@@ -426,6 +427,58 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
     )
     with pytest.raises(ValueError, match="counts by SWR overlap are not"):
         figure02.generate_figure(data_dir=tmp_path)
+
+
+def test_figure02_checks_the_whole_table_and_draws_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    """Two non-SWR events on the track, between two visits: the frames hold
+    them, so the check against the frames counts them; every panel is drawn
+    from the other eight, the events that start inside a well visit."""
+    import joblib
+
+    from continuum_swr_replay.paths import (
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    outside = _figure02_events().iloc[[3, 4]].assign(visit_context="track_leaf_arm")
+    events = pd.concat([_figure02_events(), outside], ignore_index=True)
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(analyzed_time.stamp_swr_source(events), table)
+    cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    cache.parent.mkdir(parents=True)
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    frames = {**FIGURE02_FRAME_COUNTS, "non_swr": 7, "total": 10}
+    joblib.dump({"frame_event_counts": frames, "data": data, "results": None}, cache)
+    seen = []
+    counted = figure02.overlap_class_statistics
+
+    def count(table):
+        seen.append(len(table))
+        return counted(table)
+
+    class Drawn(Exception):
+        pass
+
+    def stop(session_events, *args):
+        seen.append(session_events)
+        raise Drawn
+
+    monkeypatch.setattr(figure02, "overlap_class_statistics", count)
+    monkeypatch.setattr(figure02, "example_windows", stop)
+    monkeypatch.setattr(figure02, "parse_nwb_filename", lambda name: ("a", "d1"))
+    with pytest.raises(Drawn):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    # the check saw all ten; panel d's classes and the session's events are eight
+    assert seen[:2] == [10, 8]
+    assert len(seen[2]) == 8
+    assert set(seen[2]["visit_context"]) == {"in_visit"}
 
 
 def _figure02_example_table(figure02) -> pd.DataFrame:
@@ -1693,3 +1746,35 @@ def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offlin
         )
     assert positions[lower][0] < drawn_extent(fig, panels[lower]).x0 - 0.01
     plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "module",
+    ["scripts.figures.generate_figure03", "scripts.figures.generate_supp_event_gamma"],
+)
+def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
+    offline, monkeypatch, module
+):
+    """An event between two visits is in the table and in no panel: the first
+    function given the events sees only those that start inside a visit."""
+    figure = offline(module)
+    outside = _figure02_events().iloc[[3]].assign(visit_context="after_visit_at_well")
+    table = pd.concat([_figure02_events(), outside], ignore_index=True)
+    seen = []
+
+    class Read(Exception):
+        pass
+
+    def stop(events, *args):
+        seen.append(events)
+        raise Read
+
+    monkeypatch.setattr(figure, "read_swr_table", lambda path: table)
+    reader = (
+        "content_along_arms_bins" if module.endswith("figure03") else "with_brain_state"
+    )
+    monkeypatch.setattr(figure, reader, stop)
+    with pytest.raises(Read):
+        figure.read_inputs()
+    assert len(seen[0]) == len(table) - 1
+    assert set(seen[0]["visit_context"]) == {"in_visit"}

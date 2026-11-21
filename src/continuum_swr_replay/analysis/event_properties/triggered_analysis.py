@@ -366,3 +366,62 @@ def compute_triggered_average_curves(
             ),
         }
     return curves
+
+
+#: The ``get_event_types`` entries :func:`compute_triggered_average_curves` reads:
+#: the immobile non-local events that do and do not overlap an SWR.
+TRIGGERING_EVENT_TYPES = (
+    "non_local_event_immobile_no_overlap_SWR_event",
+    "non_local_event_immobile_overlap_SWR_event",
+)
+
+
+def triggering_events_in(event_types: dict, events: pd.DataFrame) -> dict:
+    """``event_types`` with its triggering non-local events limited to ``events``.
+
+    The decode frames label every immobile non-local event; the triggered
+    averages are over the events of the event table's selection
+    (``cohort_selection.select_visit_context``). An event of the frames is kept
+    when its session and label are those of a row of ``events``.
+
+    Parameters
+    ----------
+    event_types : dict of str to pd.DataFrame
+        ``get_event_types`` of the aggregated frames, whose rows carry
+        ``animal``, ``day``, ``epoch`` and ``non_local_event``.
+    events : pd.DataFrame
+        The selected events, with ``animal``, ``session_date``, ``epoch`` and
+        ``non_local_event`` (the frame label of each).
+
+    Returns
+    -------
+    dict
+        A copy of ``event_types`` whose :data:`TRIGGERING_EVENT_TYPES` hold the
+        rows of the selected events only; the other entries are unchanged.
+    """
+    require_columns(
+        events,
+        ["animal", "session_date", "epoch", "non_local_event"],
+        "the selected events",
+    )
+    keys = pd.MultiIndex.from_arrays(
+        [
+            events["animal"].astype(str),
+            events["session_date"].astype(np.int64),
+            events["epoch"].astype(str),
+            events["non_local_event"].astype(np.int64),
+        ]
+    )
+    kept = dict(event_types)
+    for name in TRIGGERING_EVENT_TYPES:
+        frame = event_types[name]
+        rows = pd.MultiIndex.from_arrays(
+            [
+                frame["animal"].astype(str),
+                frame["day"].astype(np.int64),
+                frame["epoch"].astype(str),
+                frame["non_local_event"].astype(np.int64),
+            ]
+        )
+        kept[name] = frame.loc[rows.isin(keys)]
+    return kept

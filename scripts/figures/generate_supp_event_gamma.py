@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Generate the supplementary figure: slow and fast gamma during SWR and no-SWR events.
 
-The immobile non-local events of the canonical event table, split by whether
-they overlap an SWR. For each band of ``gamma_power.GAMMA_BANDS`` (a, slow
+The immobile non-local events of the canonical event table that start inside
+a well visit (``cohort_selection.select_visit_context``), split by whether
+they overlap an SWR; quiet rest is the rest inside a well visit. For each band of ``gamma_power.GAMMA_BANDS`` (a, slow
 gamma; b, fast gamma) and each kind of event, every animal's level during the
 events, between the levels of the same epochs' quiet-rest and running windows
 as long as the kind's events. An event's gamma is a mean over its bins, and a
@@ -33,6 +34,9 @@ import pandas as pd
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_signal_levels,
@@ -79,7 +83,7 @@ SIGNALS = tuple(
 def read_inputs() -> dict:
     """The events with their gamma, and each epoch's rest and running levels."""
     inputs = default_inputs()
-    events = read_swr_table(inputs.event_table)
+    events = select_visit_context(read_swr_table(inputs.event_table))
     events, reference, _ = with_brain_state(events, inputs, len(analyzed_epoch_ids()))
     return {"events": events, "reference": reference}
 
