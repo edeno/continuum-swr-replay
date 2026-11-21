@@ -154,6 +154,12 @@ The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
 `SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `event_epoch_ids`, `event_table_epochs`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
 
+### `src/continuum_swr_replay/analysis/event_definition/well_visits.py`
+
+Which times lie inside a well visit.
+
+`well_visit_index`, `in_well_visit`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py`
 
 Spike likelihood at decoded and actual positions, over each whole non-local event.

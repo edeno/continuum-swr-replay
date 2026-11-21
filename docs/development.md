@@ -318,6 +318,11 @@ most `mixed` stops start inside a visit and run past its final poke-out
 (`spans_visit_end`): the default selection keeps them, and selecting stops by
 `in_visit` alone would drop their in-visit seconds.
 
+A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
+visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
+grid: a time is inside a visit from the first poke-in (included) to the final poke-out
+(not included), the per-sample rule the labels summarize.
+
 ### Spatial Variables
 
 Position is tracked in multiple coordinate systems:
