@@ -31,7 +31,7 @@ BIN_S = 0.015
 CLOCK_MAX_S = 4.0
 N_STOPS = 350
 N_EVENTS = 300
-N_DATA_SETS = 200
+N_DATA_SETS = 1000
 N_BASIS = 15
 LOG_RATE_RATIO = np.log(1.3)
 #: Truths of the log rate over the clock (up to a constant): a fourfold rise
@@ -95,7 +95,7 @@ def _fits(shape: str, log_rate_ratio: float, seed: int) -> np.ndarray:
 @pytest.mark.slow
 def test_coverage_and_size() -> None:
     """The 95 % interval of the reward coefficient covers the planted 1.3-fold
-    effect in 93-97 % of 200 data sets with the rise truth; with a flat truth and
+    effect in 93-97 % of 1,000 data sets with the rise truth; with a flat truth and
     no reward effect the coefficient is significant at 5 % in 3-7 %, and the
     smooth shrinks to a line (edf below 2.5) in at least 90 %."""
     z = scipy.stats.norm.ppf(0.975)
