@@ -19,6 +19,8 @@ package may import it.
   destination well, long stays cut into pieces.
 - ``bands``: simultaneous 95 % bands for a curve, one fit's and the
   animal-balanced curve's across sessions.
+- ``declared_tests``: the declared family of tests, each estimand with its
+  question, model and contrast, tested for SWR, No SWR and their difference.
 
 Submodules are imported by name; nothing is re-exported here.
 """
