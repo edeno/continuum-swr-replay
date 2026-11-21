@@ -129,6 +129,9 @@ BIN_FACT_COLUMNS = (
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
 
+WINDOW_BIN_COLUMNS = ("time", *SCORE_COLUMNS, "in_swr", "category")
+"""The per-bin table's columns :func:`window_table` reads."""
+
 EVENT_TABLE_NOTE = "event_table_note"
 """The window run's settings key of the note it records when the event table it
 read is not the one the held-out tetrode run read: ``event_table_sha256`` (the

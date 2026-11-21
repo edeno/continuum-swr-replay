@@ -119,6 +119,7 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    WINDOW_EVENT_COLUMNS,
     add_cpu_arguments,
     add_restriction_dir_argument,
     add_run_arguments,
@@ -167,12 +168,14 @@ def run_epoch(
     participation_path = output_path(
         epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME
     )
-    bins = pd.read_parquet(bins_path)
+    bins = pd.read_parquet(bins_path, columns=list(rw.WINDOW_BIN_COLUMNS))
     time = decode_time(epoch_id, data_dir)
     if not np.array_equal(bins["time"].to_numpy(dtype=float), time):
         raise ValueError("the per-bin table's time is not the decode frame's")
     windows = epoch_windows(
-        time, read_swr_table(event_table), pd.read_parquet(participation_path)
+        time,
+        read_swr_table(event_table, columns=WINDOW_EVENT_COLUMNS),
+        pd.read_parquet(participation_path),
     )
     facts = pd.read_parquet(facts_path)
     table = rw.window_table(bins, facts, windows)

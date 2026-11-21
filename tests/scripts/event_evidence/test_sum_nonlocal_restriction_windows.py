@@ -113,7 +113,7 @@ def data_dir(tmp_path, monkeypatch):
         (tmp_path / folder).mkdir(exist_ok=True)
         table.to_parquet(output_path(EPOCH, tmp_path / folder, name))
     monkeypatch.setattr(runner, "decode_time", lambda epoch_id, data_dir: TIME)
-    monkeypatch.setattr(runner, "read_swr_table", lambda path: EVENTS)
+    monkeypatch.setattr(runner, "read_swr_table", lambda path, columns: EVENTS[columns])
     return tmp_path
 
 

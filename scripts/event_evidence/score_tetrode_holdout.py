@@ -101,6 +101,7 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    WINDOW_EVENT_COLUMNS,
     add_fold_design_argument,
     add_gpu_arguments,
     add_run_arguments,
@@ -133,16 +134,28 @@ def run_epoch(
     participation = pd.read_parquet(
         output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
-    windows = epoch_windows(epoch.time, read_swr_table(event_table), participation)
-    scores, record = th.holdout_scores(
-        epoch.detector,
+    windows = epoch_windows(
         epoch.time,
-        epoch.frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
-        epoch.frame["linear_position"].to_numpy(dtype=float),
-        epoch.loaded["spike_times"],
-        epoch.loaded["marks"],
-        epoch.loaded["is_training"],
-        epoch.loaded["is_missing"],
+        read_swr_table(event_table, columns=WINDOW_EVENT_COLUMNS),
+        participation,
+    )
+    # what the epoch needs of the decode frame, copied, so that the frame is
+    # not held through the scoring
+    head_position = epoch.frame[["head_position_x", "head_position_y"]].to_numpy(
+        dtype=float, copy=True
+    )
+    linear_position = epoch.frame["linear_position"].to_numpy(dtype=float, copy=True)
+    time, loaded, detector = epoch.time, epoch.loaded, epoch.detector
+    del epoch
+    scores, record = th.holdout_scores(
+        detector,
+        time,
+        head_position,
+        linear_position,
+        loaded["spike_times"],
+        loaded["marks"],
+        loaded["is_training"],
+        loaded["is_missing"],
         windows,
         folds=folds,
         margin_bins=margin_bins,

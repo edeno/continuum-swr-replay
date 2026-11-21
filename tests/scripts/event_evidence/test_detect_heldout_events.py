@@ -132,7 +132,7 @@ def data_dir(tmp_path, monkeypatch):
     ):
         (tmp_path / folder).mkdir()
         table.to_parquet(output_path(EPOCH, tmp_path / folder, name))
-    monkeypatch.setattr(runner, "read_swr_table", lambda path: TABLE)
+    monkeypatch.setattr(runner, "read_swr_table", lambda path, columns: TABLE[columns])
     return tmp_path
 
 
@@ -192,7 +192,9 @@ def test_a_facts_time_that_is_not_the_decodes_raises(data_dir):
 
 
 def test_canonical_labels_that_are_not_the_event_tables_raise(data_dir, monkeypatch):
-    monkeypatch.setattr(runner, "read_swr_table", lambda path: TABLE.iloc[:1])
+    monkeypatch.setattr(
+        runner, "read_swr_table", lambda path, columns: TABLE.iloc[:1][columns]
+    )
     with pytest.raises(ValueError, match="not the event table's"):
         _run_epoch(data_dir)
 
@@ -251,7 +253,9 @@ def test_an_event_tables_group_or_visit_start_the_rule_does_not_give_fails_the_e
     data_dir, monkeypatch, column, values, message
 ):
     monkeypatch.setattr(
-        runner, "read_swr_table", lambda path: TABLE.assign(**{column: values})
+        runner,
+        "read_swr_table",
+        lambda path, columns: TABLE.assign(**{column: values})[columns],
     )
     record = _failed_record(data_dir, monkeypatch)
     assert f"{message} for 1 of the epoch's events" in record["error"]

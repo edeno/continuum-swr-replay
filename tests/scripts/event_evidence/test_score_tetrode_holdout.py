@@ -78,7 +78,7 @@ def patched(tmp_path, monkeypatch):
         "is_missing": np.zeros(N, dtype=bool),
     }
     detector = object()
-    monkeypatch.setattr(runner, "read_swr_table", lambda path: "events")
+    monkeypatch.setattr(runner, "read_swr_table", lambda path, columns: "events")
 
     def epoch_windows(time, events, participation):
         np.testing.assert_array_equal(time, TIME)

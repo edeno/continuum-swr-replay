@@ -144,6 +144,21 @@ PRODUCED_BY = produced_by(__file__)
 HELDOUT_PROBABILITIES = tuple(STATE_PROBABILITY_COLUMNS[s] for s in NON_LOCAL_STATES)
 """The per-bin table's held-out P(Non-Local Continuous) and P(Non-Local
 Fragmented) of the ``full`` model."""
+BIN_COLUMNS = [*rw.WINDOW_BIN_COLUMNS, *HELDOUT_PROBABILITIES]
+"""The per-bin table's columns the epoch reads: the window sums' (which hold
+the time sums'), and the held-out probabilities."""
+EVENT_COLUMNS = [
+    "animal",
+    "session_date",
+    "epoch",
+    "event_id",
+    "non_local_event",
+    "is_swr",
+    "visit_context",
+]
+"""The event table's columns the epoch reads: its epoch
+(``swr_source.event_epoch_ids``), the events' ids, labels and SWR class, and
+their well-visit label (``cohort_selection.select_visit_context``)."""
 
 
 def read_raw_frame(epoch_id: str, data_dir: Path) -> pd.DataFrame:
@@ -179,7 +194,7 @@ def run_epoch(
     bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
     facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME)
     decode_path = decode_paths(epoch_id, data_dir).data_over_time
-    bins = pd.read_parquet(bins_path)
+    bins = pd.read_parquet(bins_path, columns=BIN_COLUMNS)
     facts = pd.read_parquet(facts_path)
     raw = read_raw_frame(epoch_id, data_dir)
     time = raw.index.to_numpy(dtype=float)
@@ -198,7 +213,7 @@ def run_epoch(
             f"the rule on the canonical decode's probabilities gives other labels "
             f"than its canonical ones at {int((again != canonical).sum())} bins"
         )
-    table = read_swr_table(event_table)
+    table = read_swr_table(event_table, columns=EVENT_COLUMNS)
     table = table[event_epoch_ids(table) == epoch_id]
     labels = np.unique(canonical[canonical > 0])
     if not np.array_equal(np.sort(table["non_local_event"].to_numpy()), labels):
@@ -213,6 +228,7 @@ def run_epoch(
         .set_index("label")
         .loc[table["non_local_event"].to_numpy()]
     )
+    del again_frame  # the rule's rows are all the checks below need of it
     selected = table["event_id"].isin(select_visit_context(table)["event_id"])
     for name, theirs, ours in (
         (

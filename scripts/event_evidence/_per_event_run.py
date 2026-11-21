@@ -43,6 +43,9 @@ from continuum_swr_replay.runs.io import files_sha256, ok_table_paths, sha256_fi
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
+WINDOW_EVENT_COLUMNS = ["event_id", "event_start_s", "event_end_s"]
+"""The event table's columns ``state_evidence.windows.epoch_windows`` reads."""
+
 
 def event_table_path(data_dir: Path) -> Path:
     """The canonical event table under the processed-data root ``data_dir``."""

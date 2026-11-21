@@ -183,19 +183,34 @@ def run_epoch(
             "are outside every SWR of the source"
         )
     categories = nr.bin_categories(frame, in_swr)
+    # what the epoch needs of the decode frame, copied, so that the frame is
+    # not held through the scoring
+    head_position = frame[["head_position_x", "head_position_y"]].to_numpy(
+        dtype=float, copy=True
+    )
+    linear_position = frame["linear_position"].to_numpy(dtype=float, copy=True)
+    without_speed = ~np.isfinite(frame["head_speed"].to_numpy())
+    n_bins = len(frame)
+    paths, time, loaded, detector = (
+        epoch.paths,
+        epoch.time,
+        epoch.loaded,
+        epoch.detector,
+    )
+    del epoch, frame
 
     scores, record = nr.fold_fit_scores(
-        epoch.detector,
-        epoch.time,
-        frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
-        epoch.loaded["spike_times"],
-        epoch.loaded["marks"],
-        epoch.loaded["is_training"],
-        epoch.loaded["is_missing"],
+        detector,
+        time,
+        head_position,
+        loaded["spike_times"],
+        loaded["marks"],
+        loaded["is_training"],
+        loaded["is_missing"],
         in_swr,
         folds=folds,
         margin_bins=margin_bins,
-        linear_position=frame["linear_position"].to_numpy(dtype=float),
+        linear_position=linear_position,
         log=log,
     )
     failures = nr.fold_check_failures(record)
@@ -233,20 +248,18 @@ def run_epoch(
                 np.mean(sampling <= SPARSE_SAMPLING_S)
             ),
             "n_immobile_without_place": int(np.isnan(sampling).sum()),
-            "n_bins": len(frame),
+            "n_bins": n_bins,
             "n_bins_by_category": {
                 c: int(n) for c, n in pd.Series(categories).value_counts().items()
             },
-            "n_analyzed_without_speed": int(
-                (analyzed & ~np.isfinite(frame["head_speed"].to_numpy())).sum()
-            ),
+            "n_analyzed_without_speed": int((analyzed & without_speed).sum()),
             "n_swr_source_events": len(source_events),
             "n_in_swr_label": int(in_label.sum()),
             "n_immobile_in_swr_label": int((immobile & in_label).sum()),
             "bins_table_bytes": bins_path.stat().st_size,
             "epoch_inputs": {
-                "data_over_time": file_input(epoch.paths.data_over_time),
-                "detector": file_input(epoch.paths.detector),
+                "data_over_time": file_input(paths.data_over_time),
+                "detector": file_input(paths.detector),
                 **{
                     f"swr_{name}": entry
                     for name, entry in swr_source.swr_source_files(epoch_id).items()
