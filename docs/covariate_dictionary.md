@@ -618,9 +618,12 @@ excluded time. Columns:
   inside the in-visit analyzed time is the sum of `in_visit_immobile_s`.
 - `count` — the starts of the kind's events in the bin, each in the bin that
   holds the at-risk time just before it (a start on a bin edge goes to the bin
-  that ends there). An event that starts on a stop's first sample has no
-  at-risk time before it and is not counted; `attrs["starts_not_at_risk_s"]`
-  lists them.
+  that ends there). An event that starts at the start of a piece of analyzed
+  time (a stop's first sample, a first poke-in, a final poke-out, the end of
+  excluded time) and fills the piece's first bin, or right after an event of the
+  kind that fills the bin before it, has no at-risk time before it and is not
+  counted; `attrs["starts_not_at_risk_s"]` lists them and
+  `attrs["n_starts_not_at_risk_by_reason"]` counts them by reason.
 - `time_since_visit_start_s`, `time_until_visit_end_s`,
   `time_until_stretch_end_s` — the three clocks at the bin's center, defined as
   in the event table; NaN outside a visit. `s + u` is the visit's length;

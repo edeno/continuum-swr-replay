@@ -117,6 +117,18 @@ _TIME_TOLERANCE_S = 1e-5
 #: a visit.
 _AFTER_VISIT = "after_visit_at_well"
 
+#: Why an event start has no at-risk time before it: it is at the start of a
+#: piece of analyzed time (a stop's first sample, a first poke-in, a final
+#: poke-out, the end of excluded time), or an event of the kind fills the bin
+#: before it.
+_NOT_AT_RISK_REASONS = (
+    "stop_start",
+    "poke_in",
+    "poke_out",
+    "excluded_end",
+    "after_event",
+)
+
 _STOP_COLUMNS = (
     *SESSION_COLUMNS,
     "stop_id",
@@ -360,9 +372,14 @@ def visit_timebins(
 
         ``attrs`` holds ``n_bins_not_at_risk`` (bins wholly inside an event of
         the kind, dropped), ``n_starts_not_at_risk`` (event starts of the kind
-        in those bins: an event that starts at the very start of a piece of
-        analyzed time has no at-risk time before it, and is not counted;
-        ``starts_not_at_risk_s`` lists their start times) and
+        in those bins, not counted: an event that starts at the start of a
+        piece of analyzed time, a stop's first sample, a first poke-in, a final
+        poke-out or the end of excluded time, and fills the piece's first bin
+        has no at-risk time before it, nor has one that starts right after an
+        event of the kind that fills the bin before it;
+        ``starts_not_at_risk_s`` lists their start times and
+        ``n_starts_not_at_risk_by_reason`` counts them by ``stop_start``,
+        ``poke_in``, ``poke_out``, ``excluded_end`` and ``after_event``) and
         ``n_stops_arrival_spanning`` (stops that contain a first poke-in after
         their start, ``stop_start < arrival <= stop_end``).
 
@@ -538,8 +555,47 @@ def visit_timebins(
     out.attrs["n_bins_not_at_risk"] = int((~at_risk).sum())
     out.attrs["n_starts_not_at_risk"] = int(lost.sum())
     out.attrs["starts_not_at_risk_s"] = ev_start[lost].tolist()
+    # Why: the start of the piece it starts at, or an event of the kind that
+    # fills the bin before it.
+    at_piece_start = offset < _TIME_TOLERANCE_S
+    reason = np.where(
+        at_piece_start,
+        _piece_start_reason(piece_start, stop_start[piece_stop], arrival, departure)[
+            start_piece
+        ],
+        "after_event",
+    )
+    out.attrs["n_starts_not_at_risk_by_reason"] = {
+        name: int((reason[lost] == name).sum()) for name in _NOT_AT_RISK_REASONS
+    }
     out.attrs["n_stops_arrival_spanning"] = int(spans_arrival.sum())
     return out
+
+
+def _piece_start_reason(
+    piece_start: np.ndarray,
+    piece_stop_start: np.ndarray,
+    arrival: np.ndarray,
+    departure: np.ndarray,
+) -> np.ndarray:
+    """What begins each piece of analyzed time, shape (n_pieces,).
+
+    ``"stop_start"`` (its stop's first sample), ``"poke_in"``, ``"poke_out"``
+    or, for the rest, ``"excluded_end"`` (a piece begins only at one of these).
+    """
+
+    def _at(times: np.ndarray) -> np.ndarray:
+        if not times.size:
+            return np.zeros(piece_start.shape, dtype=bool)
+        return (np.abs(piece_start[:, None] - times[None, :]) < _TIME_TOLERANCE_S).any(
+            axis=1
+        )
+
+    reason = np.full(piece_start.shape, "excluded_end", dtype=object)
+    reason[_at(departure)] = "poke_out"
+    reason[_at(arrival)] = "poke_in"
+    reason[np.abs(piece_start - piece_stop_start) < _TIME_TOLERANCE_S] = "stop_start"
+    return reason
 
 
 def _of_session(frame: pd.DataFrame, sessions: pd.DataFrame, name: str) -> pd.DataFrame:

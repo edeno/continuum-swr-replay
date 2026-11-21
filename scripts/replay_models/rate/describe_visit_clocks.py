@@ -161,8 +161,10 @@ def session_bins(
         The selected bins, with ``kind``, ``animal``, the clocks, ``exposure``
         and ``count``.
     records : list of dict
-        Per session and kind: the session, ``kind`` and
-        ``n_starts_not_at_risk``.
+        Per session and kind: the session, ``kind``,
+        ``n_starts_not_at_risk`` and its count per reason
+        (``n_starts_not_at_risk_<reason>``, the piece start or the event
+        before it; ``visit_timebins``).
     """
     keys = list(SESSION_COLUMNS)
     excluded = excluded_intervals_by_session(stops)
@@ -191,6 +193,12 @@ def session_bins(
                     **dict(zip(keys, key, strict=True)),
                     "kind": kind,
                     "n_starts_not_at_risk": bins.attrs["n_starts_not_at_risk"],
+                    **{
+                        f"n_starts_not_at_risk_{reason}": n
+                        for reason, n in bins.attrs[
+                            "n_starts_not_at_risk_by_reason"
+                        ].items()
+                    },
                 }
             )
     return pd.concat(parts, ignore_index=True), records

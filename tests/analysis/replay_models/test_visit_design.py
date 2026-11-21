@@ -335,8 +335,9 @@ def test_same_events_as_content(kind: str) -> None:
 
 
 def test_event_at_the_start_of_a_stop_has_no_at_risk_time() -> None:
-    """An event that starts on a stop's first sample has no at-risk time before
-    it in any bin: it is not counted, and ``attrs`` says so."""
+    """An event that starts on a stop's first sample (a piece start) has no
+    at-risk time before it in any bin: it is not counted, and ``attrs`` says
+    so."""
     events = pd.concat(
         [
             _events(),
@@ -357,7 +358,46 @@ def test_event_at_the_start_of_a_stop_has_no_at_risk_time() -> None:
     bins = _bins("SWR", events)
     assert bins.attrs["n_starts_not_at_risk"] == 1
     assert bins.attrs["starts_not_at_risk_s"] == [11.0]
+    assert bins.attrs["n_starts_not_at_risk_by_reason"]["stop_start"] == 1
     assert not np.isclose(bins["bin_start_s"], 11.0).any()
+    assert bins["count"].sum() == 5
+
+
+def _with_swr_events(*rows: tuple[float, float, str, int]) -> pd.DataFrame:
+    """The module's events plus SWR events ``(start, end, label, visit)``."""
+    extra = pd.DataFrame(
+        {
+            "event_start_s": [row[0] for row in rows],
+            "event_end_s": [row[1] for row in rows],
+            "is_swr": True,
+            "visit_context": [row[2] for row in rows],
+            "well_visit_id": pd.array([row[3] for row in rows], dtype="Int64"),
+            "time_since_visit_start_s": [row[0] - VISITS[row[3], 0] for row in rows],
+            "time_until_visit_end_s": [VISITS[row[3], 1] - row[0] for row in rows],
+        }
+    ).assign(**SESSION)
+    return pd.concat([_events(), extra], ignore_index=True)
+
+
+def test_a_start_at_the_start_of_any_piece_has_no_at_risk_time() -> None:
+    """A start is lost at the start of any piece of analyzed time: a stop's
+    first sample, a poke-in, or the end of excluded time; ``attrs`` counts
+    each reason."""
+    events = _with_swr_events(
+        (10.0, 10.11, "in_visit", 0),  # on visit 0's poke-in, inside stop 0
+        (11.0, 11.2, "in_visit", 0),  # on stop 1's first sample
+        (22.2, 22.35, "in_visit", 1),  # where excluded time ends, in stop 4
+    )
+    bins = _bins("SWR", events)
+    assert bins.attrs["n_starts_not_at_risk"] == 3
+    np.testing.assert_allclose(bins.attrs["starts_not_at_risk_s"], [10.0, 11.0, 22.2])
+    assert bins.attrs["n_starts_not_at_risk_by_reason"] == {
+        "stop_start": 1,
+        "poke_in": 1,
+        "poke_out": 0,
+        "excluded_end": 1,
+        "after_event": 0,
+    }
     assert bins["count"].sum() == 5
 
 
@@ -378,8 +418,8 @@ def test_one_kind_or_every_event() -> None:
 @pytest.mark.real_data
 def test_one_real_epoch() -> None:
     """On one epoch of the canonical tables: the in-visit bins count the
-    default-set events of each kind (less those that start on a stop's first
-    sample, which ``attrs`` lists), and exposure plus in-event time is the stop
+    default-set events of each kind (less those with no at-risk time before
+    them, which ``attrs`` lists), and exposure plus in-event time is the stop
     table's in_visit_immobile_s."""
     session = {"animal": "chimi", "session_date": "20200212", "epoch": "02_r1"}
 
