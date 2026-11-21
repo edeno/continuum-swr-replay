@@ -1,11 +1,11 @@
 """The held-out gain panels: a gain for each of two kinds of event.
 
-The held-out tetrode supplementary figure (the gain over local coding per spike,
-held out two ways) and Figure 2g's second axis (the full decoder's gain over the
-SWR-only decoder per second, in two kinds of event time) draw each gain the same
-way: a dot per animal in the group's color and, beside them, the animals' mean
-with its 95 % interval in black, with a dashed line at zero, where neither side
-predicts the spikes better.
+The held-out tetrode supplementary figure (the gain over local coding per spike)
+and Figure 2g's second axis (the full decoder's gain over the SWR-only decoder
+per spike, in two kinds of event time) draw each gain the same way: a dot per
+animal in the group's color and, beside them, the animals' mean with its 95 %
+interval in black, with a dashed line at zero, where neither side predicts the
+spikes better.
 """
 
 from __future__ import annotations
@@ -14,16 +14,19 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    SWR_LABELS,
+)
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
 
-GROUP_COLORS = {"no SWR": COLORS["No SWR"], "SWR": COLORS["SWR"]}
+GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["SWR"]}
 """Each group's color, in the figures' order: no-SWR events, then SWR events."""
 
 REFERENCE_COLOR = "#777777"
 """A reference level (the zero line): a neutral gray, not the No-Spike state's."""
 
-HELDOUT_X = {"no SWR": 0.0, "SWR": 1.0}
+HELDOUT_X = {SWR_LABELS[False]: 0.0, SWR_LABELS[True]: 1.0}
 """Each group's position on a gain axis' x axis."""
 
 
@@ -32,11 +35,13 @@ def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
     return scale * pd.Series(row[column], index=row["animal_names"])
 
 
-def draw_animal_gain(
-    ax: Axes, x: float, row: pd.Series, color: str, mean_offset: float = 0.25
-) -> None:
+MEAN_OFFSET = 0.25
+"""How far right of a group's dots its mean is drawn, in x units."""
+
+
+def draw_animal_gain(ax: Axes, x: float, row: pd.Series, color: str) -> None:
     """One group's gain at ``x``: a dot per animal in ``color`` and, at
-    ``x + mean_offset``, the animals' mean with its 95 % interval in black.
+    ``x + MEAN_OFFSET``, the animals' mean with its 95 % interval in black.
 
     Parameters
     ----------
@@ -46,12 +51,11 @@ def draw_animal_gain(
         ``animals``, ``animal_names``, ``estimate``, ``ci_low`` and ``ci_high``
         (``likelihood_advantage_statistics``' columns).
     color : str
-    mean_offset : float, optional
     """
     animals = animal_values(row, "animals")
     ax.scatter(np.full(animals.size, x), animals, s=6, color=color, lw=0, zorder=2)
     ax.errorbar(
-        x + mean_offset, row["estimate"],
+        x + MEAN_OFFSET, row["estimate"],
         yerr=[[row["estimate"] - row["ci_low"]], [row["ci_high"] - row["estimate"]]],
         fmt="_", color="black", ms=5, lw=0.8, capsize=0,
     )  # fmt: skip

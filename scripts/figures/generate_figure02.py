@@ -164,6 +164,9 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_GROUPS,
     restriction_figure_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    SWR_LABELS,
+)
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
@@ -1112,10 +1115,10 @@ PANEL_G_REFERENCE = "local-only"
 PART_X = dict(zip(RESTRICTION_FIGURE_GROUPS, (0.0, 1.0), strict=True))
 """Panel g, right: each kind of event time's position on the x axis."""
 PART_LABELS = {
-    "no SWR": "No-SWR\nevents",
-    "SWR": "Events partly\nin an SWR:\ntime outside\nthe SWR",
+    SWR_LABELS[False]: "No-SWR\nevents",
+    SWR_LABELS[True]: "Events partly\nin an SWR:\ntime outside\nthe SWR",
 }
-PART_COLORS = {"no SWR": C_NO_SWR, "SWR": C_SWR_PARTIAL}
+PART_COLORS = {SWR_LABELS[False]: C_NO_SWR, SWR_LABELS[True]: C_SWR_PARTIAL}
 """Panel d's colors of the no-SWR events and of the events partly in an SWR."""
 PANEL_G_PARTS_TITLE = "Immobile time outside\nSWR bounds"
 """On two lines: on one it is wider than its axis and meets the left axis'
