@@ -481,7 +481,7 @@ def test_one_penalty_matches_neurospatial_fixture() -> None:
 
 
 def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
-    """An outcome scaled by 1, 1e3 and 1e6: the Newton fit takes one exact step
+    """An outcome scaled by 1, 1e3, 1e6 and 1e9: the Newton fit takes one exact step
     to the same curve up to the scale, and the selected log penalty (on the
     residual-sum-of-squares scale, as mgcv's ``sp``) is the same, with every
     grid point finite."""
@@ -498,7 +498,7 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
 
     unit = penalized_newton(Gaussian(), X, base, 1.0, S, np.zeros(X.shape[1]))
     reference = select_penalties(Gaussian(), [SessionData(X, base)], blocks)
-    for scale in (1.0, 1e3, 1e6):
+    for scale in (1.0, 1e3, 1e6, 1e9):
         fit = penalized_newton(
             Gaussian(), X, scale * base, 1.0, S, np.zeros(X.shape[1]), max_iter=1
         )
@@ -671,4 +671,3 @@ def test_an_input_error_names_the_session() -> None:
     bad = SessionData(second.X, second.y, offset, name="peanut_02")
     with pytest.raises(ValueError, match=r"session 1 \(peanut_02\).*zero exposure"):
         select_penalties(lik, [first, bad], blocks)
-

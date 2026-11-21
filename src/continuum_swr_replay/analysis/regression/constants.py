@@ -24,7 +24,9 @@ MAX_STEP_LENGTH = 10.0
 # (``max |X @ step|``, on the link scale, whatever the columns' units). Where
 # the likelihood has no finite maximum along a direction (a 0/1 column whose
 # rows all have y = 1, a Poisson cell with no events), the decrement goes to
-# zero while each step still moves eta by about one.
+# zero while each step still moves eta by about one. Not applied to a quadratic
+# likelihood (the Gaussian), whose maximum is finite when A is positive definite
+# and whose eta is on the outcome's scale.
 NO_MAXIMUM_ETA_STEP = 0.1
 
 # The design identifies the coefficients the penalty leaves free (unpenalized

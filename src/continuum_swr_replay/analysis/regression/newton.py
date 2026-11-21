@@ -19,7 +19,10 @@ belongs to still moves the linear predictor by more than
 ``NO_MAXIMUM_ETA_STEP`` on some row, the likelihood has no finite maximum
 along that step (a 0/1 column whose rows all have the same outcome, a Poisson
 cell with no events): the decrement shrinks to zero while a coefficient runs
-to infinity. Near a finite maximum the step shrinks with the decrement.
+to infinity. Near a finite maximum the step shrinks with the decrement. A
+quadratic likelihood with ``A`` positive definite always has a finite maximum,
+and its linear predictor is on the outcome's scale, so the rule is not applied
+to it.
 
 Once the decrement is below the tolerance the fit still takes that last full
 step, when ``F`` does not rise by more than a few rounding units of ``F``
@@ -270,7 +273,7 @@ def penalized_newton(
         step = scipy.linalg.cho_solve(factor, g)
         decrement = 0.5 * float(g @ step)
         if decrement < tol:
-            if _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
+            if not lik.quadratic and _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
                 return NewtonFit(beta, A, NO_FINITE_MAXIMUM, decrement, n_iter, loglik)
             return _last_step(
                 lik,
