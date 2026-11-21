@@ -269,3 +269,7 @@ def detected_events(
         ]
         rows.append((overlap.kind.iloc[0] if len(overlap) else "none", s, e))
     return pd.DataFrame(rows, columns=["kind", "s", "e"])
+
+
+def quiet(message: str) -> None:
+    """A log that writes nothing, for the scorers' ``log`` argument."""

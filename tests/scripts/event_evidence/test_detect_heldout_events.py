@@ -27,6 +27,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import _per_event_run
 from scripts.event_evidence import detect_heldout_events as runner
+from tests.support._restriction_tables import bin_facts_table, restriction_bins
 from tests.support._swr_inventory_fixtures import use_swr_source, write_swr_inventory
 
 EPOCH = "j1620210706_02_r1_HPC"
@@ -80,33 +81,25 @@ def _bins() -> pd.DataFrame:
     states = dict.fromkeys(nr.STATE_PROBABILITY_COLUMNS.values(), 0.0 * one)
     states["full_prob_nonlocal_continuous"] = prob / 2
     states["full_prob_nonlocal_fragmented"] = prob / 2
-    return pd.DataFrame(
+    return restriction_bins(
+        TIME,
         {
-            "time": TIME,
             "none": 0 * one,
             "swr": one,
             "full": 3 * one,
             "none_two_sided": 0 * one,
             "swr_two_sided": 2 * one,
             "full_two_sided": 6 * one,
-            "in_swr": in_swr,
-            "category": pd.Categorical(
-                np.where(in_swr, "immobile_in_swr", "immobile_outside_swr")
-            ),
-            **states,
-        }
+        },
+        in_swr,
+        np.where(in_swr, "immobile_in_swr", "immobile_outside_swr"),
+        **states,
     )
 
 
 def _facts() -> pd.DataFrame:
     """One spike per bin; bins 0-499 inside a well visit."""
-    return pd.DataFrame(
-        {
-            "time": TIME,
-            "n_spikes": np.ones(N, dtype=np.int32),
-            "in_well_visit": np.arange(N) < 500,
-        }
-    )
+    return bin_facts_table(TIME, np.ones(N), np.arange(N) < 500)
 
 
 TABLE = pd.DataFrame(

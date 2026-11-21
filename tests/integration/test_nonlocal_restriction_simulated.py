@@ -54,10 +54,6 @@ BIN_S = 0.002
 NOT_REMOTE = ("local_burst", "silent")
 
 
-def _quiet(message: str) -> None:
-    pass
-
-
 def _event_mask(recording: sim.Recording, events: pd.DataFrame) -> np.ndarray:
     mask = np.zeros(recording.time.size, dtype=bool)
     for s, e in zip(events.s, events.e, strict=True):
@@ -114,7 +110,7 @@ def swr_masks(recording: sim.Recording) -> dict[str, np.ndarray]:
 def _model_scores(detector, log_likelihood, in_swr, models) -> dict:
     """``nr.model_scores`` of ``models``, its library checks asserted."""
     scores, record = nr.model_scores(
-        detector, log_likelihood, in_swr, models=models, log=_quiet
+        detector, log_likelihood, in_swr, models=models, log=sim.quiet
     )
     for model in models:
         assert (
@@ -151,7 +147,7 @@ def _heldout_likelihood(recording, detector) -> np.ndarray:
         recording.spike_times,
         recording.marks,
         recording.is_running,
-        log=_quiet,
+        log=sim.quiet,
     )
     state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
     return th.state_log_likelihood(
@@ -206,7 +202,7 @@ def chance():
     detector = sim.fit_detector(recording)
     no_swr = np.zeros(recording.time.size, dtype=bool)
     scores, record = nr.model_scores(
-        detector, _heldout_likelihood(recording, detector), no_swr, log=_quiet
+        detector, _heldout_likelihood(recording, detector), no_swr, log=sim.quiet
     )
     return recording, pd.DataFrame(scores), record
 
@@ -445,7 +441,7 @@ def fold_fit():
             margin_bins=margin,
             linear_position=recording.position,
             fit=recording_fit,
-            log=_quiet,
+            log=sim.quiet,
         )
     return (
         recording,
@@ -541,7 +537,7 @@ def test_each_bin_is_scored_by_its_own_folds_fit(fold_fit):
             is_missing,
         )
         passes[k], _ = nr.model_scores(
-            detector, likelihood, in_swr, summary_bins=folds == k, log=_quiet
+            detector, likelihood, in_swr, summary_bins=folds == k, log=sim.quiet
         )
         mine = folds == k
         for column in columns:

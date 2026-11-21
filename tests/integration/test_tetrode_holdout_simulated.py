@@ -39,10 +39,6 @@ REMOTE = ("sweep", "stationary", "fragmented", "close_20", "close_40", "close_80
 N_MISSING = 10
 
 
-def _quiet(message: str) -> None:
-    pass
-
-
 def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame:
     rest = ~recording.is_running
     for s, e in zip(recording.events.s, recording.events.e, strict=True):
@@ -69,7 +65,7 @@ def _score(detector, recording, windows, is_missing=None, **folds) -> pd.DataFra
         recording.is_running,
         missing,
         windows,
-        log=_quiet,
+        log=sim.quiet,
         **folds,
     )
     return scores.join(windows.set_index("window_id")["kind"], on="window_id")
@@ -361,7 +357,7 @@ def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypa
         np.zeros(recording.time.size, dtype=bool),
         window.assign(window_id=0),
         refit=refit,
-        log=_quiet,
+        log=sim.quiet,
     )
     assert len(masks) == th.N_FOLDS and len(scored) == th.N_FOLDS
     n_scored = 0

@@ -9,6 +9,7 @@ from continuum_swr_replay.analysis.event_evidence import restriction_windows as 
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     SCORE_COLUMNS,
 )
+from tests.support._restriction_tables import bin_facts_table, restriction_bins
 
 N = 10
 STEP = 0.002
@@ -23,18 +24,18 @@ def _bins() -> pd.DataFrame:
     category[2] = category[3] = "immobile_in_swr"
     category[6] = "moving"
     category[9] = "excluded"
-    return pd.DataFrame(
+    return restriction_bins(
+        100.0 + STEP * np.arange(N),
         {
-            "time": 100.0 + STEP * np.arange(N),
-            "none": np.zeros(N, dtype=np.float32),
+            "none": np.zeros(N),
             "swr": index,
             "full": 2 * index,
-            "none_two_sided": np.ones(N, dtype=np.float32),
+            "none_two_sided": np.ones(N),
             "swr_two_sided": index + 1,
             "full_two_sided": 2 * index + 1,
-            "in_swr": np.isin(np.arange(N), [2, 3]),
-            "category": pd.Categorical(category),
-        }
+        },
+        np.isin(np.arange(N), [2, 3]),
+        category,
     )
 
 
@@ -169,12 +170,8 @@ def test_a_window_without_one_of_the_tetrodes_rows_raises():
 def _facts() -> pd.DataFrame:
     """Spikes per bin that give the windows the held-out counts 3, 0, 3, 2;
     bins 0-5 inside a well visit."""
-    return pd.DataFrame(
-        {
-            "time": 100.0 + STEP * np.arange(N),
-            "n_spikes": np.array([3, 0, 0, 0, 0, 2, 1, 0, 1, 1], dtype=np.int32),
-            "in_well_visit": np.arange(N) < 6,
-        }
+    return bin_facts_table(
+        100.0 + STEP * np.arange(N), [3, 0, 0, 0, 0, 2, 1, 0, 1, 1], np.arange(N) < 6
     )
 
 

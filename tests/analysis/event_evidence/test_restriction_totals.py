@@ -1,6 +1,5 @@
 """Tests for the non-local restriction contrasts over all immobile time and
-outside SWRs, inside a well visit or not, on tables small enough to check by
-hand."""
+outside SWRs, inside a well visit, on tables small enough to check by hand."""
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,11 @@ from continuum_swr_replay.analysis.event_evidence import restriction_totals as r
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     SCORE_COLUMNS,
+)
+from tests.support._restriction_tables import (
+    bin_facts_table,
+    restriction_bins,
+    time_sums,
 )
 
 BIN_S = 0.5
@@ -39,20 +43,7 @@ def _time_sums() -> pd.DataFrame:
         ("b1", "immobile_outside_swr", True, False, 4, 2, 0.0, -2.0),
         ("b1", "immobile_in_swr", True, True, 2, 2, 3.0, 2.0),
     ]
-    table = pd.DataFrame(
-        rows,
-        columns=[
-            "epoch_id", "category", "in_well_visit", "in_event_window", "n_bins",
-            "n_spikes", "swr", "full",
-        ],
-    )  # fmt: skip
-    return table.assign(
-        animal=table["epoch_id"].str[0],
-        none=0.0,
-        none_two_sided=0.0,
-        swr_two_sided=2 * table["swr"],
-        full_two_sided=2 * table["full"],
-    )
+    return time_sums(rows)
 
 
 def _windows() -> pd.DataFrame:
@@ -88,20 +79,10 @@ def test_time_sums_partition_the_bins_by_category_visit_and_event_window():
     """Six bins: an event window over bins 1-2, a control over 4-5 (it marks
     nothing); bins 0-2 inside a visit."""
     category = ["immobile_outside_swr"] * 3 + ["immobile_in_swr", "moving", "excluded"]
-    bins = pd.DataFrame(
-        {
-            "time": np.arange(6.0),
-            "category": pd.Categorical(category),
-            **{c: np.arange(6, dtype=np.float32) for c in SCORE_COLUMNS},
-        }
+    bins = restriction_bins(
+        np.arange(6.0), dict.fromkeys(SCORE_COLUMNS, np.arange(6)), None, category
     )
-    facts = pd.DataFrame(
-        {
-            "time": np.arange(6.0),
-            "n_spikes": np.array([1, 2, 3, 4, 5, 6], dtype=np.int32),
-            "in_well_visit": np.arange(6) < 3,
-        }
-    )
+    facts = bin_facts_table(np.arange(6.0), [1, 2, 3, 4, 5, 6], np.arange(6) < 3)
     windows = pd.DataFrame({"kind": ["event", "control"], "s": [1, 4], "e": [2, 5]})
     sums = rt.restriction_time_sums(bins, facts, windows)
     assert list(sums.columns[:5]) == [*rt.TIME_SUM_KEYS, "n_bins", "n_spikes"]

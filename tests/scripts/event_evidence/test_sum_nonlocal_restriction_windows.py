@@ -24,6 +24,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import sum_nonlocal_restriction_windows as runner
+from tests.support._restriction_tables import bin_facts_table, restriction_bins
 
 EPOCH = "wilbur20210329_02_r1_HPC"
 N = 20
@@ -51,21 +52,19 @@ def _bins() -> pd.DataFrame:
     one = np.ones(N, dtype=np.float32)
     fold_fit = dict.fromkeys(nr.STATE_PROBABILITY_COLUMNS.values(), 0.25 * one)
     fold_fit[nr.NONLOCAL_PLACE_BIN_COLUMN] = np.zeros(N, dtype=np.int32)
-    return pd.DataFrame(
+    return restriction_bins(
+        TIME,
         {
-            "time": TIME,
             "none": 0 * one,
             "swr": one,
             "full": 3 * one,
             "none_two_sided": 0 * one,
             "swr_two_sided": 2 * one,
             "full_two_sided": 6 * one,
-            "in_swr": np.arange(N) == 9,
-            "category": pd.Categorical(
-                np.where(np.arange(N) == 9, "immobile_in_swr", "immobile_outside_swr")
-            ),
-            **fold_fit,
-        }
+        },
+        np.arange(N) == 9,
+        np.where(np.arange(N) == 9, "immobile_in_swr", "immobile_outside_swr"),
+        **fold_fit,
     )
 
 
@@ -93,7 +92,7 @@ def _facts() -> pd.DataFrame:
     inside = np.zeros(N, dtype=bool)
     inside[0:4] = True
     inside[9:17] = True
-    return pd.DataFrame({"time": TIME, "n_spikes": spikes, "in_well_visit": inside})
+    return bin_facts_table(TIME, spikes, inside)
 
 
 @pytest.fixture
