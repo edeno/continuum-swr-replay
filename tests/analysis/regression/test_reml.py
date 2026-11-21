@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 
 import numpy as np
@@ -860,7 +861,7 @@ def test_inner_fits_converge_at_strong_penalties() -> None:
         data, blocks = _content_session(seed)
         for rho in np.arange(15.0, 21.0):
             pooled = pooled_reml(GroupedSoftmax(), [data], blocks, [rho])
-            assert np.isfinite(pooled.score), (seed, rho, pooled.failure)
+            assert np.isfinite(pooled.score), (seed, rho, pooled.failed_status)
         strong = pooled.sessions[0].fit
         null = blocks[0].null_space
         X_null = np.column_stack([data.X[:, :9] @ null, data.X[:, 9:]])
@@ -964,10 +965,13 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
 
     pooled = pooled_reml(GroupedSoftmax(), sessions, blocks, [6.0])
     assert pooled.failed_session == 4
-    assert pooled.failure == (
+    assert pooled.failed_status == NO_FINITE_MAXIMUM
+    failure = (
         "session 4 (s4): no finite maximum (columns running away: [11, 12]; "
         "along column 11, column 12)"
     )
+    with pytest.raises(ValueError, match=re.escape(failure)):
+        fit_at_penalties(GroupedSoftmax(), sessions, blocks, [6.0])
 
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
     (left_out,) = result.search.set_aside
@@ -1201,8 +1205,6 @@ def test_a_separation_by_a_smooths_line_is_named_as_its_null_space(rho: float) -
 
 class _Quadratic:
     """A pooled score given by a formula, for the search alone."""
-
-    labels: dict[int, str] = {}
 
     def __init__(self, function) -> None:
         self.function = function

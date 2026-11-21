@@ -334,11 +334,8 @@ class PooledScore:
     failed_session : int or None
         The index of the first session whose inner fit failed; None when the
         score is finite.
-    failed_status : FitStatus or None
-        That fit's status.
-    failure : str or None
-        ``failed_session`` and ``failed_status`` in words, with the session's
-        name when it has one.
+    failed : RemlScore or None
+        That session's score, with its fit.
     """
 
     score: float
@@ -346,8 +343,12 @@ class PooledScore:
     hessian: np.ndarray | None
     sessions: tuple[RemlScore, ...]
     failed_session: int | None = None
-    failed_status: FitStatus | None = None
-    failure: str | None = None
+    failed: RemlScore | None = None
+
+    @property
+    def failed_status(self) -> FitStatus | None:
+        """How the failed session's fit ended; None when none failed."""
+        return None if self.failed is None else self.failed.fit.status
 
 
 @dataclass(frozen=True)
@@ -1027,6 +1028,16 @@ def _labeled_score(
         raise ValueError(f"{_label(data, index)}: {error}") from error
 
 
+def _pooled_failure(
+    pooled: PooledScore, sessions: Sequence[SessionData] | dict[int, SessionData]
+) -> str | None:
+    """Why a pooled score is infinite, in words (:func:`_failure`), with
+    ``sessions`` indexed as ``pooled.failed_session``; None when no session
+    failed."""
+    i = pooled.failed_session
+    return None if i is None else _failure(sessions[i], i, pooled.failed)
+
+
 def _failure(data: SessionData, index: int, session: RemlScore) -> str:
     """Why session ``index``'s fit failed, in words, with the columns running
     away and their coordinates for a fit with no finite maximum."""
@@ -1101,10 +1112,7 @@ def _pooled_reml(
     for index, data, start in zip(indices, sessions, starts, strict=True):
         session = _labeled_score(lik, data, index, blocks, rho, start, derivatives)
         if not np.isfinite(session.score):
-            failure = _failure(data, index, session)
-            return PooledScore(
-                np.inf, None, None, (), index, session.fit.status, failure
-            )
+            return PooledScore(np.inf, None, None, (), index, session)
         scores.append(session)
     score = float(sum(s.score for s in scores))
     if not derivatives:
@@ -1129,9 +1137,7 @@ class _Evaluator:
     ) -> None:
         self.lik, self.blocks = lik, blocks
         self.sessions, self.indices = list(sessions), list(indices)
-        self.labels = {
-            i: _label(data, i) for i, data in zip(indices, sessions, strict=True)
-        }
+        self.by_index = dict(zip(indices, sessions, strict=True))
         self.starts = [data.beta0 for data in sessions]
 
     def __call__(self, rho: np.ndarray, derivatives: bool) -> PooledScore:
@@ -1148,6 +1154,14 @@ class _Evaluator:
             self.starts = [s.fit.beta for s in pooled.sessions]
         return pooled
 
+    def failure(self, pooled: PooledScore) -> str | None:
+        """Why ``pooled`` is infinite, in words; None when no session failed."""
+        return _pooled_failure(pooled, self.by_index)
+
+    def label(self, index: int) -> str:
+        """The label of the session at ``index`` among all sessions given."""
+        return _label(self.by_index[index], index)
+
 
 def _grid(m: int) -> list[np.ndarray]:
     """The grid points for one to three terms."""
@@ -1159,7 +1173,7 @@ def _grid(m: int) -> list[np.ndarray]:
 
 def _grid_start(
     evaluate: _Evaluator, m: int
-) -> tuple[np.ndarray, int, Counter[tuple[str, str]]]:
+) -> tuple[np.ndarray, int, Counter[tuple[int, str]]]:
     """The best grid point, the number of points evaluated, and the points
     whose score was not finite counted by (first failing session, status).
 
@@ -1170,15 +1184,14 @@ def _grid_start(
         that failed and why.
     """
     best_rho, best_score, n_points = np.full(m, np.nan), np.inf, 0
-    failures: Counter[tuple[str, str]] = Counter()
+    failures: Counter[tuple[int, str]] = Counter()
 
     def visit(rho: np.ndarray) -> None:
         nonlocal best_rho, best_score, n_points
         pooled = evaluate(rho, derivatives=False)
         n_points += 1
         if not np.isfinite(pooled.score):
-            label = evaluate.labels[pooled.failed_session]
-            failures[label, pooled.failed_status] += 1
+            failures[pooled.failed_session, pooled.failed_status] += 1
         elif pooled.score < best_score:
             best_rho, best_score = rho, pooled.score
 
@@ -1198,8 +1211,8 @@ def _grid_start(
                     current = best_rho.copy()
     if not np.isfinite(best_score):
         detail = "; ".join(
-            f"{label}: {status} at {count} of {n_points} points"
-            for (label, status), count in failures.items()
+            f"{evaluate.label(index)}: {status} at {count} of {n_points} points"
+            for (index, status), count in failures.items()
         )
         raise ValueError(
             f"no finite REML score on the grid over {LOG_PENALTY_BOUNDS}: no penalty "
@@ -1302,8 +1315,8 @@ def _try_step(
             return candidate, trial
         scale *= 0.5
     reason = "no halving of its step lowered the pooled score"
-    if trial is not None and trial.failure is not None:
-        reason += f" (the last halving failed in {trial.failure})"
+    if trial is not None and trial.failed_session is not None:
+        reason += f" (the last halving failed in {evaluate.failure(trial)})"
     return reason
 
 
@@ -1346,7 +1359,9 @@ def _search(
     rho = np.array(start, dtype=float)
     current = evaluate(rho, derivatives=True)
     if not np.isfinite(current.score):
-        raise ValueError(f"no finite REML score at the start {rho}: {current.failure}")
+        raise ValueError(
+            f"no finite REML score at the start {rho}: {evaluate.failure(current)}"
+        )
     start_score, n_steps = current.score, 0
     while True:
         curvature = _Curvature.at(rho, current)
@@ -1794,6 +1809,7 @@ def fit_at_penalties(
     pooled = pooled_reml(lik, sessions, blocks, rho, derivatives=False)
     if not np.isfinite(pooled.score):
         raise ValueError(
-            f"an inner fit did not converge at log penalties {rho}: {pooled.failure}"
+            f"an inner fit did not converge at log penalties {rho}: "
+            f"{_pooled_failure(pooled, sessions)}"
         )
     return _pooled_fit(rho, pooled, blocks, None)
