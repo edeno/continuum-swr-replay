@@ -587,6 +587,53 @@ def _animal_balanced_weights(
     return animal_counts[:, animal] / n_animals * per_day * within_day
 
 
+def _balanced_estimate_and_draws(
+    flat: NDArray[np.float64],
+    animal: NDArray[np.int64],
+    day: NDArray[np.int64],
+    n_draws: int,
+    seed: int,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """The day -> animal mean of means of ``flat`` and its nested bootstrap
+    draws, both from :func:`_animal_balanced_weights`.
+
+    Parameters
+    ----------
+    flat : NDArray, shape (n_sessions, n_points)
+        Finite values.
+    animal, day : NDArray of int, shape (n_sessions,)
+        Codes (:func:`_animal_day_codes`).
+    n_draws, seed : int
+        The draws' count and seed.
+
+    Returns
+    -------
+    estimate : NDArray, shape (1, n_points)
+    draws : NDArray, shape (n_draws, n_points)
+    """
+    n_sessions = flat.shape[0]
+    n_animals = int(animal.max()) + 1
+    estimate = (
+        _animal_balanced_weights(
+            animal,
+            day,
+            np.ones((1, n_animals), dtype=np.int64),
+            np.ones((1, n_sessions), dtype=np.int64),
+        )
+        @ flat
+    )
+    counts = nested_bootstrap_draws(
+        animal,
+        np.arange(n_sessions, dtype=np.int64),
+        np.random.default_rng(seed),
+        n_draws,
+    )
+    draws = (
+        _animal_balanced_weights(animal, day, counts.animals, counts.sessions) @ flat
+    )
+    return estimate, draws
+
+
 def animal_balanced_bootstrap(
     values: ArrayLike,
     animal: ArrayLike,
@@ -635,32 +682,16 @@ def animal_balanced_bootstrap(
     if not finite.any():
         raise ValueError("no session has a finite value")
     values = values[finite]
-    animal = np.asarray(animal)[finite]
-    day = np.asarray(day)[finite]
-    animal_codes, day_codes = _animal_day_codes(animal, day)
-    session_codes = np.arange(values.shape[0], dtype=np.int64)
-    flat = values.reshape(values.shape[0], -1)
-    n_animals = int(animal_codes.max()) + 1
-    estimate = (
-        _animal_balanced_weights(
-            animal_codes,
-            day_codes,
-            np.ones((1, n_animals), dtype=np.int64),
-            np.ones((1, values.shape[0]), dtype=np.int64),
-        )
-        @ flat
+    animal_codes, day_codes = _animal_day_codes(
+        np.asarray(animal)[finite], np.asarray(day)[finite]
     )
-    draws = nested_bootstrap_draws(
-        animal_codes, session_codes, np.random.default_rng(seed), n_draws
-    )
-    replicates = (
-        _animal_balanced_weights(animal_codes, day_codes, draws.animals, draws.sessions)
-        @ flat
+    estimate, draws = _balanced_estimate_and_draws(
+        values.reshape(values.shape[0], -1), animal_codes, day_codes, n_draws, seed
     )
     return AnimalBalancedDraws(
         estimate.reshape(values.shape[1:]),
-        replicates.reshape((n_draws, *values.shape[1:])),
-        n_animals,
+        draws.reshape((n_draws, *values.shape[1:])),
+        int(animal_codes.max()) + 1,
     )
 
 
@@ -673,30 +704,72 @@ def _animal_day_codes(
     return nested_codes(animal, day_labels)
 
 
+def _day_and_animal_means(
+    values: NDArray[np.float64], animal: NDArray[np.int64], day: NDArray[np.int64]
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Each day's mean over its sessions and each animal's mean over its days.
+
+    The one reduction session -> day -> animal behind :func:`estimand_summary`,
+    :func:`animal_day_session_values` and :func:`day_level_test`.
+
+    Parameters
+    ----------
+    values : NDArray, shape (n_sessions,)
+        Finite values.
+    animal, day : NDArray of int, shape (n_sessions,)
+        Codes (:func:`_animal_day_codes`).
+
+    Returns
+    -------
+    day_values : NDArray, shape (n_days,)
+        By day code.
+    animal_values : NDArray, shape (n_animals,)
+        By animal code.
+    """
+    day_values = np.bincount(day, values) / np.bincount(day)
+    day_animal = np.zeros(day_values.size, dtype=np.int64)
+    day_animal[day] = animal
+    return day_values, np.bincount(day_animal, day_values) / np.bincount(day_animal)
+
+
+def _finite_rows(
+    values: pd.Series, labels: dict[str, pd.Series]
+) -> tuple[pd.Series, list[pd.Series]]:
+    """The rows of ``values`` that are finite, and the labels of those rows.
+
+    Raises
+    ------
+    ValueError
+        If a label is not indexed as ``values``.
+    """
+    if not all(values.index.equals(s.index) for s in labels.values()):
+        names = ", ".join(["values", *labels][:-1]) + f" and {list(labels)[-1]}"
+        raise ValueError(f"{names} are not indexed alike")
+    finite = np.isfinite(values.to_numpy(dtype=float))
+    return values[finite], [s[finite] for s in labels.values()]
+
+
 def animal_day_session_values(
     values: pd.Series,
     animal: pd.Series,
     day: pd.Series,
     session: pd.Series,
-    statistic: str,
 ) -> pd.Series:
     """Each animal's value of a per-row number, row -> session -> day -> animal.
 
-    The three-level analog of :func:`animal_session_values`: the
-    ``statistic`` over each session's rows, then over each recording day's
-    sessions, then over each animal's days, so every day of an animal weighs
-    the same however many sessions it holds.
+    The three-level analog of :func:`animal_session_values`: the mean over
+    each session's rows, then over each recording day's sessions, then over
+    each animal's days, so every day of an animal weighs the same however many
+    sessions it holds.
 
     Parameters
     ----------
     values : pd.Series, shape (n_rows,)
-        One number per row (a session, or a unit or event of one). A value that is not
-        finite (missing or infinite) is left out.
+        One number per row (a session, or a unit or event of one). A value
+        that is not finite (missing or infinite) is left out.
     animal, day, session : pd.Series, shape (n_rows,)
         Each row's animal, recording day within its animal, and session within
         its day, indexed as ``values``.
-    statistic : {"median", "mean"}
-        The reduction at every level.
 
     Returns
     -------
@@ -707,18 +780,23 @@ def animal_day_session_values(
     Raises
     ------
     ValueError
-        If ``statistic`` is neither ``"median"`` nor ``"mean"``, or the labels
-        are not indexed as ``values``.
+        If the labels are not indexed as ``values``.
     """
-    if statistic not in ("median", "mean"):
-        raise ValueError(f"statistic {statistic!r} is neither 'median' nor 'mean'")
-    if not all(values.index.equals(s.index) for s in (animal, day, session)):
-        raise ValueError("values, animal, day and session are not indexed alike")
-    has_value = np.isfinite(values.to_numpy(dtype=float))
-    keys = [s[has_value] for s in (animal, day, session)]
-    per_session = values[has_value].groupby(keys, observed=True).agg(statistic)
-    per_day = per_session.groupby(level=[0, 1], observed=True).agg(statistic)
-    return per_day.groupby(level=0, observed=True).agg(statistic)
+    values, (animal, day, session) = _finite_rows(
+        values, {"animal": animal, "day": day, "session": session}
+    )
+    sessions = pd.MultiIndex.from_arrays([animal, day, session])
+    session_codes = pd.factorize(sessions, sort=True)[0]
+    first = np.unique(session_codes, return_index=True)[1]
+    session_values = np.bincount(session_codes, values.to_numpy(dtype=float))
+    session_values /= np.bincount(session_codes)
+    session_animal = animal.to_numpy()[first]
+    _, per_animal = _day_and_animal_means(
+        session_values, *_animal_day_codes(session_animal, day.to_numpy()[first])
+    )
+    return pd.Series(
+        per_animal, index=pd.Index(np.unique(session_animal), name=animal.name)
+    )
 
 
 def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> float:
@@ -747,11 +825,12 @@ def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> floa
     ValueError
         If the labels are not indexed as ``values``.
     """
-    if not (values.index.equals(animal.index) and values.index.equals(day.index)):
-        raise ValueError("values, animal and day are not indexed alike")
-    has_value = np.isfinite(values.to_numpy(dtype=float))
-    keys = [animal[has_value], day[has_value]]
-    return signed_rank_p(values[has_value].groupby(keys, observed=True).mean())
+    values, (animal, day) = _finite_rows(values, {"animal": animal, "day": day})
+    day_values, _ = _day_and_animal_means(
+        values.to_numpy(dtype=float),
+        *_animal_day_codes(animal.to_numpy(), day.to_numpy()),
+    )
+    return signed_rank_p(day_values)
 
 
 def estimand_summary(
@@ -766,12 +845,13 @@ def estimand_summary(
     """The summary of a scalar estimand over sessions.
 
     The estimate is the animal-balanced value: session -> recording day ->
-    animal, a mean of means (:func:`animal_balanced_bootstrap`). Its 95 %
-    interval is :func:`bootstrap_interval` over that function's nested
-    bootstrap draws (animals, then their sessions). Beside it stand the
-    animals whose own value (:func:`animal_day_session_values`, means) has the
-    estimate's sign and the recording-day-level test (:func:`day_level_test`).
-    No claim rests on a p over five animals.
+    animal, a mean of means, with its nested bootstrap draws (animals, then
+    their sessions), as :func:`animal_balanced_bootstrap` gives them. Its 95 %
+    interval is :func:`bootstrap_interval` over those draws. Beside it stand
+    the animals whose own value (:func:`animal_day_session_values`) has the
+    estimate's sign and the recording-day-level test (:func:`day_level_test`),
+    both read from the same day and animal means. No claim rests on a p over
+    five animals.
 
     Parameters
     ----------
@@ -805,33 +885,33 @@ def estimand_summary(
         If no session has a finite value, a session has more than one value,
         or the labels are not indexed as ``values``.
     """
-    if not all(values.index.equals(s.index) for s in (animal, day, session)):
-        raise ValueError("values, animal, day and session are not indexed alike")
-    finite = np.isfinite(values.to_numpy(dtype=float))
-    values, animal, day, session = (s[finite] for s in (values, animal, day, session))
-    labels = pd.DataFrame({"animal": animal, "day": day, "session": session})
-    if labels.duplicated().any():
-        raise ValueError("a session has more than one value")
-    per_animal = animal_day_session_values(values, animal, day, session, "mean")
-    boot = animal_balanced_bootstrap(
-        values.to_numpy(),
-        animal.to_numpy(),
-        day.to_numpy(),
-        n_draws=n_draws,
-        seed=seed,
+    values, (animal, day, session) = _finite_rows(
+        values, {"animal": animal, "day": day, "session": session}
     )
-    estimate = float(boot.estimate)
-    interval = bootstrap_interval(estimate, boot.draws, boot.n_animals)
+    if values.empty:
+        raise ValueError("no session has a finite value")
+    if pd.MultiIndex.from_arrays([animal, day, session]).duplicated().any():
+        raise ValueError("a session has more than one value")
+    session_values = values.to_numpy(dtype=float)
+    animal_codes, day_codes = _animal_day_codes(animal.to_numpy(), day.to_numpy())
+    estimate, draws = _balanced_estimate_and_draws(
+        session_values[:, None], animal_codes, day_codes, n_draws, seed
+    )
+    day_values, animal_values = _day_and_animal_means(
+        session_values, animal_codes, day_codes
+    )
+    estimate = float(estimate[0, 0])
+    interval = bootstrap_interval(estimate, draws[:, 0], animal_values.size)
     return {
         "estimate": estimate,
         "low": interval.low,
         "high": interval.high,
         "sd": interval.sd,
-        "n_animals": boot.n_animals,
-        "n_days": len(labels[["animal", "day"]].drop_duplicates()),
-        "n_sessions": len(labels),
-        "n_animals_same_sign": int((np.sign(per_animal) == np.sign(estimate)).sum()),
-        "day_p": day_level_test(values, animal, day),
+        "n_animals": animal_values.size,
+        "n_days": day_values.size,
+        "n_sessions": session_values.size,
+        "n_animals_same_sign": int((np.sign(animal_values) == np.sign(estimate)).sum()),
+        "day_p": signed_rank_p(day_values),
         "n_draws": n_draws,
         "seed": seed,
     }

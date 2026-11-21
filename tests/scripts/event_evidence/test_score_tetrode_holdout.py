@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.files import DecodePaths
 from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
@@ -148,11 +149,11 @@ def test_trial_folds_are_made_from_the_trials_and_recorded(patched):
     assert given["trials"] is True
     np.testing.assert_array_equal(
         given["folds"],
-        th.trial_folds(
+        fo.trial_folds(
             TIME,
             TIME[[0, 2, 4, 6, 8, 10, 11]],
-            np.r_[TRIALS["to_well"], th.AFTER_LAST_TRIAL],
-            th.N_FOLDS,
+            np.r_[TRIALS["to_well"], fo.AFTER_LAST_TRIAL],
+            fo.N_FOLDS,
         ),
     )
     assert given["margin_bins"] == 500  # 1 s of 2 ms bins
@@ -189,6 +190,6 @@ def header(processed_data_root, monkeypatch):
 
 def test_the_header_names_the_fold_design_and_its_margin(header):
     assert header()["settings"] == {
-        "n_folds": th.N_FOLDS,
+        "n_folds": fo.N_FOLDS,
         **th.fold_settings(),
     }

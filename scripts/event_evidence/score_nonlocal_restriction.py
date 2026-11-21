@@ -15,7 +15,7 @@ The likelihood is held out by folds of whole trials: a segment runs from one dep
 ``movement_start_time``, the final poke-out at its origin) to the next, so the
 run to a well and the whole stay there are one segment, and the segments are
 dealt into ``N_FOLDS`` folds balanced by destination well
-(``tetrode_holdout.trial_folds``), with a margin of ``TRIAL_MARGIN_S``. The
+(``regression.folds.trial_folds``), with a margin of ``TRIAL_MARGIN_S``. The
 time before the first trial and after the last trial's end are segments of
 their own two classes, and a segment longer than ``MAX_SEGMENT_S`` is cut into
 equal pieces, each a group of its own, so that long stays are spread over the
@@ -117,6 +117,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from continuum_swr_replay.analysis.regression.folds import N_FOLDS
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
@@ -232,7 +233,7 @@ def run_epoch(
     analyzed = labels != "excluded"
     immobile = np.isin(labels, [nr.IMMOBILE_IN_SWR, nr.IMMOBILE_OUTSIDE_SWR])
     sampling = scores["place_sampling_s"].to_numpy()[immobile]
-    fold_share = np.bincount(scores["block"], minlength=nr.N_FOLDS) / len(scores)
+    fold_share = np.bincount(scores["block"], minlength=N_FOLDS) / len(scores)
     return json_ready(
         {
             "status": "failed_check" if failures else "ok",
@@ -287,7 +288,7 @@ def main(argv: list[str] | None = None) -> None:
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
         "settings": {
-            "n_folds": nr.N_FOLDS,
+            "n_folds": N_FOLDS,
             **fit_settings(),
             **th.fold_settings(),
             "sparse_sampling_s": SPARSE_SAMPLING_S,

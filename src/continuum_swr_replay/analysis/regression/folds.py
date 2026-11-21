@@ -1,7 +1,8 @@
 """Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
-The one fold rule of every regression model. Inside an epoch each row (a time
-bin, or an event placed by its start time) belongs to a trial segment: from a
+The project's one fold rule, for the regression models and the held-out scores
+of the event evidence alike. Inside an epoch each row (a time bin, or an event
+placed by its start time) belongs to a trial segment: from a
 trial's departure from a well to the next departure, so the run to a well and
 the whole stay there are one segment, its class the destination well
 (:func:`task_segment_starts`). A segment longer than :data:`MAX_SEGMENT_S` is
@@ -22,17 +23,21 @@ not depend on a seed.
 Folds compare designs and check over-fitting. They do not choose penalties
 and are not the test that an effect exists.
 
-The logic is that of ``analysis/event_evidence/tetrode_holdout.py`` on the
-branch ``swr-trial-folds`` (commit 3953304c: ``trial_segments``,
-``trial_bin_share``, ``task_segment_starts``, ``capped_groups``,
-``trial_folds``), copied here with the same signatures and folds so that every
-family, the held-out tetrode score included, uses one rule.
+``analysis/event_evidence/tetrode_holdout.py``'s ``epoch_folds`` calls it: it
+gives each epoch's decode bins their folds (:func:`trial_folds_and_groups`) and
+records the counts of segments and groups, for the held-out tetrode score and
+the non-local restriction run. ``scripts/checks/check_stored_folds_reproduce.py``
+checks the stored runs against this rule: on 2026-11-21, against the
+restriction run of commit 3953304c and the held-out tetrode run of commit
+be732dee, the folds and their records agreed in 242 of 242 epochs.
 """
 
 from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+
+from continuum_swr_replay.intervals import sample_step
 
 __all__ = [
     "AFTER_LAST_TRIAL",
@@ -44,6 +49,7 @@ __all__ = [
     "task_segment_starts",
     "trial_bin_share",
     "trial_folds",
+    "trial_folds_and_groups",
     "trial_segments",
 ]
 
@@ -63,9 +69,10 @@ AFTER_LAST_TRIAL = -2
 MIN_TRIAL_BIN_SHARE = 0.8
 """The smallest share of an epoch's rows that its trials must cover
 (:func:`task_segment_starts`). Over the 242 analyzed epochs the trials cover
-93 % to 99.97 % of the decode's bins (median 98.7 %), so a smaller share means
-the trials are not on the rows' clock, where every row would fall outside them
-and the cap would cut the epoch into pieces of one class."""
+93 % to 99.97 % of the decode's bins (median 98.7 %; the time before the first
+trial is at most 65 s and after the last at most 120 s), so a smaller share
+means the trials are not on the rows' clock, where every row would fall outside
+them and the cap would cut the epoch into pieces of one class."""
 
 
 def trial_segments(time: NDArray, segment_starts: NDArray) -> NDArray[np.int64]:
@@ -251,7 +258,7 @@ def capped_groups(
     if max_segment_s is None:
         pieces = np.ones(lengths.size, dtype=np.int64)
     else:
-        bin_s = float(np.median(np.diff(np.asarray(time, dtype=float))))
+        bin_s = sample_step(np.asarray(time, dtype=float))
         cap_bins = max(int(np.floor(max_segment_s / bin_s + 1e-6)), 1)
         pieces = -(-lengths // cap_bins)  # ceil
     run = np.repeat(np.arange(lengths.size), lengths)
@@ -279,6 +286,11 @@ def trial_folds(
     evenly as whole groups allow. Deterministic: without shuffling the splitter
     places the groups in a fixed order (the most rows first).
 
+    With the segments of :func:`task_segment_starts` every well with at least
+    ``n_folds`` groups is sampled in every fold, where folds of contiguous time
+    would leave a patch the animal visits in one stretch of the epoch to a
+    single fold. A well with fewer groups is not.
+
     Parameters
     ----------
     time : ndarray, shape (n_rows,)
@@ -303,8 +315,41 @@ def trial_folds(
     Raises
     ------
     ValueError
-        When the times are not strictly increasing, when the classes are not one per start or not all finite, when fewer
-        groups than ``n_folds`` hold a row, or when a fold is left empty.
+        When the times are not strictly increasing, when the classes are not
+        one per start or not all finite, when fewer groups than ``n_folds``
+        hold a row, or when a fold is left empty.
+    """
+    return trial_folds_and_groups(
+        time, segment_starts, segment_classes, n_folds, max_segment_s
+    )[0]
+
+
+def trial_folds_and_groups(
+    time: NDArray,
+    segment_starts: NDArray,
+    segment_classes: NDArray,
+    n_folds: int = N_FOLDS,
+    max_segment_s: float | None = MAX_SEGMENT_S,
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """:func:`trial_folds`' folds, with each row's segment and group.
+
+    The one computation of the folds: the segments (:func:`trial_segments`)
+    and groups (:func:`capped_groups`) returned are those the folds were made
+    from, so a caller that records their counts does not compute them again.
+
+    Parameters
+    ----------
+    time, segment_starts, segment_classes, n_folds, max_segment_s
+        As :func:`trial_folds`.
+
+    Returns
+    -------
+    folds, segment, group : ndarray of int, each shape (n_rows,)
+
+    Raises
+    ------
+    ValueError
+        As :func:`trial_folds`.
     """
     from sklearn.model_selection import StratifiedGroupKFold
 
@@ -332,4 +377,4 @@ def trial_folds(
     empty = np.setdiff1d(np.arange(n_folds), folds)
     if empty.size:
         raise ValueError(f"folds {empty.tolist()} hold no segment")
-    return folds
+    return folds, segment, group

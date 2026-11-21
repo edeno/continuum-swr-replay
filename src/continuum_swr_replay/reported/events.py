@@ -180,6 +180,7 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
     well_visit_times,
 )
+from continuum_swr_replay.analysis.regression.folds import MAX_SEGMENT_S, N_FOLDS
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_epoch_ids,
@@ -1860,8 +1861,8 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
 _TETRODE_HELD_OUT = (
     "each tetrode is left out of the decoder in turn; at a scored bin, that "
     "tetrode's and the other tetrodes' place-field encodings are fit on the other "
-    f"folds ({tetrode_holdout.N_FOLDS} folds of whole trials balanced by "
-    f"destination well, a segment longer than {tetrode_holdout.MAX_SEGMENT_S:g} s "
+    f"folds ({N_FOLDS} folds of whole trials balanced by "
+    f"destination well, a segment longer than {MAX_SEGMENT_S:g} s "
     "cut into pieces, training bins within "
     f"{tetrode_holdout.TRIAL_MARGIN_S:g} s of the fold left out); the state "
     "transitions and initial conditions are the canonical decoder's, fit on the "
@@ -1935,8 +1936,8 @@ _RESTRICTION_SCORES = {
 _RESTRICTION_HELD_OUT = (
     "with each of five folds of whole trials (balanced by destination well; a "
     "trial's run to a well with its whole stay there, when longer than "
-    f"{tetrode_holdout.MAX_SEGMENT_S:g} s, is cut into pieces of at most "
-    f"{tetrode_holdout.MAX_SEGMENT_S:g} s that can fall in different folds) "
+    f"{MAX_SEGMENT_S:g} s, is cut into pieces of at most "
+    f"{MAX_SEGMENT_S:g} s that can fall in different folds) "
     "scored under a decoder whose place-field encodings were fit on the decode's "
     "training bins (outside every SWR and artifact) of the other folds, more than "
     "1 s from the fold, and whose state transitions and initial conditions were "

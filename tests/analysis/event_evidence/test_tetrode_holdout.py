@@ -6,6 +6,7 @@ import pytest
 import sklearn
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from continuum_swr_replay.analysis.regression import folds as fo
 from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 STATES = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
@@ -86,115 +87,11 @@ def test_margin_in_bins_rounds_seconds_up_to_bins():
     assert th.margin_in_bins(0.003, time) == 2
 
 
-def test_trial_segments_join_the_epochs_edges_to_the_first_and_last():
-    time = np.arange(10.0)
-    np.testing.assert_array_equal(
-        th.trial_segments(time, np.array([2.0, 5.0, 8.5])),
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 2],
-    )
-    with pytest.raises(ValueError, match="strictly increasing"):
-        th.trial_segments(time, np.array([2.0, 2.0]))
-
-
 def _trials(lengths_s, classes, bin_s=0.1):
     """A time axis and the segment starts of back-to-back trials."""
     starts = np.r_[0.0, np.cumsum(lengths_s)[:-1]]
     time = np.arange(0.0, float(np.sum(lengths_s)), bin_s)
     return time, starts, np.asarray(classes)
-
-
-def test_trial_folds_keep_every_segment_in_one_fold_and_are_deterministic():
-    rng = np.random.default_rng(2)
-    time, starts, classes = _trials(rng.uniform(5, 30, 40), rng.integers(0, 6, 40))
-    folds = th.trial_folds(time, starts, classes, 5)
-    segment = th.trial_segments(time, starts)
-    assert folds.shape == time.shape
-    assert set(np.unique(folds)) == set(range(5))
-    for s in np.unique(segment):
-        assert np.unique(folds[segment == s]).size == 1
-    np.testing.assert_array_equal(folds, th.trial_folds(time, starts, classes, 5))
-
-
-def test_trial_folds_spread_each_classes_time_over_the_folds():
-    """Ten trials to well 0 in the first half of the epoch, ten to well 1 in
-    the second, of 8 to 12 s: each fold holds 20 % of each well's time within
-    5 points (contiguous blocks would put each well in two or three folds)."""
-    lengths = np.tile([8.0, 12.0, 9.0, 11.0, 10.0], 4)
-    time, starts, classes = _trials(lengths, np.repeat([0, 1], 10))
-    folds = th.trial_folds(time, starts, classes, 5)
-    y = classes[th.trial_segments(time, starts)]
-    for c in (0, 1):
-        share = np.bincount(folds[y == c], minlength=5) / (y == c).sum()
-        np.testing.assert_allclose(share, 0.2, atol=0.05)
-
-
-def test_capped_groups_cut_a_long_segment_into_equal_pieces_within_the_cap():
-    time = np.arange(0.0, 200.0, 0.1)  # 2000 bins
-    # segments of 95 s, exactly 30 s, 10 s and 65 s
-    segment = th.trial_segments(time, np.array([0.0, 95.0, 125.0, 135.0]))
-    group = th.capped_groups(time, segment, 30.0)
-    assert (np.diff(group) >= 0).all()
-    sizes = np.bincount(group)
-    # 95 s -> 4 pieces of 23.7-23.8 s; 30 s whole; 10 s whole; 65 s -> 3 pieces
-    np.testing.assert_array_equal(sizes, [238, 237, 238, 237, 300, 100, 217, 217, 216])
-    assert sizes.max() * 0.1 <= 30.0
-    for g in np.unique(group):
-        assert np.unique(segment[group == g]).size == 1
-    # no cap: the segments themselves
-    np.testing.assert_array_equal(th.capped_groups(time, segment, None), segment)
-
-
-def test_task_segment_starts_add_the_time_before_and_after_the_trials():
-    time = np.arange(0.0, 75.0, 0.1)
-    starts, classes = th.task_segment_starts(
-        time, np.array([5.0, 30.0, 50.0]), np.array([2, 3, 2]), 70.0
-    )
-    np.testing.assert_array_equal(starts, [0.0, 5.0, 30.0, 50.0, 70.0])
-    np.testing.assert_array_equal(
-        classes, [th.BEFORE_FIRST_TRIAL, 2, 3, 2, th.AFTER_LAST_TRIAL]
-    )
-    # no bins before the first departure or after the last end: no such segment
-    starts, classes = th.task_segment_starts(
-        time, np.array([0.0, 30.0]), np.array([2, 3]), 200.0
-    )
-    np.testing.assert_array_equal(classes, [2, 3])
-    with pytest.raises(ValueError, match="ends before its departure"):
-        th.task_segment_starts(time, np.array([10.0, 30.0]), np.array([2, 3]), 20.0)
-    with pytest.raises(ValueError, match="needs a destination"):
-        th.task_segment_starts(time, np.array([10.0]), np.array([np.nan]), 20.0)
-    with pytest.raises(ValueError, match="no trials"):
-        th.task_segment_starts(time, np.array([]), np.array([]), 20.0)
-
-
-def test_long_stays_before_and_after_the_trials_are_spread_over_the_folds():
-    """150 s before the first trial and 300 s after the last, around two
-    hundred 10 s trials: with the 30 s cap each fold holds a fifth of the time
-    before and of the time after; without it each sits in one fold."""
-    bin_s = 0.1
-    departures = 150.0 + 10.0 * np.arange(200)
-    time = np.arange(0.0, 2450.0, bin_s)
-    starts, classes = th.task_segment_starts(
-        time, departures, np.tile([0, 1], 100), 2150.0
-    )
-    y = classes[th.trial_segments(time, starts)]
-    folds = th.trial_folds(time, starts, classes, 5, max_segment_s=30.0)
-    for c in (th.BEFORE_FIRST_TRIAL, th.AFTER_LAST_TRIAL, 0, 1):
-        share = np.bincount(folds[y == c], minlength=5) / (y == c).sum()
-        np.testing.assert_allclose(share, 0.2, atol=0.02)
-    whole = th.trial_folds(time, starts, classes, 5, max_segment_s=None)
-    for c in (th.BEFORE_FIRST_TRIAL, th.AFTER_LAST_TRIAL):
-        assert np.unique(whole[y == c]).size == 1
-
-
-def test_trial_folds_need_a_segment_per_fold_and_a_class_per_segment():
-    time, starts, classes = _trials([10.0] * 4, [0, 1, 0, 1])
-    with pytest.raises(ValueError, match="fewer than the 5 folds"):
-        th.trial_folds(time, starts, classes, 5)
-    time, starts, _ = _trials([10.0] * 6, [0] * 6)
-    with pytest.raises(ValueError, match="needs a class"):
-        th.trial_folds(time, starts, np.array([0, 1, np.nan, 0, 1, 0]), 5)
-    with pytest.raises(ValueError, match="segment classes"):
-        th.trial_folds(time, starts, np.array([0, 1]), 5)
 
 
 def test_place_sampling_counts_the_folds_training_seconds_at_the_place():
@@ -229,7 +126,7 @@ def test_trial_folds_sample_a_patch_that_contiguous_blocks_leave_unsampled():
     lengths = np.full(n_trials, 10.0)
     classes = np.where(np.arange(n_trials) < 10, 0, 1)  # destination patch
     time, starts, _ = _trials(lengths, classes, bin_s)
-    segment = th.trial_segments(time, starts)
+    segment = fo.trial_segments(time, starts)
     # within each trial the animal sweeps its patch's ten places
     within = ((time - starts[segment]) / 10.0 * 10).astype(np.int64).clip(0, 9)
     place = within + 10 * classes[segment]
@@ -245,7 +142,7 @@ def test_trial_folds_sample_a_patch_that_contiguous_blocks_leave_unsampled():
     )
     assert (contiguous[first_patch] == 0).all()
 
-    folds = th.trial_folds(time, starts, classes, 5)
+    folds = fo.trial_folds(time, starts, classes, 5)
     margin = th.margin_in_bins(th.TRIAL_MARGIN_S, time)
     trial = th.place_sampling(
         place, th.fold_training_masks(is_training, folds, 5, margin), folds, bin_s
@@ -374,23 +271,6 @@ def test_add_rows_is_np_add_at_to_the_bit():
     np.testing.assert_array_equal(out, expected)
 
 
-def test_trials_off_the_decodes_clock_raise():
-    time = 1000.0 + np.arange(0.0, 600.0, 0.1)
-    departures = 1000.0 + 10.0 * np.arange(1, 50)
-    wells = np.tile([2, 3], 25)[:49]
-    # the trials as they are: they cover 97.5 % of the bins
-    th.task_segment_starts(time, departures, wells, 595.0 + 1000.0)
-    assert th.trial_bin_share(time, departures, 1595.0) == pytest.approx(0.975)
-    # in milliseconds, or offset past the epoch: the departures leave the axis
-    with pytest.raises(ValueError, match="outside the time axis"):
-        th.task_segment_starts(time, departures * 1000.0, wells, 1595.0 * 1000.0)
-    with pytest.raises(ValueError, match="outside the time axis"):
-        th.task_segment_starts(time, departures + 600.0, wells, 2195.0)
-    # within the axis, but covering a fifth of it
-    with pytest.raises(ValueError, match="cover 19.8% of the bins"):
-        th.task_segment_starts(time, departures[:12], wells[:12], 1129.0)
-
-
 def test_the_leakage_check_passes_time_blocks_and_trial_folds():
     rng = np.random.default_rng(3)
     time = np.arange(0.0, 300.0, 0.002)
@@ -404,7 +284,7 @@ def test_the_leakage_check_passes_time_blocks_and_trial_folds():
         blocks,
     )
     starts = np.arange(0.0, 300.0, 7.0)
-    folds = th.trial_folds(time, starts, np.arange(starts.size) % 3, 5)
+    folds = fo.trial_folds(time, starts, np.arange(starts.size) % 3, 5)
     margin = th.margin_in_bins(th.TRIAL_MARGIN_S, time)
     th.check_no_fold_leakage(
         time, position, th.fold_training_masks(is_training, folds, 5, margin), folds
@@ -470,10 +350,10 @@ def test_holdout_scores_fit_each_fold_on_the_folds_and_margin_it_is_given(
     (five time blocks, a margin of two bins) give other fits."""
     rng = np.random.default_rng(4)
     is_training = rng.random(1000) < 0.8
-    folds = (np.arange(1000) // 40) % th.N_FOLDS
+    folds = (np.arange(1000) // 40) % fo.N_FOLDS
     given = _fit_masks(monkeypatch, is_training, folds=folds, margin_bins=7)
-    expected = th.fold_training_masks(is_training, folds, th.N_FOLDS, 7)
-    assert len(given) == th.N_FOLDS
+    expected = th.fold_training_masks(is_training, folds, fo.N_FOLDS, 7)
+    assert len(given) == fo.N_FOLDS
     for got, mask in zip(given, expected, strict=True):
         np.testing.assert_array_equal(got, mask)
 
@@ -482,9 +362,9 @@ def test_holdout_scores_fit_each_fold_on_the_folds_and_margin_it_is_given(
         monkeypatch, is_training, folds=blocks, margin_bins=TIME_BLOCK_MARGIN_BINS
     )
     expected = th.fold_training_masks(
-        is_training, blocks, th.N_FOLDS, TIME_BLOCK_MARGIN_BINS
+        is_training, blocks, fo.N_FOLDS, TIME_BLOCK_MARGIN_BINS
     )
-    assert len(other_fits) == th.N_FOLDS
+    assert len(other_fits) == fo.N_FOLDS
     for got, mask, other in zip(other_fits, expected, given, strict=True):
         np.testing.assert_array_equal(got, mask)
         assert not np.array_equal(got, other)
@@ -522,8 +402,8 @@ def test_the_header_names_the_fold_design_and_its_margin():
         "fold_design": "trials",
         "fold_classes": "to_well",
         "margin_s": 1.0,
-        "max_segment_s": th.MAX_SEGMENT_S,
-        "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
+        "max_segment_s": fo.MAX_SEGMENT_S,
+        "min_trial_bin_share": fo.MIN_TRIAL_BIN_SHARE,
         "sklearn_version": sklearn.__version__,
     }
 
@@ -543,9 +423,9 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
     )
     folds, margin_bins, counts = th.epoch_folds(time, trials)
     starts = np.array([0.0, 0.5, 2.0, 3.5, 5.0, 6.5, 8.0, 9.5])
-    classes = np.r_[th.BEFORE_FIRST_TRIAL, 2, 3, 2, 3, 2, 3, th.AFTER_LAST_TRIAL]
+    classes = np.r_[fo.BEFORE_FIRST_TRIAL, 2, 3, 2, 3, 2, 3, fo.AFTER_LAST_TRIAL]
     np.testing.assert_array_equal(
-        folds, th.trial_folds(time, starts, classes, th.N_FOLDS)
+        folds, fo.trial_folds(time, starts, classes, fo.N_FOLDS)
     )
     assert margin_bins == 500
     assert counts == {
