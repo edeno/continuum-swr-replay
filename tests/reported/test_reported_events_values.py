@@ -1185,21 +1185,25 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     assert numbers[f"{key}_epochs_positive"] == 6
     assert numbers[f"{key}_epochs"] == 6
     # shares 0.5 and 0.4 in every animal: each animal's median 0.45
-    assert numbers[f"{key}_share_in_non_swr_events"] == pytest.approx(0.45)
-    assert numbers[f"{key}_two_sided_share_in_non_swr_events"] == pytest.approx(0.45)
-    assert values[f"{key}_share_in_non_swr_events"].kind == "fraction"
+    assert numbers[f"{key}_share_in_heldout_non_swr_events"] == pytest.approx(0.45)
+    assert numbers[f"{key}_two_sided_share_in_heldout_non_swr_events"] == pytest.approx(
+        0.45
+    )
+    assert values[f"{key}_share_in_heldout_non_swr_events"].kind == "fraction"
     # the rest: two thirds of the gain (animal medians 30, 70, 60 nats) over 6 s
     # and 3 spikes
     rest = 2 / 3 * 160 / 3
-    assert numbers[f"{key}_outside_events_per_s"] == pytest.approx(rest / 6)
-    assert numbers[f"{key}_outside_events_per_spike"] == pytest.approx(rest / 3)
-    assert numbers[f"{key}_two_sided_outside_events_per_s"] == pytest.approx(
+    assert numbers[f"{key}_outside_heldout_events_per_s"] == pytest.approx(rest / 6)
+    assert numbers[f"{key}_outside_heldout_events_per_spike"] == pytest.approx(rest / 3)
+    assert numbers[f"{key}_two_sided_outside_heldout_events_per_s"] == pytest.approx(
         2 * rest / 6
     )
-    assert numbers[f"{key}_outside_events_per_s_animals_positive"] == 3
+    assert numbers[f"{key}_outside_heldout_events_per_s_animals_positive"] == 3
     # the SWR events' time outside the SWR: a fifth of each epoch's gain
-    assert numbers[f"{key}_share_in_swr_events_outside_swr"] == pytest.approx(0.2)
-    assert numbers[f"{key}_two_sided_share_in_swr_events_outside_swr"] == (
+    assert numbers[f"{key}_share_in_heldout_swr_events_outside_swr"] == pytest.approx(
+        0.2
+    )
+    assert numbers[f"{key}_two_sided_share_in_heldout_swr_events_outside_swr"] == (
         pytest.approx(0.2)
     )
     # per family: per spike and per second, the gain and the rest (four each),

@@ -1879,7 +1879,7 @@ RESTRICTION_AFTER_VISIT = "_outside_swr_after_visit"
 #: the held-out event run marks that time from every event detected from the
 #: held-out decode, wherever it starts, so these values are over the time inside
 #: a well visit, not over the selected events.
-RESTRICTION_OUTSIDE_EVENTS = "_outside_events_"
+RESTRICTION_OUTSIDE_EVENTS = "_outside_heldout_events_"
 #: Figure 2g, the decoders compared, in one score family (its values carry the
 #: panel's tag; the other family's do not).
 RESTRICTION_FIGURE_FAMILY = "filter"
@@ -2352,13 +2352,13 @@ def restriction_outside_swr_values(
         for measure, name, part in (
             (
                 "share_in_swr_events_outside_swr",
-                "share_in_swr_events_outside_swr",
+                "share_in_heldout_swr_events_outside_swr",
                 "the time outside the SWR of the events detected from the held-out "
                 "decode that overlap an SWR",
             ),
             (
                 "share_in_no_swr_events",
-                "share_in_non_swr_events",
+                "share_in_heldout_non_swr_events",
                 "the events detected from the held-out decode with no SWR",
             ),
         ):
