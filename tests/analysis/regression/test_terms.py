@@ -395,3 +395,20 @@ def test_a_column_too_small_on_the_pooled_rows_is_refused_at_construction(
     assert design.small_terms(X) == {
         "lf(lag_1..lag_10)": pytest.approx(np.abs(X[:, 1:]).max())
     }
+
+
+def test_a_missing_level_is_not_the_reference(content_sessions) -> None:
+    """A category with no term by it: a missing value makes its row missing
+    (NaN in the level columns), not a row of the reference level (zeros)."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    design = build_design(
+        [Category("role", ROLES, reference="other"), Slope("clock_s")],
+        pooled,
+        intercept=False,
+    )
+    rows = next(iter(content_sessions.values())).copy()
+    rows["role"] = rows["role"].astype(object)
+    rows.loc[2, "role"] = None
+    np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [2])
+    X, _ = design._matrix(rows)
+    assert np.isnan(X[2, :3]).all()
