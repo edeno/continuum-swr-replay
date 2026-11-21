@@ -1324,8 +1324,8 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     labels.append("between events")
     ax_rip.legend(
         handles, labels, frameon=False, loc="lower center", ncol=2,
-        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, columnspacing=0.8,
-        borderaxespad=0.1,
+        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, handletextpad=0.4,
+        columnspacing=0.6, borderaxespad=0.1,
     )  # fmt: skip
     ax_speed.set_xlabel("Time from event start (ms)")
 
@@ -1742,6 +1742,17 @@ def generate_figure(
     )
     # panel a's letter sits at the top of its decode, not of the track drawing
     positions["a"] = (positions["a"][0], ax_a_top.get_position().y1 + 0.004)
+    # the last row's letters sit just above panels g, h and j: the legend drawn
+    # above panel i's axes would lift the whole row's letters away from them
+    last_row_top = (
+        max(
+            panel_extent(fig, renderer, axes).y1
+            for axes in ([ax_g, ax_g2], [ax_h], [ax_j, ax_j2])
+        )
+        + 0.002
+    )
+    for name in "ghij":
+        positions[name] = (positions[name][0], last_row_top)
     for name, (x, y) in positions.items():
         fig.text(
             x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",
