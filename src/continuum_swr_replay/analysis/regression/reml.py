@@ -1312,8 +1312,9 @@ def _search(
     ------
     ValueError
         If the score at ``start`` is not finite, or the search does not
-        converge: ``REML_MAX_STEPS`` steps, an empty step or no halving that
-        lowers the score. The message gives the last log penalties, the
+        converge: ``REML_MAX_STEPS`` steps without a stationary point (a point
+        of negative curvature reached at the last step is not one), an empty
+        step or no halving that lowers the score. The message gives the last log penalties, the
         gradient and the steps taken.
     """
     rho = np.array(start, dtype=float)
@@ -1341,7 +1342,7 @@ def _search(
                     rho,
                     current,
                 )
-        elif small:  # the last step, taken when the score does not rise
+        elif small and not probes:  # the last step, taken unless the score rises
             moved = _try_step(evaluate, rho, current, step, 1, rounding)
             if not isinstance(moved, str):
                 (rho, current), n_steps = moved, n_steps + 1

@@ -1233,6 +1233,24 @@ def test_the_search_does_not_stop_where_the_curvature_is_negative() -> None:
     assert current.hessian[0, 0] > 0
 
 
+def test_the_last_allowed_step_does_not_end_where_the_curvature_is_negative(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The double well of the test above, started 1e-5 from its maximum with no
+    step left (``REML_MAX_STEPS`` steps taken): the decrement is small but the
+    curvature negative, so the point is not a stationary point the search may
+    stop at, and the search raises instead of returning the maximum."""
+
+    def score(r: np.ndarray):
+        d = r[0] - 5
+        value = 100 - d**2 + 0.01 * d**4
+        return value, np.array([-2 * d + 0.04 * d**3]), np.array([[-2 + 0.12 * d**2]])
+
+    monkeypatch.setattr(reml, "REML_MAX_STEPS", 0)
+    with pytest.raises(ValueError, match="no stationary point in 0 steps"):
+        reml._search(_Quadratic(score), np.array([5.00001]))
+
+
 def test_a_constant_gaussian_outcome_is_named() -> None:
     """A Gaussian outcome with no variance has no scale to profile: the error
     says the outcome is constant."""
