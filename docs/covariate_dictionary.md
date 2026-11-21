@@ -495,7 +495,11 @@ past the boundary are counted in `out.attrs["n_stops_arrival_spanning"]`.
 the canonical stop table 173 stops (0.16 %) contain a later arrival and **none**
 of them also contains an outcome boundary, while the 2,099 `mixed` stops that do
 contain a boundary begin a median 0.22 s *after* their own arrival and last
-~0.7 s. A stop whose boundary lies outside it is untouched.
+~0.7 s. A stop whose boundary lies outside it is untouched. The boundary tested
+is the stop's own, read at its first sample: for a stop that spans an arrival it
+is the previous trip's, so the arrived visit's outcome can become known inside
+the stop and its later bins keep the earlier lags. The visit time bins (F.5)
+read their lags from the port experiences instead.
 
 ### F.5 The well visit and its clocks
 
@@ -623,10 +627,14 @@ excluded time. Columns:
   `m <= u`, equal only in a stop that runs to the final poke-out (the last stop
   of a visit often ends before it, when the animal moves at the well and then
   pokes out).
-- `known_reward_outcome_lag_1..10` — the outcomes known at the bin's left edge,
-  most recent first: the stop's lags, shifted at `outcome_known_time_s` as in
-  F.4 (`visit_design.shift_reward_lags_at_outcome`). Lag 1 is the last known
-  outcome.
+- `known_reward_outcome_lag_1..10` — the outcomes of the port experiences
+  known at the bin's left edge, most recent first
+  (`history.lagged_trial_rewards`, read from the session's port experiences, an
+  input of `visit_timebins`). The outcome of the visit a bin lies in is lag 1
+  from the first bin that starts at or after it became known, also in a stop
+  that began before the visit's first poke-in. Lag 1 is the last known outcome.
+  `attrs["n_stops_arrival_spanning"]` counts the stops that contain a first
+  poke-in after their start.
 
 ## G. Base covariate reference
 

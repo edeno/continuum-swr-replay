@@ -1,8 +1,10 @@
 """The well-visit time-bin design (``replay_models/visit_design.py``).
 
-One hand-built session, in 0.1 s bins, with two visits: visit 0 from 10.0 to
-13.0 s and visit 1 from 20.0 to 24.0 s (first poke-in to final poke-out), and
-excluded time from 22.0 to 22.2 s. The animal is immobile in five stops:
+One hand-built session, in 0.1 s bins, with two visits (port experiences):
+visit 0 at well 1 from 10.0 to 13.0 s, its omission known at 10.25 s, and
+visit 1 at well 2 from 20.0 to 24.0 s, its reward known at 21.05 s (first
+poke-in to final poke-out), and excluded time from 22.0 to 22.2 s. The animal
+is immobile in five stops:
 
 ====  ============  ==================================  ====================
 stop  span (s)      where                               analyzed in-visit s
@@ -48,6 +50,7 @@ from continuum_swr_replay.analysis.replay_models.visit_design import (
 from continuum_swr_replay.intervals import intersect, subtract, total_duration
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from scripts.replay_models.rate.describe_visit_clocks import session_port_experiences
 
 BIN_S = 0.1
 SESSION = {"animal": "rat", "session_date": "20200101", "epoch": "02_r1"}
@@ -57,7 +60,7 @@ LAGS = [f"known_reward_outcome_lag_{j}" for j in range(1, 11)]
 
 
 def _stop_table() -> pd.DataFrame:
-    stops = pd.DataFrame(
+    return pd.DataFrame(
         {
             "stop_id": [100, 101, 102, 103, 104],
             "stop_start": [9.5, 11.0, 12.5, 15.0, 20.0],
@@ -74,17 +77,28 @@ def _stop_table() -> pd.DataFrame:
             "visit_last_poke_out_s": [13.0, 13.0, 13.0, np.nan, 24.0],
             "in_visit_immobile_s": [0.5, 1.0, 0.5, 0.0, 3.3],
             "visit_stretch_index": pd.array([0, 1, 2, pd.NA, 0], dtype="Int64"),
-            "last_well_arrival_time_s": [2.0, 10.0, 10.0, 10.0, 20.0],
-            # Stop 0's boundary lies inside it, but the stop spans the arrival
-            # at 10.0 (stop 1's arrival clock), so it is not shifted. Stop 4's
-            # boundary is at 21.05 s.
-            "outcome_known_time_s": [10.2, 10.5, 10.5, 10.5, 21.05],
-            "completed_trial_reward": [0.0, 1.0, 1.0, 1.0, 1.0],
         }
     ).assign(**SESSION)
-    history = np.zeros((5, 10))
-    history[:, 1] = 1.0  # lag 1 omitted, lag 2 rewarded, the rest omitted
-    return pd.concat([stops, pd.DataFrame(history, columns=LAGS)], axis=1)
+
+
+def _port_experiences() -> pd.DataFrame:
+    """The two visits: an omission at well 1, then a reward at well 2."""
+    return pd.DataFrame(
+        {
+            "experience_id": [0, 1],
+            "movement_trial_number": pd.array([pd.NA, 1], dtype="Int64"),
+            "is_initial_experience": [True, False],
+            "is_boundary_derived": [False, False],
+            "outcome_observed": [True, True],
+            "port": [1, 2],
+            "patch": [1, 2],
+            "arrival_time": VISITS[:, 0],
+            "departure_time": VISITS[:, 1],
+            "reward_on_time": [np.nan, 21.05],
+            "outcome_known_time": [10.25, 21.05],
+            "is_reward": [False, True],
+        }
+    )
 
 
 def _events() -> pd.DataFrame:
@@ -119,6 +133,7 @@ def _bins(kind: str | None, events: pd.DataFrame | None = None) -> pd.DataFrame:
     return visit_timebins(
         _stop_table(),
         _events() if events is None else events,
+        _port_experiences(),
         kind=kind,
         bin_s=BIN_S,
         excluded_intervals=EXCLUDED,
@@ -233,35 +248,49 @@ def test_at_risk_excludes_ongoing_events() -> None:
     assert not np.isclose(swr["bin_start_s"], 20.5).any()
 
 
-def test_outcome_shift() -> None:
+def test_reward_lags_are_the_outcomes_known_at_each_bin() -> None:
+    """A bin's lags are the outcomes known at its left edge: the visit's own
+    outcome is lag 1 from the first bin that starts at or after it became
+    known, in the stop that began before the poke-in too."""
     bins = _bins("SWR")
-    lag1 = bins.set_index("bin_start_s")["known_reward_outcome_lag_1"]
-    lag2 = bins.set_index("bin_start_s")["known_reward_outcome_lag_2"]
-    lag3 = bins.set_index("bin_start_s")["known_reward_outcome_lag_3"]
-    stop4 = bins[bins["stop_id"] == 104].set_index("bin_start_s")
-    before = stop4.index < 21.05 - 1e-9
-    # the bin that holds the boundary (21.0 - 21.1) keeps the stop's lags; from
-    # the first bin that starts after it, the current trip's reward is lag 1
-    assert (stop4.loc[before, "known_reward_outcome_lag_1"] == 0.0).all()
-    assert (stop4.loc[before, "known_reward_outcome_lag_2"] == 1.0).all()
-    assert stop4.loc[~before, "known_reward_outcome_lag_1"].eq(1.0).all()
-    assert stop4.loc[~before, "known_reward_outcome_lag_2"].eq(0.0).all()
-    assert stop4.loc[~before, "known_reward_outcome_lag_3"].eq(1.0).all()
-    assert lag1[np.isclose(lag1.index, 21.0)].item() == 0.0
-    assert lag1[np.isclose(lag1.index, 21.1)].item() == 1.0
-    assert lag2[np.isclose(lag2.index, 21.1)].item() == 0.0
-    assert lag3[np.isclose(lag3.index, 21.1)].item() == 1.0
-    # stop 0 spans the arrival at 10.0 s: its boundary at 10.2 s shifts nothing
-    stop0 = bins[bins["stop_id"] == 100]
-    assert stop0["known_reward_outcome_lag_1"].eq(0.0).all()
+    start = bins["bin_start_s"].to_numpy()
+    lag1, lag2, lag3 = (bins[LAGS[j]].to_numpy() for j in range(3))
+    # nothing known before visit 0's omission at 10.25 s
+    before = start < 10.25
+    assert np.isnan(bins.loc[before, LAGS].to_numpy()).all()
+    # stop 0 started at 9.5 s, before visit 0's poke-in at 10.0 s: its bins
+    # from 10.3 s carry the omission it became known of (the bin 10.2 - 10.3
+    # holds the boundary and keeps what was known at 10.2 s)
+    stop0 = bins[bins["stop_id"] == 100].set_index("bin_start_s")[LAGS[0]]
+    assert np.isnan(stop0[stop0.index < 10.25]).all()
+    assert stop0[stop0.index > 10.25].eq(0.0).all()
+    assert (stop0.index > 10.25).sum() == 2
+    # visit 1's reward at 21.05 s: lag 1 rewarded and lag 2 the omission from
+    # the first bin that starts after it; the bin that holds it keeps lag 1
+    middle = (start >= 10.25) & (start < 21.05)
+    assert (lag1[middle] == 0.0).all() and np.isnan(lag2[middle]).all()
+    after = start >= 21.05
+    assert after.any()
+    assert (lag1[after] == 1.0).all() and (lag2[after] == 0.0).all()
+    assert np.isnan(lag3[after]).all()
+    assert lag1[np.isclose(start, 21.0)].item() == 0.0
+    assert lag1[np.isclose(start, 21.1)].item() == 1.0
+    # one stop contains a first poke-in after its start: stop 0
     assert bins.attrs["n_stops_arrival_spanning"] == 1
-    # stops already past their boundary at their start keep their lags
-    assert (
-        bins.loc[bins["stop_id"].isin([101, 102, 103]), LAGS[:2]]
-        .eq([0.0, 1.0])
-        .all()
-        .all()
-    )
+
+
+def test_visits_that_disagree_with_the_port_experiences_are_refused() -> None:
+    stops = _stop_table()
+    stops.loc[0, "visit_first_poke_in_s"] = 9.0
+    with pytest.raises(ValueError, match="port experiences"):
+        visit_timebins(
+            stops,
+            _events(),
+            _port_experiences(),
+            kind="SWR",
+            bin_s=BIN_S,
+            excluded_intervals=EXCLUDED,
+        )
 
 
 @pytest.mark.parametrize(
@@ -374,8 +403,9 @@ def test_one_real_epoch() -> None:
         .drop_duplicates()
         .to_numpy(dtype=float)
     )
+    experiences = session_port_experiences(**session)
     for kind, is_swr in EVENT_KINDS.items():
-        bins = visit_timebins(stops, events, kind=kind)
+        bins = visit_timebins(stops, events, experiences, kind=kind)
         kind_events = events[events["is_swr"] == is_swr]
         default = kind_events[kind_events["visit_context"].isin(STARTS_IN_WELL_VISIT)]
         lost = default["event_start_s"].isin(bins.attrs["starts_not_at_risk_s"]).sum()
@@ -414,6 +444,7 @@ def test_events_and_excluded_time_name_their_session() -> None:
         visit_timebins(
             _stop_table(),
             _events(),
+            _port_experiences(),
             kind="SWR",
             bin_s=BIN_S,
             excluded_intervals=EXCLUDED.assign(**{**SESSION, "epoch": "04_r2"}),

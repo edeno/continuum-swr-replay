@@ -3,7 +3,9 @@
 
 For every session of the canonical stop and event tables, builds the visit
 time-bin design of each kind (``replay_models.visit_design.visit_timebins``:
-SWR and No SWR non-local events), keeps the bins inside the well visits
+SWR and No SWR non-local events) from the tables and the session's port
+experiences (read as the table builders read them: the behavioral-context
+cache, ``event_tables.prepare_data.load_behavioral_context``), keeps the bins inside the well visits
 (``select_visit_context``, the default subset: the events that start inside a
 visit), and sums the event starts and the at-risk seconds in bins of each visit
 clock (``replay_models.rate.visit_clock_curves``):
@@ -31,6 +33,8 @@ by how they end (``stop_end_kind``). With ``--max-per-animal`` the file is
 Usage:
     uv run python scripts/replay_models/rate/describe_visit_clocks.py
     uv run python scripts/replay_models/rate/describe_visit_clocks.py --max-per-animal 1
+    uv run python scripts/replay_models/rate/describe_visit_clocks.py \
+        --behavior-cache-dir <dir>
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     count_visit_context,
     select_visit_context,
 )
+from continuum_swr_replay.analysis.event_tables import prepare_data
 from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )
@@ -63,6 +68,10 @@ from continuum_swr_replay.analysis.replay_models.rate.visit_clock_curves import 
 from continuum_swr_replay.analysis.replay_models.visit_design import (
     EVENT_KINDS,
     visit_timebins,
+)
+from continuum_swr_replay.decoding.identifiers import (
+    format_epoch_identifier,
+    nwb_file_name,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.runs.device import default_jax_platforms
@@ -109,6 +118,32 @@ def output_path(smoke: bool) -> Path:
     return replay_content_dir() / "models_convention" / "descriptive" / name
 
 
+def session_port_experiences(
+    animal: str, session_date: object, epoch: str
+) -> pd.DataFrame:
+    """One session's port experiences, read as the table builders read them.
+
+    From the behavioral-context cache (``prepare_data.session_cache_dir()``),
+    keyed by the session's HPC epoch identifier, and from Spyglass when the
+    cache has no current entry (``load_behavioral_context``).
+
+    Raises
+    ------
+    RuntimeError
+        If the session's behavioral context cannot be loaded.
+    """
+    nwb = nwb_file_name(animal, session_date)
+    key = format_epoch_identifier(nwb, epoch, "HPC")
+    _, experiences, _, _ = prepare_data.load_behavioral_context(
+        {"nwb_file_name": nwb, "epoch_name": epoch, "session_id": key},
+        from_cache=True,
+        cache_key=key,
+    )
+    if experiences is None:
+        raise RuntimeError(f"no port experiences for {key}")
+    return experiences
+
+
 def session_bins(
     stops: pd.DataFrame, events: pd.DataFrame
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
@@ -117,7 +152,8 @@ def session_bins(
     Parameters
     ----------
     stops, events : pd.DataFrame
-        The stop and event tables (any number of sessions).
+        The stop and event tables (any number of sessions). Each session's
+        port experiences are read by :func:`session_port_experiences`.
 
     Returns
     -------
@@ -136,10 +172,12 @@ def session_bins(
     for key, session_stops in stops.groupby(keys, sort=True, observed=True):
         session_events = events_by_session.get(key, events.iloc[:0])
         session_excluded = excluded_by_session.get(key, excluded.iloc[:0])
+        experiences = session_port_experiences(*key)
         for kind in EVENT_KINDS:
             bins = visit_timebins(
                 session_stops,
                 session_events,
+                experiences,
                 kind=kind,
                 excluded_intervals=session_excluded,
             )
@@ -167,8 +205,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=None,
         help="Smoke mode: keep only the first N sessions per animal.",
     )
+    parser.add_argument(
+        "--behavior-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "The behavioral-context cache root the port experiences are read "
+            "from; default the table builders' (replay_content/_session_cache)."
+        ),
+    )
     argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
+    if args.behavior_cache_dir is not None:
+        prepare_data.SESSION_CACHE_DIR = args.behavior_cache_dir.resolve()
 
     # The clocks that count down reference the future: a description only.
     assert_predictor_timing(list(VISIT_CLOCKS), descriptive=True)

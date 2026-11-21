@@ -4,7 +4,7 @@
 ``RATE_BIN_S`` bins and gives each bin what a rate model of one event kind
 reads: its well-visit label, its visit and stretch, its at-risk seconds, the
 event starts of the kind it holds, the three visit clocks and the reward
-history known at its time.
+history known at its time. The visits are the session's port experiences.
 
 **Where the bins lie.** A stop's analyzed time is its span
 ``[stop_start, stop_end]`` less excluded time
@@ -40,11 +40,19 @@ they are future-referencing (``covariate_timing.FUTURE_REFERENCING``), and a
 model that uses them is descriptive
 (``covariate_timing.assert_predictor_timing(..., descriptive=True)``).
 
-The module also holds the pieces the stop-grain design of ``per_bin_design``
-shares with it: the seconds of each bin an interval covers
-(:func:`interval_coverage_by_bin`), the outcome-boundary shift of the reward
-lags (:func:`shift_reward_lags_at_outcome`) and the stops that span a well
-arrival (:func:`arrival_spanning_stop_ids`).
+**Reward history.** A bin's ``known_reward_outcome_lag_1..10`` are the
+outcomes of the port experiences known at its left edge
+(``behavior.covariates.history.lagged_trial_rewards``), most recent first: the
+outcome of the visit a bin lies in is lag 1 from the first bin that starts at
+or after that outcome became known, also in a stop that began before the
+visit's first poke-in.
+
+The module also holds the pieces of the stop-grain design of
+``per_bin_design``: the seconds of each bin an interval covers
+(:func:`interval_coverage_by_bin`, which :func:`visit_timebins` uses too), the
+outcome-boundary shift of a stop's reward lags
+(:func:`shift_reward_lags_at_outcome`) and the stops that span a well arrival
+by the next stop's arrival clock (:func:`arrival_spanning_stop_ids`).
 """
 
 from __future__ import annotations
@@ -62,6 +70,8 @@ from continuum_swr_replay.intervals import intersect, subtract
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
+from ..behavior.covariates.history import lagged_trial_rewards
+from ..behavior.covariates.history._common import _prepare_port_experiences
 from ..behavior.design_constants import RATE_BIN_S, REWARD_HISTORY_N_LAGS
 from ..constants import IN_WELL_VISIT, STARTS_IN_WELL_VISIT
 
@@ -117,10 +127,6 @@ _STOP_COLUMNS = (
     "visit_first_poke_in_s",
     "visit_last_poke_out_s",
     "visit_stretch_index",
-    "last_well_arrival_time_s",
-    "outcome_known_time_s",
-    "completed_trial_reward",
-    *REWARD_LAG_COLUMNS,
 )
 
 _EVENT_COLUMNS = (
@@ -279,6 +285,7 @@ def interval_coverage_by_bin(
 def visit_timebins(
     stop_table: pd.DataFrame,
     events: pd.DataFrame,
+    port_experiences: pd.DataFrame,
     *,
     kind: str | None,
     bin_s: float = RATE_BIN_S,
@@ -289,20 +296,25 @@ def visit_timebins(
     Parameters
     ----------
     stop_table : pd.DataFrame
-        The stop table's rows of one session (unique ``stop_id``), with its
-        visit columns (``event_tables.visit_context.STOP_VISIT_COLUMNS``),
-        ``visit_context``, ``last_well_arrival_time_s``,
-        ``outcome_known_time_s``, ``completed_trial_reward`` and
-        ``known_reward_outcome_lag_1..10``.
+        The stop table's rows of one session (unique ``stop_id``), with
+        ``stop_start``, ``stop_end``, ``visit_context`` and the visit columns
+        ``overlapping_visit_id``, ``visit_first_poke_in_s``,
+        ``visit_last_poke_out_s`` and ``visit_stretch_index``
+        (``event_tables.visit_context.stop_visit_columns``).
     events : pd.DataFrame
         The session's events (an event table: ``event_start_s``,
         ``event_end_s``, ``visit_context``, ``well_visit_id``,
         ``time_since_visit_start_s``, ``time_until_visit_end_s``, and
         ``is_swr`` when ``kind`` is given) and the session columns. Rows of
         other sessions are ignored; a non-empty frame must hold rows of this
-        session (a session with no events passes an empty frame). All of them
-        place the visits; only the kind's are counted and reduce the at-risk
-        time.
+        session (a session with no events passes an empty frame). Only the
+        kind's are counted and reduce the at-risk time; all of them are checked
+        against the visits.
+    port_experiences : pd.DataFrame
+        The session's port experiences (one per visit, ``experience_id`` 0, 1,
+        ... in time order), as the table builders take them
+        (``event_tables.prepare_data.load_behavioral_context``): the visits and
+        the reward outcomes.
     kind : {"SWR", "No SWR"} or None
         The events modeled, by ``is_swr`` (:data:`EVENT_KINDS`); None models
         every event (an event source with one stream, such as the ContFrag
@@ -328,10 +340,10 @@ def visit_timebins(
           that starts inside a visit.
         - ``well_visit_id`` (``Int64``): the visit the bin lies in; missing
           outside a visit.
-        - ``visit_stretch_index`` (``Int64``): the stop's index among the stops
-          of the bin's visit (the stop table's); missing outside a visit, and
-          for the bins of a stop in a visit that is not the stop's
-          ``overlapping_visit_id`` (a stop across two visits).
+        - ``visit_stretch_index`` (``Int64``): the stop's index among the
+          stretches of the bin's visit (the stop table's); missing outside a
+          visit, and for the bins of a stop in a visit that is not the stop's
+          ``overlapping_visit_id`` (the earlier visit of a stop across two).
         - ``bin_start_s``, ``bin_end_s``: the bin's bounds (absolute s); the
           last bin of a piece of analyzed time ends with it.
         - ``exposure``: at-risk seconds, ``bin_end_s - bin_start_s`` less the
@@ -341,17 +353,18 @@ def visit_timebins(
           ``time_until_stretch_end_s``: at the bin's center ``c``,
           ``c - first poke-in``, ``final poke-out - c`` and ``min(stop_end,
           final poke-out) - c``; NaN outside a visit.
-        - ``known_reward_outcome_lag_1..10``: the outcomes known at the bin's
-          left edge, most recent first (:func:`shift_reward_lags_at_outcome`);
-          lag 1 is the last known outcome.
+        - ``known_reward_outcome_lag_1..10``: the outcomes of the port
+          experiences known at the bin's left edge, most recent first
+          (``lagged_trial_rewards``; NaN where fewer are known); lag 1 is the
+          last known outcome.
 
         ``attrs`` holds ``n_bins_not_at_risk`` (bins wholly inside an event of
         the kind, dropped), ``n_starts_not_at_risk`` (event starts of the kind
         in those bins: an event that starts at the very start of a piece of
         analyzed time has no at-risk time before it, and is not counted;
         ``starts_not_at_risk_s`` lists their start times) and
-        ``n_stops_arrival_spanning`` (stops left unshifted with a bin past
-        their outcome boundary).
+        ``n_stops_arrival_spanning`` (stops that contain a first poke-in after
+        their start, ``stop_start < arrival <= stop_end``).
 
     Raises
     ------
@@ -361,17 +374,16 @@ def visit_timebins(
         other sessions only, ``kind`` is unknown, two
         events of the kind overlap, an event of the kind starts outside every
         stop's analyzed time, or an event's label disagrees with its bin's
-        (the event and stop tables place the visits differently).
+        (the event and stop tables place the visits differently), or a stop's
+        or an event's visit times disagree with the port experiences.
 
     Notes
     -----
-    The visits are read from the stop table (each stop's overlapping visit)
-    and from the events (their visit clocks), so a visit is placed when a stop
-    overlaps it or an event starts in it. In-visit exposure plus the time of
-    the kind's events inside in-visit analyzed time equals the sum of the stop
-    table's ``in_visit_immobile_s`` (up to the at-risk floor of 1e-5 s per
-    dropped bin), except for a visit no stop is placed in and no event starts
-    in (a stop across two visits is placed in the later one).
+    In-visit exposure plus the time of the kind's events inside in-visit
+    analyzed time equals the sum of the stop table's ``in_visit_immobile_s``
+    (up to the at-risk floor of 1e-5 s per dropped bin). A stop across two
+    visits gives bins in both: those in the earlier visit carry its
+    ``well_visit_id`` and no stretch index.
     """
     if kind is not None and kind not in EVENT_KINDS:
         raise ValueError(f"kind must be one of {sorted(EVENT_KINDS)} or None: {kind!r}")
@@ -398,7 +410,8 @@ def visit_timebins(
     stops = stop_table.sort_values("stop_start", kind="stable").reset_index(drop=True)
     stop_start = stops["stop_start"].to_numpy(dtype=float)
     stop_end = stops["stop_end"].to_numpy(dtype=float)
-    visit_id, arrival, departure = _visit_intervals(stops, events)
+    visit_id, arrival, departure = _visit_intervals(port_experiences)
+    _check_visit_times(stops, events, arrival, departure)
 
     # The analyzed time of the stops, cut at the visit boundaries.
     analyzed = subtract(np.column_stack([stop_start, stop_end]), excluded)
@@ -492,16 +505,11 @@ def visit_timebins(
     )
     stretch[~own_visit] = pd.NA
 
-    spans_arrival = np.isin(
-        stops["stop_id"].to_numpy(), arrival_spanning_stop_ids(stops)
-    )[bin_stop]
-    lags, past_boundary = shift_reward_lags_at_outcome(
-        stops[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float)[bin_stop],
-        stops["completed_trial_reward"].to_numpy(dtype=float)[bin_stop],
-        stop_start[bin_stop],
-        stops["outcome_known_time_s"].to_numpy(dtype=float)[bin_stop],
-        bin_start,
-        spans_arrival,
+    # The outcomes known at each bin's left edge.
+    lags = lagged_trial_rewards(bin_start, port_experiences, REWARD_HISTORY_N_LAGS)
+    # A stop spans an arrival when a first poke-in lies in (stop_start, stop_end].
+    spans_arrival = np.searchsorted(arrival, stop_end, side="right") > np.searchsorted(
+        arrival, stop_start, side="right"
     )
 
     out = pd.DataFrame(
@@ -530,9 +538,7 @@ def visit_timebins(
     out.attrs["n_bins_not_at_risk"] = int((~at_risk).sum())
     out.attrs["n_starts_not_at_risk"] = int(lost.sum())
     out.attrs["starts_not_at_risk_s"] = ev_start[lost].tolist()
-    out.attrs["n_stops_arrival_spanning"] = int(
-        np.unique(bin_stop[past_boundary & spans_arrival]).size
-    )
+    out.attrs["n_stops_arrival_spanning"] = int(spans_arrival.sum())
     return out
 
 
@@ -566,40 +572,69 @@ def _of_session(frame: pd.DataFrame, sessions: pd.DataFrame, name: str) -> pd.Da
 
 
 def _visit_intervals(
-    stops: pd.DataFrame, events: pd.DataFrame
+    port_experiences: pd.DataFrame,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The session's visits that a stop overlaps or an event starts in.
+    """The session's visits, from its port experiences.
 
     Returns
     -------
     visit_id : np.ndarray of int, shape (n_visits,)
+        ``experience_id``, 0, 1, ... in time order.
     arrival, departure : np.ndarray, shape (n_visits,)
-        First poke-in and final poke-out (absolute s), in time order.
+        First poke-in and final poke-out (absolute s).
     """
-    from_stops = stops.loc[
-        stops["overlapping_visit_id"].notna(),
-        ["overlapping_visit_id", "visit_first_poke_in_s", "visit_last_poke_out_s"],
-    ].set_axis(["visit_id", "arrival", "departure"], axis=1)
-    placed = events.loc[events["well_visit_id"].notna()]
-    start = placed["event_start_s"].to_numpy(dtype=float)
-    from_events = pd.DataFrame(
-        {
-            "visit_id": placed["well_visit_id"].to_numpy(),
-            "arrival": start - placed["time_since_visit_start_s"].to_numpy(dtype=float),
-            "departure": start + placed["time_until_visit_end_s"].to_numpy(dtype=float),
-        }
-    )
-    visits = (
-        pd.concat([from_stops, from_events], ignore_index=True)
-        .astype({"visit_id": np.int64})
-        .drop_duplicates("visit_id", keep="first")
-        .sort_values("arrival", kind="stable")
-    )
+    experiences = _prepare_port_experiences(port_experiences)
     return (
-        visits["visit_id"].to_numpy(dtype=np.int64),
-        visits["arrival"].to_numpy(dtype=float),
-        visits["departure"].to_numpy(dtype=float),
+        experiences["experience_id"].to_numpy(dtype=np.int64),
+        experiences["arrival_time"].to_numpy(dtype=float),
+        experiences["departure_time"].to_numpy(dtype=float),
     )
+
+
+def _check_visit_times(
+    stops: pd.DataFrame,
+    events: pd.DataFrame,
+    arrival: np.ndarray,
+    departure: np.ndarray,
+) -> None:
+    """Raise unless the stops' and events' visits are the port experiences'.
+
+    A stop's ``overlapping_visit_id`` must name a visit with its
+    ``visit_first_poke_in_s`` and ``visit_last_poke_out_s``, and an event's
+    ``well_visit_id`` a visit with the poke times its clocks give.
+    """
+    stop_visit = stops["overlapping_visit_id"].to_numpy(dtype=float, na_value=np.nan)
+    event_visit = events["well_visit_id"].to_numpy(dtype=float, na_value=np.nan)
+    start = events["event_start_s"].to_numpy(dtype=float)
+    checks = {
+        "stop": (
+            stop_visit,
+            stops["visit_first_poke_in_s"].to_numpy(dtype=float),
+            stops["visit_last_poke_out_s"].to_numpy(dtype=float),
+        ),
+        "event": (
+            event_visit,
+            start - events["time_since_visit_start_s"].to_numpy(dtype=float),
+            start + events["time_until_visit_end_s"].to_numpy(dtype=float),
+        ),
+    }
+    for name, (visit, first_in, last_out) in checks.items():
+        placed = ~np.isnan(visit)
+        index = visit[placed].astype(np.int64)
+        known = (index >= 0) & (index < len(arrival))
+        bad = ~known
+        bad[known] = (
+            np.abs(first_in[placed][known] - arrival[index[known]]) > _TIME_TOLERANCE_S
+        ) | (
+            np.abs(last_out[placed][known] - departure[index[known]])
+            > _TIME_TOLERANCE_S
+        )
+        if bad.any():
+            raise ValueError(
+                f"{int(bad.sum())} {name}(s) name a visit whose poke times "
+                "disagree with the port experiences; the tables and the port "
+                "experiences are of different builds"
+            )
 
 
 def _covered_by_bin(
