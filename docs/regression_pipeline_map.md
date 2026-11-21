@@ -832,6 +832,12 @@ Report whether every fitted artifact is still current for the tables it read.
 
 `artifact_for_sidecar`, `find_sidecars`, `resolve_input`, `check_artifact`, `propagate_stale`, `format_line`, `main`
 
+### `scripts/checks/check_stored_folds_reproduce.py`
+
+Check that the held-out runs' stored folds are the fold rule's folds.
+
+`epoch_folds_check`, `main`
+
 ### `scripts/checks/compare_memoryless_to_reference.py`
 
 Run the port and the reference's own arithmetic on one input, and compare.

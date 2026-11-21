@@ -26,7 +26,10 @@ and are not the test that an effect exists.
 ``analysis/event_evidence/tetrode_holdout.py``'s ``epoch_folds`` calls it: it
 gives each epoch's decode bins their folds (:func:`trial_folds_and_groups`) and
 records the counts of segments and groups, for the held-out tetrode score and
-the non-local restriction run.
+the non-local restriction run. ``scripts/checks/check_stored_folds_reproduce.py``
+checks the stored runs against this rule: on 2026-11-21, against the
+restriction run of commit 3953304c and the held-out tetrode run of commit
+be732dee, the folds and their records agreed in 242 of 242 epochs.
 """
 
 from __future__ import annotations

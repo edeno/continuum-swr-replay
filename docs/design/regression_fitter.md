@@ -621,10 +621,13 @@ The held-out scores of the event evidence use the same rule:
 `analysis/event_evidence/tetrode_holdout.py`'s `epoch_folds` gives each epoch's decode
 bins their folds (`trial_folds_and_groups`, which also returns the segments and groups the
 counts are recorded from) for the held-out tetrode score and the non-local restriction
-run. On the 242 analyzed epochs the folds it makes from the session cache's trials equal
-the folds the restriction run stored, and their counts of segments and groups equal its
-records (`.claude/research/nonlocal_restriction_cohort_checks/folds_from_cache_check.py`,
-2026-11-21); the held-out tetrode run records the same counts, trial shares and margins.
+run. `scripts/checks/check_stored_folds_reproduce.py` checks both runs against the rule.
+On 2026-11-21, against the restriction run made at commit 3953304c and the held-out
+tetrode run made at commit be732dee (`event_nonlocal_restriction/` and
+`event_tetrode_holdout/`), it found in 242 of 242 epochs that the folds made from the
+session cache's trials equal the restriction run's stored folds, with the segment and
+group counts it records, and that the held-out tetrode run records the same segment and
+group counts, trial shares and margins.
 
 Folds compare designs and check over-fitting. They do not choose penalties, and they are
 not the test that an effect exists. A held-out claim is made on the sum over sessions.
