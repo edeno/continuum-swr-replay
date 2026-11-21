@@ -2168,28 +2168,72 @@ def _refuse_drawing(table):
     raise AssertionError("the participation run was read without its check")
 
 
-def _heldout_events_run(tmp_path, facts_sha256=None) -> None:
-    """A held-out event run's manifest that records the current per-bin facts
-    run's digest (or ``facts_sha256``)."""
+def _heldout_events_run(
+    tmp_path, facts_sha256=None, restriction_sha256=None, restriction_settings=None
+) -> None:
+    """A restriction run's manifest (the fold fit on whole trials, or
+    ``restriction_settings``) and a held-out event run's manifest that records
+    the current per-bin facts and restriction runs' digests (or
+    ``facts_sha256``, ``restriction_sha256``)."""
     from continuum_swr_replay.paths import (
         EVENT_BIN_FACTS_DIR,
+        EVENT_NONLOCAL_RESTRICTION_DIR,
         EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     )
     from continuum_swr_replay.runs.io import sha256_file
 
+    restriction = tmp_path / EVENT_NONLOCAL_RESTRICTION_DIR
+    restriction.mkdir()
+    settings = restriction_settings or {"fit": "folds", "fold_design": "trials"}
+    (restriction / "manifest.json").write_text(json.dumps({"settings": settings}))
     folder = tmp_path / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
     folder.mkdir()
     facts = facts_sha256 or sha256_file(
         tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
     )
+    restriction_digest = restriction_sha256 or sha256_file(
+        restriction / "manifest.json"
+    )
     (folder / "manifest.json").write_text(
         json.dumps(
             {
-                "inputs": {"bin_facts": {"sha256": facts}},
+                "inputs": {
+                    "bin_facts": {"sha256": facts},
+                    "nonlocal_restriction": {"sha256": restriction_digest},
+                },
                 "epochs": {"e": {"status": "ok", "bin_s": 0.002}},
             }
         )
     )
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"restriction_sha256": "0" * 64}, "not made from the current restriction run"),
+        ({"restriction_settings": {"n_folds": 5}}, "is not the fold fit"),
+        (
+            {"restriction_settings": {"fit": "folds", "fold_design": "contiguous"}},
+            "not 'trials'",
+        ),
+    ],
+    ids=["another restriction run", "not the fold fit", "contiguous blocks"],
+)
+def test_figure02_refuses_a_heldout_event_run_not_from_the_current_fold_fit(
+    offline, tmp_path, monkeypatch, change, message
+):
+    """Panel g draws only the fold fit on whole trials, from a held-out event
+    run made from the restriction run as it is now."""
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _heldout_events_run(tmp_path, **change)
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from another restriction run")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(ValueError, match=message) as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert "detect_heldout_events.py" in str(refused.value)
 
 
 def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(

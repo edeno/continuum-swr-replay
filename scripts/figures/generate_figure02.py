@@ -76,9 +76,10 @@ events and time sums by the events summary's own function
 the held-out decode that start inside a well visit, and the time inside a well
 visit), refused when the per-bin facts run that gave the time and the events'
 start their well-visit flag records no session cache or another than the
-current one (``prepare_data.session_cache_staleness``), or when the held-out
-event run was not made from that per-bin facts run (its recorded digest of the
-facts' manifest). Panel i is a
+current one (``prepare_data.session_cache_staleness``), when the restriction
+run is not the fold fit on folds of whole trials (``require_fold_fit``), or when
+the held-out event run was not made from that per-bin facts run or that
+restriction run (its recorded digests of their manifests). Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -198,6 +199,7 @@ from continuum_swr_replay.parameters import (
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     EVENT_BIN_FACTS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
@@ -210,6 +212,7 @@ from continuum_swr_replay.reported.events import (
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
+    require_fold_fit,
     restriction_figure_statistics,
 )
 from continuum_swr_replay.reported.formatting import format_number
@@ -1618,6 +1621,19 @@ def generate_figure(
     # steps, subset and function
     heldout_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
     heldout_manifest = read_manifest(heldout_dir)
+    # panel g draws the fold fit on whole trials, and only from a held-out
+    # event run made from the restriction run as it is now: content of another
+    # design or another decoder run is refused, not drawn
+    restriction_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    require_fold_fit(read_output_manifest(restriction_dir), str(restriction_dir))
+    if recorded_sha256(heldout_manifest, "nonlocal_restriction") != sha256_file(
+        restriction_dir / "manifest.json"
+    ):
+        raise ValueError(
+            f"the held-out event run ({heldout_dir}) was not made from the "
+            f"current restriction run ({restriction_dir}); rerun "
+            "scripts/event_evidence/detect_heldout_events.py"
+        )
     # the held-out event run must have read these per-bin facts, or its
     # well-visit flags are not the ones checked above
     if recorded_sha256(heldout_manifest, "bin_facts") != sha256_file(
