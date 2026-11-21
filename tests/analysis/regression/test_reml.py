@@ -529,6 +529,8 @@ def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
     score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
     assert score.score == np.inf
     assert score.fit.status == NOT_IDENTIFIED
+    with pytest.raises(ValueError, match="session 0: design not identified"):
+        fit_at_penalties(Poisson(), [SessionData(X, y, np.zeros(500))], blocks, [rho])
 
 
 def test_an_unconverged_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -671,3 +673,76 @@ def test_an_input_error_names_the_session() -> None:
     bad = SessionData(second.X, second.y, offset, name="peanut_02")
     with pytest.raises(ValueError, match=r"session 1 \(peanut_02\).*zero exposure"):
         select_penalties(lik, [first, bad], blocks)
+
+
+def test_softmax_penalty_selection_is_stationary() -> None:
+    """The grouped softmax's search converges, and at its optimum the central
+    differences of the score agree with the analytic gradient (both near zero)."""
+    rng = np.random.default_rng(1)
+    n_events, n_arms = 300, 9
+    n_rows = n_events * n_arms
+    s = rng.uniform(0.0, 4.0, n_rows)
+    basis = PSplineBasis(0.0, 4.0, 12)
+    B = basis.design(s)
+    Z = sum_to_zero_constraint(B)
+    X = np.column_stack([B @ Z, rng.normal(size=n_rows)])
+    eta = np.sin(1.5 * s) + 0.4 * X[:, -1]
+    groups = np.repeat(np.arange(n_events), n_arms)
+    weight = np.exp(eta).reshape(-1, n_arms)
+    p = weight / weight.sum(axis=1, keepdims=True)
+    y = np.concatenate([rng.dirichlet(10.0 * row) for row in p])
+    data = SessionData(X, y, groups)
+    blocks = [PenaltyBlock(np.arange(11), Z.T @ basis.penalty() @ Z)]
+
+    result = select_penalties(GroupedSoftmax(), [data], blocks)
+
+    assert not result.search.at_boundary.any()
+    assert 3.0 < result.sessions[0].edf[0] < 8.0
+    warm = result.sessions[0].fit.beta
+    h = 1e-4
+    numeric = (
+        _score(GroupedSoftmax(), data, blocks, result.rho + h, warm).score
+        - _score(GroupedSoftmax(), data, blocks, result.rho - h, warm).score
+    ) / (2 * h)
+    assert abs(result.gradient[0]) < 1e-6
+    assert abs(numeric) < 1e-6
+    assert abs(numeric - result.gradient[0]) < 1e-6
+
+
+def test_three_penalties_over_several_sessions() -> None:
+    """Three smooths shared by six Poisson sessions of 4,000 rows: the grid
+    (125 points) and Newton reach a stationary point with a positive definite
+    Hessian, and a search started elsewhere ends there too."""
+    sessions = []
+    for seed in range(6):
+        lik, data, blocks = _session("poisson", 3, seed=40 + seed, n_rows=4000)
+        sessions.append(data)
+    selected = select_penalties(lik, sessions, blocks)
+    assert selected.search.n_grid_points == 125
+    assert selected.search.n_grid_not_finite == 0
+    assert not selected.search.at_boundary.any()
+    pooled = pooled_reml(lik, sessions, blocks, selected.rho)
+    assert np.all(np.linalg.eigvalsh(pooled.hessian) > 0)
+    decrement = 0.5 * pooled.gradient @ np.linalg.solve(pooled.hessian, pooled.gradient)
+    assert decrement < 1e-8
+    refined = refine_penalties(lik, sessions, blocks, selected.rho + 1.0)
+    np.testing.assert_allclose(refined.rho, selected.rho, rtol=0, atol=1e-6)
+
+
+def test_no_penalty_fit_at_penalties() -> None:
+    """With no penalty block: the unpenalized Newton fit, its score
+    ``-l + log|H| / 2 - p log(2 pi) / 2`` and empty edf."""
+    lik, data, _ = _session("poisson", 1, seed=3)
+    result = fit_at_penalties(lik, [data], [], [])
+    session = result.sessions[0]
+    p = data.X.shape[1]
+    direct = penalized_newton(
+        lik, data.X, data.y, data.aux, np.zeros((p, p)), np.zeros(p)
+    )
+    np.testing.assert_allclose(session.fit.beta, direct.beta, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(session.covariance, np.linalg.inv(direct.A), rtol=1e-10)
+    _, log_det = np.linalg.slogdet(direct.A)
+    expected = -direct.loglik + 0.5 * log_det - 0.5 * p * np.log(2 * np.pi)
+    assert result.score == pytest.approx(expected, rel=1e-12)
+    assert session.edf.shape == (0,)
+    assert session.edf_total == pytest.approx(p, rel=1e-10)

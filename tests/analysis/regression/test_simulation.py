@@ -44,9 +44,10 @@ SHAPES = {
 
 def _simulate(
     shape: str, log_rate_ratio: float, rng: np.random.Generator
-) -> tuple[SessionData, np.ndarray]:
-    """One data set's summed cells, their design (intercept, reward, smooth)
-    and the smooth's penalty, shape ``(N_BASIS - 1, N_BASIS - 1)``."""
+) -> tuple[SessionData, np.ndarray, np.ndarray]:
+    """One data set's summed cells, their design (intercept, reward, smooth),
+    the smooth's penalty, shape ``(N_BASIS - 1, N_BASIS - 1)``, and the
+    cells' clock, shape ``(n_cells,)``."""
     rewarded = rng.random(N_STOPS) < 0.5
     duration = np.where(rewarded, 1.0, 0.3) * np.exp(rng.normal(size=N_STOPS))
     duration = np.maximum(duration, BIN_S)
@@ -71,31 +72,56 @@ def _simulate(
     B = basis.design(cell_s)
     Z = sum_to_zero_constraint(B)
     X = np.column_stack([np.ones(cell_s.size), cell_reward, B @ Z])
-    return SessionData(X, cell_y, np.log(cell_exposure)), Z.T @ basis.penalty() @ Z
+    data = SessionData(X, cell_y, np.log(cell_exposure))
+    return data, Z.T @ basis.penalty() @ Z, cell_s
 
 
 def _fits(shape: str, log_rate_ratio: float, seed: int) -> np.ndarray:
-    """The reward coefficient, its SE and the smooth's edf over the data sets.
+    """Per data set: the reward coefficient, its SE, the smooth's edf, and the
+    smooth's across-the-function coverage.
+
+    The across-the-function coverage (Wood's) is the share of the cells at
+    which the smooth's 95 % Bayesian interval, ``f_hat +- 1.96 se`` from the
+    covariance ``A^-1``, covers the truth. The fitted smooth sums to zero over
+    the cells (its constraint), so the truth it estimates is ``f(s)`` less its
+    mean over the cells.
 
     Returns
     -------
-    np.ndarray, shape (N_DATA_SETS, 3)
+    np.ndarray, shape (N_DATA_SETS, 4)
     """
-    out = np.empty((N_DATA_SETS, 3))
+    z = scipy.stats.norm.ppf(0.975)
+    out = np.empty((N_DATA_SETS, 4))
     for i, child in enumerate(np.random.SeedSequence(seed).spawn(N_DATA_SETS)):
-        data, penalty = _simulate(shape, log_rate_ratio, np.random.default_rng(child))
-        blocks = [PenaltyBlock(np.arange(2, 2 + penalty.shape[0]), penalty)]
+        data, penalty, clock = _simulate(
+            shape, log_rate_ratio, np.random.default_rng(child)
+        )
+        columns = np.arange(2, 2 + penalty.shape[0])
+        blocks = [PenaltyBlock(columns, penalty)]
         result = select_penalties(Poisson(), [data], blocks)
         session = result.sessions[0]
-        out[i] = session.fit.beta[1], np.sqrt(session.covariance[1, 1]), session.edf[0]
+        C = data.X[:, columns]
+        curve = C @ session.fit.beta[columns]
+        covariance = session.covariance[np.ix_(columns, columns)]
+        se = np.sqrt(np.einsum("ij,jk,ik->i", C, covariance, C))
+        truth = SHAPES[shape](clock)
+        covered = np.abs(curve - (truth - truth.mean())) <= z * se
+        out[i] = (
+            session.fit.beta[1],
+            np.sqrt(session.covariance[1, 1]),
+            session.edf[0],
+            covered.mean(),
+        )
     return out
 
 
 @pytest.mark.slow
 def test_coverage_and_size() -> None:
     """The 95 % interval of the reward coefficient covers the planted 1.3-fold
-    effect in 93-97 % of 1,000 data sets with the rise truth; with a flat truth and
-    no reward effect the coefficient is significant at 5 % in 3-7 %, and the
+    effect in 93-97 % of 1,000 data sets with the rise truth, and the smooth's
+    95 % Bayesian interval covers the centered rise at 92-98 % of the cells on
+    average (Wood's across-the-function coverage); with a flat truth and no
+    reward effect the coefficient is significant at 5 % in 3-7 %, and the
     smooth shrinks to a line (edf below 2.5) in at least 90 %."""
     z = scipy.stats.norm.ppf(0.975)
     rise = _fits("rise", LOG_RATE_RATIO, seed=20261120)
@@ -104,8 +130,13 @@ def test_coverage_and_size() -> None:
     coverage = np.mean(np.abs(rise[:, 0] - LOG_RATE_RATIO) <= z * rise[:, 1])
     size = np.mean(np.abs(flat[:, 0]) > z * flat[:, 1])
     shrunk = np.mean(flat[:, 2] < 2.5)
-    print(f"coverage {coverage:.3f}, size {size:.3f}, flat edf < 2.5 {shrunk:.3f}")
+    across = np.mean(rise[:, 3])
+    print(
+        f"coverage {coverage:.3f}, size {size:.3f}, flat edf < 2.5 {shrunk:.3f}, "
+        f"across-the-function coverage {across:.3f}"
+    )
 
     assert 0.93 <= coverage <= 0.97
     assert 0.03 <= size <= 0.07
     assert shrunk >= 0.90
+    assert 0.92 <= across <= 0.98
