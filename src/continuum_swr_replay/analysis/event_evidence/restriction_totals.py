@@ -11,9 +11,9 @@ subset of Figures 2 to 5.
 **The time sums.** Per epoch, :func:`restriction_time_sums` sums the per-bin
 scores, bins and spikes (the per-bin facts, :mod:`.bin_facts`) of each
 combination of ``category``, ``in_well_visit`` and ``in_event_window`` (the bin
-lies in the window of a canonical non-local event of either group,
-``state_evidence.windows.epoch_windows``): every bin is in exactly one row, so
-any union of rows is summed by adding them.
+lies in the window of a given event of either group: the events detected from
+the held-out decode, ``scripts/event_evidence/detect_heldout_events.py``): every
+bin is in exactly one row, so any union of rows is summed by adding them.
 
 **All immobile time** (:func:`epoch_immobile_gains`, Figure 2g's first axis):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
@@ -42,8 +42,8 @@ non-local states buy outside SWRs:
   numerators, as :func:`.restriction_windows.window_contrasts` leaves it out of
   the window statistics (none in the canonical windows);
 - the gain per spike and per second in the rest of that time, the bins inside
-  no event window of any group (``in_event_window`` false): every canonical
-  event's window counts, whichever events the shares are given.
+  no event window of any group (``in_event_window`` false): every event the
+  time sums were given counts, whichever events the shares are given.
 
 With ``in_well_visit_only=False`` each measure is read over all of its time,
 inside a visit or not, and the shares over each window's
@@ -134,9 +134,9 @@ def restriction_time_sums(
         The epoch's per-bin facts (``bin_facts.bin_facts``) on the same grid:
         ``time``, ``n_spikes`` and ``in_well_visit``.
     windows : pd.DataFrame
-        The epoch's windows (``epoch_windows``): ``kind`` and the first and
-        last bin ``s`` and ``e`` (inclusive). Only the ``"event"`` windows
-        mark ``in_event_window``.
+        The epoch's windows: ``kind`` and the first and last bin ``s`` and
+        ``e`` (inclusive). Only the ``"event"`` windows mark
+        ``in_event_window``.
 
     Returns
     -------

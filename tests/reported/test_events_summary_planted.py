@@ -5,9 +5,11 @@ table or from the current well visits makes its values pending.
 
 The restriction runs are planted too: the window run's windows (an event and
 its control per event, the planted one's too, with the columns the summary
-checks for), its time sums (one row per epoch) and each epoch's time step; the
-restriction run (a fold fit) and the per-bin facts run only through their
-manifests.
+checks for); the held-out event run's events (one per canonical event that
+starts inside a visit, and two that start outside one), its canonical events
+found again (every canonical event, the planted one too), its time sums (one
+row per epoch) and each epoch's time step; the restriction run (a fold fit) and
+the per-bin facts run only through their manifests.
 
 Every builder is a stand-in recording what it is given and returning one value
 named after it; the readers of the stored outputs are stand-ins too, or tiny
@@ -40,6 +42,7 @@ from continuum_swr_replay.paths import (
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
+    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
@@ -77,12 +80,23 @@ EVENT_BUILDERS = (
     "tetrode_holdout_values",
     "content_occupancy_values",
 )
-#: The restriction builders, by the argument holding the windows (None: none).
+#: The restriction builders, by the argument holding the canonical windows
+#: (None: none).
 RESTRICTION_BUILDERS = {
     "restriction_window_values": 0,
-    "restriction_outside_swr_values": 2,
+    "restriction_heldout_event_values": None,
+    "restriction_agreement_values": None,
+    "restriction_outside_swr_values": None,
     "restriction_immobile_values": None,
 }
+#: The builders given the held-out events, by the argument holding them.
+HELDOUT_BUILDERS = {
+    "restriction_heldout_event_values": 0,
+    "restriction_agreement_values": 0,
+    "restriction_outside_swr_values": 2,
+}
+N_HELDOUT_INSIDE = 13
+"""The held-out events that start inside a visit; two more start outside."""
 #: The window values' key that reads the well visits (through the bin facts).
 AFTER_VISIT = f"restriction_window{builder.RESTRICTION_AFTER_VISIT}"
 OUTSIDE_EVENTS = f"restriction_outside_swr{builder.RESTRICTION_OUTSIDE_EVENTS}per_spike"
@@ -153,15 +167,37 @@ def _restriction_windows() -> pd.DataFrame:
     return _per_event_run().assign(**dict.fromkeys(columns, 0))
 
 
+def _heldout_events() -> pd.DataFrame:
+    """The held-out event run's events: 13 that start inside a visit and two
+    planted that start outside one."""
+    inside = [True] * N_HELDOUT_INSIDE + [False, False]
+    return pd.DataFrame(
+        {
+            "heldout_event_id": [f"h{i}" for i in range(len(inside))],
+            "starts_in_well_visit": inside,
+        }
+    )
+
+
+def _canonical_found() -> pd.DataFrame:
+    """The held-out event run's canonical events: every event, the planted one
+    too."""
+    return pd.DataFrame(
+        {"event_id": np.array([*range(13), PLANTED], dtype="uint64"), "found": True}
+    )
+
+
 def _time_sums() -> pd.DataFrame:
-    """The window run's time sums: one row per epoch."""
+    """The held-out event run's time sums: one row per epoch."""
     return pd.DataFrame({"epoch_id": EPOCHS, "n_bins": 1})
 
 
 def _read_complete_run(folder, name, epochs) -> pd.DataFrame:
     return {
         "nonlocal_restriction_windows": _restriction_windows,
-        "nonlocal_restriction_time_sums": _time_sums,
+        "heldout_events": _heldout_events,
+        "canonical_events_found": _canonical_found,
+        "heldout_time_sums": _time_sums,
     }.get(name, _per_event_run)()
 
 
@@ -199,6 +235,7 @@ class _Run:
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             EVENT_TETRODE_HOLDOUT_DIR,
             EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+            EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
             EVENT_BIN_FACTS_DIR,
             "state_evidence",
         ):
@@ -270,6 +307,8 @@ class _Run:
             tetrode_holdout=root / EVENT_TETRODE_HOLDOUT_DIR,
             nonlocal_restriction=root / EVENT_NONLOCAL_RESTRICTION_DIR,
             nonlocal_restriction_windows=root / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+            nonlocal_restriction_heldout_events=root
+            / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
         )
@@ -402,6 +441,14 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         if at is not None:
             windows = seen[name][at]
             assert len(windows) == 2 * 13 and PLANTED not in set(windows["event_id"])
+    # the held-out events that start inside a visit, not the two outside
+    for name, at in HELDOUT_BUILDERS.items():
+        heldout = seen[name][at]
+        assert len(heldout) == N_HELDOUT_INSIDE, name
+        assert heldout["starts_in_well_visit"].all(), name
+    # the canonical events found again: the selected ones only
+    found = seen["restriction_agreement_values"][1]
+    assert len(found) == 13 and PLANTED not in set(found["event_id"])
     for name in ("restriction_outside_swr_values", "restriction_immobile_values"):
         assert seen[name][0]["epoch_id"].tolist() == EPOCHS
         assert seen[name][1].to_dict() == dict.fromkeys(EPOCHS, BIN_S)
@@ -430,7 +477,13 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     for key in ("restriction_window", AFTER_VISIT):
         assert values[key].description.endswith(f"; over {subset}")
     assert values["restriction_outside_swr"].description.endswith(
-        f"; over {builder.TIME_SUBSET}, and {builder.EVENTS_SUBSET}"
+        f"; over {builder.TIME_SUBSET}, and {builder.HELDOUT_EVENTS_SUBSET}"
+    )
+    assert values["restriction_heldout_event"].description.endswith(
+        f"; over {builder.HELDOUT_EVENTS_SUBSET}"
+    )
+    assert values["restriction_agreement"].description.endswith(
+        "so its partner may start outside a visit"
     )
     # the time no event holds is outside every event, selected or not
     for key in ("restriction_immobile", OUTSIDE_EVENTS):
@@ -450,16 +503,17 @@ def _other_cache() -> dict:
     return {"sha256": "0" * 64}
 
 
-#: The restriction values, made pending by what they read
-RESTRICTION_VALUES = {
-    "restriction_window",
-    AFTER_VISIT,
+#: The restriction values, made pending by what they read: the window run's,
+#: the held-out event run's over its events, and over immobile time
+WINDOW_VALUES = {"restriction_window", AFTER_VISIT}
+HELDOUT_EVENT_VALUES = {
+    "restriction_heldout_event",
+    "restriction_agreement",
     "restriction_outside_swr",
     OUTSIDE_EVENTS,
-    "restriction_immobile",
 }
-RESTRICTION_EVENT_VALUES = RESTRICTION_VALUES - {"restriction_immobile"}
-RESTRICTION_VISIT_VALUES = RESTRICTION_VALUES - {"restriction_window"}
+HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {"restriction_immobile"}
+RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES) - {"restriction_window"}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
 #: The values against the participation run's Local-rest controls
 CONTROL_VALUES = {"participation", "tetrode_holdout", "restriction_window", AFTER_VISIT}
@@ -542,17 +596,32 @@ PENDING_CASES = [
     *(
         (EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR, (name, {"sha256": "old"}), pending)
         for name, pending in (
-            ("event_table", RESTRICTION_EVENT_VALUES),
-            ("event_participation", RESTRICTION_EVENT_VALUES),
-            ("tetrode_holdout", RESTRICTION_EVENT_VALUES),
-            ("nonlocal_restriction", RESTRICTION_VALUES),
-            ("bin_facts", RESTRICTION_VALUES),
+            ("event_table", WINDOW_VALUES),
+            ("event_participation", WINDOW_VALUES),
+            ("tetrode_holdout", WINDOW_VALUES),
+            ("nonlocal_restriction", WINDOW_VALUES),
+            ("bin_facts", WINDOW_VALUES),
         )
     ),
     (
         EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
         ("settings", {builder.restriction_windows.EVENT_TABLE_NOTE: _NOTE}),
-        RESTRICTION_EVENT_VALUES,
+        WINDOW_VALUES,
+    ),
+    # the held-out event run: its events read the event table (the canonical
+    # check and the canonical events found again), the restriction run and the
+    # bin facts; its time sums over immobile time read the latter two only
+    *(
+        (
+            EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+            (name, {"sha256": "old"}),
+            pending,
+        )
+        for name, pending in (
+            ("event_table", HELDOUT_EVENT_VALUES),
+            ("nonlocal_restriction", HELDOUT_RUN_VALUES),
+            ("bin_facts", HELDOUT_RUN_VALUES),
+        )
     ),
     # the visits reach the restriction values through the bin facts only: a run
     # made from another session cache, or before it recorded one, makes the

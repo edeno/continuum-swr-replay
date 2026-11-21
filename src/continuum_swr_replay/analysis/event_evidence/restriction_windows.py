@@ -30,7 +30,10 @@ every tetrode the decoder put in those bins, from the per-bin facts,
 table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
 its bins outside the SWR, where ``swr`` may not use the non-local states; in an
 event without an SWR, all its bins but the few inside an SWR the ``swr`` model
-used. Figure 2g's second axis reads ``full - swr`` there, per spike.
+used. Figure 2g's second axis reads ``full - swr`` there, per spike, over the
+windows of the events detected from the held-out decode
+(``scripts/event_evidence/detect_heldout_events.py`` sums them with the same
+functions).
 
 The per-bin facts also give each window's sums over its ``immobile_outside_swr``
 bins inside a well visit (:func:`window_bin_fact_sums`,

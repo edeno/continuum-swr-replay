@@ -36,11 +36,13 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         "Immobile time outside SWR bounds": the full decoder minus the SWR-only
         decoder per spike over the immobile bins outside SWRs of each event with
         no SWR, and of each event partly in an SWR (its time outside the SWR),
-        of the events that start inside a well visit; a dot per animal, the
-        animals' mean with its interval, and a dashed line at zero
+        of the events detected from the held-out decode (the canonical event
+        rule on each fold's held-out state probabilities) that start inside a
+        well visit; a dot per animal, the animals' mean with its interval, and
+        a dashed line at zero
         (``restriction_windows.restriction_window_statistics``). Both from
-        ``Processed-Data/event_nonlocal_restriction_windows`` (its windows and
-        time sums) by the events summary's
+        ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its events
+        and time sums) by the events summary's
         ``restriction_figure_statistics``. The held-out
         tetrode gain over local coding is a supplementary figure
         (``generate_supp_heldout_tetrode.py``).
@@ -68,14 +70,15 @@ features run the summary reads; i's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; j from
 the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
-``nonlocal_below_threshold_statistics``); g from the restriction window run's
-windows and time sums by the events summary's own function
-(``reported.events.restriction_figure_statistics``: the windows of the events
-that start inside a well visit, ``cohort_selection.select_events_in``, and the
-time inside a well visit), refused when the per-bin facts run that gave the
-time its well-visit flag records no session cache or another than the current
-one (``prepare_data.session_cache_staleness``), or when the window run was not
-made from that per-bin facts run (its recorded digest of the facts' manifest). Panel i is a
+``nonlocal_below_threshold_statistics``); g from the held-out event run's
+events and time sums by the events summary's own function
+(``reported.events.restriction_figure_statistics``: the events detected from
+the held-out decode that start inside a well visit, and the time inside a well
+visit), refused when the per-bin facts run that gave the time and the events'
+start their well-visit flag records no session cache or another than the
+current one (``prepare_data.session_cache_staleness``), or when the held-out
+event run was not made from that per-bin facts run (its recorded digest of the
+facts' manifest). Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -195,7 +198,7 @@ from continuum_swr_replay.parameters import (
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     EVENT_BIN_FACTS_DIR,
-    EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
     event_features_root,
@@ -1222,8 +1225,8 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
 def draw_part_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     """Panel g, right: the full decoder minus the SWR-only decoder per spike,
     over the immobile bins outside SWRs of the events with no SWR and of the
-    events partly in an SWR (their time outside the SWR), of the events that
-    start inside a well visit.
+    events partly in an SWR (their time outside the SWR), of the events
+    detected from the held-out decode that start inside a well visit.
 
     For each, a dot per animal in panel d's color and, beside them, the animals'
     mean with its 95 % interval in black (drawn by
@@ -1609,36 +1612,32 @@ def generate_figure(
     )
     if note is not None:
         raise ValueError(
-            f"{note}, then scripts/event_evidence/sum_nonlocal_restriction_windows.py"
+            f"{note}, then scripts/event_evidence/detect_heldout_events.py"
         )
-    # the events summary's restriction values: the same runs, cohorts, time
+    # the events summary's restriction values: the same run, cohorts, time
     # steps, subset and function
-    windows_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
-    windows_manifest = read_manifest(windows_dir)
-    # the window run must have read these per-bin facts, or its well-visit
-    # flags are not the ones checked above
-    if recorded_sha256(windows_manifest, "bin_facts") != sha256_file(
+    heldout_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
+    heldout_manifest = read_manifest(heldout_dir)
+    # the held-out event run must have read these per-bin facts, or its
+    # well-visit flags are not the ones checked above
+    if recorded_sha256(heldout_manifest, "bin_facts") != sha256_file(
         facts_dir / "manifest.json"
     ):
         raise ValueError(
-            f"the restriction window run ({windows_dir}) was not made from the "
+            f"the held-out event run ({heldout_dir}) was not made from the "
             f"current per-bin facts run ({facts_dir}); rerun "
-            "scripts/event_evidence/sum_nonlocal_restriction_windows.py"
+            "scripts/event_evidence/detect_heldout_events.py"
         )
     restriction_bin_s = pd.Series(
         {
             epoch_id: record["bin_s"]
-            for epoch_id, record in windows_manifest["epochs"].items()
+            for epoch_id, record in heldout_manifest["epochs"].items()
         }
     )
+    heldout_events = read_complete_run(heldout_dir, "heldout_events", event_epochs)
     restriction_decoders, restriction_parts = restriction_figure_statistics(
-        select_events_in(
-            read_complete_run(
-                windows_dir, "nonlocal_restriction_windows", event_epochs
-            ),
-            events["event_id"],
-        ),
-        read_complete_run(windows_dir, "nonlocal_restriction_time_sums", event_epochs),
+        heldout_events[heldout_events["starts_in_well_visit"].astype(bool)],
+        read_complete_run(heldout_dir, "heldout_time_sums", event_epochs),
         restriction_bin_s,
     )
 

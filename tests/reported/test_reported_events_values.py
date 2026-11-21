@@ -1013,30 +1013,82 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     # per unit, and the two groups' events without spikes and after the visit
     assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1 + 2 * 2 * 2 * 4 + 2 * 2 + 2 * 2
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    # Figure 2g's second axis draws the filter family's full - swr per spike
-    # over both groups' events' bins outside SWRs: those values carry its tag,
-    # no other value does
-    drawn = (
-        {
-            f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike{end}"
-            for word in ("non_swr", "swr")
-            for end in ("", "_ci_low", "_ci_high", "_animals_positive")
-        }
-        | {
-            f"restriction_{word}_events_outside_swr_scored_per_spike"
-            for word in ("non_swr", "swr")
-        }
-        | {
-            f"restriction_{word}_events_outside_swr_without_spikes"
-            for word in ("non_swr", "swr")
-        }
-    )
-    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
-    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
+    # Figure 2g draws the events detected from the held-out decode, not these
+    assert {v.figures for v in values.values()} == {()}
     # the summary says what they are over (``over``), once
     assert not any(
         "start inside a well visit" in v.description for v in values.values()
     )
+
+
+def test_restriction_heldout_event_values_are_figure_2gs_right_axis():
+    """The canonical windows' events, read as held-out events: the same
+    statistic as the canonical values outside SWRs, every value with Figure
+    2g's tag."""
+    windows = _restriction_windows()
+    events = windows[windows["kind"] == "event"]
+    values = _by_key(builder.restriction_heldout_event_values(events, "s"))
+    numbers = {key: value.value for key, value in values.items()}
+    key = "restriction_heldout_{}_events_outside_swr_full_minus_swr_per_spike"
+    # outside SWRs, per spike: no SWR 1, 2, 3; SWR 0.25, 0.5, 0.75
+    assert numbers[key.format("non_swr")] == pytest.approx(2.0)
+    assert numbers[key.format("swr")] == pytest.approx(0.5)
+    assert numbers[key.format("swr") + "_ci_low"] < 0.5
+    assert numbers[key.format("swr") + "_animals_positive"] == 3
+    assert values[key.format("swr")].unit == "nats per spike"
+    assert numbers["restriction_heldout_non_swr_events"] == 3
+    assert numbers["restriction_heldout_swr_events_outside_swr_scored_per_spike"] == 3
+    assert numbers["restriction_heldout_swr_events_outside_swr_without_spikes"] == 0
+    # per group: the estimate, two bounds, animals positive, the events, those
+    # scored and those without spikes
+    assert len(numbers) == 2 * 7
+    assert {v.figures for v in values.values()} == {("2g",)}
+    assert {v.questions for v in values.values()} == {("2c.3",)}
+    canonical = _numbers(builder.restriction_window_values(windows, "s"))
+    for word in ("non_swr", "swr"):
+        assert numbers[key.format(word)] == pytest.approx(
+            canonical[f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike"]
+        )
+
+
+def test_restriction_agreement_values_are_the_shares_found_again():
+    """Canonical events: animal a 2 of 2 no-SWR found and 0 of 1 SWR; animal b
+    1 of 1 SWR. Held-out events: animal a 1 of 2 no-SWR with a canonical
+    partner, animal b 1 of 1 SWR."""
+    canonical = pd.DataFrame(
+        {
+            "epoch_id": ["a1", "a1", "a1", "b1"],
+            "animal": ["a", "a", "a", "b"],
+            "group": ["no SWR", "no SWR", "SWR", "SWR"],
+            "shares_bin_with_heldout": [True, True, False, True],
+        }
+    )
+    heldout = pd.DataFrame(
+        {
+            "epoch_id": ["a1", "a1", "b1"],
+            "animal": ["a", "a", "b"],
+            "group": ["no SWR", "no SWR", "SWR"],
+            "shares_bin_with_canonical": [True, False, True],
+        }
+    )
+    values = _by_key(builder.restriction_agreement_values(heldout, canonical, "s"))
+    numbers = {key: value.value for key, value in values.items()}
+    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(0.75)
+    assert numbers["restriction_canonical_non_swr_events_found_again"] == 1.0
+    assert numbers["restriction_canonical_swr_events_found_again"] == 0.5
+    assert numbers["restriction_canonical_events_found_again_animal_min"] == (
+        pytest.approx(2 / 3)
+    )
+    assert numbers["restriction_canonical_events_found_again_animal_max"] == 1.0
+    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(2 / 3)
+    assert numbers["restriction_heldout_non_swr_events_with_canonical"] == 0.5
+    assert numbers["restriction_heldout_swr_events_with_canonical"] == 1.0
+    assert numbers["restriction_heldout_events"] == 3
+    assert values["restriction_canonical_events_found_again"].kind == "fraction"
+    # two sets x three groups x (share, lowest and highest animal), the events
+    assert len(numbers) == 2 * 3 * 3 + 1
+    assert {v.figures for v in values.values()} == {()}
+    assert {v.questions for v in values.values()} == {("2c.3",)}
 
 
 def test_restriction_window_values_refuse_a_window_run_without_outside_sums():
@@ -1242,8 +1294,10 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
             numbers[f"restriction_immobile_{measure}"]
         )
-    numbers = _numbers(builder.restriction_window_values(windows, "s"))
+    numbers = _numbers(builder.restriction_heldout_event_values(windows, "s"))
     for word, group in (("non_swr", "no SWR"), ("swr", "SWR")):
         assert parts.loc[group, "estimate"] == pytest.approx(
-            numbers[f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike"]
+            numbers[
+                f"restriction_heldout_{word}_events_outside_swr_full_minus_swr_per_spike"
+            ]
         )
