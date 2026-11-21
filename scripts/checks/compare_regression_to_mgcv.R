@@ -9,7 +9,9 @@
 # second-order difference penalty (bs = "ps", m = c(2, 2)) on k basis functions
 # whose knots split [lo, hi] into k - 3 equal intervals, as the shared fitter's
 # PSplineBasis. The convergence control is tightened: with mgcv's defaults the
-# outer search stops early enough to move a log penalty by about 2e-4.
+# outer search stops early enough to move a log penalty by about 2e-4. It also
+# writes mgcv's three concurvity measures of every term (concurvity(full = TRUE),
+# on the unweighted model matrix; "para" is the parametric columns together).
 
 suppressMessages(library(mgcv))
 args <- commandArgs(TRUE)
@@ -78,4 +80,11 @@ if (kind == "poisson_two_smooths") {
   res$curve_u <- unname(pr$fit[, "s(u)"])
   res$se_curve_u <- unname(pr$se.fit[, "s(u)"])
 }
+conc <- concurvity(g, full = TRUE)
+res$concurvity <- list(
+  terms = colnames(conc),
+  worst = unname(conc["worst", ]),
+  observed = unname(conc["observed", ]),
+  estimate = unname(conc["estimate", ])
+)
 writeLines(jsonlite::toJSON(res, digits = NA, auto_unbox = TRUE), out)
