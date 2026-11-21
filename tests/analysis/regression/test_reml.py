@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -21,6 +22,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
 )
 from continuum_swr_replay.analysis.regression.newton import (
     NOT_IDENTIFIED,
+    STEP_LIMIT,
     penalized_newton,
 )
 from continuum_swr_replay.analysis.regression.pspline import (
@@ -541,3 +543,107 @@ def test_an_unconverged_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(reml, "MAX_STEP_HALVINGS", 0)
     with pytest.raises(ValueError, match=r"no halving.*0 steps.*gradient"):
         refine_penalties(lik, [data], blocks, [-5.0, 15.0])
+
+
+def _with_zero_column(data: SessionData, name: str | None = None) -> SessionData:
+    """``data`` with an unpenalized column that is zero on every row, last."""
+    X = np.column_stack([data.X, np.zeros(data.X.shape[0])])
+    return SessionData(X, data.y, data.aux, name=name)
+
+
+def test_a_failing_session_is_named() -> None:
+    """The pooled score records the first session whose fit failed and why,
+    and every error from a pooled fit names it."""
+    lik, first, blocks = _session("poisson", 1, seed=4)
+    _, second, _ = _session("poisson", 1, seed=5)
+    broken = _with_zero_column(second, name="j16_20210710_02")
+    pooled = pooled_reml(lik, [first, broken], blocks, [0.0])
+    assert pooled.score == np.inf
+    assert pooled.failed_session == 1
+    assert pooled.failed_status == NOT_IDENTIFIED
+    message = r"session 1 \(j16_20210710_02\).*design not identified"
+    with pytest.raises(ValueError, match=message + r".*31 of 31"):
+        select_penalties(lik, [first, broken], blocks)
+    with pytest.raises(ValueError, match=message):
+        refine_penalties(lik, [first, broken], blocks, [0.0])
+    with pytest.raises(ValueError, match=message):
+        fit_at_penalties(lik, [first, broken], blocks, [0.0])
+    unnamed = _with_zero_column(second)
+    with pytest.raises(ValueError, match=r"session 0: design not identified"):
+        fit_at_penalties(lik, [unnamed, first], blocks, [0.0])
+
+
+def test_grid_points_that_fail_are_counted_by_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A session whose inner fit fails at the weakest penalties only: the
+    search goes on from the finite points and records how many failed and why."""
+    lik, data, blocks = _session("poisson", 1, seed=4)
+    newton_fit = reml.penalized_newton
+
+    def fails_when_weak(*args, **kwargs):
+        fit = newton_fit(*args, **kwargs)
+        weak = np.max(np.abs(args[4])) < np.exp(-4.5) * np.max(np.abs(blocks[0].S))
+        return replace(fit, status=STEP_LIMIT) if weak else fit
+
+    monkeypatch.setattr(reml, "penalized_newton", fails_when_weak)
+    result = select_penalties(lik, [data], blocks)
+    assert result.search.n_grid_not_finite == 6  # log penalties -10 to -5
+    assert result.search.grid_failures == {STEP_LIMIT: 6}
+
+
+def test_an_inactive_column_is_left_out_of_its_session() -> None:
+    """A session without support for an unpenalized 0/1 column marks it
+    inactive: its fit, score and derivatives are those of its design built
+    without the column, and the column's coefficient and covariance are NaN."""
+    lik, first, blocks = _session("poisson", 2, seed=5)
+    _, second, _ = _session("poisson", 2, seed=6)
+    rng = np.random.default_rng(0)
+    n_rows = first.X.shape[0]
+
+    def with_indicator(data: SessionData, indicator: np.ndarray) -> SessionData:
+        X = np.column_stack([data.X[:, :1], indicator, data.X[:, 1:]])
+        return SessionData(X, data.y, data.aux)
+
+    shifted = [PenaltyBlock(b.columns + 1, b.S) for b in blocks]
+    first_full = with_indicator(first, (rng.uniform(size=n_rows) < 0.5).astype(float))
+    active = np.ones(first_full.X.shape[1], dtype=bool)
+    active[1] = False
+    second_inactive = replace(
+        with_indicator(second, np.zeros(n_rows)), active=active, name="no reward"
+    )
+
+    rho = np.array([0.5, 2.0])
+    pooled = pooled_reml(lik, [first_full, second_inactive], shifted, rho)
+    one = _score(lik, first_full, shifted, rho)
+    two = _score(lik, second, blocks, rho)  # the design without the column
+    assert pooled.score == pytest.approx(one.score + two.score, rel=1e-12)
+    np.testing.assert_allclose(pooled.gradient, one.gradient + two.gradient)
+    np.testing.assert_allclose(pooled.hessian, one.hessian + two.hessian)
+
+    result = fit_at_penalties(lik, [first_full, second_inactive], shifted, rho)
+    session = result.sessions[1]
+    reference = fit_at_penalties(lik, [second], blocks, rho).sessions[0]
+    assert np.isnan(session.fit.beta[1])
+    np.testing.assert_allclose(session.fit.beta[active], reference.fit.beta)
+    assert np.all(np.isnan(session.covariance[1])) and np.all(
+        np.isnan(session.covariance[:, 1])
+    )
+    np.testing.assert_allclose(
+        session.covariance[np.ix_(active, active)], reference.covariance
+    )
+    np.testing.assert_allclose(session.edf, reference.edf)
+    assert session.edf_total == pytest.approx(reference.edf_total)
+
+    selected = select_penalties(lik, [first_full, second_inactive], shifted)
+    assert np.isnan(selected.sessions[1].fit.beta[1])
+    assert np.all(np.isfinite(selected.sessions[0].fit.beta))
+
+
+def test_an_inactive_penalized_column_is_refused() -> None:
+    """The penalty identifies a smooth's columns: none may be inactive."""
+    lik, data, blocks = _session("poisson", 1, seed=5)
+    active = np.ones(data.X.shape[1], dtype=bool)
+    active[blocks[0].columns[2]] = False
+    with pytest.raises(ValueError, match=r"session 0.*column 3.*penalty"):
+        pooled_reml(lik, [replace(data, active=active)], blocks, [0.0])

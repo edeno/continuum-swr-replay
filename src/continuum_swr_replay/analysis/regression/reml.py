@@ -24,14 +24,19 @@ score above at the penalty ``S / phi``.
 Pooled REML shares the strengths across sessions, each with its own
 coefficients: the pooled score, gradient and Hessian are the sums over
 sessions, and one session whose inner fit fails makes the pooled score
-infinite. :func:`select_penalties` starts from the best point of a grid (the
-score can have two optima) and refines it by Newton on ``rho`` with the exact
-Hessian; :func:`fit_at_penalties` fits at given strengths without a search.
+infinite; the score records which session and the fit's status, and every
+error names them. A session may leave out unpenalized columns it cannot
+estimate (``SessionData.active``): its fit is that of its design without them.
+:func:`select_penalties` starts from the best point of a grid (the score can
+have two optima) and refines it by Newton on ``rho`` with the exact Hessian;
+:func:`fit_at_penalties` fits at given strengths without a search. A search
+that does not converge raises.
 """
 
 from __future__ import annotations
 
 import itertools
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 
@@ -51,7 +56,7 @@ from .constants import (
     REML_MAX_STEPS,
 )
 from .likelihoods import Gaussian, Likelihood
-from .newton import NewtonFit, penalized_newton
+from .newton import FitStatus, NewtonFit, penalized_newton
 from .pspline import penalty_rank
 
 __all__ = [
@@ -133,12 +138,32 @@ class SessionData:
         and the Gaussian (whose scale is profiled).
     beta0 : np.ndarray or None, shape (p,)
         Start of the first inner fit; zeros when None.
+    name : str or None
+        A label for messages (the session's key); its index when None.
+    active : np.ndarray of bool or None, shape (p,)
+        The columns this session estimates; all when None. An unpenalized
+        column the session cannot estimate (a 0/1 term with no support in it)
+        is inactive: the session's fit leaves it out, and its coefficient and
+        covariance rows and columns are NaN. A column in a penalty block may
+        not be inactive (the penalty identifies it).
     """
 
     X: np.ndarray
     y: np.ndarray
     aux: object = None
     beta0: np.ndarray | None = None
+    name: str | None = None
+    active: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        if self.active is not None:
+            active = np.asarray(self.active)
+            if active.dtype != bool or active.shape != (self.X.shape[1],):
+                raise ValueError(
+                    f"active must be a boolean mask over the {self.X.shape[1]} "
+                    f"columns, not {active.dtype} of shape {active.shape}"
+                )
+            object.__setattr__(self, "active", active)
 
 
 @dataclass(frozen=True)
@@ -180,13 +205,25 @@ class PooledScore:
         or the score is infinite.
     sessions : tuple of RemlScore
         One per session, in order; empty when the score is infinite (the
-        sessions after the first failure are not evaluated).
+        sessions after the first failure are not evaluated). A session's
+        ``fit.beta`` and ``fit.A`` are NaN at its inactive columns.
+    failed_session : int or None
+        The index of the first session whose inner fit failed; None when the
+        score is finite.
+    failed_status : FitStatus or None
+        That fit's status.
+    failure : str or None
+        ``failed_session`` and ``failed_status`` in words, with the session's
+        name when it has one.
     """
 
     score: float
     gradient: np.ndarray | None
     hessian: np.ndarray | None
     sessions: tuple[RemlScore, ...]
+    failed_session: int | None = None
+    failed_status: FitStatus | None = None
+    failure: str | None = None
 
 
 @dataclass(frozen=True)
@@ -245,6 +282,9 @@ class PenaltySearch:
         Grid points evaluated (0 for a given start).
     n_grid_not_finite : int
         Grid points whose pooled score was not finite (an inner fit failed).
+    grid_failures : dict of str to int
+        Those points counted by the status of their first failing session's
+        fit.
     n_outer_steps : int
         Newton steps on ``rho`` taken.
     at_boundary : np.ndarray of bool, shape (m,)
@@ -256,6 +296,7 @@ class PenaltySearch:
     start_score: float
     n_grid_points: int
     n_grid_not_finite: int
+    grid_failures: dict[str, int]
     n_outer_steps: int
     at_boundary: np.ndarray
 
@@ -271,8 +312,8 @@ class PooledFit:
         scale).
     score : float
         Pooled REML score at ``rho``.
-    gradient : np.ndarray, shape (m,)
-        Its gradient there.
+    gradient : np.ndarray or None, shape (m,)
+        Its gradient there; None when the strengths were given.
     sessions : tuple of SessionFit
         One per session, in order.
     search : PenaltySearch or None
@@ -281,7 +322,7 @@ class PooledFit:
 
     rho: np.ndarray
     score: float
-    gradient: np.ndarray
+    gradient: np.ndarray | None
     sessions: tuple[SessionFit, ...]
     search: PenaltySearch | None
 
@@ -529,6 +570,63 @@ def _gaussian_profiled(
     return RemlScore(float(score), gradient, hessian, fit, scale)
 
 
+def _label(data: SessionData, index: int) -> str:
+    """``session <index>``, with the session's name when it has one."""
+    return f"session {index}" + ("" if data.name is None else f" ({data.name})")
+
+
+def _check_active(
+    data: SessionData, index: int, blocks: Sequence[PenaltyBlock]
+) -> None:
+    """Raise when a column of a penalty block is inactive in the session."""
+    if data.active is None:
+        return
+    penalized = np.concatenate([np.empty(0, int), *(b.columns for b in blocks)])
+    inactive = penalized[~data.active[penalized]]
+    if inactive.size:
+        raise ValueError(
+            f"{_label(data, index)}: column {inactive[0]} is in a penalty block and "
+            "may not be inactive (the penalty identifies it)"
+        )
+
+
+def _session_score(
+    lik: Likelihood,
+    data: SessionData,
+    blocks: Sequence[PenaltyBlock],
+    rho: Sequence[float],
+    start: np.ndarray | None,
+    derivatives: bool,
+) -> RemlScore:
+    """One session's score, its fit left without the inactive columns.
+
+    The returned fit's ``beta`` and ``A`` are NaN at the inactive columns.
+    """
+    if data.active is None or data.active.all():
+        return reml_and_derivatives(
+            lik, data.X, data.y, data.aux, blocks, rho, start, derivatives=derivatives
+        )
+    active = data.active
+    position = np.cumsum(active) - 1  # a column's index among the active ones
+    reduced = [replace(block, columns=position[block.columns]) for block in blocks]
+    session = reml_and_derivatives(
+        lik,
+        data.X[:, active],
+        data.y,
+        data.aux,
+        reduced,
+        rho,
+        None if start is None else start[active],
+        derivatives=derivatives,
+    )
+    p = active.size
+    beta = np.full(p, np.nan)
+    beta[active] = session.fit.beta
+    A = np.full((p, p), np.nan)
+    A[np.ix_(active, active)] = session.fit.A
+    return replace(session, fit=replace(session.fit, beta=beta, A=A))
+
+
 def pooled_reml(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -545,28 +643,38 @@ def pooled_reml(
     lik : Likelihood
     sessions : sequence of SessionData
         Each with its own coefficients; the blocks apply to every session.
+        A session's inactive columns are left out of its fit.
     blocks : sequence of PenaltyBlock, length m
     rho : sequence of float, length m
     starts : sequence of np.ndarray or None
-        One inner-fit start per session (warm starts); each session's
-        ``beta0`` (or zeros) when None.
+        One inner-fit start per session (warm starts), shape ``(p,)`` with
+        anything at the inactive columns; each session's ``beta0`` (or zeros)
+        when None.
     derivatives : bool
         Also sum the gradients and Hessians.
 
     Returns
     -------
     PooledScore
-        Score inf, with no sessions, as soon as one session's inner fit fails.
+        Score inf, with no sessions, as soon as one session's inner fit fails;
+        it records which session and why.
+
+    Raises
+    ------
+    ValueError
+        If a session marks a column of a penalty block inactive.
     """
+    for index, data in enumerate(sessions):
+        _check_active(data, index, blocks)
     if starts is None:
         starts = [data.beta0 for data in sessions]
     scores = []
-    for data, start in zip(sessions, starts, strict=True):
-        session = reml_and_derivatives(
-            lik, data.X, data.y, data.aux, blocks, rho, start, derivatives=derivatives
-        )
+    for index, (data, start) in enumerate(zip(sessions, starts, strict=True)):
+        session = _session_score(lik, data, blocks, rho, start, derivatives)
         if not np.isfinite(session.score):
-            return PooledScore(np.inf, None, None, ())
+            status = session.fit.status
+            failure = f"{_label(data, index)}: {status}"
+            return PooledScore(np.inf, None, None, (), index, status, failure)
         scores.append(session)
     score = float(sum(s.score for s in scores))
     if not derivatives:
@@ -613,23 +721,34 @@ def _grid(m: int) -> list[np.ndarray]:
     return [np.array(point) for point in itertools.product(REML_GRID_POINTS, repeat=m)]
 
 
-def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int, int]:
-    """The best grid point, the number of points evaluated and the number of
-    them whose score was not finite.
+def _grid_start(
+    evaluate: _Evaluator, m: int
+) -> tuple[np.ndarray, int, Counter[tuple[str, str]]]:
+    """The best grid point, the number of points evaluated, and the points
+    whose score was not finite counted by (first failing session, status).
 
     Raises
     ------
     ValueError
-        If no grid point gives a finite score.
+        If no grid point gives a finite score; the message names the sessions
+        that failed and why.
     """
-    best_rho, best_score, n_points, n_not_finite = np.full(m, np.nan), np.inf, 0, 0
+    best_rho, best_score, n_points = np.full(m, np.nan), np.inf, 0
+    failures: Counter[tuple[str, str]] = Counter()
+
+    def visit(rho: np.ndarray) -> None:
+        nonlocal best_rho, best_score, n_points
+        pooled = evaluate(rho, derivatives=False)
+        n_points += 1
+        if not np.isfinite(pooled.score):
+            index = pooled.failed_session
+            failures[_label(evaluate.sessions[index], index), pooled.failed_status] += 1
+        elif pooled.score < best_score:
+            best_rho, best_score = rho, pooled.score
+
     if m <= 3:
         for rho in _grid(m):
-            score = evaluate(rho, derivatives=False).score
-            n_points += 1
-            n_not_finite += not np.isfinite(score)
-            if score < best_score:
-                best_rho, best_score = rho, score
+            visit(rho)
     else:
         lo, hi = LOG_PENALTY_BOUNDS
         current = np.full(m, REML_GRID_CENTER)
@@ -638,19 +757,19 @@ def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int, int]:
                 for value in np.arange(lo, hi + 0.5):
                     rho = current.copy()
                     rho[j] = value
-                    score = evaluate(rho, derivatives=False).score
-                    n_points += 1
-                    n_not_finite += not np.isfinite(score)
-                    if score < best_score:
-                        best_rho, best_score = rho, score
+                    visit(rho)
                 if np.isfinite(best_score):
                     current = best_rho.copy()
     if not np.isfinite(best_score):
+        detail = "; ".join(
+            f"{label}: {status} at {count} of {n_points} points"
+            for (label, status), count in failures.items()
+        )
         raise ValueError(
             f"no finite REML score on the grid over {LOG_PENALTY_BOUNDS}: no penalty "
-            "gives a converged inner fit in every session"
+            f"gives a converged inner fit in every session ({detail})"
         )
-    return best_rho, n_points, n_not_finite
+    return best_rho, n_points, failures
 
 
 def _free(rho: np.ndarray, gradient: np.ndarray) -> np.ndarray:
@@ -680,7 +799,7 @@ def _try_step(
     step[free] = _newton_step(
         current.gradient[free], current.hessian[np.ix_(free, free)]
     )
-    scale = 1.0
+    scale, trial = 1.0, None
     for _ in range(max_halvings):
         candidate = np.clip(rho + scale * step, *LOG_PENALTY_BOUNDS)
         if np.array_equal(candidate, rho):
@@ -689,11 +808,17 @@ def _try_step(
         if np.isfinite(trial.score) and trial.score <= current.score:
             return candidate, trial
         scale *= 0.5
-    return "no halving of its step lowered the pooled score"
+    reason = "no halving of its step lowered the pooled score"
+    if trial is not None and trial.failure is not None:
+        reason += f" (the last halving failed in {trial.failure})"
+    return reason
 
 
 def _search(
-    evaluate: _Evaluator, start: np.ndarray, n_grid_points: int, n_not_finite: int
+    evaluate: _Evaluator,
+    start: np.ndarray,
+    n_grid_points: int,
+    failures: Counter[tuple[str, str]],
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
@@ -713,7 +838,7 @@ def _search(
     rho = np.array(start, dtype=float)
     current = evaluate(rho, derivatives=True)
     if not np.isfinite(current.score):
-        raise ValueError(f"no finite REML score at the start {rho}")
+        raise ValueError(f"no finite REML score at the start {rho}: {current.failure}")
     start_score = current.score
     n_steps = 0
     while True:
@@ -743,7 +868,8 @@ def _search(
         np.array(start, dtype=float),
         start_score,
         n_grid_points,
-        n_not_finite,
+        sum(failures.values()),
+        dict(Counter({status: n for (_, status), n in failures.items()})),
         n_steps,
         at_boundary,
     )
@@ -751,19 +877,34 @@ def _search(
 
 
 def _pooled_fit(
+    data: Sequence[SessionData],
     rho: np.ndarray,
     pooled: PooledScore,
     blocks: Sequence[PenaltyBlock],
     search: PenaltySearch | None,
 ) -> PooledFit:
-    """The per-session fits, covariances and edf of a pooled score."""
+    """The per-session fits, covariances and edf of a pooled score.
+
+    A session's covariance is NaN in the rows and columns of its inactive
+    columns; its edf counts the active ones.
+    """
     sessions = []
-    for session in pooled.sessions:
-        A = session.fit.A
+    for session_data, session in zip(data, pooled.sessions, strict=True):
+        p = session.fit.beta.size
+        active = (
+            np.ones(p, dtype=bool)
+            if session_data.active is None
+            else session_data.active
+        )
+        A = session.fit.A[np.ix_(active, active)]
         factor = scipy.linalg.cho_factor(A, lower=True)
-        covariance = scipy.linalg.cho_solve(factor, np.eye(A.shape[0]))
-        S = assemble_penalty(blocks, rho, A.shape[0]) / session.scale
-        F = covariance @ (A - S)  # A^-1 H
+        S = assemble_penalty(blocks, rho, p)[np.ix_(active, active)] / session.scale
+        covariance = np.full((p, p), np.nan)
+        covariance[np.ix_(active, active)] = scipy.linalg.cho_solve(
+            factor, np.eye(A.shape[0])
+        )
+        F = np.full((p, p), np.nan)
+        F[np.ix_(active, active)] = covariance[np.ix_(active, active)] @ (A - S)
         edf = np.array([np.trace(F[np.ix_(b.columns, b.columns)]) for b in blocks])
         null_dim = np.array([b.columns.size - b.rank for b in blocks])
         sessions.append(
@@ -771,7 +912,7 @@ def _pooled_fit(
                 session.fit,
                 covariance,
                 edf,
-                float(np.trace(F)),
+                float(np.trace(F[np.ix_(active, active)])),
                 session.scale,
                 session.score,
                 edf - null_dim <= NULL_SPACE_EDF_TOL,
@@ -798,8 +939,8 @@ def refine_penalties(
     """
     evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
-    rho, pooled, search = _search(evaluate, rho0, 0, 0)
-    return _pooled_fit(rho, pooled, blocks, search)
+    rho, pooled, search = _search(evaluate, rho0, 0, Counter())
+    return _pooled_fit(sessions, rho, pooled, blocks, search)
 
 
 def select_penalties(
@@ -833,9 +974,9 @@ def select_penalties(
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")
     evaluate = _Evaluator(lik, sessions, blocks)
-    start, n_points, n_not_finite = _grid_start(evaluate, len(blocks))
-    rho, pooled, search = _search(evaluate, start, n_points, n_not_finite)
-    return _pooled_fit(rho, pooled, blocks, search)
+    start, n_points, failures = _grid_start(evaluate, len(blocks))
+    rho, pooled, search = _search(evaluate, start, n_points, failures)
+    return _pooled_fit(sessions, rho, pooled, blocks, search)
 
 
 def fit_at_penalties(
@@ -849,10 +990,13 @@ def fit_at_penalties(
     Raises
     ------
     ValueError
-        If a session's inner fit does not converge.
+        If a session's inner fit does not converge; the message names it and
+        says why.
     """
     rho = np.asarray(rho, dtype=float)
     pooled = pooled_reml(lik, sessions, blocks, rho)
     if not np.isfinite(pooled.score):
-        raise ValueError(f"an inner fit did not converge at log penalties {rho}")
-    return _pooled_fit(rho, pooled, blocks, None)
+        raise ValueError(
+            f"an inner fit did not converge at log penalties {rho}: {pooled.failure}"
+        )
+    return _pooled_fit(sessions, rho, pooled, blocks, None)
