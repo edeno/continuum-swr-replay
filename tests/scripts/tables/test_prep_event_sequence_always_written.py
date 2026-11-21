@@ -40,6 +40,8 @@ def _session_tables() -> tuple[list, list, list, list]:
                 **SESSION,
                 "event_id": 1,
                 "stop_id": 1,
+                "occupancy_state": "at_well",
+                "visit_context": "in_visit",
                 "n_nonlocal_bins": 4,
                 "n_undecoded_bins": 4,
                 "last_rewarded_arm": np.nan,
@@ -54,6 +56,8 @@ def _session_tables() -> tuple[list, list, list, list]:
         {
             "event_id": 1,
             "candidate_arm": list(arms),
+            "occupancy_state": "at_well",
+            "visit_context": "in_visit",
             "arm_count_hard": 0.0,
             "is_same_patch_as_current": 0,
             "reward_count_candidate_arm_last10_known_trials": np.nan,

@@ -474,7 +474,8 @@ def test_contract_checks_vocabulary_and_agreement_with_occupancy():
         }
     )
     require_visit_context_labels(good, "t")
-    require_visit_context_labels(good.drop(columns="visit_context"), "t")
+    with pytest.raises(ValueError, match="lacks required column"):
+        require_visit_context_labels(good.drop(columns="visit_context"), "t")
     with pytest.raises(ValueError, match="unknown visit_context"):
         require_visit_context_labels(good.replace("track_center", "hallway"), "t")
     with pytest.raises(ValueError, match="not at_well"):

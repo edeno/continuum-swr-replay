@@ -97,32 +97,29 @@ def _require_stable_event_context(frame: pd.DataFrame, columns: Iterable[str]) -
 def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
     """Check ``visit_context`` against its vocabulary and ``occupancy_state``.
 
-    The non-local event tables carry the label (their build columns name it,
-    ``_common.py``); the ContFrag tables, which share these validators, do not,
-    and a table without ``visit_context`` is not checked. Where it is present
-    every value is one of ``analysis.constants.VISIT_CONTEXTS``, and a row is
-    ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``.
+    Every event and stop table carries the label, the non-local tables and the
+    ContFrag tables (SWR and MUA events) alike, so a table without
+    ``visit_context`` or ``occupancy_state`` is refused, also when it has no
+    rows. Every value is one of ``analysis.constants.VISIT_CONTEXTS``, and a
+    row is ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``.
 
     Raises
     ------
     ValueError
-        If a label is missing or unknown, or disagrees with ``occupancy_state``.
+        If the table lacks ``visit_context`` or ``occupancy_state``, a label is
+        missing or unknown, or a label disagrees with ``occupancy_state``.
     """
-    if "visit_context" not in frame.columns or frame.empty:
-        return
+    require_columns(frame, ["visit_context", "occupancy_state"], table_name)
     labels = frame["visit_context"]
     unknown = sorted(set(labels.dropna().unique()) - set(VISIT_CONTEXTS))
     if labels.isna().any() or unknown:
         raise ValueError(
             f"{table_name} has missing or unknown visit_context values {unknown}"
         )
-    if (
-        "occupancy_state" in frame.columns
-        and not (
-            labels.eq(IN_WELL_VISIT).to_numpy()
-            == frame["occupancy_state"].astype(object).eq("at_well").to_numpy()
-        ).all()
-    ):
+    if not (
+        labels.eq(IN_WELL_VISIT).to_numpy()
+        == frame["occupancy_state"].astype(object).eq("at_well").to_numpy()
+    ).all():
         raise ValueError(
             f"{table_name} has visit_context in_visit rows that are not at_well, "
             "or at_well rows that are not in_visit"
