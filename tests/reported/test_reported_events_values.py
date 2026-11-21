@@ -951,7 +951,13 @@ def _restriction_windows() -> pd.DataFrame:
 
 def test_restriction_window_values_name_each_window_contrast_and_score():
     windows = _restriction_windows()
-    values = _by_key(builder.restriction_window_values(windows, "s"))
+    groups = builder.restriction_window_values(windows, "s")
+    # of the window values, only the counts after the visit read the visits
+    assert [v.key for v in groups.after_visit] == [
+        f"restriction_{word}_events_outside_swr_after_visit"
+        for word in ("non_swr", "swr")
+    ]
+    values = _by_key([*groups.windows, *groups.after_visit])
     numbers = {key: value.value for key, value in values.items()}
     assert numbers["restriction_non_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(4.0)
@@ -1044,7 +1050,7 @@ def test_restriction_heldout_event_values_are_figure_2gs_right_axis():
     assert len(numbers) == 2 * 7
     assert {v.figures for v in values.values()} == {("2g",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    canonical = _numbers(builder.restriction_window_values(windows, "s"))
+    canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
         assert numbers[key.format(word)] == pytest.approx(
             canonical[f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike"]
@@ -1157,11 +1163,19 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         windows[f"full{suffix}_outside_swr_in_visit"] = scale * windows["in_visit"]
     selected = windows[~windows["event_id"].str.endswith("away")]
     bin_s = pd.Series(1.0, index=["a1", "a2", "b1", "b2", "c1", "c2"])
-    values = _by_key(
-        builder.restriction_outside_swr_values(_time_sums(rows), bin_s, selected, "s")
+    groups = builder.restriction_outside_swr_values(
+        _time_sums(rows), bin_s, selected, "s"
     )
+    values = _by_key([*groups.with_events, *groups.outside_events])
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_outside_swr_full_minus_swr"
+    # the values over the time no held-out event holds are a group of their own
+    assert {v.key for v in groups.outside_events} == {
+        f"{key}{family}_outside_heldout_events_{unit}{end}"
+        for family in ("", "_two_sided")
+        for unit in ("per_spike", "per_s")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    }
     # a: median of 2 and 4 = 3; b: of 6 and 8 = 7; c: of 5 and 7 = 6
     assert numbers[f"{key}_per_s"] == pytest.approx(16 / 3)
     assert numbers[f"{key}_per_s_ci_low"] < 16 / 3 < numbers[f"{key}_per_s_ci_high"]

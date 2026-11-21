@@ -110,6 +110,7 @@ import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -1876,15 +1877,6 @@ _RESTRICTION_KINDS = {
     "event": ("events", "events"),
     "control": ("controls", "matched Local-rest controls"),
 }
-#: The end of the keys of the window values that count events by their bins
-#: after the final poke-out of their visit: of the window values, only these
-#: read the well visits (through the per-bin facts).
-RESTRICTION_AFTER_VISIT = "_outside_swr_after_visit"
-#: The part of the keys of the outside-SWR values over the time no event holds:
-#: the held-out event run marks that time from every event detected from the
-#: held-out decode, wherever it starts, so these values are over the time inside
-#: a well visit, not over the selected events.
-RESTRICTION_OUTSIDE_EVENTS = "_outside_heldout_events_"
 #: Figure 2g, the decoders compared, in one score family (its values carry the
 #: panel's tag; the other family's do not).
 RESTRICTION_FIGURE_FAMILY = "filter"
@@ -1946,7 +1938,18 @@ def restriction_figure_statistics(
     return decoders, parts
 
 
-def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]:
+class WindowValues(NamedTuple):
+    """The restriction window values, by what they read."""
+
+    windows: list[Value]
+    """The values that read the window run only."""
+    after_visit: list[Value]
+    """The counts of events by their bins after the final poke-out of their
+    visit: of the window values, only these read the well visits (through the
+    per-bin facts)."""
+
+
+def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValues:
     """Question 2c.3: the three restriction decoders compared per spike over the
     canonical events of ``windows`` (those that start inside a well visit,
     ``cohort_selection.select_events_in``) and their Local-rest controls, in
@@ -1962,7 +1965,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
         ["family", "contrast", "unit", "kind", "group"]
     )
     group_words = {group: word for word, group in _RUN_GROUPS.items()}
-    values = []
+    values, after_visit = [], []
     for family, suffix in FAMILY_SUFFIX.items():
         for kind, group, contrast in _RESTRICTION_WINDOWS:
             row = statistics.loc[(family, contrast, "per_spike", kind, group)]
@@ -2062,7 +2065,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
     for group in RESTRICTION_FIGURE_GROUPS:
         row = counts.loc[("event", group)]
         word = group_words[group]
-        values += [
+        values.append(
             make(
                 f"restriction_{word}_events_outside_swr_without_spikes",
                 row["n_without_spikes_outside_swr"],
@@ -2070,17 +2073,19 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
                 "count",
                 f"{group} events with immobile bins outside SWRs but no spike in "
                 "them: no value per spike there",
-            ),
+            )
+        )
+        after_visit.append(
             make(
-                f"restriction_{word}_events{RESTRICTION_AFTER_VISIT}",
+                f"restriction_{word}_events_outside_swr_after_visit",
                 row["n_with_bins_outside_swr_outside_visit"],
                 "count",
                 "count",
                 f"{group} events with immobile bins outside SWRs after the final "
                 "poke-out of their visit (left out of "
                 "the shares of immobile time inside a well visit)",
-            ),
-        ]
+            )
+        )
     # the windows and those with spikes are the same for every contrast and family
     for kind, (kind_word, label) in _RESTRICTION_KINDS.items():
         for word, group in _RUN_GROUPS.items():
@@ -2110,7 +2115,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
             "animals in the restriction comparison",
         )
     )
-    return values
+    return WindowValues(values, after_visit)
 
 
 def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list[Value]:
@@ -2265,9 +2270,20 @@ def restriction_agreement_values(
     return values
 
 
+class OutsideSwrValues(NamedTuple):
+    """The outside-SWR values, by what they are over."""
+
+    with_events: list[Value]
+    """The values over the time and the selected held-out events."""
+    outside_events: list[Value]
+    """The values over the time no held-out event holds: the held-out event run
+    marks that time from every event detected from the held-out decode,
+    wherever it starts, so these are over the time inside a well visit alone."""
+
+
 def restriction_outside_swr_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame, source: str
-) -> list[Value]:
+) -> OutsideSwrValues:
     """Question 2c.3: the full decoder against the SWR-only decoder over the
     immobile time outside SWRs inside a well visit (time chosen by speed, ripple
     detection and the well visits, not by the decoder), per spike and per
@@ -2290,7 +2306,7 @@ def restriction_outside_swr_values(
         f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
     )
     time = "every immobile bin outside SWRs of the epoch"
-    values = []
+    values, outside_events = [], []
     for family, suffix in FAMILY_SUFFIX.items():
         key = f"restriction_outside_swr_full_minus_swr{suffix}"
         scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
@@ -2335,9 +2351,9 @@ def restriction_outside_swr_values(
                     ),
                 ]
             row = statistics.loc[(family, f"outside_events_gain_{unit}")]
-            values += _per_spike_interval(
+            outside_events += _per_spike_interval(
                 make,
-                f"{key}{RESTRICTION_OUTSIDE_EVENTS}{unit}",
+                f"{key}_outside_heldout_events_{unit}",
                 row,
                 f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
                 "outside SWRs that no event detected from the held-out decode "
@@ -2345,9 +2361,9 @@ def restriction_outside_swr_values(
                 style="sig2",
                 unit=words,
             )
-            values.append(
+            outside_events.append(
                 make(
-                    f"{key}{RESTRICTION_OUTSIDE_EVENTS}{unit}_animals_positive",
+                    f"{key}_outside_heldout_events_{unit}_animals_positive",
                     row["n_animals_positive"],
                     "count",
                     "count",
@@ -2395,7 +2411,7 @@ def restriction_outside_swr_values(
                     "upper bound of that interval",
                 ),
             ]
-    return values
+    return OutsideSwrValues(values, outside_events)
 
 
 def restriction_immobile_values(
@@ -3689,21 +3705,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # the windows' controls come from the participation tables the held-out
     # tetrode run read (sum_nonlocal_restriction_windows.check_holdout_inputs):
     # Local rest inside one well visit only when that run records the subset
-    window_values = over(
-        pend(
-            restriction_window_values(restriction_windows_table, restriction_source),
-            *restriction_stale,
-            participation_off_subset(),
-        ),
-        CONTROL_SUBSET,
+    window_values = restriction_window_values(
+        restriction_windows_table, restriction_source
     )
+    window_stale = (*restriction_stale, participation_off_subset())
+    summary.add(*over(pend(window_values.windows, *window_stale), CONTROL_SUBSET))
     # of the window values, only the counts after the visit read the visits
     summary.add(
-        *(
-            pend([value], facts_off_visits)[0]
-            if value.key.endswith(RESTRICTION_AFTER_VISIT)
-            else value
-            for value in window_values
+        *over(
+            pend(window_values.after_visit, *window_stale, facts_off_visits),
+            CONTROL_SUBSET,
         )
     )
 
@@ -3763,27 +3774,22 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             "that set's events, so its partner may start outside a visit",
         )
     )
-    outside_swr_values = pend(
-        restriction_outside_swr_values(
-            restriction_time_sums,
-            restriction_bin_s,
-            heldout_selected,
-            f"{heldout_source} (its held-out events and time sums)",
-        ),
-        *heldout_stale,
+    outside_swr_values = restriction_outside_swr_values(
+        restriction_time_sums,
+        restriction_bin_s,
+        heldout_selected,
+        f"{heldout_source} (its held-out events and time sums)",
+    )
+    summary.add(
+        *over(
+            pend(outside_swr_values.with_events, *heldout_stale),
+            f"{TIME_SUBSET}, and {HELDOUT_EVENTS_SUBSET}",
+        )
     )
     # the time no event holds is outside every held-out event, selected or not:
     # those values are over the time alone
     summary.add(
-        *(
-            over(
-                [value],
-                TIME_SUBSET
-                if RESTRICTION_OUTSIDE_EVENTS in value.key
-                else f"{TIME_SUBSET}, and {HELDOUT_EVENTS_SUBSET}",
-            )[0]
-            for value in outside_swr_values
-        )
+        *over(pend(outside_swr_values.outside_events, *heldout_stale), TIME_SUBSET)
     )
     # over immobile time only: no event enters
     summary.add(

@@ -97,9 +97,10 @@ HELDOUT_BUILDERS = {
 }
 N_HELDOUT_INSIDE = 13
 """The held-out events that start inside a visit; two more start outside."""
-#: The window values' key that reads the well visits (through the bin facts).
-AFTER_VISIT = f"restriction_window{builder.RESTRICTION_AFTER_VISIT}"
-OUTSIDE_EVENTS = f"restriction_outside_swr{builder.RESTRICTION_OUTSIDE_EVENTS}per_spike"
+#: The window value that reads the well visits (through the bin facts), and the
+#: outside-SWR value over the time no held-out event holds.
+AFTER_VISIT = "restriction_window_after_visit"
+OUTSIDE_EVENTS = "restriction_outside_swr_outside_events"
 BIN_S = 0.002
 OTHER_BUILDERS = (
     "visit_context_values",
@@ -318,14 +319,18 @@ class _Run:
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
         )
 
-    def _spy(self, name: str, *extra_keys: str):
+    def _spy(self, name: str, group=None, group_key: str | None = None):
+        """A builder that records its arguments and returns one value, or, given
+        ``group`` (a builder's named groups), that value and ``group_key``'s in
+        the group's two fields."""
+
         def spy(*args):
             self.seen[name] = args
             make = value_factory(spy, "s", Tags(("2a.1",)))
-            return [
-                make(key, 1, "count", "count", name)
-                for key in (name.removesuffix("_values"), *extra_keys)
-            ]
+            value = make(name.removesuffix("_values"), 1, "count", "count", name)
+            if group is None:
+                return [value]
+            return group([value], [make(group_key, 1, "count", "count", name)])
 
         return spy
 
@@ -337,13 +342,17 @@ class _Run:
         monkeypatch.setattr(
             builder,
             "restriction_window_values",
-            self._spy("restriction_window_values", AFTER_VISIT),
+            self._spy("restriction_window_values", builder.WindowValues, AFTER_VISIT),
         )
         # the outside-SWR values hold the time that no event holds
         monkeypatch.setattr(
             builder,
             "restriction_outside_swr_values",
-            self._spy("restriction_outside_swr_values", OUTSIDE_EVENTS),
+            self._spy(
+                "restriction_outside_swr_values",
+                builder.OutsideSwrValues,
+                OUTSIDE_EVENTS,
+            ),
         )
 
         def class_steps(manifest, sha256, class_stale, steps, source, what):
