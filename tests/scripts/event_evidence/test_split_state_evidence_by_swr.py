@@ -17,7 +17,11 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
 )
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    behavioral_context_cache_path,
+)
 from continuum_swr_replay.paths import NL_BOUTS_BY_SWR_STEM
+from continuum_swr_replay.runs.io import files_sha256
 from continuum_swr_replay.tables.io import read_table, write_table
 from scripts.event_evidence import split_state_evidence_by_swr as splitter
 
@@ -72,6 +76,9 @@ def test_the_run_writes_its_statistics_over_the_bouts_in_visits_and_its_provenan
         "well_visit_times",
         lambda epoch_id: (np.array([VISIT[0]]), np.array([VISIT[1]])),
     )
+    entry = behavioral_context_cache_path({"session_id": EPOCH})
+    entry.parent.mkdir(parents=True)
+    entry.write_bytes(b"the epoch's visits")
 
     splitter.main([str(run_dir)])
 
@@ -97,6 +104,7 @@ def test_the_run_writes_its_statistics_over_the_bouts_in_visits_and_its_provenan
     )
     assert provenance["subset"] == ANALYZED_SUBSET
     assert provenance["epochs"] == [EPOCH]
+    assert provenance["session_cache"]["sha256"] == files_sha256([entry])
     counts = {row["state"]: row for row in provenance["bouts"]}
     assert counts["Non-Local Continuous | no SWR"] == {
         "state": "Non-Local Continuous | no SWR",

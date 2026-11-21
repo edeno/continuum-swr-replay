@@ -13,14 +13,18 @@ loops, the shard assembly and the publishing) call these.
 Also the home of the behavioral-context cache (:func:`load_behavioral_context`,
 :func:`session_cache_dir`), the per-session pickle of the Spyglass trials,
 port experiences and track graph that the replay and ContFrag builds share,
-and of :func:`well_visit_times`, an epoch's well visits read from it.
+and of :func:`well_visit_times`, an epoch's well visits read from it, with
+the record a time-masked output keeps of them (:func:`session_cache_record`,
+checked by :func:`session_cache_staleness` and :func:`time_mask_staleness`).
 """
 
 from __future__ import annotations
 
 import logging
 import pickle
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -37,6 +41,9 @@ from continuum_swr_replay.analysis.detection.nonlocal_events import (
 )
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -62,6 +69,8 @@ from continuum_swr_replay.data_loaders.trials import (
 )
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.paths import replay_content_dir
+from continuum_swr_replay.runs.io import files_sha256
+from continuum_swr_replay.runs.staleness import recorded_sha256
 from continuum_swr_replay.tables.io import write_atomically
 from continuum_swr_replay.tables.session_keys import present_session_columns
 from continuum_swr_replay.tables.standardization import (
@@ -313,6 +322,88 @@ def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
         experiences["arrival_time"].to_numpy(dtype=float),
         experiences["departure_time"].to_numpy(dtype=float),
     )
+
+
+def session_cache_record(epoch_ids: Iterable[str]) -> dict[str, object]:
+    """The record a time-masked output keeps of the well visits it read.
+
+    An output whose content depends on the visits (quiet rest, immobile time
+    or bouts inside a visit) records one SHA-256 over the session-cache
+    entries of the epochs it read (``runs.io.files_sha256``), under
+    ``session_cache`` in its manifest, so that a refreshed cache cannot pass
+    as the one it was made from (:func:`session_cache_staleness`).
+
+    Parameters
+    ----------
+    epoch_ids : iterable of str
+        The epochs the output read the visits of.
+
+    Returns
+    -------
+    dict
+        ``path`` (the cache folder), ``n_files`` and ``sha256``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If an epoch has no cache entry.
+    """
+    paths = [
+        behavioral_context_cache_path({"session_id": identifier})
+        for identifier in sorted(set(epoch_ids))
+    ]
+    return {
+        "path": str(session_cache_dir() / BEHAVIORAL_CONTEXT_CACHE_VERSION),
+        "n_files": len(paths),
+        "sha256": files_sha256(paths),
+    }
+
+
+def session_cache_staleness(
+    manifest: Mapping[str, Any], epoch_ids: Iterable[str], what: str
+) -> str | None:
+    """Why a time-masked output was not made from the current well visits, or None.
+
+    Parameters
+    ----------
+    manifest : Mapping
+        The output's manifest, with its ``session_cache`` record
+        (:func:`session_cache_record`).
+    epoch_ids : iterable of str
+        The epochs the output holds; the current digest is taken over their
+        cache entries.
+    what : str
+        The output, for the note.
+
+    Raises
+    ------
+    FileNotFoundError
+        If an epoch has no cache entry.
+    """
+    recorded = recorded_sha256(manifest, "session_cache")
+    if recorded is None:
+        return f"{what} records no session-cache SHA-256; rerun it before citing"
+    current = session_cache_record(epoch_ids)["sha256"]
+    if recorded != current:
+        return (
+            f"{what} was made from other well visits than the current session "
+            f"cache's (sha256 {recorded[:12]}, current {current[:12]}); rerun it "
+            "before citing"
+        )
+    return None
+
+
+def time_mask_staleness(
+    manifest: Mapping[str, Any], epoch_ids: Iterable[str], what: str
+) -> str | None:
+    """Why a time-masked output is not over the analyses' subset and the current
+    well visits, or None: ``cohort_selection.subset_staleness`` and
+    :func:`session_cache_staleness`, joined."""
+    notes = [
+        subset_staleness(manifest, what),
+        session_cache_staleness(manifest, epoch_ids, what),
+    ]
+    return "; ".join(note for note in notes if note) or None
 
 
 def build_session_tables(

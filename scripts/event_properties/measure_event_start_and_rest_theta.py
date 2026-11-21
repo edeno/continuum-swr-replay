@@ -13,7 +13,8 @@ port experiences, read from the session cache:
 epochs, reads the frames and writes the tables.
 
 One table per epoch, ``Processed-Data/event_start_rest_theta/<epoch>.parquet``,
-and a ``manifest.json``.
+and a ``manifest.json`` (with the session-cache entries the visits were read
+from, ``prepare_data.session_cache_record``).
 
 Usage::
 
@@ -48,7 +49,10 @@ from continuum_swr_replay.analysis.event_definition.well_visits import in_well_v
 from continuum_swr_replay.analysis.event_properties.start_and_rest_theta import (
     start_and_rest_theta,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
@@ -152,6 +156,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "sha256": sha256_file(event_table),
                 },
                 "subset": ANALYZED_SUBSET,
+                "session_cache": session_cache_record(identifiers),
                 "visit_context_counts": {
                     label: int(n)
                     for label, n in count_visit_context(table)["n"].items()

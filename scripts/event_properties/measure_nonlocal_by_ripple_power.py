@@ -5,7 +5,9 @@ ripple power below the threshold, and the share of bins that are non-local at
 each power (Figure 2j), over the immobile time inside the well visits (the
 epoch's port experiences, read from the session cache:
 ``event_tables.prepare_data.well_visit_times``). The manifest records each
-epoch's immobile bins kept and left out as outside every visit. One row per
+epoch's immobile bins kept and left out as outside every visit, and the
+session-cache entries the visits were read from
+(``prepare_data.session_cache_record``). One row per
 epoch and ripple-power bin
 (``analysis.event_properties.class_or_continuum.rest_power_counts``), for the
 ``ok`` epochs of an event features run, from the same decodes (each decode's
@@ -40,7 +42,10 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
     rest_power_counts,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -100,6 +105,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "commit": described_commit(),
             "event_features_run": args.event_features_run,
             "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(identifier for identifier, _ in jobs),
             "n_epochs": len(tables),
             "bins": f"head_speed below {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:g} "
             "cm/s, inside a well visit (first poke-in to final poke-out), outside "

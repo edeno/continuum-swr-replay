@@ -31,7 +31,9 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.io import files_sha256
 from tests.analysis.event_properties.test_start_and_rest_theta import EVENTS, frame
+from tests.support._session_cache_fixtures import write_session_cache_entries
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]
@@ -158,6 +160,7 @@ def test_main_writes_every_epoch_and_the_manifest(
         )
     )
     monkeypatch.setattr(script, "ProcessPoolExecutor", ThreadPoolExecutor)
+    entries = write_session_cache_entries([IDENTIFIER])
 
     script.main(["--n-windows", "4"])
 
@@ -171,3 +174,4 @@ def test_main_writes_every_epoch_and_the_manifest(
     assert manifest["visit_context_counts"]["track_center"] == 1
     assert manifest["visit_context_counts"]["in_visit"] == 1
     assert manifest["event_table"]["path"] == str(event_table)
+    assert manifest["session_cache"]["sha256"] == files_sha256(entries)

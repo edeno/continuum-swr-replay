@@ -37,12 +37,14 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
-    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_signal_levels,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    time_mask_staleness,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.reported.events import default_inputs, with_brain_state
 from continuum_swr_replay.runs.staleness import read_output_manifest
@@ -89,15 +91,23 @@ def read_inputs() -> dict:
     ------
     ValueError
         If the brain-state or the gamma reference was not made over the
-        analyses' subset (``cohort_selection.subset_staleness``).
+        analyses' subset or from the current session cache's well visits
+        (``prepare_data.time_mask_staleness``).
     """
     inputs = default_inputs()
-    for folder in (inputs.brain_state_reference.parent, inputs.event_gamma):
-        note = subset_staleness(read_output_manifest(folder), str(folder))
+    events = select_visit_context(read_swr_table(inputs.event_table))
+    events, reference, gamma_reference = with_brain_state(
+        events, inputs, len(analyzed_epoch_ids())
+    )
+    for folder, levels in (
+        (inputs.brain_state_reference.parent, reference),
+        (inputs.event_gamma, gamma_reference),
+    ):
+        note = time_mask_staleness(
+            read_output_manifest(folder), levels["epoch_id"], str(folder)
+        )
         if note is not None:
             raise ValueError(note)
-    events = select_visit_context(read_swr_table(inputs.event_table))
-    events, reference, _ = with_brain_state(events, inputs, len(analyzed_epoch_ids()))
     return {"events": events, "reference": reference}
 
 

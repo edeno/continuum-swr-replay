@@ -6,7 +6,9 @@ event at rest a theta-like event, or a quiet-rest one? Quiet rest is the rest
 inside a well visit (the epoch's port experiences, read from the session cache:
 ``event_tables.prepare_data.well_visit_times``); each row records the quiet-rest
 bins kept (``n_rest_bins``) and left out as outside every visit
-(``n_rest_bins_outside_visit``). One row per epoch, for
+(``n_rest_bins_outside_visit``), and the manifest records the session-cache
+entries the visits were read from (``prepare_data.session_cache_record``). One
+row per epoch, for
 the ``ok`` epochs of an event features run, from the same decodes (each
 decode's sha256 must be the one the run recorded), written to
 ``Processed-Data/brain_state_reference/reference.parquet`` with a
@@ -36,7 +38,10 @@ from continuum_swr_replay.analysis.event_definition.well_visits import in_well_v
 from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     event_features_root,
@@ -88,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "commit": described_commit(),
             "event_features_run": args.event_features_run,
             "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(table["epoch_id"]),
             "n_epochs": len(table),
             "running": "head_speed above 10 cm/s, outside excluded time",
             "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "

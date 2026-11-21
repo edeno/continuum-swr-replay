@@ -25,8 +25,10 @@ Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the r
 - ``nl_bouts_by_swr_stats.csv``: the statistics over the bouts that start inside
   a well visit (the events summary reads it, question 2c.3);
 - ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source, the epochs,
-  the subset (``cohort_selection.ANALYZED_SUBSET``) and the bouts kept and left
-  out per state, SWR label and regime (``bouts``, from ``bout_visit_counts``).
+  the subset (``cohort_selection.ANALYZED_SUBSET``), the session-cache entries
+  the visits were read from (``prepare_data.session_cache_record``) and the
+  bouts kept and left out per state, SWR label and regime (``bouts``, from
+  ``bout_visit_counts``).
 
 Usage::
 
@@ -55,7 +57,10 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     mark_bouts_in_well_visits,
     split_non_local_by_swr,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import NL_BOUTS_BY_SWR_STEM, processed_data_dir
@@ -121,6 +126,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "decode_dir": str(decode_dir),
             "epochs": epochs,
             "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(epochs),
             "bouts": json_ready(counts.to_dict(orient="records")),
         },
         indent=1,

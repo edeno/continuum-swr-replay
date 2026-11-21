@@ -1780,19 +1780,27 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
     assert set(seen[0]["visit_context"]) == {"in_visit"}
 
 
+@pytest.mark.parametrize("problem", ["subset", "session_cache"])
 @pytest.mark.parametrize("folder", ["brain_state_reference", "event_gamma"])
 def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
-    offline, monkeypatch, tmp_path, folder
+    offline, monkeypatch, tmp_path, folder, problem
 ):
     """Quiet rest is the rest inside a well visit: a brain-state or gamma
-    reference whose manifest records another subset, or none, is refused."""
+    reference whose manifest records another subset, or none, or another
+    session cache's visits than the current one, is refused."""
     import dataclasses
 
     from continuum_swr_replay.analysis.event_definition.cohort_selection import (
         ANALYZED_SUBSET,
     )
+    from continuum_swr_replay.analysis.event_tables import prepare_data
 
     figure = offline("scripts.figures.generate_supp_event_gamma")
+    monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", tmp_path / "cache")
+    entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
+    entry.parent.mkdir(parents=True)
+    entry.write_bytes(b"the visits")
+    current = prepare_data.session_cache_record(["e"])
     inputs = dataclasses.replace(
         figure.default_inputs(),
         brain_state_reference=tmp_path / "brain_state_reference" / "reference.parquet",
@@ -1800,15 +1808,28 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     )
     for name in ("brain_state_reference", "event_gamma"):
         (tmp_path / name).mkdir()
-        manifest = {} if name == folder else {"subset": ANALYZED_SUBSET}
+        manifest = {"subset": ANALYZED_SUBSET, "session_cache": current}
+        if name == folder:
+            manifest.pop(problem)
         (tmp_path / name / "manifest.json").write_text(json.dumps(manifest))
     monkeypatch.setattr(figure, "default_inputs", lambda: inputs)
     monkeypatch.setattr(figure, "read_swr_table", lambda path: _figure02_events())
+    levels = pd.DataFrame({"epoch_id": ["e"]})
     monkeypatch.setattr(
-        figure, "with_brain_state", lambda events, inputs, n: (events, None, None)
+        figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
     )
-    with pytest.raises(ValueError, match=f"{folder}.* was not made over"):
+    note = "was not made over" if problem == "subset" else "records no session-cache"
+    with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
+    # a cache refreshed since the reference was made is refused too
+    if problem == "session_cache":
+        (tmp_path / folder / "manifest.json").write_text(
+            json.dumps({"subset": ANALYZED_SUBSET, "session_cache": current})
+        )
+        assert figure.read_inputs()["reference"] is levels
+        entry.write_bytes(b"other visits")
+        with pytest.raises(ValueError, match="other well visits than the current"):
+            figure.read_inputs()
 
 
 # --------------------------------------------------------------------------

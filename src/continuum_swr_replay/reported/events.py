@@ -74,7 +74,7 @@ medians, a mean of its epochs' means).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -121,6 +121,8 @@ from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_staleness,
+    time_mask_staleness,
     behavioral_context_cache_path,
     well_visit_times,
 )
@@ -2395,6 +2397,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     def off_subset(folder: Path) -> str | None:
         return subset_staleness(read_output_manifest(folder), rel(folder))
 
+    def off_visits(folder: Path, epoch_ids: Iterable[str]) -> str | None:
+        """Why a time-masked output was not made from the current visits."""
+        return session_cache_staleness(
+            read_output_manifest(folder), epoch_ids, rel(folder)
+        )
+
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*visit_context_values(table, source))
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
@@ -2427,6 +2435,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 rest_theta_values(events_with_extras, extras_source),
                 extras_stale,
                 off_subset(inputs.event_start_rest_theta),
+                off_visits(
+                    inputs.event_start_rest_theta, (path.stem for path in extra_paths)
+                ),
             ),
             f"{EVENTS_SUBSET}, against quiet rest in {TIME_SUBSET}",
         )
@@ -2469,6 +2480,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             pend(
                 brain_state_values(events_with_gamma, reference, signal_source),
                 off_subset(inputs.brain_state_reference.parent),
+                off_visits(inputs.brain_state_reference.parent, reference["epoch_id"]),
             ),
             against_rest,
         )
@@ -2480,6 +2492,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 stale(inputs.event_gamma),
                 off_subset(inputs.brain_state_reference.parent),
                 off_subset(inputs.event_gamma),
+                off_visits(inputs.brain_state_reference.parent, reference["epoch_id"]),
+                off_visits(inputs.event_gamma, gamma_reference["epoch_id"]),
             ),
             against_rest,
         )
@@ -2498,6 +2512,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 ),
                 stale(inputs.event_gamma),
                 off_subset(inputs.event_gamma),
+                off_visits(inputs.event_gamma, gamma_reference["epoch_id"]),
             ),
             against_rest,
         )
@@ -2595,8 +2610,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"
     )
     heldout_provenance = json.loads(heldout_provenance_path.read_text())
-    heldout_off_subset = subset_staleness(
-        heldout_provenance, rel(heldout_provenance_path)
+    heldout_off_subset = time_mask_staleness(
+        heldout_provenance, heldout_provenance["epochs"], rel(heldout_provenance_path)
     )
     summary.add(
         *over(
@@ -2813,6 +2828,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
                 ),
                 off_subset(folder),
+                off_visits(folder, power_counts["epoch_id"]),
             ),
             f"the immobile {TIME_SUBSET}",
         )

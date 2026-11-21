@@ -119,7 +119,6 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     check_visit_context_starts,
     select_events_in,
     select_visit_context,
-    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_state_probability,
@@ -154,6 +153,7 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
+    time_mask_staleness,
     well_visit_times,
 )
 from continuum_swr_replay.data_loaders import load_data
@@ -437,25 +437,30 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
 
 def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
     """A per-epoch measurement (the brain-state reference, the counts by ripple
-    power), if it was made over the time inside the well visits and from the
-    decodes the event features run records for every analyzed epoch.
+    power), if it was made over the time inside the well visits, from the
+    current session cache's visits and from the decodes the event features run
+    records for every analyzed epoch.
 
     Parameters
     ----------
     reference : pd.DataFrame
         The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
     folder : Path
-        Its folder, whose ``manifest.json`` records the subset it is over.
+        Its folder, whose ``manifest.json`` records the subset it is over and
+        the session-cache entries it read the visits from.
     name : str
         What it is, for the error.
 
     Raises
     ------
     ValueError
-        If it was not made over the analyses' subset, an analyzed epoch is
-        missing or extra, or its decode hash differs.
+        If it was not made over the analyses' subset or from the current
+        session cache (``prepare_data.time_mask_staleness``), an analyzed epoch
+        is missing or extra, or its decode hash differs.
     """
-    note = subset_staleness(read_output_manifest(folder), f"the {name} ({folder})")
+    note = time_mask_staleness(
+        read_output_manifest(folder), reference["epoch_id"], f"the {name} ({folder})"
+    )
     if note is not None:
         raise ValueError(note)
     manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
