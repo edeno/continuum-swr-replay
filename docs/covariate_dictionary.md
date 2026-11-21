@@ -525,8 +525,8 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
 - `visit_context` / `well_visit_id` / `last_completed_well_visit_id` /
   `time_since_last_poke_out_s` / `time_until_next_poke_in_s` (event, stop,
-  event-arm and event-patch tables) — where the event or stop lies relative to
-  the well visits, a visit being one port experience from the first nose-poke
+  event-arm and event-patch tables, non-local and ContFrag SWR and MUA) —
+  where the event or stop lies relative to the well visits, a visit being one port experience from the first nose-poke
   in at a well to the final poke-out there
   (`analysis/event_tables/visit_context.py`; values and radii in
   `analysis/constants.py`, `VISIT_CONTEXTS`). `in_visit` is exactly

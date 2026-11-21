@@ -303,10 +303,11 @@ stop carries `visit_context` (`analysis/event_tables/visit_context.py`; the valu
 and the two 10 cm radii are in `analysis/constants.py`): `in_visit` exactly when
 `occupancy_state == "at_well"`, and otherwise where the window lies (across a visit
 boundary, still next to the well just left, on the track, before the first visit).
-The event, event × arm, event × patch and stop tables carry it, with the visit's id
-and the times since the last poke-out and until the next poke-in; the ContFrag tables
-(SWR and MUA events) do not. No row is dropped
-for its label: an analysis that reads only the events inside a well visit calls
+The event, event × arm, event × patch and stop tables carry it, the non-local tables
+and the ContFrag tables (SWR and MUA events) alike, with the visit's id and the times
+since the last poke-out and until the next poke-in; the table contract
+(`table_contracts.require_visit_context_labels`) refuses a table without it. No row
+is dropped for its label: an analysis that reads only the events inside a well visit calls
 `analysis/event_definition/cohort_selection.py:select_visit_context` (default
 `in_visit`), and `count_visit_context` gives the rows kept and dropped per label.
 Do not re-implement the filter. At the stop grain the label is about the whole stop:
