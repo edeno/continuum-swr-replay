@@ -592,12 +592,18 @@ Neither form depends on the basis that made the curve.
 
 The 242 epochs are not independent, so each per-session estimate is reduced session to
 recording day to animal (`analysis/shared_statistics.py`).
-`animal_day_session_bootstrap` takes a per-session number or curve as a mean over animals
-of each animal's mean over its days of each day's mean over its sessions, with nested
-bootstrap draws. A session whose value is not finite is left out of that reduction.
-**The levels resampled are being checked by simulation** (today: animals, then each
-drawn animal's days, then each drawn day's sessions).
-`animal_day_session_values` gives each animal's value by the same three levels (median
+`animal_balanced_bootstrap` takes a per-session number or curve as a mean over animals
+of each animal's mean over its days of each day's mean over its sessions. A session whose
+value is not finite is left out of that reduction. Its draws are the project's nested
+bootstrap, animals and then each drawn animal's sessions (`nested_bootstrap_draws`); the
+days are not resampled but stay in the estimate: in each draw a day's mean is over its
+drawn sessions, and a day with no session drawn is absent. A simulation
+(`scripts/checks/simulate_interval_coverage.py`; 5 animals, 45 days, 244 sessions, 2,000
+data sets per setting) found the t-corrected interval of this rule at or above 95 %
+coverage in every setting of animal, day and session variance, missing sessions and a
+paired kind difference included; resampling days as a third level gave intervals up to 41 %
+wider that over-covered (up to 100 %) when the animals varied little.
+`animal_day_session_values` gives each animal's value session -> day -> animal (median
 or mean). `day_level_test` is the signed-rank p over recording days of the day means
 (NaN below six non-zero differences).
 
