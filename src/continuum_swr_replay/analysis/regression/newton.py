@@ -7,10 +7,9 @@ solves ``A step = g`` by Cholesky, with ``g`` the gradient of ``-F`` and
 decrement ``g' A^-1 g / 2`` -- the gain in ``-F`` the step predicts -- is below
 the tolerance. A step is shortened so no coefficient moves more than
 ``max_step``, then halved until ``F`` does not rise; a step whose ``F`` is not
-finite is rejected the same way. ``eta`` is never clipped. A quadratic
-likelihood (the Gaussian) takes one full step, uncapped, and stops: that step
-is its exact optimum, whatever the scale of the outcome, and none of the rules
-below applies to it.
+finite is rejected the same way. A quadratic likelihood (the Gaussian) takes
+its full step, uncapped: it is the exact optimum, whatever the scale of the
+outcome. ``eta`` is never clipped.
 
 Before the first step the inputs are checked (finite, of matching shapes, and
 what the family takes) and so is the design: the coefficients the penalty
@@ -20,7 +19,10 @@ belongs to still moves the linear predictor by more than
 ``NO_MAXIMUM_ETA_STEP`` on some row, the likelihood has no finite maximum
 along that step (a 0/1 column whose rows all have the same outcome, a Poisson
 cell with no events): the decrement shrinks to zero while a coefficient runs
-to infinity. Near a finite maximum the step shrinks with the decrement.
+to infinity. Near a finite maximum the step shrinks with the decrement. A
+quadratic likelihood with ``A`` positive definite always has a finite maximum,
+and its linear predictor is on the outcome's scale, so the rule is not applied
+to it.
 
 Once the decrement is below the tolerance the fit still takes that last full
 step, when ``F`` does not rise by more than a few rounding units of ``F``
@@ -267,7 +269,8 @@ def penalized_newton(
     max_iter : int
         Most Newton steps.
     max_step : float
-        Longest step, as the largest change of any coefficient.
+        Longest step, as the largest change of any coefficient; not applied
+        to a quadratic likelihood, whose full step is the optimum.
 
     Returns
     -------
@@ -284,7 +287,10 @@ def penalized_newton(
     """
     _check_inputs(lik, X, y, aux, S, beta0)
     beta = np.array(beta0, dtype=float)
+    cap = np.inf if lik.quadratic else max_step
     F, loglik = _objective(lik, X, y, aux, S, beta)
+    capped_and_fell: list[bool] = []
+    eta_steps: list[float] = []
     unidentified = _unidentified(
         lik.identifying_design(X, aux),
         _free_columns(S) if free_basis is None else free_basis,
@@ -294,22 +300,12 @@ def penalized_newton(
         return NewtonFit(
             beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik, unidentified=unidentified
         )
-    if lik.quadratic:  # one full step is the exact optimum
-        A, step, decrement = _newton_system(lik, X, y, aux, S, beta)
-        if step is None:
-            return NewtonFit(beta, A, NOT_POSITIVE_DEFINITE, np.nan, 0, loglik)
-        beta = beta + step
-        _, loglik = _objective(lik, X, y, aux, S, beta)
-        A, _, decrement = _newton_system(lik, X, y, aux, S, beta)
-        return NewtonFit(beta, A, CONVERGED, decrement, 1, loglik)
-    capped_and_fell: list[bool] = []
-    eta_steps: list[float] = []
     for n_iter in range(max_iter + 1):
         A, step, decrement = _newton_system(lik, X, y, aux, S, beta)
         if step is None:
             return NewtonFit(beta, A, NOT_POSITIVE_DEFINITE, np.nan, n_iter, loglik)
         if decrement < NEWTON_DECREMENT_TOL:
-            if _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
+            if not lik.quadratic and _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
                 return _no_finite_maximum(X, beta, A, decrement, n_iter, loglik, step)
             return _last_step(
                 lik,
@@ -324,7 +320,7 @@ def penalized_newton(
         eta_steps.append(_eta_step(X, step))
         if n_iter == max_iter:
             break
-        scale = min(1.0, max_step / np.max(np.abs(step)))
+        scale = min(1.0, cap / np.max(np.abs(step)))
         capped = scale < 1.0
         for _ in range(MAX_STEP_HALVINGS):
             candidate = beta + scale * step
@@ -336,7 +332,7 @@ def penalized_newton(
             return NewtonFit(beta, A, HALVING_FAILED, decrement, n_iter, loglik)
         capped_and_fell.append(capped and F_new < F)
         beta, F, loglik = candidate, F_new, loglik_new
-    if _runs_away_at_the_cap(capped_and_fell, eta_steps):
+    if not lik.quadratic and _runs_away_at_the_cap(capped_and_fell, eta_steps):
         return _no_finite_maximum(X, beta, A, decrement, n_iter, loglik, step)
     return NewtonFit(beta, A, STEP_LIMIT, decrement, n_iter, loglik)
 

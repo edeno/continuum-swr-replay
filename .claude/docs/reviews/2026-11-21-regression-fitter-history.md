@@ -79,13 +79,8 @@ SWR and `[19.70, 20]` with it.
 
 ## The Gaussian scale
 
-Until 2026-11-21 the Newton fit behind the profiled Gaussian score ran at the working
-scale `var(y)` (with the penalty divided by it, the same minimizer), so that its
-decrement, and the tolerance it was held to, did not depend on the outcome's units: for
-an outcome scaled by 1, 1e3 and 1e6 the curve was the same up to the scale and the
-selected log strength the same to 3e-15 (and at 1e9 too), with every grid point finite.
+The Newton fit behind the profiled Gaussian score runs at the working scale `var(y)`.
 Before that, at an outcome scaled by 1e6, the inner fit at the four largest strengths
 stopped at 100 steps on a decrement of rounding (5e-8 to 9e-5 in squared units of the
-outcome). The working scale was removed when the Gaussian fit became one exact Newton
-step, which needs no tolerance. A constant outcome was refused as a working scale that
-is not positive before it was named ("the Gaussian outcome is constant").
+outcome). A constant outcome was refused as a working scale that is not positive before
+it was named ("the Gaussian outcome is constant").

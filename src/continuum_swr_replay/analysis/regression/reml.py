@@ -833,21 +833,28 @@ def _gaussian_profiled(
 
         V = (n - M_p) (1 + log(2 pi phi)) / 2 - log|S|_+ / 2 + log|X'X + S| / 2.
 
-    ``b`` is the Newton fit at the scale 1, one exact step
-    (:func:`.newton.penalized_newton`); the fit reports ``A`` and the Newton
-    decrement at the profiled scale.
+    The Newton fit that finds ``b`` runs at the working scale ``var(y)`` with
+    the penalty ``S / var(y)`` (the same minimizer), so that its decrement, and
+    the tolerance it is held to, do not depend on the outcome's units.
 
     ``D_p`` has derivatives ``b' S_j b`` and ``delta_jk b' S_j b + 2 b_k' S_j b``
     (``b_k = -(X'X + S)^-1 S_k b``), as in the Laplace case with ``H`` fixed.
     """
     n_rows, n_columns = X.shape
-    if not np.var(y) > 0:
+    working = float(np.var(y))
+    if not working > 0:
         raise ValueError(
             "the Gaussian outcome is constant (variance zero): it has no scale to "
             "profile"
         )
     pls = penalized_newton(
-        Gaussian(), X, y, 1.0, S, beta0, free_basis=free_basis(blocks, n_columns)
+        Gaussian(),
+        X,
+        y,
+        working,
+        S / working,
+        beta0,
+        free_basis=free_basis(blocks, n_columns),
     )
     if not pls.converged:
         return RemlScore(np.inf, None, None, pls, np.nan)
@@ -867,7 +874,7 @@ def _gaussian_profiled(
     fit = replace(
         pls,
         A=gram / scale,
-        newton_decrement=pls.newton_decrement / scale,
+        newton_decrement=pls.newton_decrement * working / scale,
         loglik=Gaussian().loglik(X @ b, y, scale),
     )
     covariance, edf, edf_total = _covariance_and_edf(factor, gram, S, blocks)

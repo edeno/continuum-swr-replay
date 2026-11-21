@@ -48,11 +48,10 @@ fit the message names the session.
 At fixed strengths `lam_j` the fit minimizes `-l(beta) + beta' S beta / 2`, with
 `S = sum_j lam_j S_j`, by Newton in float64. Each step solves `A step = g` by Cholesky
 (`A = H + S`); a step is first shortened so that no coefficient moves more than 10, then
-halved (at most 30 times) until the objective does not rise. The linear predictor is
-never clipped; a step whose objective is not finite is rejected like one that rises.
-The Gaussian, whose log-likelihood is quadratic in the linear predictor, takes one full
-step without the cap and stops: that step is the exact optimum whatever the outcome's
-scale, and none of the rules on the decrement below applies to it.
+halved (at most 30 times) until the objective does not rise. The Gaussian, whose
+log-likelihood is quadratic in the linear predictor, takes its full step without the
+cap: that step is the exact optimum whatever the outcome's scale. The linear predictor is never clipped; a
+step whose objective is not finite is rejected like one that rises.
 
 Before the first step the design is checked: the coefficients the penalty leaves free
 (the unpenalized columns and each penalty's null space) must be identified by `X`. Those
@@ -293,12 +292,11 @@ constants the likelihood leaves out: for the Poisson, `V + sum log y!` is mgcv's
 `gcv.ubre`. For the Gaussian the scale is profiled: the fit minimizes
 `||y - X b||^2 + b' S b` (`lam_j` on the residual-sum-of-squares scale, as mgcv's `sp`),
 the scale is `phi = D_p / (n - M_p)` with `D_p` that minimum, and `V` is Wood (2011,
-eq. 4) at that scale. The fit behind it is the Newton fit's one exact step at the scale
-1, so it does not depend on the outcome's units: for an outcome scaled by 1, 1e3, 1e6
-and 1e9 the curve is the same up to the scale and the selected log strength the same to
-4e-16 (2026-11-21), with every grid point finite
-(`test_gaussian_is_invariant_to_the_outcome_scale`).
-A constant outcome (`var(y) = 0`) has no scale to profile and is
+eq. 4) at that scale. The Newton fit behind it runs at the working scale `var(y)` (with
+the penalty divided by it, the same minimizer), so its decrement does not depend on the
+outcome's units: for an outcome scaled by 1, 1e3 and 1e6 the curve is the same up to
+the scale and the selected log strength the same to 3e-15 (and at 1e9 too), with every
+grid point finite. A constant outcome (`var(y) = 0`) has no scale to profile and is
 refused as such ("the Gaussian outcome is constant").
 
 ## Agreement with mgcv, neurospatial and the current fitters
