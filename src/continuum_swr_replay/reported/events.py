@@ -1857,6 +1857,20 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
     return values
 
 
+_TETRODE_HELD_OUT = (
+    "each tetrode is left out of the decoder in turn; at a scored bin, that "
+    "tetrode's and the other tetrodes' place-field encodings are fit on the other "
+    f"folds ({tetrode_holdout.N_FOLDS} folds of whole trials balanced by "
+    f"destination well, a segment longer than {tetrode_holdout.MAX_SEGMENT_S:g} s "
+    "cut into pieces, training bins within "
+    f"{tetrode_holdout.TRIAL_MARGIN_S:g} s of the fold left out); the state "
+    "transitions and initial conditions are the canonical decoder's, fit on the "
+    "whole epoch with every tetrode; the posterior is smoothed over the whole epoch"
+)
+"""How the held-out tetrode score is held out, in words
+(``tetrode_holdout.holdout_scores``)."""
+
+
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
     the events and their Local-rest controls (the held-out tetrode
@@ -1886,8 +1900,10 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
                 "log predictive score under the other tetrodes' position "
                 "distribution minus under local coding around the animal"
                 f"{spiking}, summed over tetrodes and bins and divided by the "
-                "window's spikes; mean over animals of each animal's median "
-                "over epochs of each epoch's median",
+                f"window's spikes; {_TETRODE_HELD_OUT}; mean over animals of "
+                "each animal's median over epochs of each epoch's median",
+                # the controls' values are near zero: two significant digits
+                style="sig2" if kind == "control" else "dec2",
             )
             if name == "gain":
                 values.append(
@@ -1914,7 +1930,7 @@ _RESTRICTION_MODELS = {
 _RESTRICTION_SCORES = {
     "filter": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes",
     "two_sided": "two-sided predictive log score of each 2 ms bin's spikes (from "
-    "every other bin)",
+    "every other bin; summed, two-sided scores are not a log likelihood)",
 }
 _RESTRICTION_HELD_OUT = (
     "with each of five folds of whole trials (balanced by destination well; a "
@@ -2413,22 +2429,26 @@ def restriction_agreement_values(
                     "fraction",
                     "pct",
                     f"share of the {which} that share at least one bin with "
-                    f"{partner} (of any well-visit start), pooled over animals",
+                    f"{partner} (of any well-visit start), pooled over the events "
+                    "of every epoch and animal",
                 ),
                 make(
                     f"{key}_animal_min",
                     row["share_animal_min"],
                     "fraction",
                     "pctnum",
-                    "lowest per-animal share (an animal's share is the mean over "
-                    "its epochs of the epoch's share)",
+                    "lowest of the animals' shares, each animal's share the mean "
+                    "over its epochs of the epoch's share (the pooled share, over "
+                    "events, can lie outside the animals' range)",
                 ),
                 make(
                     f"{key}_animal_max",
                     row["share_animal_max"],
                     "fraction",
                     "pct",
-                    "highest per-animal share (the mean over the animal's epochs)",
+                    "highest of the animals' shares, each animal's share the mean "
+                    "over its epochs of the epoch's share (the pooled share, over "
+                    "events, can lie outside the animals' range)",
                 ),
             ]
     row = heldout_events.found_again_statistics(
@@ -2536,11 +2556,15 @@ def restriction_outside_swr_values(
                 make,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
-                f"share of that gain ({family} score), summed over {time}, that "
-                f"lies in {part}: the events' gain "
-                "over the same kind of bins (immobile, outside SWRs, inside a "
-                "well visit; an event that runs past the final poke-out adds "
-                f"its bins before it only) over the epoch's: {_EPOCH_REDUCTION}",
+                f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
+                f"the gain summed over {part} (their immobile bins outside SWRs "
+                "inside a well visit; an event that runs past the final poke-out "
+                "adds its bins before it only), divided by the gain summed over "
+                "every immobile bin "
+                "outside SWRs inside a well visit of the epoch (no value when "
+                "that sum is not positive). Both are signed sums, so a share can "
+                "be above 1 or below 0 and the two shares need not add to 1. "
+                f"Over the cohort: {_EPOCH_REDUCTION}",
             )
     return OutsideSwrValues(values, outside_events)
 
