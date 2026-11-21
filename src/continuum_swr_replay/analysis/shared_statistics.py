@@ -604,6 +604,9 @@ def animal_balanced_bootstrap(
     resampled. In each draw the estimate is recomputed on the sessions drawn:
     a day's mean over its drawn sessions, an animal's mean over its days with
     a drawn session, the mean over the drawn animals.
+    The draws depend on the seed and on the sorted order of the animal labels
+    (the animals' codes, :func:`nested_codes`), so relabeling the animals
+    changes the draws, not the estimate.
 
     Parameters
     ----------

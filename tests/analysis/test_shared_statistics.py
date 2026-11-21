@@ -722,3 +722,12 @@ def test_no_finite_value_is_refused_by_name():
         stats.animal_balanced_bootstrap(t.value, t.animal, t.day, n_draws=10, seed=0)
     with pytest.raises(ValueError, match="no session has a finite value"):
         stats.estimand_summary(t.value, t.animal, t.day, t.session, n_draws=10, seed=0)
+
+
+def test_the_draws_follow_the_sorted_order_of_the_animal_labels():
+    t = _days_table()
+    one = stats.animal_balanced_bootstrap(t.value, t.animal, t.day, n_draws=20, seed=3)
+    relabeled = t.animal.map({"a": "z", "b": "y"})
+    two = stats.animal_balanced_bootstrap(t.value, relabeled, t.day, n_draws=20, seed=3)
+    assert one.estimate == pytest.approx(two.estimate)
+    assert not np.allclose(one.draws, two.draws)
