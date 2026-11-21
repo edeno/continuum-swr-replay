@@ -11,9 +11,12 @@ session, in order:
    column that fails is made inactive; a failing level of a category drops
    its rows and takes the terms by that level with it
    (:func:`.support.level_rows_dropped`). Under the grouped softmax an event
-   whose response was all on dropped rows is dropped too. The support is then
-   counted again on the rows kept, until nothing changes, and the record holds
-   the counts the fit used. A session with no rows, or no events, left is not
+   whose response was all on dropped rows is dropped too. The levels are
+   decided first and only accumulate: their support is counted again on the
+   rows kept, and each thin level's rows dropped, until no level fails. Every
+   other term is then judged once, on the final rows, and that alone decides
+   whether it is active. The record holds those counts, and for a dropped
+   level the counts that made it fail. A session with no rows, or no events, left is not
    fitted: its record says why and the loop goes on.
 3. The session is fitted at the design's fixed log penalties by
    :func:`.reml.refit_session`, which makes the columns running away inactive
@@ -23,7 +26,10 @@ session, in order:
    inactive. At the session's first fit a design not identified, or a
    numerical failure, is an error that names the session; in a refit, a
    direction through a penalty block or any other status leaves the session
-   without a fit, with the reason in words.
+   without a fit, with the reason in words. When the refit ends because its
+   fit has no finite maximum along the intercept
+   (:data:`.reml.ALONG_THE_INTERCEPT`), nothing is dropped or left out: the
+   session gets the not-fitted record with that reason.
 4. The collinearity of each term is measured at the fit
    (:func:`.collinearity.term_collinearity`), and the record is built.
 
@@ -48,7 +54,13 @@ from .collinearity import term_collinearity
 from .likelihoods import Bernoulli, Gaussian, GroupedSoftmax, Likelihood, Poisson
 from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
 from .record import FitRecord
-from .reml import PenaltyBlock, RemlScore, SessionData, refit_session
+from .reml import (
+    ALONG_THE_INTERCEPT,
+    PenaltyBlock,
+    RemlScore,
+    SessionData,
+    refit_session,
+)
 from .support import design_support, level_rows_dropped
 from .terms import INTERCEPT, Design
 
@@ -198,16 +210,31 @@ def fit_session(
     counts["rows_missing_values"] = int(missing.sum())
     identity = {"key": key, "model": model, "kind": kind, "table_sha256": table_sha256}
     rows = rows[~missing].reset_index(drop=True)
-    left_out: dict[str, str] = {}
+    levels_out: dict[str, str] = {}  # levels left out, with the reason
+    level_counts: dict = {}  # a level left out: its counts when it was
+    with_them: dict[str, str] = {}  # columns of terms by a dropped level
+    fit_out: dict[str, str] = {}  # other columns the refit left out
     support: dict = {}
     counts["rows_dropped"] = {}
     if isinstance(lik, GroupedSoftmax):
         counts["events_emptied_by_dropped_rows"] = 0
-    applied: set[str] = set()
     round_offset, first, reason = 0, True, ""
+
+    def current_left_out() -> dict[str, str]:
+        out = {**levels_out, **with_them, **fit_out}
+        for entry, counted in support.items():
+            if not counted.passes:
+                for column in _columns_of(design, entry):
+                    out.setdefault(column, "support")
+        return out
+
+    def recorded_support() -> dict:
+        return {**support, **level_counts}
+
     while True:
-        # The support rule and the row rule, counted again on the rows kept
-        # until nothing changes (each round drops a level).
+        # The levels first: count their support on the rows kept, drop the
+        # rows of each thin level, until no level fails. The other terms are
+        # then judged once, on the final rows (``support`` of the last round).
         while True:
             empty = _no_data(lik, rows, response)
             if not empty:
@@ -231,27 +258,30 @@ def fit_session(
                     unit,
                     counts,
                     empty,
-                    support=support,
-                    left_out=left_out,
+                    support=recorded_support(),
+                    left_out=current_left_out(),
                     **identity,
                 )
             has_event = _has_event(lik, prepared.y)
             support = design_support(design, rows, prepared.X, prepared.unit, has_event)
-            for entry, counted in support.items():
-                if not counted.passes:
-                    for column in _columns_of(design, entry):
-                        left_out.setdefault(column, "support")
-            levels = [
-                c for c in left_out if c not in applied and _drops_rows(design, c)
-            ]
+            for column, counted in support.items():
+                if (
+                    column in design.coef_names
+                    and _drops_rows(design, column)
+                    and not counted.passes
+                    and column not in levels_out
+                ):
+                    levels_out[column] = "support"
+                    level_counts[column] = counted
+            levels = [c for c in levels_out if c not in counts["rows_dropped"]]
             if not levels:
                 break
-            keep, dropped, with_them = level_rows_dropped(design, rows, levels)
-            applied.update(levels)
+            keep, dropped, by_level = level_rows_dropped(design, rows, levels)
             counts["rows_dropped"].update(dropped)
-            for column, level in with_them.items():
-                left_out.setdefault(column, f"rows of {level} dropped")
+            for column, level in by_level.items():
+                with_them.setdefault(column, f"rows of {level} dropped")
             rows = rows[keep].reset_index(drop=True)
+        left_out = current_left_out()
         inactive = np.array([c in left_out for c in design.coef_names])
         blocks, rho, block_terms = _session_blocks(design, inactive)
         data = SessionData(prepared.X, prepared.y, prepared.aux, name, ~inactive)
@@ -267,15 +297,33 @@ def fit_session(
             )
             raise ValueError(f"session {name}: at its first fit {what}")
         first = False
-        for column, round_ in zip(refit.left_out, refit.rounds, strict=True):
-            left_out[design.coef_names[column]] = (
-                f"no finite maximum (round {round_offset + round_})"
+        if refit.reason == ALONG_THE_INTERCEPT:
+            return _not_fitted(
+                design,
+                lik,
+                rows,
+                unit,
+                counts,
+                refit.reason,
+                support=recorded_support(),
+                left_out=left_out,
+                **identity,
             )
+        pending = False
+        for column, round_ in zip(refit.left_out, refit.rounds, strict=True):
+            coefficient = design.coef_names[column]
+            why = f"no finite maximum (round {round_offset + round_})"
+            if _drops_rows(design, coefficient):
+                levels_out[coefficient] = why
+                level_counts[coefficient] = support[coefficient]
+                pending = True
+            else:
+                fit_out[coefficient] = why
         round_offset += len(refit.refits) - 1
         if refit.left_out.size or not refit.fitted:
             reason = refit.reason
-        pending = [c for c in left_out if c not in applied and _drops_rows(design, c)]
         if not (refit.fitted and pending):
+            left_out = current_left_out()
             break
     return _record(
         design,
@@ -289,7 +337,7 @@ def fit_session(
         kind=kind,
         counts=counts,
         left_out=left_out,
-        support=support,
+        support=recorded_support(),
         table_sha256=table_sha256,
         reason=reason,
     )

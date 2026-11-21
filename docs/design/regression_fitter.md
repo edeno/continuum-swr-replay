@@ -256,12 +256,10 @@ start).
   a property of the data to be reported around.
 
 After the search, each set-aside session is fitted at the chosen log strengths (a
-session's penalty does not depend on its own data). While that fit has no finite
-maximum along unpenalized design columns only, those columns are made inactive and the
-session is fitted again, at most `REFIT_MAX_ROUNDS` (5) times. A direction through a
-penalty block (a smooth's own line, or its penalized coordinates) cannot be left out,
-and the session stays without a fit; so does one that still has no finite maximum
-after the rounds, or whose refit fails otherwise. Each set-aside session's record keeps
+session's penalty does not depend on its own data), by the refit rule of
+`refit_session` (section "Sessions without a finite maximum" below): columns running away
+are made inactive and the session fitted again, and a session whose direction cannot be
+left out (a penalty block's, or the intercept's) stays without a fit. Each set-aside session's record keeps
 its fit at the reference point, every refit, the columns left out, and the reason in
 words (`SetAsideSession`). `PooledFit.sessions` keeps one entry per session given, in
 order (each session's `RemlScore`): a set-aside session that was fitted has its fit,
@@ -438,10 +436,11 @@ one of them can be tiny in a session that covers a small part of its range (0.00
 the synthetic fixtures) while the term is not. The check is made at two levels:
 
 - on the pooled rows, when the design is built: a term below the threshold is the
-  caller's error (a units problem), and `build_design` raises, naming it;
-- in one session: a term below the threshold on that session's rows (a slope centered at
-  its pooled mean, nearly constant at that mean in the session) fails the support rule
-  there. It is made inactive, the reason is recorded in its support entry, and the
+  caller's error (a units problem), and `build_design` raises, naming it. It is measured
+  on the pooled rows that are not missing, so that one missing value does not hide it;
+- in one session: a term below the threshold on that session's rows, which hold no
+  missing value (they are dropped first), fails the support rule there (for example a
+  slope centered at its pooled mean, nearly constant at that mean in the session). It is made inactive, the reason is recorded in its support entry, and the
   recount of the support rule applies.
 
 A column zero on every row of a session is not small: the support rule's counts make it
@@ -508,10 +507,15 @@ was all on dropped rows is dropped too, and counted (`events_emptied_by_dropped_
 apart from `events_without_response`, the events given with no response). The other events' shares are not
 renormalized: the likelihood is the conditional one over the candidates kept.
 
-After any rows are dropped, the support is counted again on the rows kept. A column that
-fails there is made inactive, and its rows are dropped if it is a level; this repeats
-until nothing changes (each round removes a column, so it ends). The record holds the
-counts on the rows the fit used. A session with no rows, or no events of the kind, left
+The levels are decided first, and only accumulate: their support is counted on the rows
+kept, the rows of each thin level are dropped, and this repeats until no level fails
+(each round removes a level, so it ends). Every other term is then judged once, on the
+final rows, and that judgment alone decides whether it is active: a slope split at the
+median can pass once a level's rows are gone, and it is then fitted. A term's `left_out`
+entry and its `passes` flag always agree, and the result does not depend on the order of
+the terms. The record holds the counts on the final rows, and for a dropped level the
+counts that made it fail. After a level is left out for having no finite maximum, the
+two steps run again on the rows then kept. A session with no rows, or no events of the kind, left
 after this is not fitted (below).
 
 A column that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit
@@ -524,9 +528,20 @@ maximum along unpenalized design columns only, it makes the columns running away
 inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds. It records the round in
 which each column was left out. A direction through a penalty block (a smooth's own line,
 or its penalized coordinates) cannot be left out, and the session stays without a fit;
-so does a fit that ends with any other status. The penalty search's refit of a session it
-set aside calls this function, and so does the per-session loop, so the rule is in one
-place.
+so does a fit that ends with any other status, and one still without a finite maximum
+after the rounds. The intercept is never made inactive: a session fitted without it is a
+fit of another model. When the columns running away include the intercept (the rows of
+the reference level, or of the baseline, hold no event of the kind), no column is made
+inactive and the session stays without a fit, with the reason "no finite maximum along
+the intercept" (`ALONG_THE_INTERCEPT`). The intercept is found from the data: a design
+column with the same nonzero value on every row. A grouped-softmax design has none (such
+a column is constant within every group, which the fitter refuses as not identified).
+
+The penalty search's refit of a session it set aside calls this function, and so does the
+per-session loop, so the rule is in one place. In the search such a session counts among
+the sessions without a fit (`PenaltySearch.share_without_fit` and the
+`MAX_FAILING_SHARE` gate). In the per-session loop, nothing is dropped for it: it gets
+the not-fitted record with that reason, and the loop goes on.
 
 Such a session is reported with those terms missing (the lead, sixteenth round of the
 design). It is not left out of a summary, because leaving it out would depend on the
@@ -543,9 +558,9 @@ session:
 1. The rows with a missing value the design reads are dropped and counted. A missing
    category value (None or NaN) makes its row missing; any other value outside the
    levels is an error.
-2. The design is built and the support rule is applied. A failing column is made
-   inactive, a failing level drops its rows, and the support is counted again on the rows
-   kept until nothing changes, as above.
+2. The design is built and the support rule is applied: the levels first, dropping the
+   rows of each thin level until no level fails, then every other term once on the final
+   rows, as above.
 3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
    of a category left out there for having no finite maximum drops its rows as the
    support rule does (with the recount), and the session is fitted again with every

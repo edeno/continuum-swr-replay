@@ -79,6 +79,7 @@ from .newton import (
 from .pspline import penalty_rank
 
 __all__ = [
+    "ALONG_THE_INTERCEPT",
     "PenaltyBlock",
     "PenaltySearch",
     "PooledFit",
@@ -1509,6 +1510,23 @@ class SessionRefit:
         return self.refits[-1].fit.converged
 
 
+#: Why a refit leaves a session without a fit when its fit has no finite
+#: maximum along the intercept (:func:`refit_session`).
+ALONG_THE_INTERCEPT = (
+    "no finite maximum along the intercept: the rows of the reference level, or "
+    "of the baseline, hold no event of the kind"
+)
+
+
+def _intercepts(X: np.ndarray) -> np.ndarray:
+    """The design columns with one nonzero value on every row (the
+    intercept), shape ``(k,)``."""
+    if X.shape[0] == 0:
+        return np.empty(0, dtype=int)
+    same = np.all(X == X[0], axis=0) & (X[0] != 0)
+    return np.flatnonzero(same)
+
+
 def refit_session(
     lik: Likelihood,
     data: SessionData,
@@ -1527,7 +1545,14 @@ def refit_session(
     direction spread over near-collinear columns can name only part of them
     at a time). A direction through a penalty block (a smooth's own line, or
     its penalized coordinates) cannot be left out, and the session stays
-    without a fit; so does a fit that ends with any other status. Neither is
+    without a fit; so does a fit that ends with any other status. The
+    intercept is never made inactive: a session fitted without it is a fit of
+    another model. When the columns running away include it, the session
+    stays without a fit, with the reason :data:`ALONG_THE_INTERCEPT`. The
+    intercept is found from the data: a design column with the same nonzero
+    value on every row. A grouped-softmax design has none (such a column is
+    constant within every group, which the fitter refuses as not
+    identified). Neither is
     an error here: the caller decides (the search raises at its reference
     point for a design not identified or a numerical failure, before any
     refit).
@@ -1579,6 +1604,9 @@ def refit_session(
                 f"no finite maximum after {REFIT_MAX_ROUNDS} rounds of columns "
                 f"made inactive (still running away: {last.fit.running_away.tolist()})"
             )
+            break
+        if np.intersect1d(last.fit.running_away, _intercepts(data.X)).size:
+            reason = ALONG_THE_INTERCEPT
             break
         new = [int(c) for c in last.fit.running_away if active[c]]
         active[new] = False
@@ -1767,12 +1795,10 @@ def select_penalties(
     infinite. After the search each set-aside session is fitted at the chosen
     log penalties (its penalty does not depend on its own data); while that
     fit has no finite maximum along unpenalized design columns only, those
-    columns are made inactive and it is fitted again, at most
-    ``REFIT_MAX_ROUNDS`` times (a direction spread over near-collinear columns
-    can name only part of them at a time). A direction through a penalty block
-    (a smooth's own line, or its penalized coordinates) cannot be left out, and
-    the session stays without a fit. ``PenaltySearch.set_aside`` records every
-    step. More than ``MAX_FAILING_SHARE`` of the sessions without a fit at the
+    columns are made inactive and it is fitted again, by :func:`refit_session`
+    (its docstring states the rule; a direction through a penalty block or the
+    intercept cannot be left out, and the session stays without a fit).
+    ``PenaltySearch.set_aside`` records every step. More than ``MAX_FAILING_SHARE`` of the sessions without a fit at the
     end is an error.
 
     The search starts from the best point of a grid over the log penalties

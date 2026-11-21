@@ -1090,6 +1090,69 @@ def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
     assert "block 0's null space" in line.reason
 
 
+def _rate_session_with_levels(
+    seed: int, empty_reference: bool
+) -> tuple[SessionData, np.ndarray]:
+    """A Poisson session of 40 visits of 30 bins: an intercept, two level
+    columns (the reference level is the first 10 visits), a slope and a
+    P-spline of 7 columns. ``empty_reference``: no event on the reference
+    level's rows, so the fit has no finite maximum along the intercept."""
+    rng = np.random.default_rng(seed)
+    visit = np.repeat(np.arange(40), 30)
+    level = np.where(visit < 10, 0, np.where(visit < 25, 1, 2))
+    x = rng.normal(size=40)[visit]
+    t = np.tile(np.arange(30) * 0.1, 40)
+    count = rng.poisson(0.2, visit.size).astype(float)
+    if empty_reference:
+        count[level == 0] = 0.0
+    smooth = PSplineBasis(0.0, 3.0, 8).constrained(t)
+    X = np.column_stack([np.ones(visit.size), level == 1, level == 2, x, smooth.design])
+    offset = np.full(visit.size, np.log(0.1))
+    return SessionData(X, count, offset, name=f"s{seed}"), smooth.penalty
+
+
+def test_the_search_never_refits_a_session_without_its_intercept() -> None:
+    """Six Poisson sessions, one whose reference level holds no event: the
+    search sets it aside and leaves it without a fit, with the intercept
+    reason and NaN coefficients; it does not fit it with the intercept left
+    out. The chosen penalty and the other sessions' fits are as before."""
+    sessions, penalty = [], None
+    for seed in range(6):
+        data, penalty = _rate_session_with_levels(seed, empty_reference=seed == 0)
+        sessions.append(data)
+    blocks = [PenaltyBlock(np.arange(4, 11), penalty)]
+    result = select_penalties(Poisson(), sessions, blocks)
+    (left_out,) = result.search.set_aside
+    assert left_out.index == 0 and not left_out.fitted
+    assert left_out.left_out.size == 0
+    assert left_out.reason.startswith("no finite maximum along the intercept")
+    assert left_out.refits[-1].fit.status == NO_FINITE_MAXIMUM
+    assert np.isnan(result.sessions[0].fit.beta).all()
+    assert result.search.share_without_fit == pytest.approx(1 / 6)
+    np.testing.assert_array_equal(result.rho, [20.0])
+    assert result.sessions[1].fit.beta[3] == pytest.approx(
+        -0.1197006834685946, rel=1e-12
+    )
+
+
+def test_refit_session_does_not_make_the_intercept_inactive() -> None:
+    """A session whose fit has no finite maximum along the intercept (the
+    column with one nonzero value on every row) is left without a fit, with
+    that reason, and no column is made inactive."""
+    data, penalty = _rate_session_with_levels(0, empty_reference=True)
+    blocks = [PenaltyBlock(np.arange(4, 11), penalty)]
+    refit = refit_session(Poisson(), data, blocks, [6.0])
+    assert not refit.fitted and refit.left_out.size == 0
+    assert len(refit.refits) == 1
+    assert 0 in refit.refits[0].fit.running_away
+    assert refit.reason == reml.ALONG_THE_INTERCEPT
+    # Doubling the intercept column is still an intercept.
+    doubled = replace(data, X=np.column_stack([2.0 * data.X[:, :1], data.X[:, 1:]]))
+    assert refit_session(Poisson(), doubled, blocks, [6.0]).reason == (
+        reml.ALONG_THE_INTERCEPT
+    )
+
+
 def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
     """A content session whose responses are each event's row of smallest
     clock is separated by the smooth's own line, which cannot be made
