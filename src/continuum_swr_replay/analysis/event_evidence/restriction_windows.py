@@ -6,11 +6,12 @@ over its matched Local-rest control window: the windows of the held-out tetrode
 score (``state_evidence.windows.epoch_windows``), so the two methods are read on
 the same bins and summarized by the same statistic
 (``likelihood_advantage.likelihood_advantage_statistics``: one value per animal,
-their mean and its nested-bootstrap interval). The held-out encodings are not
-the same: the restriction run's folds are whole trials
-(``tetrode_holdout.trial_folds``), the held-out tetrode run's are contiguous
-blocks of time (``tetrode_holdout.time_blocks``), so the two differ in more
-than what is scored.
+their mean and its nested-bootstrap interval). The held-out encodings are the
+same only when the two runs used the same fold design (``fold_design`` in each
+run's manifest settings; both runners default to whole trials,
+``tetrode_holdout.trial_folds``). A held-out tetrode run on contiguous blocks
+of time (``tetrode_holdout.time_blocks``), as the run made before that option
+was, differs from the restriction run in more than what is scored.
 
 A window's contrast ``a - b`` (:data:`CONTRASTS`) is its sum of ``a``'s per-bin
 score less its sum of ``b``'s, in nats, for each score family

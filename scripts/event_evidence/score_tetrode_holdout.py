@@ -2,13 +2,29 @@
 """Held-out tetrode score of every canonical non-local event and its Local-rest control.
 
 For each epoch (``analysis.event_evidence.tetrode_holdout``): refit the decode's
-encodings on five contiguous time blocks, leave each tetrode out of the
+encodings on ``N_FOLDS`` folds of time, leave each tetrode out of the
 decoder's smoother over the whole epoch, and score it at every bin of every
 window under the remaining tetrodes' position distribution against local coding
 around the animal. The windows are the canonical events
 (``replay_content/event_table.parquet``, read through the SWR source; exact
 first and last decode bins, their SWR label) and the Local-rest window of each
 event's length that the participation run drew (``event_participation``).
+
+The encodings are held out by folds of whole trials (``--fold-design trials``,
+the default), as in ``score_nonlocal_restriction.py``: a segment runs from one
+departure from a well (the trial's ``movement_start_time``, the final poke-out
+at its origin) to the next, so the run to a well and the whole stay there are
+one segment, and the segments are dealt into ``N_FOLDS`` folds balanced by
+destination well (``tetrode_holdout.trial_folds``), with a margin of
+``TRIAL_MARGIN_S``. The time before the first trial and after the last trial's
+end are segments of their own two classes, and a segment longer than
+``MAX_SEGMENT_S`` is cut into equal pieces, each a group of its own, so that
+long stays are spread over the folds.
+``--fold-design contiguous`` reproduces the earlier design, ``N_FOLDS``
+contiguous time blocks with a margin of ``MARGIN_BINS`` bins. The design and its
+margin are in the header's settings, so a resume cannot mix designs. The run
+made before this option has a header without them, so its records gather or
+resume under neither design (by intent: move its folder aside before a rerun).
 
 Writes ``{epoch_id}_tetrode_holdout.parquet`` per epoch (one row per window and
 tetrode: ``window_id`` (the window's number in the epoch), ``event_id`` (the
@@ -17,8 +33,10 @@ event's, or for a control the event it matches), ``kind`` (``"event"`` or ``"con
 ``population``, ``local``, ``local_bin``, ``gain``, ``gain_bin``,
 ``nonlocal_prob``, ``gain_silent``, ``agreement``, ``agreement_silent``,
 ``uniform``, ``spread_cm``), each epoch's record
-``{epoch_id}_tetrode_holdout.json`` (status, settings, the SHA-256 of the event
-table and the participation tables, provenance) and ``manifest.json`` gathered
+``{epoch_id}_tetrode_holdout.json`` (status, the fold design and its margin in
+bins, the folds' ``n_segments``, ``n_groups`` and ``trial_bin_share`` (None for
+``contiguous``), settings, the SHA-256 of the event table and the participation
+tables, provenance) and ``manifest.json`` gathered
 from the records (``runs.epoch_records``).
 
 Spike times and waveform features are read through ``load_data`` (read-only).
@@ -40,6 +58,8 @@ Usage::
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
         --gpus 1 4 5 --workers-per-gpu 2 --shards 0 1 --n-shards 5
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --gather
+    uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
+        --fold-design contiguous --gpus 1
 """
 
 from __future__ import annotations
@@ -81,11 +101,14 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    FOLD_DESIGNS,
     add_gpu_arguments,
     add_run_arguments,
+    epoch_folds,
     epoch_inputs,
     event_table_input,
     event_table_path,
+    fold_settings,
     gpu_pool,
     run,
     select_epochs,
@@ -96,11 +119,20 @@ OUTPUT_NAME = "tetrode_holdout"
 PARTICIPATION_NAME = "participation"
 
 
-def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) -> dict:
+def run_epoch(
+    epoch_id: str,
+    event_table: Path,
+    data_dir: Path,
+    output: Path,
+    fold_design: str = "trials",
+) -> dict:
     """Score one epoch and write its table; return its status record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir)
+    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == "trials")
+    folds, margin_bins, fold_counts = epoch_folds(
+        epoch.time, epoch.loaded.get("trials"), fold_design
+    )
     participation = pd.read_parquet(
         output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
@@ -115,6 +147,8 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
         epoch.loaded["is_training"],
         epoch.loaded["is_missing"],
         windows,
+        folds=folds,
+        margin_bins=margin_bins,
         log=log,
     )
     columns = windows.set_index("window_id")[["event_id", "kind", "group"]]
@@ -127,6 +161,9 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
         "n_windows": len(windows),
         "n_tetrodes": int(scores["tetrode"].nunique()),
         **record,
+        "fold_design": fold_design,
+        "margin_bins": margin_bins,
+        **fold_counts,
         "seconds": round(clock.time() - started, 1),
     }
 
@@ -137,6 +174,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
+    parser.add_argument(
+        "--fold-design",
+        choices=FOLD_DESIGNS,
+        default="trials",
+        help="whole trials balanced by destination well (default), or the "
+        "earlier contiguous time blocks",
+    )
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -146,7 +190,7 @@ def main(argv: list[str] | None = None) -> None:
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"n_folds": th.N_FOLDS, "margin_bins": th.MARGIN_BINS},
+        "settings": {"n_folds": th.N_FOLDS, **fold_settings(args.fold_design)},
         "inputs": {
             "event_table": event_table_input(event_table),
             "event_participation": {
@@ -165,7 +209,7 @@ def main(argv: list[str] | None = None) -> None:
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
-        task_args=(event_table, data_dir, output),
+        task_args=(event_table, data_dir, output, args.fold_design),
         output=output,
         name=OUTPUT_NAME,
         header=header,

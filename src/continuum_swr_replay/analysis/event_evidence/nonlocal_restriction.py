@@ -70,8 +70,9 @@ exp(ll[t])``:
 The log-likelihood ``ll`` is held out: the epoch's bins are split into
 :data:`~.tetrode_holdout.N_FOLDS` folds and each fold's bins are scored with
 encodings fit on the other folds (:func:`.tetrode_holdout.heldout_terms`), with
-every tetrode in the model. Unlike :mod:`.tetrode_holdout`, whose folds are
-contiguous blocks of time, the runner's folds are whole trials balanced by
+every tetrode in the model. :func:`.tetrode_holdout.heldout_terms`' default
+folds are contiguous blocks of time; the runner's folds, by default (and the
+held-out tetrode runner's, by default), are whole trials balanced by
 destination well (:func:`.tetrode_holdout.trial_folds`), with a margin of
 :data:`~.tetrode_holdout.TRIAL_MARGIN_S`. The time before the first trial and
 after the last are segments of their own two classes, and a segment longer than
