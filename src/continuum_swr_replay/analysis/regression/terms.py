@@ -431,25 +431,46 @@ class _Built:
         if isinstance(term, LinearFunctional):
             lags = rows[list(term.lag_columns)].to_numpy(dtype=float)
             return lags @ self.basis.design(np.log(np.asarray(term.lags, float)))
+        x = rows[term.column].to_numpy(dtype=float)
+        if isinstance(term, Smooth):
+            if self.level is None:
+                return self._spline(x)
+            inside = levels.rows(term.by, self.level[1])
+            out = np.empty((n, self.constraint.shape[1]))
+            # A row of another level is zero: the basis at 0 times 0, whose
+            # signed zeros the rows of the level do not change.
+            out[~inside] = 0.0 * self._spline(np.zeros(1))
+            out[inside] = self._spline(x[inside])
+            out[levels.index(term.by) < 0] = np.nan
+            return out
         mask = (
             np.ones(n, dtype=bool)
             if self.level is None
             else levels.rows(term.by, self.level[1])
         )
-        x = rows[term.column].to_numpy(dtype=float)
         x = np.where(mask, x, 0.0)
-        if isinstance(term, Smooth):
-            out = self.basis.design(np.nan_to_num(x)) @ self.constraint
-            out[~np.isfinite(x)] = np.nan
-            out *= mask[:, None]
-        else:
-            if self.scale is not None:
-                reference = self.scale.reference if self.centered else 0.0
-                x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
-            out = x[:, None]
+        if self.scale is not None:
+            reference = self.scale.reference if self.centered else 0.0
+            x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
+        out = x[:, None]
         if self.level is not None:
             out[levels.index(term.by) < 0] = np.nan
         return out
+
+    def _spline(self, x: np.ndarray) -> np.ndarray:
+        """The constrained basis at ``x``, shape ``(n, k)``; NaN where ``x`` is
+        not finite."""
+        out = self.basis.design(np.nan_to_num(x)) @ self.constraint
+        out[~np.isfinite(x)] = np.nan
+        return out
+
+    @property
+    def columns(self) -> slice:
+        """The term's design columns."""
+        return slice(
+            int(self.design_terms[0].columns[0]),
+            int(self.design_terms[-1].columns[-1]) + 1,
+        )
 
     def record(self) -> dict | None:
         """The term's basis record (C7 ``basis``); None for a term without one."""
@@ -769,23 +790,60 @@ class Design:
             If a category holds a value outside its levels.
         """
         levels = _Levels(rows)
-        parts = [np.ones((len(rows), 1))] if self.intercept_column is not None else []
-        parts += [b.values(rows, levels) for b in self._built]
-        X = np.hstack(parts) if parts else np.empty((len(rows), 0))
+        X = np.empty((len(rows), len(self.coef_names)))
+        if self.intercept_column is not None:
+            X[:, self.intercept_column] = 1.0
+        for b in self._built:
+            X[:, b.columns] = b.values(rows, levels)
         level_rows = {
             t.level: levels.rows(b.category, t.level[1])
             for b in self._built
             for t in b.design_terms
             if t.level is not None
         }
-        offset = None
         missing = ~np.isfinite(X).all(axis=1)
-        if self.offset is not None:
-            exposure = rows[self.offset.column].to_numpy(dtype=float)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                offset = np.where(exposure > 0, np.log(exposure), np.nan)
+        offset = self._offset(rows)
+        if offset is not None:
             missing |= ~np.isfinite(offset)
         return SessionDesign(X, offset, missing, level_rows)
+
+    def _offset(self, rows: pd.DataFrame) -> np.ndarray | None:
+        """``log`` of the exposure, NaN where it is not positive; None without
+        an :class:`Offset`."""
+        if self.offset is None:
+            return None
+        exposure = rows[self.offset.column].to_numpy(dtype=float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(exposure > 0, np.log(exposure), np.nan)
+
+    def _check_pooled(self, rows: pd.DataFrame, levels: _Levels) -> None:
+        """The design check on the pooled rows that are not missing (one
+        missing value would make a column's largest value NaN and hide it),
+        one built term at a time: no pooled matrix is formed.
+
+        Raises
+        ------
+        ValueError
+            If a term is below ``SMALLEST_COLUMN_SIZE``, naming each.
+        """
+        offset = self._offset(rows)
+        missing = np.zeros(len(rows), bool) if offset is None else ~np.isfinite(offset)
+        largest: dict[str, np.ndarray] = {}  # term -> its largest value per row
+        for b in self._built:
+            values = b.values(rows, levels)
+            missing |= ~np.isfinite(values).all(axis=1)
+            start = b.columns.start
+            for t in b.design_terms:
+                if t.kind in _MEASURED:
+                    largest[t.name] = np.max(
+                        np.abs(values[:, t.columns - start]), axis=1
+                    )
+        small = {}
+        for term in _check_order(self.terms):
+            size = float(np.max(largest[term.name][~missing], initial=0.0))
+            if 0.0 < size < SMALLEST_COLUMN_SIZE:
+                small[term.name] = size
+        _refuse_small(small)
 
     def missing_rows(self, rows: pd.DataFrame) -> np.ndarray:
         """True for a row with a missing value the design reads, shape
@@ -927,8 +985,5 @@ def build_design(
         offset=offsets[0] if offsets else None,
         _built=tuple(pieces),
     )
-    # Measured on the pooled rows that are not missing: one missing value
-    # would make a column's largest value NaN and hide the check.
-    X = design.build(pooled_rows[~design.missing_rows(pooled_rows)]).X
-    _refuse_small(_small_terms(X, design.terms))
+    design._check_pooled(pooled_rows, levels)
     return design
