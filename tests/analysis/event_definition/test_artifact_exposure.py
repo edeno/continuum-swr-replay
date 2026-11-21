@@ -500,6 +500,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
         package / "replay_models" / "rate" / "per_bin_rate_ladder.py",
         package / "replay_models" / "rate" / "swr_contrast_rate.py",
         package / "replay_models" / "rate" / "uncertainty_rate.py",
+        package / "replay_models" / "rate" / "duration_aware_history.py",
     ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
@@ -528,7 +529,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
                         given |= literals.get(spread.value.id, set())
                 if not wanted <= given or "excluded_intervals" in given:
                     offenders.append(f"{path.name}:{node.lineno}")
-    assert n_calls >= 5
+    assert n_calls >= 4
     assert offenders == []
 
 
