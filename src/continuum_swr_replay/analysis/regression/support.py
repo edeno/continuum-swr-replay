@@ -44,7 +44,7 @@ import pandas as pd
 
 from .constants import MAX_FAILING_SHARE
 from .newton import CONVERGED
-from .terms import Design
+from .terms import SMALLEST_COLUMN_SIZE, Design
 
 __all__ = [
     "MIN_UNITS",
@@ -66,19 +66,28 @@ class Support(NamedTuple):
 
     Attributes
     ----------
-    n_low, n_high : int
-        Units with an event on each side (0 and 1; below and above the median).
+    n_low, n_high : int or None
+        Units with an event on each side (0 and 1; below and above the median);
+        None for a smooth term that failed the design check.
     passes : bool
-        Both at least ``MIN_UNITS``.
+        The counts reach ``MIN_UNITS`` (both for a slope, ``n_high`` for a
+        level) and the column passes the design check.
+    reason : str
+        Why it fails, in words; empty when it passes.
     """
 
-    n_low: int
-    n_high: int
+    n_low: int | None
+    n_high: int | None
     passes: bool
+    reason: str = ""
 
 
 def _support(n_low: int, n_high: int) -> Support:
-    return Support(int(n_low), int(n_high), min(n_low, n_high) >= MIN_UNITS)
+    passes = min(n_low, n_high) >= MIN_UNITS
+    return Support(int(n_low), int(n_high), passes, "" if passes else _FEW)
+
+
+_FEW = f"fewer than MIN_UNITS = {MIN_UNITS} units with an event"
 
 
 def level_support(
@@ -95,7 +104,8 @@ def level_support(
     has_event : np.ndarray of bool, shape (n_rows,)
     """
     both = binary_support(values, unit, has_event)
-    return both._replace(passes=both.n_high >= MIN_UNITS)
+    passes = both.n_high >= MIN_UNITS
+    return both._replace(passes=passes, reason="" if passes else _FEW)
 
 
 def binary_support(
@@ -165,8 +175,19 @@ def design_support(
     -------
     dict of str to Support
         Coefficient name -> its support, for the columns with a support rule
-        (``DesignColumn.support``), in column order.
+        (``DesignColumn.support``), in column order; then, for a smooth term
+        that fails the design check in the session
+        (:meth:`.terms.Design.small_terms`), term name -> a failing entry
+        without counts. A column that fails the design check fails, with that
+        reason.
     """
+    small = {
+        name: (
+            f"largest absolute value {size:.2g} below SMALLEST_COLUMN_SIZE = "
+            f"{SMALLEST_COLUMN_SIZE:g} in the session"
+        )
+        for name, size in design.small_terms(X).items()
+    }
     out = {}
     for j, column in enumerate(design.columns):
         if column.support is None:
@@ -179,7 +200,12 @@ def design_support(
             "binary": binary_support,
             "slope": slope_support,
         }[column.support]
-        out[column.name] = rule(X[reads, j], unit[reads], has_event[reads])
+        counted = rule(X[reads, j], unit[reads], has_event[reads])
+        if column.name in small:
+            counted = counted._replace(passes=False, reason=small.pop(column.name))
+        out[column.name] = counted
+    for name, reason in small.items():  # the smooth terms
+        out[name] = Support(None, None, False, reason)
     return out
 
 

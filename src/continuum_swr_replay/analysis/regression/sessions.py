@@ -225,9 +225,10 @@ def fit_session(
                 )
             has_event = _has_event(lik, prepared.y)
             support = design_support(design, rows, prepared.X, prepared.unit, has_event)
-            for column, counted in support.items():
+            for entry, counted in support.items():
                 if not counted.passes:
-                    left_out.setdefault(column, "support")
+                    for column in _columns_of(design, entry):
+                        left_out.setdefault(column, "support")
             levels = [
                 c for c in left_out if c not in applied and _drops_rows(design, c)
             ]
@@ -340,6 +341,13 @@ def _not_fitted(
         table_sha256=dict(table_sha256),
         fit_reason=reason,
     )
+
+
+def _columns_of(design: Design, name: str) -> list[str]:
+    """The coefficients of a support entry: itself, or a smooth term's."""
+    if name in design.coef_names:
+        return [name]
+    return [design.coef_names[j] for j in design.term_columns[name]]
 
 
 def _drops_rows(design: Design, coefficient: str) -> bool:

@@ -46,13 +46,17 @@ divided by its pooled standard deviation (population form, ``ddof = 0``), and a
 slope fitted for each level of a category (an interaction) is first centered
 at the pooled mean, the fixed reference; a slope alone is not centered.
 
-The design check (:func:`check_column_sizes`): the fitter limits each Newton
-step to ``MAX_STEP_LENGTH`` in coefficient units, so a column whose values are
-all very small needs a coefficient too large to reach in the steps allowed, and
-its fit ends at the step limit. :meth:`Design.session` refuses, naming it, a
-column whose largest absolute value over the session's rows is above zero and
-below ``SMALLEST_COLUMN_SIZE``. A column zero on every row of a session (a level
-the session does not have) is not refused: the support rule makes it inactive.
+The design check: the fitter limits each Newton step to ``MAX_STEP_LENGTH`` in
+coefficient units, so a column whose values are all very small needs a
+coefficient too large to reach in the steps allowed, and its fit ends at the
+step limit. A column's size is its largest absolute value over the rows; a
+smooth's columns are measured together, as one term. On the pooled rows, a
+term below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
+:func:`build_design` raises, naming it (:func:`check_column_sizes`). In one
+session, a term below it there (:meth:`Design.small_terms`) fails the support
+rule in that session and is made inactive. A column zero on every row of a
+session (a level the session does not have) is not small: the support rule's
+counts make it inactive.
 """
 
 from __future__ import annotations
@@ -317,6 +321,18 @@ def standardization(values: np.ndarray) -> Standardization | None:
     return Standardization(sd, 0, float(np.mean(values)))
 
 
+def _small(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) -> dict[str, float]:
+    """Group name -> its largest absolute value, for the groups above zero and
+    below ``SMALLEST_COLUMN_SIZE``."""
+    size = np.max(np.abs(X), axis=0, initial=0.0)
+    out = {}
+    for name, columns in groups:
+        largest = float(np.max(size[columns], initial=0.0))
+        if 0.0 < largest < SMALLEST_COLUMN_SIZE:
+            out[name] = largest
+    return out
+
+
 def check_column_sizes(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) -> None:
     """Refuse a column, or a smooth's set of columns, whose values are all very
     small.
@@ -335,12 +351,7 @@ def check_column_sizes(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) 
         If a group's largest absolute value is above zero and below
         ``SMALLEST_COLUMN_SIZE``; the message names each such group.
     """
-    size = np.max(np.abs(X), axis=0, initial=0.0)
-    small = []
-    for name, columns in groups:
-        largest = float(np.max(size[columns], initial=0.0))
-        if 0.0 < largest < SMALLEST_COLUMN_SIZE:
-            small.append(f"{name} ({largest:.2g})")
+    small = [f"{name} ({size:.2g})" for name, size in _small(X, groups).items()]
     if small:
         raise ValueError(
             "columns whose largest absolute value is below SMALLEST_COLUMN_SIZE = "
@@ -718,18 +729,23 @@ class Design:
         Raises
         ------
         ValueError
-            If a value read is missing, a category holds a value outside its
-            levels, or a column fails the design check
-            (:func:`check_column_sizes`).
+            If a value read is missing or a category holds a value outside
+            its levels. A column too small in the session is not refused here
+            (:meth:`small_terms`; the support rule makes it inactive).
         """
         if self.missing_rows(rows).any():
             raise ValueError(
                 f"{int(self.missing_rows(rows).sum())} rows with missing values; "
                 "drop them first (Design.missing_rows)"
             )
-        X, offset = self._matrix(rows)
-        check_column_sizes(X, self.size_groups)
-        return X, offset
+        return self._matrix(rows)
+
+    def small_terms(self, X: np.ndarray) -> dict[str, float]:
+        """The design check in one session: each group of :attr:`size_groups`
+        (a smooth term, or one column, named by its coefficient) whose largest
+        absolute value over the rows of ``X`` is above zero and below
+        ``SMALLEST_COLUMN_SIZE``, with that value."""
+        return _small(X, self.size_groups)
 
 
 def build_design(
@@ -774,7 +790,7 @@ def build_design(
             blocks.append(PenaltyBlock(np.arange(start, len(columns)), b.penalty))
             log_penalties.append(b.log_penalty)
             block_terms.append(b.name)
-    return Design(
+    design = Design(
         terms=tuple(terms),
         intercept=intercept,
         columns=tuple(columns),
@@ -784,3 +800,6 @@ def build_design(
         offset=offsets[0] if offsets else None,
         _built=tuple(built),
     )
+    X, _ = design._matrix(pooled_rows)
+    check_column_sizes(X, design.size_groups)
+    return design

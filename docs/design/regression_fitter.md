@@ -429,11 +429,20 @@ covariate, its SD, its reference and the terms centered at it.
 
 The fit limits each Newton step to `MAX_STEP_LENGTH` in coefficient units, so a column
 whose values are all very small needs a coefficient too large to reach in the steps
-allowed. `Design.session` refuses, and names, a column whose largest absolute value
-over the session's rows is above zero and below `SMALLEST_COLUMN_SIZE = 1e-2`. A smooth's
-columns are measured together, as one term: one of them can be tiny in a session that
-covers a small part of its range (0.0015 on the synthetic fixtures) while the term is
-not. A column zero on every row is not refused; the support rule makes it inactive.
+allowed. A column's size is its largest absolute value over the rows, and the threshold
+is `SMALLEST_COLUMN_SIZE = 1e-2`. A smooth's columns are measured together, as one term:
+one of them can be tiny in a session that covers a small part of its range (0.0015 on
+the synthetic fixtures) while the term is not. The check is made at two levels:
+
+- on the pooled rows, when the design is built: a term below the threshold is the
+  caller's error (a units problem), and `build_design` raises, naming it;
+- in one session: a term below the threshold on that session's rows (a slope centered at
+  its pooled mean, nearly constant at that mean in the session) fails the support rule
+  there. It is made inactive, the reason is recorded in its support entry, and the
+  recount of the support rule applies.
+
+A column zero on every row of a session is not small: the support rule's counts make it
+inactive.
 
 The threshold was measured on simulated designs of 600 rows (an intercept, three N(0,1)
 columns and a P-spline of 7 columns; Poisson, Bernoulli and grouped softmax; five seeds),

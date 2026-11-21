@@ -381,3 +381,35 @@ def test_a_session_left_without_events_by_the_row_rule_is_not_fitted(
     # The slope has its events on the level's rows only, so it fails too.
     assert first.left_out == {"grp[b]": "support", "x": "support"}
     assert second.status == "converged"
+
+
+def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -> None:
+    """A slope centered at its pooled mean is nearly constant at that mean in
+    one session: its column there is below the threshold, so it fails the
+    support rule in that session (inactive, with the reason recorded), and the
+    loop fits every session."""
+    from .conftest import content_rows
+
+    frames = list(content_sessions.values())[:2]
+    pooled = pd.concat(frames, ignore_index=True)
+    role = Category("role", ROLES, reference="other")
+    design = build_design(
+        [
+            role,
+            Slope("reward_fraction", by=role, levels=("current", "previous", "other")),
+        ],
+        pooled,
+        intercept=False,
+    )
+    mean = design.standardization_record()["reward_fraction"]["reference"]
+    flat = content_rows(7)
+    flat.loc[flat["role"] == "previous", "reward_fraction"] = mean + 0.001
+    sessions = {**by_session(frames), ("sim", "flat", "02_r1"): flat}
+    records = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )
+    assert [r.status for r in records] == ["converged"] * 3
+    last = records[-1]
+    assert last.left_out == {"reward_fraction:role=previous": "support"}
+    entry = last.support["reward_fraction:role=previous"]
+    assert not entry["passes"] and "SMALLEST_COLUMN_SIZE" in entry["reason"]

@@ -371,3 +371,22 @@ def test_a_missing_category_value_is_a_missing_row(content_sessions) -> None:
     rows.loc[1, "role"] = "unknown"
     with pytest.raises(ValueError, match="values outside the levels"):
         design.missing_rows(rows)
+
+
+def test_a_column_too_small_on_the_pooled_rows_is_refused_at_construction(
+    rate_sessions,
+) -> None:
+    """A term whose columns are all below the threshold on the pooled rows is
+    the caller's error (a units problem): building the design raises, naming
+    the term; in one session the same is left to the support rule."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    tiny = pooled.assign(**{c: pooled[c] * 1e-4 for c in LAG_COLUMNS})
+    term = LinearFunctional(LAG_COLUMNS, LAGS, 0.0, float(np.log(10)), 8, 1.0)
+    with pytest.raises(ValueError, match=re.escape("lf(lag_1..lag_10) (")):
+        build_design([term], tiny, intercept=True)
+    design = build_design([term], pooled, intercept=True)
+    X, _ = design.session(tiny.iloc[:100])
+    assert np.abs(X[:, 1:]).max() < SMALLEST_COLUMN_SIZE
+    assert design.small_terms(X) == {
+        "lf(lag_1..lag_10)": pytest.approx(np.abs(X[:, 1:]).max())
+    }
