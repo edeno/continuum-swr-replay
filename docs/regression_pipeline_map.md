@@ -1452,7 +1452,7 @@ A saved decode's fitted clusterless encoding model, read back for reuse.
 
 The decode fit: a runner's record, its detector, the fit and the files it writes.
 
-`DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`
+`DecodeRunner`, `algorithm_params`, `create_detector`, `linear_environment`, `perform_decoding`
 
 ### `src/continuum_swr_replay/tables/columns.py`
 
