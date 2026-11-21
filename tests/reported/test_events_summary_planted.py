@@ -326,8 +326,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     ):
         assert len(seen[name][0]) == 2 * 13, name
     # the other detectors' events are selected by the comparison, given the visits
-    assert seen["read_comparison"][0] is not None
-    assert set(seen["read_comparison"][0]) == set(EPOCHS)
+    assert _same_visits(seen["read_comparison"][0])
     assert seen["other_detector_values"][0]["planted"].tolist() == [PLANTED]
     # the spike evidence: the event inside a visit and the quiet window inside
     evidence = seen["spike_evidence_values"][0]
@@ -337,7 +336,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     # what another inventory leaves out: of the selected events, with the visits
     event_ids, visits, exposure = seen["left_out_values"]
     assert PLANTED not in event_ids and len(event_ids) == 13
-    assert set(visits) == set(EPOCHS)
+    assert _same_visits(visits)
     assert exposure["epoch_id"].tolist() == EPOCHS
     # the held-out bouts are counted when the split is over the subset
     assert "heldout_bout_values" in seen
@@ -346,6 +345,15 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         assert "drawn from the whole epoch" in values[key].description
     assert "wherever that event starts" in values["left_out"].description
     assert "partner may start outside a visit" in values["other_detector"].description
+
+
+def _same_visits(visits) -> bool:
+    """Whether ``visits`` are the epochs' visits, as ``well_visit_times`` gave them."""
+    return set(visits) == set(EPOCHS) and all(
+        np.array_equal(visits[epoch][i], VISITS[epoch][i])
+        for epoch in EPOCHS
+        for i in (0, 1)
+    )
 
 
 def _other_cache() -> dict:
