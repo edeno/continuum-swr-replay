@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import heldout_events as he
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from tests.support._swr_inventory_fixtures import (
     use_swr_source,
     write_artifact_run,
@@ -33,13 +34,22 @@ VISIT = np.arange(N) < 500
 """Bins 0-499 are inside a well visit."""
 
 
-def _raw() -> pd.DataFrame:
+def _raw(time: np.ndarray = TIME) -> pd.DataFrame:
     speed = np.zeros(N)
     speed[300:310] = 10.0
     return pd.DataFrame(
         {"animal": "j16", "day": 20210706, "epoch": "02_r1", "head_speed": speed},
-        index=pd.Index(TIME, name="time"),
+        index=pd.Index(time, name="time"),
     )
+
+
+def _runs(spans: dict[tuple[int, int], float]) -> np.ndarray:
+    """0.1 everywhere but each span (first and last bin, inclusive), set to its
+    value."""
+    prob = np.full(N, 0.1)
+    for (s, e), value in spans.items():
+        prob[s : e + 1] = value
+    return prob
 
 
 def _trace() -> tuple[np.ndarray, np.ndarray]:
@@ -78,6 +88,58 @@ def test_the_rule_keeps_long_immobile_events_outside_excluded_time(source):
     labels = frame[he.LABEL_COLUMN].to_numpy()
     assert (labels[800:810] == 0).all() and (labels[295:316] == 0).all()
     assert set(np.unique(labels[labels > 0])) == set(rows["label"])
+
+
+def test_the_threshold_is_strict(source):
+    """A run at exactly the threshold is not an event; the same run at the
+    next float64 above it is. Both traces are float64, so the sum the rule
+    compares is 0.8 + 0.0, exactly the float64 0.8 the threshold is, and
+    ``np.nextafter`` gives the smallest float64 above it: no rounding enters.
+    (A float32 trace would compare in float32, where these two values are not
+    distinct.)"""
+    at = DEFAULT_NON_LOCAL_THRESHOLD
+    above = np.nextafter(at, 1.0)
+    continuous = _runs({(600, 609): at, (640, 649): above})
+    frame = he.labeled_frame(_raw(), continuous, np.zeros(N))
+    rows = he.event_rows(frame, VISIT)
+    assert list(zip(rows["s"], rows["e"], strict=True)) == [(640, 649)]
+
+
+def test_seven_samples_are_an_event_on_the_decode_grid(source):
+    """15 ms is a count of samples, rounded half up from the median step. On
+    the decode's 500 Hz grid the step reads 2.0000935 ms, so 15 ms is 7.49965
+    samples and 7 suffice; on an exact 2 ms grid (``TIME``) it is 7.5 samples,
+    which round to 8."""
+    trace = _runs({(600, 606): 0.9, (620, 625): 0.9})
+    decode_grid = 100.0 + np.arange(N) * 0.0020000935
+    rows = he.event_rows(
+        he.labeled_frame(_raw(decode_grid), 2 * trace / 3, trace / 3), VISIT
+    )
+    # 7 samples are an event, 6 are not
+    assert list(zip(rows["s"], rows["e"], strict=True)) == [(600, 606)]
+    rows = he.event_rows(he.labeled_frame(_raw(), 2 * trace / 3, trace / 3), VISIT)
+    assert rows.empty
+
+
+@pytest.fixture
+def source_with_cut_swr(tmp_path, monkeypatch):
+    """:func:`source`, with a third SWR, 101.36 to 101.42 s (bins 680-710),
+    that runs into the excluded time from 101.4 s and is dropped for it."""
+    inventory = write_swr_inventory(tmp_path, {EPOCH: [*SWRS, (TIME[680], TIME[710])]})
+    artifacts = write_artifact_run(tmp_path, {EPOCH: [("spk", 101.8, 101.8)]})
+    use_swr_source(monkeypatch, inventory, artifacts)
+
+
+def test_an_event_that_overlaps_a_dropped_swr_is_dropped(source_with_cut_swr):
+    """The event at bins 670-685 lies wholly outside excluded time, but it
+    overlaps the SWR dropped for excluded time, so its overlap class is
+    unknown and it is dropped; the event at 600-609 overlaps no SWR and is
+    kept."""
+    trace = _runs({(600, 609): 0.9, (670, 685): 0.9})
+    frame = he.labeled_frame(_raw(), 2 * trace / 3, trace / 3)
+    rows = he.event_rows(frame, VISIT)
+    assert list(zip(rows["s"], rows["e"], strict=True)) == [(600, 609)]
+    assert (frame[he.LABEL_COLUMN].to_numpy()[670:686] == 0).all()
 
 
 def test_the_raw_frame_is_left_as_it_was(source):
