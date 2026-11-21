@@ -87,10 +87,10 @@ current one, or recording none, makes the values read from it pending
 when the window run read another event table than the held-out tetrode run whose
 spike counts it adds (:func:`window_run_note_staleness`); the values of the
 held-out event run when it read another restriction run, per-bin facts run or
-event table than the current ones; and those that read the well visits through
-the per-bin facts (the time sums inside a visit, the held-out events' start, the
-window counts after a visit) when the facts run was not made from the current
-session cache (``prepare_data.session_cache_staleness``). The held-out tetrode values and
+event table than the current ones (:func:`read_heldout_restriction`); and those
+that read the well visits through the per-bin facts (the time sums inside a
+visit, the held-out events' start, the window counts after a visit) when the
+facts run was not made from the current session cache (``prepare_data.session_cache_staleness``). The held-out tetrode values and
 the restriction window values are against Local-rest controls inside one well
 visit (:data:`CONTROL_SUBSET`): their runs must have read the current
 participation tables, and they are pending, as the participation values are,

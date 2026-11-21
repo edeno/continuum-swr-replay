@@ -17,7 +17,7 @@ The statistics are ``tetrode_holdout.holdout_statistics`` of the held-out
 tetrode run (``scripts/event_evidence/score_tetrode_holdout.py``;
 ``Processed-Data/event_tetrode_holdout``) over the epochs the events summary
 reads: the values its ``*_heldout_*`` keys hold (``paper/reported/events.json``).
-This was Figure 2's panel h; that panel now compares the full decoder with the
+It was a panel of Figure 2; Figure 2g now compares the full decoder with the
 SWR-only decoder.
 
 Usage
