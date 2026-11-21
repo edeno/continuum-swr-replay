@@ -1091,18 +1091,6 @@ def test_restriction_agreement_values_are_the_shares_found_again():
     assert {v.questions for v in values.values()} == {("2c.3",)}
 
 
-def test_restriction_window_values_refuse_a_window_run_without_outside_sums():
-    windows = _restriction_windows()
-    with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
-        builder.restriction_window_values(
-            windows.drop(columns=["n_bins_outside_swr"]), "s"
-        )
-    with pytest.raises(ValueError, match="per-bin facts"):
-        builder.restriction_window_values(
-            windows.drop(columns=["n_spikes_outside_swr"]), "s"
-        )
-
-
 def _time_sums(rows: list[tuple]) -> pd.DataFrame:
     """Time sums from (epoch, category, in visit, in an event window, bins,
     spikes, swr, full) rows, ``none`` 0, two-sided twice the filter scores."""

@@ -110,8 +110,7 @@ OUTSIDE_SWR_COLUMNS = (
     "duration_outside_swr_s",
     *(f"{column}{OUTSIDE_SWR_SUFFIX}" for column in SCORE_COLUMNS),
 )
-"""The window table's columns over the bins outside SWRs, which a window run
-made before they were added does not have."""
+"""The window table's columns over the bins outside SWRs."""
 
 PART_UNITS = {"whole": tuple(UNITS), "outside_swr": tuple(UNITS)}
 """Each part of a window a contrast is read over and its units: the whole
@@ -130,8 +129,7 @@ BIN_FACT_COLUMNS = (
     *(f"{column}{IN_VISIT_SUFFIX}" for column in SCORE_COLUMNS),
 )
 """The window table's columns from the per-bin facts
-(:func:`window_bin_fact_sums`), which a window run made before they were added
-does not have."""
+(:func:`window_bin_fact_sums`)."""
 
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
@@ -320,25 +318,6 @@ def window_bin_fact_sums(
     return out
 
 
-def require_bin_fact_sums(windows: pd.DataFrame) -> None:
-    """Refuse a window table without the columns from the per-bin facts.
-
-    Raises
-    ------
-    ValueError
-        If ``windows`` lacks a column of :data:`BIN_FACT_COLUMNS`: the table was
-        made by a window run older than them, and the run must be made again.
-    """
-    missing = [column for column in BIN_FACT_COLUMNS if column not in windows]
-    if missing:
-        raise ValueError(
-            "the restriction window table has no sums from the per-bin facts "
-            f"(missing {missing}): it was made before the window run read them. "
-            "Rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py "
-            "--overwrite on the cohort first."
-        )
-
-
 def outside_swr_window_counts(windows: pd.DataFrame) -> pd.DataFrame:
     """Per kind and group, the windows, those with bins outside SWRs, those with
     such bins but no spike in them (no value per spike there), and those with
@@ -358,7 +337,6 @@ def outside_swr_window_counts(windows: pd.DataFrame) -> pd.DataFrame:
         ``n_with_bins_outside_swr``, ``n_without_spikes_outside_swr`` and
         ``n_with_bins_outside_swr_outside_visit``.
     """
-    require_bin_fact_sums(windows)
     with_bins = windows["n_bins_outside_swr"] > 0
     return (
         windows.assign(
@@ -444,26 +422,6 @@ def contrast_column(contrast: str, family: str, unit: str, part: str = "whole") 
     return f"{contrast}{FAMILY_SUFFIX[family]}{where}_{unit}"
 
 
-def require_outside_swr_sums(windows: pd.DataFrame) -> None:
-    """Refuse a window table without the sums over the bins outside SWRs.
-
-    Raises
-    ------
-    ValueError
-        If ``windows`` lacks a column of :data:`OUTSIDE_SWR_COLUMNS`: the table
-        was made by a window run older than those sums, and the run must be
-        made again.
-    """
-    missing = [column for column in OUTSIDE_SWR_COLUMNS if column not in windows]
-    if missing:
-        raise ValueError(
-            "the restriction window table has no sums over the bins outside SWRs "
-            f"(missing {missing}): it was made before the window run summed them. "
-            "Rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py "
-            "--overwrite on the cohort first."
-        )
-
-
 def window_contrasts(
     windows: pd.DataFrame, parts: Sequence[str] = tuple(PART_UNITS)
 ) -> pd.DataFrame:
@@ -476,7 +434,8 @@ def window_contrasts(
         :func:`restriction_window_sums`' rows with ``n_spikes``.
     parts : sequence of str, optional
         The parts of the window (:data:`PART_UNITS`); by default both. The part
-        ``"outside_swr"`` needs the columns :data:`OUTSIDE_SWR_COLUMNS`.
+        ``"outside_swr"`` reads the columns :data:`OUTSIDE_SWR_COLUMNS` and
+        :data:`BIN_FACT_COLUMNS`.
 
     Returns
     -------
@@ -493,19 +452,11 @@ def window_contrasts(
         duration, ``duration_outside_swr_s``; NaN for a window with no such bin
         (an event wholly inside its SWR). Every contrast of a window with a bin
         in excluded time is NaN.
-
-    Raises
-    ------
-    ValueError
-        If ``"outside_swr"`` is asked for and ``windows`` lacks its columns
-        (:func:`require_outside_swr_sums`, :func:`require_bin_fact_sums`).
     """
     out = windows.copy()
     kept = out["n_bins_excluded"].to_numpy() == 0
     for part in _chosen(parts, PART_UNITS, "part"):
         if part == "outside_swr":
-            require_outside_swr_sums(out)
-            require_bin_fact_sums(out)
             seconds = out["duration_outside_swr_s"]
             spikes = out["n_spikes_outside_swr"]
             divisors = {
@@ -587,9 +538,7 @@ def restriction_window_statistics(
     Raises
     ------
     ValueError
-        If a choice is unknown, no window is of a chosen kind, or the part
-        ``"outside_swr"`` is chosen for a table without its columns
-        (:func:`require_outside_swr_sums`, :func:`require_bin_fact_sums`).
+        If a choice is unknown, or no window is of a chosen kind.
     """
     families = _chosen(families, FAMILY_SUFFIX, "family")
     contrasts = _chosen(contrasts, CONTRASTS, "contrast")

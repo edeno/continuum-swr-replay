@@ -81,8 +81,6 @@ from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     CONTRASTS,
     IN_VISIT_SUFFIX,
     OUTSIDE_SWR_SUFFIX,
-    require_bin_fact_sums,
-    require_outside_swr_sums,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -268,14 +266,9 @@ def epoch_outside_swr_gains(
     Raises
     ------
     ValueError
-        If an epoch has a row of the time sums twice or no time step, or
-        ``windows`` lacks the columns over the bins outside SWRs
-        (:func:`.restriction_windows.require_outside_swr_sums`,
-        :func:`.restriction_windows.require_bin_fact_sums`).
+        If an epoch has a row of the time sums twice or no time step.
     """
     _check_time_sums(time_sums, bin_s)
-    require_outside_swr_sums(windows)
-    require_bin_fact_sums(windows)
     total = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,), in_well_visit_only)
     rest = _chosen_time(
         time_sums, (IMMOBILE_OUTSIDE_SWR,), in_well_visit_only, outside_events=True

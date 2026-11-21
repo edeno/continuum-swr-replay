@@ -3640,10 +3640,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
         selected,
     )
-    # the windows' bins outside SWRs, which a window run made before they were
-    # summed lacks: refuse with what to rerun
-    restriction_windows.require_outside_swr_sums(restriction_windows_table)
-    restriction_windows.require_bin_fact_sums(restriction_windows_table)
     windows_manifest = read_output_manifest(restriction_windows_dir)
     heldout_manifest = read_output_manifest(heldout_dir)
 

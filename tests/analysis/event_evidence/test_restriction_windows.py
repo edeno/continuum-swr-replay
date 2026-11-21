@@ -260,16 +260,6 @@ def test_contrasts_over_the_bins_outside_swrs_per_second_and_per_spike():
     assert rw.window_contrasts(inside)["swr_minus_none_outside_swr_per_s"].isna().all()
 
 
-def test_a_table_without_the_outside_sums_gives_only_the_whole_window():
-    old = _scored().drop(columns=list(rw.OUTSIDE_SWR_COLUMNS))
-    out = rw.window_contrasts(old, parts=["whole"])
-    np.testing.assert_allclose(
-        out["full_minus_swr_per_spike"], [1 / 3, np.nan, 11 / 3, np.nan]
-    )
-    with pytest.raises(ValueError, match="no sums over the bins outside SWRs"):
-        rw.window_contrasts(old)
-
-
 def _cohort() -> pd.DataFrame:
     """Two animals; animal a has two epochs. Event windows of the "no SWR"
     group with ``full - swr`` (filter) per spike of: a/e1 1 and 3 (median 2),
@@ -387,21 +377,6 @@ def test_statistics_outside_swrs_count_windows_without_bins_or_spikes():
     assert swr["n_events"] == 3 and swr["n_scored"] == 1
 
 
-def test_statistics_outside_swrs_need_the_window_runs_new_columns():
-    old = _cohort().drop(columns=list(rw.OUTSIDE_SWR_COLUMNS))
-    whole = rw.restriction_window_statistics(old, n_boot=10)
-    assert set(whole["part"]) == {"whole"}
-    with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
-        rw.restriction_window_statistics(old, n_boot=10, parts=["outside_swr"])
-    without_facts = _cohort().drop(columns=list(rw.BIN_FACT_COLUMNS))
-    with pytest.raises(ValueError, match="no sums from the per-bin facts"):
-        rw.restriction_window_statistics(
-            without_facts, n_boot=10, parts=["outside_swr"]
-        )
-    with pytest.raises(ValueError, match="unknown part"):
-        rw.restriction_window_statistics(_cohort(), n_boot=10, parts=["edges"])
-
-
 def test_statistics_leave_out_and_count_windows_with_excluded_bins():
     cohort = _cohort()
     cohort.loc[cohort["gain"] == 30, "n_bins_excluded"] = 1
@@ -446,3 +421,5 @@ def test_an_unknown_choice_raises():
         rw.restriction_window_statistics(_cohort(), n_boot=10, contrasts=["x"])
     with pytest.raises(ValueError, match="no windows of kind"):
         rw.restriction_window_statistics(_cohort(), n_boot=10, kinds=["y"])
+    with pytest.raises(ValueError, match="unknown part"):
+        rw.restriction_window_statistics(_cohort(), n_boot=10, parts=["edges"])

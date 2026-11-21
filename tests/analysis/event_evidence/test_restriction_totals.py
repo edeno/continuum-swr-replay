@@ -234,6 +234,3 @@ def test_time_sums_with_a_row_twice_or_an_epoch_without_a_time_step_raise():
     twice = pd.concat([sums, sums.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="twice"):
         rt.epoch_outside_swr_gains(twice, _bin_s(), _windows())
-    old = _windows().drop(columns=list(rw.BIN_FACT_COLUMNS))
-    with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
-        rt.epoch_outside_swr_gains(_time_sums(), _bin_s(), old)
