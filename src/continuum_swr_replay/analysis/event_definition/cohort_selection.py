@@ -25,7 +25,7 @@ every event is read over the same events.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -561,6 +561,29 @@ ANALYZED_SUBSET = (
 )
 """What an output made over the analyses' one subset records as its ``subset``
 (in its manifest), so a reader can refuse or mark pending one made otherwise."""
+
+
+def subset_staleness(manifest: Mapping[str, Any], what: str) -> str | None:
+    """Why an output is not over the analyses' subset, or None.
+
+    An output made over the subset records :data:`ANALYZED_SUBSET` as its
+    ``subset``; one recording another or none was made over other events or
+    other time. The events summary marks the values read from such an output
+    pending; a figure refuses it.
+
+    Parameters
+    ----------
+    manifest : Mapping
+        The output's manifest.
+    what : str
+        The output, for the note.
+    """
+    if manifest.get("subset") != ANALYZED_SUBSET:
+        return (
+            f"{what} was not made over the events that start inside a well visit "
+            "and the time inside one; rerun it before citing"
+        )
+    return None
 
 
 def _visit_contexts(contexts: str | Sequence[str]) -> tuple[str, ...]:

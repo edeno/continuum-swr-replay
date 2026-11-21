@@ -1778,3 +1778,34 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
         figure.read_inputs()
     assert len(seen[0]) == len(table) - 1
     assert set(seen[0]["visit_context"]) == {"in_visit"}
+
+
+@pytest.mark.parametrize("folder", ["brain_state_reference", "event_gamma"])
+def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
+    offline, monkeypatch, tmp_path, folder
+):
+    """Quiet rest is the rest inside a well visit: a brain-state or gamma
+    reference whose manifest records another subset, or none, is refused."""
+    import dataclasses
+
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        ANALYZED_SUBSET,
+    )
+
+    figure = offline("scripts.figures.generate_supp_event_gamma")
+    inputs = dataclasses.replace(
+        figure.default_inputs(),
+        brain_state_reference=tmp_path / "brain_state_reference" / "reference.parquet",
+        event_gamma=tmp_path / "event_gamma",
+    )
+    for name in ("brain_state_reference", "event_gamma"):
+        (tmp_path / name).mkdir()
+        manifest = {} if name == folder else {"subset": ANALYZED_SUBSET}
+        (tmp_path / name / "manifest.json").write_text(json.dumps(manifest))
+    monkeypatch.setattr(figure, "default_inputs", lambda: inputs)
+    monkeypatch.setattr(figure, "read_swr_table", lambda path: _figure02_events())
+    monkeypatch.setattr(
+        figure, "with_brain_state", lambda events, inputs, n: (events, None, None)
+    )
+    with pytest.raises(ValueError, match=f"{folder}.* was not made over"):
+        figure.read_inputs()

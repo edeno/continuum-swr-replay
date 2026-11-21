@@ -57,7 +57,7 @@ events inside a well visit. Each value's description says which
 summary counts the events of every well-visit label, kept and left out
 (:func:`visit_context_values`). An output re-run over the subset records it
 (``cohort_selection.ANALYZED_SUBSET``); one that does not makes the values read
-from it pending (:func:`subset_staleness`). The decoder's quality is over each
+from it pending (``cohort_selection.subset_staleness``). The decoder's quality is over each
 epoch's decode, not over events.
 
 Each derived output above that reads the canonical event table records the
@@ -90,10 +90,10 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
-    ANALYZED_SUBSET,
     count_visit_context,
     select_events_in,
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
@@ -325,21 +325,6 @@ def _input_staleness(
             f"{what} was made from another {noun} than the current one "
             f"(sha256 {recorded[:12]}, current {current_sha256[:12]}); rerun it "
             "before citing"
-        )
-    return None
-
-
-def subset_staleness(manifest: dict, what: str) -> str | None:
-    """Why an output is not over the analyses' subset, or None.
-
-    An output re-run over the subset records ``cohort_selection.ANALYZED_SUBSET``
-    as its ``subset``; one recording another or none was made over other
-    events or other time.
-    """
-    if manifest.get("subset") != ANALYZED_SUBSET:
-        return (
-            f"{what} was not made over the events that start inside a well visit "
-            "and the time inside one; rerun it before citing"
         )
     return None
 

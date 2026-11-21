@@ -115,3 +115,16 @@ def test_select_events_in_keeps_every_row_of_a_selected_event():
 def test_select_events_in_refuses_a_table_without_event_id():
     with pytest.raises(ValueError, match="event_id"):
         select_events_in(pd.DataFrame({"stop_id": [1]}), [1])
+
+
+def test_an_output_not_made_over_the_subset_is_named():
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        ANALYZED_SUBSET,
+        subset_staleness,
+    )
+
+    assert subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
+    for manifest in ({}, {"subset": "every event"}):
+        note = subset_staleness(manifest, "out")
+        assert note.startswith("out was not made over")
+

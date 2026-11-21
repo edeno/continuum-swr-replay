@@ -116,9 +116,9 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     swr_intervals,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
-    ANALYZED_SUBSET,
     select_events_in,
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_state_probability,
@@ -454,11 +454,9 @@ def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.Da
         If it was not made over the analyses' subset, an analyzed epoch is
         missing or extra, or its decode hash differs.
     """
-    if read_output_manifest(folder).get("subset") != ANALYZED_SUBSET:
-        raise ValueError(
-            f"the {name} ({folder}) was not made over the time inside the well "
-            "visits; rerun its producer"
-        )
+    note = subset_staleness(read_output_manifest(folder), f"the {name} ({folder})")
+    if note is not None:
+        raise ValueError(note)
     manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     expected = {
         epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]

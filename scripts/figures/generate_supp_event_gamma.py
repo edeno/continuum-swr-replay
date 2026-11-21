@@ -37,6 +37,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_signal_levels,
@@ -44,6 +45,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.reported.events import default_inputs, with_brain_state
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
@@ -81,8 +83,19 @@ SIGNALS = tuple(
 
 
 def read_inputs() -> dict:
-    """The events with their gamma, and each epoch's rest and running levels."""
+    """The events with their gamma, and each epoch's rest and running levels.
+
+    Raises
+    ------
+    ValueError
+        If the brain-state or the gamma reference was not made over the
+        analyses' subset (``cohort_selection.subset_staleness``).
+    """
     inputs = default_inputs()
+    for folder in (inputs.brain_state_reference.parent, inputs.event_gamma):
+        note = subset_staleness(read_output_manifest(folder), str(folder))
+        if note is not None:
+            raise ValueError(note)
     events = select_visit_context(read_swr_table(inputs.event_table))
     events, reference, _ = with_brain_state(events, inputs, len(analyzed_epoch_ids()))
     return {"events": events, "reference": reference}
