@@ -66,6 +66,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md) — the mPFC unit GLM, its held-out test, and its bundles.
   - [pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md) — the content-marked mPFC replay kernels.
   - [pfc_marked_model_family.md](design/pfc_marked_model_family.md) — the descriptive marked mPFC model family.
+  - [regression_fitter.md](design/regression_fitter.md) — the shared regression fitter: its likelihoods, convergence and penalty rules, its cost, and its agreement with mgcv, neurospatial and the current fitters.
   - [replay_detection_comparison/](design/replay_detection_comparison/) — published detectors run on the same recordings; start at [overview.md](design/replay_detection_comparison/overview.md).
     - [01](design/replay_detection_comparison/01-yu-swr-detector.md) Yu SWR detector;
       [02](design/replay_detection_comparison/02-memoryless-sequence.md) Widloski & Foster sequence detector;
