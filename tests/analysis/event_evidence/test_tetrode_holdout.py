@@ -394,6 +394,81 @@ def test_the_leakage_check_passes_the_real_designs():
     )
 
 
+class _Stop(Exception):
+    """Raised once the encodings are fit: the masks are all the test needs."""
+
+
+def _fit_masks(monkeypatch, is_training, **options) -> list[np.ndarray]:
+    """The training mask of each fold's encoding fit in ``holdout_scores``,
+    on a stand-in decoder (three place bins), stopped after the fits."""
+    from types import SimpleNamespace
+
+    from continuum_swr_replay.decoding.results import ENCODING_KEY
+
+    environment = SimpleNamespace(
+        is_track_interior_=np.ones(N_BINS, dtype=bool),
+        place_bin_centers_=np.arange(N_BINS, dtype=float)[:, None],
+    )
+    detector = SimpleNamespace(
+        encoding_model_={ENCODING_KEY: {"environment": environment}},
+        state_ind_=STATE_IND,
+        is_track_interior_state_bins_=np.ones(STATE_IND.size, dtype=bool),
+        state_names=STATES,
+    )
+    masks = []
+
+    def refit(det, time, position, spike_times, marks, mask):
+        masks.append(np.asarray(mask).copy())
+        return {}
+
+    def fold_terms(*args, **kwargs):
+        raise _Stop
+
+    monkeypatch.setattr(th, "fold_terms", fold_terms)
+    n_time = is_training.size
+    time = np.arange(n_time) * 0.002
+    with pytest.raises(_Stop):
+        th.holdout_scores(
+            detector,
+            time,
+            np.linspace(0.0, 2.0, n_time)[:, None],
+            np.linspace(0.0, 2.0, n_time),
+            [np.array([0.01])],
+            [np.ones((1, 4))],
+            is_training,
+            np.zeros(n_time, dtype=bool),
+            pd.DataFrame({"window_id": [0], "s": [0], "e": [1]}),
+            refit=refit,
+            log=lambda message: None,
+            **options,
+        )
+    return masks
+
+
+def test_holdout_scores_fit_each_fold_on_the_folds_and_margin_it_is_given(
+    monkeypatch,
+):
+    """Interleaved folds (segments of 40 bins dealt to the five folds in turn)
+    and a margin of 7 bins reach the encodings' fit; without them the folds
+    are the five time blocks and the margin :data:`MARGIN_BINS`."""
+    rng = np.random.default_rng(4)
+    is_training = rng.random(1000) < 0.8
+    folds = (np.arange(1000) // 40) % th.N_FOLDS
+    given = _fit_masks(monkeypatch, is_training, folds=folds, margin_bins=7)
+    expected = th.fold_training_masks(is_training, folds, th.N_FOLDS, 7)
+    assert len(given) == th.N_FOLDS
+    for got, mask in zip(given, expected, strict=True):
+        np.testing.assert_array_equal(got, mask)
+
+    default = _fit_masks(monkeypatch, is_training)
+    blocks = th.time_blocks(np.arange(1000) * 0.002)
+    expected = th.fold_training_masks(is_training, blocks, th.N_FOLDS, th.MARGIN_BINS)
+    assert len(default) == th.N_FOLDS
+    for got, mask, other in zip(default, expected, given, strict=True):
+        np.testing.assert_array_equal(got, mask)
+        assert not np.array_equal(got, other)
+
+
 def test_the_leakage_check_raises_where_the_library_would_reach_a_fold():
     time = np.arange(100) * 0.002
     position = np.linspace(0, 50, 100)

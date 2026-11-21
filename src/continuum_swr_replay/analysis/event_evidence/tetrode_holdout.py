@@ -4,11 +4,16 @@ position estimate predict a tetrode it never saw better than local coding does?
 The events are fixed by the all-tetrode decode (the canonical event table). For
 each epoch:
 
-1. **Time folds.** The epoch is cut into :data:`N_FOLDS` contiguous blocks of
-   equal duration. Every tetrode's encoding is refit, once per block, on the
-   decode's own training bins outside that block (and :data:`MARGIN_BINS` from
-   its edges, which the library's padding of training runs would otherwise
-   reach). A bin is scored with the encodings of its own block, so no scored
+1. **Time folds.** The epoch's bins are split into :data:`N_FOLDS` folds: by
+   default contiguous blocks of equal duration (:func:`time_blocks`, with a
+   margin of :data:`MARGIN_BINS` bins), or the folds a caller gives, such as
+   whole trials balanced by destination well (:func:`trial_folds`, with a
+   margin of :data:`TRIAL_MARGIN_S`), which the runner
+   (``scripts/event_evidence/score_tetrode_holdout.py``) uses by default.
+   Every tetrode's encoding is refit, once per fold, on the decode's own
+   training bins outside that fold and more than the margin from each of its
+   bins (the library's padding of training runs would otherwise reach the
+   fold). A bin is scored with the encodings of its own fold, so no scored
    spike fit its own tuning.
 2. **Per-tetrode terms.** For tetrode j, bin t and real place bin x, the
    decoder's clusterless spatial log-likelihood ``l_j(t, x)`` (expected firing
@@ -69,7 +74,8 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 N_FOLDS = 5
-"""Contiguous time blocks per epoch; each block's encodings are fit on the others."""
+"""Folds per epoch (contiguous time blocks or trial folds); each fold's
+encodings are fit on the others."""
 
 MARGIN_BINS = 2
 """Training bins this close to a block are left out of its encodings' fit: the
@@ -877,6 +883,8 @@ def holdout_scores(
     windows: pd.DataFrame,
     *,
     n_folds: int = N_FOLDS,
+    folds: NDArray | None = None,
+    margin_bins: int = MARGIN_BINS,
     refit: Callable[..., dict] = refit_encoding,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
@@ -898,6 +906,12 @@ def holdout_scores(
     windows : pd.DataFrame
         ``window_id``, ``s`` and ``e`` (first and last bin, inclusive).
     n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`);
+        by default ``n_folds`` contiguous blocks (:func:`time_blocks`).
+    margin_bins : int
+        Training bins within this many bins of a fold are left out of its
+        encodings' fit (:func:`fold_training_masks`).
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
         an encoding model.
@@ -939,6 +953,8 @@ def holdout_scores(
         marks,
         is_training,
         n_folds=n_folds,
+        folds=folds,
+        margin_bins=margin_bins,
         refit=refit,
         log=log,
     )
