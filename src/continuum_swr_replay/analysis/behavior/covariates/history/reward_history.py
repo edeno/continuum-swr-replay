@@ -11,8 +11,6 @@ from continuum_swr_replay.analysis.behavior.design_constants import (
 )
 from continuum_swr_replay.analysis.behavior.history_basis import (
     raised_cosine_history_basis,
-    # Re-exported: the projection is a pure array primitive owned by
-    # ``history_basis``, which the per-bin design builder also reads.
     reward_basis_from_lags,
 )
 from continuum_swr_replay.data_loaders.constants import (

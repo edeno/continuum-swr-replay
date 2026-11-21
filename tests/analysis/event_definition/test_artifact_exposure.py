@@ -121,6 +121,7 @@ def _trials() -> pd.DataFrame:
             "to_well": [0],
             "is_reward": [True],
             "is_patch_change": [False],
+            "outcome_known_time": [15.0],
         }
     )
 

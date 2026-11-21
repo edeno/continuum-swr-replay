@@ -53,6 +53,7 @@ from tests.analysis.event_tables.test_replay_tables import (
     build_event_table,
     build_stop_table,
 )
+from tests.support._decode_frame_fixtures import with_trajectory_inputs
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 #: (start, end) of each immobility stop (s).
@@ -108,7 +109,7 @@ def visit_session() -> tuple[pd.DataFrame, _EnvStub, pd.DataFrame, nx.Graph]:
     graph = _bandit_graph()
     for node in graph:
         graph.nodes[node]["pos"] = (float(node * 10), 0.0)
-    return dot, _EnvStub(), _trials(), graph
+    return with_trajectory_inputs(dot), _EnvStub(), _trials(), graph
 
 
 def _experiences() -> pd.DataFrame:

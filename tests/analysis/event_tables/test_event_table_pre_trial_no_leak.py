@@ -23,10 +23,18 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_tables.event_table import (
     build_event_table as _build_event_table,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._decode_frame_fixtures import (
+    TrackEnvStub as _EnvStub,
+)
+from tests.support._decode_frame_fixtures import with_trajectory_inputs
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def build_event_table(dot, env, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_event_table(
         dot,
         env,
@@ -56,25 +64,6 @@ def _two_well_track_graph() -> nx.Graph:
     return g
 
 
-class _EnvStub:
-    """Minimal Environment stand-in (mirrors test_replay_tables.py)."""
-
-    class _Df:
-        _arm_lp = np.arange(18, dtype=float)
-        _arm_eid = np.repeat(np.arange(9), 2).astype(int)
-        _junc_lp = np.array([100.0, 101.0, 102.0])
-        _junc_eid = np.array([-1, -1, -1])
-        d = {
-            "linear_position": np.concatenate([_arm_lp, _junc_lp]),
-            "edge_id": np.concatenate([_arm_eid, _junc_eid]),
-        }
-
-        def __getitem__(self, k):
-            return self.d[k]
-
-    place_bin_centers_nodes_df_ = _Df()
-
-
 def _pre_trial_event_dot() -> pd.DataFrame:
     """Single non-local event spanning t=0..2.0 — entirely before the
     first trial start at t=2.5. Every bin is immobile and has high
@@ -84,7 +73,7 @@ def _pre_trial_event_dot() -> pd.DataFrame:
     derived from the trial context — exactly the leak path under test.
     """
     times = np.linspace(0.0, 2.0, 11)
-    return pd.DataFrame(
+    frame = pd.DataFrame(
         {
             "animal": ["m"] * len(times),
             "day": [20200101] * len(times),
@@ -103,6 +92,7 @@ def _pre_trial_event_dot() -> pd.DataFrame:
         },
         index=times,
     )
+    return with_trajectory_inputs(frame)
 
 
 def _trials_starting_after_event() -> pd.DataFrame:

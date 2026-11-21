@@ -562,10 +562,8 @@ def add_trial_context(
     dot["next_well"] = np.where(next_valid, to_wells[next_clipped], np.nan)
 
     # Reward identity is not available merely because the animal arrived.
-    # Advance this history at the physical outcome clock: exact pump onset for
-    # newly generated rewarded trials, the canonical latency/departure boundary
-    # for omissions, or the explicit
-    # conservative end-time fallback documented by trial_outcome_times.
+    # Advance this history at the physical outcome clock: pump onset for a
+    # rewarded trial, the canonical latency/departure boundary for an omission.
     experience_reward = experiences["outcome_observed"].to_numpy(
         dtype=bool
     ) & experiences["is_reward"].fillna(False).to_numpy(dtype=bool)

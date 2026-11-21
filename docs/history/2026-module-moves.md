@@ -778,3 +778,7 @@ event and event × arm tables gained the visit columns (`docs/covariate_dictiona
 | the dense stop time-bin table `stop_timebin_table.parquet` (canonical name `stop_timebin`, its row key in `tables/covariate_registry.py`) (removed: replaced by the visit bins) | the rate models' visit bins, built per session from the stop and event-onset tables; the file in `Processed-Data/replay_content/` is kept, no longer read |
 | `analysis/event_tables/timebin_tables.build_stop_timebin_table`, `concat_session_timebin_tables`, `ONSETS_IN_EXCLUDED_BINS_ATTR` (removed: replaced by the visit bins) | `build_event_onset_table` stays; `scripts/tables/build_timebin_tables.py` writes only the event-onset table |
 | `scripts/exploratory/_timeresolved_psth.py` (removed: its table is gone) | none |
+| `scripts/tables/regenerate_stop_table.py` (removed: the tables are rebuilt as one set) | `scripts/tables/prepare_replay_content_data.py` |
+| `scripts/tables/convert_tables_to_parquet.py` and the `fmt` parameter of `paths.table_path` (removed: the one-time pickle migration is done) | `table_path` names only the parquet file; the pickles stay under `_pickle_archive/` |
+| `analysis.event_tables.uncertainty.nonlocal_weight_sum` (removed: re-export) | `analysis.event_tables.summaries.nonlocal_weight_sum` |
+| `analysis.behavior.covariates.reward_basis_from_lags`, `analysis.behavior.covariates.history.reward_basis_from_lags` (removed: re-exports) | `analysis.behavior.history_basis.reward_basis_from_lags` |

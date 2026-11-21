@@ -195,8 +195,8 @@ def _aggregate_event_features(
     # means "count every row you were given". Keeps the two filter
     # definitions from silently diverging if one is ever tuned without
     # the other. ``nonlocal_weight_sum`` sums the raw w_t over the same
-    # pre-filtered rows; this matches the legacy ``prepare_session``
-    # aggregation contract.
+    # pre-filtered rows: an event's weight is the sum of its in-event bins'
+    # non-local probability.
     nonlocal_prob_arr = nl["nonlocal_prob"].to_numpy()
     ids_sorted, n_bins = n_nonlocal_bins(
         nonlocal_prob_arr, event_id_series, threshold=0.0
@@ -458,30 +458,24 @@ def _attach_trajectory_rollups(
 ) -> pd.DataFrame:
     """Attach the trajectory rollups.
 
-    These require the augmented data_over_time columns (step_distance, raw
-    ripple/MUA/theta, run_speed_baseline). When ``dot`` predates the
-    augmentation, emit the columns as NaN so the schema stays stable.
+    These read the augmented data_over_time columns (``step_distance``,
+    ``run_speed_baseline``), which every decode frame carries.
     """
-    trajectory_cols = (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS)
-    if {"step_distance", "run_speed_baseline"}.issubset(nl.columns):
-        rollups = compute_trajectory_rollups(
-            nl=nl,
-            event_id=event_id_series,
-            env=env,
-            track_graph=track_graph,
-            state_prob_cols=_NONLOCAL_STATE_COLS,
-            continuous_col="Non-Local_Continuous_prob",
-            fragmented_col="Non-Local_Fragmented_prob",
-            place_bin_size=place_bin_size,
-            nonlocal_prob=nonlocal_prob_arr,
-            arm_posterior=arm_posterior,
-            non_local_threshold=nonlocal_threshold,
-        )
-        for col_name in trajectory_cols:
-            per_event[col_name] = rollups[col_name]
-    else:
-        for col_name in trajectory_cols:
-            per_event[col_name] = np.nan
+    rollups = compute_trajectory_rollups(
+        nl=nl,
+        event_id=event_id_series,
+        env=env,
+        track_graph=track_graph,
+        state_prob_cols=_NONLOCAL_STATE_COLS,
+        continuous_col="Non-Local_Continuous_prob",
+        fragmented_col="Non-Local_Fragmented_prob",
+        place_bin_size=place_bin_size,
+        nonlocal_prob=nonlocal_prob_arr,
+        arm_posterior=arm_posterior,
+        non_local_threshold=nonlocal_threshold,
+    )
+    for col_name in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
+        per_event[col_name] = rollups[col_name]
     return per_event
 
 

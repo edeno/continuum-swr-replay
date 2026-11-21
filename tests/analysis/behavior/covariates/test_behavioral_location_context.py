@@ -20,11 +20,15 @@ from continuum_swr_replay.analysis.event_tables.bouts import (
 from continuum_swr_replay.data_loaders.constants import (
     OMISSION_KNOWN_LATENCY_SEC,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
     """Exercise the production API with a complete experience stream."""
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(
         dot,
         trials,

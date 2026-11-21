@@ -30,7 +30,6 @@ from .reward_history import (
     log1p_known_visit_count_all_events,
     recent_reward_rate_all_events,
     recent_trial_reward_rate,
-    reward_basis_from_lags,
     reward_history_basis_features,
     rolling_reward_count_all_events,
 )
@@ -74,7 +73,6 @@ __all__ = [
     "q_all_arm",
     "recent_reward_rate_all_events",
     "recent_trial_reward_rate",
-    "reward_basis_from_lags",
     "reward_history_basis_features",
     "rolling_reward_count_all_events",
     "spline_visit_recency_within_event",

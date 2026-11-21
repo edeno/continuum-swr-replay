@@ -23,10 +23,14 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_tables.stop_table import (
     build_stop_table as _build_stop_table,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def build_stop_table(dot, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_stop_table(
         dot,
         trials,

@@ -63,13 +63,11 @@ them importable.
 
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables (event / event-arm / event-patch / event-sequence / stop).
-- `regenerate_stop_table.py` — rebuild the per-stop immobility table.
 - `build_timebin_tables.py` — build the event-onset table.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
 - `assemble_replay_content_shards.py`, `assemble_contfrag_shards.py` — assemble per-animal table shards into one bundle.
 - `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing a preserved bundle's posterior aggregates.
 - `write_regeneration_manifest.py` — validate candidate covariate bundles and write the release manifest.
-- `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the tables.
 - `_table_runner.py` — not a script: the session selection, shard reading and publishing the drivers above share.
 
 ## `behavior/` — what the animal did and what the behavioral model says

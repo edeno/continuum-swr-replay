@@ -36,6 +36,10 @@ from continuum_swr_replay.analysis.event_tables.stop_table import (
     build_stop_table as _build_stop_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from tests.support._decode_frame_fixtures import (
+    TrackEnvStub as _EnvStub,
+)
+from tests.support._decode_frame_fixtures import with_trajectory_inputs
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 
@@ -73,33 +77,6 @@ def build_stop_table(dot, trials, graph, **kwargs):
 
 
 # ── Fixtures ──
-
-
-class _EnvStub:
-    """Minimal ``Environment`` stand-in.
-
-    ``place_bin_centers_nodes_df_`` holds 2 bins per real arm (0-8)
-    plus 3 junction bins (edge_id = -1). That gives
-    ``posterior_to_arm_marginal`` real arm-mass to marginalize and
-    real junction-bin mass to exclude, exercising the junction-bin
-    handling in the same path production code uses.
-    """
-
-    class _Df:
-        # Per-arm bins spread along [0, 90); junction bins at 100.
-        _arm_lp = np.arange(18, dtype=float)  # 2 bins per arm
-        _arm_eid = np.repeat(np.arange(9), 2).astype(int)  # 0,0,1,1,...,8,8
-        _junc_lp = np.array([100.0, 101.0, 102.0])
-        _junc_eid = np.array([-1, -1, -1])
-        d = {
-            "linear_position": np.concatenate([_arm_lp, _junc_lp]),
-            "edge_id": np.concatenate([_arm_eid, _junc_eid]),
-        }
-
-        def __getitem__(self, k):
-            return self.d[k]
-
-    place_bin_centers_nodes_df_ = _Df()
 
 
 def _bandit_graph() -> nx.Graph:
@@ -156,7 +133,7 @@ def _tiny_dot_with_two_events() -> pd.DataFrame:
         dot.loc[rows, "track_segment_id"] = arm
         dot.loc[rows, "SWR_event"] = swr
         dot.loc[rows, "MUA_event"] = mua
-    return dot
+    return with_trajectory_inputs(dot)
 
 
 def _tiny_posterior(dot: pd.DataFrame) -> xr.DataArray:
@@ -240,7 +217,7 @@ def _location_contract_session():
         graph.nodes[node]["pos"] = (float(node * 10), 0.0)
     dot.loc[:, "projected_x_position"] = 10.0
     dot.loc[:, "projected_y_position"] = 0.0
-    return dot, _EnvStub(), trials, graph
+    return with_trajectory_inputs(dot), _EnvStub(), trials, graph
 
 
 def test_event_and_stop_tables_label_location_without_filtering_events():
@@ -1392,10 +1369,11 @@ class TestTrajectoryRollupWiring:
         # path_length is the sum of the (constant 1.0) step_distance over bins
         assert (et["path_length_cm"] > 0).all()
 
-    def test_unaugmented_dot_emits_nan_trajectory_columns(self):
-        """A pre-augmentation dot still yields the columns, as NaN."""
-        dot = _tiny_dot_with_two_events()  # no step_distance etc.
-        env = _traj_env()
+    def test_a_frame_without_the_trajectory_columns_is_refused(self):
+        """Every decode frame carries the rollup inputs; one without them fails."""
+        dot = _tiny_dot_with_two_events().drop(
+            columns=["step_distance", "run_speed_baseline"]
+        )
         trials = pd.DataFrame(
             columns=[
                 "start_time",
@@ -1408,11 +1386,8 @@ class TestTrajectoryRollupWiring:
                 "is_patch_change",
             ]
         )
-        et = build_event_table(dot, env, trials, _bandit_graph())
-        for col in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
-            assert col in et.columns
-        assert et["path_length_cm"].isna().all()
-        assert et["ripple_power_z"].isna().all()
+        with pytest.raises(ValueError, match="step_distance"):
+            build_event_table(dot, _traj_env(), trials, _bandit_graph())
 
 
 # ── Guards for invariants that survived mutation testing ──

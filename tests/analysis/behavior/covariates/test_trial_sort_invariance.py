@@ -35,7 +35,10 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.behavior.covariates import (
     visit_recency_all_events as _visit_recency_all_events,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
@@ -43,6 +46,7 @@ def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(
         dot, trials, port_experiences_from_trials(trials, prepend_initial=True)
     )

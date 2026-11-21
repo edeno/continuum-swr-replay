@@ -145,14 +145,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     if missing:
         raise SystemExit(
             f"stop_table missing outcome columns {missing}; "
-            "regenerate it first (scripts/tables/regenerate_stop_table.py)."
+            "rebuild the canonical tables (scripts/tables/prepare_replay_content_data.py)."
         )
     basis_cols = [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE]
     missing_basis = [c for c in basis_cols if c not in stop.columns]
     if missing_basis:
         raise SystemExit(
             f"stop_table missing reward-history basis columns {missing_basis}; "
-            "regenerate it first (scripts/tables/regenerate_stop_table.py)."
+            "rebuild the canonical tables (scripts/tables/prepare_replay_content_data.py)."
         )
     # The cohort is applied to the whole stop table BEFORE the smoke subset and
     # before the ladder's common-cohort freeze, so the freeze reports what the

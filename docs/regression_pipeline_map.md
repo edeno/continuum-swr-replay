@@ -596,12 +596,6 @@ Build the within-stop event-onset table over all sessions.
 
 `build_one`, `validate`, `main`
 
-### `scripts/tables/convert_tables_to_parquet.py`
-
-Convert the materialized canonical tables from pickle to parquet.
-
-`canonical_tables`, `convert`, `main`
-
 ### `scripts/tables/prepare_contfrag_replay_content_data.py`
 
 Build canonical replay-content tables from ContFrag decoding results.
@@ -619,12 +613,6 @@ Build the four canonical replay-content tables across all sessions.
 Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
 `refresh_contfrag_behavioral_covariates`, `main`
-
-### `scripts/tables/regenerate_stop_table.py`
-
-Regenerate ``stop_table`` with the new count columns.
-
-`build_one`, `validate`, `main`
 
 ### `scripts/tables/write_regeneration_manifest.py`
 

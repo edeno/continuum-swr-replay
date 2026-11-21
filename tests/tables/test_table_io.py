@@ -306,7 +306,7 @@ def test_no_module_reads_a_canonical_table_with_read_pickle():
     offenders = []
     for directory in ("src", "scripts", "tests"):
         for path in (repo_root / directory).rglob("*.py"):
-            if "archive" in path.parts or path.name == "convert_tables_to_parquet.py":
+            if "archive" in path.parts:
                 continue
             for number, line in enumerate(path.read_text().splitlines(), start=1):
                 if "pd.read_pickle(" not in line:

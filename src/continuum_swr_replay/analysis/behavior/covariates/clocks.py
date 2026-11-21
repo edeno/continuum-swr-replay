@@ -37,12 +37,9 @@ def trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
 def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     """Per-trial timestamp at which reward versus omission is observable.
 
-    Newly generated trial tables carry ``outcome_known_time``: first pump onset
-    for a rewarded trial and ``min(arrival + OMISSION_KNOWN_LATENCY_SEC,
-    destination final poke-out)`` for an omission. Older or
-    manually constructed frames lack that field; for those frames ``end_time``
-    is an explicit conservative fallback for both outcomes. This fallback can
-    delay rewarded history, but it cannot expose reward before delivery.
+    Every trial table carries ``outcome_known_time``: first pump onset for a
+    rewarded trial and ``min(arrival + OMISSION_KNOWN_LATENCY_SEC, destination
+    final poke-out)`` for an omission. A frame without it is refused.
 
     Every returned value must be finite and lie within
     ``[destination_arrival, end_time]``. Invalid explicit timestamps raise
@@ -50,7 +47,7 @@ def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     """
     if len(trials) == 0:
         return np.array([], dtype=float)
-    require_columns(trials, ["end_time"], "trials")
+    require_columns(trials, ["end_time", "outcome_known_time"], "trials")
 
     end = trials["end_time"].to_numpy(dtype=float)
     arrival = trial_arrival_times(trials)
@@ -103,22 +100,17 @@ def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
             reward_on_time=reward_on,
         )
 
-    if "outcome_known_time" in trials.columns:
-        outcome = trials["outcome_known_time"].to_numpy(dtype=float)
-        if expected_from_physical_clock is not None and not np.allclose(
-            outcome,
-            expected_from_physical_clock,
-            rtol=0.0,
-            atol=1e-9,
-            equal_nan=True,
-        ):
-            raise ValueError(
-                "outcome_known_time conflicts with reward-on/end-time semantics"
-            )
-    elif expected_from_physical_clock is not None:
-        outcome = expected_from_physical_clock
-    else:
-        outcome = end.copy()
+    outcome = trials["outcome_known_time"].to_numpy(dtype=float)
+    if expected_from_physical_clock is not None and not np.allclose(
+        outcome,
+        expected_from_physical_clock,
+        rtol=0.0,
+        atol=1e-9,
+        equal_nan=True,
+    ):
+        raise ValueError(
+            "outcome_known_time conflicts with reward-on/end-time semantics"
+        )
 
     invalid = (
         ~np.isfinite(end)

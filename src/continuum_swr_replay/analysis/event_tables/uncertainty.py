@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .summaries import _group_by_event, nonlocal_weight_sum
+from .summaries import _group_by_event
 
 
 def _weighted_mean_by_event(
@@ -204,11 +204,9 @@ def posterior_hpd_widths(
     return unique, widths_by_coverage
 
 
-# Re-export from summaries for callers that want both.
 __all__ = [
     "posterior_peak_mean",
     "posterior_entropy_mean",
     "posterior_hpd_width",
     "posterior_hpd_widths",
-    "nonlocal_weight_sum",
 ]

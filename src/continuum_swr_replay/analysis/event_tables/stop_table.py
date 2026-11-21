@@ -314,21 +314,15 @@ def add_nonlocal_swr_split(
     needs both canonical tables and so lives outside :func:`build_stop_table`,
     which is deliberately event-table-independent.
     """
-    # Idempotent: drop any prior split so re-calling never produces _x/_y dups.
-    out = stop_table.drop(
-        columns=["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"],
-        errors="ignore",
-    ).copy()
-    require_columns(out, ["n_selected_events"], "add_nonlocal_swr_split's stop_table")
-    total = out["n_selected_events"]
-    if (
-        len(event_table) == 0
-        or "stop_id" not in event_table.columns
-        or "is_swr" not in event_table.columns
-    ):
-        out["n_nonlocal_swr_events"] = 0
-        out["n_nonlocal_non_swr_events"] = total.astype(np.int64)
-        return out
+    require_columns(
+        stop_table,
+        ["stop_id", "n_selected_events"],
+        "add_nonlocal_swr_split's stop_table",
+    )
+    require_columns(
+        event_table, ["stop_id", "is_swr"], "add_nonlocal_swr_split's event_table"
+    )
+    out = stop_table.copy()
 
     ev = event_table.dropna(subset=["stop_id"]).copy()
     # A non-local event whose stop_id is absent from stop_table would be silently
@@ -348,6 +342,9 @@ def add_nonlocal_swr_split(
         ev.groupby(["stop_id", "_swr"])
         .size()
         .unstack("_swr", fill_value=0)
+        # A session with no SWR (or no non-SWR) event has a zero count, not an
+        # absent column.
+        .reindex(columns=[True, False], fill_value=0)
         .rename(
             columns={
                 True: "n_nonlocal_swr_events",
@@ -355,9 +352,6 @@ def add_nonlocal_swr_split(
             }
         )
     )
-    for col in ("n_nonlocal_swr_events", "n_nonlocal_non_swr_events"):
-        if col not in counts.columns:
-            counts[col] = 0
     out = out.merge(
         counts[["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]],
         left_on="stop_id",

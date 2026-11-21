@@ -523,27 +523,24 @@ def build_contfrag_event_table(
         per_event["posterior_hpd_arm_count_mean_coverage_80pct"] = hpd[0.8]
         per_event["posterior_hpd_arm_count_mean_coverage_95pct"] = hpd[0.95]
 
-    # Trajectory rollups (shared with the Non-Local table). Gated on the
-    # augmented data_over_time columns; continuous/fragmented_prob_mean come
-    # from ``_summarize_event_state`` above, so they are excluded here.
-    if {"step_distance", "run_speed_baseline"}.issubset(ev.columns):
-        rollups = compute_trajectory_rollups(
-            nl=ev,
-            event_id=event_id_series,
-            env=env,
-            track_graph=track_graph,
-            state_prob_cols=_CONTFRAG_STATE_COLS,
-            continuous_col="Continuous_prob",
-            fragmented_col="Fragmented_prob",
-            place_bin_size=place_bin_size,
-            nonlocal_prob=None,
-            arm_posterior=arm_posterior,
-        )
-        for col_name in _CONTFRAG_TRAJECTORY_COLUMNS:
-            per_event[col_name] = rollups[col_name]
-    else:
-        for col_name in _CONTFRAG_TRAJECTORY_COLUMNS:
-            per_event[col_name] = np.nan
+    # Trajectory rollups (shared with the Non-Local table), from the augmented
+    # data_over_time columns every decode frame carries;
+    # continuous/fragmented_prob_mean come from ``_summarize_event_state``
+    # above, so they are excluded here.
+    rollups = compute_trajectory_rollups(
+        nl=ev,
+        event_id=event_id_series,
+        env=env,
+        track_graph=track_graph,
+        state_prob_cols=_CONTFRAG_STATE_COLS,
+        continuous_col="Continuous_prob",
+        fragmented_col="Fragmented_prob",
+        place_bin_size=place_bin_size,
+        nonlocal_prob=None,
+        arm_posterior=arm_posterior,
+    )
+    for col_name in _CONTFRAG_TRAJECTORY_COLUMNS:
+        per_event[col_name] = rollups[col_name]
 
     # Identifiers + stable hashes
     per_event.insert(0, "animal", animal)
