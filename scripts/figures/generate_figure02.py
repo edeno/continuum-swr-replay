@@ -26,16 +26,22 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         per animal, for no-SWR and SWR events: the events are population
         events (``event_evidence.participation``;
         ``Processed-Data/event_participation``).
-    h — Held-out tetrode score: each tetrode left out of the decoder's smoother in
-        turn and scored at every bin of each event under the other tetrodes'
-        position distribution against local coding around the animal (time-fold
-        encodings); the gain summed over tetrodes and bins, per spike. A dot per
-        animal for no-SWR and SWR events, the animals' mean with its interval,
-        and a line at zero, where local coding predicts the held-out spikes as
-        well (the Local-rest controls sit there by construction, so they are
-        in the events summary and not drawn)
-        (``event_evidence.tetrode_holdout``;
-        ``Processed-Data/event_tetrode_holdout``).
+    h — The events' gain over local coding per spike, held out two ways, on two
+        axes that share the y axis. Held-out tetrode (left): each tetrode left
+        out of the decoder's smoother in turn and scored at every bin of each
+        event under the other tetrodes' position distribution against local
+        coding around the animal (time-fold encodings); the gain summed over
+        tetrodes and bins, per spike (``event_evidence.tetrode_holdout``;
+        ``Processed-Data/event_tetrode_holdout``). Held-out time (right): every
+        tetrode's one-step-ahead predictive score of each bin, place fields held
+        out by whole trials, under the full decoder minus under the decoder with
+        only the local states, summed over the same event windows, per spike
+        (``event_evidence.restriction_windows``;
+        ``Processed-Data/event_nonlocal_restriction_windows``). On each, a dot
+        per animal for no-SWR and SWR events, the animals' mean with its
+        interval, and a line at zero, where local coding predicts the spikes as
+        well (the Local-rest controls sit near it by construction, so they are
+        in the events summary and not drawn).
     i — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
         power and head speed, each the median and interquartile range over
         events, with the epochs' level between events, theta's running level and
@@ -55,9 +61,12 @@ features run the summary reads; i's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; j from
 the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
-``nonlocal_below_threshold_statistics``). Panel i is a per-time-bin signal no
-stored output holds, computed from the aggregated decode frames (cached), whose
-event counts by SWR overlap must equal the canonical table's.
+``nonlocal_below_threshold_statistics``); h from the held-out runs by the
+functions the events summary uses (``tetrode_holdout.holdout_statistics``,
+``restriction_windows.restriction_window_statistics``). Panel i is a
+per-time-bin signal no stored output holds, computed from the aggregated decode
+frames (cached), whose event counts by SWR overlap must equal the canonical
+table's.
 
 Usage
 -----
@@ -115,6 +124,9 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
+    restriction_window_statistics,
+)
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
@@ -152,6 +164,7 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
@@ -160,6 +173,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import RESTRICTION_FIGURE
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.runs.io import read_complete_run, read_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
@@ -961,7 +975,7 @@ REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
 """Panel g: each group's Local-rest and event positions on the x axis."""
 
 HELDOUT_X = {"no SWR": 0.0, "SWR": 1.0}
-"""Panel h: each group's position on the x axis."""
+"""Panel h: each group's position on the x axis of each of its two axes."""
 
 
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
@@ -1004,19 +1018,24 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
     )
 
 
-def draw_heldout_gain(ax: Axes, events: pd.DataFrame) -> None:
-    """Panel h: the held-out tetrode gain over local coding, per spike.
+def draw_group_gain(ax: Axes, statistics: pd.DataFrame, title: str) -> None:
+    """One axis of panel h: a gain over local coding per spike, by group.
 
-    A dot per animal and the animals' mean with its 95 % interval
-    (``tetrode_holdout.holdout_statistics``). The dashed line is zero, where
-    local coding around the animal predicts the held-out spikes as well as the
-    other tetrodes' position does. It is not a control: the groups' Local-rest
-    controls sit there by construction (in Local rest the decoded position is
-    the animal's own), so they are in the events summary and not drawn.
+    A dot per animal in the group's color and, beside them, the animals' mean
+    with its 95 % interval in black, for no-SWR and SWR events, with a dashed
+    line at zero and the axis' title.
+
+    Parameters
+    ----------
+    statistics : pd.DataFrame
+        Indexed by group (``"no SWR"``, ``"SWR"``): ``animals``,
+        ``animal_names``, ``estimate``, ``ci_low`` and ``ci_high``
+        (``likelihood_advantage_statistics``' columns).
+    title : str
     """
     for group, color in (("no SWR", C_NO_SWR), ("SWR", C_SWR)):
         x = HELDOUT_X[group]
-        event = events.loc[group]
+        event = statistics.loc[group]
         animals = animal_values(event, "animals")
         ax.scatter(np.full(animals.size, x), animals, s=6, color=color, lw=0, zorder=2)
         ax.errorbar(
@@ -1026,15 +1045,50 @@ def draw_heldout_gain(ax: Axes, events: pd.DataFrame) -> None:
             fmt="_", color="black", ms=5, lw=0.8, capsize=0,
         )  # fmt: skip
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    ax.text(
-        0.04, -0.02, "no gain", transform=ax.get_yaxis_transform(), va="top",
-        fontsize=SMALL_SIZE, color=C_REFERENCE,
-    )  # fmt: skip
     ax.set_xlim(-0.6, 1.6)
     ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
-    ax.set_ylim(-0.12, None)
-    ax.set_ylabel("Held-out gain\nover local (nats/spike)")
-    ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
+    ax.set_title(title, fontsize=SMALL_SIZE, pad=3)
+
+
+def draw_heldout_gain(
+    ax_tetrode: Axes,
+    ax_time: Axes,
+    tetrode: pd.DataFrame,
+    time: pd.DataFrame,
+) -> None:
+    """Panel h: the gain over local coding per spike, held out two ways.
+
+    Left, the held-out tetrode score (``tetrode_holdout.holdout_statistics``):
+    each tetrode scored under the other tetrodes' decoded position against
+    local coding around the animal. Right, the held-out time score
+    (``restriction_windows.restriction_window_statistics``, the events
+    summary's :data:`~continuum_swr_replay.reported.events.RESTRICTION_FIGURE`):
+    every tetrode's one-step-ahead predictive score, place fields held out by
+    whole trials, of the full decoder minus that of the decoder with only the
+    local states, summed over the event. Each is drawn by
+    :func:`draw_group_gain`; the axes share their y axis. The dashed line is
+    zero, where local coding predicts the spikes as well. It is not a control:
+    the groups' Local-rest controls sit near it by construction (in Local rest
+    the decoded position is the animal's own), so they are in the events
+    summary and not drawn.
+
+    Parameters
+    ----------
+    ax_tetrode, ax_time : Axes
+        The two axes, ``ax_time`` sharing ``ax_tetrode``'s y axis.
+    tetrode, time : pd.DataFrame
+        Each score's statistics of the events, indexed by group
+        (:func:`draw_group_gain`).
+    """
+    draw_group_gain(ax_tetrode, tetrode, "Held-out\ntetrode")
+    draw_group_gain(ax_time, time, "Held-out\ntime")
+    ax_tetrode.text(
+        0.04, -0.02, "no gain", transform=ax_tetrode.get_yaxis_transform(),
+        va="top", fontsize=SMALL_SIZE, color=C_REFERENCE,
+    )  # fmt: skip
+    ax_tetrode.set_ylim(-0.12, None)
+    ax_tetrode.set_ylabel("Held-out gain\nover local (nats/spike)")
+    ax_time.tick_params(labelleft=False)
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1369,6 +1423,19 @@ def generate_figure(
         )
     )
     heldout_events = holdout_statistics(heldout, "event")
+    # the events summary's window values: the same run, cohort and function
+    family, contrast, unit, kind = RESTRICTION_FIGURE
+    restriction_events = restriction_window_statistics(
+        read_complete_run(
+            data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+            "nonlocal_restriction_windows",
+            event_epochs,
+        ),
+        families=[family],
+        contrasts=[contrast],
+        units=[unit],
+        kinds=[kind],
+    ).set_index("group")
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
@@ -1398,11 +1465,15 @@ def generate_figure(
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
     draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
-    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.05, 0.85, 1.0, 1.0], wspace=0.85)
+    row4 = outer[3].subgridspec(
+        1, 4, width_ratios=[1.4, 1.61, 2.13, 1.39], wspace=0.484
+    )
     ax_g = fig.add_subplot(row4[0])
     draw_participation(ax_g, participation)
-    ax_h = fig.add_subplot(row4[1])
-    draw_heldout_gain(ax_h, heldout_events)
+    heldout_grid = row4[1].subgridspec(1, 2, wspace=0.12)
+    ax_h = fig.add_subplot(heldout_grid[0])
+    ax_h2 = fig.add_subplot(heldout_grid[1], sharey=ax_h)
+    draw_heldout_gain(ax_h, ax_h2, heldout_events, restriction_events)
     triggered = row4[2].subgridspec(4, 1, hspace=0.2)
     ax_i = fig.add_subplot(triggered[0])
     triggered_axes = [
@@ -1437,7 +1508,7 @@ def generate_figure(
             "e": [ax_e, ax_e2],
             "f": [ax_f1, ax_f2],
             "g": [ax_g],
-            "h": [ax_h],
+            "h": [ax_h, ax_h2],
             "i": triggered_axes,
             "j": [ax_j, ax_j2],
         },
