@@ -21,7 +21,10 @@ cell with no events): the decrement shrinks to zero while a coefficient runs
 to infinity. Near a finite maximum the step shrinks with the decrement.
 
 Once the decrement is below the tolerance the fit still takes that last full
-step, and reports ``A`` and the decrement where it lands. Stopping before it
+step, when ``F`` does not rise by more than a few rounding units of ``F``
+(``8 eps max(1, |F|)``) and the decrement where it lands is below the
+tolerance too, and reports ``A`` and the decrement there; otherwise it stays
+where it was, whose decrement is below the tolerance. Stopping before the step
 would leave a coefficient off by up to about ``sqrt(2 tol / lambda_min)``
 (``lambda_min`` the smallest eigenvalue of ``A``): 4e-5 on a content fit of 80
 events. After it the error is of the order of the square of that.
@@ -242,6 +245,7 @@ def penalized_newton(
                 S,
                 NewtonFit(beta, A, CONVERGED, decrement, n_iter, loglik),
                 step,
+                tol=tol,
             )
         if n_iter == max_iter:
             break
@@ -266,23 +270,26 @@ def _last_step(
     S: np.ndarray,
     fit: NewtonFit,
     step: np.ndarray,
+    *,
+    tol: float,
 ) -> NewtonFit:
-    """The converged ``fit`` moved by its full Newton ``step``.
+    """The converged ``fit`` moved by its full Newton ``step``, when that is safe.
 
-    The step is taken when it lowers ``F`` or, when its gain is below the
-    rounding of ``F`` (``F`` cannot tell the two points apart), when it lowers
-    the decrement: otherwise a coefficient would stay off by up to
+    The step is taken when ``F`` does not rise by more than its rounding,
+    ``8 eps max(1, |F|)``, and it lands where ``A`` is positive definite and
+    the decrement is below ``tol``; otherwise ``fit`` (whose decrement is below
+    ``tol``) is returned unchanged. A gain below the rounding of ``F`` is still
+    taken: without it a coefficient would stay off by up to
     ``sqrt(2 eps |F| / lambda_min)``, about 1e-7 on a fit with ``F`` near 400,
-    which the REML score inherits through ``log|A|``. ``fit`` is returned
-    unchanged when neither holds or the step lands where ``A`` is not
-    positive definite.
+    which the REML score inherits through ``log|A|``.
     """
     beta = fit.beta + step
     eta = X @ beta
     loglik = lik.loglik(eta, y, aux)
     F_old = -fit.loglik + 0.5 * fit.beta @ S @ fit.beta
     F_new = -loglik + 0.5 * beta @ S @ beta
-    if not np.isfinite(F_new):
+    rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(F_old))
+    if not (np.isfinite(F_new) and F_new <= F_old + rounding):
         return fit
     g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
     A = lik.information(X, eta, y, aux) + S
@@ -291,6 +298,6 @@ def _last_step(
     except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
         return fit
     decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
-    if not (F_new <= F_old or decrement < fit.newton_decrement):
+    if not decrement < tol:
         return fit
     return NewtonFit(beta, A, CONVERGED, decrement, fit.n_iter + 1, loglik)

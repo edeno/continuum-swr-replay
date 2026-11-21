@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import scipy.optimize
 
+from continuum_swr_replay.analysis.regression import newton
 from continuum_swr_replay.analysis.regression.constants import NEWTON_DECREMENT_TOL
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
@@ -317,3 +318,25 @@ def test_a_collinear_design_is_not_fitted(seed: int) -> None:
         Poisson(), X, y, np.zeros(300), np.zeros((3, 3)), np.zeros(3)
     )
     assert fit.status == NOT_IDENTIFIED and not fit.converged
+
+
+@pytest.mark.parametrize("to", [0.45, 0.3])
+def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
+    """``F(b) = exp(b) - b`` (one Poisson count, optimum 0). From ``b = -0.5``
+    a move to 0.45 lowers the decrement (0.128 to 0.103) but raises ``F``
+    (0.107 to 0.118 above its minimum); a move to 0.3 lowers ``F`` but lands at
+    a decrement of 0.045, above the tolerance. Neither is taken."""
+    X, y, offset, S = np.ones((1, 1)), np.ones(1), np.zeros(1), np.zeros((1, 1))
+    lik = Poisson()
+    beta = np.array([-0.5])
+    eta = X @ beta
+    g = X.T @ lik.score_eta(eta, y, offset)
+    A = lik.information(X, eta, y, offset)
+    decrement = 0.5 * float(g @ np.linalg.solve(A, g))
+    fit = NewtonFit(beta, A, CONVERGED, decrement, 3, lik.loglik(eta, y, offset))
+
+    moved = newton._last_step(
+        lik, X, y, offset, S, fit, np.array([to + 0.5]), tol=NEWTON_DECREMENT_TOL
+    )
+
+    assert moved is fit
