@@ -9,6 +9,8 @@ package may import it.
 - ``likelihoods``: Poisson with an offset, Bernoulli, Gaussian with a scale and
   the grouped softmax, each with its derivatives on the linear-predictor scale.
 - ``newton``: the penalized Newton fit at fixed penalty strengths.
+- ``reml``: penalty strengths by REML with exact derivatives, one per smooth
+  term and shared by the sessions (pooled), from a grid start.
 - ``pspline``: the cubic B-spline basis on fixed, equally spaced knots, its
   second-order difference penalty and the sum-to-zero constraint.
 

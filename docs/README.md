@@ -124,7 +124,7 @@ violation fails.
 
 | Stage | Package (`analysis/`) | Owns | Does not own |
 |---|---|---|---|
-| Fit | `regression/` | the shared fitter: the likelihoods and their derivatives, the penalized Newton fit, the P-spline basis and penalty, and the fitter's numerical rules (`constants.py`) | which columns and rows a model uses |
+| Fit | `regression/` | the shared fitter: the likelihoods and their derivatives, the penalized Newton fit, the penalty strengths by pooled REML, the P-spline basis and penalty, and the fitter's numerical rules (`constants.py`) | which columns and rows a model uses |
 | Rule | `event_definition/` | analyzed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
 | Find | `detection/` | the algorithms that produce inventories: the SWR and Carey detectors, rule R-T, the artifact detector, the memoryless sequence detector, the paper's non-local detector applied to a decode (`nonlocal_events.py`), and the simulated run Figure 1 shows it on (`simulated_run.py`) | which inventory is canonical; comparing inventories |
 | Compare | `detector_comparison/` | the inventories brought onto one schema and compared on the same recordings: overlap, exposure, counts, event features, held-out evidence | running a detector |
