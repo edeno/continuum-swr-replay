@@ -122,6 +122,10 @@ FIGURES: dict[str, Figure] = {
         "Slow and fast gamma during SWR and no-SWR events",
         "scripts/figures/generate_supp_event_gamma.py",
     ),
+    "heldout_tetrode": Figure(
+        "The held-out tetrode gain over local coding",
+        "scripts/figures/generate_supp_heldout_tetrode.py",
+    ),
     "content_estimators": Figure(
         "Content models under three estimators",
         "scripts/replay_models/content/compare_content_estimators.py",
@@ -257,7 +261,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
-        figures=("2", "2h"),
+        figures=("2", "2h", "heldout_tetrode"),
         note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(

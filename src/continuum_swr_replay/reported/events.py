@@ -182,7 +182,7 @@ TAGS = {
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("2h",)),
+    "tetrode_holdout": Tags(("2c.3",), ("heldout_tetrode",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3")),
@@ -1441,8 +1441,8 @@ def _per_spike_interval(
 
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the spike likelihood at the decoded positions minus at the
-    animal's, per spike, over each whole event (in sample; Figure 2h shows the
-    held-out score)."""
+    animal's, per spike, over each whole event (in sample; the held-out tetrode
+    supplementary figure shows the held-out score)."""
     make = value_factory(
         likelihood_advantage_values, source, TAGS["likelihood_advantage"]
     )
@@ -1480,7 +1480,8 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
 
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
-    the events and their Local-rest controls (Figure 2h)."""
+    the events and their Local-rest controls (the held-out tetrode
+    supplementary figure)."""
     make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     values = []
     estimates = (
@@ -1543,7 +1544,6 @@ _RESTRICTION_HELD_OUT = (
 #: The window comparisons reported: kind of window, group, contrast.
 _RESTRICTION_WINDOWS = (
     ("event", SWR_LABELS[False], "full_minus_swr"),
-    ("event", SWR_LABELS[False], "full_minus_none"),
     ("event", SWR_LABELS[True], "swr_minus_none"),
     ("event", SWR_LABELS[True], "full_minus_none"),
     ("event", SWR_LABELS[True], "full_minus_swr"),
@@ -1554,9 +1554,9 @@ _RESTRICTION_KINDS = {
     "event": ("events", "events"),
     "control": ("controls", "matched Local-rest controls"),
 }
-#: The comparison Figure 2h's "Held-out time" axis draws, for both groups:
-#: score family, contrast, unit and kind of window.
-RESTRICTION_FIGURE = ("filter", "full_minus_none", "per_spike", "event")
+#: The comparison Figure 2h draws, for both groups: score family, contrast, unit
+#: and kind of window.
+RESTRICTION_FIGURE = ("filter", "full_minus_swr", "per_spike", "event")
 
 
 def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]:

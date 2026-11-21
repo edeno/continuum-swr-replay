@@ -869,7 +869,10 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
                         "spiking_gain_per_spike": value + 0.1,
                     }
                 )
-    numbers = _numbers(builder.tetrode_holdout_values(pd.DataFrame(rows), "s"))
+    values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
+    numbers = _numbers(values)
+    # the held-out tetrode supplementary figure draws them; Figure 2h does not
+    assert {v.figures for v in values} == {("heldout_tetrode",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
     assert numbers["non_swr_heldout_control_gain_per_spike"] == pytest.approx(0.0)
@@ -915,16 +918,6 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     assert numbers["restriction_non_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(4.0)
     )
-    assert numbers["restriction_non_swr_events_full_minus_none_per_spike"] == (
-        pytest.approx(4.0)
-    )
-    assert numbers[
-        "restriction_non_swr_events_full_minus_none_two_sided_per_spike"
-    ] == pytest.approx(8.0)
-    assert (
-        numbers["restriction_non_swr_events_full_minus_none_per_spike_animals_positive"]
-        == 3
-    )
     assert numbers["restriction_swr_events_swr_minus_none_per_spike"] == (
         pytest.approx(6.0)
     )
@@ -959,14 +952,14 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     assert numbers["restriction_non_swr_controls_scored"] == 3
     assert numbers["restriction_swr_events_scored"] == 3
     assert numbers["restriction_animals"] == 3
-    # two families x seven comparisons x (estimate, two bounds, animals positive),
+    # two families x six comparisons x (estimate, two bounds, animals positive),
     # two counts for each kind and group, and the animals
-    assert len(numbers) == 2 * 7 * 4 + 2 * 4 + 1
+    assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    # Figure 2h draws the filter family's full - none per spike over both groups'
+    # Figure 2h draws the filter family's full - swr per spike over both groups'
     # events: those values carry its tag, no other value does
     drawn = {
-        f"restriction_{word}_events_full_minus_none_per_spike{end}"
+        f"restriction_{word}_events_full_minus_swr_per_spike{end}"
         for word in ("non_swr", "swr")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     }
