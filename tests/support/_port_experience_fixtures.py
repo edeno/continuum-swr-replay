@@ -34,6 +34,62 @@ def empty_port_experiences() -> pd.DataFrame:
     return pd.DataFrame(columns=PORT_EXPERIENCE_COLUMNS)
 
 
+def _outcome_known_times(trials: pd.DataFrame) -> np.ndarray:
+    """Each toy trial's outcome clock: its own, or the loader's derivation.
+
+    A frame that carries ``outcome_known_time`` keeps it. Otherwise, with a
+    reward-on column, it is pump onset for a reward and the pump-latency
+    boundary after arrival (capped at the final poke-out) for an omission, as
+    ``data_loaders.trials`` derives it; with no reward-on column, ``end_time``.
+    """
+    if "outcome_known_time" in trials:
+        return pd.to_numeric(trials["outcome_known_time"], errors="coerce").to_numpy(
+            dtype=float
+        )
+    arrival_col = (
+        "destination_first_poke_in_time"
+        if "destination_first_poke_in_time" in trials
+        else "end_time"
+    )
+    arrival = pd.to_numeric(trials[arrival_col], errors="coerce").to_numpy(dtype=float)
+    end = pd.to_numeric(trials["end_time"], errors="coerce").to_numpy(dtype=float)
+    arrival = np.where(np.isfinite(arrival), arrival, end)
+    if "reward_on_time" not in trials:
+        return end
+    reward = pd.to_numeric(trials["is_reward"], errors="coerce").to_numpy(dtype=float)
+    given_reward_on = pd.to_numeric(trials["reward_on_time"], errors="coerce").to_numpy(
+        dtype=float
+    )
+    return outcome_known_times_from_task_visits(
+        rewarded=reward,
+        first_poke_in_time=arrival,
+        final_poke_out_time=end,
+        reward_on_time=np.where(reward.astype(bool), given_reward_on, np.nan),
+    )
+
+
+def with_outcome_known_time(trials: pd.DataFrame) -> pd.DataFrame:
+    """A toy trial frame with its ``outcome_known_time``, as the loaders give it.
+
+    Every loaded trial frame carries the outcome clock, and the table builders
+    require it; a hand-built frame without it gets the clock
+    :func:`_outcome_known_times` derives.
+
+    Parameters
+    ----------
+    trials : pd.DataFrame
+        A toy movement-trial frame.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy with ``outcome_known_time``.
+    """
+    if "outcome_known_time" in trials or trials.empty:
+        return trials
+    return trials.assign(outcome_known_time=_outcome_known_times(trials))
+
+
 def port_experiences_from_trials(
     trials: pd.DataFrame,
     *,
@@ -59,30 +115,7 @@ def port_experiences_from_trials(
     end = pd.to_numeric(frame["end_time"], errors="coerce").to_numpy(dtype=float)
     arrival = np.where(np.isfinite(arrival), arrival, end)
     reward = pd.to_numeric(frame["is_reward"], errors="coerce").to_numpy(dtype=float)
-    if "outcome_known_time" in frame:
-        outcome = pd.to_numeric(frame["outcome_known_time"], errors="coerce").to_numpy(
-            dtype=float
-        )
-    elif "reward_on_time" in frame:
-        # An omission becomes known at the pump-latency boundary after arrival,
-        # not at departure. This is the clock ``trial_outcome_times`` derives
-        # from the same reward-on column, so the adapted experiences have to
-        # match it or every builder test would run a later omission clock than
-        # the pipeline it stands in for.
-        given_reward_on = pd.to_numeric(
-            frame["reward_on_time"], errors="coerce"
-        ).to_numpy(dtype=float)
-        outcome = outcome_known_times_from_task_visits(
-            rewarded=reward,
-            first_poke_in_time=arrival,
-            final_poke_out_time=end,
-            reward_on_time=np.where(reward.astype(bool), given_reward_on, np.nan),
-        )
-    else:
-        # With no reward-on column there is no pump onset to anchor either
-        # outcome, and ``trial_outcome_times`` falls back to ``end_time`` for
-        # both; mirror that fallback rather than inventing a boundary.
-        outcome = end
+    outcome = _outcome_known_times(frame)
     reward_on = np.where(reward.astype(bool), outcome, np.nan)
     ports = (
         pd.to_numeric(frame["to_well"], errors="coerce").to_numpy(dtype=int)

@@ -48,14 +48,14 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402
-    fit_rows,
-    gated_coefficient_statistics,
-)
-from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.design_constants import (  # noqa: E402
     RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
+)
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402
+    fit_rows,
+    gated_coefficient_statistics,
 )
 from continuum_swr_replay.analysis.replay_models.rate.rate_fit_statistics import (  # noqa: E402
     paired_lag_one_kernel_statistics,

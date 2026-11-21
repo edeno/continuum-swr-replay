@@ -6,16 +6,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
+)
 from continuum_swr_replay.analysis.behavior.history_basis import (
     raised_cosine_history_basis,
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     PER_BIN_HISTORY_COLUMNS,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_BASIS,
-    REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (
     reward_kernel_weights,

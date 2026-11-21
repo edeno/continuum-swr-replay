@@ -323,9 +323,11 @@ def test_visit_ids_and_times_by_hand():
     assert before_next["time_since_last_poke_out_s"] == 5.0
     assert before_next["time_until_next_poke_in_s"] == 14.0
 
-    # A window across a boundary has no visit and no gap to a poke.
+    # A window across a boundary has no gap to a poke; one that starts inside
+    # a visit and crosses its final poke-out is placed in that visit.
+    assert row("spans the final poke-out")["well_visit_id"] == 0
+    assert pd.isna(row("spans a poke-in")["well_visit_id"])
     for name in ("spans the final poke-out", "spans a poke-in"):
-        assert pd.isna(row(name)["well_visit_id"])
         assert np.isnan(row(name)["time_since_last_poke_out_s"])
         assert np.isnan(row(name)["time_until_next_poke_in_s"])
     assert pd.isna(row("spans the final poke-out")["last_completed_well_visit_id"])
@@ -456,8 +458,15 @@ def test_the_label_changes_no_other_column(monkeypatch):
         "event": build_event_table(dot, env, trials, graph),
         "stop": build_stop_table(dot, trials, graph),
     }
+    # The visit clocks are read from the visit the label places an event in.
+    label_derived = (
+        *VISIT_CONTEXT_COLUMNS,
+        "time_since_visit_start_s",
+        "time_until_visit_end_s",
+        "time_until_stretch_end_s",
+    )
     for grain in with_label:
-        other = [c for c in with_label[grain] if c not in VISIT_CONTEXT_COLUMNS]
+        other = [c for c in with_label[grain] if c not in label_derived]
         pd.testing.assert_frame_equal(
             with_label[grain][other], without[grain][other], check_exact=True
         )

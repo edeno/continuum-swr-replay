@@ -50,7 +50,10 @@ from continuum_swr_replay.visualization.session_tables.responses import (
     _plot_mismatch_pointers,
     _plot_trial_rail,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
@@ -58,12 +61,14 @@ def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(dot, trials, _experiences(trials))
 
 
 def _compute_mismatch_table(
     event_table: pd.DataFrame, trials: pd.DataFrame, track_graph
 ) -> pd.DataFrame:
+    trials = with_outcome_known_time(trials)
     return _production_compute_mismatch_table(
         event_table, trials, _experiences(trials), track_graph
     )
@@ -93,6 +98,7 @@ def _ctx_with_trials(
     trials: pd.DataFrame, window: tuple[float, float]
 ) -> _PanelContext:
     """Build a minimal context for ``_plot_trial_rail`` isolation."""
+    trials = with_outcome_known_time(trials)
     return _PanelContext(
         data={},
         detector=None,
@@ -116,6 +122,7 @@ class TestTrialRail:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [100.0],
+                "destination_first_poke_in_time": [110.0],
                 "end_time": [110.0],
                 "to_well": [3],
                 "from_well": [0],
@@ -133,6 +140,7 @@ class TestTrialRail:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0, 20.0],
+                "destination_first_poke_in_time": [5.0, 15.0, 25.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "to_well": [1, 3, 5],
                 "from_well": [0, 1, 3],
@@ -156,6 +164,7 @@ class TestTrialRail:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0],
+                "destination_first_poke_in_time": [5.0],
                 "end_time": [5.0],
                 "to_well": [4],
                 "from_well": [0],
@@ -174,6 +183,7 @@ class TestTrialRail:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "to_well": [1, 3],
                 "from_well": [0, 1],
@@ -219,7 +229,7 @@ class TestTrialRail:
             == rails(from_zero)
             == [
                 ([6.0, 10.0], [1.0, 1.0]),
-                ([18.0, 20.0], [3.0, 3.0]),
+                ([16.0, 20.0], [3.0, 3.0]),
             ]
         )
 
@@ -229,7 +239,7 @@ class TestTrialRail:
         return pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
-                "destination_first_poke_in_time": [6.0, np.nan],
+                "destination_first_poke_in_time": [6.0, 16.0],
                 "end_time": [8.0, 18.0],
                 "from_well": [0, 1],
                 "to_well": [1, 3],
@@ -252,10 +262,10 @@ class TestTrialRail:
             )
             for line in rails
         ]
-        assert segments == [([6.0, 10.0], [1.0, 1.0]), ([18.0, 20.0], [3.0, 3.0])]
+        assert segments == [([6.0, 10.0], [1.0, 1.0]), ([16.0, 20.0], [3.0, 3.0])]
         plt.close(fig)
 
-    def test_reward_star_uses_goal_arrival_with_end_time_fallback(self):
+    def test_reward_star_uses_goal_arrival(self):
         fig, ax = plt.subplots()
         _plot_trial_rail(ax, _ctx_with_trials(self._timed_trials(), (0.0, 20.0)))
 
@@ -270,7 +280,7 @@ class TestTrialRail:
 
         np.testing.assert_allclose(
             offsets,
-            np.array([[6.0, 1.0], [18.0, 3.0]]),
+            np.array([[6.0, 1.0], [16.0, 3.0]]),
             rtol=0,
             atol=0,
         )
@@ -283,7 +293,7 @@ class TestTrialRail:
         ticks = [line for line in ax.lines if line.get_color() == "#9467bd"]
         assert len(ticks) == 1
         assert np.asarray(ticks[0].get_xdata(), dtype=float) == pytest.approx(
-            [18.0, 18.0]
+            [16.0, 16.0]
         )
         plt.close(fig)
 
@@ -296,6 +306,7 @@ def _ctx_for_debug(
     trials: pd.DataFrame,
     window: tuple[float, float],
 ) -> _PanelContext:
+    trials = with_outcome_known_time(trials)
     return _PanelContext(
         data={},
         detector=None,
@@ -344,7 +355,7 @@ class TestComputeMismatchTable:
             {
                 # Deliberately shuffled: production sorts before searchsorted.
                 "movement_start_time": [20.0, 0.0, 10.0],
-                "destination_first_poke_in_time": [24.0, 4.0, np.nan],
+                "destination_first_poke_in_time": [24.0, 4.0, 14.0],
                 "end_time": [25.0, 5.0, 15.0],
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
@@ -392,6 +403,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0, 20.0],
+                "destination_first_poke_in_time": [5.0, 15.0, 25.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "from_well": [0, 3, 5],
                 "to_well": [3, 5, 3],
@@ -413,6 +425,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -431,6 +444,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -449,6 +463,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0, 20.0],
+                "destination_first_poke_in_time": [5.0, 15.0, 25.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "from_well": [0, 0, 1],
                 "to_well": [0, 1, 2],
@@ -467,6 +482,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [20.0, 0.0, 10.0],
+                "destination_first_poke_in_time": [25.0, 5.0, 15.0],
                 "end_time": [25.0, 5.0, 15.0],
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
@@ -486,6 +502,7 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 1],
                 "to_well": [1, 2],
@@ -545,6 +562,7 @@ class TestMismatchPointersPanel:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -565,6 +583,7 @@ class TestMismatchPointersPanel:
         trials = pd.DataFrame(
             {
                 "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [5.0, 15.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -743,6 +762,7 @@ def _public_plot_inputs() -> dict:
     trials = pd.DataFrame(
         {
             "movement_start_time": [0.0, 2.0],
+            "destination_first_poke_in_time": [0.5, 3.0],
             "end_time": [0.5, 3.0],
             "from_well": [0, 0],
             "to_well": [0, 1],
@@ -750,6 +770,7 @@ def _public_plot_inputs() -> dict:
             "is_patch_change": [False, False],
         }
     )
+    trials = with_outcome_known_time(trials)
     return {
         "data": {},
         "detector": SimpleNamespace(environments=[None]),
@@ -1151,7 +1172,7 @@ class TestPatchPanels:
 class TestStopGrainPanels:
     @staticmethod
     def _stop_table(n_stops: int = 2) -> pd.DataFrame:
-        from continuum_swr_replay.analysis.replay_models.model_specs import (
+        from continuum_swr_replay.analysis.behavior.design_constants import (
             N_REWARD_LAGS,
         )
 
@@ -1360,6 +1381,7 @@ class TestPublicPlotSessionTables:
                 "is_patch_change": [False, False, True],
             }
         )
+        trials = with_outcome_known_time(trials)
 
         port_experiences = _experiences(trials)
         stop_table = build_stop_table(dot, trials, port_experiences, graph)
@@ -1545,7 +1567,15 @@ class TestPublicPlotSessionTables:
         for frame_name, columns in (
             ("event_table", ("event_start_s", "event_end_s", "event_midpoint_s")),
             ("event_arm_table", ("event_start_s", "event_end_s")),
-            ("trials", ("movement_start_time", "end_time")),
+            (
+                "trials",
+                (
+                    "movement_start_time",
+                    "destination_first_poke_in_time",
+                    "end_time",
+                    "outcome_known_time",
+                ),
+            ),
             (
                 "port_experiences",
                 ("arrival_time", "departure_time", "outcome_known_time"),

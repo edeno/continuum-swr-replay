@@ -91,7 +91,13 @@ from .uncertainty import (
     posterior_hpd_widths,
     posterior_peak_mean,
 )
-from .visit_context import VISIT_CONTEXT_COLUMNS, visit_context_of_samples
+from .visit_context import (
+    EVENT_VISIT_COLUMNS,
+    VISIT_CONTEXT_COLUMNS,
+    assign_visit_current_arm,
+    event_visit_columns,
+    visit_context_of_samples,
+)
 
 # State-probability column mapping for the 4-state Non-Local model:
 # per-event rollup column -> data_over_time per-bin column.
@@ -189,8 +195,8 @@ def _aggregate_event_features(
     # means "count every row you were given". Keeps the two filter
     # definitions from silently diverging if one is ever tuned without
     # the other. ``nonlocal_weight_sum`` sums the raw w_t over the same
-    # pre-filtered rows; this matches the legacy ``prepare_session``
-    # aggregation contract.
+    # pre-filtered rows: an event's weight is the sum of its in-event bins'
+    # non-local probability.
     nonlocal_prob_arr = nl["nonlocal_prob"].to_numpy()
     ids_sorted, n_bins = n_nonlocal_bins(
         nonlocal_prob_arr, event_id_series, threshold=0.0
@@ -335,7 +341,9 @@ def _attach_visit_context(
     """Attach the well-visit context of each event (``visit_context.py``).
 
     Read over the event's complete label window, the same bins its
-    ``occupancy_state`` summarizes.
+    ``occupancy_state`` summarizes. An event that crosses the final poke-out
+    takes its visit's well as its current arm
+    (``visit_context.assign_visit_current_arm``).
     """
     context = visit_context_of_samples(
         nl,
@@ -347,6 +355,25 @@ def _attach_visit_context(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_event[column] = context[column].array
+    return assign_visit_current_arm(per_event, port_experiences, track_graph)
+
+
+def _attach_visit_clocks(
+    per_event: pd.DataFrame, port_experiences: pd.DataFrame, bout_ends: np.ndarray
+) -> pd.DataFrame:
+    """Attach the visit clocks and the trial number (``visit_context.py``).
+
+    Read at ``event_start_s``, with the end of the event's stop
+    (``stop_idx``) as the end of its immobile stretch.
+    """
+    clocks = event_visit_columns(
+        per_event["event_start_s"].to_numpy(dtype=float),
+        bout_ends[per_event["stop_idx"].to_numpy()],
+        per_event["well_visit_id"].array,
+        port_experiences,
+    )
+    for column in EVENT_VISIT_COLUMNS:
+        per_event[column] = clocks[column].to_numpy()
     return per_event
 
 
@@ -431,30 +458,24 @@ def _attach_trajectory_rollups(
 ) -> pd.DataFrame:
     """Attach the trajectory rollups.
 
-    These require the augmented data_over_time columns (step_distance, raw
-    ripple/MUA/theta, run_speed_baseline). When ``dot`` predates the
-    augmentation, emit the columns as NaN so the schema stays stable.
+    These read the augmented data_over_time columns (``step_distance``,
+    ``run_speed_baseline``), which every decode frame carries.
     """
-    trajectory_cols = (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS)
-    if {"step_distance", "run_speed_baseline"}.issubset(nl.columns):
-        rollups = compute_trajectory_rollups(
-            nl=nl,
-            event_id=event_id_series,
-            env=env,
-            track_graph=track_graph,
-            state_prob_cols=_NONLOCAL_STATE_COLS,
-            continuous_col="Non-Local_Continuous_prob",
-            fragmented_col="Non-Local_Fragmented_prob",
-            place_bin_size=place_bin_size,
-            nonlocal_prob=nonlocal_prob_arr,
-            arm_posterior=arm_posterior,
-            non_local_threshold=nonlocal_threshold,
-        )
-        for col_name in trajectory_cols:
-            per_event[col_name] = rollups[col_name]
-    else:
-        for col_name in trajectory_cols:
-            per_event[col_name] = np.nan
+    rollups = compute_trajectory_rollups(
+        nl=nl,
+        event_id=event_id_series,
+        env=env,
+        track_graph=track_graph,
+        state_prob_cols=_NONLOCAL_STATE_COLS,
+        continuous_col="Non-Local_Continuous_prob",
+        fragmented_col="Non-Local_Fragmented_prob",
+        place_bin_size=place_bin_size,
+        nonlocal_prob=nonlocal_prob_arr,
+        arm_posterior=arm_posterior,
+        non_local_threshold=nonlocal_threshold,
+    )
+    for col_name in (*SHARED_TRAJECTORY_COLUMNS, *NONLOCAL_ONLY_COLUMNS):
+        per_event[col_name] = rollups[col_name]
     return per_event
 
 
@@ -659,11 +680,16 @@ def build_event_table(
         ``event_midpoint_s``, ``time_since_stop_start_s``
     Behavioral location and arms
         ``occupancy_state``, ``at_well``, ``occupancy_well_id``,
-        ``occupancy_well_arm``, ``modal_observed_track_segment_id``,
+        ``occupancy_well_arm`` (for a ``spans_visit_end`` event, the arm of
+        its visit's well), ``modal_observed_track_segment_id``,
         ``prev_arm``, ``next_arm`` (post-hoc), ``last_rewarded_arm``
     Well-visit context (``visit_context.window_visit_context``)
         ``visit_context``, ``well_visit_id``, ``last_completed_well_visit_id``,
         ``time_since_last_poke_out_s``, ``time_until_next_poke_in_s``
+    Visit clocks and trial number (``visit_context.event_visit_columns``)
+        ``time_since_visit_start_s``, ``time_until_visit_end_s``,
+        ``time_until_stretch_end_s`` (events that start inside a visit),
+        ``n_visits_arrived``
     Patches
         ``current_patch``, ``prev_patch``, ``next_patch`` (post-hoc)
     Context flags
@@ -772,6 +798,8 @@ def build_event_table(
     per_event = _merge_classified_event_facts(per_event, dot, nonlocal_threshold)
 
     per_event = _attach_stop_ids(per_event, session_key, bout_starts, bout_ends)
+
+    per_event = _attach_visit_clocks(per_event, port_experiences, bout_ends)
 
     return stamp_covariate_schema(per_event[column_order], table="event")
 

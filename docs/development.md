@@ -316,7 +316,9 @@ is that subset, and `count_visit_context` gives the rows kept and dropped per la
 Do not re-implement the filter. At the stop grain the label is about the whole stop:
 most `mixed` stops start inside a visit and run past its final poke-out
 (`spans_visit_end`): the default selection keeps them, and selecting stops by
-`in_visit` alone would drop their in-visit seconds.
+`in_visit` alone would drop their in-visit seconds. An event or a stop that starts
+inside a visit and crosses its final poke-out takes the visit's well as its current
+arm, patch and `is_stay` (`visit_context.assign_visit_current_arm`), in every table.
 
 A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
 visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time

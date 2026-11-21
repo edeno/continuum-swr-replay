@@ -69,13 +69,11 @@ and their readers select.
 
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables (event / event-arm / event-patch / event-sequence / stop).
-- `regenerate_stop_table.py` — rebuild the per-stop immobility table.
-- `build_timebin_tables.py` — build the per-(stop×bin) design tables.
+- `build_timebin_tables.py` — build the event-onset table.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
 - `assemble_replay_content_shards.py`, `assemble_contfrag_shards.py` — assemble per-animal table shards into one bundle.
 - `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing a preserved bundle's posterior aggregates.
 - `write_regeneration_manifest.py` — validate candidate covariate bundles and write the release manifest.
-- `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the tables.
 - `_table_runner.py` — not a script: the session selection, shard reading and publishing the drivers above share.
 
 ## `behavior/` — what the animal did and what the behavioral model says
@@ -92,6 +90,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `fit_cross_history_ridge_cv.py` — ridge cross-validated comparison of self vs self+cross history, per animal.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
+- `describe_visit_clocks.py` — model-free event-start rates per at-risk second on the three visit clocks, per kind and animal, and the stops by how they end; writes `models_convention/descriptive/visit_clock_curves.parquet`.
 
 ## `replay_models/coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power against the behavioral covariates.

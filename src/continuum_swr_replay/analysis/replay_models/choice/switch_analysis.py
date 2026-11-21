@@ -146,7 +146,9 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     Whether the run started here is read from the stop's own arriving
     trip, not from the ``is_stay`` of the stop before it. That neighbor's
     ``is_stay`` is NaN for reasons that say nothing about switching: the
-    stop was in transit or mixed (no current patch), before the first trial
+    stop was in transit or mixed without starting inside a visit (no
+    current patch; a stop that crosses a visit's final poke-out has the
+    visit's), before the first trial
     (no next well yet), or wholly in excluded time. When the stop before
     is a known at-well stop one trip earlier, the two readings agree
     exactly. A stop whose own ``is_stay`` or arriving-trip record is NaN

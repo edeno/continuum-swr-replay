@@ -81,7 +81,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FixedFormatter, FixedLocator, MaxNLocator
 
-from continuum_swr_replay.analysis.replay_models.model_specs import (
+from continuum_swr_replay.analysis.behavior.design_constants import (
     RECENCY_SPLINE_COLUMNS,
 )
 from continuum_swr_replay.tables.columns import require_columns

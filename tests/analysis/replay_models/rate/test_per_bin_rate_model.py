@@ -12,9 +12,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    REWARD_HISTORY_N_BASIS,
+)
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
-    REWARD_HISTORY_N_BASIS,
     PerBinRateModelSpec,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (

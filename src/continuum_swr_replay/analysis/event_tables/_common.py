@@ -44,7 +44,11 @@ from .trajectory import (
     NONLOCAL_ONLY_COLUMNS,
     SHARED_TRAJECTORY_COLUMNS,
 )
-from .visit_context import VISIT_CONTEXT_COLUMNS
+from .visit_context import (
+    EVENT_VISIT_COLUMNS,
+    STOP_VISIT_COLUMNS,
+    VISIT_CONTEXT_COLUMNS,
+)
 
 # Continuous per-arm covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``.
 # The build fills NaN placeholders per session; the real global z is computed once in
@@ -129,6 +133,7 @@ _EVENT_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_max",
     # Where the window lies relative to the well visits (visit_context.py).
     *VISIT_CONTEXT_COLUMNS,
+    *EVENT_VISIT_COLUMNS,
     "is_swr",
     "is_mua",
     "did_last_completed_trip_switch_patch",
@@ -219,6 +224,7 @@ _STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_max",
     # Where the window lies relative to the well visits (visit_context.py).
     *VISIT_CONTEXT_COLUMNS,
+    *STOP_VISIT_COLUMNS,
     "occupancy_well_arm",
     "prev_arm",
     "next_arm",
@@ -267,6 +273,7 @@ _EVENT_ARM_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_max",
     # Where the window lies relative to the well visits (visit_context.py).
     *VISIT_CONTEXT_COLUMNS,
+    *EVENT_VISIT_COLUMNS,
     "is_swr",
     "is_mua",
     "did_last_completed_trip_switch_patch",
@@ -303,6 +310,7 @@ _EVENT_ARM_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "is_candidate_arm_never_visited",
     "reward_count_candidate_arm_last10_known_trials",
     "reward_fraction_candidate_arm_last10_visits",
+    "log1p_n_known_visits_candidate_arm",
     "task_reward_probability_candidate_arm",
     "reward_belief_mean_candidate_arm_preoutcome",
     "reward_belief_variance_candidate_arm_preoutcome",

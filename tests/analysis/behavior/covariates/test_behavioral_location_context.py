@@ -20,11 +20,15 @@ from continuum_swr_replay.analysis.event_tables.bouts import (
 from continuum_swr_replay.data_loaders.constants import (
     OMISSION_KNOWN_LATENCY_SEC,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def add_trial_context(dot: pd.DataFrame, trials: pd.DataFrame) -> pd.DataFrame:
     """Exercise the production API with a complete experience stream."""
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(
         dot,
         trials,
@@ -374,6 +378,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
             pd.DataFrame(
                 {
                     "movement_start_time": [0.0, 2.0],
+                    "destination_first_poke_in_time": [3.0, 4.0],
                     "end_time": [3.0, 4.0],
                     "from_well": [0, 1],
                     "to_well": [1, 2],
@@ -387,6 +392,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
             pd.DataFrame(
                 {
                     "movement_start_time": [2.0],
+                    "destination_first_poke_in_time": [1.0],
                     "end_time": [1.0],
                     "from_well": [0],
                     "to_well": [1],
