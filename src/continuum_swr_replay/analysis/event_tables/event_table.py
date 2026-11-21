@@ -91,6 +91,7 @@ from .uncertainty import (
     posterior_hpd_widths,
     posterior_peak_mean,
 )
+from .visit_context import VISIT_CONTEXT_COLUMNS, visit_context_of_samples
 
 # State-probability column mapping for the 4-state Non-Local model:
 # per-event rollup column -> data_over_time per-bin column.
@@ -323,6 +324,30 @@ def _aggregate_event_features(
     per_event["n_nonlocal_bins"] = n_bins
     per_event["nonlocal_probability_sum"] = weight_sum
     return per_event, nonlocal_prob_arr
+
+
+def _attach_visit_context(
+    per_event: pd.DataFrame,
+    nl: pd.DataFrame,
+    port_experiences: pd.DataFrame,
+    track_graph: nx.Graph,
+) -> pd.DataFrame:
+    """Attach the well-visit context of each event (``visit_context.py``).
+
+    Read over the event's complete label window, the same bins its
+    ``occupancy_state`` summarizes.
+    """
+    context = visit_context_of_samples(
+        nl,
+        nl["non_local_event"].to_numpy(),
+        per_event["non_local_event"].to_numpy(),
+        per_event["occupancy_state"].to_numpy(dtype=object),
+        port_experiences,
+        track_graph,
+    )
+    for column in VISIT_CONTEXT_COLUMNS:
+        per_event[column] = context[column].array
+    return per_event
 
 
 def _attach_time_since_stop(
@@ -636,6 +661,9 @@ def build_event_table(
         ``occupancy_state``, ``at_well``, ``occupancy_well_id``,
         ``occupancy_well_arm``, ``modal_observed_track_segment_id``,
         ``prev_arm``, ``next_arm`` (post-hoc), ``last_rewarded_arm``
+    Well-visit context (``visit_context.window_visit_context``)
+        ``visit_context``, ``well_visit_id``, ``last_completed_well_visit_id``,
+        ``time_since_last_poke_out_s``, ``time_until_next_poke_in_s``
     Patches
         ``current_patch``, ``prev_patch``, ``next_patch`` (post-hoc)
     Context flags
@@ -712,6 +740,8 @@ def build_event_table(
     per_event, nonlocal_prob_arr = _aggregate_event_features(
         nl, event_id_series, session_key, mua_overlap_keys, track_graph
     )
+
+    per_event = _attach_visit_context(per_event, nl, port_experiences, track_graph)
 
     per_event = _attach_time_since_stop(per_event, nl, bout_starts)
 

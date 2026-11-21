@@ -13,6 +13,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.well_visits import (
+    well_visit_index,
+)
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.tables.columns import require_columns
 
@@ -323,14 +326,12 @@ def behavioral_location_from_port_experiences(
     departures = experiences["departure_time"].to_numpy(dtype=float)
     ports = experiences["port"].to_numpy(dtype=float)
 
-    arrived_idx = np.searchsorted(arrivals, sample_times, side="right") - 1
-    has_arrived = arrived_idx >= 0
-    clipped = np.clip(arrived_idx, 0, len(experiences) - 1)
-    is_at_well = has_arrived & (sample_times < departures[clipped])
+    visit = well_visit_index(sample_times, arrivals, departures)
+    is_at_well = visit >= 0
     # Once a recorded dwell ends, the animal is off-well. Keeping the final
     # post-departure state as transit makes earlier labels invariant when a
     # later experience is appended.
-    is_between_visits = has_arrived & ~is_at_well
+    is_between_visits = (sample_times >= arrivals[0]) & ~is_at_well
 
     state = np.full(len(sample_times), "unknown", dtype=object)
     state[is_between_visits] = "in_transit"
@@ -339,7 +340,7 @@ def behavioral_location_from_port_experiences(
     at_well[is_between_visits] = False
     at_well[is_at_well] = True
     location_well = pd.array([pd.NA] * len(sample_times), dtype="Float64")
-    location_well[is_at_well] = ports[clipped[is_at_well]]
+    location_well[is_at_well] = ports[visit[is_at_well]]
 
     return pd.DataFrame(
         {

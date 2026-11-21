@@ -547,6 +547,8 @@ def _synthetic_patch_inputs(**event_columns) -> tuple[pd.DataFrame, pd.DataFrame
         {
             "event_id": [1] * 9,
             "candidate_arm": arms,
+            "occupancy_state": "at_well",
+            "visit_context": "in_visit",
             "arm_count_hard": [4.0, 0, 4.0, 0, 0, 0, 0, 0, 0],
             "is_same_patch_as_current": np.zeros(9, dtype=int),
             "reward_count_candidate_arm_last10_known_trials": np.zeros(9),
@@ -560,6 +562,8 @@ def _synthetic_patch_inputs(**event_columns) -> tuple[pd.DataFrame, pd.DataFrame
             "session_date": [20200101],
             "epoch": ["01_r1"],
             "event_id": [1],
+            "occupancy_state": ["at_well"],
+            "visit_context": ["in_visit"],
             "last_rewarded_arm": [np.nan],
             "prev_patch": [np.nan],
             "did_last_completed_trip_switch_patch": [0],

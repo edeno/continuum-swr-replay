@@ -297,6 +297,32 @@ The artifact rule drops events without renumbering the rest, so kept
 `event_id`s do not shift; the atomic set is still regenerated together,
 because dropped events leave every table.
 
+**One well-visit label, one selection.** A well visit runs from the animal's first
+nose-poke in at a reward well to its final poke-out there. Every event and every
+stop carries `visit_context` (`analysis/event_tables/visit_context.py`; the values
+and the two 10 cm radii are in `analysis/constants.py`): `in_visit` exactly when
+`occupancy_state == "at_well"`, and otherwise where the window lies (across a visit
+boundary, still next to the well just left, on the track, before the first visit).
+The event, event × arm, event × patch and stop tables carry it, the non-local tables
+and the ContFrag tables (SWR and MUA events) alike, with the visit's id and the times
+since the last poke-out and until the next poke-in; the table contract
+(`table_contracts.require_visit_context_labels`) refuses a table without it. No row
+is dropped for its label: the analyses read the events and stops that start inside a well
+visit (`in_visit` and `spans_visit_end`, `analysis/constants.py:STARTS_IN_WELL_VISIT`;
+an event belongs to the time when it starts, and the rate and the content models
+analyze the same events), selected by
+`analysis/event_definition/cohort_selection.py:select_visit_context`, whose default
+is that subset, and `count_visit_context` gives the rows kept and dropped per label.
+Do not re-implement the filter. At the stop grain the label is about the whole stop:
+most `mixed` stops start inside a visit and run past its final poke-out
+(`spans_visit_end`): the default selection keeps them, and selecting stops by
+`in_visit` alone would drop their in-visit seconds.
+
+A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
+visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
+grid: a time is inside a visit from the first poke-in (included) to the final poke-out
+(not included), the per-sample rule the labels summarize.
+
 ### Spatial Variables
 
 Position is tracked in multiple coordinate systems:
