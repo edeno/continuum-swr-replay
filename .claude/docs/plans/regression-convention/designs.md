@@ -55,6 +55,14 @@ def penalized_newton(lik, X, y, aux, S_lam, beta0, *, tol=NEWTON_DECREMENT_TOL,
 ```
 
 - No clipping of `eta` at the returned optimum; an infinite `F` during halving is a rejected step.
+- As built (`regression/newton.py`): when the decrement is below the tolerance the fit takes that last
+  full Newton step and reports `A` and the decrement where it lands (it stays where it was if the step
+  does not lower `F`). Without it each coefficient is off by up to `sqrt(2 tol / lambda_min)`, more than
+  the checks allow, and REML's derivatives assume the exact optimum. A matrix `A` that is not positive
+  definite or not finite reports not converged.
+- As built, every likelihood method takes `y` and `aux` (`dinformation(X, eta, y, aux, d)`,
+  `d2information(X, eta, y, aux, d1, d2)`): the weights need the offset, the scale or the groups. The
+  shorter signatures written below are shorthand for those.
 - Start: Poisson intercept `log(sum y / sum exposure)`, others 0; during a penalty search, warm start from
   the previous `rho`'s solution of the same session.
 - Unpenalized fits (S = 0) use the same code; then `A = H` must be PD, which the support rule makes likely
@@ -102,8 +110,10 @@ Gaussian scale: REML includes `log phi` as one more parameter of the outer searc
 - Identifiability: one sum-to-zero constraint per smooth, computed once on the pooled cohort rows of the
   model and kind (`c = sum_rows B`; `Z` = null space of `c'` from a complete QR), and the same `Z` used for
   every session, so that the coefficients mean the same thing in every session and the session curves can be
-  summarized together. The constrained penalty is `Z' P Z` (rank `n_basis - 3` after the constraint for a
-  second-order penalty on a cubic basis with an intercept in the model; compute the rank numerically once).
+  summarized together. The constrained penalty is `Z' P Z`, of rank `n_basis - 2`: a second-order difference penalty
+  leaves the constant and the line unpenalized, and the constraint removes one of those two directions
+  (as built: `regression/pspline.py`, whose test asserts the rank; take it from `penalty_rank`, never
+  from a count).
 - Model D (reward history as a linear functional): `eta_i += sum_{l=1}^{10} f(log l) r_{i,l}`,
   `f(x) = sum_b B_b(x) gamma_b` over `x in [0, log 10]`, so column `b` of the design is
   `sum_l B_b(log l) r_{i,l}` with `r_{i,l}` the outcome (1 rewarded, 0 omitted) at lag `l`. No sum-to-zero
