@@ -56,6 +56,11 @@ them importable.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
 
 ## `event_properties/` — what the events are like (Part 2)
+Each is over the events that start inside a well visit and the time inside one
+(`docs/figure-pipeline.md`, "The data subset of Figures 2 and 3"), and records
+`cohort_selection.ANALYZED_SUBSET` in its manifest; `measure_content_along_arms.py`
+and the `measure` stage of `measure_ripple_class_structure.py` measure every event,
+and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
 - `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2j).

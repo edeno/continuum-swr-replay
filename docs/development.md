@@ -321,7 +321,14 @@ most `mixed` stops start inside a visit and run past its final poke-out
 A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
 visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
 grid: a time is inside a visit from the first poke-in (included) to the final poke-out
-(not included), the per-sample rule the labels summarize.
+(not included), the per-sample rule the labels summarize. An epoch's visits are read
+from the session cache by `analysis/event_tables/prepare_data.py:well_visit_times`
+(a script loads them and passes the arrays or the mask down). An SWR, or another
+detector's event, counts when its first sample is inside a visit. A stored table made
+over every event is read over the selected ones with
+`cohort_selection.select_events_in` (every row of a selected `event_id`), and an
+output re-run over the subset records `cohort_selection.ANALYZED_SUBSET` as its
+`subset`, which the readers check ([figure-pipeline.md](figure-pipeline.md)).
 
 ### Spatial Variables
 

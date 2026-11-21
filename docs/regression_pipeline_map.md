@@ -110,7 +110,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`, `select_events_in`
 
 ### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
 
@@ -242,7 +242,7 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -272,7 +272,7 @@ Canonical event-grain builders: one row per non-local event.
 
 The per-session replay-table build and the corpus-level steps around it.
 
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `well_visit_times`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
 
