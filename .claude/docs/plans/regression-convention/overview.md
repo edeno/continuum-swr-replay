@@ -166,7 +166,7 @@ values until Phase 12; that is not a blocker for any phase before it.
 
 ## Rollout
 
-Replace in place, family by family, with old and new fits side by side until Phase 12. No backwards
+Replace in place, family by family, with old and new fits side by side until Phase 12. No backward
 compatibility is required for code; old stored fits stay on disk until Phase 12 so they can serve as
 baselines. Each phase is one PR into master with the lead's approval.
 

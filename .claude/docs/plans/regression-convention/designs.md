@@ -277,7 +277,7 @@ New functions in `analysis/shared_statistics.py` (task-agnostic, so they belong 
 `docs/README.md:100-103`, is kept):
 
 - `animal_day_session_values(values, animal, day, session, statistic)`: session values -> recording-day
-  values -> animal values (a mean or median at each level), the three-level analogue of
+  values -> animal values (a mean or median at each level), the three-level analog of
   `animal_session_values` (`shared_statistics.py:191`).
 - `day_level_test(values, animal, day)`: the signed-rank p over recording-day values
   (`signed_rank_p`, `shared_statistics.py:51`, which returns NaN below six non-zero differences).
