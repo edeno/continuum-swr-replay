@@ -69,13 +69,20 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     run,
     select_epochs,
 )
-from scripts.event_evidence.sum_nonlocal_restriction_windows import (  # noqa: E402
-    decode_time,
-)
 
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "bin_facts"
 RESTRICTION_NAME = "nonlocal_restriction"
+
+
+def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
+    """The epoch's decode frame's time axis, s, shape (n_time,)."""
+    from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+        read_dot_with_swr_source,
+    )
+
+    frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
+    return frame.index.to_numpy(dtype=float)
 
 
 def well_visits(epoch_id: str):

@@ -896,7 +896,7 @@ Spike-evidence reality analysis for non-SWR non-local events.
 
 Each decode bin's spikes over every tetrode and whether it is inside a well visit.
 
-`well_visits`, `run_epoch`, `main`
+`decode_time`, `well_visits`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/measure_event_participation.py`
 
