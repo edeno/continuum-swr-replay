@@ -199,12 +199,15 @@ def nonlocal_share_by_power(
     )
 
 
-def rest_power_counts(dot: pd.DataFrame) -> pd.DataFrame:
-    """One epoch's immobile time bins, and those decoded non-local, by ripple power.
+def rest_power_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.DataFrame:
+    """One epoch's immobile time bins inside the well visits, and those decoded
+    non-local, by ripple power.
 
     The bins are the immobile ones outside excluded time
-    (``analyzed_time.immobile_analyzed_bins``); one is non-local when its
-    non-local probability is above ``DEFAULT_NON_LOCAL_THRESHOLD``.
+    (``analyzed_time.immobile_analyzed_bins``) that lie inside a well visit
+    (from the first poke-in at a well to the final poke-out), the time the
+    analyzed events start in; one is non-local when its non-local probability
+    is above ``DEFAULT_NON_LOCAL_THRESHOLD``.
 
     Parameters
     ----------
@@ -213,6 +216,9 @@ def rest_power_counts(dot: pd.DataFrame) -> pd.DataFrame:
         (``analyzed_time.with_swr_source``), with ``head_speed``,
         ``in_excluded_time``, ``SWR_zscore`` and the two non-local state
         probabilities.
+    in_visit : NDArray of bool, shape (n_time,)
+        Whether each bin is inside a well visit
+        (``event_definition.well_visits.in_well_visit`` on the frame's times).
 
     Returns
     -------
@@ -220,8 +226,19 @@ def rest_power_counts(dot: pd.DataFrame) -> pd.DataFrame:
         One row per bin of :data:`RIPPLE_POWER_EDGES`: ``power_low``,
         ``power_high``, ``n_bins`` and ``n_nonlocal``. A bin without a finite
         power or probability is in no row.
+
+    Raises
+    ------
+    ValueError
+        If ``in_visit`` is not one bool per bin.
     """
-    rest = immobile_analyzed_bins(dot)
+    in_visit = np.asarray(in_visit)
+    if in_visit.dtype != bool or in_visit.shape != (len(dot),):
+        raise ValueError(
+            f"in_visit must be one bool per bin, shape ({len(dot)},); got "
+            f"{in_visit.dtype} of shape {in_visit.shape}"
+        )
+    rest = immobile_analyzed_bins(dot) & in_visit
     counts = nonlocal_share_by_power(
         dot["SWR_zscore"].to_numpy()[rest],
         nonlocal_probability(dot).to_numpy()[rest],

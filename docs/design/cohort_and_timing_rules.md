@@ -501,6 +501,4 @@ valid-replay-stop filter — is *definitional*, so `n_in` is the post-selection
 candidate count. The qvals-merging auxiliary runners `fit_uncertainty_rate.py`
 (inner join → `n_drop_qvals_gap`) and `fit_swr_power_model.py` (left join +
 per-session dropna on qvals-derived predictors → `n_drop_qvals_gap`) each emit
-their own cohort audit. `fit_cross_history_rate.py` (a bivariate
-self-/cross-history variant with no new qvals dependence) is **not** audited —
-documented, not silently dropped.
+their own cohort audit.

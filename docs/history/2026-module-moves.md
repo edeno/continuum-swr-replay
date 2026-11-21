@@ -765,3 +765,36 @@ module kept its place; one file was renamed. Paths are under `src/continuum_swr_
 
 The PFC cohort records keep their key `n_analysed`: the records on disk carry it, and
 `reported/mpfc/population.py` reads it.
+
+## The all-bins cross-history model removed, 2026-11-20
+
+The older cross-history runner, which fit `MODEL_CROSS_HISTORY_RATE` per session with every bin of a
+stop at risk, was removed; nothing reported it. The rungs stay in `model_specs.py`: the duration-aware
+model fits them as its onset-only comparison. Its stored output,
+`models_per_bin_rate/cross_history_models.pkl`, is left on disk and nothing reads it. The module path is under
+`src/continuum_swr_replay/`.
+
+| Old path | New home |
+|---|---|
+| `analysis/replay_models/rate/cross_history.py` (removed: retired) | none |
+| `scripts/replay_models/rate/fit_cross_history_rate.py` (removed: retired) | none |
+| `tests/analysis/replay_models/rate/test_cross_history.py` (removed: retired) | none |
+
+## The well visit in the tables, 2026-11-20
+
+The well visit (first nose-poke in to final poke-out) became the tables' unit: the stop,
+event and event × arm tables gained the visit columns (`docs/covariate_dictionary.md`,
+"The well visit and its clocks"). What that replaced was removed. Paths are under
+`src/continuum_swr_replay/` unless they start with `scripts/`.
+
+| Removed | Replaced by |
+|---|---|
+| the dense stop time-bin table `stop_timebin_table.parquet` (canonical name `stop_timebin`, its row key in `tables/covariate_registry.py`) (removed: replaced by the visit bins) | the rate models' visit bins (`analysis/replay_models/visit_design.visit_timebins`), built per session from the stop and event tables; the file in `Processed-Data/replay_content/` is kept, no longer read |
+| `analysis/event_tables/timebin_tables.build_stop_timebin_table`, `concat_session_timebin_tables`, `ONSETS_IN_EXCLUDED_BINS_ATTR` (removed: replaced by the visit bins) | `build_event_onset_table` stays; `scripts/tables/build_timebin_tables.py` writes only the event-onset table |
+| `scripts/exploratory/_timeresolved_psth.py` (removed: its table is gone) | none |
+| `scripts/tables/regenerate_stop_table.py` (removed: the tables are rebuilt as one set) | `scripts/tables/prepare_replay_content_data.py` |
+| `scripts/tables/convert_tables_to_parquet.py` and the `fmt` parameter of `paths.table_path` (removed: the one-time pickle migration is done) | `table_path` names only the parquet file; the pickles stay under `_pickle_archive/` |
+| `analysis.event_tables.uncertainty.nonlocal_weight_sum` (removed: re-export) | `analysis.event_tables.summaries.nonlocal_weight_sum` |
+| `analysis.behavior.covariates.reward_basis_from_lags`, `analysis.behavior.covariates.history.reward_basis_from_lags` (removed: re-exports) | `analysis.behavior.history_basis.reward_basis_from_lags` |
+| `analysis.replay_models.per_bin_design.arrival_spanning_stop_ids` (removed: moved) | `analysis.replay_models.visit_design.arrival_spanning_stop_ids`, beside the outcome-boundary shift and the bin coverage the two designs share |
+| the rate and history constants re-exported by `analysis.replay_models.model_specs` (`RATE_BIN_S`, `TMAX`, `TMAX_ARRIVAL`, `N_HISTORY_LAGS`, `N_HISTORY_BASIS`, `N_REWARD_LAGS`, `REWARD_HISTORY_*`, `RECENCY_SPLINE_*`, `ARRIVAL_*`, `ARM_FE_PREDICTORS`, `SPLINE_KNOTS`, `N_CROSS_LONG_*`) (removed: re-exports) | `analysis.behavior.design_constants` |

@@ -3,7 +3,7 @@
 
 The parity check of a change that must not move any table. ``regen`` rebuilds
 every canonical table -- the replay tables (stop, qvals, event, event-arm,
-event-patch, event-sequence, event-onset, stop-timebin) and the ContFrag SWR
+event-patch, event-sequence, event-onset) and the ContFrag SWR
 and MUA tables -- into a new root, with the same builders, flags and order as
 the 2026-10-11 rebuild the live tables come from: stop bootstrap -> qvals ->
 one replay shard per animal (beside the time-bin build) -> assemble -> ContFrag

@@ -48,8 +48,8 @@ from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS
 from continuum_swr_replay.tables.columns import require_columns
 
 # Shared with the covariate builders, which must not import this module: see
-# ``design_constants`` for why the numbers live there and not here. Re-exported
-# below so ``from ...model_specs import RATE_BIN_S`` keeps working.
+# ``design_constants`` for why the numbers live there and not here. Import them
+# from ``design_constants``.
 from ..behavior.design_constants import (
     ARM_FE_PREDICTORS,
     ARRIVAL_CLOCK_COLUMN,
@@ -58,15 +58,11 @@ from ..behavior.design_constants import (
     N_CROSS_LONG_LAGS,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    N_REWARD_LAGS,
     RATE_BIN_S,
-    RECENCY_SPLINE_BOUNDS,
     RECENCY_SPLINE_COLUMNS,
-    RECENCY_SPLINE_KNOTS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
     REWARD_HISTORY_N_BASIS,
-    REWARD_HISTORY_N_LAGS,
     SPLINE_KNOTS,
     TMAX,
     TMAX_ARRIVAL,
@@ -74,10 +70,6 @@ from ..behavior.design_constants import (
 from ..event_tables.content_response import renormalize_fraction_over_candidates
 
 __all__ = [
-    "ARM_FE_PREDICTORS",
-    "ARRIVAL_CLOCK_COLUMN",
-    "ARRIVAL_SPLINE_KNOTS",
-    "RATE_BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "CONTENT_ESTIMATOR_COMPARISON_RUNGS",
     "ComparisonRung",
@@ -101,9 +93,6 @@ __all__ = [
     "MU_UNCERTAINTY_RL_COVARIATES",
     "ModelSpec",
     "N_ARM_CATEGORIES",
-    "N_HISTORY_BASIS",
-    "N_HISTORY_LAGS",
-    "N_REWARD_LAGS",
     "PER_BIN_DESIGN",
     "PER_BIN_HISTORY_ANCHORS",
     "PER_BIN_HISTORY_COLUMNS",
@@ -113,14 +102,6 @@ __all__ = [
     "PRIMARY_COHORT",
     "PerBinRateModelSpec",
     "PerBinTerm",
-    "RECENCY_SPLINE_BOUNDS",
-    "RECENCY_SPLINE_COLUMNS",
-    "RECENCY_SPLINE_KNOTS",
-    "REWARD_HISTORY_COLUMNS",
-    "REWARD_HISTORY_INCOMPLETE",
-    "REWARD_HISTORY_N_BASIS",
-    "REWARD_HISTORY_N_LAGS",
-    "SPLINE_KNOTS",
     "STOP_COVARIATES",
     "SWR_CONTRAST_CONTENT_ARM_KEY_TERM",
     "SWR_CONTRAST_CONTENT_ARM_LADDER",
@@ -133,8 +114,6 @@ __all__ = [
     "SWR_CONTRAST_RATE_G_SPECS",
     "SWR_CONTRAST_RATE_S_SPECS",
     "SWR_CONTRAST_RATE_STOP_COVARS",
-    "TMAX",
-    "TMAX_ARRIVAL",
     "default_content_model_names",
     "longest_history_window_s",
     "resolve_comparison_rungs",
@@ -1105,8 +1084,10 @@ MODEL_UNCERTAINTY_RATE: dict[str, PerBinRateModelSpec] = {
 }
 
 
-# Cross-history coupling (``scripts/replay_models/rate/fit_cross_history_rate.py``): does one
-# non-local stream's recent history drive the other's rate? ``Mself`` is the
+# Cross-history coupling, onset-only: does one non-local stream's recent
+# history drive the other's rate? The duration-aware runner
+# (``scripts/replay_models/rate/fit_duration_aware_history_rate.py``) fits these
+# rungs beside its own as the comparison. ``Mself`` is the
 # time spline + reward kernel + self-history; ``Mselfcross`` adds the other
 # stream's raised-cosine cross-history. Reward enters via the kernel only (no
 # reward_rate stop covariate), so the design needs no regenerated stop

@@ -284,15 +284,14 @@ MU_uncertainty  count ~ BS_TC + REWBASIS + OFFCOS
 ```
 
 ## Cross-history coupling — per-bin Poisson (auxiliary)
-`scripts/replay_models/rate/fit_cross_history_rate.py` → `models_per_bin_rate/cross_history_models.pkl`
-(only with `--write`)
+The onset-only comparison of the duration-aware model below:
+`scripts/replay_models/rate/fit_duration_aware_history_rate.py --mode pooled` fits these rungs
+on the same stacked sessions (`build_design(..., duration_aware=False)`), stored as `shipped` in
+`duration_aware_history_pooled.pkl`.
 
-`MODEL_CROSS_HISTORY_RATE` in `model_specs.py`. Fit per session in both
-directions — the non-SWR non-local rate given the with-SWR stream's history, and
-the reverse. Reward enters through the kernel only. Both rungs carry
-`parent = None`; the runner compares the pair directly (the AIC difference
-`Mselfcross − Mself`, negative when cross history helps, and the held-out bits
-per event).
+`MODEL_CROSS_HISTORY_RATE` in `model_specs.py`. History is measured from onsets only and every
+bin of a stop is at risk, the bins inside an ongoing event included — the rung the duration-aware
+design corrects. Reward enters through the kernel only. Both rungs carry `parent = None`.
 
 ```rungs
 Mself       count ~ BS_TC + REWBASIS + HISTCOS

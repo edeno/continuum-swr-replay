@@ -6,9 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RATE_BIN_S,
+)
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_UNCERTAINTY_RATE,
-    RATE_BIN_S,
 )
 from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (
     _design_columns,

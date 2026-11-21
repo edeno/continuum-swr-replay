@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    TMAX,
+)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_stop_cohort,
-)
-from continuum_swr_replay.analysis.replay_models.model_specs import (
-    TMAX,
 )
 from continuum_swr_replay.analysis.replay_models.rate import (
     stop_statistics,

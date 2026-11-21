@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Generate the supplementary figure: slow and fast gamma during SWR and no-SWR events.
 
-The immobile non-local events of the canonical event table, split by whether
-they overlap an SWR. For each band of ``gamma_power.GAMMA_BANDS`` (a, slow
+The immobile non-local events of the canonical event table that start inside
+a well visit (``cohort_selection.select_visit_context``), split by whether
+they overlap an SWR; quiet rest is the rest inside a well visit. For each band of ``gamma_power.GAMMA_BANDS`` (a, slow
 gamma; b, fast gamma) and each kind of event, every animal's level during the
 events, between the levels of the same epochs' quiet-rest and running windows
 as long as the kind's events. An event's gamma is a mean over its bins, and a
@@ -34,12 +35,19 @@ import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_signal_levels,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    time_mask_staleness,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.reported.events import default_inputs, with_brain_state
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
@@ -77,10 +85,29 @@ SIGNALS = tuple(
 
 
 def read_inputs() -> dict:
-    """The events with their gamma, and each epoch's rest and running levels."""
+    """The events with their gamma, and each epoch's rest and running levels.
+
+    Raises
+    ------
+    ValueError
+        If the brain-state or the gamma reference was not made over the
+        analyses' subset or from the current session cache's well visits
+        (``prepare_data.time_mask_staleness``).
+    """
     inputs = default_inputs()
-    events = read_swr_table(inputs.event_table)
-    events, reference, _ = with_brain_state(events, inputs, len(analyzed_epoch_ids()))
+    events = select_visit_context(read_swr_table(inputs.event_table))
+    events, reference, gamma_reference = with_brain_state(
+        events, inputs, len(analyzed_epoch_ids())
+    )
+    for folder, levels in (
+        (inputs.brain_state_reference.parent, reference),
+        (inputs.event_gamma, gamma_reference),
+    ):
+        note = time_mask_staleness(
+            read_output_manifest(folder), levels["epoch_id"], str(folder)
+        )
+        if note is not None:
+            raise ValueError(note)
     return {"events": events, "reference": reference}
 
 

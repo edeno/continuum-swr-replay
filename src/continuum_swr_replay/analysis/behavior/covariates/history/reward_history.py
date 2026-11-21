@@ -11,8 +11,6 @@ from continuum_swr_replay.analysis.behavior.design_constants import (
 )
 from continuum_swr_replay.analysis.behavior.history_basis import (
     raised_cosine_history_basis,
-    # Re-exported: the projection is a pure array primitive owned by
-    # ``history_basis``, which the per-bin design builder also reads.
     reward_basis_from_lags,
 )
 from continuum_swr_replay.data_loaders.constants import (
@@ -92,6 +90,52 @@ def rolling_reward_count_all_events(
     if no_past.any():
         out[no_past] = np.nan
     return out
+
+
+def log1p_known_visit_count_all_events(
+    event_times: np.ndarray,
+    port_experiences: pd.DataFrame,
+    well_to_arm: dict[int, int],
+) -> np.ndarray:
+    """Log of one plus each arm's visits with a known outcome, for all events.
+
+    The sample count of an arm: the visits to its well earlier in the epoch
+    whose outcome (reward or omission) was known at or before the event time,
+    the starting port included when its outcome was observed. Visits enter at
+    ``outcome_known_time``, the rule of :func:`recent_reward_rate_all_events`,
+    so the current visit counts only once its outcome is known.
+
+    Parameters
+    ----------
+    event_times : np.ndarray, shape (n_events,)
+        Query times (s), finite.
+    port_experiences : pd.DataFrame
+        Canonical experience stream with physical outcome clocks.
+    well_to_arm : dict[int, int]
+        Well id to its leaf arm.
+
+    Returns
+    -------
+    np.ndarray, shape (n_events, n_arms)
+        ``log1p(n)`` per event and arm of ``ALL_ARMS``; 0.0 for an arm with no
+        known visit yet, and for the trunk arms, which are no reward site.
+    """
+    event_times = np.asarray(event_times, dtype=float)
+    experiences = _observed_port_outcomes(
+        _prepare_port_experiences(port_experiences)
+    ).sort_values("outcome_known_time", kind="stable")
+    arm_of_experience = np.array(
+        [well_to_arm.get(int(port), -1) for port in experiences["port"]],
+        dtype=np.int64,
+    )
+    visits = (arm_of_experience[:, None] == np.asarray(ALL_ARMS)[None, :]).astype(float)
+    cumulative = np.vstack([np.zeros((1, len(ALL_ARMS))), np.cumsum(visits, axis=0)])
+    known = np.searchsorted(
+        experiences["outcome_known_time"].to_numpy(dtype=float),
+        event_times,
+        side="right",
+    )
+    return np.log1p(cumulative[known])
 
 
 def recent_reward_rate_all_events(

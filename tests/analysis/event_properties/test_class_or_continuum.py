@@ -469,8 +469,15 @@ def test_rest_power_counts_count_the_immobile_analyzed_bins_only():
             "Non-Local_Fragmented_prob": [0.4, 0.0, 0.0, 0.1, 0.0],
         }
     )
-    counts = cc.rest_power_counts(dot).set_index("power_low")
+    counts = cc.rest_power_counts(dot, np.ones(5, dtype=bool)).set_index("power_low")
     assert len(counts) == len(cc.RIPPLE_POWER_EDGES) - 1
     assert counts["n_bins"].sum() == 3
     assert counts.loc[0.0, ["n_bins", "n_nonlocal"]].tolist() == [2, 1]
     assert counts.loc[3.0, ["n_bins", "n_nonlocal"]].tolist() == [1, 1]
+    # the last bin (non-local, power 3.1) outside every well visit is not counted
+    inside = np.array([True, True, True, True, False])
+    counts = cc.rest_power_counts(dot, inside).set_index("power_low")
+    assert counts["n_bins"].sum() == 2
+    assert counts.loc[3.0, ["n_bins", "n_nonlocal"]].tolist() == [0, 0]
+    with pytest.raises(ValueError, match="one bool per bin"):
+        cc.rest_power_counts(dot, inside[:4])

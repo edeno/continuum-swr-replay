@@ -59,6 +59,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
@@ -73,8 +77,6 @@ from continuum_swr_replay.analysis.replay_models.covariate_timing import (
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_STOP_RATE,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
 )
 from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,
@@ -145,14 +147,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     if missing:
         raise SystemExit(
             f"stop_table missing outcome columns {missing}; "
-            "regenerate it first (scripts/tables/regenerate_stop_table.py)."
+            "rebuild the canonical tables (scripts/tables/prepare_replay_content_data.py)."
         )
     basis_cols = [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE]
     missing_basis = [c for c in basis_cols if c not in stop.columns]
     if missing_basis:
         raise SystemExit(
             f"stop_table missing reward-history basis columns {missing_basis}; "
-            "regenerate it first (scripts/tables/regenerate_stop_table.py)."
+            "rebuild the canonical tables (scripts/tables/prepare_replay_content_data.py)."
         )
     # The cohort is applied to the whole stop table BEFORE the smoke subset and
     # before the ladder's common-cohort freeze, so the freeze reports what the

@@ -110,7 +110,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `subset_staleness`, `select_visit_context`, `count_visit_context`, `select_events_in`, `check_visit_context_starts`
 
 ### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
 
@@ -170,13 +170,13 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Tetrode participation and spike rate of non-local events, against Local rest.
 
-`local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
+`local_rest_mask`, `control_starts`, `control_windows`, `windows_in_local_rest_anywhere`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
 Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
 
-`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
+`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`, `with_event_ids`, `in_analyzed_subset`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py`
 
@@ -242,7 +242,7 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -272,7 +272,7 @@ Canonical event-grain builders: one row per non-local event.
 
 The per-session replay-table build and the corpus-level steps around it.
 
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `cached_port_experiences`, `well_visit_times`, `session_cache_record`, `session_cache_staleness`, `time_mask_staleness`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
 
@@ -294,9 +294,9 @@ Scientific table contracts beyond the generic covariate schema stamp.
 
 ### `src/continuum_swr_replay/analysis/event_tables/timebin_tables.py`
 
-Within-stop time-binned tables (Part B).
+Within-stop event-onset table.
 
-`build_event_onset_table`, `build_stop_timebin_table`, `concat_session_timebin_tables`
+`build_event_onset_table`
 
 ### `src/continuum_swr_replay/tables/event_ids.py`
 
@@ -354,7 +354,7 @@ Diagnostic per-animal fitted-alpha leaky-Q learner.
 
 Reward-history covariates: rolling reward counts and recent reward rates over an arm's last visits, plus stop-level reward histories.
 
-`rolling_reward_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
+`rolling_reward_count_all_events`, `log1p_known_visit_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
 
 ### `src/continuum_swr_replay/analysis/behavior/covariates/history/value_block.py`
 
@@ -454,6 +454,36 @@ The raised-cosine history basis and the projection of a lag matrix onto it.
 
 `raised_cosine_history_basis`, `reward_basis_from_lags`
 
+### `src/continuum_swr_replay/analysis/regression/constants.py`
+
+The shared fitter's numerical rules, in one place.
+
+_No module-level public symbols._
+
+### `src/continuum_swr_replay/analysis/regression/likelihoods.py`
+
+Log-likelihoods of the shared fitter and their derivatives on the eta scale.
+
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`
+
+### `src/continuum_swr_replay/analysis/regression/newton.py`
+
+Penalized Newton fit at fixed penalty strengths, in float64.
+
+`NewtonFit`, `running_away_columns`, `penalized_newton`
+
+### `src/continuum_swr_replay/analysis/regression/pspline.py`
+
+Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
+
+`PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
+
+### `src/continuum_swr_replay/analysis/regression/reml.py`
+
+Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
+
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `SessionFit`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
@@ -494,7 +524,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/duration_aware_history.py`
 
@@ -592,15 +622,9 @@ Assemble disjoint Replay table shards into one canonical candidate bundle.
 
 ### `scripts/tables/build_timebin_tables.py`
 
-Build the Part B within-stop time-binned tables over all sessions.
+Build the within-stop event-onset table over all sessions.
 
 `build_one`, `validate`, `main`
-
-### `scripts/tables/convert_tables_to_parquet.py`
-
-Convert the materialized canonical tables from pickle to parquet.
-
-`canonical_tables`, `convert`, `main`
 
 ### `scripts/tables/prepare_contfrag_replay_content_data.py`
 
@@ -619,12 +643,6 @@ Build the four canonical replay-content tables across all sessions.
 Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
 `refresh_contfrag_behavioral_covariates`, `main`
-
-### `scripts/tables/regenerate_stop_table.py`
-
-Regenerate ``stop_table`` with the new count columns.
-
-`build_one`, `validate`, `main`
 
 ### `scripts/tables/write_regeneration_manifest.py`
 
@@ -742,6 +760,24 @@ Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
 
+### `scripts/checks/compare_regression_to_current_fitters.py`
+
+Compare the shared fitter without a penalty with the current fitters on real sessions.
+
+`per_bin_coefficients`, `content_coefficients`, `largest_relative_difference`, `main`
+
+### `scripts/checks/compare_regression_to_mgcv.py`
+
+Compare the shared regression fitter with mgcv on small synthetic data sets.
+
+`make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
+
+### `scripts/checks/compare_regression_to_neurospatial.py`
+
+Fit a one-term Poisson model with neurospatial's REML and write the fixture.
+
+`make_data`, `main`
+
 ### `scripts/checks/compare_to_golden_baseline.py`
 
 Diff a candidate replay_content root against a frozen golden baseline.
@@ -825,6 +861,12 @@ What the two detection-comparison reports share.
 Add each compared event's Local, No-Spike, non-local and uncertain shares to an event features run.
 
 `shares_path`, `epoch_state_shares`, `main`
+
+### `scripts/detector_comparison/measure_exposure_in_well_visits.py`
+
+Measure each epoch's non-local detector exposure, and its part inside the well visits.
+
+`main`
 
 ### `scripts/detector_comparison/report_event_features.py`
 
@@ -1046,7 +1088,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `mark_bouts_in_well_visits`, `bout_visit_counts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 
@@ -1172,11 +1214,11 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 `build_parser`, `main`
 
-### `scripts/replay_models/rate/fit_cross_history_rate.py`
+### `scripts/replay_models/rate/describe_visit_clocks.py`
 
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
+Model-free event-start rates on the three visit clocks, per kind and animal.
 
-`main`
+`input_paths`, `output_path`, `session_port_experiences`, `session_bins`, `main`
 
 ### `scripts/replay_models/rate/fit_cross_history_ridge_cv.py`
 
@@ -1242,7 +1284,7 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 Where an event or a stop lies relative to the well visits.
 
-`window_visit_context`, `visit_context_of_samples`
+`window_visit_context`, `visit_context_of_samples`, `stop_visit_columns`, `event_visit_columns`, `assign_visit_current_arm`
 
 ### `src/continuum_swr_replay/analysis/replay_models/coefficient_statistics.py`
 
@@ -1292,12 +1334,6 @@ Which sessions of a rung pair can be compared by an information criterion.
 
 `why_not_comparable`, `pair_rung_fits`
 
-### `src/continuum_swr_replay/analysis/replay_models/rate/cross_history.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`fit_direction`, `fit_cross_history`
-
 ### `src/continuum_swr_replay/analysis/replay_models/rate/history_kernel_statistics.py`
 
 Summary statistics of the event-history kernels of the duration-aware rate fits.
@@ -1339,6 +1375,18 @@ The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 `drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_clock_curves.py`
+
+Model-free event-start rates on the three visit clocks, and how stops end.
+
+`visit_clock_rate_curves`, `stop_end_kind_counts`
+
+### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
+
+The well-visit time-bin design of the event-rate models.
+
+`arrival_spanning_stop_ids`, `shift_reward_lags_at_outcome`, `interval_coverage_by_bin`, `visit_timebins`
 
 ### `src/continuum_swr_replay/decoding/encoding_model.py`
 

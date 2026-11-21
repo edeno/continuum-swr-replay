@@ -27,6 +27,61 @@ Part 4 fits.
 | 3. What SWR and no-SWR events are like | The starting hypothesis is that the two are different kinds of event, so every panel draws them separately; the legend gives each kind's number of events. a: duration, each kind's distribution, its median and each animal's median; b: the mean share of an event in Continuous and in Fragmented, the animals' mean and each animal; c: spatial extent, as a; d: replay speed (each event's median over its time bins), as a, and under it the share of events at or below each speed (in a and d the end bin marked ≥ also holds the events beyond the axis); e: each kind's content time per cm along every arm, drawn on the track once per kind against what content spread evenly over the track would give, with the track's center, a junction and a well named; f: content time per cm from the center to the junctions and from the junctions to the wells, with each kind's share at a well, against what content spread evenly over the track would give (the dashed line and its share). The figure describes the content from the decode and the track alone: content against the animal (by distance from it, by which well; `content_along_arms.distance_from_animal_shares`) is left to the behavior figure. Slow and fast gamma during the events are a supplementary figure; ripple power, MUA, theta and speed around the events are Figure 2's. The number of arms an event's decoded position touches is in the events summary, in no panel | `scripts/figures/generate_figure03.py` | the canonical event table, `content_along_arms/` (`scripts/event_properties/measure_content_along_arms.py`), and one epoch's decode environment for the track drawn in f | `tests/analysis/event_properties/test_content_along_arms.py`, `tests/scripts/figures/test_figure_script_fixes.py` |
 | 5. mPFC responses to SWR and non-SWR events | The two kinds of event are drawn separately and named as in Figures 2 and 3; here "SWR" is every detected SWR and "No SWR" every non-local event that overlaps none (the two kernels of the joint model). a: one unit's modulation by each kind, over its firing rate around each kind's event starts; b: every unit's modulation by each kind, the units in one order (the time of their SWR peak), on one color scale whose ends are marked; c: population modulation, the mean over animals (unit → session → animal) ± SEM over animals; d: the share of units whose event term improves held-out deviance beyond the matched control's null (bars pooled over units, dots the animals), and the best model per unit. Drawn to the standards of Figures 1–3: the publication style, one column grid, letters by row and column, `check_placement` and `check_journal_limits` | `scripts/figures/generate_figure05.py` | the example session's HPC decode, stops, events and SWRs; the mPFC modulation bundles, `{epoch_id}_mPFC_modulation.pkl` and their `.npy` arrays, from `scripts/pfc/run_pfc_analysis_bandit.py` | `tests/scripts/figures/test_generate_figure05.py` |
 
+**The data subset of Figures 2 and 3** (and of the events summary,
+`paper/reported/events.json`, and the gamma supplementary figure). Every event
+panel is over the immobile non-local events that start inside a well visit,
+from the first nose-poke in at a well to the final poke-out there:
+`visit_context` `in_visit` or `spans_visit_end`, selected once, where the
+canonical event table is read, by
+`analysis/event_definition/cohort_selection.py:select_visit_context`. Figure 2
+checks the whole table against the decode frames first, then selects. A stored
+per-event output (participation, the content's time bins, the start distance,
+the gamma per event) is read over the selected events
+(`cohort_selection.select_events_in`); one that is a statistic over events (the
+property bootstrap, the one-class-or-two tests) is made over them by its
+producer. Time and SWRs count only inside a well visit
+(`analysis/event_definition/well_visits.py:in_well_visit`, the visits read from
+the session cache by `analysis/event_tables/prepare_data.py:well_visit_times`):
+the quiet rest of the brain-state reference, of the rest-theta windows and of
+the gamma reference, the immobile time bins of Figure 2j, and the SWRs and other
+detectors' events of Figure 2c and 2e, which count when their first sample is
+inside a visit (running, the theta-like benchmark, is the epoch's running
+wherever it is). Each producer re-run over the subset records
+`cohort_selection.ANALYZED_SUBSET` in its manifest, and one whose content depends
+on the visits the digest of the session-cache entries it read them from
+(`prepare_data.session_cache_record`); Figure 2 and the gamma figure refuse a
+reference that records another subset or other visits than the current cache's
+(`prepare_data.time_mask_staleness`), and the events summary marks the values
+read from one pending. What another inventory leaves out (question 2b.2) is over
+the selected non-local events and the non-local detector's exposure inside a
+visit (`scripts/detector_comparison/measure_exposure_in_well_visits.py`, which
+rebuilds the inventory comparison's exposure from its stored tables and refuses
+one that is not the stored one).
+The participation run (`event_participation/`) keeps a row for every event and
+draws each event's Local-rest control wholly inside one well visit
+(`analysis/event_evidence/participation.py:CONTROL_RULE`); its settings record
+the subset and the rule, its inputs the session-cache digest, and the summary
+marks the participation values pending when either is not current. The
+held-out tetrode run takes its controls from the participation tables, so its
+values say which controls they were made with.
+The summary counts the events of every well-visit label, kept and left out
+(`events.json`, `events_label_*`, `*events_in_subset`, `*events_left_out`).
+The spike-evidence run (`event_spike_evidence/`) scores every event and every
+matched quiet window; each scored event is one of the event table's, matched to
+its `event_id` by epoch and start time
+(`analysis/event_evidence/spike_evidence.py:with_event_ids`, an event without a
+match is an error), and the summary reads the selected events and the quiet
+windows whose first sample is inside a visit (`in_analyzed_subset`;
+`*_left_out` counts the others). The held-out test split by SWR
+(`scripts/event_evidence/split_state_evidence_by_swr.py`) reads the decoder's
+immobile Non-Local bouts whose first sample is inside a visit, and every running
+bout, each with its matched window (`state_evidence.mark_bouts_in_well_visits`);
+the matched windows were
+drawn from all of the epoch's time in the bout's regime, so some of the kept
+bouts' windows start outside every visit, which its provenance counts
+(`bouts`, with the bouts kept and left out per state, SWR label and regime;
+`events.json`, `heldout_*_bouts_*`).
+
 Figure 1 needs no data. Figures 2–4 need the lab's Spyglass database and the
 processed-data root ([reproduce.md](reproduce.md#requirements)).
 

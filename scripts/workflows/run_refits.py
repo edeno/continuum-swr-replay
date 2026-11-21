@@ -19,10 +19,9 @@ runs, in the order their code requires:
 3. ``tables.replay_content``: ``prepare_replay_content_data.py``, the event,
    event x arm, event x patch, sequence and stop tables, which reads
    ``qvals_table``. It is the stop table's canonical producer (the bootstrap's
-   table plus the SWR split); ``regenerate_stop_table.py`` is not a run, as it
-   assumes the stop bouts of an existing event table;
-4. ``tables.timebin``: ``build_timebin_tables.py``, the event-onset and
-   stop-timebin tables, from the decodes alone;
+   table plus the SWR split);
+4. ``tables.timebin``: ``build_timebin_tables.py``, the event-onset table,
+   from the decodes alone;
 5. ``tables.contfrag.swr`` and ``tables.contfrag.mua``:
    ``prepare_contfrag_replay_content_data.py``, which reads ``qvals_table``.
 
@@ -169,8 +168,6 @@ RUNS: tuple[Run, ...] = (
     _run("rate.swr_contrast.all_stops", f"{_RC} --stop-cohort all_stops --workers 16", 16, _RTB),
     _run("rate.uncertainty.at_well", "scripts/replay_models/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1, _RTB),
     _run("coupling.ripple_power", "scripts/replay_models/coupling/fit_swr_power_model.py", 1, _RT),
-    # No worker flag: its parallelism is BLAS threads.
-    _run("rate.cross_history", "scripts/replay_models/rate/fit_cross_history_rate.py --write", 8, _RTB, threads=8),
     # The self- and cross-history on the at-risk design (bins inside an event dropped,
     # history from event onsets and ends): per session, then pooled within animal.
     _run("rate.duration_aware_history.at_well", f"{_DA} --mode session --workers 16", 16, _RTB),

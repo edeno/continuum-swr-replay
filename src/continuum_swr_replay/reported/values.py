@@ -319,6 +319,12 @@ def pend(values: Iterable[Value], *notes: str | None) -> list[Value]:
     ]
 
 
+def over(values: Iterable[Value], subset: str) -> list[Value]:
+    """``values`` with what they are computed over added to each description,
+    after ``"; over "``: the data subset a builder's statistics were given."""
+    return [replace(v, description=f"{v.description}; over {subset}") for v in values]
+
+
 def read_summary(path: Path) -> Summary:
     """A summary file read back, its values as :class:`Value`. Its tags are not
     checked: :func:`summary_tag_problems` lists any that the question list no

@@ -29,6 +29,7 @@ ROOTS: tuple[str, ...] = (
     "src/continuum_swr_replay/analysis/behavior",
     "src/continuum_swr_replay/analysis/event_tables",
     "src/continuum_swr_replay/analysis/replay_models",
+    "src/continuum_swr_replay/analysis/regression",
     "src/continuum_swr_replay/analysis/event_definition",
     "src/continuum_swr_replay/analysis/detection",
     "src/continuum_swr_replay/analysis/decode_quality",
@@ -110,6 +111,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Fitters",
         "Estimators and the per-session fit machinery each runner calls.",
         (
+            "*/analysis/regression/*.py",
             "*/analysis/replay_models/fitting.py",
             "*/analysis/replay_models/_fit_diagnostics.py",
             "*/analysis/behavior/history_basis.py",

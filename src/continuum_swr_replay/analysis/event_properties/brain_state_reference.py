@@ -8,7 +8,12 @@ can be read against them: an event whose theta reaches the running level is
 theta-like.
 
 - **Running**: bins above 10 cm/s (``state_evidence.windows.regimes``).
-- **Quiet rest**: bins below 4 cm/s that are in no non-local, SWR or MUA event.
+- **Quiet rest**: bins below 4 cm/s that are in no non-local, SWR or MUA event,
+  inside a well visit (from the first poke-in at a well to the final poke-out;
+  ``event_definition.well_visits.in_well_visit``), the time the analyzed
+  events start in. Running is the epoch's running wherever it is: the animal
+  does not run inside a visit, and the running level is the benchmark of
+  theta-like, not the events' setting.
 
 Bins in excluded time (``in_excluded_time``) are left out of both.
 """
@@ -35,32 +40,62 @@ EVENT_COLUMNS = ("non_local_event", "SWR_event", "MUA_event")
 """The frame's event labels; 0 is no event."""
 
 
-def regime_masks(dot: pd.DataFrame) -> dict[str, NDArray[np.bool_]]:
+def _quiet_rest_anywhere(dot: pd.DataFrame) -> NDArray[np.bool_]:
+    """Bins below 4 cm/s, in no event and outside excluded time, in or out of a visit."""
+    usable = ~dot["in_excluded_time"].to_numpy(dtype=bool)
+    regime = regimes(dot["head_speed"].to_numpy(dtype=np.float64))
+    in_event = np.zeros(len(dot), dtype=bool)
+    for column in EVENT_COLUMNS:
+        in_event |= dot[column].to_numpy() > 0
+    return usable & (regime == "immobile") & ~in_event
+
+
+def regime_masks(
+    dot: pd.DataFrame, in_visit: NDArray[np.bool_]
+) -> dict[str, NDArray[np.bool_]]:
     """The running and quiet-rest bins of a decode frame.
 
-    Running: above 10 cm/s; quiet rest: below 4 cm/s and in no non-local, SWR
-    or MUA event (:data:`EVENT_COLUMNS`); neither in excluded time.
+    Running: above 10 cm/s; quiet rest: below 4 cm/s, in no non-local, SWR or
+    MUA event (:data:`EVENT_COLUMNS`) and inside a well visit; neither in
+    excluded time.
 
     Parameters
     ----------
     dot : pd.DataFrame
         A decode frame read through the SWR source, with ``head_speed``,
         ``in_excluded_time`` and :data:`EVENT_COLUMNS`.
+    in_visit : NDArray of bool, shape (n_time,)
+        Whether each bin is inside a well visit
+        (``event_definition.well_visits.in_well_visit`` on the frame's times).
 
     Returns
     -------
     masks : dict
         ``"running"`` and ``"rest"``, each a bool array of shape (n_time,).
+
+    Raises
+    ------
+    ValueError
+        If ``in_visit`` is not one bool per bin.
     """
+    in_visit = _visit_mask(in_visit, len(dot))
     usable = ~dot["in_excluded_time"].to_numpy(dtype=bool)
     regime = regimes(dot["head_speed"].to_numpy(dtype=np.float64))
-    in_event = np.zeros(len(dot), dtype=bool)
-    for column in EVENT_COLUMNS:
-        in_event |= dot[column].to_numpy() > 0
     return {
         "running": usable & (regime == "running"),
-        "rest": usable & (regime == "immobile") & ~in_event,
+        "rest": _quiet_rest_anywhere(dot) & in_visit,
     }
+
+
+def _visit_mask(in_visit: NDArray[np.bool_], n_time: int) -> NDArray[np.bool_]:
+    """``in_visit`` as a bool array, refused unless it has one value per bin."""
+    in_visit = np.asarray(in_visit)
+    if in_visit.dtype != bool or in_visit.shape != (n_time,):
+        raise ValueError(
+            f"in_visit must be one bool per bin, shape ({n_time},); got "
+            f"{in_visit.dtype} of shape {in_visit.shape}"
+        )
+    return in_visit
 
 
 def matched_window_means(
@@ -119,7 +154,9 @@ def matched_window_means(
 
 
 def brain_state_reference(
-    dot: pd.DataFrame, signals: Mapping[str, str] = SIGNALS
+    dot: pd.DataFrame,
+    in_visit: NDArray[np.bool_],
+    signals: Mapping[str, str] = SIGNALS,
 ) -> dict[str, float]:
     """One epoch's signal levels during running and during quiet rest.
 
@@ -130,6 +167,8 @@ def brain_state_reference(
         (``analyzed_time.with_swr_source``), with ``head_speed``,
         ``in_excluded_time``, :data:`EVENT_COLUMNS` and the columns of
         ``signals``.
+    in_visit : NDArray of bool, shape (n_time,)
+        Whether each bin is inside a well visit (:func:`regime_masks`).
     signals : Mapping[str, str]
         Each signal's word and its column in ``dot``; :data:`SIGNALS` by
         default.
@@ -137,14 +176,19 @@ def brain_state_reference(
     Returns
     -------
     reference : dict
-        ``n_running_bins``, ``n_rest_bins``, and for each signal and regime
-        ``{signal}_{regime}_median`` and ``{signal}_{regime}_mean`` (NaN when
-        the regime has no bin).
+        ``n_running_bins``, ``n_rest_bins`` (quiet rest inside a visit, the
+        bins the rest levels are over) and ``n_rest_bins_outside_visit`` (the
+        quiet-rest bins left out because they are outside every visit), and
+        for each signal and regime ``{signal}_{regime}_median`` and
+        ``{signal}_{regime}_mean`` (NaN when the regime has no bin).
     """
-    masks = regime_masks(dot)
+    masks = regime_masks(dot, in_visit)
     reference: dict[str, float] = {
         f"n_{name}_bins": int(mask.sum()) for name, mask in masks.items()
     }
+    reference["n_rest_bins_outside_visit"] = int(
+        (_quiet_rest_anywhere(dot) & ~np.asarray(in_visit)).sum()
+    )
     for word, column in signals.items():
         values = dot[column].to_numpy(dtype=np.float64)
         for name, mask in masks.items():

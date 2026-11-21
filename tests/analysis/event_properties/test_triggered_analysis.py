@@ -455,3 +455,39 @@ def test_triggered_average_curves_are_mean_and_sem_over_events_by_class():
     np.testing.assert_allclose(curve["no_overlap_median"], [5.0, 5.0, 5.0])
     np.testing.assert_allclose(curve["no_overlap_q75"], [7.0, 7.0, 7.0])
     np.testing.assert_allclose(curve["overlap_median"], [4.0, 4.0, 4.0])
+
+
+def test_triggering_events_in_keeps_the_frames_rows_of_the_selected_events():
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        TRIGGERING_EVENT_TYPES,
+        triggering_events_in,
+    )
+
+    frame = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": [1, 1, 1, 1, 2, 2],
+            "epoch": "02_r1",
+            # label 1 of day 1 has two rows; label 1 of day 2 is another event
+            "non_local_event": [1, 1, 2, 3, 1, 3],
+        }
+    )
+    no_swr, swr = TRIGGERING_EVENT_TYPES
+    event_types = {
+        no_swr: frame.iloc[[0, 1, 3, 4]],
+        swr: frame.iloc[[2, 5]],
+        "SWR_events": frame.iloc[[5]],
+    }
+    selected = pd.DataFrame(
+        {
+            "animal": ["a", "a"],
+            "session_date": [1, 2],
+            "epoch": ["02_r1", "02_r1"],
+            "non_local_event": [1, 3],
+        }
+    )
+    kept = triggering_events_in(event_types, selected)
+    assert kept[no_swr].index.tolist() == [0, 1]
+    assert kept[swr].index.tolist() == [5]
+    assert kept["SWR_events"] is event_types["SWR_events"]
+    assert len(event_types[no_swr]) == 4  # the input is not changed

@@ -30,6 +30,14 @@ import numpy as np
 import pandas as pd
 from patsy import dmatrix
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_BASIS,
+    REWARD_HISTORY_N_LAGS,
+)
 from continuum_swr_replay.analysis.replay_models._fit_diagnostics import (
     fit_flag_counts,
     flagged_separated,
@@ -43,13 +51,7 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     gate_term_sessions,
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     PER_BIN_HISTORY_COLUMNS,
-    RATE_BIN_S,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_BASIS,
-    REWARD_HISTORY_N_LAGS,
     time_course_spline,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (

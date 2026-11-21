@@ -1038,7 +1038,7 @@ def test_reward_basis_from_lags_is_nan_only_where_a_bump_has_no_support():
     lags[0, 0] = 1.0  # only lag 1 known -> bump 2 (zero weight at lag 1) undefined
     lags[1, 9] = 1.0  # only lag 10 known -> bump 0 (zero weight at lag 10) undefined
 
-    out = covariates.reward_basis_from_lags(lags, basis)
+    out = history_basis.reward_basis_from_lags(lags, basis)
     np.testing.assert_allclose(out[0, :2], 1.0)
     assert np.isnan(out[0, 2])
     assert np.isnan(out[1, 0])

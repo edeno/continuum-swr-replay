@@ -53,7 +53,7 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 >   - A stop's `immobility_duration_s` is its span (`stop_end - stop_start`) less
 >     exactly the excluded seconds inside it, so it is no longer the stop's span.
 >   - A per-bin row is dropped whole when it touches excluded time: Family B's design,
->     the dense `stop_timebin` table, a PFC fit bin (its +/-0.25 s basis window).
+>     a PFC fit bin (its +/-0.25 s basis window).
 >   - A Family B bin is also dropped when its history window
 >     (`model_specs.longest_history_window_s`, 0.15 s) reaches excluded time.
 >   - The per-bin exposure therefore loses a little more than the stop-level one: the

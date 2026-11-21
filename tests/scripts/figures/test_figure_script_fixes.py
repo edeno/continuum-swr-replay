@@ -330,6 +330,7 @@ def _figure02_events() -> pd.DataFrame:
             "epoch": "e1",
             "overlap_class": ["swr_contained", "swr_partial", "swr_partial"]
             + ["non_swr"] * 5,
+            "visit_context": "in_visit",
             "whole_event_speed_eligible": True,
             "event_start_s": [0.0025, -0.25, 1.0, 3.0, 4.0, 5.0, 6.0, 7.0],
             "event_end_s": [0.25, -0.0045, 2.0, 3.1, 4.1, 5.1, 6.1, 7.1],
@@ -426,6 +427,58 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
     )
     with pytest.raises(ValueError, match="counts by SWR overlap are not"):
         figure02.generate_figure(data_dir=tmp_path)
+
+
+def test_figure02_checks_the_whole_table_and_draws_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    """Two non-SWR events on the track, between two visits: the frames hold
+    them, so the check against the frames counts them; every panel is drawn
+    from the other eight, the events that start inside a well visit."""
+    import joblib
+
+    from continuum_swr_replay.paths import (
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    outside = _figure02_events().iloc[[3, 4]].assign(visit_context="track_leaf_arm")
+    events = pd.concat([_figure02_events(), outside], ignore_index=True)
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(analyzed_time.stamp_swr_source(events), table)
+    cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    cache.parent.mkdir(parents=True)
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    frames = {**FIGURE02_FRAME_COUNTS, "non_swr": 7, "total": 10}
+    joblib.dump({"frame_event_counts": frames, "data": data, "results": None}, cache)
+    seen = []
+    counted = figure02.overlap_class_statistics
+
+    def count(table):
+        seen.append(len(table))
+        return counted(table)
+
+    class Drawn(Exception):
+        pass
+
+    def stop(session_events, *args):
+        seen.append(session_events)
+        raise Drawn
+
+    monkeypatch.setattr(figure02, "overlap_class_statistics", count)
+    monkeypatch.setattr(figure02, "example_windows", stop)
+    monkeypatch.setattr(figure02, "parse_nwb_filename", lambda name: ("a", "d1"))
+    with pytest.raises(Drawn):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    # the check saw all ten; panel d's classes and the session's events are eight
+    assert seen[:2] == [10, 8]
+    assert len(seen[2]) == 8
+    assert set(seen[2]["visit_context"]) == {"in_visit"}
 
 
 def _figure02_example_table(figure02) -> pd.DataFrame:
@@ -1693,3 +1746,289 @@ def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offlin
         )
     assert positions[lower][0] < drawn_extent(fig, panels[lower]).x0 - 0.01
     plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "module",
+    ["scripts.figures.generate_figure03", "scripts.figures.generate_supp_event_gamma"],
+)
+def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
+    offline, monkeypatch, module
+):
+    """An event between two visits is in the table and in no panel: the first
+    function given the events sees only those that start inside a visit."""
+    figure = offline(module)
+    outside = _figure02_events().iloc[[3]].assign(visit_context="after_visit_at_well")
+    table = pd.concat([_figure02_events(), outside], ignore_index=True)
+    seen = []
+
+    class Read(Exception):
+        pass
+
+    def stop(events, *args):
+        seen.append(events)
+        raise Read
+
+    monkeypatch.setattr(figure, "read_swr_table", lambda path: table)
+    reader = (
+        "content_along_arms_bins" if module.endswith("figure03") else "with_brain_state"
+    )
+    monkeypatch.setattr(figure, reader, stop)
+    with pytest.raises(Read):
+        figure.read_inputs()
+    assert len(seen[0]) == len(table) - 1
+    assert set(seen[0]["visit_context"]) == {"in_visit"}
+
+
+@pytest.mark.parametrize("problem", ["subset", "session_cache"])
+@pytest.mark.parametrize("folder", ["brain_state_reference", "event_gamma"])
+def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
+    offline, monkeypatch, tmp_path, folder, problem
+):
+    """Quiet rest is the rest inside a well visit: a brain-state or gamma
+    reference whose manifest records another subset, or none, or another
+    session cache's visits than the current one, is refused."""
+    import dataclasses
+
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        ANALYZED_SUBSET,
+    )
+    from continuum_swr_replay.analysis.event_tables import prepare_data
+
+    figure = offline("scripts.figures.generate_supp_event_gamma")
+    monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", tmp_path / "cache")
+    entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
+    entry.parent.mkdir(parents=True)
+    entry.write_bytes(b"the visits")
+    current = prepare_data.session_cache_record(["e"])
+    inputs = dataclasses.replace(
+        figure.default_inputs(),
+        brain_state_reference=tmp_path / "brain_state_reference" / "reference.parquet",
+        event_gamma=tmp_path / "event_gamma",
+    )
+    for name in ("brain_state_reference", "event_gamma"):
+        (tmp_path / name).mkdir()
+        manifest = {"subset": ANALYZED_SUBSET, "session_cache": current}
+        if name == folder:
+            manifest.pop(problem)
+        (tmp_path / name / "manifest.json").write_text(json.dumps(manifest))
+    monkeypatch.setattr(figure, "default_inputs", lambda: inputs)
+    monkeypatch.setattr(figure, "read_swr_table", lambda path: _figure02_events())
+    levels = pd.DataFrame({"epoch_id": ["e"]})
+    monkeypatch.setattr(
+        figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
+    )
+    note = "was not made over" if problem == "subset" else "records no session-cache"
+    with pytest.raises(ValueError, match=f"{folder}.* {note}"):
+        figure.read_inputs()
+    # a cache refreshed since the reference was made is refused too
+    if problem == "session_cache":
+        (tmp_path / folder / "manifest.json").write_text(
+            json.dumps({"subset": ANALYZED_SUBSET, "session_cache": current})
+        )
+        assert figure.read_inputs()["reference"] is levels
+        entry.write_bytes(b"other visits")
+        with pytest.raises(ValueError, match="other well visits than the current"):
+            figure.read_inputs()
+
+
+# --------------------------------------------------------------------------
+# Figure 2: the stored per-event tables are read over the selected events
+# --------------------------------------------------------------------------
+
+
+class _Figure02Read(Exception):
+    """Stops the figure at the read under test."""
+
+
+def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
+    """The figure module with its eight events in a visit and a ninth on the
+    track, every reader before the held-out tetrode run's stubbed, and a
+    participation run over the subset and the current session cache."""
+    import joblib
+
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        ANALYZED_SUBSET,
+    )
+    from continuum_swr_replay.analysis.event_tables import prepare_data
+    from continuum_swr_replay.paths import (
+        BRAIN_STATE_REFERENCE_DIR,
+        EVENT_PARTICIPATION_DIR,
+        NONLOCAL_BY_RIPPLE_POWER_DIR,
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    inside = _figure02_events().assign(event_id=range(8))
+    outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(analyzed_time.stamp_swr_source(pd.concat([inside, outside])), table)
+    cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    cache.parent.mkdir(parents=True)
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    frames = {**FIGURE02_FRAME_COUNTS, "non_swr": 6, "total": 9}
+    joblib.dump({"frame_event_counts": frames, "data": data, "results": None}, cache)
+    for folder, name in (
+        (BRAIN_STATE_REFERENCE_DIR, "reference.parquet"),
+        (NONLOCAL_BY_RIPPLE_POWER_DIR, "counts.parquet"),
+    ):
+        (tmp_path / folder).mkdir()
+        pd.DataFrame({"epoch_id": ["e"]}).to_parquet(tmp_path / folder / name)
+    monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", tmp_path / "cache")
+    entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
+    entry.parent.mkdir(parents=True)
+    entry.write_bytes(b"the visits")
+    (tmp_path / EVENT_PARTICIPATION_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json").write_text(
+        json.dumps(
+            {
+                "settings": {"subset": ANALYZED_SUBSET},
+                "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
+            }
+        )
+    )
+    # each stored per-event table holds a row of every event, the ninth too
+    rows = pd.DataFrame({"event_id": [*range(8), 99]})
+    for name, value in {
+        "parse_nwb_filename": lambda name: ("a", "d1"),
+        "example_windows": lambda *args: {},
+        "checked_reference": lambda reference, folder, name: reference,
+        "reference_medians": lambda *args: None,
+        "animal_power_counts": lambda *args: None,
+        "event_table_epochs": lambda *args: ["e"],
+        "read_complete_run": lambda *args: rows,
+        "participation_statistics": lambda table: None,
+        "well_visit_times": lambda identifier: None,
+        "check_visit_context_starts": lambda table, visits: None,
+    }.items():
+        monkeypatch.setattr(figure02, name, value)
+    return figure02
+
+
+def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    seen = []
+
+    def stop(table):
+        seen.append(table)
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "window_scores", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert sorted(seen[0]["event_id"]) == list(range(8))
+
+
+def test_figure02_reads_participation_over_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    seen = []
+
+    def stop(table):
+        seen.append(table)
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "participation_statistics", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert sorted(seen[0]["event_id"]) == list(range(8))
+
+
+@pytest.mark.parametrize(
+    "problem",
+    ["no subset", "another subset", "no session cache", "another session cache"],
+)
+def test_figure02_refuses_a_participation_run_off_the_subset_or_the_visits(
+    offline, tmp_path, monkeypatch, problem
+):
+    """Participation's controls are Local rest inside the current well visits:
+    a run whose settings record no subset or another, or that records no
+    session cache or another than the current one, is refused by name."""
+    from continuum_swr_replay.analysis.event_tables import prepare_data
+    from continuum_swr_replay.paths import EVENT_PARTICIPATION_DIR
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    path = tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json"
+    manifest = json.loads(path.read_text())
+    if problem == "no subset":
+        manifest["settings"].pop("subset")
+    elif problem == "another subset":
+        manifest["settings"]["subset"] = "whole_epoch"
+    elif problem == "no session cache":
+        manifest["inputs"].pop("session_cache")
+    path.write_text(json.dumps(manifest))
+    if problem == "another session cache":
+        prepare_data.behavioral_context_cache_path({"session_id": "e"}).write_bytes(
+            b"other visits"
+        )
+    note = {
+        "no subset": "was not made over the events that start inside a well visit",
+        "another subset": "was not made over the events that start inside a well visit",
+        "no session cache": "records no session-cache SHA-256",
+        "another session cache": "other well visits than the current",
+    }[problem]
+    monkeypatch.setattr(figure02, "participation_statistics", _refuse_drawing)
+    with pytest.raises(
+        ValueError, match=f"participation run .*{EVENT_PARTICIPATION_DIR}.*{note}"
+    ):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+
+
+def _refuse_drawing(table):
+    raise AssertionError("the participation run was read without its check")
+
+
+def test_figure02_checks_every_event_s_label_against_the_visits(
+    offline, tmp_path, monkeypatch
+):
+    """The ninth event (on the track, starting at 3 s) is labeled outside every
+    visit; visits that hold it make the figure refuse the table."""
+    import numpy as np
+
+    from continuum_swr_replay.analysis.event_definition import cohort_selection
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        figure02,
+        "check_visit_context_starts",
+        cohort_selection.check_visit_context_starts,
+    )
+    monkeypatch.setattr(
+        figure02, "event_table_epochs", lambda table, analyzed: ["ad1_e1_HPC"]
+    )
+    visits = (np.array([-1.0]), np.array([10.0]))
+    monkeypatch.setattr(figure02, "well_visit_times", lambda identifier: visits)
+    monkeypatch.setattr(
+        cohort_selection, "event_epoch_ids", lambda t: pd.Series("ad1_e1_HPC", t.index)
+    )
+    with pytest.raises(ValueError, match="1 of 9 events' visit_context disagrees"):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+
+
+def test_figure02_cache_is_keyed_on_the_event_table_it_reads(offline, tmp_path):
+    """The figure reads the event table of its data folder; a change to that
+    table, not to the default root's, gives another cache path."""
+    from continuum_swr_replay.paths import (
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(_figure02_events(), table)
+    before = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    write_table(_figure02_events().iloc[:3], table)
+    after = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    assert before != after

@@ -16,12 +16,14 @@ on, so a Stage 6 statement and a content statement are about the same stops;
 ``_allstops`` names, so a sensitivity bundle cannot be mistaken for the
 canonical one.
 
-At this grain the choice makes no difference to any fitted number. ``is_stay``
-is derived from the stop's ``occupancy_well_arm`` (``stop_table.py``), which is
-finite only for strictly ``at_well`` stops, so the response is missing for every
-``mixed``, ``in_transit`` and ``unknown`` stop and the effective population is
-the 67,606 strictly-at-well stops that carry an ``is_stay`` either way. The
-cohort is applied regardless, so the population is stated rather than implied.
+``is_stay`` is derived from the stop's ``occupancy_well_arm`` (``stop_table.py``),
+which is finite for strictly ``at_well`` stops and for the ``mixed`` stops that
+start inside a visit and cross its final poke-out (``spans_visit_end``, whose
+current arm is the visit's well). The response is missing for the other
+``mixed`` stops and every ``in_transit`` and ``unknown`` stop, so the effective
+population is the at-well and crossing stops that carry an ``is_stay``, under
+either cohort. The cohort is applied regardless, so the population is stated
+rather than implied.
 
 Outputs (next to the input tables):
 

@@ -436,9 +436,10 @@ def fit_history_direction(
     response: str,
     duration_aware: bool,
 ) -> dict:
-    """Fit one response stream's history rungs, as the cross runner does.
+    """Fit one response stream's history rungs, as the duration-aware model does.
 
-    Mirrors ``scripts/replay_models/rate/fit_cross_history_rate.py:_fit_direction`` on a
+    Mirrors the per-session design of the duration-aware model
+    (``analysis/replay_models/rate/duration_aware_history.py:build_design``) on a
     simulated session: :func:`aggregate_to_timebins` at ``RATE_BIN_S`` / ``TMAX``
     with the reward basis and the raised-cosine self- and cross-history, a
     frozen cohort, and :func:`fit_per_bin_rate_model`.

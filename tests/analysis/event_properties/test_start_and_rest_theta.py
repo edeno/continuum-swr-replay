@@ -50,12 +50,17 @@ def stubbed(monkeypatch) -> None:
     monkeypatch.setattr(
         module,
         "regime_masks",
-        lambda dot: {"rest": dot["non_local_event"].to_numpy() == 0},
+        lambda dot, in_visit: {
+            "rest": (dot["non_local_event"].to_numpy() == 0) & in_visit
+        },
     )
     monkeypatch.setattr(
         module,
         "brain_state_reference",
-        lambda dot: {"theta_running_median": RUNNING_THETA, "theta_rest_median": 0.0},
+        lambda dot, in_visit: {
+            "theta_running_median": RUNNING_THETA,
+            "theta_rest_median": 0.0,
+        },
     )
     monkeypatch.setattr(
         module,
@@ -65,8 +70,14 @@ def stubbed(monkeypatch) -> None:
 
 
 def measure(events: pd.DataFrame, n_windows: int = 4, seed: int = 0) -> pd.DataFrame:
+    dot = frame()
     return module.start_and_rest_theta(
-        frame(), ENVIRONMENT, events, n_windows, np.random.default_rng(seed)
+        dot,
+        ENVIRONMENT,
+        events,
+        np.ones(len(dot), dtype=bool),
+        n_windows,
+        np.random.default_rng(seed),
     )
 
 
@@ -130,13 +141,43 @@ def test_the_share_counts_windows_reaching_the_running_median_among_finite_ones(
     events = pd.DataFrame({"event_id": ["e1"], "non_local_event": [1]})
 
     row = module.start_and_rest_theta(
-        dot, ENVIRONMENT, events, 20_000, np.random.default_rng(0)
+        dot,
+        ENVIRONMENT,
+        events,
+        np.ones(len(dot), dtype=bool),
+        20_000,
+        np.random.default_rng(0),
     ).iloc[0]
 
     assert row.rest_theta_like_share == pytest.approx(2 / 8, abs=0.01)
     assert row.rest_windows == pytest.approx(20_000 * 8 / 9, rel=0.02)
     # the event's own bin is not rest
     assert row.theta_mean == 2.0
+
+
+def test_rest_windows_are_drawn_inside_the_well_visits_only(stubbed):
+    """The frame of the test above with the theta-like bin of 1.0 outside every
+    visit: of the seven rest bins left with theta, one (0.5, the tie) is
+    theta-like."""
+    theta = [2.0, 0.5, 0.4, np.nan, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0]
+    dot = pd.DataFrame(
+        {
+            "non_local_event": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "map_estimate": np.full(10, 100.0),
+            "linear_position": np.full(10, 5.0),
+            "theta_power_zscore": theta,
+        }
+    )
+    events = pd.DataFrame({"event_id": ["e1"], "non_local_event": [1]})
+    in_visit = np.ones(10, dtype=bool)
+    in_visit[4] = False
+
+    row = module.start_and_rest_theta(
+        dot, ENVIRONMENT, events, in_visit, 20_000, np.random.default_rng(0)
+    ).iloc[0]
+
+    assert row.rest_theta_like_share == pytest.approx(1 / 7, abs=0.01)
+    assert row.rest_windows == pytest.approx(20_000 * 7 / 8, rel=0.02)
 
 
 def test_an_event_whose_label_is_not_in_the_frame_is_refused(stubbed):

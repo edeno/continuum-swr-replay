@@ -19,6 +19,11 @@ from continuum_swr_replay.analysis.event_properties.gamma_power import (
 FS = 1000.0
 
 
+def INSIDE(grid: np.ndarray) -> np.ndarray:
+    """Every bin of the grid inside a well visit."""
+    return np.ones(grid.shape, dtype=bool)
+
+
 def sines(freq_hz: float, n_channels: int = 3, seconds: float = 4.0) -> np.ndarray:
     t = np.arange(int(seconds * FS)) / FS
     return np.column_stack([np.sin(2 * np.pi * freq_hz * t)] * n_channels)
@@ -198,7 +203,16 @@ def test_epoch_gamma_measures_events_and_references_on_analyzed_time():
     before = dot.copy()
 
     columns, reference, on_grid = epoch_gamma(
-        lfp, time, FS, dot, grid, excluded, events, 5, np.random.default_rng(0)
+        lfp,
+        time,
+        FS,
+        dot,
+        grid,
+        excluded,
+        events,
+        INSIDE(grid),
+        5,
+        np.random.default_rng(0),
     )
 
     pd.testing.assert_frame_equal(dot, before)
@@ -250,7 +264,16 @@ def test_epoch_gamma_is_unknown_where_the_lfp_was_not_recorded():
     reference."""
     lfp, time, dot, grid, excluded, events = _epoch()
     _, whole, _ = epoch_gamma(
-        lfp, time, FS, dot, grid, excluded, events, 5, np.random.default_rng(0)
+        lfp,
+        time,
+        FS,
+        dot,
+        grid,
+        excluded,
+        events,
+        INSIDE(grid),
+        5,
+        np.random.default_rng(0),
     )
     lfp = lfp.copy()
     lfp[((time >= 0.9) & (time < 1.0)) | ((time >= 2.0) & (time < 2.1))] *= 30.0
@@ -265,8 +288,8 @@ def test_epoch_gamma_is_unknown_where_the_lfp_was_not_recorded():
     paused = (grid > 1.0 + 0.003) & (grid < 2.0 - 0.003)
 
     columns, reference, on_grid = epoch_gamma(
-        lfp[recorded], time[recorded], FS, dot, grid, excluded, events, 5,
-        np.random.default_rng(0),
+        lfp[recorded], time[recorded], FS, dot, grid, excluded, events, INSIDE(grid),
+        5, np.random.default_rng(0),
     )  # fmt: skip
 
     for band in on_grid.values():
@@ -326,7 +349,16 @@ def test_an_events_reference_is_rest_windows_of_its_own_length():
     as long as the events, it does not."""
     lfp, time, dot, grid, excluded, events = _rest_only_epoch()
     columns, reference, _ = epoch_gamma(
-        lfp, time, FS, dot, grid, excluded, events, 50, np.random.default_rng(1)
+        lfp,
+        time,
+        FS,
+        dot,
+        grid,
+        excluded,
+        events,
+        INSIDE(grid),
+        50,
+        np.random.default_rng(1),
     )
     for band in GAMMA_BANDS:
         event_level = np.median(columns[f"{band}_z"])
@@ -335,3 +367,36 @@ def test_an_events_reference_is_rest_windows_of_its_own_length():
         # no SWR event, and the animal never runs: no level to give
         assert np.isnan(reference[f"{band}_rest_matched_swr"])
         assert np.isnan(reference[f"{band}_running_matched_non_swr"])
+
+
+def test_epoch_gamma_rest_is_the_rest_inside_a_well_visit():
+    """Outside the visits (before 2 s) the rest is louder (power 1); it is left
+    out of the quiet-rest levels and of the change against rest."""
+    lfp, time, dot, grid, excluded, events = _epoch()
+    lfp = lfp.copy()
+    lfp[time < 2.0] *= 5.0
+    in_visit = grid >= 2.0
+    columns, reference, _ = epoch_gamma(
+        lfp, time, FS, dot, grid, excluded, events, in_visit, 5,
+        np.random.default_rng(0),
+    )  # fmt: skip
+    rest = (
+        (dot["head_speed"] < 4)
+        & ~dot["in_excluded_time"]
+        & (dot["non_local_event"] == 0)
+        & (dot["SWR_event"] == 0)
+    ).to_numpy()
+    assert reference["n_rest_bins"] == int((rest & in_visit).sum())
+    assert reference["n_rest_bins_outside_visit"] == int((rest & ~in_visit).sum())
+    assert reference["slow_gamma_power_rest_median"] == pytest.approx(0.04, rel=0.05)
+    # (the louder rest leaks a little past 2 s through the filter); with every
+    # bin inside a visit the rest mean is many times larger
+    rest_mean = reference["slow_gamma_power_rest_mean"]
+    _, everywhere, _ = epoch_gamma(
+        lfp, time, FS, dot, grid, excluded, events, INSIDE(grid), 5,
+        np.random.default_rng(0),
+    )  # fmt: skip
+    assert rest_mean < 0.08 < 0.3 < everywhere["slow_gamma_power_rest_mean"]
+    assert reference["slow_gamma_db_non_swr"] == pytest.approx(
+        10 * np.log10(columns["slow_gamma_power"][1] / rest_mean)
+    )

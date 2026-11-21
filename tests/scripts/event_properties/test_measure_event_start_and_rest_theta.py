@@ -1,12 +1,15 @@
-"""``measure_event_start_and_rest_theta.measure_epoch``: the frame it reads and the
-columns it adds. The measures are tested in
+"""``measure_event_start_and_rest_theta``: the frame ``measure_epoch`` reads and the
+columns it adds, and a whole run of ``main`` to its manifest. The measures are
+tested in
 ``tests/analysis/event_properties/test_start_and_rest_theta.py``."""
 
 from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import pickle
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,9 +17,23 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (
+    STATE_SPACE_FEATURES_RUN,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+)
 from continuum_swr_replay.analysis.event_properties import start_and_rest_theta
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.paths import (
+    EVENT_START_REST_THETA_DIR,
+    event_features_root,
+    replay_content_dir,
+    table_path,
+)
+from continuum_swr_replay.runs.io import files_sha256
 from tests.analysis.event_properties.test_start_and_rest_theta import EVENTS, frame
+from tests.support._session_cache_fixtures import write_session_cache_entries
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]
@@ -46,15 +63,23 @@ def stored(processed_data_root, monkeypatch) -> str:
         )
     )
     monkeypatch.setattr(script.analyzed_time, "with_swr_source", lambda dot: dot)
+    # one well visit holding the whole frame (it spans 0 to 0.038 s)
+    monkeypatch.setattr(
+        script,
+        "well_visit_times",
+        lambda identifier: (np.array([-1.0]), np.array([1.0])),
+    )
     monkeypatch.setattr(
         start_and_rest_theta,
         "regime_masks",
-        lambda dot: {"rest": dot["non_local_event"].to_numpy() == 0},
+        lambda dot, in_visit: {
+            "rest": (dot["non_local_event"].to_numpy() == 0) & in_visit
+        },
     )
     monkeypatch.setattr(
         start_and_rest_theta,
         "brain_state_reference",
-        lambda dot: {"theta_running_median": 0.5, "theta_rest_median": 0.0},
+        lambda dot, in_visit: {"theta_running_median": 0.5, "theta_rest_median": 0.0},
     )
     monkeypatch.setattr(
         start_and_rest_theta,
@@ -90,3 +115,63 @@ def test_a_refusal_of_the_measures_names_the_epoch(stored):
     events = pd.DataFrame({"event_id": ["e9"], "non_local_event": [9]})
     with pytest.raises(ValueError, match=f"{IDENTIFIER}: an event's label has no bin"):
         script.measure_epoch((IDENTIFIER, stored, events, 4))
+
+
+def test_the_rest_windows_are_drawn_inside_the_epochs_well_visits(stored, monkeypatch):
+    """With the visits ending before the frame, no bin is rest: every event's
+    rest windows are empty."""
+    monkeypatch.setattr(
+        script,
+        "well_visit_times",
+        lambda identifier: (np.array([-1.0]), np.array([-0.5])),
+    )
+    table = script.measure_epoch((IDENTIFIER, stored, EVENTS, 4))
+    assert table.rest_windows.eq(0).all()
+    assert table.rest_theta_like_share.isna().all()
+
+
+def test_main_writes_every_epoch_and_the_manifest(
+    stored, processed_data_root, monkeypatch
+):
+    """The whole run, without ``--epochs``: the event table holds the two events
+    of the frame inside a well visit and a third, on the track, whose label is
+    in no bin (measuring it would raise), so the run reads only the selected
+    events; the manifest is written last, as on real data. The pool is a
+    thread pool here: the measures are stubbed in this process."""
+    table = pd.DataFrame(
+        {
+            "event_id": ["e1", "e2", "e3"],
+            "animal": "j16",
+            "session_date": 20210706,
+            "epoch": "02_r1",
+            "non_local_event": [1, 2, 3],
+            "visit_context": ["in_visit", "spans_visit_end", "track_center"],
+        }
+    )
+    event_table = table_path("event_table", replay_content_dir())
+    event_table.parent.mkdir(parents=True)
+    table.to_parquet(event_table)
+    monkeypatch.setattr(script, "read_swr_table", lambda path, columns: table)
+    run = event_features_root() / STATE_SPACE_FEATURES_RUN
+    run.mkdir(parents=True)
+    (run / "manifest.json").write_text(
+        json.dumps(
+            {"epochs": {IDENTIFIER: {"status": "ok", "decode": {"sha256": stored}}}}
+        )
+    )
+    monkeypatch.setattr(script, "ProcessPoolExecutor", ThreadPoolExecutor)
+    entries = write_session_cache_entries([IDENTIFIER])
+
+    script.main(["--n-windows", "4"])
+
+    folder = processed_data_root / EVENT_START_REST_THETA_DIR
+    measured = pd.read_parquet(folder / f"{IDENTIFIER}.parquet")
+    assert measured.event_id.tolist() == ["e1", "e2"]
+    manifest = json.loads((folder / "manifest.json").read_text())
+    assert manifest["subset"] == ANALYZED_SUBSET
+    assert manifest["n_epochs"] == 1
+    assert manifest["n_windows"] == 4
+    assert manifest["visit_context_counts"]["track_center"] == 1
+    assert manifest["visit_context_counts"]["in_visit"] == 1
+    assert manifest["event_table"]["path"] == str(event_table)
+    assert manifest["session_cache"]["sha256"] == files_sha256(entries)

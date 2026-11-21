@@ -21,6 +21,9 @@ from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Value
 from tests.analysis.detector_comparison.test_inventory_nonlocal_comparison import (
+    SELECTED,
+    VISITS,
+    _exposure,
     _write_run,
 )
 
@@ -246,12 +249,14 @@ def test_other_detector_values_name_each_detector_and_each_state():
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
     _write_run(tmp_path / "run", tmp_path / "inventory")
     numbers = _numbers(
-        builder.left_out_values(tmp_path / "run", tmp_path / "inventory", "s")
+        builder.left_out_values(
+            tmp_path / "run", tmp_path / "inventory", SELECTED, VISITS, _exposure(), "s"
+        )
     )
     assert numbers == {
-        "rest_hours": 2.0,
+        "rest_hours": 1.0,
         "nonlocal_time_s": 2.0,
-        "kay_time_s": 1.5,
+        "kay_time_s": 0.5,
         "nonlocal_time_outside_kay_s": 1.5,
         "nonlocal_time_outside_kay_fraction": 0.75,
         "nonlocal_time_outside_swr_s": 1.25,
@@ -262,13 +267,13 @@ def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
         "nonlocal_time_outside_widloski_fraction": 0.875,
         "nonlocal_events_outside_kay": 1,
         "nonlocal_events_outside_kay_fraction": 0.5,
-        "nonlocal_events_outside_kay_per_hour": 0.5,
+        "nonlocal_events_outside_kay_per_hour": 1.0,
         "nonlocal_events_outside_widloski": 2,
-        "nonlocal_events_outside_widloski_fraction": pytest.approx(2 / 3),
-        "nonlocal_events_outside_widloski_per_hour": 1.0,
+        "nonlocal_events_outside_widloski_fraction": 1.0,
+        "nonlocal_events_outside_widloski_per_hour": 2.0,
         "nonlocal_events_outside_trigger": 4,
-        "nonlocal_events_outside_trigger_fraction": 0.5,
-        "nonlocal_events_outside_trigger_per_hour": 2.0,
+        "nonlocal_events_outside_trigger_fraction": pytest.approx(4 / 7),
+        "nonlocal_events_outside_trigger_per_hour": 4.0,
     }
 
 

@@ -45,9 +45,8 @@ non-local SWR / no-SWR split — the pooled ``non_local`` is the one-population
 null tested against its split.
 
 How this family (B) differs from Family A on the same stop is in the
-``fit_per_stop_rate_models.py`` docstring. Family B never reads the dense
-``stop_timebin_table``: ``aggregate_to_timebins`` builds the 15 ms bins from
-``stop_table`` and ``event_onset_table``.
+``fit_per_stop_rate_models.py`` docstring. ``aggregate_to_timebins`` builds
+the 15 ms bins from ``stop_table`` and ``event_onset_table``.
 
 Outputs: ``models_per_bin_rate/all_models{sfx}.pkl`` (one row per (session,
 outcome, model)), its ``.provenance.json`` sidecar, and
@@ -88,6 +87,9 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from continuum_swr_replay.analysis.behavior.design_constants import (  # noqa: E402
+    RATE_BIN_S,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     require_swr_source,
 )
@@ -107,7 +109,6 @@ from continuum_swr_replay.analysis.replay_models.covariate_timing import (  # no
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
     MODEL_PER_BIN_RATE,
-    RATE_BIN_S,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
     POPULATIONS,

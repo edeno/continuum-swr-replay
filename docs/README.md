@@ -61,11 +61,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [2026-11-10-questions-and-numbers-design.md](design/2026-11-10-questions-and-numbers-design.md) — one question list with each question's numbers.
   - [2026-11-11-paper-development-plan.md](design/2026-11-11-paper-development-plan.md) — proposed scientific plan for the paper.
   - [2026-11-12-paper-question-outline.md](design/2026-11-12-paper-question-outline.md) — proposed questions and subquestions of the paper.
+  - [2026-11-20-regression-convention-and-figure04.md](design/2026-11-20-regression-convention-and-figure04.md) — one convention for every regression model, the shared fitter, and the plan of Figure 4, with the lead's decisions.
   - [content_model_design.md](design/content_model_design.md) — the `is_swr` content ladder.
   - [content_estimator_comparison.md](design/content_estimator_comparison.md) — three content estimators compared on one cohort.
   - [pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md) — the mPFC unit GLM, its held-out test, and its bundles.
   - [pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md) — the content-marked mPFC replay kernels.
   - [pfc_marked_model_family.md](design/pfc_marked_model_family.md) — the descriptive marked mPFC model family.
+  - [regression_fitter.md](design/regression_fitter.md) — the shared regression fitter: its likelihoods, convergence and penalty rules, its cost, and its agreement with mgcv, neurospatial and the current fitters.
   - [replay_detection_comparison/](design/replay_detection_comparison/) — published detectors run on the same recordings; start at [overview.md](design/replay_detection_comparison/overview.md).
     - [01](design/replay_detection_comparison/01-yu-swr-detector.md) Yu SWR detector;
       [02](design/replay_detection_comparison/02-memoryless-sequence.md) Widloski & Foster sequence detector;
@@ -103,7 +105,9 @@ layers below it, never from a layer above:
    summary over sessions, the nested bootstrap) and imports nothing from the package.
 2. **`analysis/`**: one package per question, in pipeline order. Each imports only
    the packages before it in the table below (and the foundation, `constants` and
-   `shared_statistics`). `event_definition/` imports no other analysis package. In
+   `shared_statistics`). `event_definition/` imports no other analysis package, and
+   neither does `regression/`, the shared fitter, which knows nothing of the task
+   (arrays in, fits out); any `analysis/` package may import it. In
    Part 1 and Part 2 the order is `event_definition` → `decode_quality` → `detection`
    → `event_evidence` → `event_properties` and `detector_comparison` (the last two
    do not import each other); none of them imports `behavior/`, `event_tables/`,
@@ -122,6 +126,7 @@ violation fails.
 
 | Stage | Package (`analysis/`) | Owns | Does not own |
 |---|---|---|---|
+| Fit | `regression/` | the shared fitter: the likelihoods and their derivatives, the penalized Newton fit, the penalty strengths by pooled REML, the P-spline basis and penalty, and the fitter's numerical rules (`constants.py`) | which columns and rows a model uses |
 | Rule | `event_definition/` | analyzed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
 | Find | `detection/` | the algorithms that produce inventories: the SWR and Carey detectors, rule R-T, the artifact detector, the memoryless sequence detector, the paper's non-local detector applied to a decode (`nonlocal_events.py`), and the simulated run Figure 1 shows it on (`simulated_run.py`) | which inventory is canonical; comparing inventories |
 | Compare | `detector_comparison/` | the inventories brought onto one schema and compared on the same recordings: overlap, exposure, counts, event features, held-out evidence | running a detector |
@@ -183,12 +188,13 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/replay_models/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
+   | `models_per_bin_rate/` | `scripts/replay_models/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
    | `models_per_event_swr_power/` | `scripts/replay_models/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
    | `models_per_stop_rate/` | `scripts/replay_models/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/replay_models/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
    | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial; the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models_swr_contrast/` beside their conditional twins |
+   | `models_convention/descriptive/` | `scripts/replay_models/rate/describe_visit_clocks.py` | the model-free event-start rates on the three visit clocks, per kind and animal (`visit_clock_curves.parquet`, with its `.provenance.json`) |
    | `content_estimator_comparison/` | `scripts/replay_models/content/compare_content_estimators.py` | the three-estimator comparison ([design/content_estimator_comparison.md](design/content_estimator_comparison.md)) |
    | `stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/replay_models/choice/run_stay_leave.py` | the per-stop replay summary and the stay/leave models |
    | `stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/replay_models/choice/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |

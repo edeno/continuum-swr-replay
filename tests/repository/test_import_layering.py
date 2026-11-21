@@ -28,6 +28,12 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   event rule, the canonical SWR source) imports, from within the package, only
   foundation modules, ``analysis.constants``, ``analysis.shared_statistics``
   and itself, and nothing from ``scripts``.
+- ``regression_imports_only_foundation``: the shared fitter
+  (``analysis.regression``: likelihoods, penalized Newton, penalized splines)
+  knows nothing of the task. It imports, from within the package, only
+  foundation modules, ``analysis.constants``, ``analysis.shared_statistics``
+  and itself, and nothing from ``scripts``; any ``analysis`` package may
+  import it.
 - ``event_packages_import_in_order``: the Part 1 and Part 2 packages
   (:data:`EVENT_RANK`) import in pipeline order: ``event_definition``, then
   ``decode_quality``, then ``detection``, then ``event_evidence``, then
@@ -90,6 +96,11 @@ from tests.support._imports import (
 #: Package nodes, besides the foundation, that ``analysis.event_definition`` may import.
 EVENT_DEFINITION_MAY_IMPORT = frozenset(
     {"analysis.event_definition", "analysis.constants", "analysis.shared_statistics"}
+)
+
+#: Package nodes, besides the foundation, that ``analysis.regression`` may import.
+REGRESSION_MAY_IMPORT = frozenset(
+    {"analysis.regression", "analysis.constants", "analysis.shared_statistics"}
 )
 
 #: The Part 1 and Part 2 packages, ranked in pipeline order: one imports only
@@ -209,6 +220,12 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             if package_of(a) == "analysis.event_definition"
             and outside(b, FOUNDATION | EVENT_DEFINITION_MAY_IMPORT)
         },
+        "regression_imports_only_foundation": {
+            (a, b)
+            for a, b in edges
+            if package_of(a) == "analysis.regression"
+            and outside(b, FOUNDATION | REGRESSION_MAY_IMPORT)
+        },
         "event_packages_import_in_order": {
             (a, b)
             for a, b in edges
@@ -296,6 +313,7 @@ def test_the_graph_is_not_vacuous() -> None:
         "analysis.event_tables",
         "analysis.replay_models",
         "analysis.pfc",
+        "analysis.regression",
         "data_loaders",
     ):
         assert node in graph, f"{node} missing from the package graph"
@@ -382,6 +400,25 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
     }
     assert found["src_imports_no_scripts"] == {("analysis.beta.b", "scripts.qa.tool")}
     assert found["foundation_imports_only_foundation"] == {("parameters", "driver")}
+
+
+def test_regression_rule_sees_a_task_import(tmp_path: Path) -> None:
+    """The shared fitter may import the constants, not a task package."""
+    root = tmp_path / "continuum_swr_replay"
+    for package in ("analysis/regression", "analysis/replay_models"):
+        (root / package).mkdir(parents=True)
+        (root / package / "__init__.py").write_text("")
+    (root / "__init__.py").write_text("")
+    (root / "analysis" / "__init__.py").write_text("")
+    (root / "analysis" / "constants.py").write_text("")
+    (root / "analysis" / "replay_models" / "fitting.py").write_text("")
+    (root / "analysis" / "regression" / "newton.py").write_text(
+        "from .. import constants\nfrom ..replay_models import fitting\n"
+    )
+
+    assert rule_violations(root)["regression_imports_only_foundation"] == {
+        ("analysis.regression.newton", "analysis.replay_models.fitting")
+    }
 
 
 def test_a_longer_cycle_is_reported_in_import_order(tmp_path: Path) -> None:

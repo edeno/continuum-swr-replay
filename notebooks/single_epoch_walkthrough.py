@@ -116,9 +116,9 @@ from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_HIERARCHY,  # M0–M7        : arm content
     MODEL_PATCH,  # P0–P4        : patch content
     MODEL_PER_STOP_RATE,  # R0-R2, Rlag  : event rate per stop (Family A)
-    N_REWARD_LAGS,
     default_content_model_names,
 )
+from continuum_swr_replay.analysis.behavior.design_constants import N_REWARD_LAGS
 from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,
     cross_validate_per_stop_rate_model,

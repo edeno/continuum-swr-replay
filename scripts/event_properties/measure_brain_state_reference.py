@@ -2,7 +2,13 @@
 
 The references an event's ``theta_z``, ``ripple_power_z`` and ``mua_rate_z`` are
 read against (``analysis.event_properties.brain_state_reference``): is a non-local
-event at rest a theta-like event, or a quiet-rest one? One row per epoch, for
+event at rest a theta-like event, or a quiet-rest one? Quiet rest is the rest
+inside a well visit (the epoch's port experiences, read from the session cache:
+``event_tables.prepare_data.well_visit_times``); each row records the quiet-rest
+bins kept (``n_rest_bins``) and left out as outside every visit
+(``n_rest_bins_outside_visit``), and the manifest records the session-cache
+entries the visits were read from (``prepare_data.session_cache_record``). One
+row per epoch, for
 the ``ok`` epochs of an event features run, from the same decodes (each
 decode's sha256 must be the one the run recorded), written to
 ``Processed-Data/brain_state_reference/reference.parquet`` with a
@@ -25,8 +31,16 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.event_definition import analyzed_time
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+)
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
@@ -43,13 +57,14 @@ def _epoch(job: tuple[str, str]) -> dict[str, Any]:
         inventory_run.decode_path(identifier), expected_sha256
     )
     animal, day, epoch = (dot[c].iloc[0] for c in ("animal", "day", "epoch"))
+    in_visit = in_well_visit(dot.index.to_numpy(), *well_visit_times(identifier))
     return {
         "epoch_id": identifier,
         "animal": str(animal),
         "session_date": int(day),
         "epoch": str(epoch),
         "decode_sha256": expected_sha256,
-        **brain_state_reference(dot),
+        **brain_state_reference(dot, in_visit),
     }
 
 
@@ -77,10 +92,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             "produced_by": produced_by(__file__),
             "commit": described_commit(),
             "event_features_run": args.event_features_run,
+            "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(table["epoch_id"]),
             "n_epochs": len(table),
             "running": "head_speed above 10 cm/s, outside excluded time",
             "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
-            "outside excluded time",
+            "inside a well visit (first poke-in to final poke-out), outside "
+            "excluded time",
         },
         indent=1,
         final_newline=True,

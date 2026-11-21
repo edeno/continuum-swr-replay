@@ -225,3 +225,90 @@ def test_a_window_with_no_spike_or_fewer_than_two_finite_bins_is_not_scored():
         spike_evidence.event_metrics(10, 13, _likelihood(4), 5, mape, lin, *args)
         is None
     )
+
+
+# --- the analyses' subset -----------------------------------------------------
+
+EPOCH = "chimi20200225_02_r1_HPC"
+"""The epoch of the hand-built event table (``chimi``, 20200225, ``02_r1``)."""
+
+BIG_ID = 2**63 + 5
+"""An ``event_id`` above 2**53, which a float would round."""
+
+
+def _event_table() -> pd.DataFrame:
+    """Three canonical events of :data:`EPOCH`, one of them never scored."""
+    return pd.DataFrame(
+        {
+            "animal": "chimi",
+            "session_date": 20200225,
+            "epoch": "02_r1",
+            "event_start_s": [10.002, 20.004, 30.0],
+            "event_id": np.array([BIG_ID, 7, 8], dtype=np.uint64),
+        }
+    )
+
+
+def _scored() -> pd.DataFrame:
+    """Two scored events of the table and three quiet windows."""
+    return pd.DataFrame(
+        {
+            "epoch_id": EPOCH,
+            "group": ["SWR-remote", "nonSWR-close", "baseline", "baseline", "baseline"],
+            "start_time": [20.004, 10.002, 5.0, 12.0, 25.0],
+            "dll_per_spike": [1.0, 2.0, 0.1, 0.2, 9.0],
+        }
+    )
+
+
+def test_each_scored_event_takes_its_event_id_by_epoch_and_start():
+    out = spike_evidence.with_event_ids(_scored(), _event_table())
+    assert out["event_id"].dtype == "UInt64"
+    assert out["event_id"].iloc[0] == 7
+    assert out["event_id"].iloc[1] == BIG_ID  # exact, not rounded
+    assert out["event_id"].iloc[2:].isna().all()  # quiet windows are no events
+    assert out["dll_per_spike"].tolist() == _scored()["dll_per_spike"].tolist()
+
+
+def test_a_scored_event_without_its_event_refuses():
+    scored = _scored()
+    scored.loc[0, "start_time"] = 20.006  # one sample later: no event starts there
+    with pytest.raises(ValueError, match="1 scored events match no event"):
+        spike_evidence.with_event_ids(scored, _event_table())
+
+
+def test_two_events_with_one_epoch_and_start_refuse():
+    events = _event_table()
+    events.loc[2, "event_start_s"] = 10.002
+    with pytest.raises(ValueError, match="share an epoch and start"):
+        spike_evidence.with_event_ids(_scored(), events)
+
+
+def test_the_subset_is_the_selected_events_and_the_quiet_windows_in_a_visit():
+    metrics = spike_evidence.with_event_ids(_scored(), _event_table())
+    # one visit, [8, 15): the quiet windows at 5 and 25 s start outside it
+    visits = {EPOCH: (np.array([8.0]), np.array([15.0]))}
+    keep = spike_evidence.in_analyzed_subset(metrics, [BIG_ID, 8], visits)
+    # the event 7 is not selected, though nothing about its time is checked here
+    assert keep.tolist() == [False, True, False, True, False]
+
+
+def test_a_quiet_window_outside_every_visit_does_not_move_the_statistics():
+    """The planted window (dll 9 at 25 s) would raise the baseline median."""
+    metrics = spike_evidence.with_event_ids(_scored(), _event_table())
+    visits = {EPOCH: (np.array([8.0]), np.array([15.0]))}
+    kept = metrics[spike_evidence.in_analyzed_subset(metrics, [BIG_ID, 7], visits)]
+    assert kept.loc[kept["group"] == "baseline", "dll_per_spike"].tolist() == [0.2]
+
+
+def test_a_quiet_window_at_a_visit_s_final_poke_out_is_outside():
+    metrics = spike_evidence.with_event_ids(_scored(), _event_table())
+    visits = {EPOCH: (np.array([5.0]), np.array([12.0]))}
+    keep = spike_evidence.in_analyzed_subset(metrics, [], visits)
+    assert keep.tolist() == [False, False, True, False, False]
+
+
+def test_an_epoch_without_visits_refuses():
+    metrics = spike_evidence.with_event_ids(_scored(), _event_table())
+    with pytest.raises(ValueError, match="no well visits for 1 epochs"):
+        spike_evidence.in_analyzed_subset(metrics, [7], {})

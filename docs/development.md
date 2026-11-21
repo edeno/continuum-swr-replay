@@ -75,6 +75,7 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   what the animal did: covariates/ (behavioral covariates, qvals_table), design constants, track lookups
 │   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
+│   ├── regression/        #   the shared fitter, arrays in and fits out: likelihoods, penalized Newton, pooled REML penalties, P-splines
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── event_definition/  #   the rule: analyzed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
 │   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode, Figure 1's simulated run
@@ -316,12 +317,27 @@ is that subset, and `count_visit_context` gives the rows kept and dropped per la
 Do not re-implement the filter. At the stop grain the label is about the whole stop:
 most `mixed` stops start inside a visit and run past its final poke-out
 (`spans_visit_end`): the default selection keeps them, and selecting stops by
-`in_visit` alone would drop their in-visit seconds.
+`in_visit` alone would drop their in-visit seconds. An event or a stop that starts
+inside a visit and crosses its final poke-out takes the visit's well as its current
+arm, patch and `is_stay` (`visit_context.assign_visit_current_arm`), in every table.
 
 A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
 visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
 grid: a time is inside a visit from the first poke-in (included) to the final poke-out
-(not included), the per-sample rule the labels summarize.
+(not included), the per-sample rule the labels summarize. An epoch's visits are read
+from the session cache only, by `analysis/event_tables/prepare_data.py:well_visit_times`
+(a missing or off-contract entry is refused: nothing is fetched from Spyglass or
+written; a script loads the visits and passes the arrays or the mask down), and where
+the event table and the visits meet (the events summary, Figure 2) every event's label
+must agree with its start (`cohort_selection.check_visit_context_starts`). An SWR, or
+another detector's event, counts when its first sample is inside a visit. A stored
+table made over every event is read over the selected ones with
+`cohort_selection.select_events_in` (every row of a selected `event_id`), and an
+output re-run over the subset records `cohort_selection.ANALYZED_SUBSET` as its
+`subset`; an output whose content depends on the visits also records one digest of the
+session-cache entries it read (`prepare_data.session_cache_record`). The readers check
+both (`cohort_selection.subset_staleness`, `prepare_data.time_mask_staleness`;
+[figure-pipeline.md](figure-pipeline.md)).
 
 ### Spatial Variables
 
