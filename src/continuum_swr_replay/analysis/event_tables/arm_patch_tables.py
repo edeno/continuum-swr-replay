@@ -52,6 +52,7 @@ from .table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
 )
+from .visit_context import VISIT_CONTEXT_COLUMNS
 
 
 def build_event_arm_table(
@@ -458,6 +459,7 @@ def build_event_patch_table(
             "nearest_well_distance_cm_min",
             "nearest_well_distance_cm_mean",
             "nearest_well_distance_cm_max",
+            *VISIT_CONTEXT_COLUMNS,
         )
         if column in event_table.columns
     ]

@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
+from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -56,6 +57,7 @@ from .bouts import (
 from .bouts import (
     nearest_well_distance_cm as _nearest_well_distance_cm,
 )
+from .visit_context import VISIT_CONTEXT_COLUMNS, visit_context_of_samples
 
 
 def build_stop_table(
@@ -84,7 +86,12 @@ def build_stop_table(
     its rows outside excluded time (``bouts.summarize_bout_location``, through
     ``bouts.bout_start_context``): a stop wholly inside it is ``unknown``, with
     NaN well, segment and distances, so it is in no well-anchored cohort. The
-    bout-start context columns read the stop's first row, as before.
+    bout-start context columns read the stop's first row, as before. The
+    well-visit context (``visit_context``, ``well_visit_id``,
+    ``last_completed_well_visit_id``, ``time_since_last_poke_out_s``,
+    ``time_until_next_poke_in_s``; ``visit_context.window_visit_context``)
+    reads the same rows as the location summaries: a stop wholly inside
+    excluded time is ``no_analyzed_samples``.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -250,6 +257,21 @@ def build_stop_table(
         .reindex(np.arange(n_bouts))
         .to_numpy()
     )
+    # Where the stop lies relative to the well visits, over the rows its
+    # occupancy_state summarizes (those outside excluded time).
+    analyzed = bout_rows.loc[
+        ~interval_mask(bout_rows.index.to_numpy(dtype=float), excluded)
+    ]
+    visit = visit_context_of_samples(
+        analyzed,
+        analyzed["_bout_idx"].to_numpy(),
+        np.arange(n_bouts),
+        per_bout["occupancy_state"].to_numpy(dtype=object),
+        port_experiences,
+        track_graph,
+    )
+    for column in VISIT_CONTEXT_COLUMNS:
+        per_bout[column] = visit[column].array
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)

@@ -71,6 +71,12 @@ LOCATION_COLUMNS = [
     "occupancy_well_arm",
     "current_patch",
     "is_stay",
+    # The well-visit label reads the same rows (event_tables/visit_context.py).
+    "visit_context",
+    "well_visit_id",
+    "last_completed_well_visit_id",
+    "time_since_last_poke_out_s",
+    "time_until_next_poke_in_s",
 ]
 
 

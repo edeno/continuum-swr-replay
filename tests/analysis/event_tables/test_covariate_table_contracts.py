@@ -39,6 +39,8 @@ def _event_arm_table(event_ids: tuple[int, ...] = (10, 11)) -> pd.DataFrame:
                     "epoch": "02_r1",
                     "event_id": event_id,
                     "candidate_arm": arm,
+                    "occupancy_state": "at_well",
+                    "visit_context": "in_visit",
                     "arm_count_hard": int(arm == event_id % 9),
                     "arm_fraction": float(arm == event_id % 9),
                     "arm_fraction_posterior": 1.0 / 9.0,
@@ -129,6 +131,8 @@ def _event_patch_table() -> pd.DataFrame:
             "epoch": "02_r1",
             "event_id": np.repeat([10, 11], 3),
             "patch": np.tile([1, 2, 3], 2),
+            "occupancy_state": "at_well",
+            "visit_context": "in_visit",
             "patch_count_hard": [1, 0, 0, 0, 1, 0],
             "patch_fraction": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         }

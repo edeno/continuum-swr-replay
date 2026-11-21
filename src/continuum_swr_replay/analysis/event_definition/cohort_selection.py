@@ -11,6 +11,13 @@ responsible for model-specific provenance, minimum-sample gates, and fitting.
 units are complete, but which population the ladder is about at all.  Both the
 rate and the content families route their occupancy restriction through it, so
 one rule -- stated once, here -- decides the stops both families describe.
+
+:func:`select_visit_context` selects rows by their well-visit label
+(``visit_context``): by default the events and stops that start inside a well
+visit (``analysis.constants.STARTS_IN_WELL_VISIT``: ``in_visit`` and
+``spans_visit_end``), the one subset the analyses of Figures 2 to 5 read.
+:func:`count_visit_context`
+counts the rows per label, kept and dropped, for a summary to record.
 """
 
 from __future__ import annotations
@@ -22,6 +29,10 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
+from continuum_swr_replay.analysis.constants import (
+    STARTS_IN_WELL_VISIT,
+    VISIT_CONTEXTS,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 
@@ -201,11 +212,13 @@ def freeze_common_cohort(
 #: 14,845 of the 107,400 canonical stops are -- but they are at-well bouts:
 #: every one that has a last-well arrival begins after it (median 0.73 s), their
 #: median nearest-well distance is 0 cm at both ends, and 96.8% of their events
-#: are themselves event-grain ``at_well``. Their first settling samples read
-#: as in-transit. Excluding them from the stop cohort would drop 18,274 of the
+#: are themselves event-grain ``at_well``. Nearly all of them start inside a
+#: well visit and run past its final poke-out (``visit_context ==
+#: "spans_visit_end"``), so it is their last samples that read as in-transit.
+#: Excluding them from the stop cohort would drop 18,274 of the
 #: 59,699 content events' stops (30.6%) and make the two cohorts CROSS rather
 #: than nest, so the stop predicate is "well-anchored": ``at_well`` or
-#: ``mixed``. An event carries no such settling ambiguity -- an event window
+#: ``mixed``. An event carries no such ambiguity -- an event window
 #: that is not wholly at one well has no defined current arm -- so the event
 #: predicate stays the strict one.
 STOP_COHORT_RULES = {
@@ -331,8 +344,9 @@ def select_stop_cohort(
     cohort : {"at_well", "all_stops", "in_transit"}
         Population to keep.  ``at_well`` is canonical and, at the stop grain,
         means *well-anchored*: ``occupancy_state`` of ``at_well`` **or**
-        ``mixed``.  A ``mixed`` stop is an at-well bout whose first settling
-        samples read as in-transit (see :data:`STOP_COHORT_RULES`); excluding
+        ``mixed``.  A ``mixed`` stop is an at-well bout that runs past the
+        visit's final poke-out, so its last samples read as in-transit (see
+        :data:`STOP_COHORT_RULES`); excluding
         those stops would leave 30.6% of the content cohort's events with no
         stop in the rate cohort.
 
@@ -532,3 +546,114 @@ def events_in_stops(event_starts: np.ndarray, stops: pd.DataFrame) -> np.ndarray
         True where the onset lies inside a kept stop.
     """
     return stop_interval_mask(np.asarray(event_starts, dtype=float), stops)
+
+
+_VISIT_CONTEXT_COLUMN = "visit_context"
+
+
+def _visit_contexts(contexts: str | Sequence[str]) -> tuple[str, ...]:
+    """The requested labels as a tuple, refusing one the vocabulary lacks."""
+    requested = (contexts,) if isinstance(contexts, str) else tuple(contexts)
+    unknown = sorted(set(requested) - set(VISIT_CONTEXTS))
+    if not requested or unknown:
+        raise ValueError(
+            f"unknown visit_context value(s) {unknown or requested!r}; expected "
+            f"some of {list(VISIT_CONTEXTS)}"
+        )
+    return requested
+
+
+def select_visit_context(
+    table: pd.DataFrame, contexts: str | Sequence[str] = STARTS_IN_WELL_VISIT
+) -> pd.DataFrame:
+    """Keep the rows of a table whose ``visit_context`` is one of ``contexts``.
+
+    Every event and stop carries a well-visit label (``visit_context``, made by
+    ``event_tables.visit_context``); the tables keep the rows outside a visit,
+    and this is where an analysis drops them. The default keeps the rows that
+    start inside a well visit (from the first nose-poke in at a well to the
+    final poke-out there): ``analysis.constants.STARTS_IN_WELL_VISIT``, the
+    rows wholly inside one (``in_visit``) and those that start inside one and
+    end after its final poke-out (``spans_visit_end``), because an event
+    belongs to the time when it starts. Pass ``"in_visit"`` for the rows wholly
+    inside a visit only.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        Any canonical table carrying ``visit_context`` (event, stop,
+        event-arm or event-patch grain).
+    contexts : str or sequence of str
+        The labels to keep, from ``analysis.constants.VISIT_CONTEXTS``;
+        default ``STARTS_IN_WELL_VISIT``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of the kept rows with a fresh integer index; ``table`` is not
+        changed.
+
+    Raises
+    ------
+    ValueError
+        If ``table`` has no ``visit_context``, or a requested label is not in
+        the vocabulary.
+    """
+    keep = _visit_contexts(contexts)
+    require_columns(table, [_VISIT_CONTEXT_COLUMN], "the table to select from")
+    return table.loc[table[_VISIT_CONTEXT_COLUMN].isin(keep)].reset_index(drop=True)
+
+
+def count_visit_context(
+    table: pd.DataFrame,
+    contexts: str | Sequence[str] = STARTS_IN_WELL_VISIT,
+    *,
+    unit_col: str | None = None,
+) -> pd.DataFrame:
+    """Count a table's rows (or units) per ``visit_context``, kept or dropped.
+
+    The record a summary keeps of what :func:`select_visit_context` with the
+    same ``contexts`` keeps and drops.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        A table carrying ``visit_context``.
+    contexts : str or sequence of str
+        The labels :func:`select_visit_context` would keep; default
+        ``STARTS_IN_WELL_VISIT``.
+    unit_col : str, optional
+        Count distinct values of this column (``event_id`` on a candidate-row
+        table) instead of rows.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per label of ``analysis.constants.VISIT_CONTEXTS``, in that
+        order, indexed by ``visit_context``: ``n`` (rows, or distinct units)
+        and ``kept`` (bool). Labels with no rows have ``n`` 0.
+
+    Raises
+    ------
+    ValueError
+        As :func:`select_visit_context`, or if ``unit_col`` is absent.
+    """
+    keep = _visit_contexts(contexts)
+    require_columns(
+        table,
+        [_VISIT_CONTEXT_COLUMN, *([unit_col] if unit_col else [])],
+        "the table to count",
+    )
+    labels = table[_VISIT_CONTEXT_COLUMN]
+    if unit_col is None:
+        counts = labels.value_counts()
+    else:
+        counts = table.groupby(labels, observed=True)[unit_col].nunique()
+    out = pd.DataFrame(
+        {
+            "n": counts.reindex(list(VISIT_CONTEXTS), fill_value=0).astype(int),
+            "kept": [label in keep for label in VISIT_CONTEXTS],
+        }
+    )
+    out.index.name = _VISIT_CONTEXT_COLUMN
+    return out
