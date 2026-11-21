@@ -109,10 +109,10 @@ for questions open with the lead: the freedom of a smooth term (the terms task a
      through a penalty block, or any other status, leaves the session without a fit, with the reason in
      words. When a column made inactive is a 0/1 role column,
      drop that role's rows from the session, as the support rule does (fact found by simulation, above).
-  2. One implementation only (C13, C14): the loop's rule and the search's must not be two copies. Either
-     make the refit a public function of `reml.py` that both call, or let the search return the set-aside
-     sessions and their directions and the loop refit them (`TODO.md`, "Who refits the set-aside
-     sessions"). Either changes the fitter: keep its tests passing and add the new ones there.
+  2. One implementation only (C13, C14): the loop's rule and the search's must not be two copies. Make
+     the refit a public function of `reml.py` that both call (the author's call: the search's behavior
+     and its tests do not change, and the rule stays in one place; this settles `TODO.md`, "Who refits
+     the set-aside sessions": remove that entry). Add the new tests beside the fitter's.
   3. What is recorded for such a session (C7): its `status`, the columns left out with the reason
      (`left_out`), NaN for those terms' coefficients and covariance, and the round count.
   4. WAITS FOR THE LEAD: how such a session is reported. The author's recommendation (a call): the
