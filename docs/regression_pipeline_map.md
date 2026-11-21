@@ -494,7 +494,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/duration_aware_history.py`
 
@@ -1160,6 +1160,12 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 `build_parser`, `main`
 
+### `scripts/replay_models/rate/describe_visit_clocks.py`
+
+Model-free event-start rates on the three visit clocks, per kind and animal.
+
+`input_paths`, `output_path`, `session_bins`, `main`
+
 ### `scripts/replay_models/rate/fit_cross_history_rate.py`
 
 Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
@@ -1327,6 +1333,18 @@ The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 `drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_clock_curves.py`
+
+Model-free event-start rates on the three visit clocks, and how stops end.
+
+`visit_clock_rate_curves`, `stop_end_kind_counts`
+
+### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
+
+The well-visit time-bin design of the event-rate models.
+
+`arrival_spanning_stop_ids`, `shift_reward_lags_at_outcome`, `interval_coverage_by_bin`, `visit_timebins`
 
 ### `src/continuum_swr_replay/decoding/encoding_model.py`
 

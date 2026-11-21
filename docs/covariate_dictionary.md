@@ -581,6 +581,41 @@ inside a visit (`table_contracts.validate_canonical_table_contract`).
   trunk arms, which are no reward site. It is a drift with the trial number
   unless `n_visits_arrived` is in the model too.
 
+**The visit time bins** (`replay_models/visit_design.py:visit_timebins`, the
+design the rate models read, built per session and event kind; not a stored
+table). A stop's analyzed time (its span less excluded time) is cut at the visit
+boundaries, and `RATE_BIN_S` bins are laid from the start of each piece, the
+last one partial, so a bin lies wholly inside or outside a visit and outside
+excluded time. Columns:
+
+- `visit_context` — `in_visit` inside a visit; outside, the stop's label, except
+  `after_visit_at_well` for the time after the final poke-out of a stop that
+  starts inside a visit. `select_visit_context(bins)` keeps exactly the in-visit
+  bins, and their counts are exactly the events of the default set.
+- `well_visit_id` — the visit the bin lies in (also for the in-visit part of a
+  `spans_visit_start` stop); missing outside. `visit_stretch_index` — the stop's
+  (missing outside a visit).
+- `bin_start_s`, `bin_end_s` — the bin's bounds (absolute session seconds).
+- `exposure` — at-risk seconds: the bin's length less the time inside an
+  ongoing event of the modeled kind (the other kind's events do not reduce it);
+  a bin with none left is dropped. In-visit exposure plus the kind's event time
+  inside the in-visit analyzed time is the sum of `in_visit_immobile_s`.
+- `count` — the starts of the kind's events in the bin, each in the bin that
+  holds the at-risk time just before it (a start on a bin edge goes to the bin
+  that ends there). An event that starts on a stop's first sample has no
+  at-risk time before it and is not counted; `attrs["starts_not_at_risk_s"]`
+  lists them.
+- `time_since_visit_start_s`, `time_until_visit_end_s`,
+  `time_until_stretch_end_s` — the three clocks at the bin's center, defined as
+  in the event table; NaN outside a visit. `s + u` is the visit's length;
+  `m <= u`, equal only in a stop that runs to the final poke-out (the last stop
+  of a visit often ends before it, when the animal moves at the well and then
+  pokes out).
+- `known_reward_outcome_lag_1..10` — the outcomes known at the bin's left edge,
+  most recent first: the stop's lags, shifted at `outcome_known_time_s` as in
+  F.4 (`visit_design.shift_reward_lags_at_outcome`). Lag 1 is the last known
+  outcome.
+
 ## G. Base covariate reference
 
 Definitions for the base (non-interaction) covariates on the canonical tables.
