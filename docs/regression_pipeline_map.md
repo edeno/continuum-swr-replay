@@ -536,13 +536,13 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 The fit-row record: one row per (model, kind, session) of every stored fit.
 
-`FitRecord`, `records_frame`, `write_records`, `read_records`
+`NoFit`, `describe`, `FitRecord`, `records_frame`, `write_records`, `read_records`
 
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
 Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
 
-`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `SessionRefit`, `refit_session`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `RefitEnd`, `SessionRefit`, `refit_session`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
@@ -554,7 +554,7 @@ The per-session fitting loop: one design, every session fitted alone.
 
 The support rule: whether a session's data can estimate an unpenalized term.
 
-`Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
+`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 

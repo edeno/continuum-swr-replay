@@ -479,7 +479,8 @@ session it set aside and the per-session loop both call it, so the rule is in on
 A session with columns left out is reported with those terms missing, not left out of a
 summary, because leaving it out would depend on the outcome: the sessions that fail are
 those with no events in one condition. Its record names each column left out with the
-reason and the round, and holds NaN for those coefficients and their covariance.
+cause and the round, and holds NaN for those coefficients and their covariance. A term of
+several unpenalized columns leaves a session whole (`sessions.py`'s docstring).
 
 ## The per-session loop
 
@@ -500,9 +501,13 @@ the build).
 ## The fit record
 
 `record.FitRecord` is one row per (model, kind, session); its docstring lists every field.
-A session with no rows, or no events of the kind, left is not fitted: its record has the
-status "not fitted", NaN coefficients and the reason, and the loop goes on. A record whose
-status is not "converged" is kept; its readers flag it. `write_records` and
+A session with no rows, or no events of the kind, left is not fitted: no fit is tried,
+and its record has the status "not fitted" and NaN coefficients. A fit tried and not
+kept keeps the last fit's status and the true counts, with NaN coefficients. A record
+whose status is not "converged" is kept; its readers flag it. Every cause is a code of a
+closed set, so that sessions can be counted by cause: `support.Removed` for a term left
+out (`left_out`, with the refit's round in `left_out_round`), `record.NoFit` for a
+session without a kept fit (`no_fit`); `record.describe` gives their words. `write_records` and
 `read_records` store the records through `tables.io` (`write_table`, `read_table`), the
 structured fields as JSON strings.
 
