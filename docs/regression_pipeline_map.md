@@ -866,7 +866,7 @@ Compute decoding quality metrics across all sessions.
 
 Coverage of the animal-balanced interval under three ways to resample.
 
-`Setting`, `cohort`, `intervals`, `simulate`, `main`
+`Setting`, `cohort`, `intervals`, `simulate`, `simulate_band`, `main`
 
 ### `scripts/checks/summarize_cohort_audits.py`
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 from scipy.stats import norm
 from scipy.stats import t as student_t
@@ -92,27 +93,64 @@ def test_simultaneous_band_coverage() -> None:
     assert pointwise < whole
 
 
-def test_the_across_session_band_widens_the_bootstrap_sd_by_the_t_correction() -> None:
-    rng = np.random.default_rng(1)
+def _sessions(n_points: int, seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Five animals of three days of two sessions; smooth animal offsets."""
+    rng = np.random.default_rng(seed)
     n_animals, n_days, n_sessions = 5, 3, 2
     animal = np.repeat(np.arange(n_animals), n_days * n_sessions)
     day = np.repeat(np.arange(n_animals * n_days), n_sessions)
+    grid = np.linspace(0.0, 4.0, n_points)
     offsets = rng.normal(0.0, 0.5, n_animals)
-    curves = np.sin(GRID)[None, :] + offsets[animal, None]
-    curves = curves + rng.normal(0.0, 0.3, (animal.size, GRID.size))
+    curves = np.sin(grid)[None, :] + offsets[animal, None]
+    curves = curves + rng.normal(0.0, 0.3, (animal.size, n_points))
+    return curves, animal, day
+
+
+def test_the_across_session_band_scales_the_bootstrap_sd_by_an_animal_level_pivot() -> (
+    None
+):
+    curves, animal, day = _sessions(GRID.size, 1)
     band = across_session_band(curves, animal, day, n_draws=2000, seed=5)
     boot = stats.animal_balanced_bootstrap(curves, animal, day, n_draws=2000, seed=5)
     np.testing.assert_allclose(band.estimate, boot.estimate)
     sd = boot.draws.std(axis=0, ddof=1)
     np.testing.assert_allclose(band.se, sd)
-    k = student_t.ppf(0.975, n_animals - 1) * np.sqrt(n_animals / (n_animals - 1))
-    k /= norm.ppf(0.975)
-    np.testing.assert_allclose(band.high - band.estimate, band.critical * sd * k)
-    expected_c = np.quantile(
-        np.max(np.abs(boot.draws - boot.draws.mean(axis=0)) / sd, axis=1), 0.95
+    np.testing.assert_allclose(
+        band.high - band.estimate, band.critical * sd * np.sqrt(5 / 4)
     )
-    assert band.critical == pytest.approx(expected_c)
-    # At one grid point the band is about the scalar interval of that point.
-    point = stats.bootstrap_interval(boot.estimate[50], boot.draws[:, 50], n_animals)
-    assert band.high[50] > point.high
+    # A whole curve needs more than one point's t quantile.
+    assert band.critical > student_t.ppf(0.975, 4)
     assert band.seed == 5 and band.n_draws == 2000
+    again = across_session_band(curves, animal, day, n_draws=2000, seed=5)
+    assert again.critical == band.critical
+
+
+@pytest.mark.parametrize("n_animals", [5, 2])
+def test_at_one_grid_point_the_band_is_the_scalar_interval(n_animals: int) -> None:
+    """With one grid point the pivot is t with A - 1 degrees of freedom, so
+    the band is estimand_summary's interval up to the pivot's simulation error
+    (its 0.95 quantile from 10,000 draws: about 2 % for A = 5, 4 % for A = 2)."""
+    curves, animal, day = _sessions(1, 2)
+    keep = animal < n_animals
+    curves, animal, day = curves[keep], animal[keep], day[keep]
+    band = across_session_band(curves, animal, day, n_draws=2000, seed=9)
+    t = student_t.ppf(0.975, n_animals - 1)
+    assert band.critical == pytest.approx(
+        t, rel=3 * (0.02 if n_animals == 5 else 0.045)
+    )
+    labels = pd.Series(np.arange(animal.size))
+    summary = stats.estimand_summary(
+        pd.Series(curves[:, 0]),
+        pd.Series(animal),
+        pd.Series(day),
+        labels,
+        n_draws=2000,
+        seed=9,
+    )
+    assert band.estimate[0] == pytest.approx(summary["estimate"])
+    assert band.high[0] - band.estimate[0] == pytest.approx(
+        summary["high"] - summary["estimate"], rel=0.15
+    )
+    assert (band.high[0] - band.estimate[0]) / band.critical == pytest.approx(
+        (summary["high"] - summary["estimate"]) / t
+    )

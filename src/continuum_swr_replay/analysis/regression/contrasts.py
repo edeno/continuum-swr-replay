@@ -12,9 +12,11 @@ covariance ``(H + S)^-1``. Two kinds are built here:
 - a coefficient difference (:func:`coefficient_contrast`): a sum of named
   coefficients less another sum.
 
-A curve enters only through ``curve_rows``, the function that maps values of
-its variable to the rows of the full coefficient vector that give the curve
-there. The basis that made them, and how its freedom was set, do not matter
+A curve contrast is given the term's range and refuses a range outside it:
+beyond its range a clamped smooth is flat, so a mean there would silently be
+the curve at the end. A curve enters only through ``curve_rows``, the
+function that maps values of its variable to the rows of the full coefficient
+vector that give the curve there. The basis that made them, and how its freedom was set, do not matter
 here.
 
 A coefficient left out of a session (NaN in its fit) makes NaN every contrast
@@ -96,13 +98,17 @@ def range_mean_contrast(
     curve_rows: Callable[[np.ndarray], np.ndarray],
     first: tuple[float, float],
     second: tuple[float, float],
+    *,
+    term_range: tuple[float, float],
     step: float = GRID_STEP,
 ) -> np.ndarray:
     """The ``c`` of a curve's mean over ``first`` less its mean over ``second``.
 
     With ``f(x) = curve_rows(x) @ beta``, ``c @ beta`` is the mean of ``f``
     over :func:`range_grid` of ``first`` less its mean over that of
-    ``second``.
+    ``second``. Both ranges must lie inside the term's range: beyond it a
+    clamped smooth is flat, so a mean there would be the curve at the end of
+    the range.
 
     Parameters
     ----------
@@ -111,13 +117,27 @@ def range_mean_contrast(
         rows of the full coefficient vector, shape ``(n_points, n_coef)``.
     first, second : tuple of float
         The two ranges ``(lo, hi)``.
+    term_range : tuple of float
+        The range ``(lo, hi)`` the term's basis covers.
     step : float
         The grid step.
 
     Returns
     -------
     np.ndarray, shape (n_coef,)
+
+    Raises
+    ------
+    ValueError
+        If a range lies outside ``term_range``.
     """
+    lo, hi = term_range
+    tolerance = 1e-9 * (hi - lo)
+    for name, (a, b) in (("first", first), ("second", second)):
+        if a < lo - tolerance or b > hi + tolerance:
+            raise ValueError(
+                f"the {name} range [{a}, {b}] lies outside the term's range [{lo}, {hi}]"
+            )
     return curve_rows(range_grid(*first, step)).mean(axis=0) - curve_rows(
         range_grid(*second, step)
     ).mean(axis=0)

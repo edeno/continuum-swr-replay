@@ -13,12 +13,19 @@ point alone. Two forms:
 - the animal-balanced curve across sessions (:func:`across_session_band`):
   the per-session curves on one grid are taken session -> recording day ->
   animal as a mean of means, with nested bootstrap draws of that curve
-  (animals, then their sessions; ``shared_statistics.animal_balanced_bootstrap``). ``sd_g`` is the draws'
-  standard deviation, ``c`` the 0.95 quantile of
-  ``max_g |draw_g - mean_g| / sd_g``, and the band is
-  ``estimate +/- c sd_g k`` with ``k = t(0.975, A - 1) sqrt(A / (A - 1)) /
-  z(0.975)``: the small-sample correction over the ``A`` animals that
-  ``shared_statistics.bootstrap_interval`` applies to a scalar.
+  (animals, then their sessions;
+  ``shared_statistics.animal_balanced_bootstrap``). With ``sd_g`` the draws'
+  standard deviation, the band is ``estimate +/- c sd_g sqrt(A / (A - 1))``,
+  the scale of ``shared_statistics.bootstrap_interval``'s scalar interval
+  over the ``A`` animals with ``c`` in place of ``t(0.975, A - 1)``. ``c`` is
+  the 0.95 quantile of a pivot simulated at the level of the animals: ``A``
+  independent Gaussian curves with the grid correlation of the draws, and
+  ``max_g |their mean| / (their sample SD / sqrt(A))``, drawn
+  :data:`PIVOT_DRAWS` times from the stored seed. At one grid point this pivot
+  is ``|t|`` with ``A - 1`` degrees of freedom, so the band is the scalar
+  interval. With five animals the draws' own maximum cannot carry the tail
+  that the t correction supplies (a quantile of it under-covered the whole
+  curve: 0.80 to 0.90 in simulation).
 
 Neither form depends on the basis that made the curve or on how its freedom
 was set: the first takes ``C``, the coefficients and their covariance, the
@@ -30,8 +37,6 @@ from __future__ import annotations
 from typing import NamedTuple
 
 import numpy as np
-from scipy.stats import norm
-from scipy.stats import t as student_t
 
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_bootstrap,
@@ -40,6 +45,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
 __all__ = [
     "BAND_DRAWS",
     "BAND_LEVEL",
+    "PIVOT_DRAWS",
     "Band",
     "across_session_band",
     "simultaneous_band",
@@ -50,6 +56,9 @@ BAND_DRAWS = 10_000
 
 BAND_LEVEL = 0.95
 """The probability that the band holds the whole curve."""
+
+PIVOT_DRAWS = 10_000
+"""Draws of the animal-level pivot behind the across-session band."""
 
 
 class Band(NamedTuple):
@@ -143,6 +152,36 @@ def simultaneous_band(
     )
 
 
+def _animal_pivot_quantile(
+    correlation: np.ndarray, n_animals: int, rng: np.random.Generator
+) -> float:
+    """The 0.95 quantile of ``max_g |mean| / (sd / sqrt(A))`` over ``A``
+    independent Gaussian curves with the grid correlation given.
+
+    Parameters
+    ----------
+    correlation : np.ndarray, shape (n_points, n_points)
+        The grid correlation; negative eigenvalues are clipped to zero.
+    n_animals : int
+        ``A``.
+    rng : np.random.Generator
+
+    Returns
+    -------
+    float
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(correlation)
+    root = eigenvectors * np.sqrt(np.clip(eigenvalues, 0.0, None))
+    maxima = []
+    for start in range(0, PIVOT_DRAWS, 1000):
+        n = min(1000, PIVOT_DRAWS - start)
+        curves = rng.standard_normal((n, n_animals, root.shape[1])) @ root.T
+        mean = curves.mean(axis=1)
+        se = curves.std(axis=1, ddof=1) / np.sqrt(n_animals)
+        maxima.append(np.max(np.abs(mean) / se, axis=1))
+    return float(np.quantile(np.concatenate(maxima), BAND_LEVEL))
+
+
 def across_session_band(
     curves: np.ndarray,
     animal: np.ndarray,
@@ -164,7 +203,8 @@ def across_session_band(
     n_draws : int
         Nested bootstrap replicates.
     seed : int
-        Their seed.
+        The seed of the bootstrap draws (``animal_balanced_bootstrap``) and,
+        as ``numpy.random.default_rng((seed, 1))``, of the pivot's draws.
 
     Returns
     -------
@@ -184,15 +224,12 @@ def across_session_band(
     sd = boot.draws.std(axis=0, ddof=1)
     if not (sd > 0).all():
         raise ValueError("the draws do not vary at a grid point")
-    deviation = np.max(np.abs(boot.draws - boot.draws.mean(axis=0)) / sd, axis=1)
-    critical = float(np.quantile(deviation, BAND_LEVEL))
-    tail = (1 + BAND_LEVEL) / 2
-    k = (
-        student_t.ppf(tail, n_animals - 1)
-        * np.sqrt(n_animals / (n_animals - 1))
-        / norm.ppf(tail)
+    critical = _animal_pivot_quantile(
+        np.corrcoef(boot.draws, rowvar=False).reshape(sd.size, sd.size),
+        n_animals,
+        np.random.default_rng((seed, 1)),
     )
-    half = critical * sd * k
+    half = critical * sd * np.sqrt(n_animals / (n_animals - 1))
     return Band(
         boot.estimate,
         boot.estimate - half,

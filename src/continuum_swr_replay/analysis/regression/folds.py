@@ -6,8 +6,13 @@ trial's departure from a well to the next departure, so the run to a well and
 the whole stay there are one segment, its class the destination well
 (:func:`task_segment_starts`). A segment longer than :data:`MAX_SEGMENT_S` is
 cut into equal pieces (:func:`capped_groups`), so that a long stay is spread
-over the folds. The pieces of one segment can fall in different folds, so one
-long stay, or one event whose rows cross a cut, can span two folds. The folds are scikit-learn's
+over the folds. The cap is a number of rows: 30 s at the median spacing of the
+rows, so a piece is 30 s of evenly spaced bins and may span more or less time
+on events, which are not evenly spaced. The pieces of one segment can fall in
+different folds, so one long stay can span two folds. The rows are one per
+event or per bin, their times strictly increasing; a caller with several rows
+per event (one per candidate arm) makes the folds on the events and gives each
+event's rows its fold. The folds are scikit-learn's
 ``StratifiedGroupKFold(n_splits=N_FOLDS, shuffle=False)`` with one sample per
 row, its class the segment's class and its group the row's piece
 (:func:`trial_folds`): every row of a piece is in one fold, each class's rows
@@ -194,23 +199,33 @@ def task_segment_starts(
     return np.concatenate(starts), np.concatenate(classes)
 
 
+def _check_one_row_per_time(time: NDArray) -> None:
+    """Refuse row times that are not strictly increasing."""
+    if (np.diff(np.asarray(time, dtype=float)) <= 0).any():
+        raise ValueError(
+            "row times must be strictly increasing: give one row per event or per "
+            "bin, and map each event's fold to its arm rows"
+        )
+
+
 def capped_groups(
     time: NDArray, segment: NDArray, max_segment_s: float | None = MAX_SEGMENT_S
 ) -> NDArray[np.int64]:
     """Each row's group: its segment, cut into equal pieces where the segment
     is longer than ``max_segment_s``.
 
-    A segment of ``n`` rows longer than the cap (``m`` rows, the cap over the
-    median spacing of ``time``, rounded down) is cut into ``ceil(n / m)``
-    pieces of consecutive rows whose lengths differ by at most one row, each at
-    most ``m`` rows; a segment of at most ``m`` rows is one group. On rows that
-    are not equally spaced (events) the cap is therefore in rows at the median
-    spacing, not in seconds.
+    The cap is a number of rows, ``m``: ``max_segment_s`` over the median
+    spacing of ``time``, rounded down. A segment of ``n`` rows longer than
+    ``m`` is cut into ``ceil(n / m)`` pieces of consecutive rows whose lengths
+    differ by at most one row, each at most ``m`` rows; a segment of at most
+    ``m`` rows is one group. A piece of evenly spaced bins spans at most
+    ``max_segment_s``; a piece of events (not evenly spaced) can span more or
+    less time.
 
     Parameters
     ----------
     time : ndarray, shape (n_rows,)
-        Each row's time, s, increasing.
+        Each row's time, s, strictly increasing: one row per event or per bin.
     segment : ndarray of int, shape (n_rows,)
         Each row's segment (:func:`trial_segments`), nondecreasing.
     max_segment_s : float or None
@@ -224,8 +239,10 @@ def capped_groups(
     Raises
     ------
     ValueError
-        When the segments are not runs of consecutive rows.
+        When the times are not strictly increasing, or the segments are not
+        runs of consecutive rows.
     """
+    _check_one_row_per_time(time)
     segment = np.asarray(segment, dtype=np.int64)
     if (np.diff(segment) < 0).any():
         raise ValueError("segments must be runs of consecutive bins")
@@ -265,7 +282,9 @@ def trial_folds(
     Parameters
     ----------
     time : ndarray, shape (n_rows,)
-        Each row's time, s, increasing (a bin's time, or an event's start).
+        Each row's time, s, strictly increasing: one row per bin, or per event
+        at its start. The rows of one event (one per candidate arm) take the
+        event's fold, which the caller maps to them.
     segment_starts : ndarray, shape (n_segments,)
         Each segment's first time, s, strictly increasing.
     segment_classes : ndarray of int, shape (n_segments,)
@@ -273,7 +292,8 @@ def trial_folds(
     n_folds : int
         The number of folds.
     max_segment_s : float or None
-        The longest group, s; None leaves every segment whole.
+        The longest group, s, as a number of rows at the median row spacing
+        (:func:`capped_groups`); None leaves every segment whole.
 
     Returns
     -------
@@ -283,11 +303,12 @@ def trial_folds(
     Raises
     ------
     ValueError
-        When the classes are not one per start or not all finite, when fewer
+        When the times are not strictly increasing, when the classes are not one per start or not all finite, when fewer
         groups than ``n_folds`` hold a row, or when a fold is left empty.
     """
     from sklearn.model_selection import StratifiedGroupKFold
 
+    _check_one_row_per_time(time)
     classes = np.asarray(segment_classes)
     if classes.shape != np.shape(segment_starts):
         raise ValueError(

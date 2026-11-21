@@ -685,3 +685,49 @@ def test_estimand_summary():
         stats.estimand_summary(
             twice.value, twice.animal, twice.day, twice.session, n_draws=10, seed=0
         )
+
+
+def test_a_session_without_a_finite_value_is_left_out_of_everything():
+    """An infinite session value is left out as a missing one is: of the
+    estimate, the counts, the animals' signs and its day's value."""
+    d = _days_table()
+    infinite, missing = d.copy(), d.copy()
+    infinite.loc[0, "value"] = np.inf
+    missing.loc[0, "value"] = np.nan
+    a = stats.estimand_summary(
+        infinite.value,
+        infinite.animal,
+        infinite.day,
+        infinite.session,
+        n_draws=50,
+        seed=0,
+    )
+    b = stats.estimand_summary(
+        missing.value, missing.animal, missing.day, missing.session, n_draws=50, seed=0
+    )
+    assert a == b
+    assert a["n_sessions"] == len(d) - 1 and a["n_days"] == 8
+    assert stats.day_level_test(
+        infinite.value, infinite.animal, infinite.day
+    ) == stats.day_level_test(missing.value, missing.animal, missing.day)
+    values = stats.animal_day_session_values(
+        infinite.value, infinite.animal, infinite.day, infinite.session, "mean"
+    )
+    assert np.isfinite(values).all()
+
+
+def test_no_finite_value_is_refused_by_name():
+    t = THREE_LEVEL.assign(value=[np.nan, np.inf, np.nan, np.nan, -np.inf, np.nan])
+    with pytest.raises(ValueError, match="no session has a finite value"):
+        stats.animal_balanced_bootstrap(t.value, t.animal, t.day, n_draws=10, seed=0)
+    with pytest.raises(ValueError, match="no session has a finite value"):
+        stats.estimand_summary(t.value, t.animal, t.day, t.session, n_draws=10, seed=0)
+
+
+def test_the_draws_follow_the_sorted_order_of_the_animal_labels():
+    t = _days_table()
+    one = stats.animal_balanced_bootstrap(t.value, t.animal, t.day, n_draws=20, seed=3)
+    relabeled = t.animal.map({"a": "z", "b": "y"})
+    two = stats.animal_balanced_bootstrap(t.value, relabeled, t.day, n_draws=20, seed=3)
+    assert one.estimate == pytest.approx(two.estimate)
+    assert not np.allclose(one.draws, two.draws)

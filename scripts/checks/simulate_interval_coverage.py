@@ -32,6 +32,23 @@ Writes a CSV, one row per setting and scheme: ``coverage``, ``mean_width``,
 
 The full run (2,000 data sets of 1,000 draws per setting) takes about 16 min on
 one core; ``--quick`` runs 40 data sets of 200 draws.
+
+With ``--band-out`` a second part measures the across-session band
+(``regression.bands.across_session_band``) on the same cohort: each session's
+curve on 20 grid points over [0, 1] is ``animal curve + day curve + session
+noise``, the animal and day curves smooth Gaussian processes (squared
+exponential, length 0.2) and the noise independent at each point, at the SDs of
+:data:`BAND_SETTINGS`, truth 0. One row per setting: ``whole_curve_coverage``
+(the band holds the whole true curve), ``point_coverage`` (at the first grid
+point), ``mean_width``, ``coverage_se``, ``n_sets`` and ``n_draws``; 300 data
+sets of 1,000 draws per setting (``--quick``: 20 of 200), about 1 min.
+
+The committed tables ``tests/scripts/checks/data/interval_coverage_full.csv``
+and ``tests/scripts/checks/data/band_coverage_full.csv`` were made by::
+
+    python scripts/checks/simulate_interval_coverage.py \
+        --out tests/scripts/checks/data/interval_coverage_full.csv \
+        --band-out tests/scripts/checks/data/band_coverage_full.csv
 """
 
 from __future__ import annotations
@@ -43,6 +60,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.regression.bands import across_session_band
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_bootstrap,
     bootstrap_interval,
@@ -215,11 +233,60 @@ def simulate(setting: Setting, n_sets: int, n_draws: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+BAND_SETTINGS = (
+    Setting((1.0, 0.5, 1.0), 301),
+    Setting((0.3, 1.0, 1.0), 302),
+    Setting((1.0, 0.0, 0.3), 303),
+)
+BAND_POINTS = 20
+BAND_LENGTH = 0.2
+
+
+def simulate_band(setting: Setting, n_sets: int, n_draws: int) -> pd.DataFrame:
+    """Whole-curve and one-point coverage of the across-session band."""
+    animal, day = cohort()
+    n_animals, n_days = animal.max() + 1, day.max() + 1
+    x = np.linspace(0.0, 1.0, BAND_POINTS)
+    kernel = np.exp(-((x[:, None] - x[None]) ** 2) / (2 * BAND_LENGTH**2))
+    root = np.linalg.cholesky(kernel + 1e-8 * np.eye(BAND_POINTS))
+    sd_animal, sd_day, sd_session = setting.sds
+    rng = np.random.default_rng(setting.seed)
+    whole, point, width = [], [], []
+    for i in range(n_sets):
+        curves = (
+            (rng.standard_normal((n_animals, BAND_POINTS)) @ root.T)[animal] * sd_animal
+            + (rng.standard_normal((n_days, BAND_POINTS)) @ root.T)[day] * sd_day
+            + rng.normal(0.0, sd_session, (animal.size, BAND_POINTS))
+        )
+        band = across_session_band(curves, animal, day, n_draws=n_draws, seed=i)
+        inside = (band.low <= 0.0) & (band.high >= 0.0)
+        whole.append(inside.all())
+        point.append(inside[0])
+        width.append(np.mean(band.high - band.low))
+    coverage = float(np.mean(whole))
+    return pd.DataFrame(
+        [
+            {
+                "setting": setting.name,
+                "whole_curve_coverage": coverage,
+                "point_coverage": float(np.mean(point)),
+                "mean_width": float(np.mean(width)),
+                "coverage_se": float(np.sqrt(coverage * (1 - coverage) / n_sets)),
+                "n_sets": n_sets,
+                "n_draws": n_draws,
+            }
+        ]
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, required=True, help="the CSV to write")
     parser.add_argument(
-        "--quick", action="store_true", help="40 data sets of 200 draws per setting"
+        "--band-out", type=Path, help="also measure the band; the CSV to write"
+    )
+    parser.add_argument(
+        "--quick", action="store_true", help="fewer data sets and draws per setting"
     )
     args = parser.parse_args(argv)
     n_sets, n_draws = (40, 200) if args.quick else (2000, 1000)
@@ -229,6 +296,15 @@ def main(argv: list[str] | None = None) -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(args.out, index=False)
     print(table.to_string(index=False))
+    if args.band_out is not None:
+        n_sets, n_draws = (20, 200) if args.quick else (300, 1000)
+        bands = pd.concat(
+            [simulate_band(setting, n_sets, n_draws) for setting in BAND_SETTINGS],
+            ignore_index=True,
+        )
+        args.band_out.parent.mkdir(parents=True, exist_ok=True)
+        bands.to_csv(args.band_out, index=False)
+        print(bands.to_string(index=False))
 
 
 if __name__ == "__main__":

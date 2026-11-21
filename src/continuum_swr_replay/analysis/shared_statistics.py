@@ -604,6 +604,9 @@ def animal_balanced_bootstrap(
     resampled. In each draw the estimate is recomputed on the sessions drawn:
     a day's mean over its drawn sessions, an animal's mean over its days with
     a drawn session, the mean over the drawn animals.
+    The draws depend on the seed and on the sorted order of the animal labels
+    (the animals' codes, :func:`nested_codes`), so relabeling the animals
+    changes the draws, not the estimate.
 
     Parameters
     ----------
@@ -621,9 +624,16 @@ def animal_balanced_bootstrap(
     Returns
     -------
     AnimalBalancedDraws
+
+    Raises
+    ------
+    ValueError
+        If no session has a finite value.
     """
     values = np.asarray(values, dtype=float)
-    finite = np.isfinite(values.reshape(values.shape[0], -1)).all(axis=1)
+    finite = np.isfinite(values).all(axis=tuple(range(1, values.ndim)))
+    if not finite.any():
+        raise ValueError("no session has a finite value")
     values = values[finite]
     animal = np.asarray(animal)[finite]
     day = np.asarray(day)[finite]
@@ -680,8 +690,8 @@ def animal_day_session_values(
     Parameters
     ----------
     values : pd.Series, shape (n_rows,)
-        One number per row (a session, or a unit or event of one). A missing
-        value is left out.
+        One number per row (a session, or a unit or event of one). A value that is not
+        finite (missing or infinite) is left out.
     animal, day, session : pd.Series, shape (n_rows,)
         Each row's animal, recording day within its animal, and session within
         its day, indexed as ``values``.
@@ -704,7 +714,7 @@ def animal_day_session_values(
         raise ValueError(f"statistic {statistic!r} is neither 'median' nor 'mean'")
     if not all(values.index.equals(s.index) for s in (animal, day, session)):
         raise ValueError("values, animal, day and session are not indexed alike")
-    has_value = values.notna()
+    has_value = np.isfinite(values.to_numpy(dtype=float))
     keys = [s[has_value] for s in (animal, day, session)]
     per_session = values[has_value].groupby(keys, observed=True).agg(statistic)
     per_day = per_session.groupby(level=[0, 1], observed=True).agg(statistic)
@@ -720,7 +730,8 @@ def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> floa
     Parameters
     ----------
     values : pd.Series, shape (n_sessions,)
-        One number per session. A missing value is left out.
+        One number per session. A value that is not finite (missing or
+        infinite) is left out.
     animal, day : pd.Series, shape (n_sessions,)
         Each session's animal and recording day within its animal, indexed as
         ``values``.
@@ -738,7 +749,7 @@ def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> floa
     """
     if not (values.index.equals(animal.index) and values.index.equals(day.index)):
         raise ValueError("values, animal and day are not indexed alike")
-    has_value = values.notna()
+    has_value = np.isfinite(values.to_numpy(dtype=float))
     keys = [animal[has_value], day[has_value]]
     return signed_rank_p(values[has_value].groupby(keys, observed=True).mean())
 
@@ -766,7 +777,8 @@ def estimand_summary(
     ----------
     values : pd.Series, shape (n_sessions,)
         One estimate per session (for a kind difference, the difference of the
-        two kinds' session estimates). A missing value is left out.
+        two kinds' session estimates). A value that is not finite (missing or
+        infinite) is left out.
     animal, day, session : pd.Series, shape (n_sessions,)
         Each session's animal, recording day within its animal and session
         within its day, indexed as ``values``; one row per session.
@@ -780,7 +792,8 @@ def estimand_summary(
     summary : dict
         - ``estimate``: the animal-balanced value.
         - ``low``, ``high``, ``sd``: :func:`bootstrap_interval`'s.
-        - ``n_animals``, ``n_days``, ``n_sessions``: those with a value.
+        - ``n_animals``, ``n_days``, ``n_sessions``: those with a finite
+          value; every entry is computed on those sessions only.
         - ``n_animals_same_sign``: animals whose own value has the sign of
           ``estimate`` (zero has its own sign).
         - ``day_p``: the day-level signed-rank p.
@@ -789,20 +802,21 @@ def estimand_summary(
     Raises
     ------
     ValueError
-        If a session has more than one value, or the labels are not indexed
-        as ``values``.
+        If no session has a finite value, a session has more than one value,
+        or the labels are not indexed as ``values``.
     """
-    per_animal = animal_day_session_values(values, animal, day, session, "mean")
-    has_value = values.notna()
-    labels = pd.DataFrame(
-        {"animal": animal, "day": day, "session": session}, index=values.index
-    )[has_value]
+    if not all(values.index.equals(s.index) for s in (animal, day, session)):
+        raise ValueError("values, animal, day and session are not indexed alike")
+    finite = np.isfinite(values.to_numpy(dtype=float))
+    values, animal, day, session = (s[finite] for s in (values, animal, day, session))
+    labels = pd.DataFrame({"animal": animal, "day": day, "session": session})
     if labels.duplicated().any():
         raise ValueError("a session has more than one value")
+    per_animal = animal_day_session_values(values, animal, day, session, "mean")
     boot = animal_balanced_bootstrap(
-        values[has_value].to_numpy(),
-        labels.animal.to_numpy(),
-        labels.day.to_numpy(),
+        values.to_numpy(),
+        animal.to_numpy(),
+        day.to_numpy(),
         n_draws=n_draws,
         seed=seed,
     )

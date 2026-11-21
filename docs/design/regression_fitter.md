@@ -579,7 +579,9 @@ Every scalar estimand of a fit is a linear functional `c' beta` of its coefficie
 its variance in a session is exact: `c' V c`, with `V` the Bayesian covariance
 (`contrasts.py`). A curve contrast is the mean of a curve over one range of its variable
 minus its mean over another, each mean taken over an equally spaced grid (step
-`GRID_STEP = 0.01`). A range whose two ends are equal is one point. A coefficient
+`GRID_STEP = 0.01`). A range whose two ends are equal is one point. Both ranges must lie
+inside the term's range, which the contrast is given (`term_range`): beyond it a clamped
+smooth is flat, so a mean there would silently be the curve at the end. A coefficient
 difference is a sum of named coefficients less another sum. A curve enters only through
 the function that maps values of its variable to rows of the coefficient vector, so the
 basis and its freedom do not matter. A coefficient left out of a session makes NaN every
@@ -592,8 +594,12 @@ placed by its start) belongs to a trial segment: from a departure from a well to
 next departure, so the run to a well and the whole stay there are one segment. Its class
 is the destination well. A segment longer than `MAX_SEGMENT_S = 30` s is cut into equal
 pieces, so that a long stay is spread over the folds; the pieces of one segment can fall
-in different folds, so one long stay, or one event whose rows cross a cut, can span two
-folds. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
+in different folds, so one long stay can span two folds. The cap is a number of rows: 30 s
+at the median spacing of the rows. A piece of evenly spaced bins is therefore at most 30 s,
+and a piece of events, which are not evenly spaced, can span more or less time. The rows'
+times must be strictly increasing, one row per bin or per event: a model with several rows
+per event (one per candidate arm) makes the folds on the events and gives each event's
+rows its fold. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
 shuffling, the class a row's segment's and the group its piece. Every row of a piece is
 in one fold, and each class is spread over the folds as evenly as whole pieces allow.
 The folds do not depend on a seed.
@@ -613,10 +619,20 @@ A band of `bands.py` holds the whole curve with 95 % probability, not each point
   `f ± c se`.
 - The animal-balanced curve across sessions: the per-session curves on one grid are
   taken session to recording day to animal as a mean of means, with nested bootstrap
-  draws of that curve. With `sd` the draws' standard deviation, `c` is the 0.95 quantile
-  of `max |draw - mean| / sd`, and the band is `estimate ± c sd k`, with
-  `k = t(0.975, A - 1) sqrt(A / (A - 1)) / z(0.975)` the small-sample correction over the
-  `A` animals.
+  draws of that curve (animals, then their sessions). With `sd` the draws' standard
+  deviation and `A` the animals with a finite curve, the band is
+  `estimate ± c sd sqrt(A / (A - 1))`, the scale of the scalar interval with `c` in place
+  of `t(0.975, A - 1)`. `c` is the 0.95 quantile of a pivot simulated at the level of the
+  animals: `A` independent Gaussian curves with the grid correlation of the draws, and
+  `max |their mean| / (their sample SD / sqrt(A))`, drawn `PIVOT_DRAWS = 10,000` times
+  from the stored seed. At one grid point the pivot is `|t|` with `A - 1` degrees of
+  freedom, so the band is `estimand_summary`'s interval. A simulation
+  (`scripts/checks/simulate_interval_coverage.py --band-out`; table
+  `tests/scripts/checks/data/band_coverage_full.csv`) measured the whole-curve coverage
+  on the cohort's shape: the earlier band, a quantile of the draws' own maximum, held the
+  whole curve in 0.80 to 0.90 of the data sets, because with five animals the draws do
+  not carry the tail the t correction supplies; this one holds it in at least 0.95 of them
+  in each setting, and is wider.
 
 Neither form depends on the basis that made the curve.
 
@@ -631,7 +647,7 @@ bootstrap, animals and then each drawn animal's sessions (`nested_bootstrap_draw
 days are not resampled but stay in the estimate: in each draw a day's mean is over its
 drawn sessions, and a day with no session drawn is absent. A simulation
 (`scripts/checks/simulate_interval_coverage.py`; 5 animals, 45 days, 244 sessions, 2,000
-data sets per setting) found the t-corrected interval of this rule at or above 95 %
+data sets per setting; table `tests/scripts/checks/data/interval_coverage_full.csv`) found the t-corrected interval of this rule at or above 95 %
 coverage in every setting of animal, day and session variance, missing sessions and a
 paired kind difference included; resampling days as a third level gave intervals up to 41 %
 wider that over-covered (up to 100 %) when the animals varied little.
