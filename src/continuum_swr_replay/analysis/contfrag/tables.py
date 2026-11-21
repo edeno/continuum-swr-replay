@@ -94,7 +94,12 @@ from ..event_tables.uncertainty import (
     posterior_peak_mean,
 )
 from ..event_tables.visit_context import (
+    EVENT_VISIT_COLUMNS,
+    STOP_VISIT_COLUMNS,
     VISIT_CONTEXT_COLUMNS,
+    assign_visit_current_arm,
+    event_visit_columns,
+    stop_visit_columns,
     visit_context_of_samples,
 )
 
@@ -472,6 +477,9 @@ def build_contfrag_event_table(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_event[column] = visit[column].array
+    # An event that crosses the final poke-out takes its visit's well as its
+    # current arm, as in the NonLocal event table.
+    per_event = assign_visit_current_arm(per_event, port_experiences, track_graph)
 
     # time_since_stop per event
     per_timebin_tss = time_since_stop(ev.index.to_numpy(), bout_starts)
@@ -568,6 +576,15 @@ def build_contfrag_event_table(
         brain_area=brain_area,
         event_source=event_source,
     )
+    # The visit clocks and the trial number, as in the NonLocal event table.
+    clocks = event_visit_columns(
+        per_event["event_start_s"].to_numpy(dtype=float),
+        bout_ends[stop_idx],
+        per_event["well_visit_id"].array,
+        port_experiences,
+    )
+    for column in EVENT_VISIT_COLUMNS:
+        per_event[column] = clocks[column].to_numpy()
 
     return stamp_covariate_schema(per_event[column_order], table="event")
 
@@ -884,6 +901,9 @@ def build_contfrag_stop_table(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_bout[column] = visit[column].array
+    stop_visit = stop_visit_columns(bout_starts, bout_ends, port_experiences, excluded)
+    for column in STOP_VISIT_COLUMNS:
+        per_bout[column] = stop_visit[column].array
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)
@@ -932,6 +952,7 @@ def _contfrag_event_table_build_columns(event_source: str = "SWR") -> list[str]:
         "nearest_well_distance_cm_max",
         # Where the window lies relative to the well visits (visit_context.py).
         *VISIT_CONTEXT_COLUMNS,
+        *EVENT_VISIT_COLUMNS,
         "is_swr",
         "is_mua",
         "continuous_prob_mean",
@@ -1007,6 +1028,7 @@ _CONTFRAG_STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_max",
     # Where the stop lies relative to the well visits (visit_context.py).
     *VISIT_CONTEXT_COLUMNS,
+    *STOP_VISIT_COLUMNS,
     "occupancy_well_arm",
     "prev_arm",
     "next_arm",
@@ -1056,6 +1078,7 @@ def _contfrag_event_arm_table_build_columns(event_source: str = "SWR") -> list[s
         "nearest_well_distance_cm_max",
         # Where the window lies relative to the well visits (visit_context.py).
         *VISIT_CONTEXT_COLUMNS,
+        *EVENT_VISIT_COLUMNS,
         "is_swr",
         "is_mua",
         "continuous_prob_mean",
@@ -1101,6 +1124,7 @@ def _contfrag_event_arm_table_build_columns(event_source: str = "SWR") -> list[s
         "is_candidate_arm_never_visited",
         "reward_count_candidate_arm_last10_known_trials",
         "reward_fraction_candidate_arm_last10_visits",
+        "log1p_n_known_visits_candidate_arm",
         "task_reward_probability_candidate_arm",
         "reward_belief_mean_candidate_arm_preoutcome",
         # Interactions

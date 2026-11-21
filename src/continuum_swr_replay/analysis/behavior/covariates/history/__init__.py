@@ -27,6 +27,7 @@ from .diagnostics import (
 )
 from .reward_history import (
     lagged_trial_rewards,
+    log1p_known_visit_count_all_events,
     recent_reward_rate_all_events,
     recent_trial_reward_rate,
     reward_basis_from_lags,
@@ -69,6 +70,7 @@ __all__ = [
     "center_visit_recency_within_event",
     "lagged_trial_rewards",
     "load_contingency",
+    "log1p_known_visit_count_all_events",
     "q_all_arm",
     "recent_reward_rate_all_events",
     "recent_trial_reward_rate",

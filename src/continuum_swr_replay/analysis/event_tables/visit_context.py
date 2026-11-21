@@ -20,17 +20,28 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.well_visits import (
+    well_visit_index,
+)
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, TRUNK_ARMS
+from continuum_swr_replay.intervals import as_frame, covered_seconds, subtract
 
 from ..behavior.covariates.history._common import _prepare_port_experiences
+from ..behavior.spatial_mapping import arm_to_patch, arms_of_wells, stay_indicator
 from ..constants import (
     IN_WELL_VISIT,
+    STARTS_IN_WELL_VISIT,
     VISIT_JUNCTION_RADIUS_CM,
     VISIT_WELL_RADIUS_CM,
 )
 
 __all__ = [
+    "EVENT_VISIT_COLUMNS",
+    "STOP_VISIT_COLUMNS",
     "VISIT_CONTEXT_COLUMNS",
+    "assign_visit_current_arm",
+    "event_visit_columns",
+    "stop_visit_columns",
     "visit_context_of_samples",
     "window_visit_context",
 ]
@@ -42,6 +53,26 @@ VISIT_CONTEXT_COLUMNS: tuple[str, ...] = (
     "last_completed_well_visit_id",
     "time_since_last_poke_out_s",
     "time_until_next_poke_in_s",
+)
+
+#: The stop table's columns of the visit a stop overlaps
+#: (:func:`stop_visit_columns`), in table order.
+STOP_VISIT_COLUMNS: tuple[str, ...] = (
+    "overlapping_visit_id",
+    "visit_first_poke_in_s",
+    "visit_last_poke_out_s",
+    "in_visit_immobile_s",
+    "visit_stretch_index",
+    "stop_end_kind",
+)
+
+#: The event table's visit clocks and trial number (:func:`event_visit_columns`),
+#: in table order; carried to the event-arm and event-patch tables.
+EVENT_VISIT_COLUMNS: tuple[str, ...] = (
+    "time_since_visit_start_s",
+    "time_until_visit_end_s",
+    "time_until_stretch_end_s",
+    "n_visits_arrived",
 )
 
 #: Contexts of a window wholly between two visits (or before the first one),
@@ -113,8 +144,10 @@ def window_visit_context(
     -------
     pd.DataFrame, shape (n_windows, 5)
         ``visit_context`` (str, one of ``analysis.constants.VISIT_CONTEXTS``);
-        ``well_visit_id`` (``Int64``), the ``experience_id`` of the visit an
-        ``in_visit`` window lies in, missing otherwise;
+        ``well_visit_id`` (``Int64``), the ``experience_id`` of the visit that
+        holds the window start, for a window that starts inside a visit
+        (``in_visit`` or ``spans_visit_end``,
+        ``analysis.constants.STARTS_IN_WELL_VISIT``), missing otherwise;
         ``last_completed_well_visit_id`` (``Int64``), the latest visit whose
         final poke-out is at or before the window start, missing before the
         first; ``time_since_last_poke_out_s``, window start less that
@@ -147,10 +180,8 @@ def window_visit_context(
 
     # A window with no samples has no times, so no visit it could be placed by.
     timed = np.isfinite(start) & np.isfinite(end)
-    current = np.searchsorted(arrivals, start, side="right") - 1
     last_done = np.searchsorted(departures, start, side="right") - 1
     upcoming = np.searchsorted(arrivals, end, side="right")
-    has_current = timed & (current >= 0)
     has_done = timed & (last_done >= 0)
     has_upcoming = timed & (upcoming < n_visits)
     last_done_well = _pick(ports, last_done, has_done)
@@ -216,9 +247,15 @@ def window_visit_context(
             "visit context"
         )
 
-    in_visit = context == IN_WELL_VISIT
+    starts_inside = np.isin(context, STARTS_IN_WELL_VISIT)
+    holding = well_visit_index(start, arrivals, departures)
+    if (holding[starts_inside] < 0).any():
+        raise ValueError(
+            "a window labeled as starting inside a visit starts outside every "
+            "visit; its occupancy states disagree with the port experiences"
+        )
     well_visit_id = pd.array([pd.NA] * n_windows, dtype="Int64")
-    well_visit_id[in_visit & has_current] = visit_ids[current[in_visit & has_current]]
+    well_visit_id[starts_inside] = visit_ids[holding[starts_inside]]
     last_completed = pd.array([pd.NA] * n_windows, dtype="Int64")
     last_completed[has_done] = visit_ids[last_done[has_done]]
 
@@ -318,3 +355,226 @@ def visit_context_of_samples(
         port_experiences=port_experiences,
         track_graph=track_graph,
     )
+
+
+def _visit_intervals(port_experiences: pd.DataFrame) -> tuple[np.ndarray, ...]:
+    """Each visit's first poke-in, final poke-out and port, in visit order.
+
+    ``experience_id`` runs 0, 1, ... in this order, so a visit id indexes
+    these arrays.
+    """
+    experiences = _prepare_port_experiences(port_experiences)
+    return (
+        experiences["arrival_time"].to_numpy(dtype=float),
+        experiences["departure_time"].to_numpy(dtype=float),
+        experiences["port"].to_numpy(dtype=float),
+    )
+
+
+def stop_visit_columns(
+    stop_start: np.ndarray,
+    stop_end: np.ndarray,
+    port_experiences: pd.DataFrame,
+    excluded: pd.DataFrame,
+) -> pd.DataFrame:
+    """The well visit each stop overlaps, its times, and how the stop ends.
+
+    A visit runs from its first poke-in (``arrival_time``, included) to its
+    final poke-out (``departure_time``, not included); a stop runs from its
+    first to its last immobile sample. The stops of one visit are the stretches
+    of immobility between the small movements the animal makes at the well;
+    the last of them ends with the animal leaving.
+
+    Parameters
+    ----------
+    stop_start, stop_end : np.ndarray, shape (n_stops,)
+        Each stop's first and last immobile sample (s), in time order.
+    port_experiences : pd.DataFrame
+        The session's port experiences (one per visit).
+    excluded : pd.DataFrame
+        The epoch's excluded time (``analyzed_time.excluded_intervals``):
+        ``start_time`` and ``end_time``.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_stops, 6)
+        :data:`STOP_VISIT_COLUMNS`:
+
+        - ``overlapping_visit_id`` (``Int64``): the latest visit the stop
+          overlaps at all (the visit it ends in or ended after), so a stop that
+          starts before the first poke-in is placed too; missing when the stop
+          overlaps no visit. Where ``well_visit_id`` is set, the two are equal.
+        - ``visit_first_poke_in_s``, ``visit_last_poke_out_s``: that visit's
+          ``arrival_time`` and ``departure_time`` (s); NaN without a visit.
+        - ``in_visit_immobile_s``: seconds of the stop inside the well visits,
+          less excluded time; 0.0 for a stop outside every visit. A stop that
+          crosses the final poke-out counts up to it.
+        - ``visit_stretch_index`` (``Int64``): 0, 1, ... for the stops of one
+          visit in time order; missing without a visit.
+        - ``stop_end_kind``: ``"leaves"`` for the visit's last stop (no later
+          stop of the visit starts before its final poke-out),
+          ``"small_movement"`` for its other stops, ``"outside_visit"`` for a
+          stop with no visit.
+
+    Notes
+    -----
+    A stop overlaps at most one visit when the animal moves between wells. One
+    stop of the 242 analyzed epochs overlaps two (a 17 s stop at the start of
+    an epoch, across the first two visits at the two wells of one patch): it is
+    placed in the later one, and its ``in_visit_immobile_s`` counts its seconds
+    in both.
+    """
+    start = np.asarray(stop_start, dtype=float)
+    end = np.asarray(stop_end, dtype=float)
+    n_stops = len(start)
+    arrivals, departures, _ = _visit_intervals(port_experiences)
+
+    # The last visit begun by the stop's end; -1 (none) reads the -inf pad.
+    latest = np.searchsorted(arrivals, end, side="right") - 1
+    overlaps = start < np.append(departures, -np.inf)[latest]
+    visit = np.where(overlaps, latest, -1)
+    first_poke_in = np.full(n_stops, np.nan)
+    last_poke_out = np.full(n_stops, np.nan)
+    first_poke_in[overlaps] = arrivals[visit[overlaps]]
+    last_poke_out[overlaps] = departures[visit[overlaps]]
+
+    analyzed_visits = subtract(
+        np.column_stack([arrivals, departures]),
+        excluded[["start_time", "end_time"]].to_numpy(dtype=float),
+    )
+    in_visit = covered_seconds(start, end, as_frame(analyzed_visits))
+
+    stretch = (
+        pd.Series(start[overlaps])
+        .groupby(visit[overlaps])
+        .rank(method="first")
+        .to_numpy(dtype=np.int64)
+        - 1
+    )
+    n_stretches = np.bincount(visit[overlaps], minlength=len(arrivals))
+    stretch_index = pd.array([pd.NA] * n_stops, dtype="Int64")
+    stretch_index[overlaps] = stretch
+    end_kind = np.full(n_stops, "outside_visit", dtype=object)
+    end_kind[overlaps] = np.where(
+        stretch == n_stretches[visit[overlaps]] - 1, "leaves", "small_movement"
+    )
+    overlapping_visit_id = pd.array([pd.NA] * n_stops, dtype="Int64")
+    overlapping_visit_id[overlaps] = visit[overlaps]
+    return pd.DataFrame(
+        {
+            "overlapping_visit_id": overlapping_visit_id,
+            "visit_first_poke_in_s": first_poke_in,
+            "visit_last_poke_out_s": last_poke_out,
+            "in_visit_immobile_s": in_visit,
+            "visit_stretch_index": stretch_index,
+            "stop_end_kind": end_kind,
+        }
+    )
+
+
+def event_visit_columns(
+    event_start: np.ndarray,
+    stop_end: np.ndarray,
+    well_visit_id: pd.api.extensions.ExtensionArray | np.ndarray,
+    port_experiences: pd.DataFrame,
+) -> pd.DataFrame:
+    """The visit clocks of each event and the visits arrived at by its start.
+
+    Parameters
+    ----------
+    event_start : np.ndarray, shape (n_events,)
+        Each event's start (s).
+    stop_end : np.ndarray, shape (n_events,)
+        The last immobile sample (s) of the stop that holds the event.
+    well_visit_id : array of Int64, shape (n_events,)
+        The visit the event starts in (``window_visit_context``), missing for
+        an event that does not start inside a visit.
+    port_experiences : pd.DataFrame
+        The session's port experiences (one per visit).
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_events, 4)
+        :data:`EVENT_VISIT_COLUMNS`. For an event that starts inside a visit
+        (``in_visit`` or ``spans_visit_end``), in seconds:
+        ``time_since_visit_start_s`` (event start less the first poke-in),
+        ``time_until_visit_end_s`` (the final poke-out less the event start,
+        positive), ``time_until_stretch_end_s`` (the end of the stop that holds
+        the event, clipped at the final poke-out, less the event start); NaN
+        for every other event. ``n_visits_arrived`` (``int64``): the port
+        experiences whose first poke-in is at or before the event start, the
+        starting port included (the trial number in the epoch, counted in
+        visits).
+    """
+    start = np.asarray(event_start, dtype=float)
+    stop_end = np.asarray(stop_end, dtype=float)
+    arrivals, departures, _ = _visit_intervals(port_experiences)
+    visit_id = pd.array(well_visit_id, dtype="Int64")
+    inside = ~np.asarray(visit_id.isna())
+    index = visit_id.to_numpy(dtype=np.int64, na_value=0)
+    since = np.full(len(start), np.nan)
+    until = np.full(len(start), np.nan)
+    stretch = np.full(len(start), np.nan)
+    since[inside] = start[inside] - arrivals[index[inside]]
+    until[inside] = departures[index[inside]] - start[inside]
+    stretch[inside] = (
+        np.minimum(stop_end[inside], departures[index[inside]]) - start[inside]
+    )
+    return pd.DataFrame(
+        {
+            "time_since_visit_start_s": since,
+            "time_until_visit_end_s": until,
+            "time_until_stretch_end_s": stretch,
+            "n_visits_arrived": np.searchsorted(arrivals, start, side="right").astype(
+                np.int64
+            ),
+        }
+    )
+
+
+def assign_visit_current_arm(
+    per_event: pd.DataFrame,
+    port_experiences: pd.DataFrame,
+    track_graph: nx.Graph,
+) -> pd.DataFrame:
+    """Give an event that crosses the final poke-out its visit's arm and patch.
+
+    The whole-window location of a ``spans_visit_end`` event is ``mixed``, so
+    its window gives no current arm. It starts inside a visit, and an event
+    belongs to the time when it starts, so its current arm
+    (``occupancy_well_arm``) and patch (``current_patch``) are those of the
+    visit's well, and ``is_stay`` compares the next arm with that arm. Every
+    other event keeps its own. ``occupancy_well_id`` stays the whole-window
+    location (missing for these events).
+
+    Parameters
+    ----------
+    per_event : pd.DataFrame
+        One row per event, with ``visit_context``, ``well_visit_id``,
+        ``occupancy_well_arm``, ``current_patch``, ``next_arm`` and ``is_stay``.
+    port_experiences : pd.DataFrame
+        The session's port experiences (one per visit).
+    track_graph : nx.Graph
+        Session track graph.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``per_event``, changed in place on its ``spans_visit_end`` rows.
+    """
+    crossing = per_event["visit_context"].eq("spans_visit_end").to_numpy()
+    if not crossing.any():
+        return per_event
+    _, _, ports = _visit_intervals(port_experiences)
+    visit_id = per_event["well_visit_id"].to_numpy(dtype=np.int64, na_value=-1)
+    arms = arms_of_wells(ports[visit_id[crossing]], track_graph)
+    rows = per_event.index[crossing]
+    per_event.loc[rows, "occupancy_well_arm"] = arms
+    per_event.loc[rows, "current_patch"] = [arm_to_patch(arm) for arm in arms]
+    per_event.loc[rows, "is_stay"] = [
+        stay_indicator(next_arm, arm)
+        for next_arm, arm in zip(
+            per_event.loc[rows, "next_arm"].to_numpy(dtype=float), arms, strict=True
+        )
+    ]
+    return per_event

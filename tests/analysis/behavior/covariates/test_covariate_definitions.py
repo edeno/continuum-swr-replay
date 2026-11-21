@@ -71,6 +71,10 @@ def test_timing_class_membership_is_pinned() -> None:
             "is_stay",
             "next_arm",
             "periswitch_index_trials",
+            "stop_end_kind",
+            "time_until_stretch_end_s",
+            "time_until_visit_end_s",
+            "visit_last_poke_out_s",
             "wsls_deviation",
         }
     )

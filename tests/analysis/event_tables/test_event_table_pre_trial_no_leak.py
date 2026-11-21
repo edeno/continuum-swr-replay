@@ -199,4 +199,9 @@ class TestEventStartContextNoLeak:
         assert pd.isna(row["is_rewarded_outcome"]), (
             f"is_rewarded_outcome leaked: {row['is_rewarded_outcome']!r}"
         )
-        assert pd.isna(row["occupancy_well_arm"])
+        # The event starts inside the starting-port visit at well 1 (0.0 to
+        # the 1.0 s departure) and crosses its final poke-out, so its current
+        # arm is that visit's well: present context, not a future trial's.
+        assert row["visit_context"] == "spans_visit_end"
+        assert row["occupancy_well_arm"] == 1.0
+        assert row["current_patch"] == 1.0

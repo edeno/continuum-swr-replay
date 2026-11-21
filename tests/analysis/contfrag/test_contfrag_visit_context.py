@@ -22,14 +22,18 @@ from continuum_swr_replay.analysis.event_tables.table_contracts import (
     require_visit_context_labels,
 )
 from continuum_swr_replay.analysis.event_tables.visit_context import (
+    EVENT_VISIT_COLUMNS,
+    STOP_VISIT_COLUMNS,
     VISIT_CONTEXT_COLUMNS,
 )
 from tests.analysis.event_tables.test_replay_tables import (
     _location_contract_session,
     _tiny_posterior,
+    build_event_arm_table,
     build_event_table,
     build_stop_table,
 )
+from tests.analysis.event_tables.test_visit_columns import visit_session
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 _EXPECTED = ["after_visit_at_well", "in_visit", "spans_visit_start"]
@@ -146,6 +150,14 @@ def test_the_label_sits_after_the_location_columns(event_source):
         ), name
 
 
+#: The visit clocks are read from the visit the label places an event in.
+_LABEL_DERIVED_CLOCKS = (
+    "time_since_visit_start_s",
+    "time_until_visit_end_s",
+    "time_until_stretch_end_s",
+)
+
+
 @pytest.mark.parametrize("event_source", ["SWR", "MUA"])
 def test_the_label_changes_no_other_column(event_source, monkeypatch):
     """A stand-in labeler gives the same other columns, rows and ids."""
@@ -165,7 +177,11 @@ def test_the_label_changes_no_other_column(event_source, monkeypatch):
         without["event"]["visit_context"].tolist()
     )
     for name, table in with_label.items():
-        other = [column for column in table if column not in VISIT_CONTEXT_COLUMNS]
+        other = [
+            column
+            for column in table
+            if column not in (*VISIT_CONTEXT_COLUMNS, *_LABEL_DERIVED_CLOCKS)
+        ]
         assert list(without[name].columns) == list(table.columns)
         pd.testing.assert_frame_equal(
             table[other], without[name][other], check_exact=True
@@ -182,3 +198,62 @@ def test_the_contract_refuses_a_table_without_the_label():
             require_visit_context_labels(table.drop(columns=column), "t")
     with pytest.raises(ValueError, match="visit_context"):
         require_visit_context_labels(table.drop(columns="visit_context").iloc[:0], "t")
+
+
+@pytest.mark.parametrize("event_source", ["SWR", "MUA"])
+def test_the_visit_columns_are_the_nonlocal_tables_on_the_same_session(event_source):
+    """Same stop visit columns, visit clocks, current arm and sample count.
+
+    The session (``test_visit_columns.visit_session``) has an event inside a
+    visit and one that crosses the final poke-out.
+    """
+    dot, env, trials, graph = visit_session()
+    nonlocal_events = build_event_table(dot, env, trials, graph).sort_values(
+        "event_start_s", ignore_index=True
+    )
+    nonlocal_arms = build_event_arm_table(nonlocal_events, dot, env, trials, graph)
+    nonlocal_stops = build_stop_table(dot, trials, graph).sort_values(
+        "stop_start", ignore_index=True
+    )
+    dot["SWR_event"] = dot["non_local_event"]
+    dot["MUA_event"] = dot["non_local_event"]
+    dot["Continuous_prob"] = 0.7
+    dot["Fragmented_prob"] = 0.3
+    experiences = port_experiences_from_trials(trials, prepend_initial=True)
+    events = contfrag_tables.build_contfrag_event_table(
+        dot, env, trials, experiences, graph, event_source=event_source
+    ).sort_values("event_start_s", ignore_index=True)
+    arms = contfrag_tables.build_contfrag_event_arm_table(
+        events, dot, env, trials, experiences, graph, event_source=event_source
+    )
+    stops = contfrag_tables.build_contfrag_stop_table(
+        dot, trials, experiences, graph, event_source=event_source
+    ).sort_values("stop_start", ignore_index=True)
+
+    assert events["visit_context"].tolist() == ["in_visit", "spans_visit_end"]
+    event_columns = [
+        *EVENT_VISIT_COLUMNS,
+        "well_visit_id",
+        "occupancy_well_arm",
+        "current_patch",
+        "is_stay",
+    ]
+    pd.testing.assert_frame_equal(
+        events[event_columns], nonlocal_events[event_columns], check_exact=True
+    )
+    pd.testing.assert_frame_equal(
+        stops[list(STOP_VISIT_COLUMNS)],
+        nonlocal_stops[list(STOP_VISIT_COLUMNS)],
+        check_exact=True,
+    )
+    arm_columns = [
+        "candidate_arm",
+        "is_current_arm",
+        "log1p_n_known_visits_candidate_arm",
+        *EVENT_VISIT_COLUMNS,
+    ]
+    pd.testing.assert_frame_equal(
+        arms[arm_columns].reset_index(drop=True),
+        nonlocal_arms[arm_columns].reset_index(drop=True),
+        check_exact=True,
+    )

@@ -21,6 +21,7 @@ from .history import (
     attach_arm_uncertainty,
     attach_contingency_value_block,
     center_visit_recency_within_event,
+    log1p_known_visit_count_all_events,
     recent_reward_rate_all_events,
     rolling_reward_count_all_events,
     spline_visit_recency_within_event,
@@ -77,8 +78,13 @@ def _history_by_event(
     event_times: np.ndarray,
     port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Compute every common arm-history family in one event-aligned pass."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Compute every common arm-history family in one event-aligned pass.
+
+    Returns recency, never-visited, reward count, reward fraction and the
+    sample count (``log1p`` of the known visits), each of shape
+    ``(n_events, n_arms)``.
+    """
     times = np.asarray(event_times, dtype=float)
     n_arms = len(ALL_ARMS)
     shape = (len(times), n_arms)
@@ -86,10 +92,11 @@ def _history_by_event(
     never_visited = np.full(shape, np.nan)
     reward_count = np.full(shape, np.nan)
     reward_fraction = np.full(shape, np.nan)
+    sample_count = np.full(shape, np.nan)
     finite = np.isfinite(times)
     experiences = _prepare_port_experiences(port_experiences)
     if experiences.empty or not finite.any():
-        return recency, never_visited, reward_count, reward_fraction
+        return recency, never_visited, reward_count, reward_fraction, sample_count
 
     well_to_arm = build_well_to_arm_map(track_graph)
     query_times = times[finite]
@@ -110,7 +117,12 @@ def _history_by_event(
         well_to_arm,
         k=10,
     )
-    return recency, never_visited, reward_count, reward_fraction
+    sample_count[finite] = log1p_known_visit_count_all_events(
+        query_times,
+        experiences,
+        well_to_arm,
+    )
+    return recency, never_visited, reward_count, reward_fraction, sample_count
 
 
 def attach_candidate_arm_covariates(
@@ -207,10 +219,12 @@ def attach_candidate_arm_covariates(
         event_table["occupancy_well_arm"].to_numpy(),
         track_graph,
     )
-    recency, never_visited, reward_count, reward_fraction = _history_by_event(
-        event_table["event_start_s"].to_numpy(dtype=float),
-        port_experiences,
-        track_graph,
+    recency, never_visited, reward_count, reward_fraction, sample_count = (
+        _history_by_event(
+            event_table["event_start_s"].to_numpy(dtype=float),
+            port_experiences,
+            track_graph,
+        )
     )
     output["distance_to_candidate_arm_cm"] = distances.reshape(-1)
     output["candidate_arm_distance_rank"] = ranks.reshape(-1)
@@ -231,6 +245,7 @@ def attach_candidate_arm_covariates(
         output[column] = basis[:, index]
     output["reward_count_candidate_arm_last10_known_trials"] = reward_count.reshape(-1)
     output["reward_fraction_candidate_arm_last10_visits"] = reward_fraction.reshape(-1)
+    output["log1p_n_known_visits_candidate_arm"] = sample_count.reshape(-1)
 
     (
         output["task_reward_probability_candidate_arm"],

@@ -145,14 +145,16 @@ POST_CHOICE_COVARIATES = frozenset(
 _DEFINITIONS = [
     _definition(
         "is_current_arm",
-        "Candidate arm is the single well arm occupied throughout the event.",
+        "Candidate arm is the arm of the well being visited when the event "
+        "starts (the single well arm occupied throughout the event, or the "
+        "visit's well for an event that crosses the final poke-out).",
         grain=_EVENT_ARM,
         units="binary indicator",
         clock=QueryClock.EVENT_START,
         availability=Availability.PRE_OUTCOME,
         support="all nine candidate arms",
         producer="covariates.candidate_arm.attach_candidate_arm_covariates",
-        missingness="event is not wholly at one well",
+        missingness="event does not start inside a well visit",
     ),
     _definition(
         "is_prev_arm",
@@ -189,14 +191,15 @@ _DEFINITIONS = [
     ),
     _definition(
         "is_same_patch_as_current",
-        "Candidate arm belongs to the patch occupied throughout the event.",
+        "Candidate arm belongs to the patch of the well being visited when the "
+        "event starts.",
         grain=_EVENT_ARM,
         units="binary indicator",
         clock=QueryClock.EVENT_START,
         availability=Availability.PRE_OUTCOME,
         support="all nine candidate arms",
         producer="covariates.candidate_arm.attach_candidate_arm_covariates",
-        missingness="event is not wholly at one well",
+        missingness="event does not start inside a well visit",
     ),
     _definition(
         "distance_to_candidate_arm_cm",
@@ -207,7 +210,7 @@ _DEFINITIONS = [
         availability=Availability.PRE_OUTCOME,
         support="all nine candidate arms",
         producer="covariates.candidate_arm._distance_and_rank_by_event",
-        missingness="event is not wholly at one well",
+        missingness="event does not start inside a well visit",
     ),
     _definition(
         "candidate_arm_distance_rank",
@@ -218,7 +221,7 @@ _DEFINITIONS = [
         availability=Availability.PRE_OUTCOME,
         support="all nine candidate arms",
         producer="covariates.candidate_arm._distance_and_rank_by_event",
-        missingness="event is not wholly at one well",
+        missingness="event does not start inside a well visit",
     ),
     _definition(
         "visit_recency_trials",
@@ -528,14 +531,14 @@ _DEFINITIONS.extend(
         ),
         _definition(
             "is_current_patch",
-            "Candidate patch contains the single well occupied throughout the event.",
+            "Candidate patch contains the well being visited when the event starts.",
             grain="event × candidate_patch",
             units="binary indicator",
             clock=QueryClock.EVENT_START,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
             producer="event_tables.arm_patch_tables.build_event_patch_table",
-            missingness="event is not wholly at one well",
+            missingness="event does not start inside a well visit",
         ),
         _definition(
             "is_prev_patch",
@@ -1013,6 +1016,119 @@ _DEFINITIONS.append(
         producer="replay_models.per_bin_design.aggregate_to_timebins",
         missingness="no completed arrival at the bout start",
     )
+)
+
+# The well-visit clocks (``event_tables.visit_context``). A visit runs from the
+# first poke-in at a well to the final poke-out there; the clocks are defined
+# for the events that start inside one. Time until the visit ends and until the
+# stretch ends embed when the animal will next move, so they are
+# future-referencing: descriptive clocks, not predictive covariates.
+_DEFINITIONS.extend(
+    [
+        _definition(
+            "time_since_visit_start_s",
+            "Event start minus the first poke-in of the well visit the event "
+            "starts in.",
+            grain="event",
+            units="seconds",
+            clock=QueryClock.EVENT_START,
+            availability=Availability.PRE_OUTCOME,
+            support="events that start inside a well visit",
+            producer="event_tables.visit_context.event_visit_columns",
+            missingness="event does not start inside a well visit",
+        ),
+        _definition(
+            "time_until_visit_end_s",
+            "Final poke-out of the well visit the event starts in minus the "
+            "event start; positive.",
+            grain="event",
+            units="seconds",
+            clock=QueryClock.EVENT_START,
+            availability=Availability.FUTURE_REFERENCING,
+            support="events that start inside a well visit",
+            producer="event_tables.visit_context.event_visit_columns",
+            missingness="event does not start inside a well visit",
+        ),
+        _definition(
+            "time_until_stretch_end_s",
+            "End of the immobility stop that holds the event, clipped at the "
+            "visit's final poke-out, minus the event start.",
+            grain="event",
+            units="seconds",
+            clock=QueryClock.EVENT_START,
+            availability=Availability.FUTURE_REFERENCING,
+            support="events that start inside a well visit",
+            producer="event_tables.visit_context.event_visit_columns",
+            missingness="event does not start inside a well visit",
+        ),
+        _definition(
+            "n_visits_arrived",
+            "Port experiences whose first poke-in is at or before the event "
+            "start, the starting port included: the trial number in the "
+            "epoch, counted in visits.",
+            grain="event",
+            units="port experiences",
+            clock=QueryClock.EVENT_START,
+            availability=Availability.PRE_OUTCOME,
+            support="every event",
+            producer="event_tables.visit_context.event_visit_columns",
+            window="all arrivals through event start",
+            missingness="none",
+        ),
+        _definition(
+            "log1p_n_known_visits_candidate_arm",
+            "Log of one plus the visits to the candidate arm's well earlier in "
+            "the epoch whose outcome was known at or before the event start "
+            "(the sample count), the starting port included when its outcome "
+            "was observed.",
+            grain=_EVENT_ARM,
+            units="log(1 + visit count)",
+            clock=QueryClock.EVENT_START,
+            availability=Availability.PRE_OUTCOME,
+            support="six leaf arms; trunks are off-support",
+            producer="covariates.history.log1p_known_visit_count_all_events",
+            window="all outcome-known visits through event start",
+            missingness="none; 0 before the arm's first known visit",
+            structural_zero="trunk arms",
+        ),
+        _definition(
+            "visit_first_poke_in_s",
+            "Absolute session time of the first poke-in of the well visit the "
+            "stop overlaps.",
+            grain=_STOP,
+            units=ABSOLUTE_SECONDS_UNITS,
+            clock=QueryClock.GOAL_ARRIVAL,
+            availability=Availability.PRE_OUTCOME,
+            support="stops that overlap a well visit",
+            producer="event_tables.visit_context.stop_visit_columns",
+            missingness="stop overlaps no well visit",
+        ),
+        _definition(
+            "visit_last_poke_out_s",
+            "Absolute session time of the final poke-out of the well visit the "
+            "stop overlaps.",
+            grain=_STOP,
+            units=ABSOLUTE_SECONDS_UNITS,
+            clock=QueryClock.FUTURE_CHOICE,
+            availability=Availability.FUTURE_REFERENCING,
+            support="stops that overlap a well visit",
+            producer="event_tables.visit_context.stop_visit_columns",
+            missingness="stop overlaps no well visit",
+        ),
+        _definition(
+            "stop_end_kind",
+            "How the stop ends: 'leaves' for the last stop of its visit, "
+            "'small_movement' for an earlier one, 'outside_visit' for a stop "
+            "that overlaps no visit.",
+            grain=_STOP,
+            units="category",
+            clock=QueryClock.FUTURE_CHOICE,
+            availability=Availability.FUTURE_REFERENCING,
+            support="every stop",
+            producer="event_tables.visit_context.stop_visit_columns",
+            missingness="none",
+        ),
+    ]
 )
 
 COVARIATE_DEFINITIONS: dict[str, CovariateDefinition] = {
