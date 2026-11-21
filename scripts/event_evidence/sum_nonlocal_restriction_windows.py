@@ -23,9 +23,8 @@ The epoch's bins summed by category, well visit and event window, and Figure
 held-out data.
 
 ``--restriction-dir`` reads another restriction run (a second scoring of the
-same bins, such as the earlier design's, which held out only the encodings)
-and ``--output-dir`` writes elsewhere; by default the canonical restriction run
-and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
+same bins) and ``--output-dir`` writes elsewhere; by default the canonical
+restriction run and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
 
 Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 
@@ -65,9 +64,6 @@ Usage::
         --epochs wilbur20210329_02_r1_HPC
     uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py \\
         --workers 8
-    uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py \\
-        --restriction-dir Processed-Data/event_nonlocal_restriction_shared_fit \\
-        --output-dir Processed-Data/event_nonlocal_restriction_shared_fit_windows
 """
 
 from __future__ import annotations

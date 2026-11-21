@@ -93,10 +93,7 @@ each pass's smoother runs over the whole epoch with fold k observed: what is
 held out of fold k's scores is fold k's spikes from the model that scores them.
 The library's M-step refit of the encoding is skipped in the fold fits
 (:data:`FOLD_FIT_ESTIMATE_ENCODING_MODEL`): in the pinned library it refits the
-same encoding, so it changes nothing but the time. An earlier version held out
-only the encodings and ran the models with the canonical decoder's ``D`` and
-``pi``, fit on the whole epoch, so its transitions had seen the bins they
-scored.
+same encoding, so it changes nothing but the time.
 
 In this task the animal stays in one patch for long stretches, so place and
 time are confounded: a place visited in only one fold has no data in that
@@ -916,8 +913,10 @@ and 249 s."""
 FIT = "folds"
 """The fit a restriction run's header settings and each record name
 (``"fit"``): the whole decoder fit on each fold's training folds
-(:func:`fold_fit_scores`). A run of the earlier design, which held out only the
-encodings, records none."""
+(:func:`fold_fit_scores`). A run of the earlier design records none: it held
+out only the encodings and ran the models with the canonical decoder's ``D``
+and ``pi``, fit on the whole epoch, so its transitions had seen the bins they
+scored."""
 
 
 def em_settings() -> dict[str, Any]:
