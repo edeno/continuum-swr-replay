@@ -1465,8 +1465,10 @@ def generate_figure(
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
     draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
+    # widths as fractions of the figure (0.89 between the margins less three
+    # gaps of 0.08): j keeps its place and size, so every letter keeps its place
     row4 = outer[3].subgridspec(
-        1, 4, width_ratios=[1.4, 1.61, 2.13, 1.39], wspace=0.484
+        1, 4, width_ratios=[0.142, 0.158, 0.210638, 0.139362], wspace=0.08 / 0.1625
     )
     ax_g = fig.add_subplot(row4[0])
     draw_participation(ax_g, participation)
