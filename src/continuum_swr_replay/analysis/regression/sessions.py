@@ -6,12 +6,15 @@ likelihood and the names of the response and unit columns, and returns one
 session, in order:
 
 1. The rows with a missing value the design reads are dropped and counted.
-2. The design is built (:meth:`.terms.Design.session`, with the design check),
-   and the support rule is applied to every unpenalized column
-   (:func:`.support.design_support`). A column that fails is made inactive; a
-   failing level of a category drops its rows and takes the terms by that
-   level with it (:func:`.support.level_rows_dropped`). Under the grouped
-   softmax an event whose response was all on dropped rows is dropped too.
+2. The design is built (:meth:`.terms.Design.session`) and the support rule is
+   applied to every unpenalized column (:func:`.support.design_support`). A
+   column that fails is made inactive; a failing level of a category drops
+   its rows and takes the terms by that level with it
+   (:func:`.support.level_rows_dropped`). Under the grouped softmax an event
+   whose response was all on dropped rows is dropped too. The support is then
+   counted again on the rows kept, until nothing changes, and the record holds
+   the counts the fit used. A session with no rows, or no events, left is not
+   fitted: its record says why and the loop goes on.
 3. The session is fitted at the design's fixed log penalties by
    :func:`.reml.refit_session`, which makes the columns running away inactive
    while the fit has no finite maximum along unpenalized columns only. A level
@@ -78,12 +81,13 @@ def _prepare(
     rows: pd.DataFrame,
     response: str,
     unit: str,
-    keep: np.ndarray,
+    keep: np.ndarray | None,
     counts: dict,
 ) -> _Prepared:
-    """The rows kept, ordered for the likelihood, with their design; softmax
-    events with no response left are dropped and counted."""
-    rows = rows[keep].reset_index(drop=True)
+    """The rows kept (all when ``keep`` is None), ordered for the likelihood,
+    with their design; softmax events with no response left are dropped and
+    counted."""
+    rows = (rows if keep is None else rows[keep]).reset_index(drop=True)
     if isinstance(lik, GroupedSoftmax):
         rows = rows.sort_values(unit, kind="stable").reset_index(drop=True)
         total = rows.groupby(unit, sort=False)[response].transform("sum").to_numpy()
@@ -92,6 +96,14 @@ def _prepare(
             "events_without_response", 0
         ) + int(rows.loc[empty, unit].nunique())
         rows = rows[~empty].reset_index(drop=True)
+        if rows.empty:  # nothing left to fit: the caller records why
+            return _Prepared(
+                rows,
+                np.empty((0, len(design.coef_names))),
+                np.empty(0),
+                None,
+                np.empty(0),
+            )
     X, offset = design.session(rows)
     y = rows[response].to_numpy(dtype=float)
     units = rows[unit].to_numpy()
@@ -184,29 +196,49 @@ def fit_session(
     missing = design.missing_rows(rows)
     counts["rows_missing_values"] = int(missing.sum())
     identity = {"key": key, "model": model, "kind": kind, "table_sha256": table_sha256}
-    empty = _no_data(lik, rows[~missing], response)
-    if empty:
-        return _not_fitted(design, lik, rows[~missing], unit, counts, empty, **identity)
-    prepared = _prepare(design, lik, rows, response, unit, ~missing, counts)
-    has_event = _has_event(lik, prepared.y)
-    support = design_support(
-        design, prepared.rows, prepared.X, prepared.unit, has_event
-    )
-    left_out = {c: "support" for c, s in support.items() if not s.passes}
+    rows = rows[~missing].reset_index(drop=True)
+    left_out: dict[str, str] = {}
+    support: dict = {}
     counts["rows_dropped"] = {}
     applied: set[str] = set()
     round_offset, first, reason = 0, True, ""
     while True:
-        levels = [c for c in left_out if c not in applied and _drops_rows(design, c)]
-        if levels:
-            keep, dropped, with_them = level_rows_dropped(design, prepared.rows, levels)
+        # The support rule and the row rule, counted again on the rows kept
+        # until nothing changes (each round drops a level).
+        while True:
+            empty = _no_data(lik, rows, response)
+            if not empty:
+                prepared = _prepare(design, lik, rows, response, unit, None, counts)
+                rows = prepared.rows
+                empty = _no_data(lik, rows, response)
+            if empty:
+                return _not_fitted(
+                    design,
+                    lik,
+                    rows,
+                    unit,
+                    counts,
+                    empty,
+                    support=support,
+                    left_out=left_out,
+                    **identity,
+                )
+            has_event = _has_event(lik, prepared.y)
+            support = design_support(design, rows, prepared.X, prepared.unit, has_event)
+            for column, counted in support.items():
+                if not counted.passes:
+                    left_out.setdefault(column, "support")
+            levels = [
+                c for c in left_out if c not in applied and _drops_rows(design, c)
+            ]
+            if not levels:
+                break
+            keep, dropped, with_them = level_rows_dropped(design, rows, levels)
             applied.update(levels)
             counts["rows_dropped"].update(dropped)
             for column, level in with_them.items():
                 left_out.setdefault(column, f"rows of {level} dropped")
-            prepared = _prepare(
-                design, lik, prepared.rows, response, unit, keep, counts
-            )
+            rows = rows[keep].reset_index(drop=True)
         inactive = np.array([c in left_out for c in design.coef_names])
         blocks, rho, block_terms = _session_blocks(design, inactive)
         data = SessionData(prepared.X, prepared.y, prepared.aux, name, ~inactive)

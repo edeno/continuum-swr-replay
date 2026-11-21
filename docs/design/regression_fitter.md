@@ -471,16 +471,18 @@ unpenalized column. A unit is what the data hold independent replicates of: a vi
 rate model, an event for a content model. A row holds an event when its response is above
 zero (Poisson, Bernoulli); every row does under the grouped softmax and the Gaussian.
 
-- A 0/1 column (a 0/1 slope or a level of a category): `n_high` counts the units with an
-  event on a row where the column is 1, `n_low` those with an event on a row where it is
-  0. For a level of a role category, `n_high` is the number of events with a candidate in
-  the role.
+- A level of a category: `n_high` counts the units with an event on a row of the level
+  (for a role category, the events with a candidate in the role). The level passes on
+  that count alone; `n_low`, the units with an event on a row of another level, is
+  recorded only.
+- A 0/1 slope: `n_high` counts the units with an event on a row where the column is 1,
+  `n_low` those with an event on a row where it is 0.
 - A continuous slope: over the rows of its level, among the rows that hold an event,
   `n_high` counts the units with a row above their median and `n_low` those with a row
   below it. Ties count on neither side, so a column constant there fails.
 
-A column passes when both counts are at least `MIN_UNITS = 5`. Smooth terms carry a
-penalty and have no support rule.
+A slope passes when both its counts are at least `MIN_UNITS = 5`, a level when its own
+count is. Smooth terms carry a penalty and have no support rule.
 
 A column that fails is made inactive in that session. When it is a level of a category,
 the session's rows of that level are dropped from its fit and counted. They are not
@@ -489,6 +491,12 @@ false positives, to 20 % in one case. Every term fitted for that level leaves th
 with it, its penalty block included. Under the grouped softmax, an event whose response
 was all on dropped rows is dropped too, and counted. The other events' shares are not
 renormalized: the likelihood is the conditional one over the candidates kept.
+
+After any rows are dropped, the support is counted again on the rows kept. A column that
+fails there is made inactive, and its rows are dropped if it is a level; this repeats
+until nothing changes (each round removes a column, so it ends). The record holds the
+counts on the rows the fit used. A session with no rows, or no events of the kind, left
+after this is not fitted (below).
 
 A column that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit
 leaves the per-session model (`terms_failing_share`).
@@ -519,12 +527,13 @@ session:
 1. The rows with a missing value the design reads are dropped and counted. A missing
    category value (None or NaN) makes its row missing; any other value outside the
    levels is an error.
-2. The design is built, with the design check, and the support rule is applied. A failing
-   column is made inactive, and a failing level drops its rows as above.
+2. The design is built and the support rule is applied. A failing column is made
+   inactive, a failing level drops its rows, and the support is counted again on the rows
+   kept until nothing changes, as above.
 3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
    of a category left out there for having no finite maximum drops its rows as the
-   support rule does, and the session is fitted again with every column left out so far
-   inactive.
+   support rule does (with the recount), and the session is fitted again with every
+   column left out so far inactive.
 4. The collinearity of each term is measured at the fit, and the record is built.
 
 At the session's first fit, a design not identified or a numerical failure is an error

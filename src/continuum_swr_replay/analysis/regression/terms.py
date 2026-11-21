@@ -358,10 +358,11 @@ class DesignColumn(NamedTuple):
         The coefficient's name.
     term : str
         The term's name.
-    support : {"binary", "slope"} or None
-        The support rule that applies (:mod:`.support`): ``"binary"`` for a
-        0/1 column, ``"slope"`` for a continuous slope; None for a smooth's
-        column and the intercept.
+    support : {"level", "binary", "slope"} or None
+        The support rule that applies (:mod:`.support`): ``"level"`` for a
+        level of a :class:`Category`, ``"binary"`` for a 0/1 slope,
+        ``"slope"`` for a continuous slope; None for a smooth's column and the
+        intercept.
     level : tuple or None
         ``(column, value)`` of a category: the level a :class:`Category`
         column codes, or the level a term ``by`` a category is fitted for; None
@@ -375,7 +376,7 @@ class DesignColumn(NamedTuple):
 
     name: str
     term: str
-    support: Literal["binary", "slope"] | None
+    support: Literal["level", "binary", "slope"] | None
     level: tuple | None
     drops_rows: bool = False
 
@@ -474,7 +475,7 @@ def _build_term(
             DesignColumn(
                 f"{term.column}[{level}]",
                 term.column,
-                "binary",
+                "level",
                 (term.column, level),
                 drops_rows=True,
             )

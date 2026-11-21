@@ -156,7 +156,8 @@ def test_an_inactive_role_drops_its_rows() -> None:
         design, sessions, GroupedSoftmax(), response="share", unit="event_id"
     )[0]
 
-    assert record.support["role[previous]"]["n_high"] == 3
+    # Counted on the rows the fit used, after the role's rows were dropped.
+    assert record.support["role[previous]"]["n_high"] == 0
     # The slope by the role fails its own support too (3 events).
     assert record.left_out == {
         "role[previous]": "support",
@@ -190,7 +191,8 @@ def test_a_role_without_a_finite_maximum_drops_its_rows() -> None:
     )[0]
 
     assert record.status == "converged"
-    assert record.support["role[previous]"]["passes"]
+    # Counted on the rows the fit used, after the role's rows were dropped.
+    assert record.support["role[previous]"]["n_high"] == 0
     assert record.left_out["role[previous]"].startswith("no finite maximum (round ")
     assert record.left_out["reward_fraction:role=previous"] == (
         "rows of role[previous] dropped"
@@ -296,3 +298,86 @@ def test_a_session_with_no_rows_left_is_recorded_not_fitted(rate_sessions) -> No
     assert "no events" in records[2].fit_reason
     for record in records[:3]:
         assert np.isnan(record.coef).all() and record.edf == {}
+
+
+def _grouped_rate(rows: pd.DataFrame, b_visits: np.ndarray) -> pd.DataFrame:
+    """Rate rows with a category ``grp``: level ``b`` on the given visits,
+    the reference ``a`` on the others."""
+    return rows.assign(grp=np.where(np.isin(rows["well_visit_id"], b_visits), "b", "a"))
+
+
+def test_a_level_passes_on_its_own_count(rate_sessions) -> None:
+    """A level with many units passes however thin the rest is: a session
+    whose reference level holds 4 visits keeps every row (the rule for a level
+    is one-sided)."""
+    frames = list(rate_sessions.values())
+    keys = list(rate_sessions)
+    sessions = {
+        keys[0]: _grouped_rate(frames[0], np.arange(4, 200)),
+        keys[1]: _grouped_rate(frames[1], np.arange(0, 200, 2)),
+    }
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    grp = Category("grp", ("a", "b"), reference="a")
+    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    record = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")[
+        0
+    ]
+    assert record.support["grp[b]"]["passes"]
+    assert record.support["grp[b]"]["n_low"] < 5
+    assert record.left_out == {} and record.cohort_counts["rows_dropped"] == {}
+    assert record.n_rows == len(sessions[keys[0]])
+
+
+def test_support_is_counted_again_on_the_rows_kept(content_sessions) -> None:
+    """A 0/1 slope that is 1 on the previous arm's rows of 3 events and the
+    current arm's rows of 3 others passes on all rows of a session (6 events),
+    but the previous arm is too thin and its rows are dropped: the slope is
+    counted again on the rows kept (3 events), fails there, and the record
+    holds the counts the fit used."""
+    frames = []
+    for rows in content_sessions.values():
+        on_previous = (rows["role"] == "previous") & (rows["event_id"] < 3)
+        on_current = (rows["role"] == "current") & rows["event_id"].between(3, 5)
+        frames.append(rows.assign(flag=(on_previous | on_current) * 1.0))
+    first = frames[0]
+    keep = (first["role"] != "previous") | (first["event_id"] < 3)
+    frames[0] = first[keep].reset_index(drop=True)
+    sessions = by_session(frames)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    role = Category("role", ROLES, reference="other")
+    design = build_design(
+        [role, Slope("flag"), Smooth("clock_s", 0.0, 20.0, 8, 4.0)],
+        pooled,
+        intercept=False,
+    )
+    record = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )[0]
+    assert record.left_out == {"role[previous]": "support", "flag": "support"}
+    assert record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
+    assert record.support["flag"]["n_high"] == 3
+    assert not record.support["flag"]["passes"]
+    assert record.support["role[previous]"]["n_high"] == 0
+    assert record.status == "converged"
+
+
+def test_a_session_left_without_events_by_the_row_rule_is_not_fitted(
+    rate_sessions,
+) -> None:
+    """A thin level that holds every event: its rows are dropped, no event is
+    left, and the session gets a not-fitted record; the loop goes on."""
+    frames = list(rate_sessions.values())
+    keys = list(rate_sessions)
+    thin = _grouped_rate(frames[0], np.arange(3))
+    thin.loc[thin["grp"] == "a", "count"] = 0.0
+    sessions = {keys[0]: thin, keys[1]: _grouped_rate(frames[1], np.arange(0, 200, 2))}
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    grp = Category("grp", ("a", "b"), reference="a")
+    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    first, second = _fit(
+        design, sessions, Poisson(), response="count", unit="well_visit_id"
+    )
+    assert first.status == "not fitted" and "no events" in first.fit_reason
+    # The slope has its events on the level's rows only, so it fails too.
+    assert first.left_out == {"grp[b]": "support", "x": "support"}
+    assert second.status == "converged"

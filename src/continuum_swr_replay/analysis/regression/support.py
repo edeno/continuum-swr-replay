@@ -5,18 +5,21 @@ the data hold independent replicates of (a visit for a rate model, an event
 for a content model); a row *holds an event* when it carries one (a bin with a
 count above zero; every candidate row of a content event).
 
-- A 0/1 column (a 0/1 slope, a level of a :class:`.terms.Category`):
-  ``n_high`` counts the units with an event on a row where the column is 1,
-  ``n_low`` those with an event on a row where it is 0 (:func:`binary_support`).
-  For a level of a role category (content) this is the number of events with
-  a candidate in the role, and the number with a candidate in another role.
+- A level of a :class:`.terms.Category`: ``n_high`` counts the units with an
+  event on a row of the level (for a role category, the events with a
+  candidate in the role), and the level passes on that count alone
+  (:func:`level_support`); ``n_low``, the units with an event on a row of
+  another level, is recorded only.
+- A 0/1 slope: ``n_high`` counts the units with an event on a row where the
+  column is 1, ``n_low`` those with an event on a row where it is 0, and both
+  must pass (:func:`binary_support`).
 - A continuous slope (over the rows of its level, for a slope by a category):
   among the rows that hold an event, ``n_high`` counts the units with a row
   above the median of those rows and ``n_low`` those with a row below it (ties
   to neither), so a column constant there fails (:func:`slope_support`).
 
-A column passes when both counts are at least ``MIN_UNITS``. Smooth terms carry
-a penalty and have no support rule.
+A slope passes when both counts are at least ``MIN_UNITS``, a level when its
+own count is. Smooth terms carry a penalty and have no support rule.
 
 A column that fails is made inactive in that session. When it is a level of a
 category, the session's rows of that level are dropped from its fit and
@@ -49,6 +52,7 @@ __all__ = [
     "binary_support",
     "design_support",
     "level_rows_dropped",
+    "level_support",
     "slope_support",
     "terms_failing_share",
 ]
@@ -75,6 +79,23 @@ class Support(NamedTuple):
 
 def _support(n_low: int, n_high: int) -> Support:
     return Support(int(n_low), int(n_high), min(n_low, n_high) >= MIN_UNITS)
+
+
+def level_support(
+    values: np.ndarray, unit: np.ndarray, has_event: np.ndarray
+) -> Support:
+    """The support of a level of a category: it passes when at least
+    ``MIN_UNITS`` units have an event on its rows.
+
+    Parameters
+    ----------
+    values : np.ndarray, shape (n_rows,)
+        The level's column, 0 or 1.
+    unit : np.ndarray, shape (n_rows,)
+    has_event : np.ndarray of bool, shape (n_rows,)
+    """
+    both = binary_support(values, unit, has_event)
+    return both._replace(passes=both.n_high >= MIN_UNITS)
 
 
 def binary_support(
@@ -153,7 +174,11 @@ def design_support(
         reads = np.ones(len(rows), dtype=bool)
         if column.level is not None and not column.drops_rows:
             reads = design.level_rows(rows, column.level)
-        rule = binary_support if column.support == "binary" else slope_support
+        rule = {
+            "level": level_support,
+            "binary": binary_support,
+            "slope": slope_support,
+        }[column.support]
         out[column.name] = rule(X[reads, j], unit[reads], has_event[reads])
     return out
 
