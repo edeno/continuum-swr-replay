@@ -518,13 +518,17 @@ poke-out counts up to it.
   otherwise.
 - `overlapping_visit_id` — the visit the stop overlaps at all, so a
   `spans_visit_start` stop (stopped at the well before the first poke-in) is
-  placed too; missing when the stop overlaps no visit. Equal to `well_visit_id`
-  wherever that is set. A stop overlaps at most one visit when the animal moves
-  between wells; a stop that overlaps two (one at the start of an epoch, across
-  the first visits at the two wells of a patch) is placed in the later one.
+  placed too; missing when the stop overlaps no visit. A stop overlaps at most
+  one visit when the animal moves between wells; a stop that overlaps two (one
+  at the start of an epoch, across the first visits at the two wells of a
+  patch) is placed in the later one, while its `well_visit_id` is the earlier
+  visit, the one it starts in. So the two ids are different columns: do not
+  substitute one for the other.
 - `visit_first_poke_in_s`, `visit_last_poke_out_s` — that visit's first poke-in
-  and final poke-out (absolute session seconds; differences only). Where both
-  exist, `last_well_arrival_time_s` equals `visit_first_poke_in_s`.
+  and final poke-out (absolute session seconds; differences only). They are not
+  `last_well_arrival_time_s`, which is read at the stop's first sample: for a
+  `spans_visit_start` stop (stopped before the first poke-in) that is the
+  previous visit's arrival, and for a stop across two visits the earlier one's.
 - `in_visit_immobile_s` — seconds of the stop inside the well visits, less
   excluded time (`analyzed_time.excluded_intervals`); 0.0 for a stop outside
   every visit. A stop that crosses the final poke-out counts up to it; a stop

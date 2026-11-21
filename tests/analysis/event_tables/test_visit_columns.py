@@ -184,7 +184,8 @@ def test_well_visit_id_for_rows_starting_inside(tables):
         assert table.loc[~starts_inside, "well_visit_id"].isna().all(), name
     assert tables["event"]["visit_context"].tolist() == ["in_visit", "spans_visit_end"]
     assert tables["event"]["well_visit_id"].tolist() == [1, 1]
-    # A visit placed by its start agrees with the visit the stop overlaps.
+    # In this session no stop crosses two visits, so the visit a stop starts
+    # in is the visit it is placed in (a stop across two is not: see below).
     stops = tables["stop"]
     placed = stops["well_visit_id"].notna()
     assert (

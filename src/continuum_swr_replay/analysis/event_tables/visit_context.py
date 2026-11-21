@@ -403,9 +403,13 @@ def stop_visit_columns(
         - ``overlapping_visit_id`` (``Int64``): the latest visit the stop
           overlaps at all (the visit it ends in or ended after), so a stop that
           starts before the first poke-in is placed too; missing when the stop
-          overlaps no visit. Where ``well_visit_id`` is set, the two are equal.
+          overlaps no visit. It is not ``well_visit_id`` (the visit that holds
+          the stop's start): a stop across two visits starts in the earlier
+          and is placed in the later.
         - ``visit_first_poke_in_s``, ``visit_last_poke_out_s``: that visit's
           ``arrival_time`` and ``departure_time`` (s); NaN without a visit.
+          Not ``last_well_arrival_time_s`` (read at the stop's first sample,
+          the previous arrival for a stop that starts before the poke-in).
         - ``in_visit_immobile_s``: seconds of the stop inside the well visits,
           less excluded time; 0.0 for a stop outside every visit. A stop that
           crosses the final poke-out counts up to it.
