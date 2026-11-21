@@ -695,10 +695,7 @@ def place_sampling(
     known = place_bin >= 0
     n_places = int(place_bin.max()) + 1 if known.any() else 1
     occupancy = np.stack(
-        [
-            np.bincount(place_bin[mask & known], minlength=n_places)
-            for mask in masks
-        ]
+        [np.bincount(place_bin[mask & known], minlength=n_places) for mask in masks]
     )  # (n_folds, n_places), training bins
     out = np.full(place_bin.size, np.nan, dtype=np.float32)
     out[known] = occupancy[blocks[known], place_bin[known]] * bin_s
