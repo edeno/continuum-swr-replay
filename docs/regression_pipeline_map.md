@@ -870,9 +870,9 @@ Does each detector's content reproduce in cells it never saw?
 
 ### `scripts/event_evidence/_per_event_run.py`
 
-What the per-event runners share: their arguments, the canonical event table, an epoch's decode inputs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
+What the per-event runners share: their arguments, the canonical event table, an epoch's decode inputs, the held-out runs' fold designs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
+`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `fold_settings`, `epoch_folds`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -908,7 +908,7 @@ Spike likelihood at decoded and actual positions, for every canonical non-local 
 
 Per-bin scores of the three non-local restriction models on every analyzed epoch.
 
-`fold_settings`, `epoch_folds`, `fit_settings`, `run_epoch`, `main`
+`fit_settings`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/score_tetrode_holdout.py`
 

@@ -113,14 +113,12 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
-from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     ROOT_DIR,
-    SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -136,9 +134,12 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    FOLD_DESIGNS,
     add_gpu_arguments,
     add_run_arguments,
+    epoch_folds,
     epoch_inputs,
+    fold_settings,
     gpu_pool,
     run,
     select_epochs,
@@ -147,10 +148,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction"
 BINS_NAME = "nonlocal_restriction_bins"
-
-FOLD_DESIGNS = ("trials", "contiguous")
-"""``trials``: whole trials balanced by destination well
-(``tetrode_holdout.trial_folds``); ``contiguous``: contiguous time blocks."""
 
 FIT_MODES = ("shared", "folds")
 """``shared``: held-out encodings with the canonical decoder's transitions and
@@ -167,78 +164,6 @@ OUTPUT_DIRS = {
 SPARSE_SAMPLING_S = 10.0
 """The record's second sampling share: immobile bins whose fold's encoding had
 at most this many seconds of training data at the animal's place."""
-
-
-def fold_settings(fold_design: str) -> dict:
-    """The header's record of a fold design: its name and margin in seconds;
-    for ``trials`` also the segment cap and the scikit-learn version, whose
-    ``StratifiedGroupKFold`` heuristic assigns the folds."""
-    if fold_design == "trials":
-        import sklearn
-
-        return {
-            "fold_design": "trials",
-            "fold_classes": "to_well",
-            "margin_s": th.TRIAL_MARGIN_S,
-            "max_segment_s": th.MAX_SEGMENT_S,
-            "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
-            "sklearn_version": sklearn.__version__,
-        }
-    if fold_design == "contiguous":
-        return {
-            "fold_design": "contiguous",
-            "margin_s": th.MARGIN_BINS / SAMPLING_FREQUENCY,
-            "margin_bins": th.MARGIN_BINS,
-        }
-    raise ValueError(f"unknown fold design {fold_design!r}, not one of {FOLD_DESIGNS}")
-
-
-def epoch_folds(
-    time: np.ndarray, trials: pd.DataFrame | None, fold_design: str
-) -> tuple[np.ndarray | None, int, dict]:
-    """Each bin's fold, the margin in bins and the folds' counts under
-    ``fold_design``.
-
-    For ``trials``, the segments are ``tetrode_holdout.task_segment_starts``'
-    (each trial from its ``movement_start_time`` to the next, of class
-    ``to_well``; the time before the first trial and after the last trial's
-    ``end_time``, each its own class), cut into pieces of at most
-    ``MAX_SEGMENT_S`` (``tetrode_holdout.trial_folds``); ``contiguous`` returns
-    no folds (``heldout_terms``' default time blocks) and
-    :data:`~.tetrode_holdout.MARGIN_BINS`.
-
-    Returns
-    -------
-    folds : ndarray of int, shape (n_time,), or None
-    margin_bins : int
-    counts : dict
-        ``n_segments`` (the segments holding a bin), ``n_groups`` (their
-        pieces after the cap) and ``trial_bin_share`` (the share of the bins
-        from the first departure to the last trial's end), None for
-        ``contiguous``.
-    """
-    if fold_design == "contiguous":
-        return (
-            None,
-            th.MARGIN_BINS,
-            {"n_segments": None, "n_groups": None, "trial_bin_share": None},
-        )
-    if fold_design != "trials":
-        raise ValueError(f"unknown fold design {fold_design!r}")
-    trials = trials.sort_values("movement_start_time")
-    departures = trials["movement_start_time"].to_numpy(dtype=float)
-    last_end = float(trials["end_time"].iloc[-1])
-    starts, classes = th.task_segment_starts(
-        time, departures, trials["to_well"].to_numpy(), last_end
-    )
-    folds = th.trial_folds(time, starts, classes, nr.N_FOLDS, th.MAX_SEGMENT_S)
-    segment = th.trial_segments(time, starts)
-    counts = {
-        "n_segments": int(np.unique(segment).size),
-        "n_groups": int(th.capped_groups(time, segment, th.MAX_SEGMENT_S)[-1]) + 1,
-        "trial_bin_share": th.trial_bin_share(time, departures, last_end),
-    }
-    return folds, th.margin_in_bins(th.TRIAL_MARGIN_S, time), counts
 
 
 def fit_settings(fit: str) -> dict:
