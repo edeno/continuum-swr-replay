@@ -216,6 +216,8 @@ paper/figures/**/*.svg
 !paper/figures/figure05/figure05.png
 !paper/figures/supp_memoryless_comparison/supp_memoryless_comparison.pdf
 !paper/figures/supp_memoryless_comparison/supp_memoryless_comparison.png
+!paper/figures/supp_heldout_tetrode/supp_heldout_tetrode.pdf
+!paper/figures/supp_heldout_tetrode/supp_heldout_tetrode.png
 
 # Pickle artifacts (detector models, environments, cached data)
 *.pkl
