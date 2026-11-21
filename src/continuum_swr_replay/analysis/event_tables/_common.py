@@ -44,6 +44,7 @@ from .trajectory import (
     NONLOCAL_ONLY_COLUMNS,
     SHARED_TRAJECTORY_COLUMNS,
 )
+from .visit_context import VISIT_CONTEXT_COLUMNS
 
 # Continuous per-arm covariates standardized to pooled-GLOBAL unit SD as ``<col>_z``.
 # The build fills NaN placeholders per session; the real global z is computed once in
@@ -126,6 +127,8 @@ _EVENT_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_min",
     "nearest_well_distance_cm_mean",
     "nearest_well_distance_cm_max",
+    # Where the window lies relative to the well visits (visit_context.py).
+    *VISIT_CONTEXT_COLUMNS,
     "is_swr",
     "is_mua",
     "did_last_completed_trip_switch_patch",
@@ -214,6 +217,8 @@ _STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_min",
     "nearest_well_distance_cm_mean",
     "nearest_well_distance_cm_max",
+    # Where the window lies relative to the well visits (visit_context.py).
+    *VISIT_CONTEXT_COLUMNS,
     "occupancy_well_arm",
     "prev_arm",
     "next_arm",
@@ -260,6 +265,8 @@ _EVENT_ARM_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "nearest_well_distance_cm_min",
     "nearest_well_distance_cm_mean",
     "nearest_well_distance_cm_max",
+    # Where the window lies relative to the well visits (visit_context.py).
+    *VISIT_CONTEXT_COLUMNS,
     "is_swr",
     "is_mua",
     "did_last_completed_trip_switch_patch",
