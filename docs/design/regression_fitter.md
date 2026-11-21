@@ -634,6 +634,12 @@ A band of `bands.py` holds the whole curve with 95 % probability, not each point
   not carry the tail the t correction supplies; this one holds it in at least 0.95 of them
   in each setting, and is wider.
 
+A band records its form (`form`), the draws behind it (`n_draws`: one fit's coefficient
+draws, or the across-session bootstrap draws) and, across sessions, the pivot's draws
+(`n_pivot_draws`) and its seed. The across-session band refuses a curve whose draws do not
+vary at a grid point: a curve expressed relative to a reference point is zero there in
+every session, and the caller leaves that point off the grid.
+
 Neither form depends on the basis that made the curve.
 
 ## From session to day to animal

@@ -11,6 +11,7 @@ from scipy.stats import t as student_t
 from continuum_swr_replay.analysis import shared_statistics as stats
 from continuum_swr_replay.analysis.regression.bands import (
     BAND_DRAWS,
+    PIVOT_DRAWS,
     across_session_band,
     simultaneous_band,
 )
@@ -46,6 +47,7 @@ def test_the_band_is_the_curve_plus_minus_a_critical_value_of_its_pointwise_se()
     # Wider than pointwise, narrower than Bonferroni over the grid.
     assert norm.ppf(0.975) < band.critical < norm.ppf(1 - 0.025 / GRID.size)
     assert band.seed == 3 and band.n_draws == BAND_DRAWS
+    assert band.form == "one fit" and band.n_pivot_draws is None
     again = simultaneous_band(C, beta, V, seed=3)
     assert again.critical == band.critical
 
@@ -121,6 +123,7 @@ def test_the_across_session_band_scales_the_bootstrap_sd_by_an_animal_level_pivo
     # A whole curve needs more than one point's t quantile.
     assert band.critical > student_t.ppf(0.975, 4)
     assert band.seed == 5 and band.n_draws == 2000
+    assert band.form == "across sessions" and band.n_pivot_draws == PIVOT_DRAWS
     again = across_session_band(curves, animal, day, n_draws=2000, seed=5)
     assert again.critical == band.critical
 
@@ -154,3 +157,12 @@ def test_at_one_grid_point_the_band_is_the_scalar_interval(n_animals: int) -> No
     assert (band.high[0] - band.estimate[0]) / band.critical == pytest.approx(
         (summary["high"] - summary["estimate"]) / t
     )
+
+
+def test_the_across_session_band_refuses_a_point_where_the_draws_do_not_vary() -> None:
+    """A curve expressed relative to a reference point is zero there in every
+    session: the caller leaves that point off the grid."""
+    curves, animal, day = _sessions(GRID.size, 3)
+    curves = curves - curves[:, :1]
+    with pytest.raises(ValueError, match="leave that point off the grid"):
+        across_session_band(curves, animal, day, n_draws=200, seed=0)

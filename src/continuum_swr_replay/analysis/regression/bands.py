@@ -34,7 +34,7 @@ second the per-session curve values.
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 
@@ -71,14 +71,20 @@ class Band(NamedTuple):
     low, high : np.ndarray, shape (n_points,)
         The band.
     se : np.ndarray, shape (n_points,)
-        The pointwise standard error (one fit's) or the draws' standard
-        deviation (across sessions).
+        One fit's form: the pointwise standard error ``sqrt(diag(C V C'))``.
+        Across sessions: the standard deviation of the bootstrap draws.
     critical : float
         The critical value ``c``.
+    form : {"one fit", "across sessions"}
+        Which of the two forms made the band.
     n_draws : int
-        The draws behind ``critical``.
+        One fit's form: the draws of ``z ~ N(0, V)`` behind ``critical``.
+        Across sessions: the nested bootstrap draws behind ``se``.
+    n_pivot_draws : int or None
+        Across sessions: the draws of the animal-level pivot behind
+        ``critical`` (:data:`PIVOT_DRAWS`); None in one fit's form.
     seed : int
-        Their seed.
+        The seed of every draw behind the band.
     """
 
     estimate: np.ndarray
@@ -86,7 +92,9 @@ class Band(NamedTuple):
     high: np.ndarray
     se: np.ndarray
     critical: float
+    form: Literal["one fit", "across sessions"]
     n_draws: int
+    n_pivot_draws: int | None
     seed: int
 
 
@@ -147,7 +155,9 @@ def simultaneous_band(
         estimate + critical * se,
         se,
         critical,
+        "one fit",
         n_draws,
+        None,
         seed,
     )
 
@@ -215,7 +225,9 @@ def across_session_band(
     ------
     ValueError
         If fewer than two animals have a session, or the draws do not vary at
-        a grid point.
+        a grid point. A curve expressed relative to a reference point (zero
+        there in every session) has no variance at that point: the caller
+        leaves it off the grid.
     """
     boot = animal_balanced_bootstrap(curves, animal, day, n_draws=n_draws, seed=seed)
     n_animals = boot.n_animals
@@ -223,7 +235,10 @@ def across_session_band(
         raise ValueError(f"{n_animals} animal: a band needs at least two")
     sd = boot.draws.std(axis=0, ddof=1)
     if not (sd > 0).all():
-        raise ValueError("the draws do not vary at a grid point")
+        raise ValueError(
+            "the draws do not vary at a grid point: a curve expressed relative to "
+            "a reference point has no variance there; leave that point off the grid"
+        )
     critical = _animal_pivot_quantile(
         np.corrcoef(boot.draws, rowvar=False).reshape(sd.size, sd.size),
         n_animals,
@@ -236,6 +251,8 @@ def across_session_band(
         boot.estimate + half,
         sd,
         critical,
+        "across sessions",
         n_draws,
+        PIVOT_DRAWS,
         seed,
     )
