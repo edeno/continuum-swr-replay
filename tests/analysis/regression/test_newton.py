@@ -185,13 +185,20 @@ def test_stops_unconverged_rather_than_raising() -> None:
     singular = penalized_newton(
         Bernoulli(), duplicated, y, None, np.zeros((3, 3)), np.zeros(3)
     )
-    assert not singular.converged
+    assert singular.status == NOT_IDENTIFIED and not singular.converged
 
+    max_iter = 2
     short = penalized_newton(
-        Bernoulli(), X, y, None, np.zeros((2, 2)), np.array([25.0, -30.0]), max_iter=2
+        Bernoulli(),
+        X,
+        y,
+        None,
+        np.zeros((2, 2)),
+        np.array([25.0, -30.0]),
+        max_iter=max_iter,
     )
-    assert not short.converged
-    assert short.n_iter == 2
+    assert short.status == STEP_LIMIT and not short.converged
+    assert short.n_iter == max_iter
 
 
 def test_a_start_that_overflows_reports_not_converged() -> None:

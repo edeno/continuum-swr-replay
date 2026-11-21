@@ -216,13 +216,14 @@ def test_a_session_whose_design_is_not_identified_raises() -> None:
     rng = np.random.default_rng(0)
     basis = PSplineBasis(0.0, 4.0, 10)
     sessions = []
-    for seed in range(10):
+    for index in range(10):
         x = rng.uniform(0.0, 4.0, 600)
         design, penalty, _ = basis.constrained(x)
-        reward = (rng.uniform(size=600) < 0.5).astype(float) * (seed != 3)
+        has_reward = index != 3  # session 3 has no rewarded row
+        reward = (rng.uniform(size=600) < 0.5).astype(float) * has_reward
         X = np.column_stack([np.ones(600), reward, design])
         y = rng.poisson(np.exp(-1.0 + np.sin(x) + 0.3 * reward)).astype(float)
-        sessions.append(SessionData(X, y, np.zeros(600), name=f"s{seed}"))
+        sessions.append(SessionData(X, y, np.zeros(600), name=f"s{index}"))
     blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     message = (
         r"session 3 \(s3\): design not identified .*cannot see .*: "
