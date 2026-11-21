@@ -253,7 +253,7 @@ def test_the_inputs_must_agree():
     with pytest.raises(ValueError, match="2-D"):
         _scores(log_likelihood, initial, continuous, discrete[None], allowed)
     with pytest.raises(ValueError, match="in_swr"):
-        nr.restriction_scores(
+        nr.fold_fit_scores(
             None, np.arange(5.0), None, [], [], None, None, np.zeros(4, bool)
         )
 
@@ -492,9 +492,9 @@ def test_each_failed_check_is_named(changes, expected):
 
 
 def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
-    """``restriction_scores``' ``place_sampling_s`` comes from the folds and
-    margin it hands the held-out stage, not the contiguous defaults. The
-    likelihood, the models and the place bins are stubbed."""
+    """``fold_fit_scores``' ``place_sampling_s`` comes from the folds and
+    margin it is given, not the contiguous defaults. The fit, the likelihood,
+    the models and the place bins are stubbed."""
     from types import SimpleNamespace
 
     from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
@@ -508,32 +508,44 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
     is_training = rng.random(n) < 0.9
     margin = 13
     environment = object()
-    detector = SimpleNamespace(
-        encoding_model_={ENCODING_KEY: {"environment": environment}}
+    canonical = SimpleNamespace(
+        encoding_model_={ENCODING_KEY: {"environment": environment}},
+        discrete_state_transitions_=np.eye(4),
+        discrete_initial_conditions=np.array([1.0, 0, 0, 0]),
     )
     linear_position = np.arange(n, dtype=float)
 
-    def heldout(*args, folds, margin_bins, **kwargs):
-        assert margin_bins == margin
-        return np.zeros((n, 3), dtype=np.float32), np.asarray(folds), {}
+    def fit(c, t, position, spikes, marks, training, missing, estimate_encoding_model):
+        return SimpleNamespace(), {
+            "discrete_transition": np.eye(4),
+            "initial_discrete": np.array([1.0, 0, 0, 0]),
+            "em_iterations": 3,
+            "converged": True,
+            "fit_s": 1.0,
+        }
 
-    def scores(detector, likelihood, in_swr, log):
-        return {
-            column: np.zeros(n, dtype=np.float32) for column in nr.SCORE_COLUMNS
-        }, {}
+    def scores(detector, likelihood, in_swr, summary_bins, log):
+        out = {c: np.zeros(n, dtype=np.float32) for c in nr.SCORE_COLUMNS}
+        out |= {
+            c: np.zeros(n, dtype=np.float32)
+            for c in nr.STATE_PROBABILITY_COLUMNS.values()
+        }
+        out[nr.NONLOCAL_PLACE_BIN_COLUMN] = np.zeros(n, dtype=np.int32)
+        return out, {}
 
     def places(env, position):
         assert env is environment
         np.testing.assert_array_equal(position, linear_position)
         return place
 
-    monkeypatch.setattr(nr, "heldout_log_likelihood", heldout)
+    monkeypatch.setattr(nr, "fold_log_likelihood", lambda *args: None)
     monkeypatch.setattr(nr, "model_scores", scores)
+    monkeypatch.setattr(nr, "check_place_grid", lambda detector, c: None)
     monkeypatch.setattr(nr, "animal_place_bins", places)
-    table, _ = nr.restriction_scores(
-        detector,
+    table, _ = nr.fold_fit_scores(
+        canonical,
         time,
-        None,
+        np.zeros((n, 2)),
         [],
         [],
         is_training,
@@ -542,6 +554,8 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
         folds=folds,
         margin_bins=margin,
         linear_position=linear_position,
+        estimate_encoding_model=False,
+        fit=fit,
         log=lambda message: None,
     )
     expected = th.place_sampling(place, is_training, folds, 5, margin, 0.002)

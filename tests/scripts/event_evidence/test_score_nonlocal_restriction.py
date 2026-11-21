@@ -1,7 +1,7 @@
 """The non-local restriction runner's wiring: what ``run_epoch`` hands the
 scores, how it labels and sums the bins, and what it writes.
 
-``epoch_inputs``, the SWR source and ``restriction_scores`` are replaced at
+``epoch_inputs``, the SWR source and ``fold_fit_scores`` are replaced at
 their boundaries; the frame, the SWR events and the scores are made by hand.
 """
 
@@ -145,7 +145,7 @@ def patched(tmp_path, monkeypatch):
         },
     )
 
-    def run(frame, record, fold_design="trials", fit="shared"):
+    def run(frame, record, fold_design="trials"):
         loaded = {
             "spike_times": [np.array([100.001])],
             "marks": [np.ones((1, 4))],
@@ -166,7 +166,7 @@ def patched(tmp_path, monkeypatch):
 
         monkeypatch.setattr(runner, "epoch_inputs", epoch_inputs)
 
-        def restriction_scores(
+        def fold_fit_scores(
             d,
             time,
             position,
@@ -179,8 +179,10 @@ def patched(tmp_path, monkeypatch):
             folds,
             margin_bins,
             linear_position,
+            estimate_encoding_model,
             log,
         ):
+            assert estimate_encoding_model is nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL
             if fold_design == "trials":
                 np.testing.assert_array_equal(
                     folds,
@@ -204,21 +206,15 @@ def patched(tmp_path, monkeypatch):
             assert training is loaded["is_training"]
             assert missing is loaded["is_missing"]
             np.testing.assert_array_equal(in_swr, IN_SWR)
-            return _scores(), record
-
-        def fold_fit_scores(*args, estimate_encoding_model, **options):
-            assert estimate_encoding_model is nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL
-            return restriction_scores(*args, **options)[0], {
+            return _scores(), {
                 "folds": [{"fold": 0, "converged": True, "em_iterations": 4, **record}],
                 "fit_s": 1.0,
+                "n_in_swr": int(IN_SWR.sum()),
             }
 
-        if fit == "shared":
-            monkeypatch.setattr(runner.nr, "restriction_scores", restriction_scores)
-        else:
-            monkeypatch.setattr(runner.nr, "fold_fit_scores", fold_fit_scores)
+        monkeypatch.setattr(runner.nr, "fold_fit_scores", fold_fit_scores)
         output = tmp_path / "out"
-        return runner.run_epoch(EPOCH, tmp_path, output, fold_design, fit), output
+        return runner.run_epoch(EPOCH, tmp_path, output, fold_design), output
 
     return run
 
@@ -304,32 +300,44 @@ def test_a_frame_swr_outside_the_source_raises(patched):
 
 
 def test_the_fold_fit_scores_and_checks_every_fold(patched):
-    """``--fit folds`` hands the same inputs to ``fold_fit_scores`` and fails
-    the epoch's check when any fold's pass fails one, naming the fold."""
-    record, output = patched(_frame(), _record(), fit="folds")
+    """The epoch is scored by ``fold_fit_scores`` and fails its check when any
+    fold's pass fails one, naming the fold."""
+    record, output = patched(_frame(), _record())
     assert record["status"] == "ok" and record["fit"] == "folds"
     assert record["folds"][0]["fold"] == 0
     assert output_path(EPOCH, output, runner.BINS_NAME).exists()
-    record, _ = patched(_frame(), _record(causal_mass_deviation_none=1.0), fit="folds")
+    record, _ = patched(_frame(), _record(causal_mass_deviation_none=1.0))
     assert record["status"] == "failed_check"
     assert record["error"].startswith("fold 0: none: filtered posterior mass")
-    record, _ = patched(_frame(), _record(converged=False), fit="folds")
+    record, _ = patched(_frame(), _record(converged=False))
     assert record["status"] == "failed_check"
     assert record["error"] == "fold 0: EM did not converge in 4 iterations"
 
 
-def test_the_header_names_the_fit_mode():
-    """The shared mode's header is the earlier runs' (no fit setting), so its
-    records still gather; the fold fit's names the mode and its EM settings,
-    so neither resumes or gathers the other's records."""
-    assert runner.fit_settings("shared") == {}
-    assert runner.fit_settings("folds") == {
+def test_the_header_names_the_fit():
+    """The header's settings name the fit and its EM settings, as the finished
+    fold-fit run's do, so its records still gather and resume, and a run of
+    the earlier design (no fit setting) is not gathered with them."""
+    assert runner.fit_settings() == {
         "fit": "folds",
         "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
     }
-    assert runner.OUTPUT_DIRS == {
-        "shared": "event_nonlocal_restriction",
-        "folds": "event_nonlocal_restriction_fold_fit",
-    }
-    with pytest.raises(ValueError, match="unknown fit mode"):
-        runner.fit_settings("all")
+
+
+def test_the_run_writes_to_the_canonical_folder(tmp_path, monkeypatch):
+    """The gather reads and writes ``EVENT_NONLOCAL_RESTRICTION_DIR``, with
+    ``"fit": "folds"`` and the EM settings after ``n_folds`` in the settings."""
+    gathered = {}
+    monkeypatch.setattr(
+        runner,
+        "gather_manifest",
+        lambda output, name, header: gathered.update(output=output, header=header),
+    )
+    runner.main(["--gather", "--data-dir", str(tmp_path)])
+    assert gathered["output"] == tmp_path / "event_nonlocal_restriction"
+    assert list(gathered["header"]["settings"])[:4] == [
+        "n_folds",
+        "fit",
+        "em",
+        "fold_design",
+    ]

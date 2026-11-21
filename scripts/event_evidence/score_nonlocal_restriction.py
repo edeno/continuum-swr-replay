@@ -25,23 +25,20 @@ folds.
 contiguous time blocks with a margin of ``MARGIN_BINS`` bins. The design and its
 margin are in the header's settings, so a resume cannot mix designs.
 
-``--fit shared`` (the default) holds out the encoding only and runs the models
-with the canonical decoder's transitions and initial conditions
-(``nonlocal_restriction.restriction_scores``). ``--fit folds`` holds out the
-whole decoder: per fold, a detector configured as the canonical one is fit by
-the library's EM on the fold's training folds with the fold's bins missing, and
-the fold's bins are scored under that fit
-(``nonlocal_restriction.fold_fit_scores``). It writes under
-``EVENT_NONLOCAL_RESTRICTION_FOLD_FIT_DIR``; its bins table also has the
-``full`` model's smoothed probability of each state (``full_prob_*``) and its
-most likely non-local place bin (``full_nonlocal_place_bin``, an index into the
-track-interior bins), and its record one entry per fold (``folds``: the fitted
-discrete transitions and initial distribution and their largest differences
-from the canonical, the EM iterations, convergence and marginal trace, each
-stage's seconds, the model checks, the device's peak memory). The fit mode and
-the EM settings are in the header's settings (the shared mode's header is the
-earlier runs'), so a resume or a gather cannot mix modes. A fold fit costs
-about what the canonical decode costs, five times an epoch.
+The whole decoder is held out (``nonlocal_restriction.fold_fit_scores``): per
+fold, a detector configured as the canonical one is fit by the library's EM on
+the fold's training folds with the fold's bins missing, and the fold's bins are
+scored under that fit. The bins table also has the ``full`` model's smoothed
+probability of each state (``full_prob_*``) and its most likely non-local place
+bin (``full_nonlocal_place_bin``, an index into the track-interior bins), and
+the record one entry per fold (``folds``: the fitted discrete transitions and
+initial distribution and their largest differences from the canonical, the EM
+iterations, convergence and marginal trace, each stage's seconds, the model
+checks, the device's peak memory). The header's settings record the fit
+(``"fit": "folds"``) and the EM settings; an earlier version of this runner
+held out only the encodings, and its header records no ``fit``, so a resume or
+a gather cannot mix the two. A fold fit costs about what the canonical decode
+costs, five times an epoch.
 
 Each bin is labeled (``nonlocal_restriction.bin_categories``): ``excluded``
 (in excluded time), ``immobile_in_swr`` / ``immobile_outside_swr`` (analyzed,
@@ -61,7 +58,7 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
   animal's place bin) and ``category``, so a later per-event or
   per-ripple-power analysis needs no rerun;
 - ``{epoch_id}_nonlocal_restriction.json``: the epoch's record (status,
-  ``restriction_scores``' record, bin counts, the share of the non-local gain
+  ``fold_fit_scores``' record, bin counts, the share of the non-local gain
   outside SWRs over the immobile bins (``share_outside_swr``, both families),
   the folds (``n_segments``, ``n_groups``, the smallest and largest fold's share of the
   bins, the margin in bins), the share of the immobile bins whose fold's
@@ -70,10 +67,11 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
 
 and ``manifest.json`` gathered from the records (``runs.epoch_records``).
 
-An epoch whose models fail a check (``nonlocal_restriction.check_failures``: a
-library marginal that disagrees with the summed filter scores, or a filtered
-posterior whose mass is more than ``CAUSAL_MASS_TOLERANCE`` from 1; with
-``--fit folds``, any fold's pass, ``fold_check_failures``) gets status
+An epoch whose models fail a check (``nonlocal_restriction.fold_check_failures``:
+a fold whose EM did not converge, or a fold's pass that fails
+``check_failures``, such as a library marginal that disagrees with the summed
+filter scores, or a filtered posterior whose mass is more than
+``CAUSAL_MASS_TOLERANCE`` from 1) gets status
 ``failed_check`` and a message naming the failures; its tables are still
 written, for diagnosis.
 A labeled bin with a score that is not finite fails the epoch when its sums are
@@ -97,7 +95,7 @@ Usage::
     uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
         --gather
     uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
-        --fit folds --gpus 1 2 4 5 6 7 8 --shards 0 --n-shards 2
+        --gpus 1 2 4 5 6 7 8 --shards 0 --n-shards 2
 """
 
 from __future__ import annotations
@@ -122,7 +120,6 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
-    EVENT_NONLOCAL_RESTRICTION_FOLD_FIT_DIR,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -149,37 +146,24 @@ PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction"
 BINS_NAME = "nonlocal_restriction_bins"
 
-FIT_MODES = ("shared", "folds")
-"""``shared``: held-out encodings with the canonical decoder's transitions and
-initial conditions (``nonlocal_restriction.restriction_scores``); ``folds``:
-the whole decoder refit by EM on each fold's training folds
-(``nonlocal_restriction.fold_fit_scores``)."""
-
-OUTPUT_DIRS = {
-    "shared": EVENT_NONLOCAL_RESTRICTION_DIR,
-    "folds": EVENT_NONLOCAL_RESTRICTION_FOLD_FIT_DIR,
-}
-"""Each fit mode's default output folder under the processed-data root."""
-
 SPARSE_SAMPLING_S = 10.0
 """The record's second sampling share: immobile bins whose fold's encoding had
 at most this many seconds of training data at the animal's place."""
 
 
-def fit_settings(fit: str) -> dict:
-    """The header's settings of a fit mode: none for ``shared``, whose header
-    is the earlier runs' (so their records still gather and resume); for
-    ``folds`` its name and the EM settings of every fold's fit
-    (``nonlocal_restriction.em_settings``), so neither mode resumes or
-    gathers the other's records."""
-    if fit == "shared":
-        return {}
-    if fit == "folds":
-        return {
-            "fit": "folds",
-            "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
-        }
-    raise ValueError(f"unknown fit mode {fit!r}, not one of {FIT_MODES}")
+FIT = "folds"
+"""The fit the header's settings and each record name (``"fit"``): the whole
+decoder fit on each fold's training folds. A run of the earlier design, which
+held out only the encodings, records none."""
+
+
+def fit_settings() -> dict:
+    """The header's settings of the fit: its name and the EM settings of every
+    fold's fit (``nonlocal_restriction.em_settings``)."""
+    return {
+        "fit": FIT,
+        "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
+    }
 
 
 def run_epoch(
@@ -187,11 +171,8 @@ def run_epoch(
     data_dir: Path,
     output: Path,
     fold_design: str = "trials",
-    fit: str = "shared",
 ) -> dict:
     """Score one epoch, write its two tables and return its record."""
-    if fit not in FIT_MODES:
-        raise ValueError(f"unknown fit mode {fit!r}, not one of {FIT_MODES}")
     started = clock.time()
     log = logging.getLogger(epoch_id).info
     epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == "trials")
@@ -209,7 +190,7 @@ def run_epoch(
         )
     categories = nr.bin_categories(frame, in_swr)
 
-    arguments = (
+    scores, record = nr.fold_fit_scores(
         epoch.detector,
         epoch.time,
         frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
@@ -218,23 +199,13 @@ def run_epoch(
         epoch.loaded["is_training"],
         epoch.loaded["is_missing"],
         in_swr,
+        folds=folds,
+        margin_bins=margin_bins,
+        linear_position=frame["linear_position"].to_numpy(dtype=float),
+        estimate_encoding_model=nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL,
+        log=log,
     )
-    options = {
-        "folds": folds,
-        "margin_bins": margin_bins,
-        "linear_position": frame["linear_position"].to_numpy(dtype=float),
-        "log": log,
-    }
-    if fit == "shared":
-        scores, record = nr.restriction_scores(*arguments, **options)
-        failures = nr.check_failures(record)
-    else:
-        scores, record = nr.fold_fit_scores(
-            *arguments,
-            estimate_encoding_model=nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL,
-            **options,
-        )
-        failures = nr.fold_check_failures(record)
+    failures = nr.fold_check_failures(record)
     bins_path = write_table(
         scores.assign(category=categories), output_path(epoch_id, output, BINS_NAME)
     )
@@ -257,7 +228,7 @@ def run_epoch(
             **({"error": "; ".join(failures)} if failures else {}),
             **record,
             **share,
-            "fit": fit,
+            "fit": FIT,
             "fold_design": fold_design,
             "margin_bins": margin_bins,
             **fold_counts,
@@ -311,24 +282,16 @@ def main(argv: list[str] | None = None) -> None:
         help="whole trials balanced by destination well (default), or the "
         "earlier contiguous time blocks",
     )
-    parser.add_argument(
-        "--fit",
-        choices=FIT_MODES,
-        default="shared",
-        help="the canonical decoder's transitions with held-out encodings "
-        "(default), or the whole decoder refit by EM on each fold's training "
-        "folds",
-    )
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
-    output = args.output_dir or data_dir / OUTPUT_DIRS[args.fit]
+    output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
         "settings": {
             "n_folds": nr.N_FOLDS,
-            **fit_settings(args.fit),
+            **fit_settings(),
             **fold_settings(args.fold_design),
             "sparse_sampling_s": SPARSE_SAMPLING_S,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -352,7 +315,7 @@ def main(argv: list[str] | None = None) -> None:
             args.epochs or analyzed_epoch_ids(), args.shards, args.n_shards
         ),
         task=run_epoch,
-        task_args=(data_dir, output, args.fold_design, args.fit),
+        task_args=(data_dir, output, args.fold_design),
         output=output,
         name=OUTPUT_NAME,
         header=header,

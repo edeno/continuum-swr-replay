@@ -776,8 +776,7 @@ def heldout_terms(
     tetrode terms under encodings refit on the other blocks, the per-tetrode
     No-Spike likelihood and the Local kernel.
 
-    Shared by :func:`holdout_scores` and
-    ``nonlocal_restriction.heldout_log_likelihood``.
+    The held-out stage of :func:`holdout_scores`.
 
     Parameters
     ----------

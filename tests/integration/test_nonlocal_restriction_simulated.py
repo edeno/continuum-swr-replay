@@ -6,10 +6,13 @@ states are allowed: never (``none``), exactly inside SWRs and nowhere else
 (``swr``), always (``full``). Checked, for the filter score and the two-sided
 score:
 
-- the likelihood is held out: each block is scored with the encoding of its
-  own fold, and no fold's encoding is fit on its block, with contiguous time
-  blocks and with folds of whole trials (each lap and the rest after it);
-- the filter scores add up to the library's marginal log-likelihood, and the
+- the fold fit: each fold's whole decoder is fit without the fold's bins
+  (no spike of the fold reaches its encoding, transitions or initial
+  conditions), each bin is scored by its own fold's fit, and the decode's
+  missing bins score 0;
+- on a likelihood held out by contiguous time blocks
+  (``tetrode_holdout.heldout_terms``, every tetrode in the model), the models
+  (``model_scores``) behave as follows. The filter scores add up to the library's marginal log-likelihood, and the
   library's covariate-dependent ``_predict`` agrees with the ``swr`` model;
 - A, replay only inside SWRs (the SWRs are the remote events): ``swr`` gains
   over ``none``, and ``full`` gains nothing over ``swr`` outside SWRs;
@@ -36,9 +39,6 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
-from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
-    refit_encoding,
-)
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     fold_training_masks,
 )
@@ -135,38 +135,30 @@ def gains(scores: pd.DataFrame, mask: np.ndarray) -> dict[str, float]:
     return out
 
 
-def _heldout(recording, detector, refit, folds=None, margin_bins=th.MARGIN_BINS):
-    return nr.heldout_log_likelihood(
+def _heldout_likelihood(recording, detector) -> np.ndarray:
+    """The decoder's four-state log-likelihood, shape (n_time, n_state_bins),
+    each contiguous time block under encodings fit on the other blocks
+    (``tetrode_holdout.heldout_terms``, every tetrode in the model, then
+    ``tetrode_holdout.state_log_likelihood``): the likelihood the models are
+    scored on below."""
+    terms, no_spike, kernel, _, _ = th.heldout_terms(
         detector,
         recording.time,
         recording.position[:, None],
         recording.spike_times,
         recording.marks,
         recording.is_running,
-        np.zeros(recording.time.size, dtype=bool),
-        folds=folds,
-        margin_bins=margin_bins,
-        refit=refit,
         log=_quiet,
     )
-
-
-def _recorded_heldout(recording, detector, folds=None, margin_bins=th.MARGIN_BINS):
-    """The held-out likelihood and its blocks, and each fold's training mask
-    and encoding as ``heldout_log_likelihood`` asked for them."""
-    fits = []
-
-    def recording_refit(detector, time, position, spike_times, marks, is_training):
-        encoding = refit_encoding(
-            detector, time, position, spike_times, marks, is_training
-        )
-        fits.append((np.asarray(is_training, dtype=bool).copy(), encoding))
-        return encoding
-
-    log_likelihood, blocks, _ = _heldout(
-        recording, detector, recording_refit, folds, margin_bins
+    state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
+    return th.state_log_likelihood(
+        terms.total(),
+        no_spike.sum(axis=1),
+        kernel,
+        state_ind,
+        list(detector.state_names),
+        np.zeros(recording.time.size, dtype=bool),
     )
-    return log_likelihood, blocks, fits
 
 
 @pytest.fixture(scope="module")
@@ -177,24 +169,10 @@ def recording_and_detector():
 
 @pytest.fixture(scope="module")
 def simulated(recording_and_detector):
-    """The recording, its detector, the held-out likelihood (contiguous time
-    blocks) and its blocks, each fold's training mask and encoding, and the
-    folds' design (None: contiguous) and margin."""
+    """The recording, its detector and the held-out likelihood (contiguous
+    time blocks)."""
     recording, detector = recording_and_detector
-    log_likelihood, blocks, fits = _recorded_heldout(recording, detector)
-    return recording, detector, log_likelihood, blocks, fits, None, th.MARGIN_BINS
-
-
-@pytest.fixture(scope="module")
-def simulated_trials(recording_and_detector):
-    """As :func:`simulated`, with trial folds (each lap and the rest after it,
-    balanced by the end it runs to, cut by the segment cap) and their margin."""
-    recording, detector = recording_and_detector
-    starts, classes = sim.trials(recording)
-    folds = th.trial_folds(recording.time, starts, classes, nr.N_FOLDS)
-    margin = th.margin_in_bins(th.TRIAL_MARGIN_S, recording.time)
-    log_likelihood, blocks, fits = _recorded_heldout(recording, detector, folds, margin)
-    return recording, detector, log_likelihood, blocks, fits, folds, margin
+    return recording, detector, _heldout_likelihood(recording, detector)
 
 
 @pytest.fixture(scope="module")
@@ -217,67 +195,6 @@ def scenarios(simulated):
     }
 
 
-FOLD_DESIGNS = ["simulated", "simulated_trials"]
-
-
-@pytest.mark.parametrize("design", FOLD_DESIGNS)
-def test_no_fold_is_fit_on_its_own_block(design, request):
-    """Fails if every fold's encoding is fit on all training bins, or on a
-    training bin within the margin of its own bins."""
-    recording, _, _, blocks, fits, folds, margin = request.getfixturevalue(design)
-    assert len(fits) == nr.N_FOLDS
-    if folds is None:
-        np.testing.assert_array_equal(blocks, th.time_blocks(recording.time))
-    else:
-        np.testing.assert_array_equal(blocks, folds)
-        # whole groups (each 31 s lap cut into two pieces by the 30 s cap):
-        # every group's bins in one fold, and the folds interleaved
-        segment = th.trial_segments(recording.time, sim.trials(recording)[0])
-        group = th.capped_groups(recording.time, segment)
-        assert group[-1] + 1 == 2 * sim.N_LAPS
-        for g in np.unique(group):
-            assert np.unique(blocks[group == g]).size == 1
-        assert (np.diff(blocks) != 0).sum() >= nr.N_FOLDS
-    expected = fold_training_masks(recording.is_running, blocks, nr.N_FOLDS, margin)
-    index = np.arange(blocks.size)
-    for k, (mask, _) in enumerate(fits):
-        assert not (mask & (blocks == k)).any()
-        np.testing.assert_array_equal(mask, expected[k])
-        own = index[blocks == k]
-        nearest = own[np.clip(np.searchsorted(own, index[mask]), 0, own.size - 1)]
-        before = own[np.clip(np.searchsorted(own, index[mask]) - 1, 0, own.size - 1)]
-        distance = np.minimum(
-            np.abs(index[mask] - nearest), np.abs(index[mask] - before)
-        )
-        assert distance.min() > margin
-
-
-@pytest.mark.parametrize("design", FOLD_DESIGNS)
-def test_each_block_is_scored_with_its_own_folds_encoding(design, request):
-    """Fold 0's encoding replaced by one fit on every training bin changes the
-    likelihood of block 0 and of no other block. Fails if a block is scored
-    with another block's encoding."""
-    recording, detector, log_likelihood, blocks, fits, folds, margin = (
-        request.getfixturevalue(design)
-    )
-    replacement = refit_encoding(
-        detector,
-        recording.time,
-        recording.position[:, None],
-        recording.spike_times,
-        recording.marks,
-        recording.is_running,
-    )
-    encodings = [replacement] + [encoding for _, encoding in fits[1:]]
-    calls = iter(encodings)
-    changed, _, _ = _heldout(
-        recording, detector, lambda *args: next(calls), folds, margin
-    )
-    own = blocks == 0
-    np.testing.assert_allclose(changed[~own], log_likelihood[~own], rtol=0, atol=1e-6)
-    assert np.abs(changed[own] - log_likelihood[own]).max() > 0.1
-
-
 @pytest.fixture(scope="module")
 def chance():
     recording = sim.simulate_recording(
@@ -285,19 +202,10 @@ def chance():
     )
     detector = sim.fit_detector(recording)
     no_swr = np.zeros(recording.time.size, dtype=bool)
-    scores, record = nr.restriction_scores(
-        detector,
-        recording.time,
-        recording.position[:, None],
-        recording.spike_times,
-        recording.marks,
-        recording.is_running,
-        no_swr,
-        no_swr,
-        linear_position=recording.position,
-        log=_quiet,
+    scores, record = nr.model_scores(
+        detector, _heldout_likelihood(recording, detector), no_swr, log=_quiet
     )
-    return recording, detector, scores, record
+    return recording, pd.DataFrame(scores), record
 
 
 def test_the_filter_scores_add_up_to_the_librarys_marginal(simulated, scenarios):
@@ -414,7 +322,7 @@ def _labels(scenarios, name: str) -> np.ndarray:
 
 
 def test_the_library_record_checks_hold(chance):
-    recording, detector, scores, record = chance
+    _, scores, record = chance
     assert np.isfinite(scores[list(nr.SCORE_COLUMNS)].to_numpy()).all()
     # the checks' keys are the real record's
     assert nr.check_failures(record) == []
@@ -422,33 +330,6 @@ def test_the_library_record_checks_hold(chance):
         assert record[f"filter_identity_deviation_{model}"] < 1e-4
         assert record[f"causal_mass_deviation_{model}"] < 1e-3
     assert record["continuous_block_deviation"] < 1e-6
-    assert list(scores.columns) == [
-        "time",
-        "none",
-        "swr",
-        "full",
-        "none_two_sided",
-        "swr_two_sided",
-        "full_two_sided",
-        "in_swr",
-        "block",
-        "place_sampling_s",
-    ]
-    # the seconds each block's encoding saw at the animal's place bin
-    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
-    np.testing.assert_array_equal(
-        scores["place_sampling_s"],
-        th.place_sampling(
-            th.animal_place_bins(environment, recording.position),
-            recording.is_running,
-            th.time_blocks(recording.time),
-            nr.N_FOLDS,
-            th.MARGIN_BINS,
-            BIN_S,
-        ),
-    )
-    # every place of the track is run over in every block
-    assert (scores["place_sampling_s"] > 0).all()
     # no SWRs: the swr model is the none model
     np.testing.assert_array_equal(scores["swr"], scores["none"])
     np.testing.assert_array_equal(scores["swr_two_sided"], scores["none_two_sided"])
@@ -461,7 +342,7 @@ def test_bursts_without_shared_content_are_credited_as_non_local(chance, suffix)
     whose tetrodes share a random place, because at 2 ms a bin holds about one
     spike and a non-local state can follow each spike's place. Local bursts
     and plain rest gain nothing."""
-    recording, _, scores, _ = chance
+    recording, scores, _ = chance
     column = f"full{suffix}"
     gain = scores[column].to_numpy(np.float64) - scores[f"none{suffix}"].to_numpy(
         np.float64
@@ -592,6 +473,39 @@ def test_each_fold_is_fit_without_its_bins(fold_fit):
     np.testing.assert_allclose(probability.sum(axis=1), 1.0, atol=1e-5)
     assert (table[nr.NONLOCAL_PLACE_BIN_COLUMN] >= 0).all()
     np.testing.assert_array_equal(table["block"], folds)
+
+
+def test_the_fold_fit_table_has_its_columns_and_place_sampling(fold_fit):
+    """The table's columns, in order, and each bin's seconds of training data
+    at the animal's place under its own fold's encoding (the trial folds and
+    their margin)."""
+    recording, canonical, folds, margin, _, table, _, _, is_training, _ = fold_fit
+    assert list(table.columns) == [
+        "time",
+        "none",
+        "swr",
+        "full",
+        "none_two_sided",
+        "swr_two_sided",
+        "full_two_sided",
+        "in_swr",
+        "block",
+        "place_sampling_s",
+        *nr.STATE_PROBABILITY_COLUMNS.values(),
+        nr.NONLOCAL_PLACE_BIN_COLUMN,
+    ]
+    environment = canonical.encoding_model_[ENCODING_KEY]["environment"]
+    np.testing.assert_array_equal(
+        table["place_sampling_s"],
+        th.place_sampling(
+            th.animal_place_bins(environment, recording.position),
+            is_training,
+            folds,
+            nr.N_FOLDS,
+            margin,
+            float(np.median(np.diff(recording.time))),
+        ),
+    )
 
 
 def test_each_bin_is_scored_by_its_own_folds_fit(fold_fit):
