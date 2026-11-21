@@ -130,6 +130,9 @@ class NewtonFit:
         For a fit with no finite maximum, the columns running away along
         ``step`` (:func:`running_away_columns`), the one moving the linear
         predictor most first; empty for every other status.
+    unidentified : np.ndarray or None, shape (p, k)
+        For a design that is not identified, the combinations of coefficients
+        it does not identify; None for every other status.
     """
 
     beta: np.ndarray
@@ -140,6 +143,7 @@ class NewtonFit:
     loglik: float
     step: np.ndarray | None = None
     running_away: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
+    unidentified: np.ndarray | None = None
 
     @property
     def converged(self) -> bool:
@@ -153,21 +157,22 @@ def _free_columns(S: np.ndarray) -> np.ndarray:
     return np.eye(S.shape[0])[:, unpenalized]
 
 
-def _identified(X: np.ndarray, free_basis: np.ndarray) -> bool:
-    """Whether ``X`` identifies the coefficients spanned by ``free_basis``.
+def _unidentified(X: np.ndarray, free_basis: np.ndarray) -> np.ndarray:
+    """The combinations ``free_basis @ v`` that ``X`` does not identify, shape
+    ``(p, k)``; ``k = 0`` when it identifies every coordinate of ``free_basis``.
 
     The columns of ``X @ free_basis`` are scaled to unit length (so a column's
-    units do not matter) and their Gram matrix's smallest eigenvalue must
-    exceed ``IDENTIFIABILITY_TOL``; a column that is zero on every row fails.
+    units do not matter). A column zero on every row is returned alone; else
+    each ``v`` is a unit eigenvector of their Gram matrix whose eigenvalue is at
+    most ``IDENTIFIABILITY_TOL``.
     """
-    if free_basis.shape[1] == 0:
-        return True
     free = X @ free_basis
     norms = np.linalg.norm(free, axis=0)
     if not np.all(norms > 0):
-        return False
+        return free_basis[:, ~(norms > 0)]
     unit = free / norms
-    return bool(np.linalg.eigvalsh(unit.T @ unit)[0] > IDENTIFIABILITY_TOL)
+    eigenvalues, vectors = np.linalg.eigh(unit.T @ unit)
+    return free_basis @ vectors[:, eigenvalues <= IDENTIFIABILITY_TOL]
 
 
 def _check_inputs(
@@ -286,12 +291,15 @@ def penalized_newton(
     F, loglik = _objective(lik, X, y, aux, S, beta)
     capped_and_fell: list[bool] = []
     eta_steps: list[float] = []
-    identifying = lik.identifying_design(X, aux)
-    if not _identified(
-        identifying, _free_columns(S) if free_basis is None else free_basis
-    ):
+    unidentified = _unidentified(
+        lik.identifying_design(X, aux),
+        _free_columns(S) if free_basis is None else free_basis,
+    )
+    if unidentified.shape[1]:
         nan = np.full((beta.size, beta.size), np.nan)
-        return NewtonFit(beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik)
+        return NewtonFit(
+            beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik, unidentified=unidentified
+        )
     for n_iter in range(max_iter + 1):
         A, step, decrement = _newton_system(lik, X, y, aux, S, beta)
         if step is None:

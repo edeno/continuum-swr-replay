@@ -52,7 +52,6 @@ import scipy.linalg
 
 from .constants import (
     AT_BOUNDARY_MARGIN,
-    IDENTIFIABILITY_TOL,
     LOG_PENALTY_BOUNDS,
     MAX_FAILING_SHARE,
     MAX_STEP_HALVINGS,
@@ -295,6 +294,9 @@ class RemlScore:
     running_away_directions : tuple of FreeDirection
         For a fit with no finite maximum, the coordinates it runs away along
         (``fit.running_away`` names the design columns); empty otherwise.
+    unidentified_directions : tuple of FreeDirection
+        For a design that is not identified, the coordinates in
+        ``fit.unidentified``, unpenalized columns first; empty otherwise.
     """
 
     score: float
@@ -306,6 +308,7 @@ class RemlScore:
     edf: np.ndarray | None = None
     edf_total: float = np.nan
     running_away_directions: tuple[FreeDirection, ...] = ()
+    unidentified_directions: tuple[FreeDirection, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -753,11 +756,22 @@ def reml_and_derivatives(
         directions = _directions(rotated, fit.running_away)
         step = _rotate(blocks, vectors, fit.step)
         fit = replace(fit, step=step, running_away=running_away_columns(X, step))
+    unidentified: tuple[FreeDirection, ...] = ()
+    if fit.unidentified is not None:
+        named = np.flatnonzero(np.any(np.abs(fit.unidentified) > 0.1, axis=1))
+        unidentified = tuple(
+            sorted(
+                _directions(rotated, named),
+                key=lambda d: (d.block is not None, d.block or 0, d.index),
+            )
+        )
+        fit = replace(fit, unidentified=_rotate(blocks, vectors, fit.unidentified))
     return replace(
         session,
         fit=fit,
         covariance=covariance,
         running_away_directions=directions,
+        unidentified_directions=unidentified,
     )
 
 
@@ -973,18 +987,28 @@ def _session_score(
         covariance = np.full((p, p), np.nan)
         covariance[np.ix_(active, active)] = session.covariance
     fit = replace(session.fit, beta=beta, A=A)
-    directions = session.running_away_directions
-    if fit.step is not None:
-        columns = np.flatnonzero(active)
-        step = np.full(p, np.nan)
-        step[active] = fit.step
-        fit = replace(fit, step=step, running_away=columns[fit.running_away])
-        directions = tuple(
+    columns = np.flatnonzero(active)
+
+    def in_session(directions: tuple[FreeDirection, ...]) -> tuple[FreeDirection, ...]:
+        return tuple(
             d._replace(index=int(columns[d.index])) if d.block is None else d
             for d in directions
         )
+
+    if fit.step is not None:
+        step = np.full(p, np.nan)
+        step[active] = fit.step
+        fit = replace(fit, step=step, running_away=columns[fit.running_away])
+    if fit.unidentified is not None:
+        unidentified = np.full((p, fit.unidentified.shape[1]), np.nan)
+        unidentified[active] = fit.unidentified
+        fit = replace(fit, unidentified=unidentified)
     return replace(
-        session, fit=fit, covariance=covariance, running_away_directions=directions
+        session,
+        fit=fit,
+        covariance=covariance,
+        running_away_directions=in_session(session.running_away_directions),
+        unidentified_directions=in_session(session.unidentified_directions),
     )
 
 
@@ -1430,7 +1454,7 @@ def _screen(
         elif status == NOT_IDENTIFIED:
             raise ValueError(
                 f"{_label(data, index)}: design not identified at the reference log "
-                f"penalties {reference} ({_zero_columns(lik, data, blocks)}); mark the "
+                f"penalties {reference} ({_unidentified_text(session)}); mark the "
                 "columns the session cannot estimate inactive (SessionData.active)"
             )
         else:
@@ -1448,50 +1472,17 @@ def _screen(
     return kept, set_aside
 
 
-def _zero_columns(
-    lik: Likelihood, data: SessionData, blocks: Sequence[PenaltyBlock]
-) -> str:
-    """The active unpenalized columns the likelihood cannot see (zero on every
-    row; for the grouped softmax, constant within every group), in words: the
-    common cause of a design that is not identified."""
-    free = np.ones(data.X.shape[1], dtype=bool)
-    for block in blocks:
-        free[block.columns] = False
-    if data.active is not None:
-        free &= data.active
-    seen = lik.identifying_design(data.X, data.aux)
-    zero = np.flatnonzero(
-        free & ~np.any(np.abs(seen) > 1e-12 * np.abs(data.X).max(), axis=0)
-    )
-    if zero.size:
+def _unidentified_text(session: RemlScore) -> str:
+    """What a design does not identify, in words: columns the likelihood cannot
+    see (each combination one column), else the coordinates collinear to it."""
+    directions = session.unidentified_directions
+    one_each = np.sum(np.abs(np.nan_to_num(session.fit.unidentified)) > 0.1, axis=0)
+    if np.all(one_each == 1) and all(d.block is None for d in directions):
         return (
             "columns the likelihood cannot see (zero on every row; for the grouped "
-            f"softmax, constant within every group): {zero.tolist()}"
+            f"softmax, constant within every group): {[d.index for d in directions]}"
         )
-    # The free coordinates (unpenalized columns, blocks' null spaces) the
-    # likelihood sees, each scaled to unit length; the right singular vectors
-    # of the smallest singular values name the combinations it cannot tell
-    # apart.
-    names, parts = [], []
-    for column in np.flatnonzero(free):
-        names.append(FreeDirection(None, int(column), True))
-        parts.append(seen[:, column])
-    for b, block in enumerate(blocks):
-        null = seen[:, block.columns] @ block.null_space
-        for q in range(null.shape[1]):
-            names.append(FreeDirection(b, q, True))
-            parts.append(null[:, q])
-    coordinates = np.column_stack(parts)
-    coordinates = coordinates / np.linalg.norm(coordinates, axis=0)
-    _, singular, vectors = np.linalg.svd(coordinates, full_matrices=False)
-    collinear = sorted(
-        {
-            j
-            for k in np.flatnonzero(singular**2 <= IDENTIFIABILITY_TOL)
-            for j in np.flatnonzero(np.abs(vectors[k]) > 0.1)
-        }
-    )
-    return "collinear to the likelihood: " + ", ".join(str(names[j]) for j in collinear)
+    return "collinear to the likelihood: " + ", ".join(str(d) for d in directions)
 
 
 def _refit(

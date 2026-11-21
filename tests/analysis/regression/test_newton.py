@@ -353,6 +353,9 @@ def test_a_collinear_design_is_not_fitted(seed: int) -> None:
         Poisson(), X, y, np.zeros(300), np.zeros((3, 3)), np.zeros(3)
     )
     assert fit.status == NOT_IDENTIFIED and not fit.converged
+    # The one combination it cannot identify is x against 3 x.
+    assert fit.unidentified.shape == (3, 1)
+    np.testing.assert_array_equal(np.abs(fit.unidentified[:, 0]) > 0.1, [0, 1, 1])
 
 
 @pytest.mark.parametrize("to", [0.45, 0.3])
