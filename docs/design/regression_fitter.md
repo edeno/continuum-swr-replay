@@ -416,11 +416,14 @@ The declared estimands name their terms by this rule.
 
 ## Standardization
 
-A slope on a 0/1 column enters as it is. A slope on any other column is divided by its
-pooled standard deviation, in the population form (`ddof = 0`). A slope fitted for each
-level of a category is an interaction, so it is first centered at its pooled mean, a
-fixed reference. Both are read over the pooled rows the slope reads (the rows of its
-levels), one standardization per covariate. They are stored in the record.
+Each covariate of a design has one scale and one centering reference. Both are computed
+once, over the pooled rows of every level on which any slope of the design reads the
+covariate (all rows for a slope without `by`), so "per SD" means the same for every term
+of the covariate. A covariate that is 0/1 on those rows enters as it is. Any other is
+divided by its pooled standard deviation, in the population form (`ddof = 0`). A slope
+fitted for each level of a category is an interaction, so it is also centered at the
+pooled mean, the fixed reference; a slope alone is not centered. The record holds, per
+covariate, its SD, its reference and the terms centered at it.
 
 ## The design check
 

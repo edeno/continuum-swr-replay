@@ -141,11 +141,10 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
     the pooled mean of the rows it reads, a slope alone is not, and a 0/1
     column is neither centered nor scaled."""
     values = np.array([0.0, 1.0, 3.0, 4.0])
-    alone = standardization(values, center=False)
-    assert alone.sd == pytest.approx(np.std(values, ddof=0)) and alone.ddof == 0
-    assert alone.reference == 0.0
-    assert standardization(values, center=True).reference == pytest.approx(2.0)
-    assert standardization(np.array([0.0, 1.0, 1.0]), center=True) is None
+    scale = standardization(values)
+    assert scale.sd == pytest.approx(np.std(values, ddof=0)) and scale.ddof == 0
+    assert scale.reference == pytest.approx(2.0)
+    assert standardization(np.array([0.0, 1.0, 1.0])) is None
 
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     design = build_design(_content_terms(), pooled, intercept=False)
@@ -157,6 +156,11 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
             "sd": pytest.approx(np.std(fraction, ddof=0)),
             "ddof": 0,
             "reference": pytest.approx(np.mean(fraction)),
+            "centered": [
+                "reward_fraction:role=current",
+                "reward_fraction:role=previous",
+                "reward_fraction:role=other",
+            ],
         }
     }
     X, _ = design.session(pooled)
@@ -172,6 +176,49 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
     assert built.coef_names == ["(Intercept)", "r", "x:r=0.0", "x:r=1.0"]
     X, _ = built.session(rate)
     np.testing.assert_array_equal(X[:, 1], rate["r"])  # 0/1: as it is
+
+
+def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
+    """Two slopes on one covariate (one per group of roles; or one alone and
+    one by a role) share one SD and one reference, computed over the pooled
+    rows of every level any of them reads; only the slopes by a category are
+    centered, and the record names them."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    pooled.loc[pooled["role"] == "previous", "reward_fraction"] *= 0.3
+    role = Category("role", ROLES, reference="other")
+    design = build_design(
+        [
+            role,
+            Slope("reward_fraction", by=role, levels=("current",)),
+            Slope("reward_fraction", by=role, levels=("previous", "other")),
+        ],
+        pooled,
+        intercept=False,
+    )
+    leaf = pooled.loc[pooled["role"] != "trunk", "reward_fraction"]
+    (record,) = design.standardization_record().values()
+    assert record["sd"] == pytest.approx(np.std(leaf, ddof=0))
+    assert record["reference"] == pytest.approx(np.mean(leaf))
+    X, _ = design.session(pooled)
+    for level in ("current", "previous"):
+        rows = (pooled["role"] == level).to_numpy()
+        j = design.coef_names.index(f"reward_fraction:role={level}")
+        expected = (pooled.loc[rows, "reward_fraction"] - leaf.mean()) / np.std(leaf)
+        np.testing.assert_allclose(X[rows, j], expected)
+
+    both = build_design(
+        [role, Slope("clock_s"), Slope("clock_s", by=role, levels=("current",))],
+        pooled,
+        intercept=False,
+    )
+    clock = pooled["clock_s"]
+    record = both.standardization_record()["clock_s"]
+    assert record["sd"] == pytest.approx(np.std(clock, ddof=0))
+    assert record["centered"] == ["clock_s:role=current"]
+    X, _ = both.session(pooled)
+    np.testing.assert_allclose(
+        X[:, both.coef_names.index("clock_s")], clock / np.std(clock)
+    )
 
 
 def test_category_and_by_terms(content_sessions) -> None:

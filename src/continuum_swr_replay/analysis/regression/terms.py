@@ -35,11 +35,14 @@ records use to find them:
   ``reward_fraction:role=current``), and its columns follow from it;
 - the intercept is ``(Intercept)``.
 
-Standardization (:func:`standardization`): a slope on a 0/1 column enters as it
-is. A slope on any other column is divided by its pooled standard deviation
-(population form, ``ddof = 0``), and when it is a slope for each level of a
-category (an interaction) it is first centered at its pooled mean, a fixed
-reference. Both are read over the pooled rows the term reads.
+Standardization (:func:`standardization`): each covariate of a design has one
+scale and one centering reference, computed once over the pooled rows of every
+level on which any :class:`Slope` of the design reads it (all rows for a slope
+without ``by``), so that "per SD" means the same for every term of the
+covariate. A covariate that is 0/1 on those rows enters as it is. Any other is
+divided by its pooled standard deviation (population form, ``ddof = 0``), and a
+slope fitted for each level of a category (an interaction) is first centered
+at the pooled mean, the fixed reference; a slope alone is not centered.
 
 The design check (:func:`check_column_sizes`): the fitter limits each Newton
 step to ``MAX_STEP_LENGTH`` in coefficient units, so a column whose values are
@@ -266,7 +269,8 @@ Term = Smooth | LinearFunctional | Category | Slope | Offset
 
 
 class Standardization(NamedTuple):
-    """How a slope's column was scaled: ``(x - reference) / sd``.
+    """A covariate's scale: ``x / sd``, or ``(x - reference) / sd`` for a
+    slope in an interaction.
 
     Attributes
     ----------
@@ -275,7 +279,7 @@ class Standardization(NamedTuple):
     ddof : int
         0.
     reference : float
-        The pooled mean for a slope in an interaction, else 0.
+        The pooled mean.
     """
 
     sd: float
@@ -283,15 +287,13 @@ class Standardization(NamedTuple):
     reference: float
 
 
-def standardization(values: np.ndarray, *, center: bool) -> Standardization | None:
-    """The pooled standardization of a slope's column.
+def standardization(values: np.ndarray) -> Standardization | None:
+    """The pooled standardization of a covariate.
 
     Parameters
     ----------
     values : np.ndarray, shape (n_rows,)
         The pooled rows' values (finite).
-    center : bool
-        Center at the pooled mean (a continuous factor in an interaction).
 
     Returns
     -------
@@ -310,7 +312,7 @@ def standardization(values: np.ndarray, *, center: bool) -> Standardization | No
     sd = float(np.std(values, ddof=0))
     if not sd > 0:
         raise ValueError("a constant column cannot be standardized")
-    return Standardization(sd, 0, float(np.mean(values)) if center else 0.0)
+    return Standardization(sd, 0, float(np.mean(values)))
 
 
 def check_column_sizes(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) -> None:
@@ -390,6 +392,7 @@ class _Built:
     penalty: np.ndarray | None = None
     log_penalty: float | None = None
     scale: Standardization | None = None
+    centered: bool = False
 
     def values(self, rows: pd.DataFrame) -> np.ndarray:
         """The term's columns at ``rows``, shape ``(n_rows, k)``; NaN where a
@@ -411,7 +414,8 @@ class _Built:
             out[~np.isfinite(x)] = np.nan
             return out * mask[:, None]
         if self.scale is not None:
-            x = np.where(mask, (x - self.scale.reference) / self.scale.sd, 0.0)
+            reference = self.scale.reference if self.centered else 0.0
+            x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
         return x[:, None]
 
     def record(self) -> dict | None:
@@ -451,7 +455,9 @@ def _level_name(term: Smooth | Slope, base: str, level: object) -> str:
     return f"{base}:{term.by.column}={level}"
 
 
-def _build_term(term: Term, pooled: pd.DataFrame) -> list[_Built]:
+def _build_term(
+    term: Term, pooled: pd.DataFrame, scales: dict[str, Standardization | None]
+) -> list[_Built]:
     """The built pieces of one term (one per level of a ``by``)."""
     if isinstance(term, Category):
         _category_values(pooled, term)
@@ -515,20 +521,35 @@ def _build_term(term: Term, pooled: pd.DataFrame) -> list[_Built]:
             name = (
                 term.column if level is None else _level_name(term, term.column, level)
             )
-            scale = _slope_scale(term, pooled)
+            scale = scales[term.column]
             rule = "binary" if scale is None else "slope"
             columns = (DesignColumn(name, name, rule, level_key),)
-            out.append(_Built(name, term, columns, level_key, scale=scale))
+            centered = scale is not None and term.by is not None
+            out.append(
+                _Built(name, term, columns, level_key, scale=scale, centered=centered)
+            )
     return out
 
 
-def _slope_scale(term: Slope, pooled: pd.DataFrame) -> Standardization | None:
-    """A slope's standardization, one for the covariate: over the pooled rows
-    of every level it is fitted for."""
-    x = pooled[term.column].to_numpy(dtype=float)
-    if term.by is not None:
-        x = x[np.isin(_category_values(pooled, term.by), term.levels)]
-    return standardization(_finite(x, term.column), center=term.by is not None)
+def _covariate_scales(
+    terms: Sequence[Term], pooled: pd.DataFrame
+) -> dict[str, Standardization | None]:
+    """Each slope covariate's one standardization: over the pooled rows of
+    every level on which any slope of the covariate reads it."""
+    reads: dict[str, np.ndarray] = {}
+    for term in terms:
+        if not isinstance(term, Slope):
+            continue
+        rows = np.ones(len(pooled), dtype=bool)
+        if term.by is not None:
+            rows = np.isin(_category_values(pooled, term.by), term.levels)
+        reads[term.column] = reads.get(term.column, np.zeros(len(pooled), bool)) | rows
+    return {
+        column: standardization(
+            _finite(pooled[column].to_numpy(dtype=float)[rows], column)
+        )
+        for column, rows in reads.items()
+    }
 
 
 def _finite(x: np.ndarray, name: str) -> np.ndarray:
@@ -631,13 +652,17 @@ class Design:
         }
 
     def standardization_record(self) -> dict[str, dict]:
-        """Covariate -> its standardization (C7 ``standardization``), for the
-        scaled slopes (one entry per covariate: the levels of a slope ``by`` a
-        category share it)."""
-        out = {}
+        """Covariate -> its standardization (C7 ``standardization``): its SD,
+        ``ddof``, reference and the terms centered at it, one entry per scaled
+        covariate (every term of the covariate shares it)."""
+        out: dict[str, dict] = {}
         for b in self._built:
             if b.scale is not None:
-                out[b.term.column] = b.scale._asdict()
+                entry = out.setdefault(
+                    b.term.column, {**b.scale._asdict(), "centered": []}
+                )
+                if b.centered:
+                    entry["centered"].append(b.name)
         return out
 
     def _matrix(self, rows: pd.DataFrame) -> tuple[np.ndarray, np.ndarray | None]:
@@ -720,11 +745,12 @@ def build_design(
     offsets = [term for term in terms if isinstance(term, Offset)]
     if len(offsets) > 1:
         raise ValueError("at most one offset")
+    scales = _covariate_scales(terms, pooled_rows)
     built = [
         piece
         for term in terms
         if not isinstance(term, Offset)
-        for piece in _build_term(term, pooled_rows)
+        for piece in _build_term(term, pooled_rows, scales)
     ]
     names = [b.name for b in built]
     if len(set(names)) != len(names):
