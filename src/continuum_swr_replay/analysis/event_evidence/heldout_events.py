@@ -91,7 +91,14 @@ def labeled_frame(
         ``with_swr_source`` of ``raw`` with ``non_local_event`` the labels of
         ``detect_nonlocal_events`` on ``continuous + fragmented`` and the two
         probability columns (:data:`PROBABILITY_COLUMNS`) set to these;
-        ``raw`` is not changed.
+        ``raw`` is not changed. Every other column (``Local_prob``,
+        ``No-Spike_prob``, ``map_estimate``, the posterior statistics, ...) is
+        still the saved decode's.
+
+    Notes
+    -----
+    When the trace is a held-out decode's, the frame is not that decode: only
+    ``non_local_event`` and the two non-local probabilities are from it.
     """
     _, labels = detect_nonlocal_events(
         xr.DataArray(continuous + fragmented, dims="time"),
