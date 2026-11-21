@@ -67,6 +67,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.regression.bands import across_session_band
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_bootstrap,
+    animal_day_session_values,
     bootstrap_interval,
     nested_bootstrap_draws,
     nested_codes,
@@ -152,16 +153,6 @@ def _animal_day_session_weights(
     return draws.animals[:, animal] / n_animals * within_animal[:, day] * within_day
 
 
-def _animal_values(
-    values: np.ndarray, animal: np.ndarray, day: np.ndarray
-) -> np.ndarray:
-    """Each animal's mean over its days of each day's mean, shape (n_animals,)."""
-    day_mean = np.bincount(day, values) / np.bincount(day)
-    day_animal = np.zeros(day_mean.size, dtype=np.int64)
-    day_animal[day] = animal
-    return np.bincount(day_animal, day_mean) / np.bincount(day_animal)
-
-
 def intervals(
     values: np.ndarray,
     animal: np.ndarray,
@@ -182,7 +173,13 @@ def intervals(
     animal_draws = rng.multinomial(
         n_animals, np.full(n_animals, 1 / n_animals), n_draws
     )
-    by_animal = animal_draws @ _animal_values(values, animal, day) / n_animals
+    per_animal = animal_day_session_values(
+        pd.Series(values),
+        pd.Series(animal),
+        pd.Series(day),
+        pd.Series(np.arange(values.size)),
+    )
+    by_animal = animal_draws @ per_animal.to_numpy() / n_animals
     out = {}
     for scheme, draws in zip(
         SCHEMES, (convention.draws, third_level, by_animal), strict=True

@@ -601,27 +601,20 @@ def test_the_animal_balanced_bootstrap_leaves_out_a_session_without_a_finite_val
 
 def test_animal_day_session_values():
     t = THREE_LEVEL
-    means = stats.animal_day_session_values(t.value, t.animal, t.day, t.session, "mean")
+    means = stats.animal_day_session_values(t.value, t.animal, t.day, t.session)
     # a: day means 2 and 8 -> 5; b: one day, mean 1.
     pd.testing.assert_series_equal(
         means, pd.Series([5.0, 1.0], index=pd.Index(["a", "b"])), check_names=False
     )
-    medians = stats.animal_day_session_values(
-        t.value, t.animal, t.day, t.session, "median"
-    )
-    # a: day medians 2 and 8 -> 5; b: median of -1, 0, 4 -> 0.
-    np.testing.assert_allclose(medians.to_numpy(), [5.0, 0.0])
     # Rows within a session are reduced first: two rows of session s3 of a.
     rows = pd.concat([t, t.iloc[[2]].assign(value=10.0)], ignore_index=True)
     means = stats.animal_day_session_values(
-        rows.value, rows.animal, rows.day, rows.session, "mean"
+        rows.value, rows.animal, rows.day, rows.session
     )
     assert means["a"] == pytest.approx((2.0 + 9.0) / 2)
-    with pytest.raises(ValueError, match="neither"):
-        stats.animal_day_session_values(t.value, t.animal, t.day, t.session, "max")
     with pytest.raises(ValueError, match="indexed alike"):
         stats.animal_day_session_values(
-            t.value, t.animal.set_axis(range(10, 16)), t.day, t.session, "mean"
+            t.value, t.animal.set_axis(range(10, 16)), t.day, t.session
         )
 
 
@@ -680,6 +673,17 @@ def test_estimand_summary():
         d.value, d.animal, d.day, d.session, n_draws=50, seed=0
     )
     assert days["day_p"] == stats.day_level_test(d.value, d.animal, d.day)
+    own = stats.animal_day_session_values(d.value, d.animal, d.day, d.session)
+    assert days["n_animals_same_sign"] == int(
+        (np.sign(own) == np.sign(days["estimate"])).sum()
+    )
+    shifted = t.day.set_axis(range(10, 16))
+    with pytest.raises(ValueError, match="values, animal, day and session"):
+        stats.estimand_summary(
+            t.value, t.animal, shifted, t.session, n_draws=10, seed=0
+        )
+    with pytest.raises(ValueError, match="values, animal and day are not"):
+        stats.day_level_test(t.value, t.animal, shifted)
     with pytest.raises(ValueError, match="more than one value"):
         twice = pd.concat([t, t.iloc[[0]]], ignore_index=True)
         stats.estimand_summary(
@@ -711,7 +715,7 @@ def test_a_session_without_a_finite_value_is_left_out_of_everything():
         infinite.value, infinite.animal, infinite.day
     ) == stats.day_level_test(missing.value, missing.animal, missing.day)
     values = stats.animal_day_session_values(
-        infinite.value, infinite.animal, infinite.day, infinite.session, "mean"
+        infinite.value, infinite.animal, infinite.day, infinite.session
     )
     assert np.isfinite(values).all()
 
