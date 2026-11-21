@@ -157,6 +157,13 @@ The review of the restriction and held-out tetrode runs before the
   folds. Each epoch's record now keeps the digest of the trials it used
   (`epoch_inputs["trials"]`), but nothing compares it on a resume.
   *When:* decide which trials are canonical before any rerun of either runner.
+- [ ] **The participation run's record names a staging folder.**
+  `event_participation/manifest.json` records the paths of its event table and session
+  cache under a staging root that held links to the real files (the run of 2026-11-21
+  with controls inside well visits). The digests it records are the real files', and no
+  code reads those paths. Do not edit the manifest by hand: the held-out tetrode run and
+  the events summary record its digest.
+  *When:* the paths become correct at the next participation run.
 - [ ] **A run made from a restriction run of another design is pending, not refused.**
   The window run (`sum_nonlocal_restriction_windows.py`) and the held-out event run
   (`detect_heldout_events.py`) record the restriction run's manifest digest but not its
