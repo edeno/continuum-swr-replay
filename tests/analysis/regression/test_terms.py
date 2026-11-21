@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     standardization,
 )
 
-from .conftest import N_LAGS, ROLES
+from .conftest import N_LAGS, ROLE, draw_response
 
 LAGS = tuple(range(1, N_LAGS + 1))
 LAG_COLUMNS = tuple(f"lag_{lag}" for lag in LAGS)
@@ -50,11 +50,10 @@ def _rate_terms(penalty: float | str = 2.0) -> list:
 
 
 def _content_terms() -> list:
-    role = Category("role", ROLES, reference="other")
     return [
-        role,
-        Slope("reward_fraction", by=role, levels=("current", "previous", "other")),
-        Smooth("clock_s", 0.0, 20.0, 8, 4.0, by=role, levels=("current",)),
+        ROLE,
+        Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
+        Smooth("clock_s", 0.0, 20.0, 8, 4.0, by=ROLE, levels=("current",)),
     ]
 
 
@@ -187,12 +186,11 @@ def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
     centered, and the record names them."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     pooled.loc[pooled["role"] == "previous", "reward_fraction"] *= 0.3
-    role = Category("role", ROLES, reference="other")
     design = build_design(
         [
-            role,
-            Slope("reward_fraction", by=role, levels=("current",)),
-            Slope("reward_fraction", by=role, levels=("previous", "other")),
+            ROLE,
+            Slope("reward_fraction", by=ROLE, levels=("current",)),
+            Slope("reward_fraction", by=ROLE, levels=("previous", "other")),
         ],
         pooled,
         intercept=False,
@@ -209,7 +207,7 @@ def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
         np.testing.assert_allclose(X[rows, j], expected)
 
     both = build_design(
-        [role, Slope("clock_s"), Slope("clock_s", by=role, levels=("current",))],
+        [ROLE, Slope("clock_s"), Slope("clock_s", by=ROLE, levels=("current",))],
         pooled,
         intercept=False,
     )
@@ -281,16 +279,14 @@ def _scaled_session(family: str, scale: float) -> tuple[object, SessionData, lis
     if family == "softmax":
         X, beta = X[:, 1:], beta[1:]
         groups = np.repeat(np.arange(n // 4), 4)
-        weight = np.exp(X @ beta).reshape(-1, 4)
-        p = weight / weight.sum(axis=1, keepdims=True)
-        y = np.concatenate([rng.multinomial(5, row) for row in p]).astype(float)
+        y = draw_response(rng, "counts", X @ beta, total=5)
         lik, aux, column = GroupedSoftmax(), groups, 0
     elif family == "poisson":
         offset = np.log(rng.uniform(0.5, 2.0, n))
-        y = rng.poisson(np.exp(X @ beta + offset)).astype(float)
+        y = draw_response(rng, "poisson", X @ beta + offset)
         lik, aux, column = Poisson(), offset, 1
     else:
-        y = (rng.uniform(size=n) < 1 / (1 + np.exp(-(X @ beta)))).astype(float)
+        y = draw_response(rng, "bernoulli", X @ beta)
         lik, aux, column = Bernoulli(), None, 1
     X = X.copy()
     X[:, column] *= scale
@@ -374,7 +370,7 @@ def test_a_missing_category_value_is_a_missing_row(content_sessions) -> None:
     rows.loc[5, "role"] = np.nan
     np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [0, 5])
     by_only = build_design(
-        [Slope("clock_s", by=Category("role", ROLES, reference="other"))],
+        [Slope("clock_s", by=ROLE)],
         pooled,
         intercept=False,
     )
@@ -413,7 +409,7 @@ def test_a_missing_level_is_not_the_reference(content_sessions) -> None:
     (NaN in the level columns), not a row of the reference level (zeros)."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     design = build_design(
-        [Category("role", ROLES, reference="other"), Slope("clock_s")],
+        [ROLE, Slope("clock_s")],
         pooled,
         intercept=False,
     )

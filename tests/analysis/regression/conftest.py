@@ -2,7 +2,8 @@
 
 Two kinds of rows, each built from a fixed seed:
 
-- rate rows: 15 ms bins of the visits of one session, with a Poisson count of
+- rate rows: 15 ms bins of the visits of one session (the mgcv comparison's
+  ``bins_of``), with a Poisson count of
   event starts, the bin's exposure, two clocks, the last outcome (0/1), ten
   lagged outcomes and one continuous covariate;
 - content rows: one row per candidate arm of each event (four candidates: the
@@ -17,8 +18,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.terms import Category
+from scripts.checks.compare_regression_to_mgcv import bins_of
+
 N_LAGS = 10
 ROLES = ("current", "previous", "other", "trunk")
+#: The content rows' role category, the "other" leaf arm its reference.
+ROLE = Category("role", ROLES, reference="other")
 
 
 def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:
@@ -37,12 +43,7 @@ def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:
     """
     rng = np.random.default_rng(seed)
     duration = 2.0 * np.exp(0.6 * rng.normal(size=n_visits))
-    n_bins = np.maximum(np.ceil(duration / 0.015).astype(int), 1)
-    visit = np.repeat(np.arange(n_visits), n_bins)
-    k = np.arange(n_bins.sum()) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
-    start = 0.015 * k
-    end = np.minimum(start + 0.015, duration[visit])
-    since = 0.5 * (start + end)
+    visit, _, since, until, exposure = bins_of(duration)
     outcomes = (rng.uniform(size=(n_visits, N_LAGS)) < 0.6).astype(float)
     x = rng.normal(size=n_visits)
     log_rate = (
@@ -51,7 +52,6 @@ def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:
         + 0.4 * outcomes[visit, 0]
         + 0.2 * x[visit]
     )
-    exposure = end - start
     frame = pd.DataFrame(
         {
             "animal": "sim",
@@ -61,7 +61,7 @@ def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:
             "exposure": exposure,
             "count": rng.poisson(exposure * np.exp(log_rate)).astype(float),
             "time_since_s": since,
-            "time_until_s": duration[visit] - since,
+            "time_until_s": until,
             "last_rewarded": outcomes[visit, 0],
             "x": x[visit],
         }
@@ -110,6 +110,48 @@ def content_rows(seed: int, n_events: int = 150) -> pd.DataFrame:
             "reward_fraction": fraction,
         }
     )
+
+
+def draw_response(
+    rng: np.random.Generator,
+    family: str,
+    eta: np.ndarray,
+    total: float = 0.0,
+    group_size: int = 4,
+) -> np.ndarray:
+    """A response drawn at the linear predictor ``eta`` (an offset included).
+
+    Parameters
+    ----------
+    rng : np.random.Generator
+    family : {"poisson", "bernoulli", "counts", "shares"}
+        Poisson counts of mean ``exp(eta)``; 0/1 with probability
+        ``expit(eta)``; under the grouped softmax over groups of
+        ``group_size`` rows with probabilities ``softmax(eta)``, ``total``
+        counts per group
+        (multinomial) or shares from a Dirichlet of concentration ``total``
+        times the probabilities.
+    eta : np.ndarray, shape (n_rows,)
+    total : float
+        The softmax's counts or concentration per group.
+    group_size : int
+        The softmax's rows per group.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+    """
+    if family == "poisson":
+        return rng.poisson(np.exp(eta)).astype(float)
+    if family == "bernoulli":
+        return (rng.uniform(size=eta.size) < 1 / (1 + np.exp(-eta))).astype(float)
+    weight = np.exp(eta).reshape(-1, group_size)
+    p = weight / weight.sum(axis=1, keepdims=True)
+    if family == "counts":
+        return np.concatenate([rng.multinomial(int(total), row) for row in p]).astype(
+            float
+        )
+    return np.concatenate([rng.dirichlet(total * row) for row in p])
 
 
 def by_session(frames: list[pd.DataFrame]) -> dict[tuple[str, str, str], pd.DataFrame]:

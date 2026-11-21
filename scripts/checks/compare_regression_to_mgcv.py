@@ -117,24 +117,45 @@ def stop_bins(
     """
     rewarded = rng.random(N_STOPS) < 0.5
     duration = np.where(rewarded, 1.0, 0.3) * np.exp(rng.normal(size=N_STOPS))
-    duration = np.maximum(duration, BIN_S)
-    n_bins = np.ceil(duration / BIN_S).astype(int)
-    stop = np.repeat(np.arange(N_STOPS), n_bins)
-    k = np.arange(n_bins.sum()) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
-    start = k * BIN_S
-    end = np.minimum(start + BIN_S, duration[stop])
-    s = 0.5 * (start + end)
-    u = duration[stop] - s
+    stop, k, s, u, expo = bins_of(np.maximum(duration, BIN_S))
     keep = (s < HI) & (u < until_end_max_s)
     return pd.DataFrame(
         {
             "s": s[keep],
             "u": u[keep],
-            "expo": (end - start)[keep],
+            "expo": expo[keep],
             "rew": rewarded[stop][keep].astype(float),
             "k": k[keep],
         }
     )
+
+
+def bins_of(
+    duration: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """``BIN_S`` bins of stops of the given durations, each from its stop's
+    start, the last one partial.
+
+    Parameters
+    ----------
+    duration : np.ndarray, shape (n_stops,)
+        Each stop's duration (s).
+
+    Returns
+    -------
+    stop, k : np.ndarray of int, shape (n_bins,)
+        Each bin's stop and its index in the stop.
+    s, u, expo : np.ndarray, shape (n_bins,)
+        The time since the stop began at the bin's middle, the time until it
+        ends from there, and the bin's length (s).
+    """
+    n_bins = np.ceil(duration / BIN_S).astype(int)
+    stop = np.repeat(np.arange(duration.size), n_bins)
+    k = np.arange(n_bins.sum()) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
+    start = k * BIN_S
+    end = np.minimum(start + BIN_S, duration[stop])
+    s = 0.5 * (start + end)
+    return stop, k, s, duration[stop] - s, end - start
 
 
 def make_data(name: str) -> pd.DataFrame:

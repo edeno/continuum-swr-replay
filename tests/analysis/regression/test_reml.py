@@ -52,6 +52,8 @@ from scripts.checks.compare_regression_to_mgcv import (
     stop_bins,
 )
 
+from .conftest import draw_response
+
 FAMILIES = ("poisson", "bernoulli", "gaussian", "grouped_softmax")
 N_BASIS = 7  # 6 constrained columns per smooth
 
@@ -89,18 +91,16 @@ def _session(
     X = np.hstack(parts)
     if family == "poisson":
         offset = np.log(rng.uniform(0.5, 2.0, size=n_rows))
-        y = rng.poisson(np.exp(0.7 + truth + offset)).astype(float)
+        y = draw_response(rng, "poisson", 0.7 + truth + offset)
         return Poisson(), SessionData(X, y, offset), blocks
     if family == "bernoulli":
-        y = (rng.uniform(size=n_rows) < 1 / (1 + np.exp(-truth))).astype(float)
+        y = draw_response(rng, "bernoulli", truth)
         return Bernoulli(), SessionData(X, y), blocks
     if family == "gaussian":
         y = 1.0 + truth + rng.normal(scale=0.5, size=n_rows)
         return Gaussian(), SessionData(X, y), blocks
     groups = np.repeat(np.arange(n_rows // 4), 4)
-    weight = np.exp(truth).reshape(-1, 4)
-    p = weight / weight.sum(axis=1, keepdims=True)
-    y = np.concatenate([rng.dirichlet(30.0 * row) for row in p])
+    y = draw_response(rng, "shares", truth, total=30.0)
     return GroupedSoftmax(), SessionData(X, y, groups), blocks
 
 
@@ -224,7 +224,7 @@ def test_a_session_whose_design_is_not_identified_raises() -> None:
         has_reward = index != 3  # session 3 has no rewarded row
         reward = (rng.uniform(size=600) < 0.5).astype(float) * has_reward
         X = np.column_stack([np.ones(600), reward, design])
-        y = rng.poisson(np.exp(-1.0 + np.sin(x) + 0.3 * reward)).astype(float)
+        y = draw_response(rng, "poisson", -1.0 + np.sin(x) + 0.3 * reward)
         sessions.append(SessionData(X, y, np.zeros(600), name=f"s{index}"))
     blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     message = (
@@ -576,7 +576,7 @@ def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
     x = rng.uniform(size=500)
     design, penalty = _smooth(x, n_basis=10)
     X = np.column_stack([np.ones(500), x, design])
-    y = rng.poisson(np.exp(0.5 + np.sin(3.0 * x))).astype(float)
+    y = draw_response(rng, "poisson", 0.5 + np.sin(3.0 * x))
     blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
     assert score.score == np.inf
@@ -792,9 +792,7 @@ def test_softmax_penalty_selection_is_stationary() -> None:
     X = np.column_stack([design, rng.normal(size=n_rows)])
     eta = np.sin(1.5 * s) + 0.4 * X[:, -1]
     groups = np.repeat(np.arange(n_events), n_arms)
-    weight = np.exp(eta).reshape(-1, n_arms)
-    p = weight / weight.sum(axis=1, keepdims=True)
-    y = np.concatenate([rng.dirichlet(10.0 * row) for row in p])
+    y = draw_response(rng, "shares", eta, total=10.0, group_size=n_arms)
     data = SessionData(X, y, groups)
     blocks = [PenaltyBlock(np.arange(11), penalty)]
 
@@ -1074,7 +1072,7 @@ def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
     indicator = (rng.uniform(size=600) < 0.2).astype(float)
     copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
     X = np.column_stack([np.ones(600), design, *copies])
-    y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
+    y = draw_response(rng, "bernoulli", np.sin(x))
     y[indicator == 1] = 1.0
     blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     with np.errstate(over="ignore"):
@@ -1201,7 +1199,7 @@ def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
         indicator = (rng.uniform(size=600) < 0.2).astype(float)
         copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
         X = np.column_stack([np.ones(600), design, *copies])
-        y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
+        y = draw_response(rng, "bernoulli", np.sin(x))
         if seed == 2:
             y[indicator == 1] = 1.0
         sessions.append(SessionData(X, y, name=f"s{seed}"))

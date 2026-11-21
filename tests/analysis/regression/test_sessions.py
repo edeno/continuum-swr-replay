@@ -17,7 +17,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     build_design,
 )
 
-from .conftest import ROLES, by_session
+from .conftest import ROLE, by_session
 
 N_ARMS = 6
 
@@ -70,6 +70,14 @@ def _fit(design, sessions, lik, **kw):
         kind="SWR",
         table_sha256={"t": "0" * 64},
         **kw,
+    )
+
+
+def _rate_design(pooled: pd.DataFrame, *categories: Category):
+    """The small rate design: ``categories``, a slope of ``x`` and the
+    exposure's offset, with an intercept."""
+    return build_design(
+        [*categories, Slope("x"), Offset("exposure")], pooled, intercept=True
     )
 
 
@@ -132,11 +140,10 @@ def _role_rows(seed: int, n_previous: int, never_chosen: bool = False) -> pd.Dat
 
 
 def _role_design(pooled: pd.DataFrame):
-    role = Category("role", ROLES, reference="other")
     return build_design(
         [
-            role,
-            Slope("reward_fraction", by=role, levels=("current", "previous", "other")),
+            ROLE,
+            Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
             Smooth("clock_s", 0.0, 20.0, 8, 4.0),
         ],
         pooled,
@@ -267,7 +274,7 @@ def test_missing_rows_are_dropped_and_counted(rate_sessions) -> None:
     rows = rows.copy()
     rows.loc[[2, 7], "x"] = np.nan
     pooled = pd.concat(rate_sessions.values(), ignore_index=True)
-    design = build_design([Slope("x"), Offset("exposure")], pooled, intercept=True)
+    design = _rate_design(pooled)
     (record,) = _fit(
         design, {key: rows}, Poisson(), response="count", unit="well_visit_id"
     )
@@ -279,7 +286,7 @@ def test_a_session_with_no_rows_left_is_recorded_not_fitted(rate_sessions) -> No
     """A session given with no rows, or whose rows are all missing, or with no
     events, is not fitted: one record says why, and the loop goes on."""
     pooled = pd.concat(rate_sessions.values(), ignore_index=True)
-    design = build_design([Slope("x"), Offset("exposure")], pooled, intercept=True)
+    design = _rate_design(pooled)
     keys = list(rate_sessions)
     frames = list(rate_sessions.values())
     missing = frames[1].assign(x=np.nan)
@@ -318,7 +325,7 @@ def test_a_level_passes_on_its_own_count(rate_sessions) -> None:
     }
     pooled = pd.concat(sessions.values(), ignore_index=True)
     grp = Category("grp", ("a", "b"), reference="a")
-    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    design = _rate_design(pooled, grp)
     record = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")[
         0
     ]
@@ -344,9 +351,8 @@ def test_support_is_counted_again_on_the_rows_kept(content_sessions) -> None:
     frames[0] = first[keep].reset_index(drop=True)
     sessions = by_session(frames)
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    role = Category("role", ROLES, reference="other")
     design = build_design(
-        [role, Slope("flag"), Smooth("clock_s", 0.0, 20.0, 8, 4.0)],
+        [ROLE, Slope("flag"), Smooth("clock_s", 0.0, 20.0, 8, 4.0)],
         pooled,
         intercept=False,
     )
@@ -373,7 +379,7 @@ def test_a_session_left_without_events_by_the_row_rule_is_not_fitted(
     sessions = {keys[0]: thin, keys[1]: _grouped_rate(frames[1], np.arange(0, 200, 2))}
     pooled = pd.concat(sessions.values(), ignore_index=True)
     grp = Category("grp", ("a", "b"), reference="a")
-    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    design = _rate_design(pooled, grp)
     first, second = _fit(
         design, sessions, Poisson(), response="count", unit="well_visit_id"
     )
@@ -392,11 +398,10 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
 
     frames = list(content_sessions.values())[:2]
     pooled = pd.concat(frames, ignore_index=True)
-    role = Category("role", ROLES, reference="other")
     design = build_design(
         [
-            role,
-            Slope("reward_fraction", by=role, levels=("current", "previous", "other")),
+            ROLE,
+            Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
         ],
         pooled,
         intercept=False,
@@ -433,7 +438,7 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     sessions[keys[0]] = first.assign(grp=np.where(first["well_visit_id"] % 2, "b", "c"))
     pooled = pd.concat(sessions.values(), ignore_index=True)
     grp = Category("grp", ("a", "b", "c"), reference="a")
-    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    design = _rate_design(pooled, grp)
     message = (
         r"session sim/20260000/02_r1: at its first fit its design is not identified"
         r".*\(Intercept\), grp\[b\], grp\[c\]"

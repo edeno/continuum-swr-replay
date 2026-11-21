@@ -36,6 +36,8 @@ from scripts.checks.compare_regression_to_mgcv import (
     make_data,
 )
 
+from .conftest import draw_response
+
 
 def _poisson_design(seed: int = 0, n: int = 800):
     """An intercept, a smooth of 7 columns and a column ``z`` correlated with
@@ -47,7 +49,7 @@ def _poisson_design(seed: int = 0, n: int = 800):
     X = np.column_stack([np.ones(n), smooth.design, z])
     offset = np.log(rng.uniform(0.5, 2.0, n))
     beta = np.r_[-1.0, 0.3 * rng.normal(size=7), 0.4]
-    y = rng.poisson(np.exp(X @ beta + offset)).astype(float)
+    y = draw_response(rng, "poisson", X @ beta + offset)
     return X, y, offset, beta, {"s(t)": np.arange(1, 8), "z": np.array([8])}
 
 

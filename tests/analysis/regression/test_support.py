@@ -17,13 +17,12 @@ from continuum_swr_replay.analysis.regression.support import (
     terms_failing_share,
 )
 from continuum_swr_replay.analysis.regression.terms import (
-    Category,
     Slope,
     Smooth,
     build_design,
 )
 
-from .conftest import ROLES
+from .conftest import ROLE
 
 FEW = f"fewer than MIN_UNITS = {MIN_UNITS} units with an event"
 
@@ -73,11 +72,10 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
     the role (and those with a candidate in another); a slope by a role is
     split at the median of that role's rows only; smooths have no entry."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
-    role = Category("role", ROLES, reference="other")
     design = build_design(
         [
-            role,
-            Slope("reward_fraction", by=role, levels=("current", "previous")),
+            ROLE,
+            Slope("reward_fraction", by=ROLE, levels=("current", "previous")),
             Smooth("clock_s", 0.0, 20.0, 8, 2.0),
         ],
         pooled,
