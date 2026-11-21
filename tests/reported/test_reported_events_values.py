@@ -871,7 +871,7 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
                 )
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
-    # the held-out tetrode supplementary figure draws them; Figure 2h does not
+    # the held-out tetrode supplementary figure draws them; Figure 2 does not
     assert {v.figures for v in values} == {("heldout_tetrode",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
@@ -886,7 +886,11 @@ def _restriction_windows() -> pd.DataFrame:
     2k; SWR events ``swr - none`` 3k, ``full - none`` 2.5k, ``full - swr``
     -0.5k; no-SWR controls ``full - swr`` -0.1k, SWR controls 0.1k. The
     two-sided scores are twice the filter scores. Animal a has one more no-SWR
-    control, without spikes."""
+    control, without spikes.
+
+    Outside SWRs, over half a second: ``full - swr`` per second 4k in no-SWR
+    events and k in SWR events (0 in controls); the two-sided scores twice
+    those."""
     sums = {
         ("event", "no SWR"): (0.0, 4.0),
         ("event", "SWR"): (6.0, 5.0),
@@ -901,6 +905,15 @@ def _restriction_windows() -> pd.DataFrame:
     table = pd.DataFrame(
         rows, columns=["animal", "kind", "group", "n_spikes", "swr", "full"]
     )
+    k = table["animal"].map({"a": 1.0, "b": 2.0, "c": 3.0})
+    per_s = np.select(
+        [
+            (table["kind"] == "event") & (table["group"] == "no SWR"),
+            (table["kind"] == "event") & (table["group"] == "SWR"),
+        ],
+        [4 * k, k],
+        0.0,
+    )
     return table.assign(
         epoch_id=table["animal"] + "1",
         n_bins_excluded=0,
@@ -909,6 +922,14 @@ def _restriction_windows() -> pd.DataFrame:
         none_two_sided=0.0,
         swr_two_sided=2 * table["swr"],
         full_two_sided=2 * table["full"],
+        n_bins_outside_swr=1,
+        duration_outside_swr_s=0.5,
+        none_outside_swr=0.0,
+        swr_outside_swr=0.0,
+        full_outside_swr=0.5 * per_s,
+        none_two_sided_outside_swr=0.0,
+        swr_two_sided_outside_swr=0.0,
+        full_two_sided_outside_swr=per_s,
     )
 
 
@@ -952,26 +973,43 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     assert numbers["restriction_non_swr_controls_scored"] == 3
     assert numbers["restriction_swr_events_scored"] == 3
     assert numbers["restriction_animals"] == 3
+    # outside SWRs, per second: no SWR 4, 8, 12; SWR 1, 2, 3
+    key = "restriction_{}_events_outside_swr_full_minus_swr{}_per_s"
+    assert numbers[key.format("non_swr", "")] == pytest.approx(8.0)
+    assert numbers[key.format("swr", "")] == pytest.approx(2.0)
+    assert numbers[key.format("swr", "_two_sided")] == pytest.approx(4.0)
+    assert numbers[key.format("swr", "") + "_animals_positive"] == 3
+    assert values[key.format("swr", "")].unit == "nats per s"
+    assert numbers["restriction_swr_events_outside_swr_scored"] == 3
     # two families x six comparisons x (estimate, two bounds, animals positive),
-    # two counts for each kind and group, and the animals
-    assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1
+    # two counts for each kind and group, and the animals; outside SWRs, two
+    # families x two groups x four, and the two groups' events scored there
+    assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1 + 2 * 2 * 4 + 2
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    # Figure 2h draws the filter family's full - swr per spike over both groups'
-    # events: those values carry its tag, no other value does
+    # Figure 2g's second axis draws the filter family's full - swr per second
+    # over both groups' events' bins outside SWRs: those values carry its tag,
+    # no other value does
     drawn = {
-        f"restriction_{word}_events_full_minus_swr_per_spike{end}"
+        f"restriction_{word}_events_outside_swr_full_minus_swr_per_s{end}"
         for word in ("non_swr", "swr")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
-    }
-    assert {k for k, v in values.items() if v.figures == ("2h",)} == drawn
+    } | {f"restriction_{word}_events_outside_swr_scored" for word in ("non_swr", "swr")}
+    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
+
+
+def test_restriction_window_values_refuse_a_window_run_without_outside_sums():
+    windows = _restriction_windows().drop(columns=["n_bins_outside_swr"])
+    with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
+        builder.restriction_window_values(windows, "s")
 
 
 def test_restriction_outside_swr_values_are_the_gain_per_second_and_its_share():
     """Animals a (epochs a1, a2), b (b1, b2) and c (c1, c2), 10 bins of 1 s
     outside SWRs each, ``full - swr`` there of 20, 40, 60, 80, 50 and 70
     (two-sided twice that), of which the no-SWR event windows hold 10, 16, 30,
-    32, 25 and 28."""
+    32, 25 and 28 over 4 bins, and the SWR event windows a fifth of the gain
+    over their 2 bins outside the SWR."""
     sums, windows = [], []
     for epoch, gain, in_events in (
         ("a1", 20.0, 10.0),
@@ -983,8 +1021,8 @@ def test_restriction_outside_swr_values_are_the_gain_per_second_and_its_share():
     ):
         sums.append((epoch, "immobile_outside_swr", 10, gain))
         sums.append((epoch, "immobile_in_swr", 5, 1000.0))
-        windows.append((epoch, "event", "no SWR", in_events))
-        windows.append((epoch, "event", "SWR", 1000.0))
+        windows.append((epoch, "event", "no SWR", in_events, in_events, 4, 0))
+        windows.append((epoch, "event", "SWR", 1000.0, gain / 5, 2, 10))
     sums = pd.DataFrame(sums, columns=["epoch_id", "category", "n_bins", "full"])
     sums = sums.assign(
         animal=sums["epoch_id"].str[0],
@@ -994,12 +1032,24 @@ def test_restriction_outside_swr_values_are_the_gain_per_second_and_its_share():
         swr_two_sided=0.0,
         full_two_sided=2 * sums["full"],
     )
-    windows = pd.DataFrame(windows, columns=["epoch_id", "kind", "group", "full"])
+    windows = pd.DataFrame(
+        windows,
+        columns=["epoch_id", "kind", "group", "full", "outside", "n_out", "s"],
+    )
     windows = windows.assign(
+        e=windows["s"] + 5,
         n_bins_excluded=0,
         swr=0.0,
         swr_two_sided=0.0,
         full_two_sided=2 * windows["full"],
+        n_bins_outside_swr=windows["n_out"],
+        duration_outside_swr_s=windows["n_out"] * 1.0,
+        none_outside_swr=0.0,
+        swr_outside_swr=0.0,
+        full_outside_swr=windows["outside"],
+        none_two_sided_outside_swr=0.0,
+        swr_two_sided_outside_swr=0.0,
+        full_two_sided_outside_swr=2 * windows["outside"],
     )
     bin_s = pd.Series(1.0, index=["a1", "a2", "b1", "b2", "c1", "c2"])
     values = _by_key(builder.restriction_outside_swr_values(sums, bin_s, windows, "s"))
@@ -1016,4 +1066,76 @@ def test_restriction_outside_swr_values_are_the_gain_per_second_and_its_share():
     assert numbers[f"{key}_share_in_non_swr_events"] == pytest.approx(0.45)
     assert numbers[f"{key}_two_sided_share_in_non_swr_events"] == pytest.approx(0.45)
     assert values[f"{key}_share_in_non_swr_events"].kind == "fraction"
-    assert len(numbers) == 2 * 9
+    # the rest, outside events: (gain - events - gain / 5) over 4 s, per epoch
+    # 1.5 and 4, 4.5 and 8, 3.75 and 7; animal medians 2.75, 6.25, 5.375
+    rest = (2.75 + 6.25 + 5.375) / 3
+    assert numbers[f"{key}_outside_events_per_s"] == pytest.approx(rest)
+    assert numbers[f"{key}_two_sided_outside_events_per_s"] == pytest.approx(2 * rest)
+    assert numbers[f"{key}_outside_events_per_s_animals_positive"] == 3
+    # the SWR events' time outside the SWR: a fifth of each epoch's gain
+    assert numbers[f"{key}_share_in_swr_events_outside_swr"] == pytest.approx(0.2)
+    assert numbers[f"{key}_two_sided_share_in_swr_events_outside_swr"] == (
+        pytest.approx(0.2)
+    )
+    assert len(numbers) == 2 * (9 + 7)
+    assert {v.figures for v in values.values()} == {()}
+
+
+def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
+    """Animals a, b, c, one epoch each, 10 immobile bins of 1 s (5 in SWRs);
+    ``swr - none`` and ``full - none`` over them 20 and 30, 24 and 32, 21 and
+    30 (two-sided twice that); moving bins do not count."""
+    rows = []
+    for epoch, swr, full in (
+        ("a1", 20.0, 30.0),
+        ("b1", 24.0, 32.0),
+        ("c1", 21.0, 30.0),
+    ):
+        rows.append((epoch, "immobile_in_swr", 5, swr, full - 5.0))
+        rows.append((epoch, "immobile_outside_swr", 5, 0.0, 5.0))
+        rows.append((epoch, "moving", 50, 1000.0, 0.0))
+    sums = pd.DataFrame(rows, columns=["epoch_id", "category", "n_bins", "swr", "full"])
+    sums = sums.assign(
+        animal=sums["epoch_id"].str[0],
+        none=0.0,
+        none_two_sided=0.0,
+        swr_two_sided=2 * sums["swr"],
+        full_two_sided=2 * sums["full"],
+    )
+    bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
+    values = _by_key(builder.restriction_immobile_values(sums, bin_s, "s"))
+    numbers = {key: value.value for key, value in values.items()}
+    assert numbers["restriction_immobile_swr_minus_none_per_s"] == pytest.approx(
+        6.5 / 3
+    )
+    assert numbers["restriction_immobile_full_minus_none_per_s"] == pytest.approx(
+        9.2 / 3
+    )
+    assert numbers["restriction_immobile_full_minus_swr_per_s"] == pytest.approx(0.9)
+    assert numbers["restriction_immobile_full_minus_none_two_sided_per_s"] == (
+        pytest.approx(18.4 / 3)
+    )
+    assert numbers["restriction_immobile_full_minus_swr_per_s_animals_positive"] == 3
+    assert numbers["restriction_immobile_epochs_full_above_swr_only"] == 3
+    assert numbers["restriction_immobile_epochs"] == 3
+    share = (2 / 3 + 3 / 4 + 0.7) / 3
+    assert numbers["restriction_immobile_share_captured_by_swr_only"] == (
+        pytest.approx(share)
+    )
+    assert values["restriction_immobile_share_captured_by_swr_only"].kind == "fraction"
+    # per family: three gains x four, the epochs above, the share and its bounds;
+    # and the epochs
+    assert len(numbers) == 2 * (3 * 4 + 1 + 3) + 1
+    # Figure 2g's first axis draws the filter family's gains and their
+    # difference; the share and the two-sided family carry no figure
+    drawn = {
+        f"restriction_immobile_{contrast}_per_s{end}"
+        for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    } | {
+        "restriction_immobile_epochs_full_above_swr_only",
+        "restriction_immobile_epochs",
+    }
+    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
+    assert {v.questions for v in values.values()} == {("2c.3",)}

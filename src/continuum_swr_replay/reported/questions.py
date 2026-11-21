@@ -261,7 +261,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
-        figures=("2", "2h", "heldout_tetrode"),
+        figures=("2", "2g", "heldout_tetrode"),
         note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
@@ -313,7 +313,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.9",
         "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2", "2g"),
+        figures=("2", "2h"),
         note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
     ),
     Question(
