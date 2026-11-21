@@ -167,10 +167,9 @@ class TestDecoderTimeBin:
             ]
         )
         expected = np.digitize(spikes, time[1:-1])
-        for t in (time, np.asarray(time, dtype=np.float64)):
-            got = decoder_time_bin(spikes, t)
-            assert got.dtype == expected.dtype
-            np.testing.assert_array_equal(got, expected)
+        got = decoder_time_bin(spikes, time)
+        assert got.dtype == expected.dtype
+        np.testing.assert_array_equal(got, expected)
         # the decoder's own count is the bincount of the kept spikes' bins
         from non_local_detector.likelihoods.common import (
             get_spikecount_per_time_bin as library_count,

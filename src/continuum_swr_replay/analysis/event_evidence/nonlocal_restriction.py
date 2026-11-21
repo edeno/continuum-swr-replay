@@ -975,9 +975,9 @@ def fresh_detector(canonical: Any) -> Any:
     ``linear_environment`` on the decode's track graph, edge order and
     spacing), never by copying ``canonical``: the library's EM writes its
     fitted discrete initial distribution into the detector's
-    ``discrete_initial_conditions`` setting, so a fit of a copy would start from the canonical fit. Every
-    other setting must equal ``canonical``'s, so a configuration changed since
-    the decode raises.
+    ``discrete_initial_conditions`` setting, so a fit of a copy would start
+    from the canonical fit. Every other setting must equal ``canonical``'s, so
+    a configuration changed since the decode raises.
 
     Parameters
     ----------

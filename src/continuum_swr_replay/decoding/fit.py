@@ -11,7 +11,8 @@ epoch's spikes and position. What an epoch's decode does around the fit
 ``scripts/decoding/_decode_runner.py:run_decode``.
 
 ``non_local_detector`` and ``decoding.transitions`` are imported inside
-:func:`perform_decoding`, so importing this module loads no JAX.
+:func:`perform_decoding` and :func:`linear_environment`, so importing this
+module loads no JAX.
 """
 
 from __future__ import annotations
