@@ -146,7 +146,7 @@ def patched(tmp_path, monkeypatch):
         },
     )
 
-    def run(frame, record, fold_design="trials"):
+    def run(frame, record, fold_design="trials", fit="shared"):
         loaded = {
             "spike_times": [np.array([100.001])],
             "marks": [np.ones((1, 4))],
@@ -207,9 +207,19 @@ def patched(tmp_path, monkeypatch):
             np.testing.assert_array_equal(in_swr, IN_SWR)
             return _scores(), record
 
-        monkeypatch.setattr(runner.nr, "restriction_scores", restriction_scores)
+        def fold_fit_scores(*args, estimate_encoding_model, **options):
+            assert estimate_encoding_model is nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL
+            return restriction_scores(*args, **options)[0], {
+                "folds": [{"fold": 0, **record}],
+                "fit_s": 1.0,
+            }
+
+        if fit == "shared":
+            monkeypatch.setattr(runner.nr, "restriction_scores", restriction_scores)
+        else:
+            monkeypatch.setattr(runner.nr, "fold_fit_scores", fold_fit_scores)
         output = tmp_path / "out"
-        return runner.run_epoch(EPOCH, tmp_path, output, fold_design), output
+        return runner.run_epoch(EPOCH, tmp_path, output, fold_design, fit), output
 
     return run
 
@@ -310,3 +320,32 @@ def test_a_frame_swr_outside_the_source_raises(patched):
     label[8] = 2  # immobile, but in no source SWR
     with pytest.raises(ValueError, match="outside every SWR of the source"):
         patched(_frame(label), _record())
+
+
+def test_the_fold_fit_scores_and_checks_every_fold(patched):
+    """``--fit folds`` hands the same inputs to ``fold_fit_scores`` and fails
+    the epoch's check when any fold's pass fails one, naming the fold."""
+    record, output = patched(_frame(), _record(), fit="folds")
+    assert record["status"] == "ok" and record["fit"] == "folds"
+    assert record["folds"][0]["fold"] == 0
+    assert output_path(EPOCH, output, runner.BINS_NAME).exists()
+    record, _ = patched(_frame(), _record(causal_mass_deviation_none=1.0), fit="folds")
+    assert record["status"] == "failed_check"
+    assert record["error"].startswith("fold 0: none: filtered posterior mass")
+
+
+def test_the_header_names_the_fit_mode():
+    """The shared mode's header is the earlier runs' (no fit setting), so its
+    records still gather; the fold fit's names the mode and its EM settings,
+    so neither resumes or gathers the other's records."""
+    assert runner.fit_settings("shared") == {}
+    assert runner.fit_settings("folds") == {
+        "fit": "folds",
+        "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
+    }
+    assert runner.OUTPUT_DIRS == {
+        "shared": "event_nonlocal_restriction",
+        "folds": "event_nonlocal_restriction_fold_fit",
+    }
+    with pytest.raises(ValueError, match="unknown fit mode"):
+        runner.fit_settings("all")
