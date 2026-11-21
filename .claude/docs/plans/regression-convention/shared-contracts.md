@@ -122,9 +122,14 @@ Facts about those labels that this plan relies on (read from that branch's code)
   bin design), and the rate and mPFC designs select bins with the same function. A bin is `in_visit` when
   it lies inside a visit interval (first poke-in to final poke-out) and inside an immobility stop. So a stop
   that crosses the final poke-out contributes its bins up to the poke-out (lead, L4, option A), and a stop
-  that starts before the first poke-in contributes its bins after it. With this rule every event of the
-  default set starts in an at-risk bin, and every event that starts in an at-risk bin is in the set: rate
-  and content analyze the same events (lead: "rate and content models should analyze the same events").
+  that starts before the first poke-in contributes its bins after it. With this rule every event that is
+  counted starts in an at-risk bin and is in the default set: rate and content analyze the same events
+  (lead: "rate and content models should analyze the same events"), with one exception as built
+  (`visit_design.visit_timebins`): an event whose start has no at-risk time before it, such as one that
+  starts on a stop's first sample, is not counted by the rate design. Those on a stop's first sample are
+  about 0.2 % of the No SWR events and none of the SWR events (28 events). Whether the two families may
+  differ by them is a question for the lead at Phase 5a
+  ([designs.md#rate-design](designs.md#rate-design)).
   Diagnostic of 2026-11-20 (all 242 epochs, not summary values): 93,738 stops start inside a visit, 15,803
   of them cross the final poke-out (part before it median 1.75 s, after it 0.07 s); those parts before the
   poke-out are 31 % of the immobile time inside visits (11.4 of 36.8 h) and hold 20,497 of the 69,011
@@ -144,17 +149,33 @@ The design's section 4. In short, with the phase that implements each piece:
 |---|---|---|
 | 1. Data | Unit is the well visit (first poke-in to last poke-out); the events are those that start inside a visit (C3); at-risk time is immobile in-visit time less time inside an ongoing event of the outcome's kind; three clocks per bin (time since arrival = first poke-in, time until leaving = until the last poke-out, time until the next movement of any size); whole visit modeled | Phase 3 |
 | 2. Design | Clocks, trials since last visit and peri-event lags are penalized cubic B-spline smooths (second-order difference penalty); arm role (current, previous, other leaf, trunk) is a category with a separate slope per role; kind is a category with separate terms per kind; one pooled standardization (population SD, ddof = 0) stored with the fit; a continuous factor in an interaction is centered at a fixed pooled reference, a 0/1 factor is not; reward history by model A (last outcome, 0/1) and model D (penalized smooth over the last ten outcomes, log lag) | Phases 2, 5a, 6a |
-| 3. Fit | Penalized likelihood by the shared fitter; one REML penalty strength per smooth term, shared by all sessions of a model and kind, from a grid start; Newton decrement convergence in float64; a data-based support rule per unpenalized term and session, stored | Phases 1, 2 |
+| 3. Fit | Penalized likelihood by the shared fitter, one fit for each session (design, fourteenth round); the freedom of a smooth term as the smooth-term rule below says; Newton decrement convergence in float64; a data-based support rule per unpenalized term and session, stored; a session without a finite maximum handled by one rule (Phase 2) | Phases 1, 2 |
 | 4. Folds | Five folds of whole trials balanced by destination well, long stays cut into pieces (one function); used to compare designs and check over-fitting only; held-out claims summed over sessions | Phase 2 |
 | 5. Inference | Session to recording day to animal; animal-balanced estimate with the nested bootstrap interval (t-corrected); animals with the estimate's sign; recording-day-level test; one declared family with FDR; simultaneous bands for curves | Phases 2, 9 |
 | 6. Report | Rate effects as rate ratios, content effects as ratios of shares, each with an interval; every fit carries the record of C7; each statistic lives in `analysis/` and the figure calls the function the summary reads | every family phase |
 | Collinearity | Before a coefficient is read: VIF for one-column terms, concurvity for smooths, on the quantity the likelihood sees; a term the others explain at R² ≥ 0.8 (VIF ≥ 5) is reported only jointly with its partner, or leaves by a rule written before the fit; a planted-effect simulation over the real design must not move to another term. A declared term that fails the rule **by design** (the question is what it adds beyond its partner, as the belief variance beyond recency) is not dropped: it is reported as a conditional effect, "beyond <partner>", with its VIF, the partner's curve fitted flexibly as the simulation requires, the simulated false-positive rate and power on the real design, and a null stated as "no evidence beyond <partner>; the design cannot detect an effect of this size". Which terms fall under this, and how they are reported, is written before the fit | Phase 2 (measures), each family phase (rule) |
 
-Shared numerical constants (one home, new module `analysis/regression/constants.py`): Newton decrement
-tolerance `1e-8` (the value of `analysis/replay_models/fitting.py:78`), at most 100 Newton steps and 30
-halvings, log-penalty bounds `[-10, 20]`, collinearity threshold R² 0.8, support minimum 5 units each side,
-largest failing share 0.20 (the value of `analysis/replay_models/contrast_aggregation.py:94`), five folds,
-maximum stay piece 30 s. Change a value only there.
+> WAITS FOR THE LEAD (smooth-term rule): rule 2 says every clock, recency and lag is a penalized cubic
+> B-spline smooth, and the design's section 4.3 says each strength is chosen by REML and shared by the
+> sessions. A penalty chosen from the data makes a per-session curve a line when a session has few events
+> (simulation, about 140 events), so the REML choice is not used for per-session smooth terms with few
+> events; it stays in the package. Open: option A, a natural cubic spline of 4 columns, knots from the
+> pooled data, no penalty (the author's recommendation, with a check at 3, 4 and 5 columns), or option B,
+> a P-spline with one fixed weak penalty per term. Rules 2 and 3 and the record's `log_penalty` (C7) follow
+> the decision.
+
+Numerical constants, each in one home; change a value only there:
+
+- The fitter's own rules are in `analysis/regression/constants.py` (built): the Newton decrement
+  tolerance `1e-8` (the value of `analysis/replay_models/fitting.py:78`), at most 100 Newton steps and 30
+  halvings, the step cap, log-penalty bounds `[-10, 20]`, the penalty search's grid and stopping rule,
+  `REFIT_MAX_ROUNDS` and the largest failing share `MAX_FAILING_SHARE = 0.20` (the value of
+  `analysis/replay_models/contrast_aggregation.py:MAX_UNIDENTIFIED_SHARE`).
+- The convention's constants that the fitter does not read are defined in the Phase 2 module that reads
+  each, not in `constants.py`: the collinearity threshold R² 0.8 in `collinearity.py`, the support minimum
+  of 5 units each side in `support.py`, the number of folds (5) and the longest stay piece (30 s) in
+  `folds.py`, and the smallest column scale of the design check in the module that holds that check
+  ([Phase 2](phase-2-convention-tools.md)).
 
 ## C6. Kinds, contrasts and the two meanings of "direct"
 
@@ -186,17 +207,20 @@ written by one function (new, `analysis/regression/record.py`, Phase 2):
 | `n_rows`, `n_units`, `n_events` | what the likelihood saw (units: visits, events or units) |
 | `cohort_counts` | JSON: `count_visit_context` output and the rows dropped for missing values, per kind |
 | `coef`, `vcov` | JSON arrays with `coef_names`; `vcov` is the Bayesian covariance `(H + S)^-1` |
-| `log_penalty` | JSON: term -> selected log lambda (shared value, repeated per row), and `at_boundary` |
+| `log_penalty` | JSON: term -> log lambda (repeated per row) and how it was set; WAITS FOR THE LEAD (smooth-term rule): a value selected by REML with `at_boundary`, a fixed declared value, or none |
 | `edf` | JSON: term -> effective degrees of freedom |
-| `converged`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3 |
+| `status`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3: the fit's `NewtonFit.status` (one of the six statuses of `newton.FitStatus`; only "converged" is a fit) |
+| `left_out` | JSON: coefficient name -> why it is inactive in this session (`support`, or `no finite maximum` with the refit round); its `coef` and `vcov` entries are NaN |
 | `support` | JSON: term -> {`n_low`, `n_high`, `passes`} from the support rule |
 | `collinearity` | JSON: term -> {`r2`, `vif`} or {`observed`, `worst`, `estimate`} |
 | `basis` | JSON: term -> {`kind`, `knots`, `degree`, `range`, `constraint`, `clamp`} |
 | `standardization` | JSON: covariate -> {`sd`, `ddof`: 0, `reference`} |
 | `table_sha256` | the canonical tables the fit read (`reported.values.file_record` hashes) |
 
-A record with `converged = False`, a failing support entry for a declared term, or a declared term over the
-collinearity threshold is kept and flagged; the summary reads only passing rows and states the count left out.
+A record whose `status` is not "converged", a failing support entry for a declared term, or a declared term
+over the collinearity threshold is kept and flagged; the summary reads only passing rows and states the count
+left out. A session with a term in `left_out` is kept for its other terms and reported with that term
+missing (lead, 2026-11-21); Phase 2's handling of sessions without a finite maximum builds it.
 
 ## C8. The declared family of tests
 

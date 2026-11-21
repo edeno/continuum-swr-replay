@@ -42,7 +42,12 @@ tests, the leave-one-animal-out check, and the curve bands Figure 4 draws.
   if kept), model D's lag curve, the recency curve, the reward-fraction smooth per role (Q4 is now read from it) and
   the current-arm `f_u`, per kind and for the
   difference; stored as curves (grid, estimate, pointwise and simultaneous bounds) in
-  `models_convention/curves.parquet`.
+  `models_convention/curves.parquet`. The recency curve is read from Phase 6a's uncertainty model, the one
+  that also holds the belief variance, the sample count and the trial number (read from the model without
+  them, it absorbs a true belief-variance effect or a drift; simulation), and is stored over its supported
+  range in the simulation, 5 to 80 trials since the last visit. WAITS FOR THE LEAD (smooth-term rule): each
+  curve is the average of per-session curves fitted at the declared freedom (design, fourteenth round, a
+  call), and the per-session covariance the bands read is that fit's.
 - **Coverage check of the bands** (stored analysis, `scripts/checks/simulate_band_coverage.py`, new):
   simulated sessions nested in five animals with between-animal variation; the simultaneous band of the
   animal-balanced curve covers the true population curve at the stated rate. If it does not, report and

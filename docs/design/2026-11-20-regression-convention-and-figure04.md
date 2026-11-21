@@ -737,6 +737,56 @@ terms. The lead: "I don't want one curve for each animal. This is a whole new de
 - The shared fitter is corrected for the failures that the content design showed (sessions with no finite
   maximum, fits at very strong penalties, a flat score); its merge waits for that.
 
+### Fifteenth round (2026-11-21): the shared fitter on master; two questions open with the lead
+
+No decision of the lead is recorded in this round. It records what was built and the two questions the
+lead has not yet answered.
+
+- **The shared fitter is on master.** It was merged in 6e54eda8 and cleaned up in 98fe5c06
+  (`docs/design/regression_fitter.md`). The cleanup fixed two defects: the penalty search could return a
+  point of negative curvature (a maximum or a saddle of the score) as converged when its last allowed step
+  came there (df1d0625); and when two sessions failed first at different grid points with the same status,
+  the count of failing grid points kept one session's count (9 failing points recorded as 3; 52d5b633).
+  A change that fit the Gaussian by one exact Newton step was tried (726adc45) and reverted (538f83e9): on
+  a near-collinear design one step was less accurate than the loop (largest coefficient error 3.9e-8
+  against 2.9e-11), and it returned "converged" for an objective that was not finite.
+- **The step limit depends on the scaling of a column** (`TODO.md`, a prototype on simulated designs of
+  600 rows). With one N(0,1) column multiplied by 1e-4 or less, the Poisson, Bernoulli and softmax fits
+  end at the step limit; multiplied by 1e-2, or by any factor above 1, every fit converges to the same
+  optimum. Two replacement rules failed on the saved failure cases, so the fitter keeps its rule, and the
+  convention's design check will refuse a column whose values are all very small (its threshold is set and
+  tested in the phase that builds the check).
+- **Open: the rule for a smooth term in a per-session fit.** The design stays one fit for each session
+  (fourteenth round). Option A: a natural cubic spline with 4 columns, knots from the pooled data, no
+  penalty. Option B: a P-spline with one fixed weak penalty per term. (**call**, the author's
+  recommendation: option A, with a check that the conclusions hold at 3, 4 and 5 columns.) Known from
+  simulation: a penalty chosen from the data by REML makes each session's curve a line when a session has
+  about 140 events, and the belief-variance test is then wrong; a fixed, declared smoothness keeps that
+  test correct. Either way the REML choice is not used for per-session smooth terms with few events; it
+  stays in the package. Section 4.3's REML penalty shared by the sessions waits for this answer.
+- **Open: a session whose simple terms have no finite maximum.** Today only the penalty search handles one
+  (`select_penalties` sets the session aside and fits it again with the running-away unpenalized columns
+  made inactive); `fit_at_penalties` raises at the first such session. Under either option for smooth terms
+  the models are fitted at given penalties or with none, so this handling must exist outside the search.
+  (**call**, the author's recommendation: the caller owns it, since it owns the support rule, and such a
+  session is reported with those terms missing, not left out; leaving it out depends on the outcome,
+  because the sessions that fail are those with no events in one condition.) In simulated content data 4 of
+  242 sessions were of this kind, with 5 or 6 arm and role columns left out in each (simulation, not a
+  result).
+- A rule found by simulation for the support rule: when a 0/1 role column is made inactive for a session,
+  the rows with that role are dropped from the session's fit, not merged into the reference role (merging
+  inflated the belief variance's false positives, to 20 % in one case).
+
+### Sixteenth round (lead, 2026-11-21, 10:10): a session with no finite maximum keeps its other terms
+
+The lead: "A session with no finite best value: do terms missing."
+
+- A session whose simple terms have no finite maximum is fitted again with the running-away unpenalized
+  columns left out, and it is **reported with those terms missing**. It is not left out of the summary.
+- The handling is built outside the penalty search, with the support rule (the per-session loop), and the
+  record of the session names the columns left out and the reason.
+- Still open: the rule for a smooth term in a per-session fit (fifteenth round).
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions

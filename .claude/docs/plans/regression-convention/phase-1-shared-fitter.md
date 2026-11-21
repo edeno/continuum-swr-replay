@@ -1,6 +1,43 @@
 # Phase 1 — The shared fitter and its correctness checks
 
-[← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#penalized-newton)
+[← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#the-shared-fitter-built)
+
+**Status:** done. Merged to master in 6e54eda8 (branch `regression-fitter`), cleaned up in 98fe5c06.
+
+**As built (2026-11-21).** This file is the record of the work as planned; it is not rewritten. The code
+(`src/continuum_swr_replay/analysis/regression/`, its docstrings) and `docs/design/regression_fitter.md`
+are the truth. Where they differ from the text below:
+
+- `penalized_newton(lik, X, y, aux, S, beta0, *, free_basis=None, max_iter, max_step)` has no `tol` and no
+  `max_halvings` argument (the rules are in `constants.py`). It returns a `NewtonFit` with a `status`, one
+  of six (`newton.FitStatus`); `converged` is a property, true only for "converged". A fit with no finite
+  maximum also carries its `step` and `running_away` columns. The design's identification is checked
+  before the first step, and the fit takes a last full step at the stop.
+- `SessionData(X, y, aux, name, active)` holds no start (`beta0`); `active` marks the columns a session
+  estimates.
+- The fixed-penalty path is `fit_at_penalties(lik, sessions, blocks, rho)`; it raises at the first session
+  whose fit does not converge. `refine_penalties` searches from a given start without the grid.
+- `select_penalties` sets aside the sessions with no finite maximum at the grid's center before the search
+  and refits them after it with their running-away unpenalized columns inactive. A `PooledFit`'s
+  `sessions` are `RemlScore` records (there is no `SessionFit`); the sessions that chose the penalties are
+  `search.in_choice`, and `in_null_space(session, blocks)` flags a term shrunk to a line.
+- The search stops on its Newton decrement in log-likelihood units (`REML_DECREMENT_TOL`), not on
+  `max |g| < 1e-6 max(1, |V|)`; fits and scores are computed in each penalty's eigenbasis. The Gaussian
+  scale is profiled, not an outer parameter.
+- `PSplineBasis.constrained(x)` returns a `ConstrainedSmooth`: the constrained design, its penalty and the
+  constraint.
+- `constants.py` holds only the fitter's own rules. The convention's constants that the fitter does not
+  read (the collinearity threshold, the support minimum, the longest stay piece, the number of folds) are
+  not there; each is defined in the Phase 2 module that reads it.
+- Check 7 runs four synthetic data sets (a Gaussian smooth added) and its fixtures are JSON; the R script
+  does not print concurvity (Phase 2 adds it). The coverage simulation fits 1,000 data sets per truth, not
+  200.
+- The cleanup fixed two defects: the penalty search could end at negative curvature on its last allowed
+  step (df1d0625), and grid failures of two sessions with one status were not summed (52d5b633). A one-step
+  Gaussian fit was tried (726adc45) and reverted (538f83e9).
+- Follow-ups are in `TODO.md`, section "Regression fitter" (among them, the step cap's dependence on column
+  scaling). The designs this file links to are replaced by
+  [designs.md#the-shared-fitter-built](designs.md#the-shared-fitter-built), an interface summary.
 
 Branch: `regression-fitter` from master. Reads no canonical table except in check 1 (three real sessions).
 Can start before the visit labels merge.

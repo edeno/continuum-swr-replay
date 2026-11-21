@@ -2,6 +2,11 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [shared contracts](shared-contracts.md#c4-the-selection-function-is-the-only-filter)
 
+**Status:** done on master (5dc74fc6), except 20 held-out tetrode values in `paper/reported/events.json`,
+which stay pending until another session's rerun ends. The other session's branches (`swr-trial-folds`,
+`swr-restricted-models`) are not on master, so the fold task below is not done: its own text sends it to
+Phase 5a, and it needs Phase 2's `folds.py` and that branch's `trial_folds` on master.
+
 Branch: `figures-2-3-common-subset` from a master that holds the visit labels (C3) **and** the other
 session's Figure 2 branch (`swr-restricted-models` / `swr-trial-folds`). Independent of Phases 1 to 3,
 except the fold parity task, which needs Phase 2.

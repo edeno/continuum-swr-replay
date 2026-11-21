@@ -9,8 +9,10 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
 - The design, sections 2.1, 2.4, 2.5, 2.7, 3 (Q1, Q2, Q7), 4.1 to 4.7, and decision 3 (both forms of the
   reward effect).
 - Phase 2's `analysis/regression/` (`terms.py`, `sessions.py`, `contrasts.py`, `collinearity.py`,
-  `support.py`, `record.py`, `declared_tests.py`) and Phase 3's
-  `analysis/replay_models/visit_design.py` (`visit_timebins`).
+  `support.py`, `record.py`, `declared_tests.py`), the fitter's interface
+  ([designs.md#the-shared-fitter-built](designs.md#the-shared-fitter-built), `docs/design/regression_fitter.md`)
+  and Phase 3's `analysis/replay_models/visit_design.py`
+  (`visit_timebins(stop_table, events, port_experiences, *, kind, ...)`, on master since d14ff888).
 - The family it replaces, to compare against: `analysis/replay_models/rate/per_bin_rate_ladder.py:98`
   (`fit_ladder_session`), `:254` (`fit_per_bin_rate_models`); `model_specs.py:879` (`MODEL_PER_BIN_RATE`);
   `reported/behavior/rate.py` (`per_bin_values`, `per_bin_detail_values`) and the `rate_*` keys of
@@ -30,7 +32,18 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
 [C9](shared-contracts.md#c9-where-new-fits-are-stored), [C10](shared-contracts.md#c10-rebuilding-reported-values-and-figures).
 
 **Designs referenced:** [rate design](designs.md#rate-design), [smooth terms](designs.md#smooth-terms-and-bases),
-[pooled REML](designs.md#pooled-reml), [session to day to animal](designs.md#session-to-day-to-animal).
+[the shared fitter](designs.md#the-shared-fitter-built), [session to day to animal](designs.md#session-to-day-to-animal).
+
+**Questions for the lead at this phase** (calls of the plan's author, not decided):
+
+- An event that starts on a stop's first sample has no at-risk time before it, and the rate design does not
+  count it (`visit_timebins`' `attrs["n_starts_not_at_risk_by_reason"]["stop_start"]`): about 0.2 % of the
+  No SWR events and none of the SWR events, 28 events. The rate and content models would then differ by
+  those events, against the lead's "rate and content models should analyze the same events" (C4). Ask
+  before the first real fit whether that stands, or whether the content model leaves them out too; state
+  the answer in `docs/regression_models.md`.
+- WAITS FOR THE LEAD (smooth-term rule): the freedom of `f_s`, `f_u`, `f_m` and model D's lag curve in a
+  per-session fit (below).
 
 **Decisions this phase applies** (settled 2026-11-20): L1, the declared family of twelve estimands and 36
 tests (C8), committed in `declared_tests.py` before the first real fit of this phase; L4, the event set (C3);
@@ -45,6 +58,10 @@ ASK-1, the ContFrag event sources; C14.
   [designs.md#rate-design](designs.md#rate-design), per kind (`swr`, `no_swr`), as term lists:
   - A: `Offset(log exposure) + Smooth(s, 0, 20) + Smooth(u, 0, 3) [+ Smooth(m, 0, 1.5)] + Slope(last_outcome_rewarded)` (a 0/1 column, not centered);
   - D: the same smooths + `LinearFunctional(lag_1..lag_10, log lags, 0, log 10)`.
+  WAITS FOR THE LEAD (smooth-term rule): these `Smooth` terms and model D's functional assume a P-spline
+  whose penalty is chosen by REML. Under option A each is a natural cubic spline of 4 columns with no
+  penalty; under option B a P-spline at a fixed weak penalty. The ranges stay; the basis sizes and model
+  D's penalty follow the decision.
   The rule for the third clock is written in the module before any fit: fit A with `f_m`; if the
   concurvity `estimate` of `f_m` or `f_u` is at least 0.8 in more than 20 % of sessions, refit without `f_m`
   and report the time-until-movement curve only from the model-free curves (Figure 4c second half). Store
@@ -52,8 +69,22 @@ ASK-1, the ContFrag event sources; C14.
 - **Cohort step** (in the same module): `visit_timebins` per session -> `select_visit_context` -> drop
   rows with a missing covariate (counted per kind) -> D additionally keeps bins with ten known lags
   (counted). Store `count_visit_context` and the drop counts in each record.
-- **Fit** through `analysis/regression/sessions.py`: support rule for the 0/1 term; one pooled REML
-  selection per (model, kind); per-session fits at the shared penalties; collinearity measures; records.
+- **Fit** through `analysis/regression/sessions.py`: support rule for the 0/1 term; per-session fits;
+  sessions without a finite maximum handled by Phase 2's rule; collinearity measures; records.
+  WAITS FOR THE LEAD (smooth-term rule): the plan had one pooled REML selection per (model, kind) and
+  per-session fits at the shared penalties; under either option the smooth terms are fitted at a declared
+  penalty or with none, so no selection runs here.
+- **Storage order of the design** (in the design builder, `visit_rate.py`): store each session's design in
+  column (Fortran) order if a timing confirms it. A reviewer measured one weighted Gram product (`X' W X`, 82
+  % of an evaluation's time in `docs/design/regression_fitter.md`, "Cost") at 7.0 ms with the design in column
+  order against 9.8 ms in row order, on a synthetic session of 40,000 rows and 56 columns; we have not
+  verified it. Timing step: on the smoke-test session, time 20 fits of model A with the design in each order
+  (median, the same thread count), check that the coefficients agree to 1e-12 relative, and keep column order
+  only if it is faster; state both timings in the PR.
+- **The fold task from Phase 4** (its text sends it here): if `swr-trial-folds` is on master, make its
+  `trial_folds` call `analysis/regression/folds.py`'s function and add the parity test
+  (`tests/analysis/event_evidence/test_trial_folds_shared.py::test_same_folds`); otherwise leave it and say
+  so in the PR.
 - **Estimands** (`analysis/replay_models/rate/visit_rate_statistics.py`, new), each per session with its
   exact variance, then `shared_statistics.estimand_summary` per kind and for the difference:
   - Q1: mean of `f_s` over `[2, 4] s` minus mean over `[0, 1] s` (log rate ratio);
@@ -145,7 +176,9 @@ reusing the Phase 3 synthetic helpers. Real data only in the runner's smoke test
   evaluation over the five sessions. Time both (the design measured about 0.08 s per two-clock fit). The
   selection over 242 sessions costs (grid points + Newton steps) x 242 x (one fit); with up to 125 grid
   points that is about 40 minutes per (model, kind) on one core; parallelize over sessions with a process
-  pool if the smoke test confirms it; run in `tmux` (`csr-5a-rate`).
+  pool if the smoke test confirms it; run in `tmux` (`csr-5a-rate`). WAITS FOR THE LEAD (smooth-term rule):
+  without a selection the cost is one fit per session, model and kind; drop the pooled evaluation from the
+  smoke test unless a selection remains.
 - Compare with the baseline: Q1's sign and the rise over the first seconds against the model-free
   `s` curve; Q7a against the model-free `u` curve; Q2 for SWR against the old lag-1 value (the design's
   section 2.1 says it falls when the end-of-stop time is modeled; state the old and new values from the two

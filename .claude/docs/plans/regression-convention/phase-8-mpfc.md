@@ -57,6 +57,10 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   design says the same penalty rule as every family; a ridge on spline weights is not a smoothness penalty);
   the intercept stays free. Keep `--penalty-sigma` only as a fixed-penalty sensitivity path. Apply the same
   to the marked kernels (`marked_glm.py:1409-1422`).
+  WAITS FOR THE LEAD (smooth-term rule): here REML pools over the units of one session, not over sessions,
+  so the kernels' penalty is still chosen from the data within a session. Whether the per-session
+  smooth-term rule (no penalty chosen from the data for smooth terms with few events) applies to these
+  kernels, or REML over a session's many units stays, is part of the decision.
 - **Fit mask on the common subset**: replace the stop-cohort mask (`cohort.py:65`) with in-visit immobile
   bins (the visit intervals of Phase 3, selected by the one function, C4) and events selected by
   `select_visit_context` in `canonical_events.py:95` (the default set: events that start inside a visit,

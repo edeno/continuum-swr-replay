@@ -2,6 +2,10 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#rate-design)
 
+**Status:** done. Merged to master in d14ff888 (branch `visit-clocks`); the 13 canonical tables are
+published with the visit columns (design, thirteenth round). The visit bin design is
+`replay_models/visit_design.py:visit_timebins(stop_table, events, port_experiences, *, kind, ...)`.
+
 Branch: `visit-clocks` from master after the precondition of C3. Code does not depend on Phases 1 and 2,
 so it can run beside them. Ends with one rebuild of the canonical tables.
 
