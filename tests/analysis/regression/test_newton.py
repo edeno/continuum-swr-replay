@@ -8,7 +8,10 @@ import pytest
 import scipy.optimize
 
 from continuum_swr_replay.analysis.regression import newton
-from continuum_swr_replay.analysis.regression.constants import NEWTON_DECREMENT_TOL
+from continuum_swr_replay.analysis.regression.constants import (
+    NEWTON_DECREMENT_TOL,
+    NO_MAXIMUM_ETA_STEP,
+)
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
@@ -262,15 +265,39 @@ def _separated_cases() -> dict[str, tuple]:
     return {"logistic_cell": logistic, "poisson_cell": poisson, "quasi": quasi}
 
 
-@pytest.mark.parametrize("name", ["logistic_cell", "poisson_cell", "quasi"])
-def test_separation_has_no_finite_maximum(name: str) -> None:
+@pytest.mark.parametrize(
+    ("name", "running_away"),
+    [("logistic_cell", [2]), ("poisson_cell", [1]), ("quasi", [1])],
+)
+def test_separation_has_no_finite_maximum(name: str, running_away: list[int]) -> None:
     """The decrement goes to zero while a coefficient runs to infinity: the fit
-    is not converged, and says why."""
+    is not converged, says why, and names the column running away (the 0/1
+    cell, the separating column; not the intercept)."""
     lik, X, y, aux = _separated_cases()[name]
     p = X.shape[1]
     fit = penalized_newton(lik, X, y, aux, np.zeros((p, p)), np.zeros(p))
     assert not fit.converged
     assert fit.status == NO_FINITE_MAXIMUM
+    assert fit.running_away.tolist() == running_away
+    assert np.max(np.abs(X @ fit.step)) > NO_MAXIMUM_ETA_STEP
+
+
+def test_a_converged_fit_has_no_running_away_columns() -> None:
+    X, y = _logistic_data()
+    fit = penalized_newton(Bernoulli(), X, y, None, np.zeros((2, 2)), np.zeros(2))
+    assert fit.converged
+    assert fit.step is None and fit.running_away.size == 0
+
+
+def test_running_away_columns_by_their_part_of_the_step() -> None:
+    """Column ``j``'s part is ``max_i |X_ij step_j|``; those above
+    ``NO_MAXIMUM_ETA_STEP`` (0.1), the largest first."""
+    X = np.array([[1.0, 0.0, 2.0], [1.0, 1.0, -1.0]])
+    step = np.array([0.05, -1.0, 0.5])  # parts 0.05, 1.0, 1.0
+    np.testing.assert_array_equal(newton.running_away_columns(X, step), [1, 2])
+    np.testing.assert_array_equal(
+        newton.running_away_columns(X, np.array([0.2, 0.0, 0.0])), [0]
+    )
 
 
 def test_each_status() -> None:

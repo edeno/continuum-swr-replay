@@ -93,6 +93,21 @@ first): "converged"; "design not identified"; "information not positive definite
 overflow); "step halving failed"; "step limit reached" (100 steps); "no finite
 maximum".
 
+**The columns running away.** A fit that stops as "no finite maximum" keeps its last
+Newton step (`NewtonFit.step`), the direction along which the likelihood rises without
+bound, and the columns running away along it (`NewtonFit.running_away`,
+`running_away_columns`): those whose part of the step, `max_i |X_ij step_j|`, moves the
+linear predictor by more than 0.1 on some row, the threshold of the stop itself, the
+largest first. Along the direction each such column moves the linear predictor by about
+one a step and the others by about the square root of the decrement; on the simulated
+content model's separated sessions the columns named moved it by 1.0 and every other by
+less than 5e-4. A separation that combines columns (an arm column at -19.6 with a role
+column, each with part of the response on its rows, which a rule on one column at a time
+cannot see) names each of them. Error texts name them too
+(`session 4 (s4): no finite maximum (columns running away: [11, 12])`), so that a caller
+can mark them inactive in that session (`SessionData.active`); the fit leaves nothing
+regularized to hide the separation.
+
 ## How the penalties are chosen
 
 A smooth term is a cubic P-spline: B-splines on equally spaced knots over a fixed range,
@@ -103,7 +118,9 @@ constraint computed once on the pooled rows and used for every session.
 Each smooth has one strength, shared by every session of a model (pooled REML). The
 pooled score is the sum of the sessions' Laplace-approximate REML scores, each with its
 own coefficients; one session whose inner fit fails makes it infinite, and the score
-records the first such session's index and its fit's status (`PooledScore`). Every error
+records the first such session's index and its fit's status (`PooledScore`); the
+searches set aside, before they start, the sessions that fail at a reference point
+(below). Every error
 a pooled fit raises names the session (its index, and `SessionData.name` when given)
 and the reason. The gradient and Hessian in the log strengths are exact. The penalty
 blocks must be disjoint (each smooth has its own columns); the code refuses overlapping
@@ -177,12 +194,32 @@ penalty 5 on, the search raised at ef98019d (the score's rounding at strong pena
 above, made it rise where it falls, by 3e-4 from 14 to 16, and inner fits failed from
 17); it now ends at the bound, the edf 1.000 in every session.
 
-There is no fallback: if no grid point gives a finite score, `select_penalties` raises,
-naming the sessions that failed and why, and the model is not fitted. A search that does
-not converge (50 steps, or a step no halving accepts) raises too, with the last log
-strengths, the gradient and the steps taken; there is no argument that returns an
-unconverged result. When sessions fail at only part of the grid, the search goes on
-from the finite points and records how many failed and why
+**Sessions that fail are set aside before the search.** A session whose unpenalized
+columns separate the outcome has no finite maximum at any penalty (the penalty does not
+touch those columns), and one such session made every pooled score infinite, so the
+whole model raised. Before the grid, `select_penalties` fits every session at one
+reference point, every log strength at the grid's center (6: a fixed point, the same for
+every model and data set, where the penalty identifies the smooth without dominating
+it; `refine_penalties` uses its start). A session whose fit fails there is set aside
+(`PenaltySearch.set_aside`: its index, name, the fit's status and the columns running
+away; `share_set_aside`), and the search runs over the other sessions, the same ones
+from the grid's first point to the last step, so that the objective it minimizes does
+not change as it goes. `PooledFit.sessions` keeps one entry per session given, in
+order; a set-aside session's has NaN coefficients, covariance, edf and score, and its
+`fit.status` says why. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for
+reporting a model) of the sessions are set aside the search raises, naming each with
+its status and its running-away columns. A session that passes the reference point but
+fails at another point makes that point's score infinite, as before. On the simulated
+content model the 242 sessions of the M0 and M1 models without SWR set aside 4 sessions
+each (1.7 %, all "no finite maximum") and select log penalties 2.57 and 2.95; at
+ef98019d both raised.
+
+There is no fallback: if no grid point gives a finite score over the sessions kept,
+`select_penalties` raises, naming the sessions that failed and why, and the model is not
+fitted. A search that does not converge (50 steps, or a step no halving accepts) raises
+too, with the last log strengths, the gradient and the steps taken; there is no argument
+that returns an unconverged result. When sessions fail at only part of the grid, the
+search goes on from the finite points and records how many failed and why
 (`PenaltySearch.n_grid_not_finite`, `grid_failures`: the count per status).
 `fit_at_penalties` fits at given strengths without a search (and without the score's
 derivatives).

@@ -33,12 +33,17 @@ would leave a coefficient off by up to about ``sqrt(2 tol / lambda_min)``
 (``lambda_min`` the smallest eigenvalue of ``A``): 4e-5 on a content fit of 80
 events. After it the error is of the order of the square of that.
 
+A fit with no finite maximum records its last step and the columns running
+away along it (:func:`running_away_columns`): those whose part of the step
+moves the linear predictor by more than ``NO_MAXIMUM_ETA_STEP`` on some row,
+so that a caller can leave them out of the session.
+
 Every fit ends with one of the statuses below; only ``CONVERGED`` is a fit.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
@@ -65,6 +70,7 @@ __all__ = [
     "FitStatus",
     "NewtonFit",
     "penalized_newton",
+    "running_away_columns",
 ]
 
 FitStatus = Literal[
@@ -122,6 +128,14 @@ class NewtonFit:
         Newton steps taken.
     loglik : float
         The log-likelihood at ``beta`` (without the penalty).
+    step : np.ndarray or None, shape (p,)
+        For a fit with no finite maximum, the Newton step at ``beta``: the
+        direction along which the likelihood rises without bound. None for
+        every other status.
+    running_away : np.ndarray of int, shape (k,)
+        For a fit with no finite maximum, the columns running away along
+        ``step`` (:func:`running_away_columns`), the one moving the linear
+        predictor most first; empty for every other status.
     """
 
     beta: np.ndarray
@@ -130,6 +144,8 @@ class NewtonFit:
     newton_decrement: float
     n_iter: int
     loglik: float
+    step: np.ndarray | None = None
+    running_away: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
 
     @property
     def converged(self) -> bool:
@@ -189,6 +205,32 @@ def _check_inputs(
 def _eta_step(X: np.ndarray, step: np.ndarray) -> float:
     """``max |X @ step|``: the most a step moves the linear predictor on a row."""
     return float(np.max(np.abs(X @ step)))
+
+
+def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
+    """The columns whose part of ``step`` moves the linear predictor by more
+    than ``NO_MAXIMUM_ETA_STEP`` on some row.
+
+    Column ``j``'s part is ``max_i |X_ij step_j|``. At a stop with no finite
+    maximum the columns along the direction of unbounded increase move the
+    linear predictor by about one each step and the others by about the
+    square root of the decrement (below ``1e-3`` on the content model's
+    separated sessions); a direction that combines several columns (an arm
+    column with a role column) lists each of them.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, p)
+    step : np.ndarray, shape (p,)
+
+    Returns
+    -------
+    np.ndarray of int, shape (k,)
+        Column indices, the largest part first.
+    """
+    part = np.max(np.abs(X * step), axis=0)
+    columns = np.flatnonzero(part > NO_MAXIMUM_ETA_STEP)
+    return columns[np.argsort(-part[columns], kind="stable")]
 
 
 def penalized_newton(
@@ -274,7 +316,16 @@ def penalized_newton(
         decrement = 0.5 * float(g @ step)
         if decrement < tol:
             if not lik.quadratic and _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
-                return NewtonFit(beta, A, NO_FINITE_MAXIMUM, decrement, n_iter, loglik)
+                return NewtonFit(
+                    beta,
+                    A,
+                    NO_FINITE_MAXIMUM,
+                    decrement,
+                    n_iter,
+                    loglik,
+                    step,
+                    running_away_columns(X, step),
+                )
             return _last_step(
                 lik,
                 X,

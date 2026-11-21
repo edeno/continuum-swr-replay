@@ -32,10 +32,14 @@ sessions, and one session whose inner fit fails makes the pooled score
 infinite; the score records which session and the fit's status, and every
 error names them. A session may leave out unpenalized columns it cannot
 estimate (``SessionData.active``): its fit is that of its design without them.
-:func:`select_penalties` starts from the best point of a grid (the score can
-have two optima) and refines it by Newton on ``rho`` with the exact Hessian;
-:func:`fit_at_penalties` fits at given strengths without a search. A search
-that does not converge raises.
+:func:`select_penalties` first sets aside the sessions whose fit fails at a
+reference point (the grid's center), naming them with the fit's status and,
+for a fit with no finite maximum, the columns running away, and raises when
+they are more than ``MAX_FAILING_SHARE`` of the sessions; it then starts from
+the best point of a grid over the others (the score can have two optima) and
+refines it by Newton on ``rho`` with the exact Hessian; :func:`fit_at_penalties`
+fits at given strengths without a search. A search that does not converge
+raises.
 """
 
 from __future__ import annotations
@@ -51,6 +55,7 @@ import scipy.linalg
 from .constants import (
     AT_BOUNDARY_MARGIN,
     LOG_PENALTY_BOUNDS,
+    MAX_FAILING_SHARE,
     MAX_STEP_HALVINGS,
     NULL_SPACE_EDF_TOL,
     PENALTY_ROUNDING_TOL,
@@ -62,7 +67,7 @@ from .constants import (
     REML_MAX_STEPS,
 )
 from .likelihoods import Gaussian, Likelihood
-from .newton import FitStatus, NewtonFit, penalized_newton
+from .newton import FitStatus, NewtonFit, penalized_newton, running_away_columns
 from .pspline import penalty_rank
 
 __all__ = [
@@ -73,6 +78,7 @@ __all__ = [
     "RemlScore",
     "SessionData",
     "SessionFit",
+    "SetAsideSession",
     "assemble_penalty",
     "fit_at_penalties",
     "free_basis",
@@ -311,6 +317,37 @@ class SessionFit:
 
 
 @dataclass(frozen=True)
+class SetAsideSession:
+    """A session left out of a penalty search: its fit failed at the search's
+    reference point (:func:`select_penalties`).
+
+    Attributes
+    ----------
+    index : int
+        Its place among the sessions given.
+    name : str or None
+        ``SessionData.name``.
+    fit : NewtonFit
+        Its inner fit at the reference point, as it ended.
+    """
+
+    index: int
+    name: str | None
+    fit: NewtonFit
+
+    @property
+    def status(self) -> FitStatus:
+        """How its fit at the reference point ended."""
+        return self.fit.status
+
+    @property
+    def running_away(self) -> np.ndarray:
+        """For a fit with no finite maximum, the columns running away
+        (:func:`.newton.running_away_columns`); empty otherwise."""
+        return self.fit.running_away
+
+
+@dataclass(frozen=True)
 class PenaltySearch:
     """How :func:`select_penalties` or :func:`refine_penalties` found ``rho``.
 
@@ -321,6 +358,14 @@ class PenaltySearch:
 
     Attributes
     ----------
+    reference_rho : np.ndarray, shape (m,)
+        Where every session was fitted before the search: the sessions whose
+        fit failed there are set aside, and the search runs over the others.
+    set_aside : tuple of SetAsideSession
+        The sessions set aside, in order; at most ``MAX_FAILING_SHARE`` of the
+        sessions given.
+    share_set_aside : float
+        ``len(set_aside)`` over the number of sessions given.
     start_rho : np.ndarray, shape (m,)
         Where Newton started: the best grid point, or the given start.
     start_score : float
@@ -339,6 +384,9 @@ class PenaltySearch:
         a bound.
     """
 
+    reference_rho: np.ndarray
+    set_aside: tuple[SetAsideSession, ...]
+    share_set_aside: float
     start_rho: np.ndarray
     start_score: float
     n_grid_points: int
@@ -358,11 +406,15 @@ class PooledFit:
         Log penalty strengths (for the Gaussian, on the residual-sum-of-squares
         scale).
     score : float
-        Pooled REML score at ``rho``.
+        Pooled REML score at ``rho``, over the sessions searched (not those
+        set aside).
     gradient : np.ndarray or None, shape (m,)
         Its gradient there; None when the strengths were given.
     sessions : tuple of SessionFit
-        One per session, in order.
+        One per session given, in order. A session set aside by the search
+        (``search.set_aside``) has NaN coefficients, covariance, edf and
+        score, and ``fit.status`` says how its fit at the reference point
+        ended.
     search : PenaltySearch or None
         None when the strengths were given (:func:`fit_at_penalties`).
     """
@@ -554,7 +606,11 @@ def reml_and_derivatives(
         if session.covariance is None
         else _rotate(blocks, vectors, _rotate(blocks, vectors, session.covariance).T)
     )
-    return replace(session, fit=replace(fit, beta=beta, A=A), covariance=covariance)
+    fit = replace(fit, beta=beta, A=A)
+    if fit.step is not None:
+        step = _rotate(blocks, vectors, fit.step)
+        fit = replace(fit, step=step, running_away=running_away_columns(X, step))
+    return replace(session, fit=fit, covariance=covariance)
 
 
 def _reml_in_basis(
@@ -772,9 +828,23 @@ def _session_score(
     if session.covariance is not None:
         covariance = np.full((p, p), np.nan)
         covariance[np.ix_(active, active)] = session.covariance
-    return replace(
-        session, fit=replace(session.fit, beta=beta, A=A), covariance=covariance
-    )
+    fit = replace(session.fit, beta=beta, A=A)
+    if fit.step is not None:
+        step = np.full(p, np.nan)
+        step[active] = fit.step
+        fit = replace(
+            fit, step=step, running_away=np.flatnonzero(active)[fit.running_away]
+        )
+    return replace(session, fit=fit, covariance=covariance)
+
+
+def _failure(data: SessionData, index: int, fit: NewtonFit) -> str:
+    """Why session ``index``'s fit failed, in words, with the columns running
+    away for a fit with no finite maximum."""
+    text = f"{_label(data, index)}: {fit.status}"
+    if fit.running_away.size:
+        text += f" (columns running away: {fit.running_away.tolist()})"
+    return text
 
 
 def pooled_reml(
@@ -815,20 +885,37 @@ def pooled_reml(
         If a session marks a column of a penalty block inactive or its inputs
         cannot be fitted; the message names the session.
     """
-    for index, data in enumerate(sessions):
-        _check_active(data, index, blocks)
     if starts is None:
         starts = [data.beta0 for data in sessions]
+    return _pooled_reml(
+        lik, sessions, range(len(sessions)), blocks, rho, starts, derivatives
+    )
+
+
+def _pooled_reml(
+    lik: Likelihood,
+    sessions: Sequence[SessionData],
+    indices: Sequence[int],
+    blocks: Sequence[PenaltyBlock],
+    rho: Sequence[float],
+    starts: Sequence[np.ndarray | None],
+    derivatives: bool,
+) -> PooledScore:
+    """:func:`pooled_reml`, with each session labeled by its index in ``indices``
+    (its place among all of a search's sessions)."""
+    for index, data in zip(indices, sessions, strict=True):
+        _check_active(data, index, blocks)
     scores = []
-    for index, (data, start) in enumerate(zip(sessions, starts, strict=True)):
+    for index, data, start in zip(indices, sessions, starts, strict=True):
         try:
             session = _session_score(lik, data, blocks, rho, start, derivatives)
         except ValueError as error:
             raise ValueError(f"{_label(data, index)}: {error}") from error
         if not np.isfinite(session.score):
-            status = session.fit.status
-            failure = f"{_label(data, index)}: {status}"
-            return PooledScore(np.inf, None, None, (), index, status, failure)
+            failure = _failure(data, index, session.fit)
+            return PooledScore(
+                np.inf, None, None, (), index, session.fit.status, failure
+            )
         scores.append(session)
     score = float(sum(s.score for s in scores))
     if not derivatives:
@@ -848,19 +935,25 @@ class _Evaluator:
         self,
         lik: Likelihood,
         sessions: Sequence[SessionData],
+        indices: Sequence[int],
         blocks: Sequence[PenaltyBlock],
     ) -> None:
-        self.lik, self.sessions, self.blocks = lik, sessions, blocks
+        self.lik, self.blocks = lik, blocks
+        self.sessions, self.indices = list(sessions), list(indices)
+        self.labels = {
+            i: _label(data, i) for i, data in zip(indices, sessions, strict=True)
+        }
         self.starts = [data.beta0 for data in sessions]
 
     def __call__(self, rho: np.ndarray, derivatives: bool) -> PooledScore:
-        pooled = pooled_reml(
+        pooled = _pooled_reml(
             self.lik,
             self.sessions,
+            self.indices,
             self.blocks,
             rho,
             self.starts,
-            derivatives=derivatives,
+            derivatives,
         )
         if np.isfinite(pooled.score):
             self.starts = [s.fit.beta for s in pooled.sessions]
@@ -895,8 +988,8 @@ def _grid_start(
         pooled = evaluate(rho, derivatives=False)
         n_points += 1
         if not np.isfinite(pooled.score):
-            index = pooled.failed_session
-            failures[_label(evaluate.sessions[index], index), pooled.failed_status] += 1
+            label = evaluate.labels[pooled.failed_session]
+            failures[label, pooled.failed_status] += 1
         elif pooled.score < best_score:
             best_rho, best_score = rho, pooled.score
 
@@ -984,6 +1077,7 @@ def _search(
     start: np.ndarray,
     n_grid_points: int,
     failures: Counter[tuple[str, str]],
+    screen: tuple[np.ndarray, tuple[SetAsideSession, ...], float],
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
@@ -1040,6 +1134,7 @@ def _search(
     lo, hi = LOG_PENALTY_BOUNDS
     at_boundary = (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
     search = PenaltySearch(
+        *screen,
         np.array(start, dtype=float),
         start_score,
         n_grid_points,
@@ -1051,6 +1146,46 @@ def _search(
     return rho, current, search
 
 
+def _screen(
+    lik: Likelihood,
+    sessions: Sequence[SessionData],
+    blocks: Sequence[PenaltyBlock],
+    reference: np.ndarray,
+) -> tuple[list[int], tuple[np.ndarray, tuple[SetAsideSession, ...], float]]:
+    """Fit every session at ``reference``; set aside those whose fit fails.
+
+    Returns the indices of the sessions kept and the screen's record for
+    :class:`PenaltySearch` (the reference, the sessions set aside, their
+    share).
+
+    Raises
+    ------
+    ValueError
+        If more than ``MAX_FAILING_SHARE`` of the sessions are set aside; the
+        message names each, its fit's status and the columns running away.
+    """
+    kept, set_aside, failures = [], [], []
+    for index, data in enumerate(sessions):
+        _check_active(data, index, blocks)
+        try:
+            session = _session_score(lik, data, blocks, reference, data.beta0, False)
+        except ValueError as error:
+            raise ValueError(f"{_label(data, index)}: {error}") from error
+        if np.isfinite(session.score):
+            kept.append(index)
+        else:
+            set_aside.append(SetAsideSession(index, data.name, session.fit))
+            failures.append(_failure(data, index, session.fit))
+    share = len(set_aside) / len(sessions)
+    if share > MAX_FAILING_SHARE:
+        raise ValueError(
+            f"no finite REML score at the reference log penalties {reference} in "
+            f"{len(set_aside)} of {len(sessions)} sessions ({share:.0%}, more than "
+            f"MAX_FAILING_SHARE = {MAX_FAILING_SHARE:.0%}): " + "; ".join(failures)
+        )
+    return kept, (reference.copy(), tuple(set_aside), share)
+
+
 def _pooled_fit(
     rho: np.ndarray,
     pooled: PooledScore,
@@ -1060,10 +1195,11 @@ def _pooled_fit(
     """The per-session fits, covariances and edf of a pooled score.
 
     A session's covariance is NaN in the rows and columns of its inactive
-    columns; its edf counts the active ones.
+    columns; its edf counts the active ones. A session the search set aside
+    is put back in its place with NaN values.
     """
     null_dim = np.array([b.columns.size - b.rank for b in blocks])
-    sessions = tuple(
+    sessions = [
         SessionFit(
             session.fit,
             session.covariance,
@@ -1074,8 +1210,21 @@ def _pooled_fit(
             session.edf - null_dim <= NULL_SPACE_EDF_TOL,
         )
         for session in pooled.sessions
-    )
-    return PooledFit(rho, pooled.score, pooled.gradient, sessions, search)
+    ]
+    for left_out in () if search is None else search.set_aside:
+        p = left_out.fit.beta.size
+        nan = np.full((p, p), np.nan)
+        placeholder = SessionFit(
+            replace(left_out.fit, beta=np.full(p, np.nan), A=nan),
+            nan,
+            np.full(len(blocks), np.nan),
+            np.nan,
+            np.nan,
+            np.nan,
+            np.zeros(len(blocks), dtype=bool),
+        )
+        sessions.insert(left_out.index, placeholder)
+    return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
 
 
 def refine_penalties(
@@ -1087,16 +1236,20 @@ def refine_penalties(
     """Newton on the pooled REML score from ``rho0``, without the grid.
 
     A local search: from a poor start it can stop at the worse of two optima,
-    which is why :func:`select_penalties` starts from a grid.
+    which is why :func:`select_penalties` starts from a grid. The sessions
+    are screened at ``rho0`` as :func:`select_penalties` screens them at the
+    grid's center.
 
     Raises
     ------
     ValueError
-        If the score at ``rho0`` is not finite or the search does not converge.
+        If more than ``MAX_FAILING_SHARE`` of the sessions fail at ``rho0``,
+        or the search does not converge.
     """
-    evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
-    rho, pooled, search = _search(evaluate, rho0, 0, Counter())
+    kept, screen = _screen(lik, sessions, blocks, rho0)
+    evaluate = _Evaluator(lik, [sessions[i] for i in kept], kept, blocks)
+    rho, pooled, search = _search(evaluate, rho0, 0, Counter(), screen)
     return _pooled_fit(rho, pooled, blocks, search)
 
 
@@ -1106,6 +1259,16 @@ def select_penalties(
     blocks: Sequence[PenaltyBlock],
 ) -> PooledFit:
     """One penalty strength per block, shared by the sessions, by pooled REML.
+
+    First every session is fitted at the reference point, every log penalty
+    at ``REML_GRID_CENTER``: a session whose fit fails there (its unpenalized
+    columns separate the outcome, so that no penalty gives it a finite
+    maximum, or its design is not identified) is set aside, with its index,
+    name, status and the columns running away (``PenaltySearch.set_aside``).
+    The search then runs over the other sessions, the same ones throughout,
+    so that its objective does not change as it goes. More than
+    ``MAX_FAILING_SHARE`` of the sessions set aside is an error. A session
+    kept that fails at another point makes that point's score infinite.
 
     The grid start (one term: every integer of the bounds; two or three: the
     product of ``REML_GRID_POINTS``; more: one-term integer grids, two passes
@@ -1121,18 +1284,23 @@ def select_penalties(
     Returns
     -------
     PooledFit
+        One entry per session given; a session set aside has NaN values.
 
     Raises
     ------
     ValueError
-        If there is no block, no grid point gives a finite pooled score, or
-        the search does not converge (no fallback: the model is not fitted).
+        If there is no block, more than ``MAX_FAILING_SHARE`` of the sessions
+        fail at the reference point, no grid point gives a finite pooled
+        score over the sessions kept, or the search does not converge (no
+        fallback: the model is not fitted).
     """
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")
-    evaluate = _Evaluator(lik, sessions, blocks)
+    reference = np.full(len(blocks), REML_GRID_CENTER)
+    kept, screen = _screen(lik, sessions, blocks, reference)
+    evaluate = _Evaluator(lik, [sessions[i] for i in kept], kept, blocks)
     start, n_points, failures = _grid_start(evaluate, len(blocks))
-    rho, pooled, search = _search(evaluate, start, n_points, failures)
+    rho, pooled, search = _search(evaluate, start, n_points, failures, screen)
     return _pooled_fit(rho, pooled, blocks, search)
 
 

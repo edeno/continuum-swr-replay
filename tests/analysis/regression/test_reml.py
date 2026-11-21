@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.newton import (
+    NO_FINITE_MAXIMUM,
     NOT_IDENTIFIED,
     STEP_LIMIT,
     penalized_newton,
@@ -576,7 +577,7 @@ def test_a_failing_session_is_named() -> None:
     assert pooled.failed_session == 1
     assert pooled.failed_status == NOT_IDENTIFIED
     message = r"session 1 \(j16_20210710_02\).*design not identified"
-    with pytest.raises(ValueError, match=message + r".*31 of 31"):
+    with pytest.raises(ValueError, match=r"1 of 2 sessions.*" + message):
         select_penalties(lik, [first, broken], blocks)
     with pytest.raises(ValueError, match=message):
         refine_penalties(lik, [first, broken], blocks, [0.0])
@@ -861,3 +862,95 @@ def test_a_gain_below_the_rounding_of_the_score_ends_the_search(
     assert result.score <= reference.score + 8 * np.finfo(float).eps * abs(
         reference.score
     )
+
+
+def _with_arm_columns(
+    data: SessionData, seed: int, separated: bool, n_arms: int = 6
+) -> SessionData:
+    """``data`` (a :func:`_content_session`) with two unpenalized 0/1 columns
+    on the second and third rows of events, an arm and a role.
+
+    Separated: the arm marks the second row of the first 40 events, never
+    chosen (a chosen second row is moved to the first), and the third row of
+    the next 40, the role marks those same third rows. Each column has the
+    response on part of its rows, so a rule on one column at a time passes
+    both; the direction "arm down, role up" lowers only rows never chosen,
+    and the likelihood has no finite maximum along it.
+    """
+    rng = np.random.default_rng(seed)
+    n_events = data.X.shape[0] // n_arms
+    y = data.y.reshape(n_events, n_arms).copy()
+    arm = np.zeros((n_events, n_arms))
+    role = np.zeros((n_events, n_arms))
+    if separated:
+        y[:40, 0] += y[:40, 1]
+        y[:40, 1] = 0.0
+        arm[:40, 1] = 1.0
+        arm[40:80, 2] = 1.0
+        role[40:80, 2] = 1.0
+    else:
+        arm[rng.uniform(size=n_events) < 0.5, 2] = 1.0
+        role[rng.uniform(size=n_events) < 0.3, 2] = 1.0
+    X = np.column_stack([data.X, arm.ravel(), role.ravel()])
+    return SessionData(X, y.ravel(), data.aux, name=f"s{seed}")
+
+
+def test_separated_sessions_are_set_aside_before_the_search() -> None:
+    """One of ten sessions has no finite maximum (an arm column with a role
+    column separates): it fails at the reference point (every log penalty at
+    the grid center) and is set aside, named, with its status and the columns
+    running away; the search over the other nine is the search without it.
+    Three of ten (30 %, above ``MAX_FAILING_SHARE``) is an error naming each."""
+    sessions = []
+    for seed in range(10):
+        data, blocks = _content_session(seed)
+        sessions.append(_with_arm_columns(data, seed, separated=seed == 4))
+    arm, role = 11, 12
+
+    pooled = pooled_reml(GroupedSoftmax(), sessions, blocks, [6.0])
+    assert pooled.failed_session == 4
+    assert pooled.failure == (
+        "session 4 (s4): no finite maximum (columns running away: [11, 12])"
+    )
+
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+    (left_out,) = result.search.set_aside
+    assert (left_out.index, left_out.name, left_out.status) == (
+        4,
+        "s4",
+        NO_FINITE_MAXIMUM,
+    )
+    assert sorted(left_out.running_away.tolist()) == [arm, role]
+    assert result.search.share_set_aside == pytest.approx(0.1)
+    np.testing.assert_array_equal(result.search.reference_rho, [6.0])
+    assert len(result.sessions) == 10
+    assert np.all(np.isnan(result.sessions[4].fit.beta))
+    assert np.isnan(result.sessions[4].edf[0])
+    assert result.sessions[4].fit.status == NO_FINITE_MAXIMUM
+
+    without = select_penalties(GroupedSoftmax(), sessions[:4] + sessions[5:], blocks)
+    np.testing.assert_array_equal(result.rho, without.rho)
+    assert result.score == without.score
+    assert without.search.set_aside == ()
+    for kept, alone in zip(
+        result.sessions[:4] + result.sessions[5:], without.sessions, strict=True
+    ):
+        np.testing.assert_array_equal(kept.fit.beta, alone.fit.beta)
+
+    # Leaving the running-away columns out of the session gives it a fit.
+    active = np.ones(sessions[4].X.shape[1], dtype=bool)
+    active[left_out.running_away] = False
+    repaired = replace(sessions[4], active=active)
+    assert np.isfinite(pooled_reml(GroupedSoftmax(), [repaired], blocks, [6.0]).score)
+
+    many = [
+        _with_arm_columns(_content_session(seed)[0], seed, separated=seed in (1, 4, 7))
+        for seed in range(10)
+    ]
+    message = (
+        r"3 of 10 sessions \(30%, more than MAX_FAILING_SHARE = 20%\): "
+        r"session 1 \(s1\): no finite maximum \(columns running away: \[1[12], "
+        r"1[12]\]\); session 4 \(s4\).*; session 7 \(s7\)"
+    )
+    with pytest.raises(ValueError, match=message):
+        select_penalties(GroupedSoftmax(), many, blocks)
