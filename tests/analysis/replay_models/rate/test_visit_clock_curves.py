@@ -64,13 +64,24 @@ def test_edges_must_ascend() -> None:
 
 
 def test_stop_end_kind_counts() -> None:
+    """The analyzed stops (those that start inside a visit) by how they end;
+    a stop that starts outside every visit is not counted."""
     stops = pd.DataFrame(
         {
-            "animal": ["a", "a", "a", "a", "b"],
+            "animal": ["a", "a", "a", "a", "a", "b"],
+            "visit_context": [
+                "in_visit",
+                "in_visit",
+                "spans_visit_end",
+                "in_visit",
+                "track_leaf_arm",
+                "in_visit",
+            ],
             "stop_end_kind": [
                 "leaves",
                 "small_movement",
                 "small_movement",
+                "outside_visit",
                 "outside_visit",
                 "leaves",
             ],

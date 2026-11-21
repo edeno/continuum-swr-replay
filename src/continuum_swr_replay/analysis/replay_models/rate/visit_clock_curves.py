@@ -4,9 +4,9 @@ The descriptive counterpart of the visit rate models: the event starts per
 at-risk second in bins of each visit clock (time since the first poke-in, time
 until the final poke-out, time until the end of the current immobile stretch),
 read from the visit time-bin design (``replay_models.visit_design``), and the
-stops of each animal by how they end. Two of the clocks count down to a future
-event (``covariate_timing.FUTURE_REFERENCING``), so these are descriptions, not
-predictions.
+stops that start inside a visit, per animal, by how they end. Two of the clocks
+count down to a future event (``covariate_timing.FUTURE_REFERENCING``), so these
+are descriptions, not predictions.
 """
 
 from __future__ import annotations
@@ -16,6 +16,9 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 __all__ = ["VISIT_CLOCKS", "stop_end_kind_counts", "visit_clock_rate_curves"]
@@ -103,22 +106,31 @@ def visit_clock_rate_curves(
 
 
 def stop_end_kind_counts(stop_table: pd.DataFrame) -> pd.DataFrame:
-    """The stops of each animal by how they end (``stop_end_kind``).
+    """The analyzed stops of each animal by how they end (``stop_end_kind``).
+
+    The analyzed stops are those that start inside a well visit
+    (``select_visit_context``'s default, ``STARTS_IN_WELL_VISIT``), the stops
+    the visit time bins read.
 
     Parameters
     ----------
     stop_table : pd.DataFrame
-        ``animal`` and ``stop_end_kind``.
+        ``animal``, ``visit_context`` and ``stop_end_kind``.
 
     Returns
     -------
     pd.DataFrame
         ``animal``, ``stop_end_kind``, ``n_stops`` (int) and ``share`` (of the
-        animal's stops), one row per kind an animal has.
+        animal's analyzed stops), one row per kind an animal has.
     """
-    require_columns(stop_table, ["animal", "stop_end_kind"], "stop-end kind counts")
+    require_columns(
+        stop_table,
+        ["animal", "visit_context", "stop_end_kind"],
+        "stop-end kind counts",
+    )
     counts = (
-        stop_table.groupby(["animal", "stop_end_kind"], observed=True)
+        select_visit_context(stop_table)
+        .groupby(["animal", "stop_end_kind"], observed=True)
         .size()
         .rename("n_stops")
         .reset_index()

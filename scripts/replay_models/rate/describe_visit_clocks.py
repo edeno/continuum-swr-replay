@@ -24,8 +24,8 @@ animal, clock and clock bin: ``n_starts``, ``at_risk_s``, ``rate``) and its
 ``visit_clock_curves.provenance.json`` sidecar: the input tables' SHA-256, the
 commit and command line, the subset in words, the label counts of each kind's
 events (``count_visit_context``), the event starts left out for having no
-at-risk time before them, and the stops of each animal by how they end
-(``stop_end_kind``). With ``--max-per-animal`` the file is
+at-risk time before them, and the stops that start inside a visit, per animal,
+by how they end (``stop_end_kind``). With ``--max-per-animal`` the file is
 ``visit_clock_curves_smoke.parquet``.
 
 Usage:
