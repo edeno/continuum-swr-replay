@@ -454,11 +454,35 @@ The raised-cosine history basis and the projection of a lag matrix onto it.
 
 `raised_cosine_history_basis`, `reward_basis_from_lags`
 
+### `src/continuum_swr_replay/analysis/regression/bands.py`
+
+Simultaneous 95 % bands for a curve on a fixed grid.
+
+`Band`, `simultaneous_band`, `across_session_band`
+
+### `src/continuum_swr_replay/analysis/regression/collinearity.py`
+
+How well the other terms of a fit explain each term, on what the likelihood sees.
+
+`weighted_design`, `concurvity`, `term_collinearity`, `separable`
+
 ### `src/continuum_swr_replay/analysis/regression/constants.py`
 
 The shared fitter's numerical rules, in one place.
 
 _No module-level public symbols._
+
+### `src/continuum_swr_replay/analysis/regression/contrasts.py`
+
+Linear functionals of a fit: a scalar ``c' beta`` and its exact variance.
+
+`Contrast`, `range_grid`, `range_mean_contrast`, `coefficient_contrast`, `evaluate_contrast`
+
+### `src/continuum_swr_replay/analysis/regression/folds.py`
+
+Folds of whole trials, balanced by destination well, long stays cut into pieces.
+
+`trial_segments`, `trial_bin_share`, `task_segment_starts`, `capped_groups`, `trial_folds`
 
 ### `src/continuum_swr_replay/analysis/regression/likelihoods.py`
 
@@ -478,11 +502,35 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 `ConstrainedSmooth`, `PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
 
+### `src/continuum_swr_replay/analysis/regression/record.py`
+
+The fit-row record: one row per (model, kind, session) of every stored fit.
+
+`FitRecord`, `records_frame`, `write_records`, `read_records`
+
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
 Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
 
-`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `SessionRefit`, `refit_session`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+
+### `src/continuum_swr_replay/analysis/regression/sessions.py`
+
+The per-session fitting loop: one design, every session fitted alone.
+
+`fit_session`, `fit_sessions`
+
+### `src/continuum_swr_replay/analysis/regression/support.py`
+
+The support rule: whether a session's data can estimate an unpenalized term.
+
+`Support`, `binary_support`, `slope_support`, `design_support`, `level_rows_dropped`, `terms_failing_share`
+
+### `src/continuum_swr_replay/analysis/regression/terms.py`
+
+Model terms and the design they build, the same for every session.
+
+`Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `check_column_sizes`, `DesignColumn`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -1327,6 +1375,12 @@ Fit the content rungs on every session of a cohort.
 The per-event SWR-power model: an event's ripple power against the behavioral covariates.
 
 `post_outcome_masks`, `balanced_post_outcome_selection`, `gate_events_after_outcome`, `fit_power_model`, `power_distribution_statistics`, `duration_power_correlation`, `assemble_power_frame`, `power_cohort_records`
+
+### `src/continuum_swr_replay/analysis/replay_models/declared_tests.py`
+
+The declared family of tests: one list, written before any fit.
+
+`CurveContrast`, `SDChangeContrast`, `CoefficientContrast`, `Estimand`, `estimand`
 
 ### `src/continuum_swr_replay/analysis/replay_models/fit_comparability.py`
 

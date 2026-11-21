@@ -14,6 +14,19 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `newton.py` | the penalized Newton fit at fixed penalty strengths |
 | `reml.py` | the REML score with exact derivatives, pooled over sessions, and the penalty search |
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
+| `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
+| `collinearity.py` | how well the other terms explain each term, on the weighted design |
+| `support.py` | the support rule and the row rule for an inactive level |
+| `sessions.py` | the per-session fitting loop |
+| `record.py` | the fit-row record and its parquet storage |
+| `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
+| `folds.py` | the one fold rule |
+| `bands.py` | simultaneous bands for a curve |
+
+The reduction of a per-session estimate to recording days and animals is in
+`analysis/shared_statistics.py`, beside the project's other statistics. The declared
+family of tests names the task's models and roles, so it is in
+`analysis/replay_models/declared_tests.py`.
 
 ## Likelihoods
 
@@ -362,6 +375,238 @@ centered rising truth at 93.7 % of the cells averaged over the sets (Wood's
 across-the-function coverage; the test asserts 92-98 %): the interval leaves out the
 intercept's uncertainty, which Marra and Wood (2012) add to bring it to the nominal
 rate.
+
+## Terms and their names
+
+A model is a list of terms (`terms.py`) and, for the diagonal families, an intercept:
+
+- `Smooth(column, lo, hi, n_basis, penalty, by=None, levels=None)`: a cubic P-spline over
+  a fixed range, clamped beyond it, with one sum-to-zero constraint. With `by`, one
+  smooth for each of `levels` of a category, zero on the other levels' rows, each with
+  its own constraint and penalty.
+- `LinearFunctional(lag_columns, lags, lo, hi, n_basis, penalty)`: a smooth curve over
+  log lag; column `b` is `sum_l B_b(log l) r_l`. It has no sum-to-zero constraint.
+- `Category(column, levels, reference)`: one 0/1 column for each level but the reference.
+- `Slope(column, by=None, levels=None)`: one column, or one for each level of a category.
+- `Offset(column)`: the Poisson offset, `log` of an exposure column.
+
+A smooth's penalty is required: `"none"` (the same basis, unpenalized) or a fixed log
+penalty. The rule for a smooth term in a per-session fit is open with the lead (the
+design's fifteenth round), so no penalty is chosen from the data here.
+
+`build_design(terms, pooled_rows, intercept=...)` computes, once, from the pooled rows
+of the model and kind, what every session shares: the knots, the sum-to-zero
+constraints, the penalty blocks and the standardizations. `Design.session(rows)` maps
+one session's rows to its design matrix and offset. A row with a missing value the
+design reads is refused there; `Design.missing_rows` finds such rows.
+
+Every term and coefficient is named by one rule:
+
+| Term | Term name | Coefficient names |
+| --- | --- | --- |
+| smooth | `s(<column>)` | `s(<column>).<b>`, `b` from 0 |
+| slope | `<column>` | `<column>` |
+| linear functional | `lf(<first lag column>..<last lag column>)` | `lf(...).<b>` |
+| category | `<column>` | `<column>[<level>]` |
+| intercept | `(Intercept)` | `(Intercept)` |
+
+A smooth or a slope fitted for one level of a category appends `:<by column>=<level>`
+to its term name, for example `s(clock_s):role=current` or `reward_fraction:role=current`.
+The declared estimands name their terms by this rule.
+
+## Standardization
+
+A slope on a 0/1 column enters as it is. A slope on any other column is divided by its
+pooled standard deviation, in the population form (`ddof = 0`). A slope fitted for each
+level of a category is an interaction, so it is first centered at its pooled mean, a
+fixed reference. Both are read over the pooled rows the slope reads (the rows of its
+levels), one standardization per covariate. They are stored in the record.
+
+## The design check
+
+The fit limits each Newton step to `MAX_STEP_LENGTH` in coefficient units, so a column
+whose values are all very small needs a coefficient too large to reach in the steps
+allowed. `Design.session` refuses, and names, a column whose largest absolute value
+over the session's rows is above zero and below `SMALLEST_COLUMN_SIZE = 1e-2`. A smooth's
+columns are measured together, as one term: one of them can be tiny in a session that
+covers a small part of its range (0.0015 on the synthetic fixtures) while the term is
+not. A column zero on every row is not refused; the support rule makes it inactive.
+
+The threshold was measured on simulated designs of 600 rows (an intercept, three N(0,1)
+columns and a P-spline of 7 columns; Poisson, Bernoulli and grouped softmax; five seeds),
+with each N(0,1) column multiplied in turn by 1e-4 to 1e-2 and fitted at log penalty 2.
+Every case whose column was at most 3.3e-3 in absolute value ended at the step limit in
+at least one fit. Every case at 6.0e-3 or more converged. The threshold is three times
+the largest that failed.
+
+## Collinearity
+
+`collinearity.py` measures each term on the quantity the likelihood sees. The design is
+weighted so that `X~' X~` is the information at the fit. For the Poisson and the
+Bernoulli, `X~ = diag(sqrt(w)) X`. For the Gaussian, `X~ = X`. For the grouped softmax,
+each event's rows are centered at its probabilities and weighted by its response total:
+`X~_g = sqrt(n_g) diag(sqrt(p_g)) (X_g - 1 p_g' X_g)`.
+
+When the design has an intercept, it is projected out of every other column first.
+Without that, a 0/1 column whose mean is 0.85 would count as 85 % explained by the
+intercept alone. Then for each term, with its columns `Xi` and the other terms' columns
+`X0`, the three measures of mgcv's `concurvity(full = TRUE)` are computed: `observed`
+(with the fitted coefficients), `worst` and `estimate`. `R0i` is taken in an orthonormal
+basis of the range of `X0`, so a column zero in a session adds no direction. For a term
+of one column the three equal its R² on the others, and the record stores `r2` and
+`VIF = 1 / (1 - R²)`. For a term of several columns it stores the three measures.
+
+A term is separable when the others explain less than `MAX_EXPLAINED = 0.8` of it (a VIF
+of 5): `r2` is read for a term of one column, `estimate` for a term of several. On the
+mgcv fixtures, at unit weights, the smooths' three measures equal mgcv's to 3.5e-12
+(measured 2026-11-21). mgcv's "para" term keeps the intercept, so it is not compared.
+
+## The support rule
+
+`support.py` decides from the rows, before the fit, whether a session can estimate an
+unpenalized column. A unit is what the data hold independent replicates of: a visit for a
+rate model, an event for a content model. A row holds an event when its response is above
+zero (Poisson, Bernoulli); every row does under the grouped softmax and the Gaussian.
+
+- A 0/1 column (a 0/1 slope or a level of a category): `n_high` counts the units with an
+  event on a row where the column is 1, `n_low` those with an event on a row where it is
+  0. For a level of a role category, `n_high` is the number of events with a candidate in
+  the role.
+- A continuous slope: over the rows of its level, among the rows that hold an event,
+  `n_high` counts the units with a row above their median and `n_low` those with a row
+  below it. Ties count on neither side, so a column constant there fails.
+
+A column passes when both counts are at least `MIN_UNITS = 5`. Smooth terms carry a
+penalty and have no support rule.
+
+A column that fails is made inactive in that session. When it is a level of a category,
+the session's rows of that level are dropped from its fit and counted. They are not
+merged into the reference level: in simulation, merging inflated the belief variance's
+false positives, to 20 % in one case. Every term fitted for that level leaves the session
+with it, its penalty block included. Under the grouped softmax, an event whose response
+was all on dropped rows is dropped too, and counted. The other events' shares are not
+renormalized: the likelihood is the conditional one over the candidates kept.
+
+A column that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit
+leaves the per-session model (`terms_failing_share`).
+
+## Sessions without a finite maximum
+
+`reml.refit_session` fits a session at given log penalties. While the fit has no finite
+maximum along unpenalized design columns only, it makes the columns running away
+inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds. It records the round in
+which each column was left out. A direction through a penalty block (a smooth's own line,
+or its penalized coordinates) cannot be left out, and the session stays without a fit;
+so does a fit that ends with any other status. The penalty search's refit of a session it
+set aside calls this function, and so does the per-session loop, so the rule is in one
+place.
+
+Such a session is reported with those terms missing (the lead, sixteenth round of the
+design). It is not left out of a summary, because leaving it out would depend on the
+outcome: the sessions that fail are those with no events in one condition. Its record
+names each column left out with the reason, for example `no finite maximum (round 1)`,
+and holds NaN for those coefficients and their covariance.
+
+## The per-session loop
+
+`sessions.fit_sessions(design, sessions, lik, model=..., kind=..., response=..., unit=...,
+table_sha256=...)` fits every session alone and returns one record per session. For each
+session:
+
+1. The rows with a missing value the design reads are dropped and counted.
+2. The design is built, with the design check, and the support rule is applied. A failing
+   column is made inactive, and a failing level drops its rows as above.
+3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
+   of a category left out there for having no finite maximum drops its rows as the
+   support rule does, and the session is fitted again with every column left out so far
+   inactive.
+4. The collinearity of each term is measured at the fit, and the record is built.
+
+At the session's first fit, a design not identified or a numerical failure is an error
+that names the session. In a refit, a direction through a penalty block or any other
+status leaves the session without a fit, with the reason in words. Under the grouped
+softmax, the unit column is the group id.
+
+## The fit record
+
+`record.FitRecord` is one row per (model, kind, session). It holds the identity; the
+likelihood; the rows, units and events the fit saw; the rows dropped and why
+(`cohort_counts`, to which a caller adds its own cohort counts); the coefficients with
+their names and the Bayesian covariance `(H + S)^-1`; how each smooth's penalty was set
+(`fixed` with its value, or `none`); the edf of each term; the last fit's status, Newton
+decrement and step count; the columns left out and why; the support counts; the
+collinearity measures; each smooth's basis (knots, degree, range, constraint, clamp);
+the standardizations; the hashes of the tables read; and `fit_reason`, how the fit ended
+when columns were left out or the session has no fit. A record whose status is not
+"converged" is kept; its readers flag it. `write_records` writes a parquet table
+atomically, the structured fields as JSON strings, and `read_records` reads it back.
+
+## Contrasts
+
+Every scalar estimand of a fit is a linear functional `c' beta` of its coefficients, so
+its variance in a session is exact: `c' V c`, with `V` the Bayesian covariance
+(`contrasts.py`). A curve contrast is the mean of a curve over one range of its variable
+minus its mean over another, each mean taken over an equally spaced grid (step
+`GRID_STEP = 0.01`). A range whose two ends are equal is one point. A coefficient
+difference is a sum of named coefficients less another sum. A curve enters only through
+the function that maps values of its variable to rows of the coefficient vector, so the
+basis and its freedom do not matter. A coefficient left out of a session makes NaN every
+contrast that uses it, and no other.
+
+## Folds
+
+There is one fold rule (`folds.py`). Inside an epoch each row (a time bin, or an event
+placed by its start) belongs to a trial segment: from a departure from a well to the
+next departure, so the run to a well and the whole stay there are one segment. Its class
+is the destination well. A segment longer than `MAX_SEGMENT_S = 30` s is cut into equal
+pieces, so that a long stay is spread over the folds; the pieces of one segment can fall
+in different folds, so one long stay, or one event whose rows cross a cut, can span two
+folds. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
+shuffling, the class a row's segment's and the group its piece. Every row of a piece is
+in one fold, and each class is spread over the folds as evenly as whole pieces allow.
+The folds do not depend on a seed.
+
+Folds compare designs and check over-fitting. They do not choose penalties, and they are
+not the test that an effect exists. A held-out claim is made on the sum over sessions.
+The rule is copied from `trial_folds` on the branch `swr-trial-folds`; when that branch
+merges, its code calls this one.
+
+## Bands
+
+A band of `bands.py` holds the whole curve with 95 % probability, not each point alone.
+
+- One fit's curve: `f = C beta` on a grid, with pointwise standard error
+  `se = sqrt(diag(C V C'))`. From `BAND_DRAWS = 10,000` draws `z ~ N(0, V)` with a stored
+  seed, the critical value `c` is the 0.95 quantile of `max |C z| / se`, and the band is
+  `f ± c se`.
+- The animal-balanced curve across sessions: the per-session curves on one grid are
+  taken session to recording day to animal as a mean of means, with nested bootstrap
+  draws of that curve. With `sd` the draws' standard deviation, `c` is the 0.95 quantile
+  of `max |draw - mean| / sd`, and the band is `estimate ± c sd k`, with
+  `k = t(0.975, A - 1) sqrt(A / (A - 1)) / z(0.975)` the small-sample correction over the
+  `A` animals.
+
+Neither form depends on the basis that made the curve.
+
+## From session to day to animal
+
+The 242 epochs are not independent, so each per-session estimate is reduced session to
+recording day to animal (`analysis/shared_statistics.py`).
+`animal_day_session_bootstrap` takes a per-session number or curve as a mean over animals
+of each animal's mean over its days of each day's mean over its sessions, with nested
+bootstrap draws. A session whose value is not finite is left out of that reduction.
+**The levels resampled are being checked by simulation** (today: animals, then each
+drawn animal's days, then each drawn day's sessions).
+`animal_day_session_values` gives each animal's value by the same three levels (median
+or mean). `day_level_test` is the signed-rank p over recording days of the day means
+(NaN below six non-zero differences).
+
+`estimand_summary` summarizes a scalar estimand: the animal-balanced estimate, its 95 %
+interval (`bootstrap_interval` over the nested draws, with the t correction over animals),
+the number of animals whose own value has the estimate's sign, and the day-level p. A kind
+difference is the difference of the two kinds' session estimates, reduced the same way.
+With five animals a sign test cannot go below p = 0.0625, so no claim rests on a p over
+animals alone.
 
 ## Cost
 
