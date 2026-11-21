@@ -506,11 +506,11 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
 
         result = select_penalties(Gaussian(), [SessionData(X, scale * base)], blocks)
         assert result.search.n_grid_not_finite == 0
-        np.testing.assert_allclose(result.rho, reference.rho, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(result.rho, reference.rho, rtol=0, atol=1e-9)
         np.testing.assert_allclose(
             result.sessions[0].fit.beta / scale,
             reference.sessions[0].fit.beta,
-            rtol=1e-6,
+            rtol=1e-8,
         )
 
 

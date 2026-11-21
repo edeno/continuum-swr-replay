@@ -49,8 +49,8 @@ from .constants import (
     MAX_STEP_HALVINGS,
     NULL_SPACE_EDF_TOL,
     PENALTY_ROUNDING_TOL,
+    REML_DECREMENT_TOL,
     REML_EIGEN_FLOOR,
-    REML_GRADIENT_TOL,
     REML_GRID_CENTER,
     REML_GRID_PASSES,
     REML_GRID_POINTS,
@@ -279,9 +279,10 @@ class SessionFit:
 class PenaltySearch:
     """How :func:`select_penalties` or :func:`refine_penalties` found ``rho``.
 
-    There is one only for a converged search (the gradient rule met; a
-    component at a bound whose gradient points out of the bounds is not
-    counted): a search that does not converge raises.
+    There is one only for a converged search (the Newton decrement on the
+    log penalties below ``REML_DECREMENT_TOL``; a term at a bound whose
+    gradient points out of the bounds is held there): a search that does not
+    converge raises.
 
     Attributes
     ----------
@@ -801,26 +802,37 @@ def _newton_step(gradient: np.ndarray, hessian: np.ndarray) -> np.ndarray:
     return -vectors @ ((vectors.T @ gradient) / eigenvalues)
 
 
+def _outer_step(rho: np.ndarray, current: PooledScore) -> np.ndarray:
+    """The Newton step on the free terms, zero on the terms held at a bound."""
+    free = _free(rho, current.gradient)
+    step = np.zeros_like(rho)
+    if free.any():
+        step[free] = _newton_step(
+            current.gradient[free], current.hessian[np.ix_(free, free)]
+        )
+    return step
+
+
 def _try_step(
-    evaluate: _Evaluator, rho: np.ndarray, current: PooledScore, max_halvings: int
+    evaluate: _Evaluator,
+    rho: np.ndarray,
+    current: PooledScore,
+    step: np.ndarray,
+    max_halvings: int,
+    slack: float = 0.0,
 ) -> tuple[np.ndarray, PooledScore] | str:
-    """One Newton step on the free terms, halved until the score does not rise.
+    """``step``, halved until the score does not rise by more than ``slack``.
 
     Returns the new point and its score, or why there is none: the step is
     empty (the bounds hold it), or no halving lowers the score.
     """
-    free = _free(rho, current.gradient)
-    step = np.zeros_like(rho)
-    step[free] = _newton_step(
-        current.gradient[free], current.hessian[np.ix_(free, free)]
-    )
     scale, trial = 1.0, None
     for _ in range(max_halvings):
         candidate = np.clip(rho + scale * step, *LOG_PENALTY_BOUNDS)
         if np.array_equal(candidate, rho):
             return "its step is empty at the bounds"
         trial = evaluate(candidate, derivatives=True)
-        if np.isfinite(trial.score) and trial.score <= current.score:
+        if np.isfinite(trial.score) and trial.score <= current.score + slack:
             return candidate, trial
         scale *= 0.5
     reason = "no halving of its step lowered the pooled score"
@@ -837,10 +849,12 @@ def _search(
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
-    Stops when the largest free gradient component is below
-    ``REML_GRADIENT_TOL * max(1, |V|)``, then takes that last Newton step when
-    it does not raise the score (as the inner fit does), so ``rho`` is the
-    optimum to rounding.
+    Stops when the Newton decrement in the log penalties, ``g' H~^-1 g / 2``
+    on the free terms with the floored Hessian ``H~`` (the gain in the score
+    the next step predicts), is below ``REML_DECREMENT_TOL``, then takes that
+    last step when the score does not rise by more than its rounding,
+    ``8 eps max(1, |V|)`` (as the inner fit does), so ``rho`` is the optimum
+    to rounding.
 
     Raises
     ------
@@ -857,18 +871,17 @@ def _search(
     start_score = current.score
     n_steps = 0
     while True:
-        free = _free(rho, current.gradient)
-        tolerance = REML_GRADIENT_TOL * max(1.0, abs(current.score))
-        if not free.any() or np.max(np.abs(current.gradient[free])) < tolerance:
-            if free.any():
-                moved = _try_step(evaluate, rho, current, max_halvings=1)
-                if not isinstance(moved, str):
-                    (rho, current), n_steps = moved, n_steps + 1
+        step = _outer_step(rho, current)
+        if -0.5 * float(current.gradient @ step) < REML_DECREMENT_TOL:
+            rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
+            moved = _try_step(evaluate, rho, current, step, 1, rounding)
+            if not isinstance(moved, str):
+                (rho, current), n_steps = moved, n_steps + 1
             break
         if n_steps == REML_MAX_STEPS:
             reason = f"no stationary point in {REML_MAX_STEPS} steps"
         else:
-            moved = _try_step(evaluate, rho, current, MAX_STEP_HALVINGS)
+            moved = _try_step(evaluate, rho, current, step, MAX_STEP_HALVINGS)
             if not isinstance(moved, str):
                 (rho, current), n_steps = moved, n_steps + 1
                 continue
