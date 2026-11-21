@@ -28,6 +28,8 @@ from continuum_swr_replay.analysis.replay_models.model_specs import (
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (
     aggregate_to_timebins,
+)
+from continuum_swr_replay.analysis.replay_models.visit_design import (
     arrival_spanning_stop_ids,
 )
 from continuum_swr_replay.intervals import covered_seconds
