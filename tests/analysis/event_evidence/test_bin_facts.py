@@ -2,7 +2,6 @@
 well-visit flag, on grids small enough to check by hand."""
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import bin_facts as bf
@@ -42,10 +41,11 @@ def test_time_must_ascend():
 
 
 def test_bin_facts_flags_bins_inside_a_visit():
-    """Visits [0.5, 2.0) and [2.5, 3.0), given out of order: bins at 1 and 2.5
-    are inside (arrival inclusive), 2 and 3 are not (departure exclusive)."""
+    """Visits [0.5, 2.0) and [2.5, 3.0), as ``prepare_data.well_visit_times``
+    gives them: bins at 1 and 2.5 are inside (arrival inclusive), 2 and 3 are
+    not (departure exclusive)."""
     time = np.array([0.0, 1.0, 2.0, 2.5, 3.0])
-    visits = pd.DataFrame({"arrival_time": [2.5, 0.5], "departure_time": [3.0, 2.0]})
+    visits = (np.array([0.5, 2.5]), np.array([2.0, 3.0]))
     table = bf.bin_facts(time, [np.array([0.2, 1.5, 2.6])], visits)
     assert list(table.columns) == list(bf.BIN_FACTS_COLUMNS)
     np.testing.assert_array_equal(table["n_spikes"], [1, 1, 0, 1, 0])
@@ -56,6 +56,5 @@ def test_bin_facts_flags_bins_inside_a_visit():
 
 
 def test_bin_facts_without_visits():
-    visits = pd.DataFrame({"arrival_time": [], "departure_time": []})
-    table = bf.bin_facts(TIME, [np.array([0.5])], visits)
+    table = bf.bin_facts(TIME, [np.array([0.5])], (np.array([]), np.array([])))
     assert not table["in_well_visit"].any()

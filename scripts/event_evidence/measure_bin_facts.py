@@ -5,12 +5,13 @@ For every epoch of the non-local restriction run (``score_nonlocal_restriction.p
 its ``ok`` records): load the epoch's spikes (``state_evidence.terms.load_marks_and_training_mask``,
 which reads the lab's database through ``load_data``, read only), check that the
 loader's time axis is the decode frame's, and read the epoch's well visits from
-the session cache of the table builders (``event_tables.prepare_data.load_behavioral_context``
-with ``from_cache=True``; an epoch without a current cache entry fails instead
-of being fetched). Then write the per-bin facts (``event_evidence.bin_facts.bin_facts``:
-spikes binned as the decoder bins them, and ``in_well_visit``). The total spike
-count must equal the restriction run's record ``n_spikes`` for the epoch, or the
-epoch fails. No event table is read. CPU only.
+the session cache of the table builders only (``event_tables.prepare_data.well_visit_times``;
+an epoch without a current cache entry fails instead of being fetched). Then
+write the per-bin facts (``event_evidence.bin_facts.bin_facts``: spikes binned
+as the decoder bins them, and ``in_well_visit``). The total spike count must
+equal the restriction run's record ``n_spikes`` for the epoch, or the epoch
+fails. No event table is read, and every bin is kept: the facts are not made
+over a subset, so the run records none. CPU only.
 
 Writes, under ``processed_data_dir() / EVENT_BIN_FACTS_DIR``:
 
@@ -18,9 +19,12 @@ Writes, under ``processed_data_dir() / EVENT_BIN_FACTS_DIR``:
   ``n_spikes`` (int32) and ``in_well_visit`` (bool);
 - ``{epoch_id}_bin_facts.json``: the epoch's record (bins, spikes, well visits,
   bins and spikes inside them, the restriction run's ``n_spikes``, the digests
-  of the decode frame and the cache entry; provenance);
+  of the decode frame and the restriction run's record; provenance);
 
-and ``manifest.json`` gathered from the records.
+and ``manifest.json`` gathered from the records. The inputs record the
+session-cache entries the visits were read from
+(``prepare_data.session_cache_record``, over every epoch of the restriction run),
+so the events summary and Figure 2 can tell a run made from other visits.
 
 Usage::
 
@@ -42,8 +46,11 @@ from pathlib import Path
 import numpy as np
 
 from continuum_swr_replay.analysis.event_evidence.bin_facts import bin_facts
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     EVENT_BIN_FACTS_DIR,
@@ -85,37 +92,6 @@ def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
     return frame.index.to_numpy(dtype=float)
 
 
-def well_visits(epoch_id: str):
-    """The epoch's port experiences from the table builders' session cache.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the cache has no entry for the epoch: it is not fetched here.
-    ValueError
-        If the entry is not current (``load_behavioral_context`` would have
-        fetched it from the database).
-    """
-    from continuum_swr_replay.analysis.event_tables.prepare_data import (
-        behavioral_context_cache_path,
-        load_behavioral_context,
-    )
-
-    key = parse_epoch_identifier(epoch_id)
-    session = {
-        "nwb_file_name": key.nwb_file_name,
-        "epoch_name": key.epoch_name,
-        "session_id": epoch_id,
-    }
-    path = behavioral_context_cache_path(session)
-    if not path.exists():
-        raise FileNotFoundError(f"no session cache entry for {epoch_id}: {path}")
-    _, experiences, _, hit_cache = load_behavioral_context(session, from_cache=True)
-    if not hit_cache:
-        raise ValueError(f"the session cache entry of {epoch_id} is not current")
-    return experiences, path
-
-
 def run_epoch(
     epoch_id: str, data_dir: Path, restriction_dir: Path, output: Path
 ) -> dict:
@@ -136,8 +112,8 @@ def run_epoch(
     loaded = load_marks_and_training_mask(epoch_id)
     if not np.array_equal(np.asarray(loaded["time"], dtype=float), time):
         raise ValueError("the loader's time axis is not the decode frame's")
-    experiences, cache_path = well_visits(epoch_id)
-    table = bin_facts(time, loaded["spike_times"], experiences)
+    visits = well_visit_times(epoch_id)
+    table = bin_facts(time, loaded["spike_times"], visits)
     n_spikes = int(table["n_spikes"].sum())
     restriction_record = output_path(
         epoch_id, restriction_dir, RESTRICTION_NAME
@@ -156,14 +132,13 @@ def run_epoch(
             "n_bins": len(table),
             "n_spikes": n_spikes,
             "restriction_n_spikes": restriction_spikes,
-            "n_well_visits": len(experiences),
+            "n_well_visits": len(visits[0]),
             "n_bins_in_well_visit": int(inside.sum()),
             "n_spikes_in_well_visit": int(table.loc[inside, "n_spikes"].sum()),
             "epoch_inputs": {
                 name: {"sha256": sha256_file(path), "path": str(path)}
                 for name, path in {
                     "data_over_time": decode_paths(epoch_id, data_dir).data_over_time,
-                    "session_cache": cache_path,
                     "restriction_record": restriction_record,
                 }.items()
             },
@@ -183,16 +158,16 @@ def main(argv: list[str] | None = None) -> None:
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_BIN_FACTS_DIR
     restriction_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    every_epoch = sorted(ok_epochs(read_manifest(restriction_dir)))
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
         "settings": {"binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]"},
-        "inputs": {},
+        "inputs": {"session_cache": session_cache_record(every_epoch)},
     }
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    every_epoch = sorted(ok_epochs(read_manifest(restriction_dir)))
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,

@@ -29,7 +29,6 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
-from continuum_swr_replay.tables.columns import require_columns
 
 BIN_FACTS_COLUMNS = ("time", "n_spikes", "in_well_visit")
 """The columns of a per-bin facts table, in order."""
@@ -72,32 +71,8 @@ def decoder_bin_spike_counts(
     return counts
 
 
-def visit_bounds(port_experiences: pd.DataFrame) -> tuple[NDArray, NDArray]:
-    """Each well visit's first poke-in and final poke-out (s), in arrival order.
-
-    Parameters
-    ----------
-    port_experiences : pd.DataFrame
-        An epoch's port experiences (one row per well visit), with
-        ``arrival_time`` and ``departure_time``.
-
-    Returns
-    -------
-    arrival_times, departure_times : np.ndarray, shape (n_visits,)
-        Sorted by arrival.
-    """
-    require_columns(
-        port_experiences, ["arrival_time", "departure_time"], "the port experiences"
-    )
-    ordered = port_experiences.sort_values("arrival_time", kind="stable")
-    return (
-        ordered["arrival_time"].to_numpy(dtype=float),
-        ordered["departure_time"].to_numpy(dtype=float),
-    )
-
-
 def bin_facts(
-    time: NDArray, spike_times: Sequence[NDArray], port_experiences: pd.DataFrame
+    time: NDArray, spike_times: Sequence[NDArray], visits: tuple[NDArray, NDArray]
 ) -> pd.DataFrame:
     """One epoch's per-bin facts: each decode bin's spikes and well-visit flag.
 
@@ -107,8 +82,10 @@ def bin_facts(
         The decode's time grid (s).
     spike_times : sequence of np.ndarray
         Each tetrode's spike times (s), as :func:`decoder_bin_spike_counts`.
-    port_experiences : pd.DataFrame
-        The epoch's well visits, as :func:`visit_bounds`.
+    visits : tuple of np.ndarray, each shape (n_visits,)
+        The epoch's well visits, ``(arrival_times, departure_times)`` (s,
+        ``arrival_times`` ascending), as ``prepare_data.well_visit_times``
+        gives them.
 
     Returns
     -------
@@ -118,11 +95,10 @@ def bin_facts(
     """
     time = np.asarray(time, dtype=float)
     counts = decoder_bin_spike_counts(spike_times, time)
-    arrivals, departures = visit_bounds(port_experiences)
     return pd.DataFrame(
         {
             "time": time,
             "n_spikes": counts.astype(np.int32),
-            "in_well_visit": in_well_visit(time, arrivals, departures),
+            "in_well_visit": in_well_visit(time, *visits),
         }
     )
