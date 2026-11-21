@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     SessionData,
     select_penalties,
 )
+from continuum_swr_replay.runs.io import write_json
 
 REPO = Path(__file__).resolve().parents[2]
 R_SCRIPT = Path(__file__).with_suffix(".R")
@@ -309,8 +310,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         for name in DATA_SETS:
             frame = make_data(name)
             mgcv = run_mgcv(name, frame, args.rscript, Path(work))
-            (args.out_dir / f"{name}.json").write_text(
-                json.dumps(mgcv, indent=1) + "\n"
+            write_json(
+                args.out_dir / f"{name}.json", mgcv, indent=1, final_newline=True
             )
             ours = fit_ours(name, frame)
             diff = agreement(name, ours, mgcv)
