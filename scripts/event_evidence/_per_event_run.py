@@ -4,8 +4,8 @@ and the epoch loop that writes each epoch's record and gathers the run's
 manifest (``runs.epoch_records``).
 
 Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
-``score_tetrode_holdout.py``, ``score_nonlocal_restriction.py`` and
-``sum_nonlocal_restriction_windows.py``.
+``score_tetrode_holdout.py``, ``score_nonlocal_restriction.py``,
+``sum_nonlocal_restriction_windows.py`` and ``detect_heldout_events.py``.
 """
 
 from __future__ import annotations
@@ -55,6 +55,11 @@ def event_table_path(data_dir: Path) -> Path:
 def event_table_input(path: Path) -> dict[str, str]:
     """The event table as a run's input: its digest and where it was read."""
     return {"sha256": sha256_file(path), "path": str(path)}
+
+
+def run_input(run_dir: Path) -> dict[str, str]:
+    """A run folder as an input: its manifest's digest and where it is."""
+    return {"sha256": sha256_file(run_dir / "manifest.json"), "path": str(run_dir)}
 
 
 def add_run_arguments(parser: argparse.ArgumentParser) -> None:
