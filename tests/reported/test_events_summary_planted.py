@@ -6,7 +6,8 @@ table or from the current well visits makes its values pending.
 The restriction runs are planted too: the window run's windows (an event and
 its control per event, the planted one's too, with the columns the summary
 checks for), its time sums (one row per epoch) and each epoch's time step; the
-per-bin facts run only through its manifest.
+restriction run (a fold fit) and the per-bin facts run only through their
+manifests.
 
 Every builder is a stand-in recording what it is given and returning one value
 named after it; the readers of the stored outputs are stand-ins too, or tiny
@@ -203,6 +204,12 @@ class _Run:
         ):
             (root / folder).mkdir(parents=True, exist_ok=True)
             self.manifests[folder] = json.loads(json.dumps(fresh))
+        # the restriction run is the fold fit: its settings record the fit
+        (root / EVENT_NONLOCAL_RESTRICTION_DIR).mkdir(parents=True, exist_ok=True)
+        self.manifests[EVENT_NONLOCAL_RESTRICTION_DIR] = {
+            **json.loads(json.dumps(fresh)),
+            "settings": {"n_folds": 5, "fit": "folds", "em": {"max_iter": 20}},
+        }
         for folder, (key, value) in (changes or {}).items():
             if value is None:
                 self.manifests[folder].pop(key)
@@ -415,11 +422,11 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     assert "heldout_bout_values" in seen
     assert not [key for key, value in values.items() if value.pending]
     assert "wholly inside one well visit" in values["participation"].description
-    assert "drawn from the whole epoch" in values["tetrode_holdout"].description
+    assert "wholly inside one well visit" in values["tetrode_holdout"].description
     assert "wherever that event starts" in values["left_out"].description
     assert "partner may start outside a visit" in values["other_detector"].description
     # the restriction values say what they are over, in the summary's words
-    subset = builder.HOLDOUT_CONTROL_SUBSET
+    subset = builder.CONTROL_SUBSET
     for key in ("restriction_window", AFTER_VISIT):
         assert values[key].description.endswith(f"; over {subset}")
     assert values["restriction_outside_swr"].description.endswith(
@@ -454,6 +461,8 @@ RESTRICTION_VALUES = {
 RESTRICTION_EVENT_VALUES = RESTRICTION_VALUES - {"restriction_immobile"}
 RESTRICTION_VISIT_VALUES = RESTRICTION_VALUES - {"restriction_window"}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
+#: The values against the participation run's Local-rest controls
+CONTROL_VALUES = {"participation", "tetrode_holdout", "restriction_window", AFTER_VISIT}
 
 #: (folder, (manifest key, value or None to drop it)) -> the values made pending
 PENDING_CASES = [
@@ -503,13 +512,11 @@ PENDING_CASES = [
         {"content_occupancy"},
     ),
     (EVENT_PARTICIPATION_DIR, ("event_table", {"sha256": "old"}), {"participation"}),
-    (EVENT_PARTICIPATION_DIR, ("settings", None), {"participation"}),
-    (
-        EVENT_PARTICIPATION_DIR,
-        ("settings", {"subset": "every event"}),
-        {"participation"},
-    ),
-    (EVENT_PARTICIPATION_DIR, ("session_cache", _other_cache()), {"participation"}),
+    # a participation run off the subset or the visits: its controls are not
+    # Local rest inside the current visits, so the values against them pend
+    (EVENT_PARTICIPATION_DIR, ("settings", None), CONTROL_VALUES),
+    (EVENT_PARTICIPATION_DIR, ("settings", {"subset": "every event"}), CONTROL_VALUES),
+    (EVENT_PARTICIPATION_DIR, ("session_cache", _other_cache()), CONTROL_VALUES),
     (
         EVENT_LIKELIHOOD_ADVANTAGE_DIR,
         ("event_table", {"sha256": "old"}),
@@ -582,4 +589,23 @@ def test_a_table_whose_labels_disagree_with_the_visits_is_refused(
         builder, "well_visit_times", lambda identifier: visits_by[identifier]
     )
     with pytest.raises(ValueError, match="1 of 14 events' visit_context disagrees"):
+        run.summarize()
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{"n_folds": 5}, {"n_folds": 5, "fit": "shared"}],
+    ids=["no fit", "another fit"],
+)
+def test_a_restriction_run_that_is_not_the_fold_fit_is_refused(
+    processed_data_root, monkeypatch, settings
+):
+    """A run of the earlier design (its settings record no fit) cannot give
+    values that describe the fold fit."""
+    run = _Run(
+        processed_data_root,
+        monkeypatch,
+        {EVENT_NONLOCAL_RESTRICTION_DIR: ("settings", settings)},
+    )
+    with pytest.raises(ValueError, match="is not the fold fit"):
         run.summarize()

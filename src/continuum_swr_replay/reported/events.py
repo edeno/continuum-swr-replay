@@ -49,7 +49,10 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   curve, summarized by ``analysis.decode_quality.quality_metrics``;
 - the non-local restriction run (``Processed-Data/event_nonlocal_restriction``,
   from ``scripts/event_evidence/score_nonlocal_restriction.py``): each epoch's
-  per-bin scores of the local-only, SWR-only and full decoders, summed over the
+  per-bin scores of the local-only, SWR-only and full decoders, each fold's bins
+  under the whole decoder fit on the other folds (a run of the earlier design,
+  which held out only the encodings, is refused, :func:`require_fold_fit`),
+  summed over the
   windows of Figure 2g's second axis and by category of bins, well visit and
   event window (``Processed-Data/event_nonlocal_restriction_windows``, from
   ``scripts/event_evidence/sum_nonlocal_restriction_windows.py``, with each
@@ -79,7 +82,13 @@ when the window run read another event table than the held-out tetrode run whose
 spike counts it adds (:func:`window_run_note_staleness`), and those that read the
 well visits through the per-bin facts (the time sums inside a visit, the window
 counts after a visit) when the facts run was not made from the current session
-cache (``prepare_data.session_cache_staleness``).
+cache (``prepare_data.session_cache_staleness``). The held-out tetrode values and
+the restriction window values are against Local-rest controls inside one well
+visit (:data:`CONTROL_SUBSET`): their runs must have read the current
+participation tables, and they are pending, as the participation values are,
+when the participation run records no subset or another, or other visits than
+the current session cache's (the participation run records the subset only
+since its controls lie inside one visit).
 
 Pooled values sum events over sessions and animals; "animals in direction"
 counts the animals whose own value points the way the claim states, an
@@ -275,13 +284,6 @@ CONTROL_SUBSET = (
 """What the participation values are over: their controls are Local rest inside
 one well visit (``event_evidence.participation.CONTROL_RULE``)."""
 
-HOLDOUT_CONTROL_SUBSET = (
-    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
-    "drawn from the whole epoch (not only inside a well visit)"
-)
-"""What the held-out tetrode values are over: their run took its controls from
-participation tables whose controls were Local rest anywhere in the epoch."""
-
 TIME_SUBSET = (
     "time inside a well visit (from the first poke-in at a well to the final poke-out)"
 )
@@ -418,6 +420,32 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
         f"spike counts it adds (sha256 {'none' if theirs is None else theirs[:12]}); "
         "rerun the held-out tetrode run and then the window run before citing"
     )
+
+
+def require_fold_fit(manifest: dict, what: str) -> None:
+    """Refuse a restriction run that is not the fold fit.
+
+    The values describe scores under the whole decoder fit on the other folds;
+    the fold-fit run's settings record ``"fit": "folds"``, and a run of the
+    earlier design, which held out only the encodings and ran the models with
+    the transitions fit on the whole epoch, records no ``fit``. That run cannot
+    give these values.
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fit": "folds"``.
+    """
+    fit = manifest.get("settings", {}).get("fit")
+    if fit != "folds":
+        raise ValueError(
+            f"{what} is not the fold fit (its settings record fit {fit!r}, not "
+            "'folds'): it is the earlier design, which held out only the "
+            "encodings. Put the fold-fit run (scripts/event_evidence/"
+            "score_nonlocal_restriction.py) in this folder, then rerun "
+            "scripts/event_evidence/measure_bin_facts.py and "
+            "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
+        )
 
 
 def spike_evidence_staleness(
@@ -1790,8 +1818,10 @@ _RESTRICTION_SCORES = {
     "every other bin)",
 }
 _RESTRICTION_HELD_OUT = (
-    "with encodings held out in time (five folds of whole trials balanced by "
-    "destination well)"
+    "with the whole decoder (place-field encodings, state transitions and initial "
+    "conditions) fit by EM on the other folds (five folds of whole trials balanced "
+    "by destination well) and each fold's bins scored under the fit that did not "
+    "see them"
 )
 #: The window comparisons reported: kind of window, group, contrast.
 _RESTRICTION_WINDOWS = (
@@ -3378,8 +3408,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 ),
                 stale(inputs.tetrode_holdout),
                 participation_staleness(inputs.tetrode_holdout),
+                participation_off_subset(),
             ),
-            HOLDOUT_CONTROL_SUBSET,
+            CONTROL_SUBSET,
         )
     )
     summary.inputs += [
@@ -3407,6 +3438,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # window run's own table)
     restriction_dir = inputs.nonlocal_restriction
     restriction_windows_dir = inputs.nonlocal_restriction_windows
+    # the values describe the fold fit: refuse a run of the earlier design (the
+    # window run must have summed this run, run_staleness below)
+    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
     # the run holds the windows of every event: those of the selected events
     # (and their controls, under their event's id) are read
     restriction_windows_table = select_events_in(
@@ -3466,13 +3500,15 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         f"and {rel(inputs.bin_facts)}, scripts/event_evidence/measure_bin_facts.py)"
     )
     # the windows' controls come from the participation tables the held-out
-    # tetrode run read (sum_nonlocal_restriction_windows.check_holdout_inputs)
+    # tetrode run read (sum_nonlocal_restriction_windows.check_holdout_inputs):
+    # Local rest inside one well visit only when that run records the subset
     window_values = over(
         pend(
             restriction_window_values(restriction_windows_table, restriction_source),
             *restriction_stale,
+            participation_off_subset(),
         ),
-        HOLDOUT_CONTROL_SUBSET,
+        CONTROL_SUBSET,
     )
     # of the window values, only the counts after the visit read the visits
     summary.add(
