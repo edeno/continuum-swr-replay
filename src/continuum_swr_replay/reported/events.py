@@ -289,7 +289,9 @@ EVENTS_SUBSET = (
 
 HELDOUT_EVENTS_SUBSET = (
     "the immobile non-local events detected from the held-out decode (each fold's "
-    "bins under the decoder fit on the other folds, by the canonical event rule) "
+    "bins under the decoder fit on the other folds, by the canonical event rule; "
+    "a small share span two folds, each bin still under a fit that did not see "
+    "it) "
     "that start inside a well visit (their first bin is inside one, from the first "
     "poke-in at a well to the final poke-out)"
 )
@@ -1852,7 +1854,10 @@ _RESTRICTION_SCORES = {
     "every other bin)",
 }
 _RESTRICTION_HELD_OUT = (
-    "with each of five folds of whole trials (balanced by destination well) "
+    "with each of five folds of whole trials (balanced by destination well; a "
+    "trial's run to a well with its whole stay there, when longer than "
+    f"{tetrode_holdout.MAX_SEGMENT_S:g} s, is cut into pieces of at most "
+    f"{tetrode_holdout.MAX_SEGMENT_S:g} s that can fall in different folds) "
     "scored under a decoder whose place-field encodings were fit on the decode's "
     "training bins (outside every SWR and artifact) of the other folds, more than "
     "1 s from the fold, and whose state transitions and initial conditions were "

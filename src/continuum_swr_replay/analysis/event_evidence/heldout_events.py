@@ -7,7 +7,16 @@ bin, the ``full`` model's held-out smoothed state probabilities. The canonical
 events were found from a decode fit on all the data, so a gain read over their
 windows is read on time chosen by a decoder that saw those bins. Here the
 events are found from the held-out probabilities instead, by the canonical rule,
-on the canonical decode frame:
+on the canonical decode frame.
+
+A fold is whole trial segments (the run to a well and the whole stay there),
+but a segment longer than ``tetrode_holdout.MAX_SEGMENT_S`` (30 s) is cut into
+pieces of at most 30 s that can fall in different folds
+(``tetrode_holdout.trial_folds``). So a held-out event can span two folds (a
+small share do); its probability trace and its per-bin scores then come from
+two fits, each bin still scored under a fit that did not see it.
+
+The two steps:
 
 1. :func:`labeled_frame`: ``nonlocal_event_rule.detect_nonlocal_events`` on the
    summed non-local probability (strictly above 0.8 for at least 7 samples, the

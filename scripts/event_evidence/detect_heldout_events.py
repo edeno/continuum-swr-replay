@@ -9,7 +9,11 @@ canonical event rule (``heldout_events.labeled_frame`` and
 ``heldout_events.event_rows``) to the ``full`` model's held-out smoothed
 non-local probabilities. Each fold's bins were scored under the decoder fit on
 the other folds, so these events are chosen without the decoder having seen
-their bins. Then sum the restriction scores over each event
+their bins. A trial segment (the run to a well and the whole stay there) longer
+than ``tetrode_holdout.MAX_SEGMENT_S`` (30 s) is cut into pieces of at most
+30 s that can fall in different folds, so a small share of the events span two
+folds: their probability trace and per-bin scores come from two fits, each bin
+still scored under a fit that did not see it. Then sum the restriction scores over each event
 (``restriction_windows.restriction_window_sums``, ``window_bin_fact_sums``),
 say which held-out and which canonical events share a bin
 (``heldout_events.shared_bin_events``), and sum the epoch's bins by category,
