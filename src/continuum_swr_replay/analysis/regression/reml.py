@@ -42,6 +42,7 @@ from .constants import (
     AT_BOUNDARY_MARGIN,
     LOG_PENALTY_BOUNDS,
     MAX_STEP_HALVINGS,
+    NULL_SPACE_EDF_TOL,
     REML_EIGEN_FLOOR,
     REML_GRADIENT_TOL,
     REML_GRID_CENTER,
@@ -202,6 +203,13 @@ class SessionFit:
         The profiled Gaussian scale; 1 for the other families.
     score : float
         The session's REML score.
+    in_null_space : np.ndarray of bool, shape (m,)
+        True for a term shrunk to its penalty's null space (a P-spline drawn
+        as a straight line): its edf is within ``NULL_SPACE_EDF_TOL`` of the
+        null space's dimension within the term's columns (the number of
+        columns less the penalty's rank). The search can stop on the score's
+        plateau before the bound, so ``PenaltySearch.at_boundary`` misses
+        such a term.
     """
 
     fit: NewtonFit
@@ -210,6 +218,7 @@ class SessionFit:
     edf_total: float
     scale: float
     score: float
+    in_null_space: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -699,6 +708,7 @@ def _pooled_fit(
         S = assemble_penalty(blocks, rho, A.shape[0]) / session.scale
         F = covariance @ (A - S)  # A^-1 H
         edf = np.array([np.trace(F[np.ix_(b.columns, b.columns)]) for b in blocks])
+        null_dim = np.array([b.columns.size - b.rank for b in blocks])
         sessions.append(
             SessionFit(
                 session.fit,
@@ -707,6 +717,7 @@ def _pooled_fit(
                 float(np.trace(F)),
                 session.scale,
                 session.score,
+                edf - null_dim <= NULL_SPACE_EDF_TOL,
             )
         )
     return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)

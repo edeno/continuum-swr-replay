@@ -6,7 +6,10 @@ import numpy as np
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
+from continuum_swr_replay.analysis.regression.constants import (
+    LOG_PENALTY_BOUNDS,
+    NULL_SPACE_EDF_TOL,
+)
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
@@ -355,3 +358,29 @@ def test_at_boundary() -> None:
     np.testing.assert_array_equal(wiggle.search.at_boundary, [False])
     assert wiggle.search.converged and wiggle.search.n_outer_steps >= 1
     assert 3.0 < wiggle.sessions[0].edf[0] < 5.0
+
+
+def test_shrunk_to_null_space() -> None:
+    """A straight-line truth whose search stops on the plateau, short of the
+    bound, is flagged by its edf (one, the line); at_boundary misses it. A
+    curved truth on the same rows is not flagged."""
+    rng = np.random.default_rng(2)
+    n_rows = 400
+    x = rng.uniform(size=n_rows)
+    basis = PSplineBasis(0.0, 1.0, 10)
+    B = basis.design(x)
+    Z = sum_to_zero_constraint(B)
+    X = np.column_stack([np.ones(n_rows), B @ Z])
+    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    line_y = (x - 0.5) + rng.normal(size=n_rows)
+    curve_y = np.sin(2 * np.pi * x) + rng.normal(size=n_rows)
+
+    line = select_penalties(Gaussian(), [SessionData(X, line_y)], blocks)
+    curve = select_penalties(Gaussian(), [SessionData(X, curve_y)], blocks)
+
+    assert line.search.converged and curve.search.converged
+    assert line.sessions[0].edf[0] - 1.0 <= NULL_SPACE_EDF_TOL
+    np.testing.assert_array_equal(line.sessions[0].in_null_space, [True])
+    np.testing.assert_array_equal(line.search.at_boundary, [False])
+    assert curve.sessions[0].edf[0] > 3.0
+    np.testing.assert_array_equal(curve.sessions[0].in_null_space, [False])
