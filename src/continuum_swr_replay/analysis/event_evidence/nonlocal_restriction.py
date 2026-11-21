@@ -157,6 +157,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     place_sampling,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
+from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 MODELS = ("none", "swr", "full")
@@ -1373,7 +1374,7 @@ def fold_fit_scores(
             blocks,
             n_folds,
             margin_bins,
-            float(np.median(np.diff(time))),
+            sample_step(time),
         )
     for column in (*STATE_PROBABILITY_COLUMNS.values(), NONLOCAL_PLACE_BIN_COLUMN):
         table[column] = columns[column]

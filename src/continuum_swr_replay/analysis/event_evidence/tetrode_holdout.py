@@ -72,6 +72,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     training_spike_bins,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
+from continuum_swr_replay.intervals import sample_step
 
 N_FOLDS = 5
 """Folds per epoch (contiguous time blocks or trial folds); each fold's
@@ -330,7 +331,7 @@ def capped_groups(
     if max_segment_s is None:
         pieces = np.ones(lengths.size, dtype=np.int64)
     else:
-        bin_s = float(np.median(np.diff(np.asarray(time, dtype=float))))
+        bin_s = sample_step(np.asarray(time, dtype=float))
         cap_bins = max(int(np.floor(max_segment_s / bin_s + 1e-6)), 1)
         pieces = -(-lengths // cap_bins)  # ceil
     run = np.repeat(np.arange(lengths.size), lengths)
@@ -430,7 +431,7 @@ def margin_in_bins(margin_s: float, time: NDArray) -> int:
     -------
     int
     """
-    bin_s = float(np.median(np.diff(np.asarray(time, dtype=float))))
+    bin_s = sample_step(np.asarray(time, dtype=float))
     # the tolerance keeps 1.0 / 0.002 at 500 bins, whatever its last float bit
     return int(np.ceil(margin_s / bin_s - 1e-6))
 
