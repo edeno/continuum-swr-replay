@@ -132,6 +132,46 @@ def time_blocks(time: NDArray, n_folds: int = N_FOLDS) -> NDArray[np.int64]:
     return np.minimum(block, n_folds - 1)
 
 
+def fold_blocks(
+    time: NDArray, n_folds: int, folds: NDArray | None = None
+) -> NDArray[np.int64]:
+    """Each bin's fold: ``folds``, or by default ``n_folds`` contiguous blocks
+    (:func:`time_blocks`).
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s, increasing.
+    n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`).
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+
+    Raises
+    ------
+    ValueError
+        When the folds are not one fold per bin in 0 .. n_folds - 1, each with
+        bins.
+    """
+    time = np.asarray(time, dtype=float)
+    blocks = (
+        time_blocks(time, n_folds)
+        if folds is None
+        else np.asarray(folds, dtype=np.int64)
+    )
+    if blocks.shape != time.shape or not np.array_equal(
+        np.unique(blocks), np.arange(n_folds)
+    ):
+        raise ValueError(
+            f"folds must give each of the {time.size} bins a fold in "
+            f"0 .. {n_folds - 1}, each fold with bins"
+        )
+    return blocks
+
+
 def trial_segments(time: NDArray, segment_starts: NDArray) -> NDArray[np.int64]:
     """Each bin's segment: segment i runs from ``segment_starts[i]`` up to the
     next start. Bins before the first start belong to segment 0, bins after the
@@ -771,7 +811,7 @@ def heldout_terms(
     margin_bins: int = MARGIN_BINS,
     refit: Callable[..., dict] = refit_encoding,
     log: Callable[[str], None] = print,
-) -> tuple[FoldTerms, NDArray, NDArray, NDArray[np.int64], dict]:
+) -> tuple[FoldTerms, NDArray, NDArray, dict]:
     """The held-out stage of the decoder's likelihood: each time block's
     tetrode terms under encodings refit on the other blocks, the per-tetrode
     No-Spike likelihood and the Local kernel.
@@ -809,17 +849,15 @@ def heldout_terms(
         Each tetrode's No-Spike log-likelihood.
     kernel : ndarray, shape (n_time, n_place_bins)
         The decoder's Local position kernel.
-    blocks : ndarray of int, shape (n_time,)
-        Each bin's fold: its time block, or ``folds``.
     record : dict
         ``refit_s``, ``terms_s`` (the terms, No-Spike and kernel), ``n_spikes``.
 
     Raises
     ------
     ValueError
-        When ``folds`` is not one fold per bin in 0 .. n_folds - 1, each with
-        bins, or when a fold's encoding would take spikes from one of its own
-        bins (:func:`check_no_fold_leakage`).
+        When the folds are not one fold per bin in 0 .. n_folds - 1, each with
+        bins (:func:`fold_blocks`), or when a fold's encoding would take spikes
+        from one of its own bins (:func:`check_no_fold_leakage`).
     """
     from non_local_detector.likelihoods.no_spike import (
         predict_no_spike_log_likelihood,
@@ -831,17 +869,7 @@ def heldout_terms(
     environment = detector.encoding_model_[ENCODING_KEY]["environment"]
     centers = np.asarray(environment.place_bin_centers_)[interior_bin_mask(environment)]
 
-    if folds is None:
-        blocks = time_blocks(time, n_folds)
-    else:
-        blocks = np.asarray(folds, dtype=np.int64)
-        if blocks.shape != time.shape or not np.array_equal(
-            np.unique(blocks), np.arange(n_folds)
-        ):
-            raise ValueError(
-                f"folds must give each of the {time.size} bins a fold in "
-                f"0 .. {n_folds - 1}, each fold with bins"
-            )
+    blocks = fold_blocks(time, n_folds, folds)
     masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
     check_no_fold_leakage(time, head_position, masks, blocks)
     encodings = [
@@ -867,7 +895,7 @@ def heldout_terms(
     record["terms_s"] = round(clock.time() - t0, 1)
     record["n_spikes"] = int(terms.time_bin.size)
     log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
-    return terms, no_spike, kernel, blocks, record
+    return terms, no_spike, kernel, record
 
 
 def holdout_scores(
@@ -944,7 +972,7 @@ def holdout_scores(
         s for s, name in enumerate(state_names) if name not in (LOCAL, NO_SPIKE)
     ]
 
-    terms, no_spike, kernel, _, record = heldout_terms(
+    terms, no_spike, kernel, record = heldout_terms(
         detector,
         time,
         head_position,

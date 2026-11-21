@@ -141,7 +141,7 @@ def _heldout_likelihood(recording, detector) -> np.ndarray:
     (``tetrode_holdout.heldout_terms``, every tetrode in the model, then
     ``tetrode_holdout.state_log_likelihood``): the likelihood the models are
     scored on below."""
-    terms, no_spike, kernel, _, _ = th.heldout_terms(
+    terms, no_spike, kernel, _ = th.heldout_terms(
         detector,
         recording.time,
         recording.position[:, None],

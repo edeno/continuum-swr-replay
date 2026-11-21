@@ -152,9 +152,9 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     NO_SPIKE,
     animal_place_bins,
     check_no_fold_leakage,
+    fold_blocks,
     fold_training_masks,
     place_sampling,
-    time_blocks,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
@@ -1274,8 +1274,9 @@ def fold_fit_scores(
     ------
     ValueError
         When ``in_swr`` and ``time`` differ in length, as
-        :func:`predictive_log_scores`, when ``folds`` is not one fold per bin
-        in 0 .. n_folds - 1, each with bins, or when a fold's encoding would
+        :func:`predictive_log_scores`, when the folds are not one fold per bin
+        in 0 .. n_folds - 1, each with bins
+        (:func:`.tetrode_holdout.fold_blocks`), or when a fold's encoding would
         take spikes from one of its own bins
         (:func:`.tetrode_holdout.check_no_fold_leakage`), or when a fold's
         fitted place grid is not the canonical one (:func:`check_place_grid`).
@@ -1286,18 +1287,7 @@ def fold_fit_scores(
     is_missing = np.asarray(is_missing, dtype=bool)
     if in_swr.shape != time.shape:
         raise ValueError(f"in_swr has shape {in_swr.shape}, time {time.shape}")
-    blocks = (
-        time_blocks(time, n_folds)
-        if folds is None
-        else np.asarray(folds, dtype=np.int64)
-    )
-    if blocks.shape != time.shape or not np.array_equal(
-        np.unique(blocks), np.arange(n_folds)
-    ):
-        raise ValueError(
-            f"folds must give each of the {time.size} bins a fold in "
-            f"0 .. {n_folds - 1}, each fold with bins"
-        )
+    blocks = fold_blocks(time, n_folds, folds)
     masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
     check_no_fold_leakage(time, head_position, masks, blocks)
     canonical_discrete = np.asarray(canonical.discrete_state_transitions_)

@@ -20,6 +20,16 @@ def test_time_blocks_are_contiguous_and_of_equal_duration():
     np.testing.assert_array_equal(np.bincount(blocks), [20, 20, 20, 20, 20])
 
 
+def test_fold_blocks_are_the_given_folds_or_the_time_blocks():
+    time = np.arange(10) * 0.5
+    np.testing.assert_array_equal(th.fold_blocks(time, 5), th.time_blocks(time, 5))
+    folds = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
+    np.testing.assert_array_equal(th.fold_blocks(time, 2, folds), folds)
+    for bad in (folds[:-1], np.zeros(10, dtype=int), folds + 1):
+        with pytest.raises(ValueError, match="folds must give each of the"):
+            th.fold_blocks(time, 2, bad)
+
+
 def test_fold_training_masks_leave_out_the_block_and_its_margin():
     blocks = np.repeat([0, 1, 2], 10)
     is_training = np.ones(30, dtype=bool)
