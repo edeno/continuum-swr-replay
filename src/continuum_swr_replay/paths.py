@@ -207,6 +207,34 @@ EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root
 (``scripts/event_evidence/measure_event_participation.py``)."""
+
+# The names of the per-epoch tables (and records) the event-evidence runs write
+# in their folders: ``{epoch_id}_{name}.parquet`` (``runs.io.output_path``) and
+# ``{epoch_id}_{name}.json`` (``runs.epoch_records.record_path``).
+PARTICIPATION_NAME = "participation"
+"""The participation run's tables and records, in ``EVENT_PARTICIPATION_DIR``."""
+TETRODE_HOLDOUT_NAME = "tetrode_holdout"
+"""The held-out tetrode run's tables and records, in
+``EVENT_TETRODE_HOLDOUT_DIR``."""
+NONLOCAL_RESTRICTION_NAME = "nonlocal_restriction"
+"""The restriction run's per-category sums and records, in
+``EVENT_NONLOCAL_RESTRICTION_DIR``."""
+NONLOCAL_RESTRICTION_BINS_NAME = "nonlocal_restriction_bins"
+"""The restriction run's per-bin tables, in ``EVENT_NONLOCAL_RESTRICTION_DIR``."""
+NONLOCAL_RESTRICTION_WINDOWS_NAME = "nonlocal_restriction_windows"
+"""The window run's tables and records, in
+``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``."""
+HELDOUT_EVENTS_NAME = "heldout_events"
+"""The held-out event run's event tables and records, in
+``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``."""
+CANONICAL_EVENTS_FOUND_NAME = "canonical_events_found"
+"""The held-out event run's tables of the canonical events it finds again, in
+``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``."""
+HELDOUT_TIME_SUMS_NAME = "heldout_time_sums"
+"""The held-out event run's time sums, in
+``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``."""
+BIN_FACTS_NAME = "bin_facts"
+"""The per-bin facts run's tables and records, in ``EVENT_BIN_FACTS_DIR``."""
 EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
 """Each epoch's non-local detector exposure inside the well visits, under the
 processed-data root (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""

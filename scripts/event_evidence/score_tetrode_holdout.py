@@ -84,6 +84,8 @@ from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    PARTICIPATION_NAME,
+    TETRODE_HOLDOUT_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -112,8 +114,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "tetrode_holdout"
-PARTICIPATION_NAME = "participation"
 
 
 def run_epoch(
@@ -152,7 +152,7 @@ def run_epoch(
     table = scores.join(columns, on="window_id").assign(
         epoch_id=epoch_id, animal=parse_epoch_identifier(epoch_id).animal
     )
-    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
+    write_table(table, output_path(epoch_id, output, TETRODE_HOLDOUT_NAME))
     return {
         "status": "ok",
         "n_windows": len(windows),
@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> None:
         },
     }
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, TETRODE_HOLDOUT_NAME, header)
         return
     max_workers, pool_options = gpu_pool(parser, args)
     every_epoch = ok_epochs(read_manifest(participation_dir))
@@ -208,7 +208,7 @@ def main(argv: list[str] | None = None) -> None:
         task=run_epoch,
         task_args=(event_table, data_dir, output, args.fold_design),
         output=output,
-        name=OUTPUT_NAME,
+        name=TETRODE_HOLDOUT_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=max_workers,

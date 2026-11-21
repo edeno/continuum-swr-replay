@@ -15,9 +15,14 @@ import pytest
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
+    CANONICAL_EVENTS_FOUND_NAME,
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    HELDOUT_EVENTS_NAME,
+    HELDOUT_TIME_SUMS_NAME,
+    NONLOCAL_RESTRICTION_BINS_NAME,
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import _per_event_run
@@ -122,8 +127,8 @@ def data_dir(tmp_path, monkeypatch):
     use_swr_source(monkeypatch, write_swr_inventory(tmp_path, {EPOCH: [SWR]}))
     _raw().to_pickle(decode_paths(EPOCH, tmp_path).data_over_time)
     for folder, name, table in (
-        (EVENT_NONLOCAL_RESTRICTION_DIR, runner.BINS_NAME, _bins()),
-        (EVENT_BIN_FACTS_DIR, runner.FACTS_NAME, _facts()),
+        (EVENT_NONLOCAL_RESTRICTION_DIR, NONLOCAL_RESTRICTION_BINS_NAME, _bins()),
+        (EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME, _facts()),
     ):
         (tmp_path / folder).mkdir()
         table.to_parquet(output_path(EPOCH, tmp_path / folder, name))
@@ -135,7 +140,7 @@ def _run_epoch(data_dir) -> tuple[dict, dict[str, pd.DataFrame]]:
     output = data_dir / "out"
     output.mkdir()
     record = runner.run_epoch(EPOCH, data_dir / "event_table.parquet", data_dir, output)
-    names = (runner.OUTPUT_NAME, runner.FOUND_NAME, runner.TIME_SUMS_NAME)
+    names = (HELDOUT_EVENTS_NAME, CANONICAL_EVENTS_FOUND_NAME, HELDOUT_TIME_SUMS_NAME)
     return record, {
         name: pd.read_parquet(output_path(EPOCH, output, name)) for name in names
     }
@@ -145,7 +150,7 @@ def test_run_epoch_writes_the_heldout_events_the_canonical_found_and_the_time(
     data_dir,
 ):
     record, tables = _run_epoch(data_dir)
-    events = tables[runner.OUTPUT_NAME]
+    events = tables[HELDOUT_EVENTS_NAME]
     assert list(zip(events["s"], events["e"], strict=True)) == HELDOUT
     assert events["heldout_event_id"].tolist() == [f"{EPOCH}:1", f"{EPOCH}:2"]
     assert events["group"].tolist() == ["SWR", "no SWR"]
@@ -162,12 +167,12 @@ def test_run_epoch_writes_the_heldout_events_the_canonical_found_and_the_time(
     )
     assert events["n_bins_outside_swr_in_visit"].tolist() == [5, 0]
     # the canonical events: 1 shares bins with a held-out event, 2 does not
-    found = tables[runner.FOUND_NAME]
+    found = tables[CANONICAL_EVENTS_FOUND_NAME]
     assert found["event_id"].tolist() == [11, 22]
     assert found["group"].tolist() == ["no SWR", "no SWR"]
     assert found["shares_bin_with_heldout"].tolist() == [True, False]
     # the time sums mark both held-out events' bins, wherever they start
-    sums = tables[runner.TIME_SUMS_NAME]
+    sums = tables[HELDOUT_TIME_SUMS_NAME]
     assert sums["n_bins"].sum() == N
     assert sums.loc[sums["in_event_window"], "n_bins"].sum() == 20
     assert set(sums["epoch_id"]) == {EPOCH}
@@ -203,7 +208,7 @@ def _failed_record(data_dir, monkeypatch) -> dict:
             task=runner.run_epoch,
             task_args=(data_dir / "e.parquet", data_dir, output),
             output=output,
-            name=runner.OUTPUT_NAME,
+            name=HELDOUT_EVENTS_NAME,
             header={
                 "produced_by": "t",
                 "settings": {},
@@ -215,7 +220,7 @@ def _failed_record(data_dir, monkeypatch) -> dict:
         )
     record = json.loads((output / "manifest.json").read_text())["epochs"][EPOCH]
     assert record["status"] == "failed"
-    assert not output_path(EPOCH, output, runner.OUTPUT_NAME).exists()
+    assert not output_path(EPOCH, output, HELDOUT_EVENTS_NAME).exists()
     return record
 
 

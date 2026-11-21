@@ -14,7 +14,11 @@ import pytest
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
 )
-from continuum_swr_replay.paths import EVENT_NONLOCAL_RESTRICTION_DIR
+from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
+    EVENT_NONLOCAL_RESTRICTION_DIR,
+    NONLOCAL_RESTRICTION_NAME,
+)
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import measure_bin_facts as runner
 from tests.support._session_cache_fixtures import write_session_cache_entries
@@ -54,7 +58,7 @@ def folders(tmp_path, monkeypatch):
 
 def _record(restriction) -> None:
     """A fold-fit record: it counts no spikes."""
-    output_path(EPOCH, restriction, runner.RESTRICTION_NAME).with_suffix(
+    output_path(EPOCH, restriction, NONLOCAL_RESTRICTION_NAME).with_suffix(
         ".json"
     ).write_text(json.dumps({"status": "ok", "fit": "folds", "n_bins": 6}))
 
@@ -63,7 +67,7 @@ def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
     data_dir, restriction, output = folders
     _record(restriction)
     record = runner.run_epoch(EPOCH, data_dir, restriction, output)
-    table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+    table = pd.read_parquet(output_path(EPOCH, output, BIN_FACTS_NAME))
     # spikes at 50.0 -> 0, 50.0031 -> 1, 50.005 -> 2, 50.0099 -> 4 (the last
     # bin, 5, is never reached); 60.0 is outside the grid
     np.testing.assert_array_equal(table["n_spikes"], [1, 1, 1, 0, 1, 0])

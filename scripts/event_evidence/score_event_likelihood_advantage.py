@@ -57,6 +57,7 @@ from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_PARTICIPATION_DIR,
+    PARTICIPATION_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -83,7 +84,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "likelihood_advantage"
-PARTICIPATION_NAME = "participation"
 
 
 def epoch_events(

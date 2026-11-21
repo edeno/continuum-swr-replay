@@ -15,6 +15,10 @@ import pytest
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths
+from continuum_swr_replay.paths import (
+    NONLOCAL_RESTRICTION_BINS_NAME,
+    NONLOCAL_RESTRICTION_NAME,
+)
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_nonlocal_restriction as runner
 from scripts.event_evidence._per_event_run import EpochInputs
@@ -221,12 +225,12 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
     record, output = patched(_frame(), _record())
     assert record["status"] == "ok" and "error" not in record
 
-    bins = pd.read_parquet(output_path(EPOCH, output, runner.BINS_NAME))
+    bins = pd.read_parquet(output_path(EPOCH, output, NONLOCAL_RESTRICTION_BINS_NAME))
     assert list(bins["category"].astype(str)) == CATEGORY
     assert bins["place_sampling_s"].dtype == np.float32
     np.testing.assert_array_equal(bins["in_swr"], IN_SWR)
 
-    sums = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+    sums = pd.read_parquet(output_path(EPOCH, output, NONLOCAL_RESTRICTION_NAME))
     sums = sums.set_index("category")
     assert sums["n_bins"].to_dict() == {
         "excluded": 1,
@@ -286,7 +290,7 @@ def test_a_failed_check_is_recorded_with_its_message(patched):
     assert record["status"] == "failed_check"
     assert "full: predictive posterior mass" in record["error"]
     # the tables are still written, for diagnosis
-    assert output_path(EPOCH, output, runner.BINS_NAME).exists()
+    assert output_path(EPOCH, output, NONLOCAL_RESTRICTION_BINS_NAME).exists()
 
 
 def test_a_frame_swr_outside_the_source_raises(patched):
@@ -303,7 +307,7 @@ def test_the_fold_fit_scores_and_checks_every_fold(patched):
     record, output = patched(_frame(), _record())
     assert record["status"] == "ok" and record["fit"] == "folds"
     assert record["folds"][0]["fold"] == 0
-    assert output_path(EPOCH, output, runner.BINS_NAME).exists()
+    assert output_path(EPOCH, output, NONLOCAL_RESTRICTION_BINS_NAME).exists()
     record, _ = patched(_frame(), _record(causal_mass_deviation_none=1.0))
     assert record["status"] == "failed_check"
     assert record["error"].startswith("fold 0: none: filtered posterior mass")

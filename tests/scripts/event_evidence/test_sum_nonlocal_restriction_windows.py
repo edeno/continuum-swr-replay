@@ -12,10 +12,15 @@ import pytest
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    NONLOCAL_RESTRICTION_BINS_NAME,
+    NONLOCAL_RESTRICTION_WINDOWS_NAME,
+    PARTICIPATION_NAME,
+    TETRODE_HOLDOUT_NAME,
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import sum_nonlocal_restriction_windows as runner
@@ -100,10 +105,10 @@ def data_dir(tmp_path, monkeypatch):
         ".json"
     ).write_text(json.dumps({"status": "ok", "fit": "folds", "n_bins": N}))
     for folder, name, table in (
-        (EVENT_NONLOCAL_RESTRICTION_DIR, runner.BINS_NAME, _bins()),
-        (EVENT_BIN_FACTS_DIR, runner.FACTS_NAME, _facts()),
-        (EVENT_PARTICIPATION_DIR, runner.PARTICIPATION_NAME, PARTICIPATION),
-        (EVENT_TETRODE_HOLDOUT_DIR, runner.HOLDOUT_NAME, _holdout()),
+        (EVENT_NONLOCAL_RESTRICTION_DIR, NONLOCAL_RESTRICTION_BINS_NAME, _bins()),
+        (EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME, _facts()),
+        (EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME, PARTICIPATION),
+        (EVENT_TETRODE_HOLDOUT_DIR, TETRODE_HOLDOUT_NAME, _holdout()),
     ):
         (tmp_path / folder).mkdir(exist_ok=True)
         table.to_parquet(output_path(EPOCH, tmp_path / folder, name))
@@ -116,7 +121,9 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     output = tmp_path / "out"
     output.mkdir()
     record = runner.run_epoch(EPOCH, tmp_path / "event_table.parquet", data_dir, output)
-    table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+    table = pd.read_parquet(
+        output_path(EPOCH, output, NONLOCAL_RESTRICTION_WINDOWS_NAME)
+    )
     assert table["window_id"].tolist() == [0, 1, 2]
     assert table["n_bins"].tolist() == [3, 2, 2]
     assert table["n_spikes"].tolist() == [2, 0, 5]
@@ -154,7 +161,7 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     assert record["n_spikes"] == 8
     # the time sums are the held-out event run's (detect_heldout_events.py)
     assert sorted(path.name for path in output.iterdir()) == [
-        f"{EPOCH}_{runner.OUTPUT_NAME}.parquet"
+        f"{EPOCH}_{NONLOCAL_RESTRICTION_WINDOWS_NAME}.parquet"
     ]
 
 
@@ -185,11 +192,13 @@ def test_another_restriction_run_is_read(data_dir, tmp_path):
     other.mkdir()
     bins = _bins()
     bins["full"] = np.float32(5.0)
-    bins.to_parquet(output_path(EPOCH, other, runner.BINS_NAME))
+    bins.to_parquet(output_path(EPOCH, other, NONLOCAL_RESTRICTION_BINS_NAME))
     output = tmp_path / "out"
     output.mkdir()
     runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, output, other)
-    table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+    table = pd.read_parquet(
+        output_path(EPOCH, output, NONLOCAL_RESTRICTION_WINDOWS_NAME)
+    )
     np.testing.assert_allclose(table["full"] - table["swr"], [12, 8, 8])
 
 
@@ -203,7 +212,7 @@ def test_windows_the_holdout_run_did_not_score_raise(data_dir, tmp_path):
     holdout = _holdout()
     holdout = holdout[holdout["window_id"] != 2]
     holdout.to_parquet(
-        output_path(EPOCH, data_dir / EVENT_TETRODE_HOLDOUT_DIR, runner.HOLDOUT_NAME)
+        output_path(EPOCH, data_dir / EVENT_TETRODE_HOLDOUT_DIR, TETRODE_HOLDOUT_NAME)
     )
     with pytest.raises(ValueError, match="not the held-out"):
         runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, tmp_path)

@@ -37,6 +37,7 @@ from continuum_swr_replay.runs.io import sha256_file
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
+
 def event_table_path(data_dir: Path) -> Path:
     """The canonical event table under the processed-data root ``data_dir``."""
     return table_path(

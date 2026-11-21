@@ -55,8 +55,10 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
+    NONLOCAL_RESTRICTION_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -80,8 +82,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "bin_facts"
-RESTRICTION_NAME = "nonlocal_restriction"
 
 
 def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
@@ -117,9 +117,9 @@ def run_epoch(
     table = bin_facts(time, loaded["spike_times"], visits)
     n_spikes = int(table["n_spikes"].sum())
     restriction_record = output_path(
-        epoch_id, restriction_dir, RESTRICTION_NAME
+        epoch_id, restriction_dir, NONLOCAL_RESTRICTION_NAME
     ).with_suffix(".json")
-    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
+    write_table(table, output_path(epoch_id, output, BIN_FACTS_NAME))
     inside = table["in_well_visit"].to_numpy()
     return json_ready(
         {
@@ -160,14 +160,14 @@ def main(argv: list[str] | None = None) -> None:
         "inputs": {"session_cache": session_cache_record(every_epoch)},
     }
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, BIN_FACTS_NAME, header)
         return
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
         task_args=(data_dir, restriction_dir, output),
         output=output,
-        name=OUTPUT_NAME,
+        name=BIN_FACTS_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=args.workers,

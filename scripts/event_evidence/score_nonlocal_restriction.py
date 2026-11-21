@@ -121,6 +121,8 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
+    NONLOCAL_RESTRICTION_BINS_NAME,
+    NONLOCAL_RESTRICTION_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -141,8 +143,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "nonlocal_restriction"
-BINS_NAME = "nonlocal_restriction_bins"
 
 SPARSE_SAMPLING_S = 10.0
 """The record's second sampling share: immobile bins whose fold's encoding had
@@ -198,14 +198,15 @@ def run_epoch(
     )
     failures = nr.fold_check_failures(record)
     bins_path = write_table(
-        scores.assign(category=categories), output_path(epoch_id, output, BINS_NAME)
+        scores.assign(category=categories),
+        output_path(epoch_id, output, NONLOCAL_RESTRICTION_BINS_NAME),
     )
     sums = nr.restriction_sums(scores, np.asarray(categories))
     share = nr.share_outside_swr(sums)
     animal = parse_epoch_identifier(epoch_id).animal
     write_table(
         sums.reset_index().assign(epoch_id=epoch_id, animal=animal),
-        output_path(epoch_id, output, OUTPUT_NAME),
+        output_path(epoch_id, output, NONLOCAL_RESTRICTION_NAME),
     )
 
     labels = np.asarray(categories)
@@ -298,7 +299,7 @@ def main(argv: list[str] | None = None) -> None:
         "inputs": {},
     }
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, NONLOCAL_RESTRICTION_NAME, header)
         return
     max_workers, pool_options = gpu_pool(parser, args)
     run(
@@ -308,7 +309,7 @@ def main(argv: list[str] | None = None) -> None:
         task=run_epoch,
         task_args=(data_dir, output, args.fold_design),
         output=output,
-        name=OUTPUT_NAME,
+        name=NONLOCAL_RESTRICTION_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=max_workers,

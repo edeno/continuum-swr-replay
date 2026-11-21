@@ -105,9 +105,14 @@ from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD, ROOT_DIR
 from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
+    CANONICAL_EVENTS_FOUND_NAME,
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    HELDOUT_EVENTS_NAME,
+    HELDOUT_TIME_SUMS_NAME,
+    NONLOCAL_RESTRICTION_BINS_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -134,11 +139,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "heldout_events"
-FOUND_NAME = "canonical_events_found"
-TIME_SUMS_NAME = "heldout_time_sums"
-BINS_NAME = "nonlocal_restriction_bins"
-FACTS_NAME = "bin_facts"
 HELDOUT_PROBABILITIES = tuple(STATE_PROBABILITY_COLUMNS[s] for s in NON_LOCAL_STATES)
 """The per-bin table's held-out P(Non-Local Continuous) and P(Non-Local
 Fragmented) of the ``full`` model."""
@@ -174,8 +174,8 @@ def run_epoch(
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
-    bins_path = output_path(epoch_id, restriction_dir, BINS_NAME)
-    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, FACTS_NAME)
+    bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
+    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME)
     decode_path = decode_paths(epoch_id, data_dir).data_over_time
     bins = pd.read_parquet(bins_path)
     facts = pd.read_parquet(facts_path)
@@ -266,7 +266,7 @@ def run_epoch(
         ],
         axis=1,
     )
-    write_table(rows, output_path(epoch_id, output, OUTPUT_NAME))
+    write_table(rows, output_path(epoch_id, output, HELDOUT_EVENTS_NAME))
 
     # the canonical events found again
     found_canonical = he.shared_bin_events(canonical, heldout)
@@ -286,13 +286,13 @@ def run_epoch(
             ).to_numpy(dtype=bool),
         }
     )
-    write_table(found_table, output_path(epoch_id, output, FOUND_NAME))
+    write_table(found_table, output_path(epoch_id, output, CANONICAL_EVENTS_FOUND_NAME))
 
     # the epoch's time, with the held-out events' windows as the event windows
     time_sums = rt.restriction_time_sums(bins, facts, windows)
     time_sums.insert(0, "animal", animal)
     time_sums.insert(0, "epoch_id", epoch_id)
-    write_table(time_sums, output_path(epoch_id, output, TIME_SUMS_NAME))
+    write_table(time_sums, output_path(epoch_id, output, HELDOUT_TIME_SUMS_NAME))
 
     return json_ready(
         {
@@ -362,7 +362,7 @@ def main(argv: list[str] | None = None) -> None:
         },
     }
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, HELDOUT_EVENTS_NAME, header)
         return
     run(
         epochs=select_epochs(
@@ -373,7 +373,7 @@ def main(argv: list[str] | None = None) -> None:
         task=run_epoch,
         task_args=(event_table, data_dir, output, restriction_dir),
         output=output,
-        name=OUTPUT_NAME,
+        name=HELDOUT_EVENTS_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=args.workers,

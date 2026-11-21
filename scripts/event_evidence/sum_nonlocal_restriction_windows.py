@@ -95,11 +95,16 @@ from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
+    BIN_FACTS_NAME,
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    NONLOCAL_RESTRICTION_BINS_NAME,
+    NONLOCAL_RESTRICTION_WINDOWS_NAME,
+    PARTICIPATION_NAME,
+    TETRODE_HOLDOUT_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -128,11 +133,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "nonlocal_restriction_windows"
-BINS_NAME = "nonlocal_restriction_bins"
-FACTS_NAME = "bin_facts"
-HOLDOUT_NAME = "tetrode_holdout"
-PARTICIPATION_NAME = "participation"
 HOLDOUT_COLUMNS = [*rw.WINDOW_KEYS, "tetrode", "n_bins", "n_spikes"]
 
 
@@ -164,10 +164,10 @@ def run_epoch(
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
-    bins_path = output_path(epoch_id, restriction_dir, BINS_NAME)
-    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, FACTS_NAME)
+    bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
+    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME)
     holdout_path = output_path(
-        epoch_id, data_dir / EVENT_TETRODE_HOLDOUT_DIR, HOLDOUT_NAME
+        epoch_id, data_dir / EVENT_TETRODE_HOLDOUT_DIR, TETRODE_HOLDOUT_NAME
     )
     participation_path = output_path(
         epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME
@@ -193,7 +193,7 @@ def run_epoch(
     animal = parse_epoch_identifier(epoch_id).animal
     table.insert(0, "animal", animal)
     table.insert(0, "epoch_id", epoch_id)
-    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
+    write_table(table, output_path(epoch_id, output, NONLOCAL_RESTRICTION_WINDOWS_NAME))
 
     no_swr_events = (table["kind"] == "event") & (table["group"] == "no SWR")
     return json_ready(
@@ -338,7 +338,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         header["settings"][rw.EVENT_TABLE_NOTE] = note
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, NONLOCAL_RESTRICTION_WINDOWS_NAME, header)
         return
     check_holdout_inputs(header["inputs"], holdout_manifest)
     restriction_ok = set(ok_epochs(read_manifest(restriction_dir)))
@@ -356,7 +356,7 @@ def main(argv: list[str] | None = None) -> None:
         task=run_epoch,
         task_args=(event_table, data_dir, output, restriction_dir),
         output=output,
-        name=OUTPUT_NAME,
+        name=NONLOCAL_RESTRICTION_WINDOWS_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=args.workers,

@@ -12,7 +12,11 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths
-from continuum_swr_replay.paths import EVENT_PARTICIPATION_DIR
+from continuum_swr_replay.paths import (
+    EVENT_PARTICIPATION_DIR,
+    PARTICIPATION_NAME,
+    TETRODE_HOLDOUT_NAME,
+)
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_tetrode_holdout as runner
 from scripts.event_evidence._per_event_run import EpochInputs
@@ -55,7 +59,7 @@ def patched(tmp_path, monkeypatch):
         tmp_path / "environment.pkl",
     )
     participation = output_path(
-        EPOCH, tmp_path / EVENT_PARTICIPATION_DIR, runner.PARTICIPATION_NAME
+        EPOCH, tmp_path / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME
     )
     participation.parent.mkdir()
     PARTICIPATION.to_parquet(participation)
@@ -134,7 +138,7 @@ def patched(tmp_path, monkeypatch):
         record = runner.run_epoch(
             EPOCH, tmp_path / "event_table.parquet", tmp_path, output, fold_design
         )
-        table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+        table = pd.read_parquet(output_path(EPOCH, output, TETRODE_HOLDOUT_NAME))
         assert list(table["kind"]) == ["event", "control", "event", "control"]
         return record, given
 
