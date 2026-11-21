@@ -244,9 +244,11 @@ class SessionFit:
     Attributes
     ----------
     fit : NewtonFit
-        The inner fit (``beta``, ``A``, convergence).
+        The inner fit (``beta``, ``A``, status); ``beta`` and ``A`` are NaN at
+        the session's inactive columns.
     covariance : np.ndarray, shape (p, p)
-        ``A^-1``, the Bayesian covariance of ``beta`` (mgcv's ``Vp``).
+        ``A^-1``, the Bayesian covariance of ``beta`` (mgcv's ``Vp``); NaN in
+        the rows and columns of the inactive columns.
     edf : np.ndarray, shape (m,)
         Effective degrees of freedom per penalty block: the trace of the
         block's rows and columns of ``A^-1 H`` (mgcv's ``edf``, summed over
