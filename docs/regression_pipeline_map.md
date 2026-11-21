@@ -476,13 +476,13 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
-`PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
+`ConstrainedSmooth`, `PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
 
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
 Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
 
-`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `SessionFit`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -770,7 +770,7 @@ Compare the shared fitter without a penalty with the current fitters on real ses
 
 Compare the shared regression fitter with mgcv on small synthetic data sets.
 
-`make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
+`stop_bins`, `make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
 
 ### `scripts/checks/compare_regression_to_neurospatial.py`
 
