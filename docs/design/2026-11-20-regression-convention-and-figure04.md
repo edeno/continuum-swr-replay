@@ -605,6 +605,18 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
 - Decision: label the events in the data structures and filter at analysis (section 4.1). The outside
   events are not described in a supplement for now ("We might decide to at some point").
 
+### Seventh round (lead, 2026-11-20): how the labels are built
+
+- The labels go into the main tables as new columns, not into a separate label table ("new table is just
+  avoiding future work").
+- New columns change the table files, so every stored output that recorded the old files (the per-event
+  measurements of Figures 2 and 3, the behavior fits, the mPFC bundles) is marked stale and its values
+  pending until it is run again. The lead accepts that ("pending is fine, this whole system gets in the way
+  of iteration"); no tool is built to avoid it.
+- The labels and the one filter function are built first, on their own branch (`event-visit-labels`), and
+  merged early so that other work can use them. That step changes no number. Figures 2 and 3 move to the
+  filter in a second step, timed with the other session's Figure 2 work.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
