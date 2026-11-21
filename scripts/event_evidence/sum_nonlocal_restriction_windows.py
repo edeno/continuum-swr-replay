@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""The non-local restriction scores summed over the windows of Figure 2's panel g.
+"""The non-local restriction scores summed over the canonical events and their controls.
 
 For each epoch of the restriction run (``score_nonlocal_restriction.py``, its
 ``ok`` records): read its per-bin table, check that its time is the decode
@@ -16,11 +16,11 @@ window's spikes over its bins outside SWRs and its sums over those inside a
 well visit (``restriction_windows.window_bin_fact_sums``; the facts' spikes over
 the whole window must be the held-out tetrode run's ``n_spikes``, which ties
 the facts' spikes to that run's loader: the restriction run's record counts no
-spikes), and sum the epoch's
-bins by category, well visit and event window
-(``restriction_totals.restriction_time_sums``). An epoch that is ``ok`` in only
-one of the two runs is left out and named in a warning. CPU only: pandas and
-numpy, nothing is decoded or refit.
+spikes). An epoch that is ``ok`` in only one of the two runs is left out and
+named in a warning. CPU only: pandas and numpy, nothing is decoded or refit.
+The epoch's bins summed by category, well visit and event window, and Figure
+2g's events, come from ``detect_heldout_events.py``, from events detected on
+held-out data.
 
 ``--restriction-dir`` reads another restriction run (a second scoring of the
 same bins, such as the earlier design's, which held out only the encodings)
@@ -39,10 +39,6 @@ Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
   ``n_spikes``, and the columns from the per-bin facts
   (``restriction_windows.BIN_FACT_COLUMNS``: ``n_spikes_outside_swr``, and the
   bins, spikes and six scores of the bins outside SWRs inside a well visit);
-- ``{epoch_id}_nonlocal_restriction_time_sums.parquet``: the epoch's bins,
-  spikes and six summed scores by ``category``, ``in_well_visit`` and
-  ``in_event_window`` (``restriction_totals.restriction_time_sums``), with
-  ``epoch_id`` and ``animal``;
 - ``{epoch_id}_nonlocal_restriction_windows.json``: the epoch's record (the
   windows by kind and group, the windows with a bin in excluded time, outside
   the immobile categories, with a score that is not finite, without spikes, the
@@ -90,7 +86,6 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
     read_swr_table,
 )
-from continuum_swr_replay.analysis.event_evidence import restriction_totals as rt
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     epoch_windows,
@@ -128,12 +123,12 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     event_table_input,
     event_table_path,
     run,
+    run_input,
     select_epochs,
 )
 
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction_windows"
-TIME_SUMS_NAME = "nonlocal_restriction_time_sums"
 BINS_NAME = "nonlocal_restriction_bins"
 FACTS_NAME = "bin_facts"
 HOLDOUT_NAME = "tetrode_holdout"
@@ -154,7 +149,7 @@ def run_epoch(
     output: Path,
     restriction_dir: Path | None = None,
 ) -> dict:
-    """Sum one epoch's windows and time, write its tables and return its record.
+    """Sum one epoch's windows, write its table and return its record.
 
     ``restriction_dir`` is the restriction run read, by default
     ``data_dir / EVENT_NONLOCAL_RESTRICTION_DIR``.
@@ -202,10 +197,6 @@ def run_epoch(
     table.insert(0, "animal", animal)
     table.insert(0, "epoch_id", epoch_id)
     write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
-    time_sums = rt.restriction_time_sums(bins, facts, windows)
-    time_sums.insert(0, "animal", animal)
-    time_sums.insert(0, "epoch_id", epoch_id)
-    write_table(time_sums, output_path(epoch_id, output, TIME_SUMS_NAME))
 
     no_swr_events = (table["kind"] == "event") & (table["group"] == "no SWR")
     return json_ready(
@@ -252,12 +243,6 @@ def run_epoch(
             "seconds": round(clock.time() - started, 1),
         }
     )
-
-
-def run_input(run_dir: Path) -> dict[str, str]:
-    """A run folder as an input: its manifest's digest and where it is."""
-    manifest = run_dir / "manifest.json"
-    return {"sha256": sha256_file(manifest), "path": str(run_dir)}
 
 
 def check_holdout_inputs(header_inputs: dict, holdout_manifest: dict) -> None:

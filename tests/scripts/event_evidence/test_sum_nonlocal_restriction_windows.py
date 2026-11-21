@@ -152,17 +152,10 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     )
     assert record["n_events_without_spikes_outside_swr"] == 1
     assert record["n_spikes"] == 8
-    # the time sums: 20 bins, by category, visit and event window
-    sums = pd.read_parquet(output_path(EPOCH, output, runner.TIME_SUMS_NAME))
-    assert len(sums) == 16 and sums["n_bins"].sum() == N
-    assert sums["n_spikes"].sum() == 8
-    rest = sums.set_index(["category", "in_well_visit", "in_event_window"]).loc[
-        ("immobile_outside_swr", True, False)
+    # the time sums are the held-out event run's (detect_heldout_events.py)
+    assert sorted(path.name for path in output.iterdir()) == [
+        f"{EPOCH}_{runner.OUTPUT_NAME}.parquet"
     ]
-    # bins 0-1 and 10-16 (bin 9 is in an SWR; 2-4 and 8 are event bins)
-    assert rest["n_bins"] == 9 and rest["n_spikes"] == 5
-    assert rest["full"] - rest["swr"] == pytest.approx(18.0)
-    assert set(sums["epoch_id"]) == {EPOCH}
 
 
 def test_per_bin_facts_whose_window_spikes_are_not_the_holdout_runs_raise(
