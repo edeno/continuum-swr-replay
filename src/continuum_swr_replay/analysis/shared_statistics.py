@@ -20,9 +20,9 @@
   :func:`weighted_median`.
 - :func:`bootstrap_interval`: the 95 % interval from those draws, a
   small-sample t correction over the animals.
-- :func:`animal_day_session_bootstrap`: a per-session number (or curve) taken
+- :func:`animal_balanced_bootstrap`: a per-session number (or curve) taken
   session -> recording day -> animal as a mean of means, with its nested
-  bootstrap draws (animals, then their days, then each day's sessions).
+  bootstrap draws (animals, then their sessions; the days are not resampled).
 - :func:`animal_day_session_values`, :func:`day_level_test` and
   :func:`estimand_summary`: each animal's value row -> session -> day ->
   animal; the signed-rank p over recording days; and a scalar estimand's
@@ -517,9 +517,9 @@ def bootstrap_interval(
     return BootstrapInterval(low, high, sd)
 
 
-class ThreeLevelDraws(NamedTuple):
-    """A mean of means over sessions, days and animals, and its bootstrap draws
-    (:func:`animal_day_session_bootstrap`).
+class AnimalBalancedDraws(NamedTuple):
+    """A per-session number taken session -> day -> animal, and its bootstrap
+    draws (:func:`animal_balanced_bootstrap`).
 
     Attributes
     ----------
@@ -537,60 +537,73 @@ class ThreeLevelDraws(NamedTuple):
     n_animals: int
 
 
-def _three_level_weights(
-    animal: NDArray[np.int64], day: NDArray[np.int64], draws: NestedDraw
+def _animal_balanced_weights(
+    animal: NDArray[np.int64],
+    day: NDArray[np.int64],
+    animal_counts: NDArray[np.int64],
+    session_counts: NDArray[np.int64],
 ) -> NDArray[np.float64]:
-    """Each session's weight in the mean of means of each replicate.
+    """Each session's weight in the day -> animal mean of each replicate.
 
-    A session's weight is ``A_a / n_animals * D_d / sum_{d' of a} D_d' *
-    R_s / sum_{s' of d} R_s'``, with ``A``, ``D`` and ``R`` how often its
-    animal, day and the session itself are drawn. A copy of an animal (or day)
-    drawn ``k`` times draws ``k`` times as many members, pooled
-    (:func:`nested_bootstrap_draws`), and with copies of one size the mean of
-    the copies' means is the mean over the pooled members, so the weights are
-    exact for a mean of means.
+    A session's weight is ``A_a / n_animals / n_a * R_s / sum_{s' of d} R_s'``,
+    with ``A_a`` and ``R_s`` how often its animal and the session itself are
+    drawn and ``n_a`` the number of its animal's days with a drawn session: a
+    day's mean is over its drawn sessions, and a day with none is absent. An
+    animal drawn ``k`` times draws ``k`` times as many sessions, pooled
+    (:func:`nested_bootstrap_draws`), so its days' means are taken over the
+    pooled sessions.
+
+    Parameters
+    ----------
+    animal, day : NDArray of int, shape (n_sessions,)
+        Codes; every day belongs to one animal.
+    animal_counts : NDArray of int, shape (n_draws, n_animals)
+    session_counts : NDArray of int, shape (n_draws, n_sessions)
 
     Returns
     -------
     NDArray, shape (n_draws, n_sessions)
     """
-    n_animals = draws.animals.shape[1]
-    day_animal = np.zeros(draws.sessions.shape[1], dtype=np.int64)
+    n_animals = animal_counts.shape[1]
+    n_days = int(day.max()) + 1
+    day_animal = np.zeros(n_days, dtype=np.int64)
     day_animal[day] = animal
-    day_total = np.stack([np.bincount(day, weights=r) for r in draws.rows])
-    animal_total = np.stack(
-        [np.bincount(day_animal, weights=d) for d in draws.sessions]
+    day_total = np.stack([np.bincount(day, r, n_days) for r in session_counts])
+    days_drawn = np.stack(
+        [np.bincount(day_animal, t > 0, n_animals) for t in day_total]
     )
     within_day = np.divide(
-        draws.rows,
+        session_counts,
         day_total[:, day],
-        out=np.zeros(draws.rows.shape),
-        where=draws.rows > 0,
+        out=np.zeros(session_counts.shape),
+        where=session_counts > 0,
     )
-    within_animal = np.divide(
-        draws.sessions,
-        animal_total[:, day_animal],
-        out=np.zeros(draws.sessions.shape),
-        where=draws.sessions > 0,
+    per_day = np.divide(
+        1.0,
+        days_drawn[:, animal],
+        out=np.zeros(session_counts.shape),
+        where=days_drawn[:, animal] > 0,
     )
-    return draws.animals[:, animal] / n_animals * within_animal[:, day] * within_day
+    return animal_counts[:, animal] / n_animals * per_day * within_day
 
 
-def animal_day_session_bootstrap(
+def animal_balanced_bootstrap(
     values: ArrayLike,
     animal: ArrayLike,
     day: ArrayLike,
     *,
     n_draws: int,
     seed: int,
-) -> ThreeLevelDraws:
+) -> AnimalBalancedDraws:
     """A per-session number taken session -> day -> animal, with its draws.
 
     The estimate is the mean over animals of each animal's mean over its
-    recording days of each day's mean over its sessions. The draws resample
-    the same three levels (:func:`nested_bootstrap_draws` with the days as its
-    sessions and the sessions as its rows): animals with replacement, then
-    each drawn animal's days, then each drawn day's sessions.
+    recording days of each day's mean over its sessions. The draws are the
+    project's nested bootstrap of animals, then their sessions
+    (:func:`nested_bootstrap_draws`, each session one row); the days are not
+    resampled. In each draw the estimate is recomputed on the sessions drawn:
+    a day's mean over its drawn sessions, an animal's mean over its days with
+    a drawn session, the mean over the drawn animals.
 
     Parameters
     ----------
@@ -607,7 +620,7 @@ def animal_day_session_bootstrap(
 
     Returns
     -------
-    ThreeLevelDraws
+    AnimalBalancedDraws
     """
     values = np.asarray(values, dtype=float)
     finite = np.isfinite(values.reshape(values.shape[0], -1)).all(axis=1)
@@ -615,20 +628,26 @@ def animal_day_session_bootstrap(
     animal = np.asarray(animal)[finite]
     day = np.asarray(day)[finite]
     animal_codes, day_codes = _animal_day_codes(animal, day)
+    session_codes = np.arange(values.shape[0], dtype=np.int64)
     flat = values.reshape(values.shape[0], -1)
     n_animals = int(animal_codes.max()) + 1
-    n_days = int(day_codes.max()) + 1
-    once = NestedDraw(
-        np.ones((1, n_animals), dtype=np.int64),
-        np.ones((1, n_days), dtype=np.int64),
-        np.ones((1, values.shape[0]), dtype=np.int64),
+    estimate = (
+        _animal_balanced_weights(
+            animal_codes,
+            day_codes,
+            np.ones((1, n_animals), dtype=np.int64),
+            np.ones((1, values.shape[0]), dtype=np.int64),
+        )
+        @ flat
     )
-    estimate = _three_level_weights(animal_codes, day_codes, once) @ flat
     draws = nested_bootstrap_draws(
-        animal_codes, day_codes, np.random.default_rng(seed), n_draws
+        animal_codes, session_codes, np.random.default_rng(seed), n_draws
     )
-    replicates = _three_level_weights(animal_codes, day_codes, draws) @ flat
-    return ThreeLevelDraws(
+    replicates = (
+        _animal_balanced_weights(animal_codes, day_codes, draws.animals, draws.sessions)
+        @ flat
+    )
+    return AnimalBalancedDraws(
         estimate.reshape(values.shape[1:]),
         replicates.reshape((n_draws, *values.shape[1:])),
         n_animals,
@@ -736,9 +755,9 @@ def estimand_summary(
     """The summary of a scalar estimand over sessions.
 
     The estimate is the animal-balanced value: session -> recording day ->
-    animal, a mean of means (:func:`animal_day_session_bootstrap`). Its 95 %
+    animal, a mean of means (:func:`animal_balanced_bootstrap`). Its 95 %
     interval is :func:`bootstrap_interval` over that function's nested
-    bootstrap draws (animals, then days, then sessions). Beside it stand the
+    bootstrap draws (animals, then their sessions). Beside it stand the
     animals whose own value (:func:`animal_day_session_values`, means) has the
     estimate's sign and the recording-day-level test (:func:`day_level_test`).
     No claim rests on a p over five animals.
@@ -780,7 +799,7 @@ def estimand_summary(
     )[has_value]
     if labels.duplicated().any():
         raise ValueError("a session has more than one value")
-    boot = animal_day_session_bootstrap(
+    boot = animal_balanced_bootstrap(
         values[has_value].to_numpy(),
         labels.animal.to_numpy(),
         labels.day.to_numpy(),

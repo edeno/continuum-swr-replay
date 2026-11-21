@@ -101,7 +101,7 @@ def test_the_across_session_band_widens_the_bootstrap_sd_by_the_t_correction() -
     curves = np.sin(GRID)[None, :] + offsets[animal, None]
     curves = curves + rng.normal(0.0, 0.3, (animal.size, GRID.size))
     band = across_session_band(curves, animal, day, n_draws=2000, seed=5)
-    boot = stats.animal_day_session_bootstrap(curves, animal, day, n_draws=2000, seed=5)
+    boot = stats.animal_balanced_bootstrap(curves, animal, day, n_draws=2000, seed=5)
     np.testing.assert_allclose(band.estimate, boot.estimate)
     sd = boot.draws.std(axis=0, ddof=1)
     np.testing.assert_allclose(band.se, sd)

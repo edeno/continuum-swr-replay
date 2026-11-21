@@ -13,7 +13,7 @@ point alone. Two forms:
 - the animal-balanced curve across sessions (:func:`across_session_band`):
   the per-session curves on one grid are taken session -> recording day ->
   animal as a mean of means, with nested bootstrap draws of that curve
-  (``shared_statistics.animal_day_session_bootstrap``). ``sd_g`` is the draws'
+  (animals, then their sessions; ``shared_statistics.animal_balanced_bootstrap``). ``sd_g`` is the draws'
   standard deviation, ``c`` the 0.95 quantile of
   ``max_g |draw_g - mean_g| / sd_g``, and the band is
   ``estimate +/- c sd_g k`` with ``k = t(0.975, A - 1) sqrt(A / (A - 1)) /
@@ -34,7 +34,7 @@ from scipy.stats import norm
 from scipy.stats import t as student_t
 
 from continuum_swr_replay.analysis.shared_statistics import (
-    animal_day_session_bootstrap,
+    animal_balanced_bootstrap,
 )
 
 __all__ = [
@@ -177,7 +177,7 @@ def across_session_band(
         If fewer than two animals have a session, or the draws do not vary at
         a grid point.
     """
-    boot = animal_day_session_bootstrap(curves, animal, day, n_draws=n_draws, seed=seed)
+    boot = animal_balanced_bootstrap(curves, animal, day, n_draws=n_draws, seed=seed)
     n_animals = boot.n_animals
     if n_animals < 2:
         raise ValueError(f"{n_animals} animal: a band needs at least two")
