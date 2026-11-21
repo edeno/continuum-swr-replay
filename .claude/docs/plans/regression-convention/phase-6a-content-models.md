@@ -49,6 +49,17 @@ tested together in one model with the trial number
 well's arm), ASK-1 (lead: "Move them": the ContFrag SWR- and MUA-sourced events are two more event sources of
 this runner), C14.
 
+**Questions for the lead at this phase** (calls of the plan's author, not decided; ask before the first
+real fit and state the answers in `docs/regression_models.md`):
+
+- Q4a, first declared as a slope on the reward fraction, is read as the change of the current role's
+  reward-fraction smooth over one pooled standard deviation of the fraction, `f(m + sd/2) - f(m - sd/2)`
+  ([designs.md#content-design](designs.md#content-design)). The lead may prefer another summary of the
+  curve.
+- The trial number in the epoch is the number of visits the animal has arrived at by the event start
+  (Phase 3's `n_visits_arrived`), not the trials completed (`completed_trial_id`).
+- WAITS FOR THE LEAD (smooth-term rule): the freedom of the per-session smooth terms (gate item 2 below).
+
 **Gate before any real fit: the uncertainty simulations.** Two semi-synthetic studies on the real data
 structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`):
 
@@ -59,11 +70,18 @@ structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/202
    trial number unless the trial number is in the model; with all three and the trial number every
    false-positive rate is 1 to 9 % except the reward variability under curvature; the belief variance's power
    is 30 to 50 % at 0.25 per SD with a t test over five animals. (Simulation results, not summary values.)
-2. The repeat with the shared fitter's REML-penalized recency smooth (call; running in the same folder). Read
-   its result before any real fit. If the selected penalty moves recency into the belief variance, the
-   uncertainty model's recency curve is fitted unpenalized, or with the penalty selected in the model without
-   the uncertainty terms and then held (`Smooth(..., penalty=...)`, Phase 2); write which one into the
-   phase's PR and `docs/regression_models.md` before the first real fit.
+2. The repeat with the shared fitter's REML-penalized recency smooth is done (design, thirteenth and
+   fourteenth rounds; scratch `REPORT.md`, same folder; simulation): a penalty chosen from the data makes
+   each session's curve a straight line when a session has about 140 events of a kind, and the
+   belief-variance test is then wrong (61 % and 68 % false positives). A small fixed penalty, or a small
+   basis with no penalty, keeps that test correct (false positives 0 to 7 %) with low power (23 to 50 %
+   at an effect of the size of the recency effect's linear part). The lead kept one fit for each session
+   (fourteenth round).
+   WAITS FOR THE LEAD (smooth-term rule): how the uncertainty model's recency curve, and every other
+   per-session smooth of this phase, is fitted: option A, a natural cubic spline of 4 columns, knots from
+   the pooled data, no penalty (the author's recommendation, with the conclusions checked at 3, 4 and 5
+   columns), or option B, a P-spline with one fixed weak penalty per term. Write the rule into the phase's
+   PR and `docs/regression_models.md` before the first real fit.
 
 Both results go to the lead before any real fit of this phase. The statements that must be written before the
 fits (C5's rule for a term that fails the collinearity rule by design): the belief variance is reported
@@ -91,7 +109,9 @@ identifiability test" below), since scratch is not kept.
   missing covariate in the cohort step (counted per kind) -> terms:
   `Category(arm)` (arm fixed effects) + `Category(role)` + `Smooth(reward_fraction, 0, 1, 6, by=role)` +
   `Slope(value, by=role)` + `Smooth(log_recency, log 1, log 200)` on leaf rows + never-visited indicator +
-  `Smooth(u, 0, 3)` for the current role (Q7b). Two variants per model: length-unadjusted, and
+  `Smooth(u, 0, 3)` for the current role (Q7b). WAITS FOR THE LEAD (smooth-term rule): the three `Smooth`
+  terms' basis and penalty (a natural spline of 4 columns with no penalty, or a P-spline at a fixed weak
+  penalty); their ranges stay. Two variants per model: length-unadjusted, and
   length-adjusted (every role term and role slope interacting with `log(duration) - L0`, `L0` the pooled
   median, stored). One uncertainty model: the main design plus, on the leaf roles, the belief variance,
   the sample count (Phase 3's column) and the trial number in the epoch (Phase 3's `n_visits_arrived`), each
@@ -124,19 +144,33 @@ identifiability test" below), since scratch is not kept.
   record; each source is one stream, without an SWR and No SWR split, call). Their values are a
   supplementary comparison (Phase 7 builds the comparison values), not members of the declared family.
 - **Fit** through `analysis/regression/sessions.py` with the grouped softmax: support rule per role slope
-  and role category; one pooled REML selection per smooth, model and kind; collinearity per term (recency
-  against uncertainty is the known concern, design 2.3); records.
-- **Estimands** (`analysis/replay_models/content/role_content_statistics.py`, new): Q3a (current role
-  minus other_leaf), Q3b (previous minus other_leaf), Q4a (the current role's reward-fraction smooth,
-  `f(m + sd/2) - f(m - sd/2)`, designs.md), Q4b
-  (value slope on the other_leaf role), Q5a (recency smooth at log 20 minus at log 3, other_leaf rows),
-  Q5b-var and Q5b-n (the belief-variance and sample-count slopes on other_leaf, both from the one
-  uncertainty model),
-  Q7b (mean of the current role's `f_u` over
-  `[0, 0.25] s` minus over `[1, 2] s`), each per kind and difference, length-adjusted and unadjusted, with
-  `estimand_summary`. A term over the collinearity threshold is reported jointly with its partner, except a
-  declared term that fails the rule by design: the belief variance is reported beyond recency as C5 says,
-  with its simulated power.
+  and role category (a role column made inactive drops that role's rows from the session's fit, Phase 2);
+  sessions without a finite maximum handled by Phase 2's rule (the simulated content model had 4 of 242
+  such sessions; simulation); collinearity per term (recency against uncertainty is the known concern,
+  design 2.3); records. WAITS FOR THE LEAD (smooth-term rule): the plan had one pooled REML selection per
+  smooth, model and kind; under either option no penalty is chosen from the data for these per-session
+  smooth terms.
+- **Storage order of the design** (in the design builder, `role_content.py`): store each session's design
+  in column (Fortran) order if a timing confirms it. A reviewer measured one weighted Gram product at
+  7.0 ms in column order against 9.8 ms in row order on a synthetic session of 40,000 rows and 56 columns
+  (a rate-sized design, not verified by us; the content design has fewer rows). Timing step: on the
+  smoke-test session, time 20 fits of the main model with the design in each order (median, the same
+  thread count), check that the coefficients agree to 1e-12 relative, and keep column order only if it is
+  faster; state both timings in the PR.
+- **Estimands** (`analysis/replay_models/content/role_content_statistics.py`, new): Q3a (current role minus
+  other_leaf), Q3b (previous minus other_leaf), Q4a (the current role's reward-fraction smooth, `f(m + sd/2) -
+  f(m - sd/2)`, designs.md), Q4b (value slope on the other_leaf role), Q5a (recency smooth at log 20 minus at
+  log 3, other_leaf rows), Q5b-var and Q5b-n (the belief-variance and sample-count slopes on other_leaf, both
+  from the one uncertainty model), Q7b (mean of the current role's `f_u` over `[0, 0.25] s` minus over `[1, 2]
+  s`), each per kind and difference, length-adjusted and unadjusted, with `estimand_summary`. The recency
+  curve the paper shows (and Figure 4g) is read from the uncertainty model, the one that also holds the belief
+  variance, the sample count and the trial number: read from the model without them, the curve absorbs a true
+  belief-variance effect or a drift (simulation, bias 0.3 to 0.9). Its supported range in the simulation was 5
+  to 80 trials since the last visit; at 150 only about a quarter of the sessions contribute. Show it over that
+  range. Q5a's reference of 3 trials lies below that range: a question for the lead before the first real fit.
+  A term over the collinearity threshold is reported jointly with its partner, except a declared term that
+  fails the rule by design: the belief variance is reported beyond recency as C5 says, with its simulated
+  power.
 - **Runner** `scripts/replay_models/content/fit_role_content_models.py` (new; event sources non-local,
   ContFrag SWR, ContFrag MUA), registered in `run_refits.py`.
 - **Summary values** (`reported/behavior/role_content.py`, new, called from
@@ -200,7 +234,8 @@ seeds; the synthetic visit helpers of Phase 3 for `u`.
   then 242.
 - The design measured about 0.03 s per content fit and session; a pooled selection with two smooths (25 grid
   points plus Newton steps) over 242 sessions is minutes; one uncertainty model, two length variants and
-  two kinds make about twelve selections. Time the smoke test; run the full fits in `tmux`
+  two kinds make about twelve selections. WAITS FOR THE LEAD (smooth-term rule): without selections the
+  cost is one fit per session, model, variant and kind. Time the smoke test; run the full fits in `tmux`
   (`csr-6a-content`).
 - Compare with the model-free references: Q3a's direction and Q4a's sign (negative for SWR on the current arm
   in the design's check) against the within-arm slopes; Q7b against the model-free current-arm share by time

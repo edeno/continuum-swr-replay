@@ -30,14 +30,46 @@ In the lead's order (design section 9, eighth round):
 - A description of the events outside the visits in a supplement (sixth round: not for now).
 - Any tool to avoid pending values (seventh round).
 
+## Status
+
+As of 2026-11-21 (branch `figure04-behavior-models`, at master 98fe5c06 plus one `TODO.md` commit):
+
+| Phase | State | Commit on master |
+|---|---|---|
+| 1, the shared fitter | done; interface differs from the plan's sketch (the "as built" note at the top of [phase-1-shared-fitter.md](phase-1-shared-fitter.md)) | merged 6e54eda8, cleaned up 98fe5c06 |
+| 3, the well visit in the tables | done; the 13 canonical tables published | d14ff888 |
+| 4, Figures 2 and 3 on the common subset | done, except 20 held-out tetrode values in `paper/reported/events.json`, pending until another session's rerun ends; the fold task waits for `swr-trial-folds` and Phase 2 | 5dc74fc6 |
+| 2, the convention's tools | **next**; can start now | |
+| 5a to 12 | not started | |
+
+What Phase 2 waits for, and only in the tasks named:
+
+- **Open with the lead: the rule for a smooth term in a per-session fit.** The design stays one fit for
+  each session (design, fourteenth round). Option A: a natural cubic spline with 4 columns, knots from the
+  pooled data, no penalty (the author's recommendation, with a check that the conclusions hold at 3, 4
+  and 5 columns). Option B: a P-spline with one fixed weak penalty per term. Known from simulation: a
+  penalty chosen from the data by REML makes each session's curve a line when a session has about 140
+  events, and the belief-variance test is then wrong; a fixed, declared smoothness keeps that test
+  correct. Either way the REML choice is not used for per-session smooth terms with few events; it stays
+  in the package. Every place that depends on it carries a line `WAITS FOR THE LEAD (smooth-term rule)`.
+- **Open with the lead: a session whose simple terms have no finite maximum.** Only the penalty search
+  handles one today; `fit_at_penalties` raises at the first. The author's recommendation: the caller owns
+  it, and such a session is reported with those terms missing, not left out
+  ([phase-2-convention-tools.md](phase-2-convention-tools.md)).
+
+Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
+on a stop's first sample, which the rate design does not count (about 0.2 % of the No SWR events, none of
+the SWR events: 28 events); at Phase 6a, Q4a read as the change over one standard deviation of the
+reward-fraction smooth, and the trial number defined as the number of visits arrived.
+
 ## Phases and dependencies
 
 | Phase | Delivers | Depends on | Size (code + tests, LOC) |
 |---|---|---|---|
-| [1](phase-1-shared-fitter.md) | `analysis/regression/` core: likelihoods, penalized Newton, exact REML derivatives, pooled REML, grid start; checks 1 to 5; mgcv script; older all-bins history model deleted | nothing (no table) | L, ~1,800 |
+| [1](phase-1-shared-fitter.md) (done) | `analysis/regression/` core: likelihoods, penalized Newton, exact REML derivatives, pooled REML, grid start; checks 1 to 5; mgcv script; older all-bins history model deleted | nothing (no table) | L, ~1,800 |
 | [2](phase-2-convention-tools.md) | bases, collinearity, support rule, fit-row record, folds, bands, day-level reduction, declared-test list | 1 | M, ~1,100 |
-| [3](phase-3-visit-tables.md) | visit clocks and stop-end kinds in the stop and event tables, two new uncertainty covariates, the visit at-risk bin design; one table rebuild; the same columns in the ContFrag tables; the dense stop time-bin table and table-side legacy removed (compatibility branches, re-exports, one-time table scripts) | precondition C3 (code independent of 1 and 2) | M, ~900 added, ~800 removed + a rebuild |
-| [4](phase-4-figures-2-3-common-subset.md) | Figures 2, 3 and `events.json` on the common subset; the duplicate fold function removed | C3; the other session's branch on master | M, ~500 + producer re-runs |
+| [3](phase-3-visit-tables.md) (done) | visit clocks and stop-end kinds in the stop and event tables, two new uncertainty covariates, the visit at-risk bin design; one table rebuild; the same columns in the ContFrag tables; the dense stop time-bin table and table-side legacy removed (compatibility branches, re-exports, one-time table scripts) | precondition C3 (code independent of 1 and 2) | M, ~900 added, ~800 removed + a rebuild |
+| [4](phase-4-figures-2-3-common-subset.md) (done) | Figures 2, 3 and `events.json` on the common subset; the duplicate fold function removed | C3; the other session's branch on master | M, ~500 + producer re-runs |
 | [5a](phase-5a-rate-models.md) | visit rate model, models A and D, Q1, Q2, Q7a values; the per-bin ladder, its plotters, values and docs removed | 2, 3 | L, ~1,300 added, ~5,000 removed |
 | [5b](phase-5b-rate-families-moved.md) | per-visit total reward effect, SWR-contrast covariates, uncertainty rate model, on the convention; the three old families removed | 5a | M, ~700 added, ~3,500 removed |
 | [6a](phase-6a-content-models.md) | nine-arm content by role, smooth recency, one uncertainty model (belief variance and sample count with the trial number, after the simulation gate), smooth reward fraction, Q3, Q4, Q5, Q7b values, the ContFrag sources; the content ladders removed | 2, 3 | L, ~1,500 added, ~8,000 removed |
@@ -86,7 +118,7 @@ What the plan touches (line numbers on `figure04-behavior-models` at `02df809f`)
   `replay_models/` (call) and their own docs table.
 - `src/continuum_swr_replay/analysis/replay_models/rate/cross_history.py` and
   `scripts/replay_models/rate/fit_cross_history_rate.py`: the older all-bins history model, deleted in
-  Phase 1 (the spec `MODEL_CROSS_HISTORY_RATE` stays: the duration-aware model uses it,
+  Phase 1 (done; the spec `MODEL_CROSS_HISTORY_RATE` stays: the duration-aware model uses it,
   `rate/duration_aware_history.py:295`).
 - `src/continuum_swr_replay/analysis/replay_models/content/uncertainty_content.py:705`
   (`within_arm_horserace`), `:856` (`summarize_horserace`); `reported/behavior/content.py:718`
@@ -163,10 +195,10 @@ runs it last; that is not a blocker for any phase before it.
 | Risk | Mitigation |
 | --- | --- |
 | Stops that cross the final poke-out hold 31 % of the immobile time inside visits; selecting stops by label would drop the seconds before leaving, and counting only whole-in-visit events would make the rate fall before leaving | bins carry their own label and are selected by the same function, and the event set is the events that start inside a visit, so rate and content analyze the same events ([C4](shared-contracts.md#c4-the-selection-function-is-the-only-filter); L4) |
-| The belief-variance test moves recency into its slope (a shrunk recency curve) or has too little power to be informative | the Phase 6a gate repeats the simulation with the shared fitter's recency penalty before any real fit; the recency rule and the power statement are written before the fits; a null is reported as "no evidence beyond recency; the design cannot detect an effect of this size" |
+| The belief-variance test moves recency into its slope (a shrunk recency curve) or has too little power to be informative | the repeat with the shared fitter's REML penalty was run (design, thirteenth round; simulation): a penalty chosen from the data makes each session's curve a line at about 140 events and the test wrong. WAITS FOR THE LEAD (smooth-term rule): the recency curve is fitted by the rule the lead chooses (a natural spline with no penalty, or a fixed weak penalty); the rule and the power statement are written before the fits; a null is reported as "no evidence beyond recency; the design cannot detect an effect of this size" |
 | The table rebuild of Phase 3 changes files the other session reads, and its summing step refuses until its runs record the new event table (design, eighth round) | build into a staging root (`--output-dir`), check parity, message the other session before swapping the files in, and swap once |
 | A declared estimand fails the support or collinearity rule in many sessions | the rule is applied before any coefficient is read; the phase stops and reports to the lead; no silent pooling |
-| Pooled REML is slow (every evaluation refits every session) | measure one evaluation; the grid has at most 125 points; parallelize over sessions only if measured above a few seconds |
+| Pooled REML is slow (every evaluation refits every session) | measured on synthetic sessions of the real size: one selection over 242 sessions took 6.3 min (`docs/design/regression_fitter.md`, "Cost"); prepare each session once per search before the real searches (`TODO.md`); parallelize over sessions only if measured above a few seconds. WAITS FOR THE LEAD (smooth-term rule): under either option the per-session smooth terms are fitted without a search, so this risk may apply only to the searches that remain (the mPFC units, Phase 8) |
 | The fractional softmax response is a quasi-likelihood, so Laplace REML is approximate for content | check against mgcv on the same fractional design (mgcv `multinom` does not take fractions; compare with the count response and the shared fitter's own simulation coverage); report coverage from simulation |
 | A cited value is removed by mistake | each retire task lists the macros `paper/*.tex` cites from the values it removes (none of behavior, mpfc or events were cited on 2026-11-20) and asks the lead at that phase's boundary; `tests/reported/test_manuscript_macros.py` fails on a cited macro that no longer exists |
 | A baseline is removed too early (the old fits are the only baseline, and Phase 1's checks 1 and 3 compare with old fitters) | the old-against-new comparison is written before the removal (C13); a test that compares with an old fitter switches to a committed fixture of its coefficients first; old stored fits stay on disk, unread |
@@ -204,6 +236,8 @@ Settled by the lead on 2026-11-20 (18:51 and 18:58), with the lead's words. The 
 
 Still open, for the lead, by Phase 12 at the latest: ASK-2 and ASK-5 to ASK-12
 ([legacy-inventory.md#ask-list](legacy-inventory.md#ask-list)), and the confirmation of L7 at Phase 7.
+Open now, before Phase 2 can finish: the rule for a smooth term in a per-session fit, and how a session
+without a finite maximum is reported ([Status](#status); the design's fifteenth round).
 
 ## Things in the design that are unclear or contradict each other
 
@@ -220,6 +254,12 @@ Still open, for the lead, by Phase 12 at the latest: ASK-2 and ASK-5 to ASK-12
 - Section 6 places check 6 in stage 0; only the mPFC family needs a GPU (see the deviation above).
 - Figure 4's panel c asks for the rate against "time until a small movement", but the third clock is kept
   only if the collinearity rule separates it; panel c's second half depends on Phase 5a's result.
+- The design's section 4.3 chooses each smooth's strength by REML shared by all sessions. The fourteenth
+  round keeps one fit per session, and the simulation shows the REML choice makes a per-session curve a
+  line at few events; the rule that replaces it is open with the lead (see [Status](#status)).
+- Contract C4 says rate and content analyze the same events; as built, the rate design does not count an
+  event with no at-risk time before its start (28 events start on a stop's first sample). A question for
+  the lead at Phase 5a.
 
 ## Estimated effort
 

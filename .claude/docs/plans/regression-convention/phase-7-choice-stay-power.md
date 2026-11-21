@@ -59,6 +59,9 @@ rest of the old event-source suite.
   z-score), `time_since_stop_start_s` replaced by a smooth of time since visit start and a smooth of time
   until leaving (Phase 3's event clocks), the post-outcome gate of `swr_power.py:56` kept for post-outcome
   predictors (the cohort step restricts and counts). REML with the profiled scale.
+  WAITS FOR THE LEAD (smooth-term rule): the two clock smooths take the per-session smooth-term rule; if no
+  penalty is chosen from the data, the Gaussian fit is at the declared freedom and its scale is still
+  profiled.
 - **Event-source comparison (supplementary)** (`analysis/replay_models/event_source_comparison.py`, new;
   ASK-1, ASK-3): reads the stored rate (5a) and content (6a) fits of the three event sources (non-local,
   ContFrag SWR, ContFrag MUA) and reports, per source, the declared estimands that apply to a single stream

@@ -1,6 +1,12 @@
 # Regression convention and Figures 2 to 5 on one data subset: Implementation Plan
 
-**Status:** Not started.
+**Status (2026-11-21):** Phases 1, 3 and 4 are done and on master: Phase 1, the shared fitter (merged in
+6e54eda8, cleaned up in 98fe5c06); Phase 3, the well visit in the tables (d14ff888; the 13 tables
+published); Phase 4, Figures 2 and 3 on the common subset (5dc74fc6), except 20 held-out tetrode values in
+`paper/reported/events.json`, pending until another session's rerun ends. Next is Phase 2, the convention's
+tools. It can start now; its smooth-term vocabulary and its handling of sessions without a finite maximum
+wait for two questions open with the lead ([overview.md](overview.md#status)). Phases 5a, 6a and 8 wait
+for Phase 2.
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the
@@ -19,7 +25,8 @@ For agent invocation, **load only the slice you need**:
    selection function, the fit-row record, the declared tests, how to run code and rebuild values, the GPU
    and coordination rules, C13 (no legacy left behind) and C14 (one unit, event set, selection, fitter and
    clocks everywhere).
-3. **Need a per-component design (math, code)?** [designs.md](designs.md).
+3. **Need a per-component design (math, code)?** [designs.md](designs.md). For the built fitter, read its
+   code and `docs/design/regression_fitter.md`; designs.md holds only its interface summary.
 4. **Need broader scope, dependencies, risks, decisions?** [overview.md](overview.md).
    **What to remove, and when?** [legacy-inventory.md](legacy-inventory.md).
 5. **Need the scratch prototypes and outside references?** [appendix.md](appendix.md).
@@ -29,19 +36,20 @@ For agent invocation, **load only the slice you need**:
 - [overview.md](overview.md) — goals, non-goals, phase graph, integration points, risks, rollout,
   decisions for the lead, effort.
 - [shared-contracts.md](shared-contracts.md) — the rules every phase obeys.
-- [designs.md](designs.md) — the fitter's math (penalized Newton, exact REML derivatives, pooled REML),
-  bases, collinearity, support, folds, bands, and the rate and content designs.
+- [designs.md](designs.md) — the built fitter's interface (entry points, inputs, outputs, statuses,
+  errors), bases, collinearity, support, folds, bands, and the rate and content designs.
 - Phases (each ships as a separable PR; branch names are suggestions):
-  - [phase-1-shared-fitter.md](phase-1-shared-fitter.md) — `analysis/regression/`: likelihoods,
-    penalized Newton, REML with a grid start and exact derivatives, checks 1 to 5, the mgcv script;
-    the older all-bins history model deleted first.
-  - [phase-2-convention-tools.md](phase-2-convention-tools.md) — bases, collinearity, support rule,
+  - [phase-1-shared-fitter.md](phase-1-shared-fitter.md) — **done** (6e54eda8, 98fe5c06):
+    `analysis/regression/`: likelihoods, penalized Newton, REML with a grid start and exact derivatives,
+    checks 1 to 5, the mgcv script; the older all-bins history model deleted first.
+  - [phase-2-convention-tools.md](phase-2-convention-tools.md) — **next**: bases, collinearity, support rule,
     fit-row record, trial folds, simultaneous bands, the session to day to animal reduction.
-  - [phase-3-visit-tables.md](phase-3-visit-tables.md) — the well visit as the unit: visit clocks and
-    stop-end kinds in the tables, the visit at-risk bin design, the two new uncertainty covariates;
-    one table rebuild.
-  - [phase-4-figures-2-3-common-subset.md](phase-4-figures-2-3-common-subset.md) — Figures 2 and 3 and
-    `paper/reported/events.json` on the common subset (after the other session's Figure 2 branch merges).
+  - [phase-3-visit-tables.md](phase-3-visit-tables.md) — **done** (d14ff888): the well visit as the unit:
+    visit clocks and stop-end kinds in the tables, the visit at-risk bin design, the sample count and the
+    trial number; one table rebuild.
+  - [phase-4-figures-2-3-common-subset.md](phase-4-figures-2-3-common-subset.md) — **done** (5dc74fc6; 20
+    held-out values pending): Figures 2 and 3 and `paper/reported/events.json` on the common subset (done
+    before the other session's Figure 2 branches merged; the fold task waits for them).
   - [phase-5a-rate-models.md](phase-5a-rate-models.md) — rate on the visit: three clocks, models A and D
     for reward history, both forms of the reward effect, Q1, Q2, Q7.
   - [phase-5b-rate-families-moved.md](phase-5b-rate-families-moved.md) — the per-stop (total) family,

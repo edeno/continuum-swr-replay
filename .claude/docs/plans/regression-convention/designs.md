@@ -3,15 +3,11 @@
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [shared contracts](shared-contracts.md)
 
 Per-component designs. Names inside `analysis/regression/` are the builder's to choose (design section 10);
-the ones here are proposals, marked new. Code samples are NumPy float64 reference code; they show the
-algorithm, not final style.
+the ones for code not yet built are proposals, marked new. The fitter is built: its section below is an
+interface summary, and the code is the truth for it.
 
-- [Penalized Newton](#penalized-newton)
-- [Likelihoods](#likelihoods)
+- [The shared fitter (built)](#the-shared-fitter-built)
 - [Smooth terms and bases](#smooth-terms-and-bases)
-- [REML with exact derivatives](#reml-with-exact-derivatives)
-- [Pooled REML: one strength per term across sessions](#pooled-reml)
-- [Penalty selection: grid start, then Newton](#penalty-selection)
 - [Support rule](#support-rule)
 - [Collinearity measures](#collinearity-measures)
 - [Trial folds](#trial-folds)
@@ -21,99 +17,110 @@ algorithm, not final style.
 - [Content design](#content-design)
 - [JAX batch twin](#jax-batch-twin)
 
-## Penalized Newton
+## The shared fitter (built)
 
-Objective to minimize, for fixed penalty strengths `lam_j = exp(rho_j)`:
+Built in Phase 1 (merged to master in 6e54eda8, cleaned up in 98fe5c06). Every name, signature and rule is
+in the code, `src/continuum_swr_replay/analysis/regression/` (each module's docstring states its rules),
+and in `docs/design/regression_fitter.md` (the rules with their measurements, the agreement with mgcv,
+neurospatial and the current fitters, and the cost). This section says only what a caller passes in and
+gets back. It does not repeat the internals; read them there.
 
-    F(beta) = -l(beta) + 1/2 beta' S_lam beta,     S_lam = sum_j lam_j S_j  (each S_j embedded in p x p)
+**Likelihoods** (`likelihoods.py`): `Poisson` (aux: the offset `log(exposure)` per row), `Bernoulli` (aux
+None; 0/1 outcomes only), `Gaussian` (aux: the scale in `penalized_newton`; None in the REML functions,
+which profile it), `GroupedSoftmax` (aux: the group id of each row, sorted so that a group's rows are
+contiguous; the content response is the event's shares). Under the softmax a column constant within every
+group (an intercept, an event-level covariate) is not identified and must not be in the design; the fitter
+checks identification on `Likelihood.identifying_design`.
 
-```python
-def penalized_newton(lik, X, y, aux, S_lam, beta0, *, tol=NEWTON_DECREMENT_TOL,
-                     max_iter=100, max_halvings=30, max_step=10.0):
-    beta = beta0.copy()
-    F = -lik.loglik(X @ beta, y, aux) + 0.5 * beta @ S_lam @ beta
-    for it in range(max_iter):
-        eta = X @ beta
-        g = X.T @ lik.score_eta(eta, y, aux) - S_lam @ beta      # gradient of +l - penalty
-        A = lik.information(X, eta, y, aux) + S_lam              # H + S, PD for a penalized fit
-        L = np.linalg.cholesky(A)                                # fails -> not converged
-        step = scipy.linalg.cho_solve((L, True), g)
-        decrement = 0.5 * g @ step                                # predicted gain
-        if decrement < tol:
-            return Fit(beta, A, converged=True, newton_decrement=decrement, n_iter=it)
-        scale = min(1.0, max_step / np.max(np.abs(step)))
-        for _ in range(max_halvings):
-            cand = beta + scale * step
-            F_new = -lik.loglik(X @ cand, y, aux) + 0.5 * cand @ S_lam @ cand
-            if np.isfinite(F_new) and F_new <= F:
-                break
-            scale *= 0.5
-        else:
-            return Fit(beta, A, converged=False, newton_decrement=decrement, n_iter=it)
-        beta, F = cand, F_new
-    return Fit(beta, A, converged=False, ...)
-```
+**Inputs.**
 
-- No clipping of `eta` at the returned optimum; an infinite `F` during halving is a rejected step.
-- As built (`regression/newton.py`): when the decrement is below the tolerance the fit takes that last
-  full Newton step and reports `A` and the decrement where it lands (it stays where it was if the step
-  does not lower `F`). Without it each coefficient is off by up to `sqrt(2 tol / lambda_min)`, more than
-  the checks allow, and REML's derivatives assume the exact optimum. A matrix `A` that is not positive
-  definite or not finite reports not converged.
-- As built, every likelihood method takes `y` and `aux` (`dinformation(X, eta, y, aux, d)`,
-  `d2information(X, eta, y, aux, d1, d2)`): the weights need the offset, the scale or the groups. The
-  shorter signatures written below are shorthand for those.
-- Start: Poisson intercept `log(sum y / sum exposure)`, others 0; during a penalty search, warm start from
-  the previous `rho`'s solution of the same session.
-- Unpenalized fits (S = 0) use the same code; then `A = H` must be PD, which the support rule makes likely
-  and a failed Cholesky reports as not converged.
+- `reml.SessionData(X, y, aux=None, name=None, active=None)`: one session's design `(n_rows, p)`, response
+  and aux; `name` labels messages; `active` is a boolean mask over the columns that marks the columns the
+  session estimates (unpenalized columns only; the others get NaN coefficients and covariance). It holds
+  no start: the fitter chooses its starts.
+- `reml.PenaltyBlock(columns, S)`: one quadratic penalty on its columns. The blocks of a model must be
+  disjoint; a matrix that is not symmetric positive semidefinite is refused when the block is built.
+- `pspline.PSplineBasis(lo, hi, n_basis, degree=3)` (or `PSplineBasis.from_spacing(lo, hi, spacing)`):
+  `design(x)` (clamped to the range), `penalty(order=2)`, and `constrained(x, order=2)`, which returns a
+  `ConstrainedSmooth(design, penalty, constraint)`: the constrained design `B Z`, its penalty `Z' P Z` and
+  the constraint `Z`, computed on the rows given (the pooled rows). Another session's design is
+  `basis.design(x_s) @ constraint`.
 
-## Likelihoods
+**Entry points** (`reml.py` unless named):
 
-One small class per family with `loglik(eta, y, aux)`, `score_eta` (dl/deta), `information(X, eta, y, aux)`
-(= -d2l/dbeta2 = X' W X, or the grouped form), and, for REML, the directional derivatives
-`dinformation(X, eta, d)` and `d2information(X, eta, d1, d2)` (d, d1, d2 are vectors on the eta scale, n).
+- `select_penalties(lik, sessions, blocks) -> PooledFit`: one log penalty per block, shared by the
+  sessions, by pooled REML from a grid start. Before the search it fits every session at the grid center
+  and sets aside the sessions with no finite maximum; after it, it refits them at the chosen penalties
+  with their running-away unpenalized columns inactive (at most `REFIT_MAX_ROUNDS` rounds).
+- `refine_penalties(lik, sessions, blocks, rho0) -> PooledFit`: the same search from `rho0`, without the
+  grid.
+- `fit_at_penalties(lik, sessions, blocks, rho) -> PooledFit`: the fits at given log penalties (no block
+  and an empty `rho` for no penalty), without a search. It raises at the first session whose fit does not
+  converge: it sets no session aside.
+- `pooled_reml(lik, sessions, blocks, rho, *, derivatives=True) -> PooledScore` and
+  `reml_and_derivatives(lik, X, y, aux, blocks, rho, beta0=None, *, derivatives=True) -> RemlScore`: the
+  pooled score and one session's score, with the exact gradient and Hessian in the log penalties.
+  `PooledScore` names the first failing session (`failed_session`, `failed`, `failed_status`) instead of
+  raising.
+- `newton.penalized_newton(lik, X, y, aux, S, beta0, *, free_basis=None, max_iter=NEWTON_MAX_STEPS,
+  max_step=MAX_STEP_LENGTH) -> NewtonFit`: one fit at a summed penalty `S` (`reml.assemble_penalty`). It
+  takes no tolerance and no halving count: those are rules in `constants.py`.
 
-| Family | aux | l | w = information weight | w' = dw/deta | w'' |
-|---|---|---|---|---|---|
-| Poisson, log link, offset | `offset = log(exposure)` | `sum y (eta+o) - exp(eta+o)` | mu | mu | mu |
-| Bernoulli, logit | none | `sum y eta - log(1+e^eta)` | `mu(1-mu)` | `w(1-2mu)` | `w(1-6w)` |
-| Gaussian, identity | `phi` (scale) | `-sum (y-eta)^2/(2 phi) - n/2 log(2 pi phi)` | `1/phi` | 0 | 0 |
-| Grouped softmax | `groups` (event id per row), `n_g = sum_k y_gk` | `sum_g sum_k y_gk log p_gk`, `p_g = softmax(eta_g)` | per group `n_g G_g`, `G = diag(p) - p p'` | see below | see below |
+**What comes back.** `PooledFit(rho, score, gradient, sessions, search)`. `sessions` holds one
+`RemlScore` per session given, in order (there is no separate per-session fit class): `fit` (a
+`NewtonFit`: `beta`, `A`, `status`, `newton_decrement`, `n_iter`, `loglik`, and for a fit with no finite
+maximum its `step` and `running_away` columns), `covariance` (`A^-1`, mgcv's `Vp`), `edf` per block,
+`edf_total`, `scale` (the Gaussian's), `score`, and `running_away_directions` and
+`unidentified_directions` (`FreeDirection`s: a design column, a block's null space or a block's penalized
+direction). `in_null_space(session, blocks)` flags, per block, a term shrunk to its penalty's null space (a
+straight line). `search` is a `PenaltySearch` (None from `fit_at_penalties`): `reference_rho`, `in_choice`
+(the sessions whose scores chose the penalties; `PooledFit.score` is over these only), `set_aside`
+(`SetAsideSession`s with `reference`, `refits`, `left_out`, `reason` and `fitted`), `grid_failures` per
+status, `n_outer_steps`, `at_boundary` per term and `share_without_fit`. A set-aside session has its refit
+in `sessions`, NaN at the columns left out, or NaN values when it has no fit.
 
-For the diagonal families: `dinformation(X, eta, d) = X' diag(w' * d) X` and
-`d2information(X, eta, d1, d2) = X' diag(w'' * d1 * d2) X`.
+**Statuses** (`newton.FitStatus`; `NewtonFit.converged` is true only for the first): "converged", "design
+not identified", "information not positive definite", "step halving failed", "step limit reached", "no
+finite maximum". `penalized_newton` returns every status without raising.
 
-Grouped softmax (content, choice). Within a group with probabilities `p` and directions `d1`, `d2`:
+**Errors** (`ValueError`; in a pooled fit each names the session by index and `SessionData.name`):
+inputs that are not finite, of the wrong shape or outside what the family takes; overlapping blocks; an
+inactive column inside a penalty block; in a search, a session whose design is not identified (the message
+names the coordinates that take part and says to mark the columns inactive) or whose fit fails for a
+numerical reason at the reference point; no finite grid point; a search that does not converge (no
+argument returns an unconverged result); more than `MAX_FAILING_SHARE` (20 %) of the sessions without a
+fit; and `fit_at_penalties` at the first session whose fit does not converge.
 
-    D_d p      = G d                                   (G = diag(p) - p p')
-    D_d G      = diag(G d) - (G d) p' - p (G d)'
-    D_d2 D_d1 G = diag(q) - q p' - p q' - (G d1)(G d2)' - (G d2)(G d1)',   q = (D_d2 G) d1
+**Constants** (`constants.py`): only the fitter's own rules (convergence, step control, identifiability,
+penalty bounds and search, `REFIT_MAX_ROUNDS`, `MAX_FAILING_SHARE`). The convention's constants that the
+fitter does not read are defined in the Phase 2 module that reads each
+([C5](shared-contracts.md#c5-the-convention)).
 
-so `dinformation = sum_g n_g X_g' (D_d G_g) X_g` and `d2information = sum_g n_g X_g' (D_d2 D_d1 G_g) X_g`.
-The response is the event's share over its candidates (fractions summing to one, `n_g = 1`), as the
-shipped fits use; the likelihood is then a quasi-likelihood with the scale fixed at one, as now. The
-conditional Poisson of `analysis/replay_models/fitting.py:677` is the same likelihood (check 3 of Phase 1).
-Group-level constants (an intercept, any event-level covariate) are not identified and must not be in X;
-the design builder drops them and the support rule reports it.
-
-Gaussian scale: REML includes `log phi` as one more parameter of the outer search
-([REML](#reml-with-exact-derivatives)); `w = 1/phi` makes the inner fit penalized least squares.
+**Known limits** (`TODO.md`, section "Regression fitter"): the step cap is in coefficient units, so a fit
+with a column whose values are all very small ends at the step limit (Phase 2's design check refuses such
+a column); only `select_penalties` handles a session without a finite maximum (Phase 2's per-session loop
+must handle it at given penalties); each evaluation prepares every session again (to fix before the real
+models' searches).
 
 ## Smooth terms and bases
 
+> WAITS FOR THE LEAD (smooth-term rule): the basis and the penalty of a per-session smooth term. Option A:
+> a natural cubic spline of 4 columns, knots from the pooled data, no penalty (the author's
+> recommendation, checked at 3, 4 and 5 columns); option B: the P-spline below with one fixed weak penalty
+> per term. Under either, no penalty is chosen from the data for a per-session smooth term with few
+> events (simulation: a penalty chosen by REML makes each session's curve a line at about 140 events, and
+> the belief-variance test is then wrong). Depends on it: which basis this section prescribes (option A
+> needs a natural-spline basis the package does not have), the initial basis sizes, the basis check, and
+> model D's penalty.
+
 - Cubic B-spline on equally spaced knots over a fixed range `[lo, hi]` per term (the knots are the same
   for every session), with a second-order difference penalty `P = D2' D2`. Beyond `hi` the clock is clamped
-  to `hi` (the curve is flat there), below `lo` to `lo`. Scratch reference:
-  `proto_basic/pspline.py` (`pspline_knots`, `bspline_basis`, `diff_penalty`), see
-  [appendix.md](appendix.md#scratch-map).
+  to `hi` (the curve is flat there), below `lo` to `lo`. As built: `pspline.PSplineBasis`.
 - Identifiability: one sum-to-zero constraint per smooth, computed once on the pooled cohort rows of the
-  model and kind (`c = sum_rows B`; `Z` = null space of `c'` from a complete QR), and the same `Z` used for
-  every session, so that the coefficients mean the same thing in every session and the session curves can be
-  summarized together. The constrained penalty is `Z' P Z`, of rank `n_basis - 2`: a second-order difference penalty
-  leaves the constant and the line unpenalized, and the constraint removes one of those two directions
-  (as built: `regression/pspline.py`, whose test asserts the rank; take it from `penalty_rank`, never
-  from a count).
+  model and kind, and the same `Z` used for every session, so that the coefficients mean the same thing in
+  every session and the session curves can be summarized together. As built:
+  `PSplineBasis.constrained(x)` returns the constrained design, its penalty `Z' P Z` and `Z`. The
+  constrained penalty has rank `n_basis - 2` (take it from `PenaltyBlock.rank`, never from a count).
 - Model D (reward history as a linear functional): `eta_i += sum_{l=1}^{10} f(log l) r_{i,l}`,
   `f(x) = sum_b B_b(x) gamma_b` over `x in [0, log 10]`, so column `b` of the design is
   `sum_l B_b(log l) r_{i,l}` with `r_{i,l}` the outcome (1 rewarded, 0 omitted) at lag `l`. No sum-to-zero
@@ -128,103 +135,6 @@ Gaussian scale: REML includes `log phi` as one more parameter of the outer searc
 - Basis check: after the fit, a term whose edf exceeds 0.8 times its basis dimension is refit with twice
   the basis functions; the rule and both sizes are recorded in `basis` of the fit record.
 
-## REML with exact derivatives
-
-For one session (Laplace approximation; exact for the Gaussian):
-
-    V(rho) = -l(b) + 1/2 b' S b - 1/2 log|S|_+ + 1/2 log|H + S|          (b = beta_hat(rho), S = S_lam, H = H(b))
-
-Penalties of different terms never overlap (each smooth has its own columns), so
-`log|S|_+ = sum_j (r_j rho_j + log|S_j|_+)` with `r_j = rank(S_j)`; the code asserts the blocks are
-disjoint. Write `A = H + S`, `S_j~ = lam_j S_j`, and the derivatives of the optimum:
-
-    b_j  = db/drho_j        = -A^-1 S_j~ b
-    H_j  = dH/drho_j        = dinformation(X, eta, X b_j)
-    A_j  = S_j~ + H_j
-    b_jk = d2b/drho_j drho_k = -A^-1 (A_k b_j + S_j~ b_k) + delta_jk b_j
-    H_jk = d2information(X, eta, X b_j, X b_k) + dinformation(X, eta, X b_jk)
-    A_jk = delta_jk S_j~ + H_jk
-
-Gradient and Hessian (the envelope theorem removes the derivative of the first two terms through `b`):
-
-    g_j  = 1/2 [ b' S_j~ b - r_j + tr(A^-1 A_j) ]
-    V_jk = 1/2 [ delta_jk b' S_j~ b + 2 b_k' S_j~ b - tr(A^-1 A_k A^-1 A_j) + tr(A^-1 A_jk) ]
-
-```python
-def reml_and_derivatives(lik, X, y, aux, blocks, rho, beta0):
-    S = assemble(blocks, rho)                                  # blocks: list of (cols, S_j, rank_j)
-    fit = penalized_newton(lik, X, y, aux, S, beta0)
-    if not fit.converged:
-        return np.inf, None, None, fit                          # the search rejects this rho
-    b, A = fit.beta, fit.A
-    L = np.linalg.cholesky(A)
-    eta = X @ b
-    V = -lik.loglik(eta, y, aux) + 0.5 * b @ S @ b \
-        - 0.5 * sum(r * rj for (_, _, r), rj in zip(blocks, rho)) + np.sum(np.log(np.diag(L)))
-    Sj = [embed(cols, np.exp(rj) * Sj_) for (cols, Sj_, _), rj in zip(blocks, rho)]
-    bj = [-cho_solve(L, Sjj @ b) for Sjj in Sj]
-    Aj = [Sjj + lik.dinformation(X, eta, X @ bjj) for Sjj, bjj in zip(Sj, bj)]
-    AinvAj = [cho_solve(L, Ajj) for Ajj in Aj]
-    g = 0.5 * np.array([b @ Sjj @ b - r + np.trace(M)
-                        for Sjj, (_, _, r), M in zip(Sj, blocks, AinvAj)])
-    m = len(blocks); Hs = np.empty((m, m))
-    for j in range(m):
-        for k in range(j, m):
-            bjk = -cho_solve(L, Aj[k] @ bj[j] + Sj[j] @ bj[k]) + (j == k) * bj[j]
-            Ajk = (j == k) * Sj[j] + lik.d2information(X, eta, X @ bj[j], X @ bj[k]) \
-                  + lik.dinformation(X, eta, X @ bjk)
-            Hs[j, k] = Hs[k, j] = 0.5 * ((j == k) * (b @ Sj[j] @ b) + 2 * bj[k] @ Sj[j] @ b
-                                         - np.sum(AinvAj[k] * AinvAj[j].T)
-                                         + np.trace(cho_solve(L, Ajk)))
-    return V, g, Hs, fit
-```
-
-Gaussian: profile the scale. As built (`regression/reml.py`, equal to mgcv to 1e-12): with
-`D_p = ||y - X b||^2 + b' S b`, `M_p` the dimension of the penalty null space, and `rho` the log of mgcv's
-`sp` (the penalty is on the residual-sum-of-squares scale), each session's scale is profiled in closed form,
-`phi = D_p / (n - M_p)`, and `V` is Wood (2011) eq. 4 with unscaled determinants:
-`V = D_p/(2 phi) + (n - M_p)/2 log(2 pi phi) - 1/2 log|S|_+ + 1/2 log|X'X + S|`. (An earlier version of
-this section scaled the determinants by `1/phi` as well, which counts `M_p` twice.)
-
-As built, the outer search adds two rules: a log penalty that sits at a bound with its gradient pointing
-outward is held fixed and left out of the Newton step and of the stopping rule; and after the stopping
-rule passes, one last Newton step is taken if `V` does not rise. `at_boundary` (within 0.5 of a bound)
-does not catch a term shrunk to its null space, because the gradient decays like `exp(-rho)` and the
-search stops on the plateau; report a term as shrunk to its null space from its edf (within 0.01 of the
-penalty's null dimension), not from `at_boundary`.
-
-Tests (Phase 1): the gradient and Hessian against central finite differences of `V` (relative error below
-1e-5) for every family with one, two and three penalties; `V` against mgcv on the stored fixtures.
-
-## Pooled REML
-
-One penalty strength per smooth term, shared by all sessions of a model and kind (design 4.3; the
-per-session choice was unstable, section 2.5). The pooled score is the sum of the sessions' scores, each
-with its own coefficients and its own `log|S|_+` term, as
-`/cumulus/edeno/neurospatial/src/neurospatial/encoding/_glm_numpy.py:408-478` (`_reml_objective_numpy`)
-does over units (its convergence gate is at lines 467-468):
-
-    V_pool(rho) = sum_s V_s(rho),   g_pool = sum_s g_s,   H_pool = sum_s H_s
-
-A session whose inner fit fails at some `rho` makes `V_pool(rho) = inf` (rejected), as that file does. The session loop is embarrassingly parallel; on CPU use a `ProcessPoolExecutor` over sessions only
-if one evaluation exceeds a few seconds (measure first).
-
-## Penalty selection
-
-The REML score can have two optima (design 2.4: a wiggly one and the straight-line limit). Start from a
-grid, then Newton:
-
-1. Grid over `[-10, 20]` per log penalty: one term, every integer (31 points); two or three terms, the
-   product of `{-2, 2, 6, 10, 14}` (25 or 125 points); more than three, coordinate-wise 1-D integer grids
-   starting from all terms at 6, two passes. Keep the best point.
-2. Newton on `rho` from there with the exact Hessian: eigen-decompose, floor eigenvalues at
-   `1e-6 * max(1, max|eig|)` (flip negative ones), step halving on `V_pool`, clamp to the bounds.
-3. Stop when `max |g_pool| < 1e-6 * max(1, |V_pool|)` or 50 steps; record `at_boundary` per term
-   (within 0.5 of a bound) and the number of outer steps.
-
-Fallback is not allowed: if no grid point gives a finite score, raise (as `_glm_numpy.py:481-560`,
-`select_penalty_by_reml`, does) and record the model as not fitted.
-
 ## Support rule
 
 Decided from the data before the fit, per unpenalized declared term and session (design 4.3):
@@ -236,11 +146,23 @@ Decided from the data before the fit, per unpenalized declared term and session 
   pass when both are at least 5 and the covariate is not constant within the role.
 - A role category (content: previous arm, next arm): pass when at least 5 events of the kind have a
   candidate in the role.
-- A term that fails in more than 20 % of sessions with a fit (constant of [C5](shared-contracts.md#c5-the-convention))
-  leaves the per-session model. The design says it is then asked in a pooled model; that model is stage 3,
-  outside this plan, so the phase stops and reports the term to the lead.
+- A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
+  `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
+  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.
+- A term that fails in a session is made inactive there (`SessionData.active`). When the term is a 0/1 role
+  column (a role category, such as the previous arm), the rows with that role are dropped from that
+  session's fit and counted, not merged into the reference role. Found by simulation (scratch
+  `proto_uncertainty_measures/REPORT.md`): merging inflated the belief variance's false positives, to 20 %
+  in one case. The same row rule holds for a role column made inactive because the session has no finite
+  maximum ([Phase 2](phase-2-convention-tools.md)).
+- The minimum count (5) is defined in `analysis/regression/support.py`, the module that reads it; the
+  fitter's `constants.py` does not hold it.
 
 Smooth terms carry a penalty and have no support rule; their basis check and edf are recorded.
+
+> WAITS FOR THE LEAD (smooth-term rule): under option A (a natural spline with no penalty) a smooth term
+> is an unpenalized set of columns, and whether it then needs a support rule (enough events across its
+> range in each session) depends on the decision.
 
 ## Collinearity measures
 
@@ -258,8 +180,10 @@ For a term `i` with columns `Xi` and the rest of the design `X0` (intercept or a
 
 For one column the three equal `R^2` of that column on the rest, and `VIF = 1 / (1 - R^2)`. The rule of
 [C5](shared-contracts.md#c5-the-convention) reads `R^2` for one-column terms and `estimate` for smooths
-(call), and stores all three. Phase 1's mgcv script prints `concurvity(full = TRUE)` for the fixture models,
-and Phase 2 tests the three numbers against it.
+(call), and stores all three. Phase 1's mgcv script (`scripts/checks/compare_regression_to_mgcv.R`) does not
+print concurvity: Phase 2 adds `concurvity(full = TRUE)` to it and to the fixtures, and tests the three
+numbers against it. The threshold (R² 0.8) is defined in `analysis/regression/collinearity.py`, the module
+that reads it.
 
 ## Trial folds
 
@@ -269,11 +193,13 @@ signature as `trial_folds(time, segment_starts, segment_classes, n_folds=5, max_
 `capped_groups` `:255`, `task_segment_starts` `:177`): scikit-learn `StratifiedGroupKFold(n_splits=5,
 shuffle=False)` with one sample per row, class = the destination well of the row's trial segment, group =
 the row's piece of that segment (a segment longer than 30 s cut into equal pieces). Deterministic. For a
-regression the rows are bins (rate, mPFC) or events (content, choice), placed by their start time.
+regression the rows are bins (rate, mPFC) or events (content, choice), placed by their start time. The
+number of folds (5) and the longest stay piece (30 s) are defined in `folds.py`, the module that reads them.
 
-When that branch is on master, its `trial_folds` calls the shared function (or the shared function is that
-one, moved), and a test asserts both give the same folds on a synthetic epoch. Folds compare designs and
-check over-fitting; they do not choose penalties and are not the test that an effect exists.
+That branch is not on master (2026-11-21; Phase 4 was done without it). When it is, its `trial_folds` calls
+the shared function (or the shared function is that one, moved), and a test asserts both give the same folds
+on a synthetic epoch. Folds compare designs and check over-fitting; they do not choose penalties and are not
+the test that an effect exists.
 
 ## Simultaneous bands
 
@@ -319,7 +245,9 @@ The visit at-risk bin design (Phase 3 builds it; Phase 5a fits it). Per session 
   poke-out is cut there; a stop that starts before the first poke-in starts at it. Each bin carries
   `visit_context = "in_visit"`, `well_visit_id`, `stretch_index` within the visit, and the three clocks at
   the bin center: `s` = t - first poke-in, `u` = last poke-out - t, `m` = end of the current immobile stretch
-  (clipped at the last poke-out) - t. In the visit's last stretch `m = u`.
+  (clipped at the last poke-out) - t. In the visit's last stretch `m = u`. As built:
+  `replay_models/visit_design.py:visit_timebins` (columns `time_since_visit_start_s`,
+  `time_until_visit_end_s`, `time_until_stretch_end_s`).
 - Counts: event starts of the kind whose event starts inside a visit (`select_visit_context` default,
   `STARTS_IN_WELL_VISIT` = `in_visit` and `spans_visit_end`, C3). An event that starts in a bin and crosses
   the final poke-out is counted (lead, L4); the bins end at the poke-out, so its time after it is not at
@@ -327,6 +255,13 @@ The visit at-risk bin design (Phase 3 builds it; Phase 5a fits it). Per session 
   a candidate that starts in a stop and runs into movement is not an event. The rate simulation of Phase 5a
   plants that rule at every stop end (small movements and the last one), so its effect is measured, not
   assumed.
+- One exception, as built: an event whose start has no at-risk time before it is not counted (it starts at
+  the start of a piece of analyzed time, such as a stop's first sample, and fills that bin, or right after
+  an event of the kind that fills the bin before it). `visit_timebins` records these in `attrs`
+  (`n_starts_not_at_risk`, `n_starts_not_at_risk_by_reason`). The events that start on a stop's first
+  sample are about 0.2 % of the No SWR events and none of the SWR events (28 events), so the rate and
+  content models would differ by them. Whether that stands is a question for the lead at
+  [Phase 5a](phase-5a-rate-models.md).
 - Reward covariates per bin: the last known outcome and the last ten known outcomes at the bin's time, with
   the existing outcome-boundary shift (the outcome of the current trial becomes lag 1 at
   `outcome_known_time_s`; `per_bin_design.py:85-91`, `_OUTCOME_SHIFT_STOP_COLUMNS`).
@@ -352,6 +287,10 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   trunk role absorbing the level). Q4a, the "slope" of the current arm's share on its reward fraction, is
   then a linear functional of the smooth: `f(m + sd/2) - f(m - sd/2)`, `m` and `sd` the pooled mean and SD
   of the fraction on current-arm rows (call), so it stays a change per pooled SD with an exact variance.
+  That reading of Q4a is a call to confirm with the lead at [Phase 6a](phase-6a-content-models.md).
+- WAITS FOR THE LEAD (smooth-term rule): the reward-fraction smooth per role, the recency smooth and the
+  current role's smooth of `u` are per-session smooth terms; their basis and penalty (above, "Smooth terms
+  and bases") follow the decision.
 - Recency: a smooth of `log(trials since last visit)` on leaf rows, not centered within the event (lead:
   absolute recency), with the never-visited indicator; recency is clamped at 200 trials. The shipped
   within-event centering (`behavior/covariates/history/visit_recency.py:23`) is not used.
@@ -366,7 +305,8 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
      `behavior/covariates/history/value_block.py:206`), pooled-SD slope per role;
   2. the sample count: `log(1 + n)`, `n` the visits to the well with a known outcome earlier in the epoch,
      before the event, pooled-SD slope per role;
-  3. the trial number in the epoch (the visits the animal has arrived at by the event start), a pooled-SD
+  3. the trial number in the epoch (the visits the animal has arrived at by the event start, Phase 3's
+     `n_visits_arrived`; this definition is a call to confirm with the lead at Phase 6a), a pooled-SD
      slope per role on the same leaf roles the measures enter on. It is an event-level quantity, so it is
      identified only as a role interaction; without it the sample count is a drift with the trial number;
   with the smooth reward fraction above. The reward variability (the variance of the arm's 0/1 outcomes
@@ -374,11 +314,18 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   fraction and could not be told from a curved reward-fraction effect in the simulation.
   - Recency in this model (call, stated before the fit): the simulation found the belief-variance test
     calibrated only when the recency curve is flexible and not shrunk (a straight line, a small ridge or the
-    production centered spline moved recency into the belief variance). A repeat with the shared fitter's
-    REML-penalized recency smooth is running (same scratch folder). If the selected penalty moves recency
-    into the belief variance, the recency curve of the uncertainty model is fitted unpenalized (a cubic
-    B-spline of the same basis without its penalty), or with the penalty selected in the model without the
-    uncertainty terms and then held fixed; which one is stated before the first real fit.
+    production centered spline moved recency into the belief variance). The repeat with the shared
+    fitter's REML penalty (design, thirteenth round; simulation) found that a penalty chosen from the data
+    makes each session's recency curve a straight line at about 140 events of a kind, and the
+    belief-variance test is then wrong (61 % and 68 % false positives). The design stays one fit for each
+    session (fourteenth round).
+  - WAITS FOR THE LEAD (smooth-term rule): how the recency curve of this model is fitted (a natural spline
+    of 4 columns with no penalty, or a P-spline with a fixed weak penalty). Either is stated before the
+    first real fit.
+  - The recency curve the paper shows is read from this model, the one that holds the belief variance, the
+    sample count and the trial number: read from the model without them, the curve absorbs a true
+    belief-variance effect or a drift (simulation, bias 0.3 to 0.9). Its supported range in the
+    simulation was 5 to 80 trials since the last visit.
   - The belief variance is predicted by recency within a session (VIF far above the collinearity limit by
     construction), and its simulated power is low; it is reported under C5's rule for a term that fails the
     collinearity rule by design, and a null is reported as "no evidence beyond recency; the design cannot
@@ -390,11 +337,11 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
 
 ## JAX batch twin
 
-For the mPFC unit models only (Phase 8): the same objective, Newton rule and pooled REML as the NumPy
-reference, vectorized over units with `jax.vmap` and run in float64 on CPU for tests and in float32 on the
-GPU (design 5, check 6). Read for method, not imported:
+For the mPFC unit models only (Phase 8): the same objective, Newton rule and pooled REML (over a session's
+units) as the NumPy reference, vectorized over units with `jax.vmap` and run in float64 on CPU for tests and
+in float32 on the GPU (design 5, check 6). Read for method, not imported:
 `/cumulus/edeno/neurospatial/src/neurospatial/encoding/_glm_jax.py:215-459` (`_newton_loop_jax`,
-`_reml_score_jax`, `select_penalty_by_reml_jax`) and this repository's
-`analysis/pfc/batched_glm.py:460-640` (`_sweep`, `_solve`, `_parameter_covariance`). Known pitfalls with
-the pinned library stack are in the project memory: float32 drift in marginals, A100 matmul precision (set
-`jax.default_matmul_precision("highest")` for the check).
+`_reml_score_jax`, `select_penalty_by_reml_jax`) and this repository's `analysis/pfc/batched_glm.py:460-640`
+(`_sweep`, `_solve`, `_parameter_covariance`). Known pitfalls with the pinned library stack are in the project
+memory: float32 drift in marginals, A100 matmul precision (set `jax.default_matmul_precision("highest")` for
+the check).

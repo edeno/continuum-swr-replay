@@ -34,10 +34,13 @@ so measure before choosing.
   from event ends as now.
 - **Penalty by REML**: the history kernels become penalized smooths of lag (the convention's form for a
   peri-event lag), with one REML strength per kernel shared over sessions, replacing the per-animal nested
-  cross-validation of the ridge sigma (`nested_cv`). The cross-history question ("does a recent event of one
-  kind change the other kind's rate") is answered by the kernel with its simultaneous band and, as a
-  held-out check, by the score summed over sessions on trial folds (Phase 2's fold function), not by a
-  per-session held-out test.
+  cross-validation of the ridge sigma (`nested_cv`). WAITS FOR THE LEAD (smooth-term rule): one REML strength
+  shared over sessions is a pooled penalty for a per-session smooth term; under either option of the decision
+  the kernels take the per-session rule instead (a small unpenalized basis, or a fixed weak penalty), and the
+  nested cross-validation is still replaced. The cross-history question ("does a recent event of one kind
+  change the other kind's rate") is answered by the kernel with its simultaneous band and, as a held-out
+  check, by the score summed over sessions on trial folds (Phase 2's fold function), not by a per-session
+  held-out test.
 - **Per session, then reduced**: per-session fits at the shared penalty, reduced session to day to animal,
   replacing the per-animal pooled fits with `C(session)` (the pooled form is stage 3; say so in the docs).
 - **Runner** `scripts/replay_models/rate/fit_visit_history.py` (new), registered in `run_refits.py`; the

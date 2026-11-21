@@ -50,6 +50,8 @@ even as a literature check (C6, C14). If a per-stop number is ever wanted, it is
   bins at or after `outcome_known_time_s` (the cohort step restricts and counts; the fitter drops nothing).
   REWXTIME is replaced by nothing: its question (does the reward effect change over the visit) is answered
   by adding a by-outcome smooth of `s` to model A (call; state it in the docs).
+  WAITS FOR THE LEAD (smooth-term rule): that by-outcome smooth, like model A's clocks, takes the per-session
+  smooth-term rule (a natural spline with no penalty, or a P-spline at a fixed weak penalty).
 - **Uncertainty rate model**: the `MU_UNCERTAINTY_COVARIATES` added to model A as pooled-SD slopes, one model
   with all of them as now, with the collinearity record; a covariate over the threshold is reported only
   jointly with its partner (C5).

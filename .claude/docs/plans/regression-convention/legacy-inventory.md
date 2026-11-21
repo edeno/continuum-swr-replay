@@ -32,7 +32,7 @@ Contents: [Phase 1](#phase-1) · [Phase 3](#phase-3) · [Phase 4](#phase-4) · [
 
 | ID | Item | Callers | Replaced by | Class |
 |---|---|---|---|---|
-| 1-1 | `analysis/replay_models/rate/cross_history.py`, `scripts/replay_models/rate/fit_cross_history_rate.py`, `tests/analysis/replay_models/rate/test_cross_history.py`, run `rate.cross_history` (`scripts/workflows/run_refits.py:173`) and the doc mentions listed in Phase 1's first task | none reports it | nothing (lead: "ok delete") | REMOVE (in progress on `regression-fitter`; the task stays as written) |
+| 1-1 | `analysis/replay_models/rate/cross_history.py`, `scripts/replay_models/rate/fit_cross_history_rate.py`, `tests/analysis/replay_models/rate/test_cross_history.py`, run `rate.cross_history` (`scripts/workflows/run_refits.py:173`) and the doc mentions listed in Phase 1's first task | none reports it | nothing (lead: "ok delete") | REMOVE (done in Phase 1, on master) |
 
 ## Phase 3
 
