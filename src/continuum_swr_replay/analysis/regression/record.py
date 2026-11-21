@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.tables.io import write_atomically
+from continuum_swr_replay.tables.io import read_table, write_table
 
 __all__ = ["JSON_FIELDS", "FitRecord", "read_records", "records_frame", "write_records"]
 
@@ -74,7 +74,8 @@ class FitRecord:
         Coefficient name -> why it is inactive: ``support``, ``rows of <level>
         dropped`` or ``no finite maximum (round k)``.
     support : dict
-        Coefficient name -> ``{"n_low", "n_high", "passes"}``.
+        Term name -> ``{"n_low", "n_high", "passes", "reason"}``
+        (:class:`.support.Support`).
     collinearity : dict
         Term -> ``{"r2", "vif"}`` or ``{"observed", "worst", "estimate"}``;
         empty for a session without a fit.
@@ -133,23 +134,20 @@ def records_frame(records: Sequence[FitRecord]) -> pd.DataFrame:
 
 
 def write_records(records: Sequence[FitRecord], path: str | Path) -> Path:
-    """Write ``records`` to a parquet table at ``path``, atomically.
+    """Write ``records`` to a parquet table at ``path``, atomically
+    (:func:`continuum_swr_replay.tables.io.write_table`).
 
     Returns
     -------
     Path
-        The file written.
+        The file written (``path`` with the suffix ``.parquet``).
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame = records_frame(records)
-    write_atomically(path, lambda temporary: frame.to_parquet(temporary, index=False))
-    return path
+    return write_table(records_frame(records), path)
 
 
 def read_records(path: str | Path) -> list[FitRecord]:
     """The records of a table written by :func:`write_records`."""
-    frame = pd.read_parquet(path)
+    frame = read_table(path)
     names = [f.name for f in fields(FitRecord)]
     if list(frame.columns) != names:
         raise ValueError(f"{path}: columns {list(frame.columns)}, not {names}")
