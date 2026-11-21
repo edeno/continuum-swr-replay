@@ -6,7 +6,8 @@ trial's departure from a well to the next departure, so the run to a well and
 the whole stay there are one segment, its class the destination well
 (:func:`task_segment_starts`). A segment longer than :data:`MAX_SEGMENT_S` is
 cut into equal pieces (:func:`capped_groups`), so that a long stay is spread
-over the folds. The folds are scikit-learn's
+over the folds. The pieces of one segment can fall in different folds, so one
+long stay, or one event whose rows cross a cut, can span two folds. The folds are scikit-learn's
 ``StratifiedGroupKFold(n_splits=N_FOLDS, shuffle=False)`` with one sample per
 row, its class the segment's class and its group the row's piece
 (:func:`trial_folds`): every row of a piece is in one fold, each class's rows

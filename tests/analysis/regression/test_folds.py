@@ -137,3 +137,20 @@ def test_trials_off_the_rows_clock_raise() -> None:
         fo.task_segment_starts(time, departures * 1000.0, wells, 1595.0 * 1000.0)
     with pytest.raises(ValueError, match="cover 19.8% of the bins"):
         fo.task_segment_starts(time, departures[:12], wells[:12], 1129.0)
+
+
+def test_a_long_stay_and_an_event_across_its_cut_span_two_folds() -> None:
+    """A 95 s stay among 10 s trials is cut into four pieces that fall in
+    different folds; the rows of an event that crosses a cut (here the 2 s
+    around it) are in two folds."""
+    lengths = np.r_[[10.0] * 20, 95.0, [10.0] * 20]
+    time, starts, classes = _trials(lengths, np.r_[[0, 1] * 10, 2, [0, 1] * 10])
+    folds = fo.trial_folds(time, starts, classes)
+    segment = fo.trial_segments(time, starts)
+    group = fo.capped_groups(time, segment)
+    stay = segment == 20
+    assert np.unique(group[stay]).size == 4
+    assert np.unique(folds[stay]).size > 1
+    cut = time[stay][np.flatnonzero(np.diff(group[stay]))]
+    crossing = [c for c in cut if np.unique(folds[np.abs(time - c) < 1.0]).size == 2]
+    assert crossing
