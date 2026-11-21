@@ -54,8 +54,11 @@ coefficient units, so a column whose values are all very small needs a
 coefficient too large to reach in the steps allowed, and its fit ends at the
 step limit. A term's size is its largest absolute value over the rows; a
 smooth's columns are measured together, as one term. Only the terms whose
-columns take values other than 0 and 1 are measured (a continuous slope, a
-smooth, a lag functional). On the pooled rows that are not missing, a term
+columns take values other than 0 and 1 are measured: a smooth, a lag
+functional and a continuous slope (standardized, a slope can still be small
+on the pooled rows that are not missing: when it shares its scale with a
+slope of the covariate on another level, or when its spread lies on rows
+missing for another term). On the pooled rows that are not missing, a term
 below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
 :func:`build_design` raises, naming it. In one session, a term below it on the
 session's rows (:meth:`Design.small_terms`) fails the support rule in that

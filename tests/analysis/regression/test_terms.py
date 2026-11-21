@@ -423,3 +423,39 @@ def test_a_missing_level_is_not_the_reference(content_sessions) -> None:
     np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [2])
     X = design.build(rows).X
     assert np.isnan(X[2, :3]).all()
+
+
+def test_a_slope_is_measured_after_its_standardization(rate_sessions) -> None:
+    """A slope's units do not reach the design: its raw values scaled by 1e-6
+    build, and give the same standardized column (to rounding). A
+    standardized slope is still measured, because it can be small on the
+    pooled rows that are not missing: when it shares its scale with a slope
+    of the covariate on another level, and when its spread lies on rows
+    missing for another term. Both are refused, naming the term."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    by = Category("last_rewarded", (0.0, 1.0), reference=0.0)
+    for terms in ([Slope("x")], [by, Slope("x", by=by)]):
+        tiny = pooled.assign(x=pooled["x"] * 1e-6)
+        X, _ = build_design(terms, pooled, intercept=True).session(pooled)
+        X_tiny, _ = build_design(terms, tiny, intercept=True).session(tiny)
+        np.testing.assert_allclose(X_tiny, X, rtol=1e-12, atol=1e-15)
+
+    rng = np.random.default_rng(0)
+    level = np.where(np.arange(400) < 200, "a", "b")
+    spread = 5.0 + 100.0 * np.where(np.arange(400) % 2 == 0, 1.0, -1.0)
+    x = np.where(level == "a", 5.0 + 1e-4 * rng.normal(size=400), spread)
+    rows = pd.DataFrame({"g": level, "x": x})
+    g = Category("g", ("a", "b"), reference="a")
+    shared = [g, Slope("x", by=g, levels=("a",)), Slope("x", by=g, levels=("b",))]
+    with pytest.raises(ValueError, match=re.escape("x:g=a (")):
+        build_design(shared, rows, intercept=True)
+
+    z = 1e-3 * rng.normal(size=400)
+    z[:5] = [50.0, -50.0, 40.0, -40.0, 30.0]
+    h = np.where(np.arange(400) % 2 == 0, "u", "v").astype(object)
+    h[:5] = None  # the rows holding z's spread are missing
+    rows = pd.DataFrame({"z": z, "h": h})
+    with pytest.raises(ValueError, match=re.escape("z (")):
+        build_design(
+            [Category("h", ("u", "v"), reference="u"), Slope("z")], rows, intercept=True
+        )
