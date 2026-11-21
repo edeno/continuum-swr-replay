@@ -138,6 +138,7 @@ class _Run:
             "session_cache": session_cache_record(EPOCHS),
             "event_table": {"sha256": "current"},
             "event_participation": {"sha256": "participation"},
+            "settings": {"subset": ANALYZED_SUBSET},
         }
         self.manifests = {}
         for folder in (
@@ -341,8 +342,8 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     # the held-out bouts are counted when the split is over the subset
     assert "heldout_bout_values" in seen
     assert not [key for key, value in values.items() if value.pending]
-    for key in ("participation", "tetrode_holdout"):
-        assert "drawn from the whole epoch" in values[key].description
+    assert "wholly inside one well visit" in values["participation"].description
+    assert "drawn from the whole epoch" in values["tetrode_holdout"].description
     assert "wherever that event starts" in values["left_out"].description
     assert "partner may start outside a visit" in values["other_detector"].description
 
@@ -408,6 +409,13 @@ PENDING_CASES = [
         {"content_occupancy"},
     ),
     (EVENT_PARTICIPATION_DIR, ("event_table", {"sha256": "old"}), {"participation"}),
+    (EVENT_PARTICIPATION_DIR, ("settings", None), {"participation"}),
+    (
+        EVENT_PARTICIPATION_DIR,
+        ("settings", {"subset": "every event"}),
+        {"participation"},
+    ),
+    (EVENT_PARTICIPATION_DIR, ("session_cache", _other_cache()), {"participation"}),
     (
         EVENT_LIKELIHOOD_ADVANTAGE_DIR,
         ("event_table", {"sha256": "old"}),

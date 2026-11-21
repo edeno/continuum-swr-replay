@@ -243,9 +243,17 @@ EVENTS_SUBSET = (
 
 CONTROL_SUBSET = (
     f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
+    "lying wholly inside one well visit"
+)
+"""What the participation values are over: their controls are Local rest inside
+one well visit (``event_evidence.participation.CONTROL_RULE``)."""
+
+HOLDOUT_CONTROL_SUBSET = (
+    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
     "drawn from the whole epoch (not only inside a well visit)"
 )
-"""What the values of the per-event runs with Local-rest controls are over."""
+"""What the held-out tetrode values are over: their run took its controls from
+participation tables whose controls were Local rest anywhere in the epoch."""
 
 TIME_SUBSET = (
     "time inside a well visit (from the first poke-in at a well to the final poke-out)"
@@ -1589,7 +1597,8 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             int((table["kind"] == "event").sum() - (table["kind"] == "control").sum()),
             "count",
             "count",
-            "events longer than any Local-rest stretch of their epoch (no control)",
+            "events longer than any stretch of Local rest inside one well visit of "
+            "their epoch (no control)",
         )
     )
     return values
@@ -2732,6 +2741,18 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     participation_paths = ok_table_paths(inputs.event_participation, "participation")
     participation_sha256 = files_sha256(participation_paths)
 
+    def participation_off_subset() -> str | None:
+        """Why the participation run's controls are not Local rest inside the
+        current well visits, or None: its settings record no subset or another,
+        or it read other visits than the current session cache's."""
+        manifest = read_output_manifest(inputs.event_participation)
+        what = rel(inputs.event_participation)
+        notes = [
+            subset_staleness(manifest.get("settings", {}), what),
+            session_cache_staleness(manifest, analyzed, what),
+        ]
+        return "; ".join(note for note in notes if note) or None
+
     def participation_staleness(folder: Path) -> str | None:
         """Why a run made from the participation tables is stale, or None."""
         return _input_staleness(
@@ -2752,6 +2773,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "(scripts/event_evidence/measure_event_participation.py)",
                 ),
                 stale(inputs.event_participation),
+                participation_off_subset(),
             ),
             CONTROL_SUBSET,
         )
@@ -2781,7 +2803,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 stale(inputs.tetrode_holdout),
                 participation_staleness(inputs.tetrode_holdout),
             ),
-            CONTROL_SUBSET,
+            HOLDOUT_CONTROL_SUBSET,
         )
     )
     summary.inputs += [

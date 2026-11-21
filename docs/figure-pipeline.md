@@ -57,6 +57,13 @@ the selected non-local events and the non-local detector's exposure inside a
 visit (`scripts/detector_comparison/measure_exposure_in_well_visits.py`, which
 rebuilds the inventory comparison's exposure from its stored tables and refuses
 one that is not the stored one).
+The participation run (`event_participation/`) keeps a row for every event and
+draws each event's Local-rest control wholly inside one well visit
+(`analysis/event_evidence/participation.py:CONTROL_RULE`); its settings record
+the subset and the rule, its inputs the session-cache digest, and the summary
+marks the participation values pending when either is not current. The
+held-out tetrode run takes its controls from the participation tables, so its
+values say which controls they were made with.
 The summary counts the events of every well-visit label, kept and left out
 (`events.json`, `events_label_*`, `*events_in_subset`, `*events_left_out`).
 The spike-evidence run (`event_spike_evidence/`) scores every event and every

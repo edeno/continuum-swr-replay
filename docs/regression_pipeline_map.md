@@ -170,7 +170,7 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Tetrode participation and spike rate of non-local events, against Local rest.
 
-`local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
+`local_rest_mask`, `control_starts`, `control_windows`, `windows_in_local_rest_anywhere`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
