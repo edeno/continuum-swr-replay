@@ -55,7 +55,10 @@ coefficient too large to reach in the steps allowed, and its fit ends at the
 step limit. A column's size is its largest absolute value over the rows; a
 smooth's columns are measured together, as one term. On the pooled rows, a
 term below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
-:func:`build_design` raises, naming it (:func:`check_column_sizes`). In one
+:func:`build_design` raises, naming it (:func:`check_column_sizes`), measured on
+the pooled rows that are not missing (:meth:`Design.missing_rows`). The
+session's design is built on rows without missing values, so its measure has
+none. In one
 session, a term below it there (:meth:`Design.small_terms`) fails the support
 rule in that session and is made inactive. A column zero on every row of a
 session (a level the session does not have) is not small: the support rule's
@@ -803,6 +806,8 @@ def build_design(
         offset=offsets[0] if offsets else None,
         _built=tuple(built),
     )
-    X, _ = design._matrix(pooled_rows)
+    # Measured on the pooled rows that are not missing: one missing value
+    # would make a column's largest value NaN and hide the check.
+    X, _ = design._matrix(pooled_rows[~design.missing_rows(pooled_rows)])
     check_column_sizes(X, design.size_groups)
     return design

@@ -438,10 +438,11 @@ one of them can be tiny in a session that covers a small part of its range (0.00
 the synthetic fixtures) while the term is not. The check is made at two levels:
 
 - on the pooled rows, when the design is built: a term below the threshold is the
-  caller's error (a units problem), and `build_design` raises, naming it;
-- in one session: a term below the threshold on that session's rows (a slope centered at
-  its pooled mean, nearly constant at that mean in the session) fails the support rule
-  there. It is made inactive, the reason is recorded in its support entry, and the
+  caller's error (a units problem), and `build_design` raises, naming it. It is measured
+  on the pooled rows that are not missing, so that one missing value does not hide it;
+- in one session: a term below the threshold on that session's rows, which hold no
+  missing value (they are dropped first), fails the support rule there (for example a
+  slope centered at its pooled mean, nearly constant at that mean in the session). It is made inactive, the reason is recorded in its support entry, and the
   recount of the support rule applies.
 
 A column zero on every row of a session is not small: the support rule's counts make it

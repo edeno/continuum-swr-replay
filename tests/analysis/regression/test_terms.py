@@ -384,8 +384,13 @@ def test_a_column_too_small_on_the_pooled_rows_is_refused_at_construction(
     term = LinearFunctional(LAG_COLUMNS, LAGS, 0.0, float(np.log(10)), 8, 1.0)
     with pytest.raises(ValueError, match=re.escape("lf(lag_1..lag_10) (")):
         build_design([term], tiny, intercept=True)
+    # A missing value in one pooled row does not hide the check: it is made
+    # on the rows that are not missing.
+    tiny.loc[0, "lag_3"] = np.nan
+    with pytest.raises(ValueError, match=re.escape("lf(lag_1..lag_10) (")):
+        build_design([term], tiny, intercept=True)
     design = build_design([term], pooled, intercept=True)
-    X, _ = design.session(tiny.iloc[:100])
+    X, _ = design.session(tiny.iloc[1:101])
     assert np.abs(X[:, 1:]).max() < SMALLEST_COLUMN_SIZE
     assert design.small_terms(X) == {
         "lf(lag_1..lag_10)": pytest.approx(np.abs(X[:, 1:]).max())
