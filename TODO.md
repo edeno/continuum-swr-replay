@@ -151,12 +151,18 @@ Work that is deferred on purpose. Each item says when it should be done.
 The review of the restriction and held-out tetrode runs before the
 `swr-restricted-models` merge left these on purpose.
 
-- [ ] **Which trials make the folds.** Both GPU runners make their folds from the
-  trials `load_data` returns (the DIO parse); the session cache's trials
-  (`replay_content/_session_cache/<epoch>.pkl`) can differ from them and give other
-  folds. Each epoch's record now keeps the digest of the trials it used
-  (`epoch_inputs["trials"]`), but nothing compares it on a resume.
-  *When:* decide which trials are canonical before any rerun of either runner.
+- [ ] **Old session-cache files hold other trials.** Both GPU runners make their
+  folds from the trials `load_data` returns (the DIO parse). The current session
+  cache (`replay_content/_session_cache/comrie_photogate_trials_v4/`) is a saved
+  copy of the same trials: folds made from it equal the stored folds of the
+  restriction run in every epoch (checked 2026-11-21). The files of older cache
+  contracts beside it (the `.pkl` files directly under `_session_cache/` and
+  `comrie_photogate_trials_v3/`) hold trials from before the photogate reparse; a
+  review read one of them and took it for the current cache. Each epoch's record now
+  keeps the digest of the trials it used (`epoch_inputs["trials"]`), but nothing
+  compares it on a resume.
+  *When:* delete the old cache files when the lead agrees; compare the digest on a
+  resume if the runners are rerun.
 - [ ] **A run made from a restriction run of another design is pending, not refused.**
   The window run (`sum_nonlocal_restriction_windows.py`) and the held-out event run
   (`detect_heldout_events.py`) record the restriction run's manifest digest but not its
