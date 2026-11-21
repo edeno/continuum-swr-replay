@@ -260,9 +260,9 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     Question(
         "2c.3",
-        "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
+        "Do an event's spikes favor its decoded location over the animal's position (against matched windows and on held-out tetrodes), and do held-out spikes favor a decoder that may be non-local outside SWRs over one that is non-local only in SWRs or never?",
         figures=("2", "2g", "heldout_tetrode"),
-        note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
+        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of the supplementary figure is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time and over the events detected from the held-out decode (restriction_heldout_*, Figure 2g) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
         "2c.4",
