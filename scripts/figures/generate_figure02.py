@@ -1430,10 +1430,13 @@ def generate_figure(
         )
     )
     heldout = window_scores(
-        read_complete_run(
-            data_dir / EVENT_TETRODE_HOLDOUT_DIR,
-            "tetrode_holdout",
-            analyzed_epoch_ids(),
+        select_events_in(
+            read_complete_run(
+                data_dir / EVENT_TETRODE_HOLDOUT_DIR,
+                "tetrode_holdout",
+                analyzed_epoch_ids(),
+            ),
+            events["event_id"],
         )
     )
     heldout_events = holdout_statistics(heldout, "event")

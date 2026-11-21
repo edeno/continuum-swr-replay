@@ -1809,3 +1809,121 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     )
     with pytest.raises(ValueError, match=f"{folder}.* was not made over"):
         figure.read_inputs()
+
+
+# --------------------------------------------------------------------------
+# Figure 2: the stored per-event tables are read over the selected events
+# --------------------------------------------------------------------------
+
+
+class _Figure02Read(Exception):
+    """Stops the figure at the read under test."""
+
+
+def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
+    """The figure module with its eight events in a visit and a ninth on the
+    track, every reader before the held-out tetrode run's stubbed."""
+    import joblib
+
+    from continuum_swr_replay.paths import (
+        BRAIN_STATE_REFERENCE_DIR,
+        NONLOCAL_BY_RIPPLE_POWER_DIR,
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    inside = _figure02_events().assign(event_id=range(8))
+    outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(analyzed_time.stamp_swr_source(pd.concat([inside, outside])), table)
+    cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    cache.parent.mkdir(parents=True)
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    frames = {**FIGURE02_FRAME_COUNTS, "non_swr": 6, "total": 9}
+    joblib.dump({"frame_event_counts": frames, "data": data, "results": None}, cache)
+    for folder, name in (
+        (BRAIN_STATE_REFERENCE_DIR, "reference.parquet"),
+        (NONLOCAL_BY_RIPPLE_POWER_DIR, "counts.parquet"),
+    ):
+        (tmp_path / folder).mkdir()
+        pd.DataFrame({"epoch_id": ["e"]}).to_parquet(tmp_path / folder / name)
+    # each stored per-event table holds a row of every event, the ninth too
+    rows = pd.DataFrame({"event_id": [*range(8), 99]})
+    for name, value in {
+        "parse_nwb_filename": lambda name: ("a", "d1"),
+        "example_windows": lambda *args: {},
+        "checked_reference": lambda reference, folder, name: reference,
+        "reference_medians": lambda *args: None,
+        "animal_power_counts": lambda *args: None,
+        "event_table_epochs": lambda *args: ["e"],
+        "read_complete_run": lambda *args: rows,
+        "participation_statistics": lambda table: None,
+        "well_visit_times": lambda identifier: None,
+        "check_visit_context_starts": lambda table, visits: None,
+    }.items():
+        monkeypatch.setattr(figure02, name, value)
+    return figure02
+
+
+def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    seen = []
+
+    def stop(table):
+        seen.append(table)
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "window_scores", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert sorted(seen[0]["event_id"]) == list(range(8))
+
+
+def test_figure02_reads_participation_over_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    seen = []
+
+    def stop(table):
+        seen.append(table)
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "participation_statistics", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert sorted(seen[0]["event_id"]) == list(range(8))
+
+
+def test_figure02_checks_every_event_s_label_against_the_visits(
+    offline, tmp_path, monkeypatch
+):
+    """The ninth event (on the track, starting at 3 s) is labeled outside every
+    visit; visits that hold it make the figure refuse the table."""
+    import numpy as np
+
+    from continuum_swr_replay.analysis.event_definition import cohort_selection
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        figure02,
+        "check_visit_context_starts",
+        cohort_selection.check_visit_context_starts,
+    )
+    monkeypatch.setattr(
+        figure02, "event_table_epochs", lambda table, analyzed: ["ad1_e1_HPC"]
+    )
+    visits = (np.array([-1.0]), np.array([10.0]))
+    monkeypatch.setattr(figure02, "well_visit_times", lambda identifier: visits)
+    monkeypatch.setattr(
+        cohort_selection, "event_epoch_ids", lambda t: pd.Series("ad1_e1_HPC", t.index)
+    )
+    with pytest.raises(ValueError, match="1 of 9 events' visit_context disagrees"):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
