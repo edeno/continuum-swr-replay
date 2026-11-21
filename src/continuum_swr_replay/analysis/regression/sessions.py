@@ -427,17 +427,19 @@ def _record(
     design = session.design
     kept = session.kept
     p = len(design.coef_names)
-    beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)
+    beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)  # no fit tried
     collinearity, edf = {}, {}
     status, decrement, n_iter, n_events = NOT_FITTED, float("nan"), 0, 0.0
     if refit is not None:
         data, block_terms = session.fitted_with
         last = refit.refits[-1]
+        if not refit.fitted:
+            last = last.without_fit(len(block_terms))
         status = str(last.fit.status)
         decrement, n_iter = float(last.fit.newton_decrement), int(last.fit.n_iter)
         n_events = _n_events(session.lik, data.y, session.unit[kept])
+        beta, vcov = last.fit.beta, last.covariance
         if refit.fitted:
-            beta, vcov = last.fit.beta, last.covariance
             collinearity = term_collinearity(
                 session.lik,
                 data.X,

@@ -315,6 +315,28 @@ class RemlScore:
     running_away_directions: tuple[FreeDirection, ...] = ()
     unidentified_directions: tuple[FreeDirection, ...] = ()
 
+    def without_fit(self, n_blocks: int) -> RemlScore:
+        """The score of a session left without a fit: the score, scale,
+        coefficients, ``A``, covariance and edf NaN; the inner fit's status,
+        Newton decrement and steps kept.
+
+        Parameters
+        ----------
+        n_blocks : int
+            The penalty blocks, the length of ``edf``.
+        """
+        p = self.fit.beta.size
+        nan = np.full((p, p), np.nan)
+        return replace(
+            self,
+            score=np.nan,
+            fit=replace(self.fit, beta=np.full(p, np.nan), A=nan),
+            scale=np.nan,
+            covariance=nan,
+            edf=np.full(n_blocks, np.nan),
+            edf_total=np.nan,
+        )
+
 
 @dataclass(frozen=True)
 class PooledScore:
@@ -1701,17 +1723,7 @@ def _pooled_fit(
     for left_out in () if search is None else search.set_aside:
         entry = left_out.refits[-1]
         if not left_out.fitted:
-            p = entry.fit.beta.size
-            nan = np.full((p, p), np.nan)
-            entry = replace(
-                entry,
-                score=np.nan,
-                fit=replace(entry.fit, beta=np.full(p, np.nan), A=nan),
-                scale=np.nan,
-                covariance=nan,
-                edf=np.full(len(blocks), np.nan),
-                edf_total=np.nan,
-            )
+            entry = entry.without_fit(len(blocks))
         sessions.insert(left_out.index, entry)
     return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
 
