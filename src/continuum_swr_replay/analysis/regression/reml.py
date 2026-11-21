@@ -231,6 +231,10 @@ class SessionFit:
 class PenaltySearch:
     """How :func:`select_penalties` or :func:`refine_penalties` found ``rho``.
 
+    There is one only for a converged search (the gradient rule met; a
+    component at a bound whose gradient points out of the bounds is not
+    counted): a search that does not converge raises.
+
     Attributes
     ----------
     start_rho : np.ndarray, shape (m,)
@@ -241,9 +245,6 @@ class PenaltySearch:
         Grid points evaluated (0 for a given start).
     n_grid_not_finite : int
         Grid points whose pooled score was not finite (an inner fit failed).
-    converged : bool
-        True when the gradient rule was met (components at a bound whose
-        gradient points out of the bounds are not counted).
     n_outer_steps : int
         Newton steps on ``rho`` taken.
     at_boundary : np.ndarray of bool, shape (m,)
@@ -255,7 +256,6 @@ class PenaltySearch:
     start_score: float
     n_grid_points: int
     n_grid_not_finite: int
-    converged: bool
     n_outer_steps: int
     at_boundary: np.ndarray
 
@@ -669,14 +669,13 @@ def _newton_step(gradient: np.ndarray, hessian: np.ndarray) -> np.ndarray:
 
 def _try_step(
     evaluate: _Evaluator, rho: np.ndarray, current: PooledScore, max_halvings: int
-) -> tuple[np.ndarray, PooledScore] | None:
+) -> tuple[np.ndarray, PooledScore] | str:
     """One Newton step on the free terms, halved until the score does not rise.
 
-    Returns None when no halving lowers the score or the step is empty.
+    Returns the new point and its score, or why there is none: the step is
+    empty (the bounds hold it), or no halving lowers the score.
     """
     free = _free(rho, current.gradient)
-    if not free.any():
-        return None
     step = np.zeros_like(rho)
     step[free] = _newton_step(
         current.gradient[free], current.hessian[np.ix_(free, free)]
@@ -685,12 +684,12 @@ def _try_step(
     for _ in range(max_halvings):
         candidate = np.clip(rho + scale * step, *LOG_PENALTY_BOUNDS)
         if np.array_equal(candidate, rho):
-            return None
+            return "its step is empty at the bounds"
         trial = evaluate(candidate, derivatives=True)
         if np.isfinite(trial.score) and trial.score <= current.score:
             return candidate, trial
         scale *= 0.5
-    return None
+    return "no halving of its step lowered the pooled score"
 
 
 def _search(
@@ -701,30 +700,43 @@ def _search(
     Stops when the largest free gradient component is below
     ``REML_GRADIENT_TOL * max(1, |V|)``, then takes that last Newton step when
     it does not raise the score (as the inner fit does), so ``rho`` is the
-    optimum to rounding; or after ``REML_MAX_STEPS`` steps, or when no halving
-    of a step lowers the score (not converged).
+    optimum to rounding.
+
+    Raises
+    ------
+    ValueError
+        If the score at ``start`` is not finite, or the search does not
+        converge: ``REML_MAX_STEPS`` steps, an empty step or no halving that
+        lowers the score. The message gives the last log penalties, the
+        gradient and the steps taken.
     """
     rho = np.array(start, dtype=float)
     current = evaluate(rho, derivatives=True)
     if not np.isfinite(current.score):
         raise ValueError(f"no finite REML score at the start {rho}")
     start_score = current.score
-    converged, n_steps = False, 0
+    n_steps = 0
     while True:
         free = _free(rho, current.gradient)
         tolerance = REML_GRADIENT_TOL * max(1.0, abs(current.score))
         if not free.any() or np.max(np.abs(current.gradient[free])) < tolerance:
-            converged = True
-            moved = _try_step(evaluate, rho, current, max_halvings=1)
-            if moved is not None:
-                (rho, current), n_steps = moved, n_steps + 1
+            if free.any():
+                moved = _try_step(evaluate, rho, current, max_halvings=1)
+                if not isinstance(moved, str):
+                    (rho, current), n_steps = moved, n_steps + 1
             break
         if n_steps == REML_MAX_STEPS:
-            break
-        moved = _try_step(evaluate, rho, current, MAX_STEP_HALVINGS)
-        if moved is None:
-            break
-        (rho, current), n_steps = moved, n_steps + 1
+            reason = f"no stationary point in {REML_MAX_STEPS} steps"
+        else:
+            moved = _try_step(evaluate, rho, current, MAX_STEP_HALVINGS)
+            if not isinstance(moved, str):
+                (rho, current), n_steps = moved, n_steps + 1
+                continue
+            reason = moved
+        raise ValueError(
+            f"the penalty search did not converge: {reason}, after {n_steps} "
+            f"steps; log penalties {rho}, gradient {current.gradient}"
+        )
     lo, hi = LOG_PENALTY_BOUNDS
     at_boundary = (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
     search = PenaltySearch(
@@ -732,7 +744,6 @@ def _search(
         start_score,
         n_grid_points,
         n_not_finite,
-        converged,
         n_steps,
         at_boundary,
     )
@@ -783,7 +794,7 @@ def refine_penalties(
     Raises
     ------
     ValueError
-        If the score at ``rho0`` is not finite.
+        If the score at ``rho0`` is not finite or the search does not converge.
     """
     evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
@@ -816,8 +827,8 @@ def select_penalties(
     Raises
     ------
     ValueError
-        If there is no block, or no grid point gives a finite pooled score
-        (no fallback: the model is not fitted).
+        If there is no block, no grid point gives a finite pooled score, or
+        the search does not converge (no fallback: the model is not fitted).
     """
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")

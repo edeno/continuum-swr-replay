@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import scipy.optimize
 
+from continuum_swr_replay.analysis.regression import reml
 from continuum_swr_replay.analysis.regression.constants import (
     LOG_PENALTY_BOUNDS,
     NULL_SPACE_EDF_TOL,
@@ -260,7 +261,6 @@ def test_grid_start_finds_better_optimum() -> None:
     local = refine_penalties(Poisson(), [data], blocks, [0.0])
     selected = select_penalties(Poisson(), [data], blocks)
 
-    assert local.search.converged and selected.search.converged
     assert 2.0 < local.rho[0] < 5.0
     assert local.sessions[0].edf[0] > 2.0
     np.testing.assert_array_equal(selected.search.at_boundary, [True])
@@ -275,7 +275,6 @@ def test_pooled_invariant_to_duplication() -> None:
     _, second, _ = _session("poisson", 2, seed=8)
     once = select_penalties(lik, [first, second], blocks)
     twice = select_penalties(lik, [first, second, first, second], blocks)
-    assert once.search.converged and twice.search.converged
     np.testing.assert_allclose(twice.rho, once.rho, rtol=0, atol=1e-6)
     assert twice.score == pytest.approx(2 * once.score, rel=1e-10)
     assert once.search.n_grid_points == 25  # the product of five points per term
@@ -287,7 +286,6 @@ def test_more_than_three_terms_use_one_term_grids() -> None:
     lik, data, blocks = _session("poisson", 4, seed=10, n_rows=400)
     result = select_penalties(lik, [data], blocks)
     assert result.search.n_grid_points == 2 * 4 * 31
-    assert result.search.converged
     free = ~result.search.at_boundary
     assert np.max(np.abs(result.gradient[free])) < 1e-6 * max(1.0, abs(result.score))
     assert result.score <= result.search.start_score
@@ -339,7 +337,6 @@ def test_gaussian_scale_matches_closed_form() -> None:
         rtol=1e-10,
     )
     # The search stopped at a stationary point of the profiled score.
-    assert result.search.converged
     assert np.max(np.abs(result.gradient)) < 1e-6 * max(1.0, abs(result.score))
 
 
@@ -369,7 +366,7 @@ def test_at_boundary() -> None:
     assert line.rho[0] == LOG_PENALTY_BOUNDS[1]
     assert line.sessions[0].edf[0] == pytest.approx(1.0, abs=1e-5)
     np.testing.assert_array_equal(wiggle.search.at_boundary, [False])
-    assert wiggle.search.converged and wiggle.search.n_outer_steps >= 1
+    assert wiggle.search.n_outer_steps >= 1
     assert 3.0 < wiggle.sessions[0].edf[0] < 5.0
 
 
@@ -391,7 +388,6 @@ def test_shrunk_to_null_space() -> None:
     line = select_penalties(Gaussian(), [SessionData(X, line_y)], blocks)
     curve = select_penalties(Gaussian(), [SessionData(X, curve_y)], blocks)
 
-    assert line.search.converged and curve.search.converged
     assert line.sessions[0].edf[0] - 1.0 <= NULL_SPACE_EDF_TOL
     np.testing.assert_array_equal(line.sessions[0].in_null_space, [True])
     np.testing.assert_array_equal(line.search.at_boundary, [False])
@@ -426,7 +422,7 @@ def test_matches_mgcv_fixtures(name: str) -> None:
     ours = fit_ours(name, frame)
     differences = agreement(name, ours, mgcv)
 
-    assert ours["converged"] and mgcv["converged"]
+    assert mgcv["converged"]
     assert not ours["in_null_space"].any()
     expected_keys = {"log_penalty", "edf", "reml", "curve", "se_curve"}
     if name.startswith("poisson"):
@@ -475,7 +471,6 @@ def test_one_penalty_matches_neurospatial_fixture() -> None:
         assert ours.score - constant == pytest.approx(theirs, abs=1e-7)
 
     result = select_penalties(Poisson(), sessions, blocks)
-    assert result.search.converged
     assert result.rho[0] == pytest.approx(fixture["tight_log_penalty"], abs=1e-6)
     assert abs(result.rho[0] - fixture["select_log_penalty"]) < fixture["select_xatol"]
     log_rate = np.column_stack([X @ session.fit.beta for session in result.sessions])
@@ -531,3 +526,18 @@ def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
     score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
     assert score.score == np.inf
     assert score.fit.status == NOT_IDENTIFIED
+
+
+def test_an_unconverged_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A search that runs out of steps, or whose step no halving accepts, is
+    an error that gives the last log penalties, the gradient and the steps."""
+    lik, data, blocks = _session("poisson", 2, seed=7)
+    monkeypatch.setattr(reml, "REML_MAX_STEPS", 1)
+    with pytest.raises(ValueError, match=r"not converge.*1 step.*gradient"):
+        refine_penalties(lik, [data], blocks, [-5.0, 15.0])
+    with pytest.raises(ValueError, match=r"not converge.*1 step.*gradient"):
+        select_penalties(lik, [data], blocks)
+    monkeypatch.setattr(reml, "REML_MAX_STEPS", 50)
+    monkeypatch.setattr(reml, "MAX_STEP_HALVINGS", 0)
+    with pytest.raises(ValueError, match=r"no halving.*0 steps.*gradient"):
+        refine_penalties(lik, [data], blocks, [-5.0, 15.0])

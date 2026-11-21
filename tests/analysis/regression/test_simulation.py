@@ -86,7 +86,6 @@ def _fits(shape: str, log_rate_ratio: float, seed: int) -> np.ndarray:
         data, penalty = _simulate(shape, log_rate_ratio, np.random.default_rng(child))
         blocks = [PenaltyBlock(np.arange(2, 2 + penalty.shape[0]), penalty)]
         result = select_penalties(Poisson(), [data], blocks)
-        assert result.search.converged
         session = result.sessions[0]
         out[i] = session.fit.beta[1], np.sqrt(session.covariance[1, 1]), session.edf[0]
     return out

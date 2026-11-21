@@ -174,8 +174,8 @@ def fit_ours(name: str, frame: pd.DataFrame) -> dict:
         trace of each smooth's penalty matrix), ``reml`` (the score plus the
         constants mgcv's score keeps: ``sum log y!`` for the Poisson),
         ``curve_<v>`` and ``se_curve_<v>`` on ``GRID`` for each smooth ``v``,
-        ``coef_rew`` and ``se_rew`` for the Poisson sets, ``scale``, and the
-        search's ``converged`` and ``in_null_space``.
+        ``coef_rew`` and ``se_rew`` for the Poisson sets, ``scale`` and
+        ``in_null_space`` (the search raises when it does not converge).
     """
     basis = PSplineBasis(LO, HI, N_BASIS)
     y = frame["y"].to_numpy(dtype=float)
@@ -212,7 +212,6 @@ def fit_ours(name: str, frame: pd.DataFrame) -> dict:
         "trace_S": np.array([np.trace(block.S) for block in blocks]),
         "reml": result.score + (float(gammaln(y + 1.0).sum()) if poisson else 0.0),
         "scale": session.scale,
-        "converged": result.search.converged,
         "in_null_space": session.in_null_space,
     }
     grid_basis = basis.design(GRID)
@@ -316,7 +315,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(
                 f"{name}: {len(frame)} rows, y total {frame['y'].sum():.0f}; "
                 f"mgcv converged {mgcv['converged']} in {mgcv['outer_iterations']} "
-                f"outer steps; ours converged {ours['converged']}"
+                "outer steps"
             )
             print(
                 f"  log penalty ours {np.round(ours['log_penalty'], 6)}, "
