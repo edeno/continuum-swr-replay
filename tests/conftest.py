@@ -27,6 +27,32 @@ from pathlib import Path
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
+# JAX keeps the programs it compiles on disk, so that a later run of the suite
+# reads them instead of compiling them again. The library's clusterless
+# likelihood runs operation by operation, and each operation is compiled again
+# for every new number of spikes: the simulated decoder tests
+# (``tests/integration/test_*_simulated.py``) compile about 6,000 small programs
+# per file, three quarters of one file's time and a third of the other's on a
+# cold run. A program is found only by a key
+# made of the program itself, its compile options and the JAX, jaxlib and XLA
+# versions, so an entry left by other code or another version is never read,
+# and a damaged entry is compiled again (with a warning). The default folder
+# follows the XDG convention; a caller's ``JAX_COMPILATION_CACHE_DIR`` wins, and
+# ``JAX_ENABLE_COMPILATION_CACHE=false`` turns the cache off. Every program is
+# kept, however fast it compiled (JAX's default keeps only those taking a
+# second or more). The folder is not pruned (JAX's size limit rescans the whole
+# folder on every write): delete it to reclaim the space.
+# Set before any test imports JAX, which reads these when it is imported.
+os.environ.setdefault(
+    "JAX_COMPILATION_CACHE_DIR",
+    str(
+        Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+        / "continuum-swr-replay"
+        / "jax-compilation-cache"
+    ),
+)
+os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
+
 # No test reads or writes the live data root unless it asks to. Every data root
 # is resolved when it is used, from ``$CSR_PROCESSED_DATA_DIR``
 # (``paths.processed_data_dir()``), so that variable is the one place a test

@@ -20,6 +20,14 @@ uv run pytest --lf                         # rerun only last-failed tests
 `pytest-xdist` is not installed, so there is no `-n`. A full check is the two
 runs together: the default run, then `-m real_data` on a host with the data.
 
+JAX keeps what it compiles in a cache on disk,
+`${XDG_CACHE_HOME:-~/.cache}/continuum-swr-replay/jax-compilation-cache`, so a
+second run compiles little (set in [`conftest.py`](conftest.py)). It helps
+most in the simulated decoder tests (`integration/test_*_simulated.py`), which
+spend much of a first run compiling. Set `JAX_COMPILATION_CACHE_DIR` to use
+another folder, or `JAX_ENABLE_COMPILATION_CACHE=false` to turn it off. JAX
+never prunes the folder; delete it to reclaim the space.
+
 ## Markers
 
 The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
