@@ -416,7 +416,7 @@ def epoch_windows(
 ) -> pd.DataFrame:
     """The epoch's events and their Local-rest controls as decode-bin windows.
 
-    The windows Figure 2's held-out tetrode score
+    The windows the held-out tetrode score of the supplementary figure
     (``scripts/event_evidence/score_tetrode_holdout.py``) and the non-local
     restriction windows (``scripts/event_evidence/sum_nonlocal_restriction_windows.py``)
     are taken over.

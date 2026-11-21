@@ -1,4 +1,4 @@
-"""Tests for the non-local restriction scores over panel g's windows, on tables
+"""Tests for the non-local restriction scores summed over event windows, on tables
 small enough to check by hand."""
 
 import numpy as np

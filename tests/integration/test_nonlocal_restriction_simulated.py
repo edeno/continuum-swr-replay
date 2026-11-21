@@ -648,8 +648,7 @@ def test_the_decodes_missing_bins_score_zero_in_every_fold(fold_fit):
         assert (likelihood[~is_missing] != 0).any(axis=1).all()
     scores = table[list(nr.SCORE_COLUMNS)].to_numpy(np.float64)
     # float32 rounding of the posterior's mass: here up to 1e-6 (filter) and
-    # 7e-6 (two-sided); on chimi20200225_06_r3_HPC 9.5e-7 and 1.3e-5, in the
-    # shared run's table as in the fold fit's
+    # 7e-6 (two-sided)
     filter_columns = [nr.SCORE_COLUMNS.index(m) for m in nr.MODELS]
     two_sided_columns = [nr.SCORE_COLUMNS.index(f"{m}_two_sided") for m in nr.MODELS]
     np.testing.assert_allclose(

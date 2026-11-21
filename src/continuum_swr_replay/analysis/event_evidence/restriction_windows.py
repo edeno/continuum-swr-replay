@@ -1,21 +1,26 @@
-"""The non-local restriction models over the windows of Figure 2's panel g.
+"""The non-local restriction models summed over event windows.
 
 The per-bin scores of the three models (``none``, ``swr``, ``full``;
-:mod:`.nonlocal_restriction`) summed over each canonical non-local event and
-over its matched Local-rest control window: the windows of the held-out tetrode
-score (``state_evidence.windows.epoch_windows``), so the two methods are read on
-the same bins and summarized by the same statistic
-(``likelihood_advantage.likelihood_advantage_statistics``: one value per animal,
-their mean and its nested-bootstrap interval). Both runs hold out the same
-folds of whole trials (``fold_design`` in each run's manifest settings).
+:mod:`.nonlocal_restriction`) summed over windows. The canonical windows are
+each canonical non-local event and its matched Local-rest control window: the
+windows of the held-out tetrode score (``state_evidence.windows.epoch_windows``),
+so the two methods are read on the same bins and summarized by the same
+statistic (``likelihood_advantage.likelihood_advantage_statistics``: one value
+per animal, their mean and its nested-bootstrap interval). The same functions
+sum the windows of the events detected from the held-out decode
+(``scripts/event_evidence/detect_heldout_events.py``), which Figure 2g draws.
+Both runs are held out in folds of whole trials; the window step checks only
+the held-out tetrode run's fold design (``fold_design`` in its manifest
+settings).
 
 A window's contrast ``a - b`` (:data:`.nonlocal_restriction.CONTRASTS`) is its
 sum of ``a``'s per-bin score less its sum of ``b``'s, in nats, for each score
 family (:data:`.nonlocal_restriction.FAMILY_SUFFIX`). It is read two ways:
 
-- per spike: divided by the window's spike count over every tetrode (the
-  held-out tetrode run's ``n_spikes``, summed over tetrodes), NaN without
-  spikes, as ``tetrode_holdout.window_scores`` does;
+- per spike: divided by the window's spike count over every tetrode (from the
+  per-bin facts, :mod:`.bin_facts`; for the canonical windows the window runner
+  checks it against the held-out tetrode run's ``n_spikes``, summed over
+  tetrodes), NaN without spikes, as ``tetrode_holdout.window_scores`` does;
 - per second: divided by the window's duration, its bins times the decode's
   time step (``intervals.sample_step`` of the per-bin table's time).
 
@@ -46,8 +51,7 @@ SWR" is the event table's class (strict overlap with a kept SWR), not the
 that lies in an SWR the cohort drops for speed, is without an SWR and still
 holds bins where ``swr`` is forced non-local. The table counts them
 (``n_bins_in_swr``) and the runner's records total them
-(``n_no_swr_events_with_in_swr_bins``, ``n_in_swr_bins_of_no_swr_events``: 12
-of the 42,974 such events and 32 bins in the 242-epoch run).
+(``n_no_swr_events_with_in_swr_bins``, ``n_in_swr_bins_of_no_swr_events``).
 
 The filter family's window sum is the window's share of the model's log
 likelihood; the two-sided family's is a sum of scores that do not add up to a
@@ -249,8 +253,9 @@ def window_bin_fact_sums(
     -------
     pd.DataFrame
         One row per window, in ``windows``' order: ``n_spikes_bins`` (the
-        window's spikes over all its bins, which must be the held-out tetrode
-        run's ``n_spikes``) and :data:`BIN_FACT_COLUMNS`:
+        window's spikes over all its bins; the window runner checks them
+        against the held-out tetrode run's ``n_spikes``) and
+        :data:`BIN_FACT_COLUMNS`:
         ``n_spikes_outside_swr`` (spikes in its ``immobile_outside_swr``
         bins), ``n_bins_outside_swr_in_visit`` and
         ``n_spikes_outside_swr_in_visit`` (bins and spikes of those inside a
@@ -502,9 +507,8 @@ def window_contrasts(
         (:func:`contrast_column`). Over the whole window: the contrast's window
         sum (nats) divided by ``n_spikes`` (NaN without spikes) or by
         ``duration_s``. So the two units do not cover the same windows: a
-        window without spikes has a value per second and none per spike (153
-        Local-rest controls in the cohort; the statistics' ``n_scored`` counts
-        the windows with a value). Outside SWRs: the contrast summed over the
+        window without spikes has a value per second and none per spike (the
+        statistics' ``n_scored`` counts the windows with a value). Outside SWRs: the contrast summed over the
         window's ``immobile_outside_swr`` bins divided by their spikes,
         ``n_spikes_outside_swr`` (NaN without a spike there), or by their
         duration, ``duration_outside_swr_s``; NaN for a window with no such bin

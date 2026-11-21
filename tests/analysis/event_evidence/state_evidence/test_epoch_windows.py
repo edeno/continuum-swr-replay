@@ -1,4 +1,5 @@
-"""``epoch_windows``: the events and Local-rest controls of panel h as decode bins."""
+"""``epoch_windows``: the canonical events and their Local-rest controls as decode
+bins."""
 
 import numpy as np
 import pandas as pd

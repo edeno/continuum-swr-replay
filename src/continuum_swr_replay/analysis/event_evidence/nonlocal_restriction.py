@@ -736,7 +736,9 @@ def model_scores(
     Parameters
     ----------
     detector : NonLocalClusterlessDetector
-        The epoch's fitted decoder (its states and transitions).
+        The fitted decoder (its states and transitions): in
+        :func:`fold_fit_scores`, each fold's decoder, fit on the fold's
+        training folds.
     log_likelihood : ndarray, shape (n_time, n_state_bins)
         ``ll[t, s]`` (:func:`fold_log_likelihood`).
     in_swr : ndarray of bool, shape (n_time,)

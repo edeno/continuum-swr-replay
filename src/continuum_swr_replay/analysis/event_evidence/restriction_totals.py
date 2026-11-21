@@ -40,7 +40,7 @@ non-local states buy outside SWRs:
   poke-out adds its bins inside the visit only. NaN when the epoch's total is
   not positive. A window with a bin in excluded time is left out of the
   numerators, as :func:`.restriction_windows.window_contrasts` leaves it out of
-  the window statistics (none in the canonical windows);
+  the window statistics;
 - the gain per spike and per second in the rest of that time, the bins inside
   no event window of any group (``in_event_window`` false): every event the
   time sums were given counts, whichever events the shares are given.
