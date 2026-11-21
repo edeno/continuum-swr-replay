@@ -23,6 +23,11 @@
 - :func:`animal_day_session_bootstrap`: a per-session number (or curve) taken
   session -> recording day -> animal as a mean of means, with its nested
   bootstrap draws (animals, then their days, then each day's sessions).
+- :func:`animal_day_session_values`, :func:`day_level_test` and
+  :func:`estimand_summary`: each animal's value row -> session -> day ->
+  animal; the signed-rank p over recording days; and a scalar estimand's
+  summary over sessions (the animal-balanced estimate, its interval, the
+  animals with its sign and the day-level p).
 - :func:`session_mean_curve`, :func:`animal_balanced_curve` and
   :func:`animal_curve_sem`: a curve (one value per lag) taken unit -> session
   -> animal, the mean over animals of each animal's mean over its sessions, and
@@ -637,6 +642,166 @@ def _animal_day_codes(
     pairs = pd.MultiIndex.from_arrays([animal, day])
     day_labels = pd.factorize(pairs, sort=True)[0]
     return nested_codes(animal, day_labels)
+
+
+def animal_day_session_values(
+    values: pd.Series,
+    animal: pd.Series,
+    day: pd.Series,
+    session: pd.Series,
+    statistic: str,
+) -> pd.Series:
+    """Each animal's value of a per-row number, row -> session -> day -> animal.
+
+    The three-level analog of :func:`animal_session_values`: the
+    ``statistic`` over each session's rows, then over each recording day's
+    sessions, then over each animal's days, so every day of an animal weighs
+    the same however many sessions it holds.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_rows,)
+        One number per row (a session, or a unit or event of one). A missing
+        value is left out.
+    animal, day, session : pd.Series, shape (n_rows,)
+        Each row's animal, recording day within its animal, and session within
+        its day, indexed as ``values``.
+    statistic : {"median", "mean"}
+        The reduction at every level.
+
+    Returns
+    -------
+    per_animal : pd.Series, shape (n_animals,)
+        Indexed by animal in sorted order; an animal with no value is not in
+        it.
+
+    Raises
+    ------
+    ValueError
+        If ``statistic`` is neither ``"median"`` nor ``"mean"``, or the labels
+        are not indexed as ``values``.
+    """
+    if statistic not in ("median", "mean"):
+        raise ValueError(f"statistic {statistic!r} is neither 'median' nor 'mean'")
+    if not all(values.index.equals(s.index) for s in (animal, day, session)):
+        raise ValueError("values, animal, day and session are not indexed alike")
+    has_value = values.notna()
+    keys = [s[has_value] for s in (animal, day, session)]
+    per_session = values[has_value].groupby(keys, observed=True).agg(statistic)
+    per_day = per_session.groupby(level=[0, 1], observed=True).agg(statistic)
+    return per_day.groupby(level=0, observed=True).agg(statistic)
+
+
+def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> float:
+    """The signed-rank p over recording days of a per-session number.
+
+    Each recording day's value is the mean of its sessions' values; the test
+    is :func:`signed_rank_p` of those day values against zero.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_sessions,)
+        One number per session. A missing value is left out.
+    animal, day : pd.Series, shape (n_sessions,)
+        Each session's animal and recording day within its animal, indexed as
+        ``values``.
+
+    Returns
+    -------
+    p : float
+        NaN when fewer than :data:`MIN_SIGNED_RANK_DIFFERENCES` day values are
+        non-zero.
+
+    Raises
+    ------
+    ValueError
+        If the labels are not indexed as ``values``.
+    """
+    if not (values.index.equals(animal.index) and values.index.equals(day.index)):
+        raise ValueError("values, animal and day are not indexed alike")
+    has_value = values.notna()
+    keys = [animal[has_value], day[has_value]]
+    return signed_rank_p(values[has_value].groupby(keys, observed=True).mean())
+
+
+def estimand_summary(
+    values: pd.Series,
+    animal: pd.Series,
+    day: pd.Series,
+    session: pd.Series,
+    *,
+    n_draws: int,
+    seed: int,
+) -> dict[str, float]:
+    """The summary of a scalar estimand over sessions.
+
+    The estimate is the animal-balanced value: session -> recording day ->
+    animal, a mean of means (:func:`animal_day_session_bootstrap`). Its 95 %
+    interval is :func:`bootstrap_interval` over that function's nested
+    bootstrap draws (animals, then days, then sessions). Beside it stand the
+    animals whose own value (:func:`animal_day_session_values`, means) has the
+    estimate's sign and the recording-day-level test (:func:`day_level_test`).
+    No claim rests on a p over five animals.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_sessions,)
+        One estimate per session (for a kind difference, the difference of the
+        two kinds' session estimates). A missing value is left out.
+    animal, day, session : pd.Series, shape (n_sessions,)
+        Each session's animal, recording day within its animal and session
+        within its day, indexed as ``values``; one row per session.
+    n_draws : int
+        Bootstrap replicates.
+    seed : int
+        Their seed.
+
+    Returns
+    -------
+    summary : dict
+        - ``estimate``: the animal-balanced value.
+        - ``low``, ``high``, ``sd``: :func:`bootstrap_interval`'s.
+        - ``n_animals``, ``n_days``, ``n_sessions``: those with a value.
+        - ``n_animals_same_sign``: animals whose own value has the sign of
+          ``estimate`` (zero has its own sign).
+        - ``day_p``: the day-level signed-rank p.
+        - ``n_draws``, ``seed``: the bootstrap's.
+
+    Raises
+    ------
+    ValueError
+        If a session has more than one value, or the labels are not indexed
+        as ``values``.
+    """
+    per_animal = animal_day_session_values(values, animal, day, session, "mean")
+    has_value = values.notna()
+    labels = pd.DataFrame(
+        {"animal": animal, "day": day, "session": session}, index=values.index
+    )[has_value]
+    if labels.duplicated().any():
+        raise ValueError("a session has more than one value")
+    boot = animal_day_session_bootstrap(
+        values[has_value].to_numpy(),
+        labels.animal.to_numpy(),
+        labels.day.to_numpy(),
+        n_draws=n_draws,
+        seed=seed,
+    )
+    estimate = float(boot.estimate)
+    interval = bootstrap_interval(estimate, boot.draws, boot.n_animals)
+    return {
+        "estimate": estimate,
+        "low": interval.low,
+        "high": interval.high,
+        "sd": interval.sd,
+        "n_animals": boot.n_animals,
+        "n_days": len(labels[["animal", "day"]].drop_duplicates()),
+        "n_sessions": len(labels),
+        "n_animals_same_sign": int((np.sign(per_animal) == np.sign(estimate)).sum()),
+        "day_p": day_level_test(values, animal, day),
+        "n_draws": n_draws,
+        "seed": seed,
+    }
 
 
 def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
