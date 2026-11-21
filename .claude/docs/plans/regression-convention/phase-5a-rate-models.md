@@ -78,15 +78,37 @@ first real fit of this phase.
   per kind and difference, the estimate as a rate ratio, its interval, animals with the sign, day-level p,
   sessions kept and left out (support, convergence, collinearity), cohort counts per label. No q-values
   yet (Phase 9). Pending notes follow C10.
-- **Docs**: `docs/rate_models.md` gains a section on the visit model (unit, clocks, A and D, the rule for
-  the third clock, what is tested and what is described), written with value markers; a model table for
-  the new models (in `docs/models_table.md`, a new section, or a new doc linked from it).
+- **Docs**: create `docs/regression_models.md` (new; the one doc for the convention's models, linked from
+  `docs/README.md` in place of `rate_models.md` once that is gone) with the visit rate model (unit, clocks,
+  A and D, the rule for the third clock, what is tested and what is described), written with value markers,
+  and its model table. Later family phases add their sections to it.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-5a](legacy-inventory.md#phase-5a)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. First commit the fixture of C13 for Phase 1's check 1 (the `fit_per_bin_glm` coefficients of
+     `M7r_time_histcos_rew` on the synthetic design of `tests/analysis/regression/test_no_penalty_equals_current.py`),
+     switch the test to it, then remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - The per-stop (total) reward effect, the SWR-contrast covariates, the uncertainty rate model (Phase 5b).
 - FDR over the family and figure bands (Phase 9), Figure 4 (Phase 10).
-- Removing the per-bin ladder, its runner, its values (Phase 12). Its stored fits stay as the baseline.
+- Removing what other families still call (`per_bin_design.py`, `PerBinRateModelSpec`, `_fit_diagnostics.py`,
+  `coefficient_statistics.py`, the cohort selectors): each leaves with its last caller (the inventory names
+  the phase). The per-bin ladder's stored fits stay on disk, unread.
 - The duration-aware and ridge history models (Phase 11).
 
 ## Validation slice

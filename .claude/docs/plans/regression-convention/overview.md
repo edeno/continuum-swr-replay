@@ -36,18 +36,18 @@ In the lead's order (design section 9, eighth round):
 |---|---|---|---|
 | [1](phase-1-shared-fitter.md) | `analysis/regression/` core: likelihoods, penalized Newton, exact REML derivatives, pooled REML, grid start; checks 1 to 5; mgcv script; older all-bins history model deleted | nothing (no table) | L, ~1,800 |
 | [2](phase-2-convention-tools.md) | bases, collinearity, support rule, fit-row record, folds, bands, day-level reduction, declared-test list | 1 | M, ~1,100 |
-| [3](phase-3-visit-tables.md) | visit clocks and stop-end kinds in the stop and event tables, two new uncertainty covariates, the visit at-risk bin design; one table rebuild | precondition C3 (code independent of 1 and 2) | M, ~900 + a rebuild |
-| [4](phase-4-figures-2-3-common-subset.md) | Figures 2, 3 and `events.json` on the common subset | C3; the other session's branch on master | M, ~500 + producer re-runs |
-| [5a](phase-5a-rate-models.md) | visit rate model, models A and D, Q1, Q2, Q7a values | 2, 3 | L, ~1,300 |
-| [5b](phase-5b-rate-families-moved.md) | per-stop (total) reward effect, SWR-contrast covariates, uncertainty rate model, on the convention | 5a | M, ~700 |
-| [6a](phase-6a-content-models.md) | nine-arm content by role, smooth recency, three uncertainty measures, Q3, Q4, Q5, Q7b values | 2, 3 | L, ~1,500 |
-| [6b](phase-6b-content-robustness.md) | count and Dirichlet-multinomial estimators on the new design; within-arm comparison deleted | 6a | M, ~600 |
-| [7](phase-7-choice-stay-power.md) | Q6, stay or leave per visit, ripple power, on the convention | 6a | M, ~900 |
-| [8](phase-8-mpfc.md) | mPFC unit models on the convention (JAX twin, check 6, REML over units, trial folds); Figure 5 redrawn | 2, 3 | L, ~1,400 + GPU run |
+| [3](phase-3-visit-tables.md) | visit clocks and stop-end kinds in the stop and event tables, two new uncertainty covariates, the visit at-risk bin design; one table rebuild; table-side legacy removed (compatibility branches, re-exports, one-time table scripts) | precondition C3 (code independent of 1 and 2) | M, ~900 added, ~800 removed + a rebuild |
+| [4](phase-4-figures-2-3-common-subset.md) | Figures 2, 3 and `events.json` on the common subset; the duplicate fold function removed | C3; the other session's branch on master | M, ~500 + producer re-runs |
+| [5a](phase-5a-rate-models.md) | visit rate model, models A and D, Q1, Q2, Q7a values; the per-bin ladder, its plotters, values and docs removed | 2, 3 | L, ~1,300 added, ~5,000 removed |
+| [5b](phase-5b-rate-families-moved.md) | per-stop (total) reward effect, SWR-contrast covariates, uncertainty rate model, on the convention; the three old families removed | 5a | M, ~700 added, ~3,500 removed |
+| [6a](phase-6a-content-models.md) | nine-arm content by role, smooth recency, three uncertainty measures, Q3, Q4, Q5, Q7b values; the content ladders removed (as far as ASK-1 allows) | 2, 3 | L, ~1,500 added, ~8,000 removed |
+| [6b](phase-6b-content-robustness.md) | count and Dirichlet-multinomial estimators on the new design; within-arm comparison, old estimator paths and the per-term gate removed | 6a | M, ~600 added, ~2,500 removed |
+| [7](phase-7-choice-stay-power.md) | Q6, stay or leave per visit, ripple power, on the convention; old choice, stay or leave (with the pooled GEE), power and the conditional fitters removed | 6a | M, ~900 added, ~4,000 removed |
+| [8](phase-8-mpfc.md) | mPFC unit models on the convention (JAX twin, check 6, REML over units, trial folds); Figure 5 redrawn; statsmodels backend, fixed-sigma ridge, blocked folds, stop cohort and old-bundle readers removed | 2, 3 | L, ~1,400 added, ~3,000 removed + GPU run |
 | [9](phase-9-inference-family.md) | the declared family with FDR, bands, inference values | 5a, 6a, 7 | M, ~600 |
 | [10](phase-10-figure04.md) | Figure 4 | 9 (and 5a, 6a, 7) | L, ~1,000 |
-| [11](phase-11-history-models.md) | duration-aware and ridge cross-validated history models on the shared fitter | 10 | M, ~600 |
-| [12](phase-12-retire-replaced.md) | replaced ladders, runners, values and docs removed | 10, and the lead's yes on any cited value | M, mostly deletions |
+| [11](phase-11-history-models.md) | duration-aware and ridge cross-validated history models on the shared fitter; the old history models, `per_bin_design.py`, the stop-bin specs and constants removed | 10 | M, ~600 added, ~4,000 removed |
+| [12](phase-12-legacy-sweep.md) | final sweep: cross-cutting leftovers, the ASK list answered, five audits proving nothing replaced is left | 10, 11 | S to M, deletions and audits |
 
 ```
 1 ──> 2 ──┬──> 5a ──> 5b
@@ -71,12 +71,13 @@ CPU, design section 5). Everything else of stage 0 is in Phase 1. The lead may m
 What the plan touches (line numbers on `figure04-behavior-models` at `02df809f`):
 
 - `src/continuum_swr_replay/analysis/replay_models/fitting.py:677` (`fit_conditional_poisson`), `:78`
-  (`NEWTON_DECREMENT_TOL`): the content fitter; check 3 compares to it; replaced in Phase 12.
+  (`NEWTON_DECREMENT_TOL`): the content fitter; check 3 compares to it; removed in Phase 7 (after a fixture).
 - `src/continuum_swr_replay/analysis/replay_models/rate/per_bin_rate_model.py:293` (`fit_per_bin_glm`,
-  statsmodels), `:509` (shuffled `KFold` over stops): the per-bin family; check 1 compares to it; replaced.
+  statsmodels), `:509` (shuffled `KFold` over stops): the per-bin family; check 1 compares to it; removed in
+  Phase 5a or 5b (after a fixture).
 - `src/continuum_swr_replay/analysis/replay_models/per_bin_design.py:394` (`aggregate_to_timebins`): the
   stop bin design, first 4 s (`behavior/design_constants.py:111`, `TMAX`); the visit design of Phase 3 reuses
-  its at-risk and outcome-shift logic (`:85-91`); left in place until Phase 12.
+  its at-risk and outcome-shift logic (`:85-91`); removed in Phase 11 with its last caller.
 - `src/continuum_swr_replay/analysis/replay_models/model_specs.py`: every ladder (`MODEL_PER_BIN_RATE` `:879`,
   `MODEL_PER_STOP_RATE` `:490`, `MODEL_HIERARCHY` `:247`, `MODEL_UNCERTAINTY_RATE` `:1090`,
   `MODEL_CROSS_HISTORY_RATE` `:1141`, `MODEL_CHOICE` `:1251`); `docs/models_table.md` mirrors it
@@ -97,36 +98,42 @@ What the plan touches (line numbers on `figure04-behavior-models` at `02df809f`)
   selection.
 - `src/continuum_swr_replay/analysis/pfc/batched_glm.py:167` (`DEFAULT_PENALTY_SIGMA = 3.0`),
   `analysis/pfc/fit.py:112` (`model_penalties`), `analysis/pfc/heldout.py:222` (`assign_blocked_folds`),
-  `analysis/pfc/cohort.py:65` (`load_session_stop_cohort`): changed in Phase 8.
+  `analysis/pfc/cohort.py:65` (`load_session_stop_cohort`): replaced and removed in Phase 8.
 - `src/continuum_swr_replay/reported/behavior/__init__.py:132` (`summarize`): gains the new families'
-  values phase by phase; loses the old ones in Phase 12.
+  values phase by phase and loses the old ones in the same phases.
 - `src/continuum_swr_replay/reported/questions.py:93` (`FIGURES`), `:320-358` (Part 3 questions): Q1 to Q7
   added in Phase 5a, Figure 4 in Phase 10.
-- `scripts/workflows/run_refits.py:152-200` (`RUNS`): each new runner is registered there; old ones leave in
-  Phase 12.
-- Untouched: the decoders, the event rule, the SWR source, `event_definition/`, the event evidence code
+- `scripts/workflows/run_refits.py:152-200` (`RUNS`): each new runner is registered there; an old one leaves in
+  the phase that replaces it.
+- [legacy-inventory.md](legacy-inventory.md): every other piece of legacy in the touched areas, with its
+  callers, replacement, phase and class (REMOVE, ASK, KEEP).
+- Untouched: the decoders, the event rule, the SWR source, `event_definition/` (except
+  `cohort_selection.py`'s old selectors), the event evidence code
   (owned by the other session until Phase 4), Figures 1 and the supplements.
 
 ## What happens to each existing family
 
-The design's table (section 7), with the phase that does it. Nothing is removed before its replacement's
-values are in a summary, and a value `paper/*.tex` cites is removed only with the lead's yes.
+The design's table (section 7), with the phase that does it. The phase that builds a replacement removes
+what it replaces ([C13](shared-contracts.md#c13-no-legacy-left-behind)); the item-by-item list, with what
+else counts as legacy, is [legacy-inventory.md](legacy-inventory.md). Nothing is removed before its
+replacement's values are in a summary, and a value `paper/*.tex` cites is removed only with the lead's yes,
+asked at that phase's boundary.
 
 | Family | Fate | Phase |
 |---|---|---|
-| Per-bin rate ladder (M0 to M9r, arrival rungs) | replaced by the visit model | 5a builds, 12 removes |
-| Per-stop rate ladder | refit by the shared fitter as the per-second-of-stop reward effect | 5b |
-| SWR-contrast rate ladder | its kind contrast is in the visit model; its other covariates moved to the convention | 5b |
-| Uncertainty rate model | moved to the convention | 5b |
-| Duration-aware and ridge cross-validated history | kept; moved to the shared fitter after Figure 4 | 11 |
+| Per-bin rate ladder (M0 to M9r, arrival rungs) | replaced by the visit model | 5a builds and removes |
+| Per-stop rate ladder | refit by the shared fitter as the per-second-of-stop reward effect | 5b builds and removes |
+| SWR-contrast rate ladder | its kind contrast is in the visit model; its other covariates moved to the convention | 5b builds and removes |
+| Uncertainty rate model | moved to the convention | 5b builds and removes |
+| Duration-aware and ridge cross-validated history | kept; moved to the shared fitter after Figure 4 | 11 builds and removes |
 | Older all-bins cross-history model | deleted first (lead: "ok delete"; nothing reports it) | 1 |
-| Content ladders (arm, patch, contrast, leaf) | replaced by the role model | 6a builds, 12 removes |
-| Dirichlet-multinomial content | robustness estimator on the new design | 6b |
+| Content ladders (arm, patch, contrast, leaf) | replaced by the role model (the ContFrag ladders are ASK-1) | 6a builds and removes |
+| Dirichlet-multinomial content | robustness estimator on the new design | 6b builds and removes the old path |
 | Within-arm comparison | deleted when Q5 values are in the summary (lead: "ok delete") | 6b |
-| Choice | moved | 7 |
-| Stay or leave | refit on the convention; the lead then decides if it stays | 7 |
-| Ripple power per event | moved onto the shared cohort | 7 |
-| mPFC peri-event ladder, marked kernels, stop context | moved (REML over a session's units, trial folds, shared rules) | 8 |
+| Choice | moved | 7 builds and removes |
+| Stay or leave | refit on the convention (the pooled GEE goes); the lead then decides if it stays | 7 builds and removes |
+| Ripple power per event | moved onto the shared cohort | 7 builds and removes |
+| mPFC peri-event ladder, marked kernels, stop context | moved (REML over a session's units, trial folds, shared rules) | 8 builds and removes |
 
 ## How reported values and figures are rebuilt
 
@@ -134,8 +141,8 @@ After each phase that writes fits: commit, then rebuild only the summary the pha
 (`behavior` for 5a to 7 and 9; `events` for 4; `mpfc` for 8), then emit the macros
 ([C10](shared-contracts.md#c10-rebuilding-reported-values-and-figures)). Figures that read changed values are
 redrawn in the same phase (Figures 2 and 3 in 4, Figure 5 in 8, Figure 4 in 10). Pending values from the
-table rebuilds of C3 and Phase 3 are accepted. `make release-check` is expected to fail on pending cited
-values until Phase 12; that is not a blocker for any phase before it.
+table rebuilds of C3 and Phase 3 are accepted. `make release-check` may fail on pending values until Phase 12
+runs it last; that is not a blocker for any phase before it.
 
 ## Metrics
 
@@ -159,20 +166,27 @@ values until Phase 12; that is not a blocker for any phase before it.
 | A declared estimand fails the support or collinearity rule in many sessions | the rule is applied before any coefficient is read; the phase stops and reports to the lead; no silent pooling |
 | Pooled REML is slow (every evaluation refits every session) | measure one evaluation; the grid has at most 125 points; parallelize over sessions only if measured above a few seconds |
 | The fractional softmax response is a quasi-likelihood, so Laplace REML is approximate for content | check against mgcv on the same fractional design (mgcv `multinom` does not take fractions; compare with the count response and the shared fitter's own simulation coverage); report coverage from simulation |
-| Removing old ladders removes values the manuscript cites | Phase 12 lists cited macros first; the lead decides each text change |
+| A cited value is removed by mistake | each retire task lists the macros `paper/*.tex` cites from the values it removes (none of behavior, mpfc or events were cited on 2026-11-20) and asks the lead at that phase's boundary; `tests/reported/test_manuscript_macros.py` fails on a cited macro that no longer exists |
+| A baseline is removed too early (the old fits are the only baseline, and Phase 1's checks 1 and 3 compare with old fitters) | the old-against-new comparison is written before the removal (C13); a test that compares with an old fitter switches to a committed fixture of its coefficients first; old stored fits stay on disk, unread |
+| Removing a family breaks a caller outside it (ContFrag, Part 1 and 2, the pipeline figure) | the inventory lists callers per item; ASK-1 settles ContFrag before Phase 6a; the zero-match check and the full suite run at each phase end |
 | The other session's branch is not merged when Phase 4 is ready | Phase 4 does not start; Phases 5a to 8 proceed; see Phase 4's "if not merged" |
 | GPU contention with other users and the other session | [C11](shared-contracts.md#c11-gpus-long-runs-and-the-other-session); Phase 8 measures three sessions before planning cards |
 | Model D on a log-lag basis smooths away a sharp lag-1 effect | Phase 5a's simulation plants a sharp effect at lag 1 and reports what D returns; A remains the tested estimand |
 
 ## Rollout
 
-Replace in place, family by family, with old and new fits side by side until Phase 12. No backward
-compatibility is required for code; old stored fits stay on disk until Phase 12 so they can serve as
-baselines. Each phase is one PR into master with the lead's approval.
+Replace in place, family by family: a family phase builds the replacement, records the old-against-new
+comparison, and removes the old code in the same PR or a second PR of the phase that merges right after.
+Old and new code never live side by side past the phase that replaces the old. No backward compatibility,
+shim or flag back to an old path is allowed ([C13](shared-contracts.md#c13-no-legacy-left-behind)); old
+stored fits stay on disk, unread. Phase 12 is the final sweep and audit. Each phase is one PR (or two) into
+master with the lead's approval.
 
 ## Decisions for the lead
 
-Each must be settled before the named phase starts.
+Each must be settled before the named phase starts. The legacy questions (ASK-1 to ASK-12) are in
+[legacy-inventory.md#ask-list](legacy-inventory.md#ask-list); ASK-1 (the ContFrag regressions) is needed before
+Phase 6a, ASK-4 (the dense stop time-bin table) before Phase 3, the rest by Phase 12 at the latest.
 
 | # | Decision | Plan's default if the lead agrees | Before |
 |---|---|---|---|
@@ -203,6 +217,7 @@ Each must be settled before the named phase starts.
 
 ## Estimated effort
 
-About 13,000 lines of code and tests over fourteen PRs, plus one table rebuild, the producer re-runs of
+About 13,000 lines of code and tests added and about 30,000 removed (code, tests and docs of the replaced
+families; a rough count from the inventory's modules) over fourteen phases, plus one table rebuild, the producer re-runs of
 Figures 2 and 3, CPU refits of the rate, content, choice and power families, and one mPFC GPU run (the last
 full one took about 14 GPU-hours; Phase 8 measures before committing to it).

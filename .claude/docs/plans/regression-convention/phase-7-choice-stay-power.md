@@ -48,7 +48,8 @@ Branch: `choice-stay-power-convention` from master after Phase 6a. CPU only.
   content share per kind, and their products (the continuous factor centered at a pooled reference; the 0/1
   factor not), through the shared fitter with the Newton decrement rule. Report the share of sessions that
   converge and pass support, beside the baseline count, so the lead can decide whether it stays in the paper.
-  The pooled GEE is not moved (it is the stage 3 kind of model); say so in the docs.
+  The pooled GEE (`stay_leave.py:534`) is not moved: the session to day to animal reduction replaces its
+  inference, and a pooled model is stage 3. It is removed by this phase's retire task.
 - **Ripple power** (`analysis/replay_models/coupling/visit_swr_power.py`, new): the Gaussian likelihood per
   in-visit event of the kind, the `PREDICTORS` of `swr_power.py:46` at pooled SD (replacing the per-session
   z-score), `time_since_stop_start_s` replaced by a smooth of time since visit start and a smooth of time
@@ -58,11 +59,28 @@ Branch: `choice-stay-power-convention` from master after Phase 6a. CPU only.
   `scripts/replay_models/coupling/fit_visit_swr_power.py`; registered in `run_refits.py`.
 - **Summary values**: Q6 per kind and difference (declared); choice, stay or leave and ripple power
   slopes with intervals, labeled outside the declared family; the stay or leave convergence counts.
-- **Docs**: `docs/behavior_models.md` sections for the three.
+- **Docs**: `docs/regression_models.md` sections for the three.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-7](legacy-inventory.md#phase-7)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. First commit the fixture of C13 for Phase 1's check 3 (`fitting.fit_conditional_poisson` and `fit_conditional_logit` coefficients on the same synthetic data the test uses), switch the test to it, then delete the fitters. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
-- Removing the old choice, stay or leave and power code and values (Phase 12).
+- Whether stay or leave stays in the paper at all (the lead decides from this phase's convergence counts).
 - The pooled GEE (not moved).
 - FDR (Phase 9).
 

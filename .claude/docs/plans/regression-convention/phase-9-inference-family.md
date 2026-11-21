@@ -49,7 +49,7 @@ tests, the leave-one-animal-out check, and the curve bands Figure 4 draws.
 - **Summary values**: add the q-value and the leave-one-animal-out range to each declared value's group in
   `reported/behavior/`; descriptions say "q over the declared family of N tests" with N read from
   `declared_tests.py`. Curves are figure inputs, not values.
-- **Docs**: a short section in `docs/behavior_models.md` (or `docs/rate_models.md`) on the declared family,
+- **Docs**: a short section in `docs/regression_models.md` on the declared family,
   its members, and the reduction; with value markers for the counts.
 
 ## Deliberately not in this phase

@@ -18,6 +18,7 @@ numbers as there.
 - [C10. Rebuilding reported values and figures](#c10-rebuilding-reported-values-and-figures)
 - [C11. GPUs, long runs and the other session](#c11-gpus-long-runs-and-the-other-session)
 - [C12. Layering of the new package](#c12-layering-of-the-new-package)
+- [C13. No legacy left behind](#c13-no-legacy-left-behind)
 
 ## C1. Running code and tests
 
@@ -89,6 +90,10 @@ Facts about those labels that this plan relies on (read from that branch's code)
   for what that means for at-risk time.
 - A visit is one port experience, from `arrival_time` (first nose-poke in) to `departure_time` (final
   poke-out) of the port experiences.
+- The label columns are required. On the labels branch (head `9b460a90`) the contract check
+  `table_contracts.require_visit_context_labels` still skipped a table with no `visit_context` ("built
+  before the label existed"); the coordinator is removing that allowance there. If master still has it,
+  remove it in the first phase that reads the tables (C13).
 
 ## C4. The selection function is the only filter
 
@@ -96,7 +101,8 @@ Facts about those labels that this plan relies on (read from that branch's code)
   `select_visit_context(table)` (default: `in_visit`), and records `count_visit_context(table)` (rows or
   `event_id`s per label, kept or not) in its output. No other code filters by occupancy, position or visit.
   New code never calls the older `select_stop_cohort` / `select_event_cohort` (`cohort_selection.py:322`,
-  `:378`); their remaining callers move to the selection function or retire in Phase 12.
+  `:378`); each remaining caller moves to the selection function or retires in the phase the inventory names
+  ([legacy-inventory.md](legacy-inventory.md#cohort-selectors-and-stop-clocks)).
 - Time bins carry their own `visit_context` (Phase 3 adds it to the visit bin design), and the rate and mPFC
   designs select bins with the same function. A bin is `in_visit` when it lies inside a visit interval and
   inside an immobility stop. Selecting stops by their own label would drop the in-visit part of every
@@ -202,7 +208,7 @@ New fits go under `Processed-Data/replay_content/models_convention/<family>/` (`
 `descriptive` for model-free reference curves), one parquet of
 fit-row records per model plus a `manifest.json`, each written with `tables/io.py:215` (`write_atomically`). mPFC bundles keep their own directory layout
 (`analysis/pfc/bundle_files.py`) with the record of C7 added. Old fits are not overwritten; they stay
-until Phase 12.
+on disk, unread once their family is removed (C13).
 
 ## C10. Rebuilding reported values and figures
 
@@ -219,7 +225,8 @@ PYTHONPATH=src JAX_PLATFORMS=cpu $PY scripts/reported/emit_reported_values.py
   build no tool to avoid it, and do not re-run an unrelated family only to clear a pending note.
 - A new value tags a question in `src/continuum_swr_replay/reported/questions.py` and, when it has one, a
   figure (`questions.py:93`, `FIGURES`). Q1 to Q7 are added as new Part 3 questions in Phase 5a (call:
-  ids `3.11` to `3.17`); the old 3.x questions stay until their values leave in Phase 12.
+  ids `3.11` to `3.17`); an old 3.x question is marked `dropped` (reason: superseded by its new id) in the
+  phase that removes its last value.
 - A number in a doc is written inside a `<!--v:<summary>.key-->…<!--/v-->` marker; never typed.
 - Before removing any value, list the macros `paper/main.tex` cites (`make reported-values` prints the
   count; grep the macro names in `paper/*.tex`). A cited value is removed only with the lead's yes on the
@@ -246,3 +253,45 @@ import it (the event-evidence code of Figure 2 included, for the shared fold fun
 rule to `tests/repository/test_import_layering.py` (beside `EVENT_DEFINITION_MAY_IMPORT`,
 `test_import_layering.py:91`) and to the layer list in `docs/README.md:93-133`. Task-aware code (which
 columns, which rows) stays in `replay_models/`, `event_tables/` and `pfc/`.
+
+## C13. No legacy left behind
+
+Lead (2026-11-20): "Let's make sure to cleanup any legacy code." Every phase obeys these rules, and the
+phase that replaces a thing removes it ([legacy-inventory.md](legacy-inventory.md) lists what and where):
+
+- **No compatibility shims.** No wrapper, adapter or alias that keeps an old call working.
+- **No flag or parameter that selects the old path** (no `--legacy`, no `inference="legacy"`, no
+  `fitter="statsmodels"`, no `--stop-cohort` choice among old cohorts). A sensitivity variant the design
+  keeps is a named model with its own record, not a switch back to old code.
+- **No allowance for older files.** No "skip when the column or field is absent", "built before", "older
+  bundle" or version-fallback branch for tables or bundles made before a change. Tables are rebuilt and fits
+  are refit; an old file fails loudly (`require_columns`, a version check that raises).
+- **No re-export of a moved or renamed name.** Callers import from the new home.
+- **A renamed column is renamed everywhere in the same phase** (builders, registry, readers, tests, docs);
+  no deny-list of the old spelling is added for it.
+- **Nothing new under `scripts/exploratory/`.** A check worth keeping is a test or a committed stored
+  analysis; a one-off stays in the phase's scratch directory.
+- **Zero matches at the end of the phase.** Every symbol, file and column the phase removes has no match in
+  `git grep -n -w <name> -- src scripts tests docs` (dated records exempt: `docs/history/`, dated
+  `docs/design/<YYYY-MM-DD>-*.md`, `docs/design/model_history.md`, `paper/reported/removed_part*.md`).
+- **Record every removal**: a row in `docs/history/2026-module-moves.md` ("removed: replaced by ..."), and
+  `docs/regression_pipeline_map.md` regenerated with `scripts/checks/write_pipeline_map.py`.
+- **Old against new before removal.** A phase that removes a family first writes, for the lead, each old
+  reported value beside its replacement with the reason for the change (cohort, clock, scaling, design),
+  read from the two summary files (keep a copy of the old `paper/reported/behavior.json` or `mpfc.json` in
+  the phase scratch directory before rebuilding). The old fits are the only baseline, so this comes first.
+- **A correctness check never keeps dead code alive.** Where a test compares the new fitter with an old one
+  that is being removed (Phase 1's check 1 and check 3), the phase that removes the old fitter first commits
+  the old fitter's coefficients on the same small data as a fixture under
+  `tests/analysis/regression/data/legacy_fitters/` (CSV, with the script line that made them in a README
+  beside it), switches the test to the fixture, then deletes the old fitter.
+
+The guards:
+
+- **Cited values need the lead's yes.** A value `paper/*.tex` cites is removed only after the lead approves
+  the text change, asked at the boundary of the phase that removes it (C10), not saved for the end.
+- **An analysis this plan does not replace is not removed without asking.** The lead's standing rule: "an
+  analysis nothing cites is a question for the lead, not a removal." Those are the ASK items of the
+  inventory; they go to the lead as one list at the latest in Phase 12.
+- Stored outputs in Processed-Data are never deleted by this plan; they are only no longer read.
+

@@ -47,16 +47,33 @@ JAX; run it with `JAX_PLATFORMS=cpu` unless a measured run says otherwise).
   text change. Then remove `within_arm_horserace`, `summarize_horserace`, `HORSERACE_SUMMARY`, the script
   lines that build and write it, `_plot_horserace` and its panel in the uncertainty-content figure (redraw the
   figure without panel E, or ask the lead whether the figure stays), `horserace_values` and its summary
-  wiring and input, its tests, and its mentions in docs (`docs/behavior_models.md`,
+  wiring and input, its tests, and its mentions in docs (`docs/regression_models.md`,
   `docs/regression_pipeline_map.md` regenerated). Leave the quartile profiles of the same module: nothing
   retires them. Add a row to `docs/history/2026-module-moves.md`.
 - **Summary values**: per declared content estimand, the three estimators' values side by side (as now for
   the old design), labeled as robustness.
-- **Docs**: `docs/behavior_models.md` (the robustness estimators on the role design).
+- **Docs**: `docs/regression_models.md` and `docs/design/content_estimator_comparison.md` (the robustness estimators on the role design).
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-6b](legacy-inventory.md#phase-6b)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
-- Removing the old content ladders or the old estimator-comparison outputs (Phase 12).
+- Stored outputs of the old estimator comparison stay on disk, unread.
 - Q6 (Phase 7).
 
 ## Validation slice

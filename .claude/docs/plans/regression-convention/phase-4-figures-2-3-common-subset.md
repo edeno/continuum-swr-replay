@@ -92,6 +92,23 @@ adopted the selection function in its branch, this phase shrinks to what it left
 - **Docs**: `docs/figure-pipeline.md` (Figures 2 and 3 are over events inside a well visit) and the captions'
   source (if captions are generated) say the subset and the count per label.
 
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-4](legacy-inventory.md#phase-4)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
+
 ## Deliberately not in this phase
 
 - Changing the labels, their radii or the cohort (the labels work).

@@ -25,7 +25,8 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 - `src/continuum_swr_replay/analysis/replay_models/content/simulation.py:139` (`sample_arm_design`),
   `:230` (`simulate_counts`), `:306` (`simulate_with_event_covariates`): the repository's content simulator.
 - `reported/behavior/content.py` (`content_contrast_values` `:326`, `leaf_values` `:607`) and the content
-  keys of `paper/reported/behavior.json`; `docs/behavior_models.md`.
+  keys of `paper/reported/behavior.json`; `docs/models_table.md:367-457` (content arm and patch ladders) and
+  `docs/design/content_model_design.md` (the design being replaced).
 - Scratch: `S/proto_content/sim_lib.py`, `run_sim.py`, `diag_centering.py`, `calibrate.py`,
   `S/verify_uncertainty/s06_null.py`, `s01_covariate.py`, `S/verify_content/42_role_slopes.py`,
   `41_value_recency.py`, `S/my_checks/role_slopes_check.py`, `departure_timecourse.py`,
@@ -38,6 +39,10 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 
 **Designs referenced:** [content design](designs.md#content-design), [likelihoods](designs.md#likelihoods)
 (grouped softmax), [collinearity](designs.md#collinearity-measures), [support rule](designs.md#support-rule).
+
+**Decision needed first:** ASK-1 of the [legacy inventory](legacy-inventory.md#ask-list) (the ContFrag
+content regressions: move them onto the role design here, or retire them). It decides how much of the old
+content code this phase can remove.
 
 ## Tasks
 
@@ -87,15 +92,33 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
   `reported/behavior/__init__.py`): per estimand, kind and difference, as ratios of shares with intervals,
   animals with the sign, day-level p, sessions kept and left out, cohort counts; tagged with the new
   questions of Phase 5a.
-- **Docs**: `docs/behavior_models.md` (the role design, nine arms, recency form, the three uncertainty
+- **Docs**: `docs/regression_models.md` (the role design, nine arms, recency form, the three uncertainty
   measures declared before the fit, the length-adjusted and unadjusted comparisons), with value markers;
   the model table.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-6a](legacy-inventory.md#phase-6a)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - The count and Dirichlet-multinomial estimators, and deleting the within-arm comparison (Phase 6b).
 - Q6 and the next-arm role (Phase 7).
-- Removing the old content ladders, runners and values (Phase 12).
+- Removing what Phase 6b or 7 still calls (the Dirichlet-multinomial and estimator-comparison inputs,
+  `fitting.py`'s conditional fitters used by choice): the inventory names the phase.
 - FDR (Phase 9).
 
 ## Validation slice

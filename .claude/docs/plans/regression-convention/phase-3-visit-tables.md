@@ -39,7 +39,8 @@ so it can run beside them. Ends with one rebuild of the canonical tables.
 **Designs referenced:** [rate design](designs.md#rate-design), [content design](designs.md#content-design)
 (the uncertainty measures).
 
-**Decisions needed first:** L2 (the two uncertainty measures), L3 (arrival = first poke-in), L4 (in-visit
+**Decisions needed first:** ASK-4 of the [legacy inventory](legacy-inventory.md#ask-list) (retire the dense stop
+time-bin table in this rebuild), L2 (the two uncertainty measures), L3 (arrival = first poke-in), L4 (in-visit
 seconds of partly-inside stops count). If L2 is not settled, ship without the two covariates; Phase 6a then
 builds them at design time from the port experiences.
 
@@ -101,15 +102,33 @@ builds them at design time from the port experiences.
   (`scripts/replay_models/rate/describe_visit_clocks.py`, new; method from `S/explore_leave/part_b4.py`):
   per kind and animal, event-start rate per at-risk second in bins of `s`, `u` and `m`, and the counts of
   stop-end kinds per animal; writes `Processed-Data/replay_content/models_convention/descriptive/visit_clock_curves.parquet`. Phase 5a compares its model curves to these.
-- **Docs**: `docs/behavior_models.md` (or the doc that describes the stop table) gains a section on the
+- **Docs**: `docs/covariate_dictionary.md` (its "F.1 Two clocks" section, lines 382-423, rewritten for the visit clocks) gains a section on the
   visit unit, its clocks and the stop-end kind; `docs/data-lineage.md` lists the new columns.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-3](legacy-inventory.md#phase-3)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - Any rate or content fit (Phases 5a, 6a).
 - Changing what `visit_context` means or its thresholds (owned by the labels work).
 - Figures 2 and 3 (Phase 4).
-- Removing `aggregate_to_timebins` or the stop-grain clocks (Phase 12).
+- Removing `aggregate_to_timebins` and the stop-grain clock columns: they leave with their last reader
+  (inventory, "Cohort selectors and stop clocks").
 
 ## Validation slice
 
