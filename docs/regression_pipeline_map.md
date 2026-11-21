@@ -182,7 +182,7 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Is the non-local activity of rest the activity of sharp-wave ripples? Three decoders that differ only in when the non-local states may be occupied, scored by how well each predicts each bin's spikes.
 
-`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `model_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
+`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `model_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `share_outside_swr`, `ratio_or_nan`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 
@@ -200,7 +200,7 @@ The non-local restriction contrasts over all immobile time, and outside SWRs.
 
 The non-local restriction models over the windows of Figure 2's panel g.
 
-`restriction_window_sums`, `window_bin_fact_sums`, `require_bin_fact_sums`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `require_outside_swr_sums`, `window_contrasts`, `restriction_window_statistics`
+`restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -212,7 +212,7 @@ Spike evidence of non-local events: does the prior-excluded spike likelihood fav
 
 Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode it never saw better than local coding does?
 
-`time_blocks`, `trial_segments`, `trial_bin_share`, `task_segment_starts`, `capped_groups`, `trial_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
+`time_blocks`, `fold_blocks`, `trial_segments`, `trial_bin_share`, `task_segment_starts`, `capped_groups`, `trial_folds`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
@@ -882,9 +882,9 @@ Does each detector's content reproduce in cells it never saw?
 
 ### `scripts/event_evidence/_per_event_run.py`
 
-What the per-event runners share: their arguments, the canonical event table, an epoch's decode inputs, the held-out runs' fold designs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
+What the per-event runners share: their arguments, the canonical event table, their input records, an epoch's decode inputs, the CPU and GPU worker pools, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `event_table_input`, `run_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `fold_settings`, `epoch_folds`, `run`
+`event_table_path`, `file_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `add_fold_design_argument`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -902,7 +902,7 @@ Non-local events detected from held-out data, for Figure 2's panel g.
 
 Each decode bin's spikes over every tetrode and whether it is inside a well visit.
 
-`decode_time`, `run_epoch`, `main`
+`run_epoch`, `main`
 
 ### `scripts/event_evidence/measure_event_participation.py`
 
@@ -944,7 +944,7 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 The non-local restriction scores summed over the canonical events and their controls.
 
-`decode_time`, `run_epoch`, `check_holdout_inputs`, `event_table_note`, `main`
+`run_epoch`, `check_holdout_inputs`, `event_table_note`, `main`
 
 ### `scripts/event_properties/bootstrap_event_properties.py`
 
