@@ -65,7 +65,36 @@ after a change to fitting code only, start at step 6.
    5. `tables/build_timebin_tables.py`;
    6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
 5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
-   the supplements).
+   the supplements). The runs behind Figure 2g, the supplementary held-out tetrode figure and the restriction
+   and held-out tetrode values of the events summary go in this order (in `scripts/event_evidence/` unless
+   named otherwise; the two GPU runners need `--gpus`):
+   1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on
+      the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR source);
+   2. `measure_bin_facts.py`: each bin's spikes and well-visit flag (reads run 1's records, the decodes and
+      the session cache);
+   3. `detect_heldout_events.py`: the events detected from the held-out decode and the time sums (needs 1
+      and 2; reads the event table);
+   4. `measure_event_participation.py`: the Local-rest controls (reads the event table, the decodes and the
+      session cache);
+   5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score (needs 4; reads the event table,
+      the decodes, the detectors and the trials);
+   6. `sum_nonlocal_restriction_windows.py`: the restriction scores over the canonical windows (needs 1, 2,
+      4 and 5);
+   7. `reported/summarize.py --summary events`, then `reported/emit_reported_values.py`;
+   8. `figures/generate_figure02.py` and `figures/generate_supp_heldout_tetrode.py` (the second is not drawn
+      by `figures/generate_all_figures.py`).
+
+   ```bash
+   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --gpus 1 2 4 5
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/measure_bin_facts.py --workers 6
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/detect_heldout_events.py
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/measure_event_participation.py
+   uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --gpus 1 2 4 5
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py
+   ```
+
+   With two workers on a card (`--workers-per-gpu 2`), the largest epochs can run out of GPU memory; run the
+   same command again with `--workers-per-gpu 1`. Each runner reruns only the epochs whose record is not `ok`.
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
    `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.
