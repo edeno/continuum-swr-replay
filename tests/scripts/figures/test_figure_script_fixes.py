@@ -2168,17 +2168,35 @@ def _refuse_drawing(table):
     raise AssertionError("the participation run was read without its check")
 
 
+def _restriction_windows_run(tmp_path, facts_sha256=None) -> None:
+    """A window run's manifest that records the current per-bin facts run's
+    digest (or ``facts_sha256``)."""
+    from continuum_swr_replay.paths import (
+        EVENT_BIN_FACTS_DIR,
+        EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+    )
+    from continuum_swr_replay.runs.io import sha256_file
+
+    folder = tmp_path / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
+    folder.mkdir()
+    facts = facts_sha256 or sha256_file(
+        tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
+    )
+    (folder / "manifest.json").write_text(
+        json.dumps(
+            {
+                "inputs": {"bin_facts": {"sha256": facts}},
+                "epochs": {"e": {"status": "ok", "bin_s": 0.002}},
+            }
+        )
+    )
+
+
 def test_figure02_reads_the_restriction_windows_over_the_selected_events(
     offline, tmp_path, monkeypatch
 ):
-    from continuum_swr_replay.paths import EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
-
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    folder = tmp_path / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
-    folder.mkdir()
-    (folder / "manifest.json").write_text(
-        json.dumps({"epochs": {"e": {"status": "ok", "bin_s": 0.002}}})
-    )
+    _restriction_windows_run(tmp_path)
     seen = []
 
     def stop(windows, time_sums, bin_s):
@@ -2227,6 +2245,26 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
     message = str(refused.value)
     assert "scripts/event_evidence/measure_bin_facts.py" in message
     assert "sum_nonlocal_restriction_windows.py" in message
+
+
+def test_figure02_refuses_a_window_run_not_made_from_the_current_bin_facts(
+    offline, tmp_path, monkeypatch
+):
+    """Panel g draws the window run, whose well-visit sums come from the
+    per-bin facts: a window run that recorded another facts run than the
+    current one is refused, naming the run to make again."""
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _restriction_windows_run(tmp_path, facts_sha256="0" * 64)
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from another facts run's windows")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(
+        ValueError, match="not made from the current per-bin facts run"
+    ) as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert "sum_nonlocal_restriction_windows.py" in str(refused.value)
 
 
 def test_figure02_checks_every_event_s_label_against_the_visits(

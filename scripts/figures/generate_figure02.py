@@ -23,7 +23,9 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         outlines the animals.
     g — Three decoders that differ only in when the non-local states may be
         occupied, scored by every tetrode's one-step-ahead predictive score of
-        each bin, place fields held out by whole trials: the local-only decoder
+        each bin, the whole decoder (place fields, state transitions, initial
+        conditions) fit on folds of whole trials and each fold scored under the
+        fit that did not see it: the local-only decoder
         (Local and No-Spike states only), the SWR-only decoder (non-local states
         only inside SWRs) and the full decoder. Left, "All immobile time": each
         epoch's gain of the SWR-only and of the full decoder over the local-only
@@ -72,7 +74,8 @@ windows and time sums by the events summary's own function
 that start inside a well visit, ``cohort_selection.select_events_in``, and the
 time inside a well visit), refused when the per-bin facts run that gave the
 time its well-visit flag records no session cache or another than the current
-one (``prepare_data.session_cache_staleness``). Panel i is a
+one (``prepare_data.session_cache_staleness``), or when the window run was not
+made from that per-bin facts run (its recorded digest of the facts' manifest). Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -207,8 +210,13 @@ from continuum_swr_replay.reported.events import (
     restriction_figure_statistics,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import ok_epochs, read_complete_run, read_manifest
-from continuum_swr_replay.runs.staleness import read_output_manifest
+from continuum_swr_replay.runs.io import (
+    ok_epochs,
+    read_complete_run,
+    read_manifest,
+    sha256_file,
+)
+from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     REFERENCE_COLOR,
@@ -1606,10 +1614,21 @@ def generate_figure(
     # the events summary's restriction values: the same runs, cohorts, time
     # steps, subset and function
     windows_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
+    windows_manifest = read_manifest(windows_dir)
+    # the window run must have read these per-bin facts, or its well-visit
+    # flags are not the ones checked above
+    if recorded_sha256(windows_manifest, "bin_facts") != sha256_file(
+        facts_dir / "manifest.json"
+    ):
+        raise ValueError(
+            f"the restriction window run ({windows_dir}) was not made from the "
+            f"current per-bin facts run ({facts_dir}); rerun "
+            "scripts/event_evidence/sum_nonlocal_restriction_windows.py"
+        )
     restriction_bin_s = pd.Series(
         {
             epoch_id: record["bin_s"]
-            for epoch_id, record in read_manifest(windows_dir)["epochs"].items()
+            for epoch_id, record in windows_manifest["epochs"].items()
         }
     )
     restriction_decoders, restriction_parts = restriction_figure_statistics(
