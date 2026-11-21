@@ -1,5 +1,6 @@
 """Held-out tetrode score of each non-local event: does the rest of the population's
-position estimate predict a tetrode it never saw better than local coding does?
+position estimate predict a tetrode left out of the decoder better than local
+coding does?
 
 The events are fixed by the all-tetrode decode (the canonical event table). For
 each epoch:
@@ -23,8 +24,8 @@ each epoch:
    Fragmented states all use the same spatial term; Local adds the
    position kernel around the animal (``local_position_std``) once.
 3. **Leave tetrode k out.** The four-state log-likelihood of the other
-   tetrodes is smoothed over the whole epoch with the decoder's own transitions
-   (``_predict``). At each bin, the position distribution ``pi_{-k}(t, x)`` is
+   tetrodes is smoothed over the whole epoch with the canonical decoder's state
+   transitions and initial conditions (``_predict``). At each bin, the position distribution ``pi_{-k}(t, x)`` is
    the posterior summed over the spatial states (Local, Non-Local Continuous,
    Non-Local Fragmented) and renormalized: No-Spike is left out, so a silent
    tetrode does not score for its silence.
@@ -47,6 +48,15 @@ each epoch:
 
 Bins are scored one at a time and summed; the joint score of a whole window
 would need the posterior over paths.
+
+What is held out: at a scored bin, the scored tetrode's term and the other
+tetrodes' terms come from encodings fit without the bin's fold or its margin,
+and the scored tetrode is absent from the reduced likelihood at every bin. What
+is not: the state transitions and initial conditions are the canonical
+decoder's, fit by EM on the whole epoch with every tetrode; the other folds'
+encodings, used at the other bins of the smoothed posterior, were fit on this
+fold's spikes from the other tetrodes; and the windows come from the
+all-tetrode decode.
 """
 
 from __future__ import annotations
@@ -81,9 +91,13 @@ N_FOLDS = 5
 TRIAL_MARGIN_S = 1.0
 """The margin of :func:`trial_folds`' folds, s: training bins this close to any
 bin of a fold are left out of its encodings' fit. A trial fold is many separate
-segments, so its scored bins neighbor other folds' training bins about a hundred
-times an epoch; 1 s is longer than the longest non-local event, so no event is
-scored with an encoding fit on its own edges."""
+segments, so its scored bins neighbor other folds' training bins many times an
+epoch. The margin guarantees that no bin is scored under an encoding fit on its
+own fold or on training bins within the margin of any bin of its fold. It does
+not keep every event within one fold: an event that spans a change of fold has
+its parts scored under different folds' encodings, and a part that lies farther
+than the margin from the change may be among the training bins of the encoding
+that scores the other part."""
 
 MAX_SEGMENT_S = 30.0
 """The longest piece of a segment :func:`trial_folds` keeps whole, s: a longer
