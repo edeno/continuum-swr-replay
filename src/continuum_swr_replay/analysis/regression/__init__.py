@@ -15,6 +15,8 @@ package may import it.
   second-order difference penalty and the sum-to-zero constraint.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
+- ``folds``: the one fold rule, five folds of whole trials balanced by
+  destination well, long stays cut into pieces.
 
 Submodules are imported by name; nothing is re-exported here.
 """
