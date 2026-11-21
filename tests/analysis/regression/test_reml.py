@@ -35,6 +35,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     SessionData,
     assemble_penalty,
     fit_at_penalties,
+    in_null_space,
     pooled_reml,
     refine_penalties,
     reml_and_derivatives,
@@ -444,10 +445,10 @@ def test_shrunk_to_null_space() -> None:
     curve = select_penalties(Gaussian(), [SessionData(X, curve_y)], blocks)
 
     assert line.sessions[0].edf[0] - 1.0 <= NULL_SPACE_EDF_TOL
-    np.testing.assert_array_equal(line.sessions[0].in_null_space, [True])
+    np.testing.assert_array_equal(in_null_space(line.sessions[0], blocks), [True])
     np.testing.assert_array_equal(line.search.at_boundary, [False])
     assert curve.sessions[0].edf[0] > 3.0
-    np.testing.assert_array_equal(curve.sessions[0].in_null_space, [False])
+    np.testing.assert_array_equal(in_null_space(curve.sessions[0], blocks), [False])
 
 
 #: Largest difference from mgcv allowed per quantity (``agreement``): absolute
@@ -880,7 +881,7 @@ def test_a_flat_pooled_score_ends_converged_in_the_null_space() -> None:
     assert result.rho[0] > 15.0
     for session in result.sessions:
         assert session.edf[0] == pytest.approx(1.0, abs=1e-5)
-        np.testing.assert_array_equal(session.in_null_space, [True])
+        np.testing.assert_array_equal(in_null_space(session, blocks), [True])
     limit = pooled_reml(GroupedSoftmax(), sessions, blocks, [LOG_PENALTY_BOUNDS[1]])
     # Warm and cold inner starts differ by the inner fits' accuracy (6e-10 here).
     assert abs(result.score - limit.score) < 1e-6
@@ -975,11 +976,9 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     for kept, alone in zip(
         result.sessions[:4] + result.sessions[5:], without.sessions, strict=True
     ):
-        assert kept.in_penalty_choice
         np.testing.assert_array_equal(kept.fit.beta, alone.fit.beta)
 
     refitted = result.sessions[4]
-    assert not refitted.in_penalty_choice
     active = np.ones(sessions[4].X.shape[1], dtype=bool)
     active[[arm, role]] = False
     direct = fit_at_penalties(
@@ -1009,7 +1008,7 @@ def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
     assert "block 0's null space" in left_out.reason
     assert result.search.share_without_fit == pytest.approx(0.1)
     assert np.all(np.isnan(result.sessions[6].fit.beta))
-    assert not result.sessions[6].in_penalty_choice
+    assert 6 not in result.search.in_choice
 
     many = []
     for seed in range(10):
@@ -1081,7 +1080,7 @@ def test_two_smooths_in_their_null_spaces_return() -> None:
     assert np.all(result.rho > 15.0)
     for session in result.sessions:
         np.testing.assert_allclose(session.edf, [1.0, 1.0], rtol=0, atol=1e-5)
-        np.testing.assert_array_equal(session.in_null_space, [True, True])
+        np.testing.assert_array_equal(in_null_space(session, blocks), [True, True])
 
 
 def _stack(parts: list[SessionData], n_shared: int = 9) -> SessionData:

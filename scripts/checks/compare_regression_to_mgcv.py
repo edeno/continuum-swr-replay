@@ -60,6 +60,7 @@ from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
     SessionData,
+    in_null_space,
     select_penalties,
 )
 from continuum_swr_replay.runs.io import write_json
@@ -215,7 +216,7 @@ def fit_ours(name: str, frame: pd.DataFrame) -> dict:
         "trace_S": np.array([np.trace(block.S) for block in blocks]),
         "reml": result.score + (float(gammaln(y + 1.0).sum()) if poisson else 0.0),
         "scale": session.scale,
-        "in_null_space": session.in_null_space,
+        "in_null_space": in_null_space(session, blocks),
     }
     grid_basis = basis.design(GRID)
     for variable, block, Z in zip(SMOOTHS[name], blocks, constraints, strict=True):

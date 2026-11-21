@@ -249,9 +249,10 @@ and the session stays without a fit; so does one that still has no finite maximu
 after the rounds, or whose refit fails otherwise. Each set-aside session's record keeps
 its fit at the reference point, every refit, the columns left out, and the reason in
 words (`SetAsideSession`). `PooledFit.sessions` keeps one entry per session given, in
-order: a set-aside session that was fitted has its fit, with `in_penalty_choice` False
-(it did not take part in choosing the penalties) and NaN at the columns left out; one
-without a fit has NaN coefficients, covariance, edf and score. `PooledFit.score` is the
+order (each session's `RemlScore`): a set-aside session that was fitted has its fit,
+with NaN at the columns left out (it is not in `search.in_choice`: it did not take part
+in choosing the penalties); one without a fit has NaN coefficients, covariance, edf and
+score. `PooledFit.score` is the
 pooled score over `search.in_choice` only, so two models' scores are compared only on
 the same set. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for reporting
 a model) of the sessions end without a fit (`PenaltySearch.share_without_fit`), the
@@ -272,11 +273,12 @@ search goes on from the finite points and records how many failed and why
 (`PenaltySearch.n_grid_not_finite`, `grid_failures`: the count per status).
 `fit_at_penalties` fits at given strengths without a search (and without the score's
 derivatives).
-Each session's fit carries its covariance `A^-1` (mgcv's `Vp`), the edf per term and in
-all, and two flags per term: `at_boundary` (the log strength within 0.5 of a bound) and
-`in_null_space` (the edf within 0.01 of the dimension of the penalty's null space, for a
-P-spline a straight line). Only the second catches a term shrunk to a line by a search
-that stopped on the score's plateau short of the bound.
+Each session's fit carries its covariance `A^-1` (mgcv's `Vp`) and the edf per term and in
+all. Two flags per term say a term was shrunk: `PenaltySearch.at_boundary` (the log
+strength within 0.5 of a bound) and `in_null_space(session, blocks)` (the edf within 0.01
+of the dimension of the penalty's null space, for a P-spline a straight line). Only the
+second catches a term shrunk to a line by a search that stopped on the score's plateau
+short of the bound.
 
 ## What the score includes
 

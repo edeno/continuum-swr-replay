@@ -83,12 +83,12 @@ __all__ = [
     "PooledScore",
     "RemlScore",
     "SessionData",
-    "SessionFit",
     "SetAsideSession",
     "FreeDirection",
     "assemble_penalty",
     "fit_at_penalties",
     "free_basis",
+    "in_null_space",
     "pooled_reml",
     "refine_penalties",
     "reml_and_derivatives",
@@ -346,49 +346,18 @@ class PooledScore:
         return None if self.failed is None else self.failed.fit.status
 
 
-@dataclass(frozen=True)
-class SessionFit:
-    """One session's fit at the chosen strengths.
+def in_null_space(session: RemlScore, blocks: Sequence[PenaltyBlock]) -> np.ndarray:
+    """Per block, True for a term shrunk to its penalty's null space (a P-spline
+    drawn as a straight line), shape ``(m,)``.
 
-    Attributes
-    ----------
-    fit : NewtonFit
-        The inner fit (``beta``, ``A``, status); ``beta`` and ``A`` are NaN at
-        the session's inactive columns.
-    covariance : np.ndarray, shape (p, p)
-        ``A^-1``, the Bayesian covariance of ``beta`` (mgcv's ``Vp``); NaN in
-        the rows and columns of the inactive columns.
-    edf : np.ndarray, shape (m,)
-        Effective degrees of freedom per penalty block: the trace of the
-        block's rows and columns of ``A^-1 H`` (mgcv's ``edf``, summed over
-        the term's coefficients).
-    edf_total : float
-        ``tr(A^-1 H)`` over all coefficients.
-    scale : float
-        The profiled Gaussian scale; 1 for the other families.
-    score : float
-        The session's REML score.
-    in_null_space : np.ndarray of bool, shape (m,)
-        True for a term shrunk to its penalty's null space (a P-spline drawn
-        as a straight line): its edf is within ``NULL_SPACE_EDF_TOL`` of the
-        null space's dimension within the term's columns (the number of
-        columns less the penalty's rank). The search can stop on the score's
-        plateau before the bound, so ``PenaltySearch.at_boundary`` misses
-        such a term.
-    in_penalty_choice : bool
-        True when the session's score was part of the pooled score that chose
-        the penalties; False for a session set aside before the search and
-        fitted afterward at the chosen penalties (``PenaltySearch.set_aside``).
+    Its edf is within ``NULL_SPACE_EDF_TOL`` of the null space's dimension
+    within the term's columns (the number of columns less the penalty's rank).
+    The search can stop on the score's plateau before the bound, so
+    ``PenaltySearch.at_boundary`` misses such a term. False for a session
+    without a fit (its edf is NaN).
     """
-
-    fit: NewtonFit
-    covariance: np.ndarray
-    edf: np.ndarray
-    edf_total: float
-    scale: float
-    score: float
-    in_null_space: np.ndarray
-    in_penalty_choice: bool = True
+    null_dim = np.array([b.columns.size - b.rank for b in blocks])
+    return session.edf - null_dim <= NULL_SPACE_EDF_TOL
 
 
 @dataclass(frozen=True)
@@ -505,12 +474,15 @@ class PooledFit:
         on the same set.
     gradient : np.ndarray or None, shape (m,)
         Its gradient there; None when the strengths were given.
-    sessions : tuple of SessionFit
-        One per session given, in order. A session set aside by the search
-        (``search.set_aside``) and fitted afterward has its fit at ``rho``
-        with ``in_penalty_choice`` False (NaN at the columns its refit left
-        out); one not fitted has NaN coefficients, covariance, edf and score,
-        and ``fit.status`` says how its last fit ended.
+    sessions : tuple of RemlScore
+        One per session given, in order, each with its fit, covariance
+        (``A^-1``, mgcv's ``Vp``), edf per block (mgcv's ``edf`` summed over
+        the term's coefficients) and score; :func:`in_null_space` flags its
+        terms shrunk to a line. A session set aside by the search
+        (``search.set_aside``; not in ``search.in_choice``) and fitted
+        afterward has its fit at ``rho`` (NaN at the columns its refit left
+        out); one not fitted has NaN coefficients, covariance, edf, scale and
+        score, and ``fit.status`` says how its last fit ended.
     search : PenaltySearch or None
         None when the strengths were given (:func:`fit_at_penalties`).
     """
@@ -518,7 +490,7 @@ class PooledFit:
     rho: np.ndarray
     score: float
     gradient: np.ndarray | None
-    sessions: tuple[SessionFit, ...]
+    sessions: tuple[RemlScore, ...]
     search: PenaltySearch | None
 
 
@@ -1577,23 +1549,6 @@ def _refit_set_aside(
     return records
 
 
-def _session_fit(
-    session: RemlScore, blocks: Sequence[PenaltyBlock], in_penalty_choice: bool
-) -> SessionFit:
-    """The :class:`SessionFit` of a converged session score."""
-    null_dim = np.array([b.columns.size - b.rank for b in blocks])
-    return SessionFit(
-        session.fit,
-        session.covariance,
-        session.edf,
-        session.edf_total,
-        session.scale,
-        session.score,
-        session.edf - null_dim <= NULL_SPACE_EDF_TOL,
-        in_penalty_choice,
-    )
-
-
 def _pooled_fit(
     rho: np.ndarray,
     pooled: PooledScore,
@@ -1604,26 +1559,23 @@ def _pooled_fit(
 
     A session's covariance is NaN in the rows and columns of its inactive
     columns; its edf counts the active ones. A session the search set aside
-    is put back in its place: its refit at ``rho`` when that converged
-    (``in_penalty_choice`` False), else NaN values.
+    is put back in its place: its refit at ``rho`` when that converged, else
+    NaN values.
     """
-    sessions = [_session_fit(session, blocks, True) for session in pooled.sessions]
+    sessions = list(pooled.sessions)
     for left_out in () if search is None else search.set_aside:
-        last = left_out.refits[-1]
-        if left_out.fitted:
-            entry = _session_fit(last, blocks, False)
-        else:
-            p = last.fit.beta.size
+        entry = left_out.refits[-1]
+        if not left_out.fitted:
+            p = entry.fit.beta.size
             nan = np.full((p, p), np.nan)
-            entry = SessionFit(
-                replace(last.fit, beta=np.full(p, np.nan), A=nan),
-                nan,
-                np.full(len(blocks), np.nan),
-                np.nan,
-                np.nan,
-                np.nan,
-                np.zeros(len(blocks), dtype=bool),
-                False,
+            entry = replace(
+                entry,
+                score=np.nan,
+                fit=replace(entry.fit, beta=np.full(p, np.nan), A=nan),
+                scale=np.nan,
+                covariance=nan,
+                edf=np.full(len(blocks), np.nan),
+                edf_total=np.nan,
             )
         sessions.insert(left_out.index, entry)
     return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
@@ -1723,8 +1675,8 @@ def select_penalties(
     Returns
     -------
     PooledFit
-        One entry per session given; a set-aside session has its refit (with
-        ``in_penalty_choice`` False), or NaN values when it has no fit. The
+        One entry per session given; a set-aside session has its refit, or NaN
+        values when it has no fit. The
         score is over ``search.in_choice`` only.
 
     Raises
