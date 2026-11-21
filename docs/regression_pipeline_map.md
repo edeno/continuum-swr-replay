@@ -1164,7 +1164,7 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 Model-free event-start rates on the three visit clocks, per kind and animal.
 
-`input_paths`, `output_path`, `session_bins`, `main`
+`input_paths`, `output_path`, `session_port_experiences`, `session_bins`, `main`
 
 ### `scripts/replay_models/rate/fit_cross_history_rate.py`
 
