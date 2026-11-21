@@ -62,7 +62,6 @@ from .likelihoods import Likelihood
 
 __all__ = [
     "CONVERGED",
-    "FIT_STATUSES",
     "HALVING_FAILED",
     "NOT_IDENTIFIED",
     "NOT_POSITIVE_DEFINITE",
@@ -101,14 +100,6 @@ STEP_LIMIT: FitStatus = "step limit reached"
 #: lowered ``F`` and left a full step no shorter: a coefficient runs to
 #: infinity.
 NO_FINITE_MAXIMUM: FitStatus = "no finite maximum"
-FIT_STATUSES: tuple[FitStatus, ...] = (
-    CONVERGED,
-    NOT_IDENTIFIED,
-    NOT_POSITIVE_DEFINITE,
-    HALVING_FAILED,
-    STEP_LIMIT,
-    NO_FINITE_MAXIMUM,
-)
 
 
 @dataclass(frozen=True)
@@ -245,9 +236,7 @@ def penalized_newton(
     beta0: np.ndarray,
     *,
     free_basis: np.ndarray | None = None,
-    tol: float = NEWTON_DECREMENT_TOL,
     max_iter: int = NEWTON_MAX_STEPS,
-    max_halvings: int = MAX_STEP_HALVINGS,
     max_step: float = MAX_STEP_LENGTH,
 ) -> NewtonFit:
     """Fit ``beta`` by penalized Newton from ``beta0``.
@@ -272,12 +261,8 @@ def penalized_newton(
         columns and the null spaces of the penalty blocks
         (:func:`.reml.reml_and_derivatives` passes it). None: the columns
         where ``S`` is zero, which misses a penalty's null space.
-    tol : float
-        Stop when the Newton decrement is below this.
     max_iter : int
         Most Newton steps.
-    max_halvings : int
-        Most halvings of one step.
     max_step : float
         Longest step, as the largest change of any coefficient; not applied
         to a quadratic likelihood, whose full step is the optimum.
@@ -285,7 +270,7 @@ def penalized_newton(
     Returns
     -------
     NewtonFit
-        With ``status`` saying how it ended (:data:`FIT_STATUSES`); a fit that
+        With ``status`` saying how it ended (the statuses above); a fit that
         is not ``CONVERGED`` is returned without raising.
 
     Raises
@@ -322,7 +307,7 @@ def penalized_newton(
             return NewtonFit(beta, A, NOT_POSITIVE_DEFINITE, np.nan, n_iter, loglik)
         step = scipy.linalg.cho_solve(factor, g)
         decrement = 0.5 * float(g @ step)
-        if decrement < tol:
+        if decrement < NEWTON_DECREMENT_TOL:
             if not lik.quadratic and _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
                 return NewtonFit(
                     beta,
@@ -342,14 +327,13 @@ def penalized_newton(
                 S,
                 NewtonFit(beta, A, CONVERGED, decrement, n_iter, loglik),
                 step,
-                tol=tol,
             )
         eta_steps.append(_eta_step(X, step))
         if n_iter == max_iter:
             break
         scale = min(1.0, cap / np.max(np.abs(step)))
         capped = scale < 1.0
-        for _ in range(max_halvings):
+        for _ in range(MAX_STEP_HALVINGS):
             candidate = beta + scale * step
             F_new, loglik_new = objective(candidate)
             if np.isfinite(F_new) and F_new <= F:
@@ -399,15 +383,13 @@ def _last_step(
     S: np.ndarray,
     fit: NewtonFit,
     step: np.ndarray,
-    *,
-    tol: float,
 ) -> NewtonFit:
     """The converged ``fit`` moved by its full Newton ``step``, when that is safe.
 
     The step is taken when ``F`` does not rise by more than its rounding,
     ``8 eps max(1, |F|)``, and it lands where ``A`` is positive definite and
-    the decrement is below ``tol``; otherwise ``fit`` (whose decrement is below
-    ``tol``) is returned unchanged. A gain below the rounding of ``F`` is still
+    the decrement is below ``NEWTON_DECREMENT_TOL``; otherwise ``fit`` (whose
+    decrement is below it) is returned unchanged. A gain below the rounding of ``F`` is still
     taken: without it a coefficient would stay off by up to
     ``sqrt(2 eps |F| / lambda_min)``, about 1e-7 on a fit with ``F`` near 400,
     which the REML score inherits through ``log|A|``.
@@ -427,6 +409,6 @@ def _last_step(
     except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
         return fit
     decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
-    if not decrement < tol:
+    if not decrement < NEWTON_DECREMENT_TOL:
         return fit
     return NewtonFit(beta, A, CONVERGED, decrement, fit.n_iter + 1, loglik)

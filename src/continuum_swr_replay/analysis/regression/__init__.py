@@ -5,7 +5,7 @@ It knows nothing of the task. It imports only the foundation,
 package may import it.
 
 - ``constants``: the fitter's numerical rules (convergence, step control,
-  penalty bounds, support and collinearity thresholds, folds).
+  penalty bounds, the penalty search, the share of sessions without a fit).
 - ``likelihoods``: Poisson with an offset, Bernoulli, Gaussian with a scale and
   the grouped softmax, each with its derivatives on the linear-predictor scale.
 - ``newton``: the penalized Newton fit at fixed penalty strengths.

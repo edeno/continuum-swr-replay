@@ -245,8 +245,6 @@ class SessionData:
     aux : object
         The family's extra data (offset, group ids); None for the Bernoulli
         and the Gaussian (whose scale is profiled).
-    beta0 : np.ndarray or None, shape (p,)
-        Start of the first inner fit; zeros when None.
     name : str or None
         A label for messages (the session's key); its index when None.
     active : np.ndarray of bool or None, shape (p,)
@@ -260,7 +258,6 @@ class SessionData:
     X: np.ndarray
     y: np.ndarray
     aux: object = None
-    beta0: np.ndarray | None = None
     name: str | None = None
     active: np.ndarray | None = None
 
@@ -429,16 +426,6 @@ class SetAsideSession:
     refits: tuple[RemlScore, ...]
     left_out: np.ndarray
     reason: str
-
-    @property
-    def reference_status(self) -> FitStatus:
-        """How its fit at the reference point ended."""
-        return self.reference.fit.status
-
-    @property
-    def final_status(self) -> FitStatus:
-        """How its last fit at the chosen log penalties ended."""
-        return self.refits[-1].fit.status
 
     @property
     def fitted(self) -> bool:
@@ -1054,7 +1041,6 @@ def pooled_reml(
     sessions: Sequence[SessionData],
     blocks: Sequence[PenaltyBlock],
     rho: Sequence[float],
-    starts: Sequence[np.ndarray] | None = None,
     *,
     derivatives: bool = True,
 ) -> PooledScore:
@@ -1068,10 +1054,6 @@ def pooled_reml(
         A session's inactive columns are left out of its fit.
     blocks : sequence of PenaltyBlock, length m
     rho : sequence of float, length m
-    starts : sequence of np.ndarray or None
-        One inner-fit start per session (warm starts), shape ``(p,)`` with
-        anything at the inactive columns; each session's ``beta0`` (or zeros)
-        when None.
     derivatives : bool
         Also sum the gradients and Hessians.
 
@@ -1087,10 +1069,9 @@ def pooled_reml(
         If a session marks a column of a penalty block inactive or its inputs
         cannot be fitted; the message names the session.
     """
-    if starts is None:
-        starts = [data.beta0 for data in sessions]
     for index, data in enumerate(sessions):
         _check_active(data, index, blocks)
+    starts = [None] * len(sessions)
     return _pooled_reml(
         lik, sessions, range(len(sessions)), blocks, rho, starts, derivatives
     )
@@ -1138,7 +1119,7 @@ class _Evaluator:
         self.lik, self.blocks = lik, blocks
         self.sessions, self.indices = list(sessions), list(indices)
         self.by_index = dict(zip(indices, sessions, strict=True))
-        self.starts = [data.beta0 for data in sessions]
+        self.starts: list[np.ndarray | None] = [None] * len(sessions)
 
     def __call__(self, rho: np.ndarray, derivatives: bool) -> PooledScore:
         pooled = _pooled_reml(
@@ -1450,7 +1431,7 @@ def _screen(
     kept, set_aside = [], []
     for index, data in enumerate(sessions):
         _check_active(data, index, blocks)
-        session = _labeled_score(lik, data, index, blocks, reference, data.beta0, False)
+        session = _labeled_score(lik, data, index, blocks, reference, None, False)
         status = session.fit.status
         if np.isfinite(session.score):
             kept.append(index)
@@ -1546,7 +1527,7 @@ def _refit(
         else data.active.copy()
     )
     left_out: list[int] = []
-    refits = [_labeled_score(lik, data, index, blocks, rho, data.beta0, False)]
+    refits = [_labeled_score(lik, data, index, blocks, rho, None, False)]
     reason = ""
     while not refits[-1].fit.converged:
         last = refits[-1]
@@ -1577,7 +1558,7 @@ def _refit(
                 index,
                 blocks,
                 rho,
-                data.beta0,
+                None,
                 False,
             )
         )

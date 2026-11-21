@@ -976,7 +976,7 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
     (left_out,) = result.search.set_aside
     assert (left_out.index, left_out.name) == (4, "s4")
-    assert left_out.reference_status == NO_FINITE_MAXIMUM
+    assert left_out.reference.fit.status == NO_FINITE_MAXIMUM
     assert sorted(left_out.running_away.tolist()) == [arm, role]
     assert [r.fit.status for r in left_out.refits] == [NO_FINITE_MAXIMUM, CONVERGED]
     assert sorted(left_out.left_out.tolist()) == [arm, role]
@@ -1020,7 +1020,7 @@ def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
     (left_out,) = result.search.set_aside
     assert left_out.index == 6 and not left_out.fitted
-    assert left_out.final_status == NO_FINITE_MAXIMUM
+    assert left_out.refits[-1].fit.status == NO_FINITE_MAXIMUM
     assert left_out.left_out.size == 0
     assert "block 0's null space" in left_out.reason
     assert result.search.share_without_fit == pytest.approx(0.1)

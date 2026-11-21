@@ -60,7 +60,6 @@ __all__ = [
 class Likelihood(Protocol):
     """The interface the Newton fit and REML read."""
 
-    name: str
     quadratic: bool
 
     def check(self, y: np.ndarray, aux: object) -> None: ...
@@ -136,7 +135,6 @@ class Poisson(_DiagonalFamily):
     ``l = sum y (eta + o) - exp(eta + o)``.
     """
 
-    name = "poisson"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: np.ndarray) -> None:
@@ -177,7 +175,6 @@ class Bernoulli(_DiagonalFamily):
     ``l = sum y eta - log(1 + exp(eta))``.
     """
 
-    name = "bernoulli"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: object) -> None:
@@ -209,7 +206,6 @@ class Gaussian(_DiagonalFamily):
     ``l = -sum (y - eta)^2 / (2 phi) - n/2 log(2 pi phi)``.
     """
 
-    name = "gaussian"
     quadratic = True
 
     def check(self, y: np.ndarray, aux: float) -> None:
@@ -273,7 +269,6 @@ class GroupedSoftmax:
     not be in ``X``.
     """
 
-    name = "grouped_softmax"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: np.ndarray) -> None:

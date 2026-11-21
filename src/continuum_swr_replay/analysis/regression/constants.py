@@ -81,18 +81,7 @@ NULL_SPACE_EDF_TOL = 0.01
 # near-collinear columns names only part of them at a time).
 REFIT_MAX_ROUNDS = 5
 
-# A term the other terms explain at R^2 >= COLLINEARITY_R2 (VIF >= 5) is read
-# only jointly with its partner.
-COLLINEARITY_R2 = 0.8
-
-# Support rule: a declared unpenalized term needs at least SUPPORT_MIN_UNITS
-# units on each side in a session, and leaves the per-session model when it
-# fails in more than MAX_FAILING_SHARE of the sessions with a fit (the value of
+# A penalty search raises when more than MAX_FAILING_SHARE of the sessions end
+# without a fit (the value of
 # ``analysis/replay_models/contrast_aggregation.py:MAX_UNIDENTIFIED_SHARE``).
-SUPPORT_MIN_UNITS = 5
 MAX_FAILING_SHARE = 0.20
-
-# Folds: whole trials balanced by destination well, a stay longer than
-# MAX_STAY_PIECE_S cut into equal pieces.
-N_FOLDS = 5
-MAX_STAY_PIECE_S = 30.0
