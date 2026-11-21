@@ -4,9 +4,9 @@
 6e54eda8, cleaned up in 98fe5c06); Phase 3, the well visit in the tables (d14ff888; the 13 tables
 published); Phase 4, Figures 2 and 3 on the common subset (5dc74fc6), except 20 held-out tetrode values in
 `paper/reported/events.json`, pending until another session's rerun ends. Next is Phase 2, the convention's
-tools. It can start now; its smooth-term vocabulary and its handling of sessions without a finite maximum
-wait for two questions open with the lead ([overview.md](overview.md#status)). Phases 5a, 6a and 8 wait
-for Phase 2.
+tools. It is started; its smooth-term vocabulary waits for one question open with the lead
+([overview.md](overview.md#status)); a session without a finite maximum is reported with those terms
+missing (lead, 2026-11-21). Phases 5a, 6a and 8 wait for Phase 2.
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the

@@ -777,6 +777,16 @@ lead has not yet answered.
   the rows with that role are dropped from the session's fit, not merged into the reference role (merging
   inflated the belief variance's false positives, to 20 % in one case).
 
+### Sixteenth round (lead, 2026-11-21, 10:10): a session with no finite maximum keeps its other terms
+
+The lead: "A session with no finite best value: do terms missing."
+
+- A session whose simple terms have no finite maximum is fitted again with the running-away unpenalized
+  columns left out, and it is **reported with those terms missing**. It is not left out of the summary.
+- The handling is built outside the penalty search, with the support rule (the per-session loop), and the
+  record of the session names the columns left out and the reason.
+- Still open: the rule for a smooth term in a per-session fit (fifteenth round).
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
