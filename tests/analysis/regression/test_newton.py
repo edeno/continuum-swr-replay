@@ -430,3 +430,20 @@ def test_a_group_whose_shares_sum_to_zero_is_refused() -> None:
     y[3:] = 0.0
     with pytest.raises(ValueError, match="group.*sum to zero"):
         penalized_newton(lik, X, y, groups, np.zeros((1, 1)), np.zeros(1))
+
+
+def test_a_finite_maximum_far_away_is_a_step_limit_not_a_separation() -> None:
+    """A Poisson slope of 2e3 on a column of units 1e-3: every step is cut to
+    the cap of 10 and lowers ``F``, but the full step shrinks as the fit
+    approaches the optimum, so a fit that runs out of steps on the way is
+    "step limit reached", not "no finite maximum"."""
+    rng = np.random.default_rng(3)
+    x = rng.uniform(0.0, 1e-3, 400)
+    X = np.column_stack([np.ones(400), x])
+    y = rng.poisson(np.exp(0.2 + 2e3 * x)).astype(float)
+    S, start = np.zeros((2, 2)), np.zeros(2)
+    short = penalized_newton(Poisson(), X, y, np.zeros(400), S, start, max_iter=40)
+    assert short.status == STEP_LIMIT
+    full = penalized_newton(Poisson(), X, y, np.zeros(400), S, start, max_iter=400)
+    assert full.converged
+    assert full.beta[1] == pytest.approx(2e3, rel=0.1)

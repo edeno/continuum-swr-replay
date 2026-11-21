@@ -55,6 +55,7 @@ from .constants import (
     MAX_STEP_LENGTH,
     NEWTON_DECREMENT_TOL,
     NEWTON_MAX_STEPS,
+    NO_MAXIMUM_CAPPED_STEPS,
     NO_MAXIMUM_ETA_STEP,
 )
 from .likelihoods import Likelihood
@@ -95,7 +96,9 @@ HALVING_FAILED: FitStatus = "step halving failed"
 #: ``max_iter`` steps without the decrement falling below the tolerance.
 STEP_LIMIT: FitStatus = "step limit reached"
 #: The decrement is below the tolerance but the step still moves the linear
-#: predictor by more than ``NO_MAXIMUM_ETA_STEP``: a coefficient runs to
+#: predictor by more than ``NO_MAXIMUM_ETA_STEP``, or the fit ran out of steps
+#: while each of its last ``NO_MAXIMUM_CAPPED_STEPS`` was cut to the step cap,
+#: lowered ``F`` and left a full step no shorter: a coefficient runs to
 #: infinity.
 NO_FINITE_MAXIMUM: FitStatus = "no finite maximum"
 FIT_STATUSES: tuple[FitStatus, ...] = (
@@ -301,6 +304,8 @@ def penalized_newton(
         return -loglik + 0.5 * b @ S @ b, loglik
 
     F, loglik = objective(beta)
+    capped_and_fell: list[bool] = []
+    eta_steps: list[float] = []
     if not _identified(X, _free_columns(S) if free_basis is None else free_basis):
         nan = np.full((beta.size, beta.size), np.nan)
         return NewtonFit(beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik)
@@ -336,9 +341,11 @@ def penalized_newton(
                 step,
                 tol=tol,
             )
+        eta_steps.append(_eta_step(X, step))
         if n_iter == max_iter:
             break
         scale = min(1.0, cap / np.max(np.abs(step)))
+        capped = scale < 1.0
         for _ in range(max_halvings):
             candidate = beta + scale * step
             F_new, loglik_new = objective(candidate)
@@ -347,8 +354,38 @@ def penalized_newton(
             scale *= 0.5
         else:
             return NewtonFit(beta, A, HALVING_FAILED, decrement, n_iter, loglik)
+        capped_and_fell.append(capped and F_new < F)
         beta, F, loglik = candidate, F_new, loglik_new
+    if not lik.quadratic and _runs_away_at_the_cap(capped_and_fell, eta_steps):
+        return NewtonFit(
+            beta,
+            A,
+            NO_FINITE_MAXIMUM,
+            decrement,
+            n_iter,
+            loglik,
+            step,
+            running_away_columns(X, step),
+        )
     return NewtonFit(beta, A, STEP_LIMIT, decrement, n_iter, loglik)
+
+
+def _runs_away_at_the_cap(capped_and_fell: list[bool], eta_steps: list[float]) -> bool:
+    """Whether a fit that ran out of steps was running away at the step cap.
+
+    True when each of the last ``NO_MAXIMUM_CAPPED_STEPS`` steps was shortened
+    to ``max_step`` and lowered ``F``, and the full Newton step's movement of
+    the linear predictor (``max |X step|``) did not shrink from one step to the
+    next, through the step left untaken. Along a direction without a finite
+    maximum the curvature vanishes and the full step grows while the cap keeps
+    the progress linear; toward a finite maximum, however far, the full step
+    shrinks as the fit approaches it.
+    """
+    k = NO_MAXIMUM_CAPPED_STEPS
+    if len(capped_and_fell) < k:
+        return False
+    growing = np.diff(eta_steps[-(k + 1) :]) >= 0.0
+    return bool(all(capped_and_fell[-k:]) and growing.all())
 
 
 def _last_step(

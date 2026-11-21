@@ -910,7 +910,8 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     pooled = pooled_reml(GroupedSoftmax(), sessions, blocks, [6.0])
     assert pooled.failed_session == 4
     assert pooled.failure == (
-        "session 4 (s4): no finite maximum (columns running away: [11, 12])"
+        "session 4 (s4): no finite maximum (columns running away: [11, 12]; "
+        "along column 11, column 12)"
     )
 
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
@@ -950,7 +951,7 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     message = (
         r"3 of 10 sessions \(30%, more than MAX_FAILING_SHARE = 20%\): "
         r"session 1 \(s1\): no finite maximum \(columns running away: \[1[12], "
-        r"1[12]\]\); session 4 \(s4\).*; session 7 \(s7\)"
+        r"1[12]\]; along [^)]*\); session 4 \(s4\).*; session 7 \(s7\)"
     )
     with pytest.raises(ValueError, match=message):
         select_penalties(GroupedSoftmax(), many, blocks)
@@ -1061,3 +1062,27 @@ def test_a_stack_with_inactive_columns_is_the_stack_without_them() -> None:
     )
     assert repaired.search.set_aside == ()
     assert np.all(np.isfinite(repaired.sessions[2].fit.beta[active]))
+
+
+@pytest.mark.parametrize("rho", [0.0, 6.0, 20.0])
+def test_a_separation_by_a_smooths_line_is_named_as_its_null_space(rho: float) -> None:
+    """A 0/1 outcome that is a step in ``x`` beside a P-spline of ``x``: the
+    smooth's unpenalized straight line separates it at every penalty. Each
+    step is cut to the step cap, so the fit runs out of steps; it is reported
+    as no finite maximum, running away along the block's null space and the
+    intercept, which says that the smooth's own line is in the direction."""
+    rng = np.random.default_rng(0)
+    x = rng.uniform(0.0, 4.0, 300)
+    basis = PSplineBasis(0.0, 4.0, 10)
+    B = basis.design(x)
+    Z = sum_to_zero_constraint(B)
+    X = np.column_stack([np.ones(300), B @ Z])
+    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    y = (x > 2.0).astype(float)
+    with np.errstate(over="ignore"):
+        score = reml_and_derivatives(Bernoulli(), X, y, None, blocks, [rho])
+    assert score.fit.status == NO_FINITE_MAXIMUM
+    assert set(score.running_away_directions) == {
+        reml.FreeDirection(0, 0, True),
+        reml.FreeDirection(None, 0, True),
+    }

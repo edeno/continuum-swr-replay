@@ -48,6 +48,7 @@ import itertools
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from typing import NamedTuple
 
 import numpy as np
 import scipy.linalg
@@ -79,6 +80,7 @@ __all__ = [
     "SessionData",
     "SessionFit",
     "SetAsideSession",
+    "FreeDirection",
     "assemble_penalty",
     "fit_at_penalties",
     "free_basis",
@@ -89,6 +91,54 @@ __all__ = [
 ]
 
 _LOG_2PI = float(np.log(2.0 * np.pi))
+
+
+class FreeDirection(NamedTuple):
+    """One coordinate along which a fit with no finite maximum runs away, in
+    the coordinates the penalty leaves free or penalizes.
+
+    Attributes
+    ----------
+    block : int or None
+        None for an unpenalized design column; else the penalty block.
+    index : int
+        The design column; or, in a block, the coordinate in the eigenbasis of
+        its penalty (``PenaltyBlock.eigenvectors``), its null space first.
+    unpenalized : bool
+        True for a design column the penalty does not touch and for a block's
+        null-space coordinate (for a P-spline, its straight line): a block's
+        coordinate cannot be made inactive.
+    """
+
+    block: int | None
+    index: int
+    unpenalized: bool
+
+    def __str__(self) -> str:
+        if self.block is None:
+            return f"column {self.index}"
+        if self.unpenalized:
+            return f"block {self.block}'s null space (direction {self.index})"
+        return f"block {self.block}, penalized direction {self.index}"
+
+
+def _directions(
+    blocks: Sequence[PenaltyBlock], columns: np.ndarray
+) -> tuple[FreeDirection, ...]:
+    """The :class:`FreeDirection` of each of ``columns``, indices into the
+    design in the blocks' eigenbasis."""
+    owner = {}
+    for b, block in enumerate(blocks):
+        for q, column in enumerate(block.columns):
+            owner[int(column)] = (b, q, q < block.columns.size - block.rank)
+    out = []
+    for column in columns.tolist():
+        if column in owner:
+            b, q, null = owner[column]
+            out.append(FreeDirection(b, q, null))
+        else:
+            out.append(FreeDirection(None, column, True))
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -230,6 +280,9 @@ class RemlScore:
         None when the score is infinite.
     edf_total : float
         ``tr(A^-1 H)``; NaN when the score is infinite.
+    running_away_directions : tuple of FreeDirection
+        For a fit with no finite maximum, the coordinates it runs away along
+        (``fit.running_away`` names the design columns); empty otherwise.
     """
 
     score: float
@@ -240,6 +293,7 @@ class RemlScore:
     covariance: np.ndarray | None = None
     edf: np.ndarray | None = None
     edf_total: float = np.nan
+    running_away_directions: tuple[FreeDirection, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -607,10 +661,17 @@ def reml_and_derivatives(
         else _rotate(blocks, vectors, _rotate(blocks, vectors, session.covariance).T)
     )
     fit = replace(fit, beta=beta, A=A)
+    directions: tuple[FreeDirection, ...] = ()
     if fit.step is not None:
+        directions = _directions(rotated, fit.running_away)
         step = _rotate(blocks, vectors, fit.step)
         fit = replace(fit, step=step, running_away=running_away_columns(X, step))
-    return replace(session, fit=fit, covariance=covariance)
+    return replace(
+        session,
+        fit=fit,
+        covariance=covariance,
+        running_away_directions=directions,
+    )
 
 
 def _reml_in_basis(
@@ -829,21 +890,29 @@ def _session_score(
         covariance = np.full((p, p), np.nan)
         covariance[np.ix_(active, active)] = session.covariance
     fit = replace(session.fit, beta=beta, A=A)
+    directions = session.running_away_directions
     if fit.step is not None:
+        columns = np.flatnonzero(active)
         step = np.full(p, np.nan)
         step[active] = fit.step
-        fit = replace(
-            fit, step=step, running_away=np.flatnonzero(active)[fit.running_away]
+        fit = replace(fit, step=step, running_away=columns[fit.running_away])
+        directions = tuple(
+            d._replace(index=int(columns[d.index])) if d.block is None else d
+            for d in directions
         )
-    return replace(session, fit=fit, covariance=covariance)
+    return replace(
+        session, fit=fit, covariance=covariance, running_away_directions=directions
+    )
 
 
-def _failure(data: SessionData, index: int, fit: NewtonFit) -> str:
+def _failure(data: SessionData, index: int, session: RemlScore) -> str:
     """Why session ``index``'s fit failed, in words, with the columns running
-    away for a fit with no finite maximum."""
+    away and their coordinates for a fit with no finite maximum."""
+    fit = session.fit
     text = f"{_label(data, index)}: {fit.status}"
     if fit.running_away.size:
-        text += f" (columns running away: {fit.running_away.tolist()})"
+        along = ", ".join(str(d) for d in session.running_away_directions)
+        text += f" (columns running away: {fit.running_away.tolist()}; along {along})"
     return text
 
 
@@ -912,7 +981,7 @@ def _pooled_reml(
         except ValueError as error:
             raise ValueError(f"{_label(data, index)}: {error}") from error
         if not np.isfinite(session.score):
-            failure = _failure(data, index, session.fit)
+            failure = _failure(data, index, session)
             return PooledScore(
                 np.inf, None, None, (), index, session.fit.status, failure
             )
@@ -1175,7 +1244,7 @@ def _screen(
             kept.append(index)
         else:
             set_aside.append(SetAsideSession(index, data.name, session.fit))
-            failures.append(_failure(data, index, session.fit))
+            failures.append(_failure(data, index, session))
     share = len(set_aside) / len(sessions)
     if share > MAX_FAILING_SHARE:
         raise ValueError(

@@ -28,6 +28,12 @@ MAX_STEP_LENGTH = 10.0
 # likelihood (the Gaussian), whose maximum is finite when A is positive definite
 # and whose eta is on the outcome's scale.
 NO_MAXIMUM_ETA_STEP = 0.1
+# A fit that reaches NEWTON_MAX_STEPS has no finite maximum, too, when each of
+# its last NO_MAXIMUM_CAPPED_STEPS steps was cut to MAX_STEP_LENGTH and lowered
+# the objective while the full Newton step's movement of eta did not shrink: a
+# separation along a direction whose progress the cap keeps linear (a 0/1
+# outcome that is a step in x, separated by a smooth's unpenalized line).
+NO_MAXIMUM_CAPPED_STEPS = 10
 
 # The design identifies the coefficients the penalty leaves free (unpenalized
 # columns, penalties' null spaces) when the Gram matrix of those columns of
