@@ -1747,36 +1747,131 @@ def assert_draws_group_gain(ax, statistics: pd.DataFrame) -> None:
     assert [t.get_text() for t in ax.texts] == ["no gain"]
 
 
-def test_figure02_panel_h_draws_the_full_decoders_gain_over_the_swr_only(offline):
-    """Panel h, one axis: a dot per animal and the mean with its interval for
-    each group, a dashed zero line with its "no gain" note, and labels that say
-    what is compared."""
+def _immobile_statistics(swr_only: list[float], full: list[float]) -> pd.DataFrame:
+    """``immobile_gain_statistics``' rows indexed by family and measure: the
+    filter family's two decoders' per-animal gains (the two-sided family's
+    twice them)."""
+    rows = {}
+    for family, scale in (("filter", 1.0), ("two_sided", 2.0)):
+        for measure, animals in (
+            ("swr_minus_none_per_s", swr_only),
+            ("full_minus_none_per_s", full),
+        ):
+            values = scale * np.asarray(animals)
+            rows[(family, measure)] = {
+                "animals": values,
+                "animal_names": np.array(list("abcde"[: len(values)])),
+                "estimate": float(values.mean()),
+            }
+    table = pd.DataFrame.from_dict(rows, orient="index")
+    table.index.names = ["family", "measure"]
+    return table
+
+
+def test_figure02_panel_g_left_draws_each_decoders_gain_joined_by_animal(offline):
+    """Panel g's first axis: a dot per animal for the SWR-only decoder (dark
+    gray) and the full decoder (green), each animal's two dots joined, a dashed
+    zero line labeled "local-only", and the filter family only."""
     import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
 
     figure02 = offline("scripts.figures.generate_figure02")
-    statistics = _gain_statistics([0.46, 0.45, 0.25, 0.43, 0.47], [-0.03] * 5)
+    swr_only, full = [32.4, 17.7, 23.7, 33.9, 10.9], [40.8, 22.7, 31.8, 45.3, 14.3]
     fig, ax = plt.subplots()
-    figure02.draw_restriction_gain(ax, statistics)
+    figure02.draw_decoder_gains(ax, _immobile_statistics(swr_only, full))
     fig.canvas.draw()
-    assert_draws_group_gain(ax, statistics)
-    assert ax.get_title() == "Full vs. SWR-only"
-    assert ax.get_ylabel() == "Gain over SWR-only\ndecoder (nats/spike)"
-    assert ax.get_ylim()[0] == pytest.approx(-0.12)
+    dots = ax.collections
+    assert len(dots) == 2
+    for drawn, x, values, color in (
+        (dots[0], 0.0, swr_only, figure02.C_SWR_ONLY),
+        (dots[1], 1.0, full, figure02.COLORS["Non-Local"]),
+    ):
+        np.testing.assert_allclose(drawn.get_offsets()[:, 0], x)
+        np.testing.assert_allclose(drawn.get_offsets()[:, 1], values)
+        np.testing.assert_allclose(drawn.get_facecolors()[0], to_rgba(color))
+    pairs = [line for line in ax.lines if line.get_linestyle() == "-"]
+    assert len(pairs) == 5
+    for line, a, b in zip(pairs, swr_only, full, strict=True):
+        np.testing.assert_allclose(line.get_ydata(), [a, b])
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-only", "Full"]
+    assert [t.get_text() for t in ax.texts] == ["local-only"]
+    assert ax.get_title() == "All immobile time"
+    assert ax.get_ylabel() == "Gain over local-only\ndecoder (nats/s)"
+    low, high = ax.get_ylim()
+    assert low < 0 < max(full) < high
     plt.close(fig)
 
 
-def test_figure02_panel_h_draws_the_comparison_the_events_summary_tags(offline):
-    """Panel h draws the restriction comparison whose values the events summary
-    tags with panel h: the filter family's full - swr per spike over events."""
+def test_figure02_panel_g_right_draws_the_full_minus_swr_only_by_event_time(
+    offline,
+):
+    """Panel g's second axis: for the events with no SWR and the time outside
+    the SWR of the events partly in one, a dot per animal in panel d's colors,
+    the mean with its interval beside them, and a dashed zero line."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    statistics = _gain_statistics([318, 241, 253, 367, 244], [124, 106, 153, 219, 142])
+    fig, ax = plt.subplots()
+    figure02.draw_part_gains(ax, statistics)
+    fig.canvas.draw()
+    for group, x, color in (
+        ("no SWR", 0.0, figure02.COLORS["No SWR"]),
+        ("SWR", 1.0, figure02.COLORS["SWR partial"]),
+    ):
+        (dots,) = [
+            c
+            for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.allclose(c.get_offsets()[:, 0], x)
+        ]
+        np.testing.assert_allclose(
+            dots.get_offsets()[:, 1], statistics.loc[group, "animals"]
+        )
+        np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
+        means = [
+            line.get_ydata()
+            for line in ax.lines
+            if np.allclose(line.get_xdata(), x + 0.25)
+        ]
+        assert np.allclose(means, statistics.loc[group, "estimate"])
+    assert figure02.CLASS_COLORS["swr_partial"] == figure02.COLORS["SWR partial"]
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == [
+        "No-SWR\nevents",
+        "Events partly\nin an SWR:\ntime outside\nthe SWR",
+    ]
+    assert ax.get_title() == "Immobile time outside\nSWR bounds"
+    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/s)"
+    plt.close(fig)
+
+
+def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
+    """Panel g draws the restriction rows the events summary tags with it, by
+    the summary's own definitions; participation is panel h; the held-out
+    tetrode values are the supplementary figure's."""
     from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
-    assert figure02.RESTRICTION_FIGURE == events.RESTRICTION_FIGURE
-    assert events.RESTRICTION_FIGURE == (
-        "filter",
-        "full_minus_swr",
-        "per_spike",
-        "event",
-    )
-    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2h",)
+    assert figure02.RESTRICTION_FIGURE is events.RESTRICTION_FIGURE
+    assert events.RESTRICTION_FIGURE == {
+        "parts": ["outside_swr"],
+        "families": ["filter"],
+        "contrasts": ["full_minus_swr"],
+        "units": ["per_s"],
+        "kinds": ["event"],
+    }
+    assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)
+    assert list(figure02.PART_X) == list(events.RESTRICTION_FIGURE_GROUPS)
+    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
+    assert events.TAGS["participation"].figures == ("2h",)
     assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)
