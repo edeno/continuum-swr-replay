@@ -54,11 +54,13 @@ LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 # the log penalties (the score can have two optima): every integer in the
 # bounds for one term; the product of REML_GRID_POINTS for two or three; for
 # more, REML_GRID_PASSES passes of one-term integer grids from all terms at
-# REML_GRID_CENTER. Newton on the log penalties then floors the Hessian's
-# eigenvalues at REML_EIGEN_FLOOR times max(1, its largest |eigenvalue|) and
-# stops when its Newton decrement (g' H^-1 g / 2 on the free terms with the
-# floored Hessian: the gain in the score, in log-likelihood units, the next step
-# predicts) is below REML_DECREMENT_TOL; after REML_MAX_STEPS steps it raises. A term is at the boundary
+# REML_GRID_CENTER. Newton on the log penalties then scales the Hessian by each
+# term's sqrt(max(1, |H_jj|)), floors its eigenvalues there at REML_EIGEN_FLOOR
+# times max(1, its largest |eigenvalue|), and stops when its Newton decrement
+# (g' H^-1 g / 2 on the free terms with the floored Hessian: the gain in the
+# score, in log-likelihood units, the next step predicts) is below
+# REML_DECREMENT_TOL and the Hessian is positive semidefinite to that floor;
+# after REML_MAX_STEPS steps it raises. A term is at the boundary
 # when its log penalty is within AT_BOUNDARY_MARGIN of a bound. A term is shrunk
 # to its penalty's null space (for a P-spline, a straight line) when its edf is
 # within NULL_SPACE_EDF_TOL of the null space's dimension: the search can stop on
