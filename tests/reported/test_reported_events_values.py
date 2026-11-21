@@ -955,65 +955,76 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     groups = builder.restriction_window_values(windows, "s")
     # of the window values, only the counts after the visit read the visits
     assert [v.key for v in groups.after_visit] == [
-        f"restriction_{word}_events_outside_swr_after_visit"
+        f"restriction_canonical_{word}_events_outside_swr_after_visit"
         for word in ("non_swr", "swr")
     ]
     values = _by_key([*groups.windows, *groups.after_visit])
+    # every key names the canonical events
+    assert all(key.startswith("restriction_canonical_") for key in values)
     numbers = {key: value.value for key, value in values.items()}
-    assert numbers["restriction_non_swr_events_full_minus_swr_per_spike"] == (
+    assert numbers["restriction_canonical_non_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(4.0)
     )
-    assert numbers["restriction_swr_events_swr_minus_none_per_spike"] == (
+    assert numbers["restriction_canonical_swr_events_swr_minus_none_per_spike"] == (
         pytest.approx(6.0)
     )
-    assert numbers["restriction_swr_events_full_minus_none_per_spike"] == (
+    assert numbers["restriction_canonical_swr_events_full_minus_none_per_spike"] == (
         pytest.approx(5.0)
     )
-    assert numbers["restriction_swr_events_full_minus_swr_per_spike"] == (
+    assert numbers["restriction_canonical_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(-1.0)
     )
-    assert numbers["restriction_non_swr_controls_full_minus_swr_per_spike"] == (
-        pytest.approx(-0.2)
-    )
-    assert numbers["restriction_swr_controls_full_minus_swr_per_spike"] == (
+    assert numbers[
+        "restriction_canonical_non_swr_controls_full_minus_swr_per_spike"
+    ] == (pytest.approx(-0.2))
+    assert numbers["restriction_canonical_swr_controls_full_minus_swr_per_spike"] == (
         pytest.approx(0.2)
     )
     assert numbers[
-        "restriction_non_swr_events_full_minus_swr_two_sided_per_spike"
+        "restriction_canonical_non_swr_events_full_minus_swr_two_sided_per_spike"
     ] == pytest.approx(8.0)
     assert (
-        numbers["restriction_swr_events_full_minus_swr_two_sided_per_spike_ci_low"]
+        numbers[
+            "restriction_canonical_swr_events_full_minus_swr_two_sided_per_spike_ci_low"
+        ]
         < -2.0
-        < numbers["restriction_swr_events_full_minus_swr_two_sided_per_spike_ci_high"]
+        < numbers[
+            "restriction_canonical_swr_events_full_minus_swr_two_sided_per_spike_ci_high"
+        ]
     )
     assert (
-        numbers["restriction_swr_events_full_minus_swr_per_spike_animals_positive"] == 0
+        numbers[
+            "restriction_canonical_swr_events_full_minus_swr_per_spike_animals_positive"
+        ]
+        == 0
     )
     assert (
-        numbers["restriction_swr_controls_full_minus_swr_per_spike_animals_positive"]
+        numbers[
+            "restriction_canonical_swr_controls_full_minus_swr_per_spike_animals_positive"
+        ]
         == 3
     )
-    assert numbers["restriction_non_swr_controls"] == 4
-    assert numbers["restriction_non_swr_controls_scored"] == 3
-    assert numbers["restriction_swr_events_scored"] == 3
-    assert numbers["restriction_animals"] == 3
+    assert numbers["restriction_canonical_non_swr_controls"] == 4
+    assert numbers["restriction_canonical_non_swr_controls_scored"] == 3
+    assert numbers["restriction_canonical_swr_events_scored"] == 3
+    assert numbers["restriction_canonical_animals"] == 3
     # outside SWRs, per spike: no SWR 1, 2, 3; SWR 0.25, 0.5, 0.75
-    key = "restriction_{}_events_outside_swr_full_minus_swr{}_per_spike"
+    key = "restriction_canonical_{}_events_outside_swr_full_minus_swr{}_per_spike"
     assert numbers[key.format("non_swr", "")] == pytest.approx(2.0)
     assert numbers[key.format("swr", "")] == pytest.approx(0.5)
     assert numbers[key.format("swr", "_two_sided")] == pytest.approx(1.0)
     assert values[key.format("swr", "")].unit == "nats per spike"
     # per second: no SWR 4, 8, 12; SWR 1, 2, 3
-    key = "restriction_{}_events_outside_swr_full_minus_swr{}_per_s"
+    key = "restriction_canonical_{}_events_outside_swr_full_minus_swr{}_per_s"
     assert numbers[key.format("non_swr", "")] == pytest.approx(8.0)
     assert numbers[key.format("swr", "")] == pytest.approx(2.0)
     assert numbers[key.format("swr", "_two_sided")] == pytest.approx(4.0)
     assert numbers[key.format("swr", "") + "_animals_positive"] == 3
     assert values[key.format("swr", "")].unit == "nats per s"
-    assert numbers["restriction_swr_events_outside_swr_scored"] == 3
-    assert numbers["restriction_swr_events_outside_swr_scored_per_spike"] == 3
-    assert numbers["restriction_swr_events_outside_swr_without_spikes"] == 0
-    assert numbers["restriction_non_swr_events_outside_swr_after_visit"] == 0
+    assert numbers["restriction_canonical_swr_events_outside_swr_scored_per_s"] == 3
+    assert numbers["restriction_canonical_swr_events_outside_swr_scored_per_spike"] == 3
+    assert numbers["restriction_canonical_swr_events_outside_swr_without_spikes"] == 0
+    assert numbers["restriction_canonical_non_swr_events_outside_swr_after_visit"] == 0
     # two families x six comparisons x (estimate, two bounds, animals positive),
     # two counts for each kind and group, and the animals; outside SWRs, two
     # families x two units x two groups x four, the two groups' events scored
@@ -1054,7 +1065,9 @@ def test_restriction_heldout_event_values_are_figure_2gs_right_axis():
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
         assert numbers[key.format(word)] == pytest.approx(
-            canonical[f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike"]
+            canonical[
+                f"restriction_canonical_{word}_events_outside_swr_full_minus_swr_per_spike"
+            ]
         )
 
 

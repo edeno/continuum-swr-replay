@@ -326,6 +326,14 @@ CONTROL_SUBSET = (
 """What the participation values are over: their controls are Local rest inside
 one well visit (``event_evidence.participation.CONTROL_RULE``)."""
 
+CANONICAL_WINDOWS_SUBSET = (
+    "the canonical events, chosen from the decode fit on the whole epoch (the "
+    "scores are held out; the choice of events is not; Figure 2g's values use "
+    f"the events detected from the held-out decode instead): {CONTROL_SUBSET}"
+)
+"""What the restriction values over the canonical windows are over
+(:func:`restriction_window_values`)."""
+
 TIME_SUBSET = (
     "time inside a well visit (from the first poke-in at a well to the final poke-out)"
 )
@@ -2175,7 +2183,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     spike and per second over the events' bins outside SWRs. Figure 2g draws
     the latter over the events detected from the held-out decode instead
     (:func:`restriction_heldout_event_values`), so none of these carries its
-    tag."""
+    tag. Every key starts ``restriction_canonical_``, and the summary adds
+    :data:`CANONICAL_WINDOWS_SUBSET` to every description."""
     make = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction"]
     )
@@ -2192,8 +2201,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
             a, b = restriction_windows.CONTRASTS[contrast]
             values += _interval_and_animals_positive(
                 make,
-                f"restriction_{_GROUP_WORDS[group]}_{kind_word}_{contrast}{suffix}"
-                "_per_spike",
+                f"restriction_canonical_{_GROUP_WORDS[group]}_{kind_word}_{contrast}"
+                f"{suffix}_per_spike",
                 row,
                 f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
                 f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
@@ -2219,8 +2228,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
                 word = _GROUP_WORDS[group]
                 values += _interval_and_animals_positive(
                     make,
-                    f"restriction_{word}_events_outside_swr_full_minus_swr{suffix}"
-                    f"_{unit}",
+                    f"restriction_canonical_{word}_events_outside_swr_full_minus_swr"
+                    f"{suffix}_{unit}",
                     row,
                     f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
                     f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
@@ -2232,8 +2241,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
                 if family == RESTRICTION_FIGURE_FAMILY:
                     values.append(
                         make(
-                            f"restriction_{word}_events_outside_swr_scored"
-                            + ("_per_spike" if unit == "per_spike" else ""),
+                            f"restriction_canonical_{word}_events_outside_swr_scored"
+                            f"_{unit}",
                             row["n_scored"],
                             "count",
                             "count",
@@ -2251,7 +2260,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
         word = _GROUP_WORDS[group]
         values.append(
             make(
-                f"restriction_{word}_events_outside_swr_without_spikes",
+                f"restriction_canonical_{word}_events_outside_swr_without_spikes",
                 row["n_without_spikes_outside_swr"],
                 "count",
                 "count",
@@ -2261,7 +2270,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
         )
         after_visit.append(
             make(
-                f"restriction_{word}_events_outside_swr_after_visit",
+                f"restriction_canonical_{word}_events_outside_swr_after_visit",
                 row["n_with_bins_outside_swr_outside_visit"],
                 "count",
                 "count",
@@ -2276,14 +2285,14 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
             row = statistics.loc[("filter", "full_minus_swr", "per_spike", kind, group)]
             values += [
                 make(
-                    f"restriction_{word}_{kind_word}",
+                    f"restriction_canonical_{word}_{kind_word}",
                     row["n_events"],
                     "count",
                     "count",
                     f"{group} {label} summed",
                 ),
                 make(
-                    f"restriction_{word}_{kind_word}_scored",
+                    f"restriction_canonical_{word}_{kind_word}_scored",
                     row["n_scored"],
                     "count",
                     "count",
@@ -2292,7 +2301,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
             ]
     values.append(
         make(
-            "restriction_animals",
+            "restriction_canonical_animals",
             row["n_animals"],
             "count",
             "count",
@@ -3794,13 +3803,15 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         restriction_windows_table, restriction_source
     )
     window_stale = (*restriction_stale, participation_off_subset())
-    summary.add(*over(pend(window_values.windows, *window_stale), CONTROL_SUBSET))
+    summary.add(
+        *over(pend(window_values.windows, *window_stale), CANONICAL_WINDOWS_SUBSET)
+    )
     # of the window values, only the counts after the visit read the visits
     # (through the per-bin facts)
     summary.add(
         *over(
             pend(window_values.after_visit, *window_stale, heldout.session_cache),
-            CONTROL_SUBSET,
+            CANONICAL_WINDOWS_SUBSET,
         )
     )
 

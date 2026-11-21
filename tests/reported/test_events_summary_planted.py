@@ -526,7 +526,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     assert "wherever that event starts" in values["left_out"].description
     assert "partner may start outside a visit" in values["other_detector"].description
     # the restriction values say what they are over, in the summary's words
-    subset = builder.CONTROL_SUBSET
+    subset = builder.CANONICAL_WINDOWS_SUBSET
     for key in ("restriction_window", AFTER_VISIT):
         assert values[key].description.endswith(f"; over {subset}")
     assert values["restriction_outside_swr"].description.endswith(
