@@ -523,6 +523,32 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   trunk-to-destination fallback.
   9.10 % of events are off-well on the regenerated tables — see
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
+- `visit_context` / `well_visit_id` / `last_completed_well_visit_id` /
+  `time_since_last_poke_out_s` / `time_until_next_poke_in_s` (event, stop,
+  event-arm and event-patch tables) — where the event or stop lies relative to
+  the well visits, a visit being one port experience from the first nose-poke
+  in at a well to the final poke-out there
+  (`analysis/event_tables/visit_context.py`; values and radii in
+  `analysis/constants.py`, `VISIT_CONTEXTS`). `in_visit` is exactly
+  `occupancy_state == "at_well"`; `spans_visit_end` / `spans_visit_start` are
+  the `mixed` windows whose first sample is inside / outside a visit;
+  `before_first_visit` is `unknown` with samples; `no_analyzed_samples` is a
+  stop wholly inside excluded time. An `in_transit` window is placed by the
+  projected position at its middle sample: within `VISIT_WELL_RADIUS_CM`
+  (10 cm) of the well just left (`after_visit_at_well`), of the next visit's
+  well (`before_visit_at_well`) or of another well (`at_other_well`), in that
+  order; else within `VISIT_JUNCTION_RADIUS_CM` (10 cm) of a patch junction
+  (`track_patch_junction`) or the center (`track_center`); else
+  `track_leaf_arm` / `track_trunk_arm` by the observed segment, or
+  `track_no_position`. `well_visit_id` is the `experience_id` of an `in_visit`
+  window's visit (missing otherwise); `last_completed_well_visit_id` the latest
+  visit whose final poke-out is at or before the window start. The two times
+  (window start less that poke-out; next poke-in after the window end less the
+  end) are defined only for windows wholly outside a visit and missing for
+  `in_visit`, `spans_*` and `no_analyzed_samples` rows. The tables keep every
+  row; an analysis selects with
+  `event_definition.cohort_selection.select_visit_context` (default `in_visit`)
+  and records the kept and dropped counts with `count_visit_context`.
 - `is_current_arm`, `is_prev_arm`, `is_next_arm` — candidate arm equals the
   animal's at-well / previous-trip-origin / upcoming-trip-destination arm.
   `is_next_arm` is **future-referenced**
