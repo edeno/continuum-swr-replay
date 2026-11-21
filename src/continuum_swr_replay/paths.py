@@ -181,9 +181,10 @@ Local-rest controls, under the processed-data root
 (``scripts/event_evidence/score_tetrode_holdout.py``)."""
 EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
 """The per-bin scores of the three non-local restriction models (``none``,
-``swr``, ``full``) on every analyzed epoch, with the whole decoder (place-field
-encodings, discrete transitions, initial conditions) fit by EM on each fold's
-training folds and each fold scored under its own fit, under the processed-data
+``swr``, ``full``) on every analyzed epoch, each fold scored under a decoder
+whose place-field encodings were fit on the decode's training bins of the other
+folds (more than 1 s from the fold) and whose discrete transitions and initial
+conditions were fit by EM with the fold's bins missing, under the processed-data
 root (``scripts/event_evidence/score_nonlocal_restriction.py``)."""
 EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
 """The non-local restriction models' per-bin scores summed over each canonical

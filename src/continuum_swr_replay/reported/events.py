@@ -1840,10 +1840,11 @@ _RESTRICTION_SCORES = {
     "every other bin)",
 }
 _RESTRICTION_HELD_OUT = (
-    "with the whole decoder (place-field encodings, state transitions and initial "
-    "conditions) fit by EM on the other folds (five folds of whole trials balanced "
-    "by destination well) and each fold's bins scored under the fit that did not "
-    "see them"
+    "with each of five folds of whole trials (balanced by destination well) "
+    "scored under a decoder whose place-field encodings were fit on the decode's "
+    "training bins (outside every SWR and artifact) of the other folds, more than "
+    "1 s from the fold, and whose state transitions and initial conditions were "
+    "fit by EM with the fold's bins missing"
 )
 #: The window comparisons reported: kind of window, group, contrast.
 _RESTRICTION_WINDOWS = (
