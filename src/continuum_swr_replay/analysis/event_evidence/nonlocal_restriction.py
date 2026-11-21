@@ -102,6 +102,29 @@ non-local activity outside SWRs at a well, from the other stays there, is in the
 data the Local state's encoding at that well is fit on, while spikes inside SWRs
 never are; the Local state explains part of that activity, so ``full - swr``
 outside SWRs and the share outside SWRs are understated, not overstated.
+
+**Two ways to hold out** (the runner's ``--fit``). In the default, *shared*
+(:func:`restriction_scores`), only the encoding is held out: the three models
+run with the canonical decoder's ``D`` and ``pi``, which the library's EM fit on
+the whole epoch, so the transitions have seen the bins they score. The *fold
+fit* (:func:`fold_fit_scores`) holds out the whole decoder, the standard
+procedure: for each fold k, a detector configured as the canonical one
+(:func:`fresh_detector`, never a copy of the fitted one) is fit by the
+library's own EM with the canonical decode's call and EM settings
+(:func:`fit_fold_detector`), its encoding trained on fold k's training bins of
+the shared mode and every bin of fold k missing, so that no spike of fold k
+reaches its encoding, ``D`` or ``pi``. Every bin's likelihood is then the
+library's own under that fit (:func:`fold_log_likelihood`), the three models
+are run as above with its ``D`` and ``pi``, and fold k's bins keep that pass's
+scores, with the ``full`` model's smoothed state probabilities and most likely
+non-local place bin. ``C`` has nothing EM fits (its blocks are discrete,
+uniform and random-walk kernels on the track), so it is the same in every fit.
+The other folds' fits do see fold k (it is their training data), and each
+pass's smoother runs over the whole epoch with fold k observed: what is held
+out of fold k's scores is fold k's spikes from the model that scores them.
+The library's M-step refit of the encoding is skipped in the fold fits
+(:data:`FOLD_FIT_ESTIMATE_ENCODING_MODEL`): in the pinned library it refits the
+same encoding, so it changes nothing but the time.
 """
 
 from __future__ import annotations
@@ -121,6 +144,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     immobile_analyzed_bins,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+    interior_bin_mask,
     refit_encoding,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
@@ -129,9 +153,12 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     N_FOLDS,
     NO_SPIKE,
     animal_place_bins,
+    check_no_fold_leakage,
+    fold_training_masks,
     heldout_terms,
     place_sampling,
     state_log_likelihood,
+    time_blocks,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
@@ -397,6 +424,88 @@ def _bin_scores(
     return filter_score, filter_score - jnp.log((skipped * ratio).sum(axis=1))
 
 
+@jax.jit
+def _summary_batch(
+    smoothed: jnp.ndarray, membership: jnp.ndarray, place_columns: jnp.ndarray
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """A batch of bins' smoothed state probabilities and the place bin with the
+    most summed smoothed mass over the states of ``place_columns``.
+
+    Parameters
+    ----------
+    smoothed : jnp.ndarray, shape (n_batch, n_state_bins)
+    membership : jnp.ndarray, shape (n_state_bins, n_states)
+        1 where a state bin is of a state.
+    place_columns : jnp.ndarray of int, shape (n_summed_states, n_place_bins)
+        Each summed state's state bins, in place-bin order.
+    """
+    # at full float32 precision, as in _bin_scores
+    probability = jnp.matmul(smoothed, membership, precision=jax.lax.Precision.HIGHEST)
+    return probability, jnp.argmax(smoothed[:, place_columns].sum(axis=1), axis=1)
+
+
+def smoothed_summary(
+    smoothed: Any,
+    state_ind: NDArray,
+    summed_states: Sequence[int],
+    rows: NDArray,
+    *,
+    chunk_bins: int = CHUNK_BINS,
+) -> tuple[NDArray[np.float32], NDArray[np.int32]]:
+    """At the bins ``rows``, each discrete state's smoothed probability and the
+    most likely place bin of the states ``summed_states`` together.
+
+    Parameters
+    ----------
+    smoothed : array, shape (n_time, n_state_bins)
+        The smoothed (acausal) posterior over the track-interior state bins.
+    state_ind : ndarray of int, shape (n_state_bins,)
+        Each state bin's discrete state, 0 .. n_states - 1.
+    summed_states : sequence of int
+        The states whose smoothed mass is summed place bin by place bin (the
+        two non-local states); each has the same place bins, in the same order.
+    rows : ndarray of int, shape (n_rows,)
+    chunk_bins : int
+
+    Returns
+    -------
+    probability : ndarray of float32, shape (n_rows, n_states)
+        ``sum_{s: d(s) = j} gamma_t[s]``.
+    place_bin : ndarray of int32, shape (n_rows,)
+        ``argmax_x sum_{j in summed_states} gamma_t[j, x]``, an index into the
+        summed states' place bins (the track-interior bins).
+
+    Raises
+    ------
+    ValueError
+        When the summed states differ in their number of place bins.
+    """
+    state_ind = np.asarray(state_ind)
+    n_states = int(state_ind.max()) + 1
+    columns = [np.flatnonzero(state_ind == s) for s in summed_states]
+    if len({c.size for c in columns}) != 1:
+        raise ValueError(
+            f"states {list(summed_states)} have {[c.size for c in columns]} "
+            "place bins, not one number"
+        )
+    membership = jnp.asarray(
+        state_ind[:, None] == np.arange(n_states)[None, :], dtype=jnp.float32
+    )
+    place_columns = jnp.asarray(np.stack(columns))
+    rows = np.asarray(rows, dtype=np.int64)
+    probability = np.empty((rows.size, n_states), dtype=np.float32)
+    place_bin = np.empty(rows.size, dtype=np.int32)
+    for start in range(0, rows.size, chunk_bins):
+        stop = min(start + chunk_bins, rows.size)
+        # index where the posterior is (the host, from the library), so that
+        # only the batch is copied to the device
+        batch = jnp.asarray(smoothed[rows[start:stop]])
+        p, x = _summary_batch(batch, membership, place_columns)
+        probability[start:stop] = np.asarray(p)
+        place_bin[start:stop] = np.asarray(x)
+    return probability, place_bin
+
+
 def predictive_log_scores(
     log_likelihood: NDArray,
     initial: NDArray,
@@ -406,6 +515,8 @@ def predictive_log_scores(
     allowed: NDArray,
     *,
     chunk_bins: int = CHUNK_BINS,
+    summary_rows: NDArray | None = None,
+    summed_states: Sequence[int] = (),
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], dict]:
     """Each bin's filter and two-sided scores under the model that allows the
     states ``allowed`` at each bin, from the library's filter and smoother.
@@ -428,6 +539,12 @@ def predictive_log_scores(
         ``a_t``: the states that may be occupied at bin t.
     chunk_bins : int
         Bins per batch of the two-sided step.
+    summary_rows : ndarray of int, shape (n_rows,), optional
+        Given, the record also has the smoothed posterior's summary at these
+        bins (:func:`smoothed_summary`): ``state_probability`` (n_rows,
+        n_states) and ``place_bin`` (n_rows,). It changes no score.
+    summed_states : sequence of int
+        The states whose place bins ``place_bin`` sums (the non-local ones).
 
     Returns
     -------
@@ -560,6 +677,10 @@ def predictive_log_scores(
     two_sided[-1] = filter_score[-1]
     record["two_sided_s"] = round(clock.time() - started, 2)
     record["predicted_mass_deviation"] = predicted_mass_deviation
+    if summary_rows is not None:
+        record["state_probability"], record["place_bin"] = smoothed_summary(
+            smoothed, state_ind, summed_states, summary_rows, chunk_bins=chunk_bins
+        )
     del smoothed, predicted
 
     total = float(filter_score.astype(np.float64).sum())
@@ -660,14 +781,31 @@ _MODEL_RECORD_KEYS = {
 }
 
 
+STATE_PROBABILITY_COLUMNS = {
+    LOCAL: "full_prob_local",
+    NO_SPIKE: "full_prob_no_spike",
+    "Non-Local Continuous": "full_prob_nonlocal_continuous",
+    "Non-Local Fragmented": "full_prob_nonlocal_fragmented",
+}
+"""Each discrete state's column of the ``full`` model's smoothed (acausal)
+probability of the state, in the fold-fit table."""
+
+NONLOCAL_PLACE_BIN_COLUMN = "full_nonlocal_place_bin"
+"""The fold-fit table's column of the ``full`` model's most likely non-local
+place bin: the argmax over the track-interior place bins (junction placeholders
+excluded) of the summed smoothed mass of the two non-local states, an index
+into the interior bins (``is_track_interior_`` order)."""
+
+
 def model_scores(
     detector: Any,
     log_likelihood: NDArray,
     in_swr: NDArray,
     *,
     models: Sequence[str] = MODELS,
+    summary_bins: NDArray | None = None,
     log: Callable[[str], None] = print,
-) -> tuple[dict[str, NDArray[np.float32]], dict]:
+) -> tuple[dict[str, NDArray], dict]:
     """Every bin's scores under the three models (or ``models``), on a given
     likelihood.
 
@@ -684,12 +822,18 @@ def model_scores(
         The bins inside an SWR, where ``swr`` allows only the non-local states.
     models : sequence of str
         The models to score, of :data:`MODELS`.
+    summary_bins : ndarray of bool, shape (n_time,), optional
+        Given (with ``full`` among ``models``), ``scores`` also has the ``full``
+        model's smoothed state probabilities (:data:`STATE_PROBABILITY_COLUMNS`,
+        float32, NaN outside these bins) and its most likely non-local place bin
+        (:data:`NONLOCAL_PLACE_BIN_COLUMN`, int32, -1 outside them).
     log : callable
 
     Returns
     -------
-    scores : dict of str to ndarray of float32, shape (n_time,)
-        Each model's columns of :data:`SCORE_COLUMNS`.
+    scores : dict of str to ndarray, shape (n_time,)
+        Each model's columns of :data:`SCORE_COLUMNS` (float32), and the
+        summary's columns with ``summary_bins``.
     record : dict
         ``continuous_block_deviation``; per model the library's
         ``marginal_log_likelihood_<model>`` as it returned it, the
@@ -709,14 +853,62 @@ def model_scores(
     record: dict[str, Any] = {
         "continuous_block_deviation": continuous_block_deviation(continuous, state_ind)
     }
-    scores: dict[str, NDArray[np.float32]] = {}
+    scores: dict[str, NDArray] = {}
     allowed = allowed_states(detector.state_names, in_swr)
+    state_names = list(detector.state_names)
+    if summary_bins is not None:
+        if "full" not in models:
+            raise ValueError("the summary is the full model's; full is not scored")
+        unknown = set(state_names) - set(STATE_PROBABILITY_COLUMNS)
+        if unknown:
+            raise ValueError(f"no state probability column for states {unknown}")
+        summary_bins = np.asarray(summary_bins, dtype=bool)
+        if summary_bins.shape != (len(log_likelihood),):
+            raise ValueError(
+                f"summary_bins has shape {summary_bins.shape}, not "
+                f"({len(log_likelihood)},)"
+            )
+        nonlocal_states = [
+            s for s, name in enumerate(state_names) if name not in LOCAL_STATES
+        ]
+        # the state bins are the track-interior bins, which must be the real
+        # place bins (no junction placeholder)
+        environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+        n_real = int(interior_bin_mask(environment).sum())
+        for s in nonlocal_states:
+            if int((state_ind == s).sum()) != n_real:
+                raise ValueError(
+                    f"state {state_names[s]!r} has {int((state_ind == s).sum())} "
+                    f"state bins, not the {n_real} real place bins"
+                )
     for model in models:
+        summarized = summary_bins is not None and model == "full"
         filter_score, two_sided, part = predictive_log_scores(
-            likelihood, initial, continuous, discrete, state_ind, allowed[model]
+            likelihood,
+            initial,
+            continuous,
+            discrete,
+            state_ind,
+            allowed[model],
+            **(
+                {
+                    "summary_rows": np.flatnonzero(summary_bins),
+                    "summed_states": nonlocal_states,
+                }
+                if summarized
+                else {}
+            ),
         )
         scores[f"{model}{FAMILY_SUFFIX['filter']}"] = filter_score
         scores[f"{model}{FAMILY_SUFFIX['two_sided']}"] = two_sided
+        if summarized:
+            for s, name in enumerate(state_names):
+                column = np.full(summary_bins.size, np.nan, dtype=np.float32)
+                column[summary_bins] = part["state_probability"][:, s]
+                scores[STATE_PROBABILITY_COLUMNS[name]] = column
+            place = np.full(summary_bins.size, -1, dtype=np.int32)
+            place[summary_bins] = part["place_bin"]
+            scores[NONLOCAL_PLACE_BIN_COLUMN] = place
         for key, name in _MODEL_RECORD_KEYS.items():
             record[name.format(model)] = part[key]
         log(
@@ -874,6 +1066,537 @@ def check_failures(record: dict) -> list[str]:
                 f"{model}: predictive posterior mass is {deviation} from 1 "
                 f"(tolerance {PREDICTED_MASS_TOLERANCE})"
             )
+    return failures
+
+
+EM_SETTING_NAMES = (
+    "estimate_initial_conditions",
+    "estimate_discrete_transition",
+    "max_iter",
+    "tolerance",
+    "cache_likelihood",
+    "n_chunks",
+    "min_encoding_local_mass",
+    "min_encoding_local_ess",
+    "encoding_update_damping",
+)
+"""The arguments of the library's ``estimate_parameters`` that the canonical
+decode (``decoding.fit.perform_decoding``) leaves at their defaults, apart from
+``estimate_encoding_model``; :func:`em_settings` reads their values from the
+pinned library."""
+
+
+FOLD_FIT_ESTIMATE_ENCODING_MODEL = False
+"""The fold fits' ``estimate_encoding_model``; the canonical decode leaves it at
+the library's default, True. The pinned library's clusterless KDE
+(``fit_clusterless_kde_encoding_model``, non_local_detector 2d730c3a) takes the
+Local-state weights that step passes and never reads them, so the step refits
+the same encoding from the same training spikes. Measured on fold 0 of
+``wilbur20210329_02_r1_HPC`` (GPU): with True and with False the encodings
+(spike positions, marks, rates, occupancy, ground intensity) and initial
+conditions are identical, the marginal traces identical, and the discrete
+transitions differ by at most 2.9e-7 (GPU run-to-run level); the fit took 305 s
+and 249 s."""
+
+
+def em_settings(estimate_encoding_model: bool) -> dict[str, Any]:
+    """The EM settings of a fold fit: the library's defaults of
+    :data:`EM_SETTING_NAMES`, as the canonical decode takes them, and
+    ``estimate_encoding_model``."""
+    import inspect
+
+    from non_local_detector import NonLocalClusterlessDetector
+
+    parameters = inspect.signature(
+        NonLocalClusterlessDetector.estimate_parameters
+    ).parameters
+    return {
+        **{name: parameters[name].default for name in EM_SETTING_NAMES},
+        "estimate_encoding_model": bool(estimate_encoding_model),
+    }
+
+
+def _same_setting(a: Any, b: Any) -> bool:
+    """Whether two detector settings are equal: arrays by value, settings
+    objects by type and their constructor fields (a dataclass) or attributes,
+    sequences and mappings item by item.
+
+    A fitted transition object also holds the environment it was made on, an
+    attribute that is not a constructor field, so it is not compared."""
+    import dataclasses
+
+    if dataclasses.is_dataclass(a) and not isinstance(a, type):
+        return type(a) is type(b) and all(
+            _same_setting(getattr(a, f.name), getattr(b, f.name))
+            for f in dataclasses.fields(a)
+            if f.init
+        )
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        return np.shape(a) == np.shape(b) and np.array_equal(
+            np.asarray(a), np.asarray(b)
+        )
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        return len(a) == len(b) and all(
+            _same_setting(x, y) for x, y in zip(a, b, strict=True)
+        )
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_same_setting(a[k], b[k]) for k in a)
+    if hasattr(a, "__dict__") and not isinstance(a, type):
+        return type(a) is type(b) and _same_setting(vars(a), vars(b))
+    return bool(a == b)
+
+
+def fresh_detector(canonical: Any) -> Any:
+    """An unfitted detector configured as the canonical decode's.
+
+    Built as ``decoding.fit.perform_decoding`` builds it (the NonLocal
+    clusterless detector, ``NonLocalDecodingConfig``'s algorithm parameters,
+    ``decoding.transitions.nonlocal_detector_kwargs`` and an ``Environment`` of
+    ``PLACE_BIN_SIZE_1D`` on the decode's track graph, edge order and spacing),
+    never by copying ``canonical``: the library's EM writes its fitted discrete
+    initial distribution into the detector's ``discrete_initial_conditions``
+    setting, so a fit of a copy would start from the canonical fit. Every
+    other setting must equal ``canonical``'s, so a configuration changed since
+    the decode raises.
+
+    Parameters
+    ----------
+    canonical : NonLocalClusterlessDetector
+        The epoch's saved decoder.
+
+    Raises
+    ------
+    ValueError
+        When a setting other than ``discrete_initial_conditions`` differs from
+        ``canonical``'s.
+    """
+    import dataclasses
+
+    from non_local_detector import NonLocalClusterlessDetector
+    from non_local_detector.environment import Environment
+
+    from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
+    from continuum_swr_replay.decoding.fit import algorithm_params
+    from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
+    from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
+
+    (decoded,) = canonical.environments
+    config = NonLocalDecodingConfig()
+    environment = Environment(
+        place_bin_size=PLACE_BIN_SIZE_1D,
+        track_graph=decoded.track_graph,
+        edge_order=decoded.edge_order,
+        edge_spacing=decoded.edge_spacing,
+    )
+    detector = NonLocalClusterlessDetector(
+        environments=environment,
+        **algorithm_params(config, "clusterless"),
+        **nonlocal_detector_kwargs(config),
+    )
+    # the environment's settings; its fitted grid (the names ending in an
+    # underscore, and track_graphDD, the graph a 1-D grid without a track graph
+    # is given when it is fitted) is refit by the library from the position
+    differ = [
+        f.name
+        for f in dataclasses.fields(Environment)
+        if f.init
+        and not f.name.startswith("_")
+        and not f.name.endswith("_")
+        and f.name not in ("track_graph", "track_graphDD")
+        and not _same_setting(getattr(environment, f.name), getattr(decoded, f.name))
+    ]
+    expected = canonical.get_params(deep=False)
+    actual = detector.get_params(deep=False)
+    differ += [
+        name
+        for name in sorted(expected.keys() | actual.keys())
+        if name not in ("environments", "discrete_initial_conditions")
+        and not _same_setting(expected.get(name), actual.get(name))
+    ]
+    if differ:
+        raise ValueError(
+            f"the configured detector differs from the decode's in {differ}: has "
+            "the configuration changed since the decode?"
+        )
+    return detector
+
+
+def em_record(marginal_log_likelihoods: NDArray, tolerance: float) -> dict[str, Any]:
+    """The EM iterations and convergence of a fit, from its trace.
+
+    Parameters
+    ----------
+    marginal_log_likelihoods : ndarray, shape (n_iterations + 1,)
+        The library's trace (``results.attrs["marginal_log_likelihoods"]``):
+        each iteration's E-step marginal, then the final E-step's.
+    tolerance : float
+        The fit's.
+
+    Returns
+    -------
+    dict
+        ``em_iterations``; ``converged``, as the library's loop decides it
+        (``core.check_converged`` on the last two iterations' marginals;
+        False when the loop stopped at ``max_iter``, which
+        :func:`fold_check_failures` fails); ``marginal_log_likelihoods`` (the
+        trace).
+    """
+    from non_local_detector.core import check_converged
+
+    trace = np.asarray(marginal_log_likelihoods, dtype=float)
+    n_iter = trace.size - 1
+    converged = n_iter > 1 and bool(
+        check_converged(trace[n_iter - 1], trace[n_iter - 2], tolerance)[0]
+    )
+    return {
+        "em_iterations": int(n_iter),
+        "converged": converged,
+        "marginal_log_likelihoods": trace.tolist(),
+    }
+
+
+def fit_fold_detector(
+    canonical: Any,
+    time: NDArray,
+    position: NDArray,
+    spike_times: Sequence[NDArray],
+    marks: Sequence[NDArray],
+    is_training: NDArray,
+    is_missing: NDArray,
+    *,
+    estimate_encoding_model: bool = True,
+) -> tuple[Any, dict]:
+    """The whole decoder fit by the library's EM on some bins, as the canonical
+    decode is fit.
+
+    A :func:`fresh_detector` and the canonical decode's call
+    (``decoding.fit.perform_decoding``): ``estimate_parameters`` with the
+    decode's time axis as ``time`` and ``position_time``, its 2-D position, the
+    spikes and marks, no covariates, and the library's defaults of
+    :data:`EM_SETTING_NAMES`. The library re-initializes the discrete
+    transitions from the configured ``discrete_transition_type`` and the
+    initial conditions from the configured ``discrete_initial_conditions``, so
+    nothing is warm-started. Only ``is_training``, ``is_missing`` and
+    ``estimate_encoding_model`` may differ from the decode's. The decode also
+    asks for its log-likelihood back (``return_outputs``), which changes no
+    parameter and is not asked for here.
+
+    Parameters
+    ----------
+    canonical : NonLocalClusterlessDetector
+        The epoch's saved decoder (its configuration only).
+    time : ndarray, shape (n_time,)
+    position : ndarray, shape (n_time, 2)
+    spike_times, marks : sequence of ndarray, one per tetrode
+    is_training : ndarray of bool, shape (n_time,)
+        The bins the encoding is fit on.
+    is_missing : ndarray of bool, shape (n_time,)
+        The bins whose likelihood EM sets to 0, so that their spikes reach no
+        parameter.
+    estimate_encoding_model : bool
+        The library's M-step refit of the encoding.
+
+    Returns
+    -------
+    detector : NonLocalClusterlessDetector
+        Fitted.
+    record : dict
+        ``discrete_transition`` (the fitted matrix), ``initial_discrete`` (the
+        fitted initial distribution over the states), :func:`em_record`'s and
+        ``fit_s``.
+    """
+    started = clock.time()
+    settings = em_settings(estimate_encoding_model)
+    detector = fresh_detector(canonical)
+    results = detector.estimate_parameters(
+        position_time=np.asarray(time),
+        position=np.asarray(position),
+        spike_times=list(spike_times),
+        spike_waveform_features=list(marks),
+        time=np.asarray(time),
+        discrete_transition_covariate_data=None,
+        is_training=np.asarray(is_training, dtype=bool),
+        is_missing=np.asarray(is_missing, dtype=bool),
+        estimate_encoding_model=estimate_encoding_model,
+    )
+    trace = np.asarray(results.attrs["marginal_log_likelihoods"])
+    del results
+    return detector, {
+        "discrete_transition": np.asarray(detector.discrete_state_transitions_),
+        "initial_discrete": np.asarray(detector.discrete_initial_conditions),
+        **em_record(trace, settings["tolerance"]),
+        "fit_s": round(clock.time() - started, 1),
+    }
+
+
+def fold_log_likelihood(
+    detector: Any,
+    time: NDArray,
+    position: NDArray,
+    spike_times: Sequence[NDArray],
+    marks: Sequence[NDArray],
+    is_missing: NDArray,
+) -> Any:
+    """Every bin's four-state log-likelihood under a fitted detector: the
+    library's own (``compute_log_likelihood``), with the bins ``is_missing``
+    and the bins without a position at 0, as the library's ``predict`` sets them.
+
+    Returns
+    -------
+    jax array of float32, shape (n_time, n_state_bins)
+    """
+    position = np.asarray(position, dtype=float)
+    missing = np.asarray(is_missing, dtype=bool) | np.isnan(
+        position.reshape(len(position), -1)
+    ).any(axis=1)
+    return detector.compute_log_likelihood(
+        np.asarray(time),
+        np.asarray(time),
+        position,
+        list(spike_times),
+        list(marks),
+        is_missing=missing,
+    )
+
+
+def check_place_grid(detector: Any, canonical: Any) -> None:
+    """Raise unless a fold's fitted place grid is the canonical decoder's: the
+    same place-bin centers and track-interior bins.
+
+    ``full_nonlocal_place_bin`` indexes the fold detector's interior bins, and
+    ``place_sampling_s`` and every reader of the table use the canonical
+    environment's.
+
+    Raises
+    ------
+    ValueError
+        Naming what differs.
+    """
+    fitted = detector.encoding_model_[ENCODING_KEY]["environment"]
+    decoded = canonical.encoding_model_[ENCODING_KEY]["environment"]
+    for name in ("place_bin_centers_", "is_track_interior_"):
+        a, b = np.asarray(getattr(fitted, name)), np.asarray(getattr(decoded, name))
+        if a.shape != b.shape or not np.array_equal(a, b):
+            raise ValueError(
+                f"the fold's fitted {name} is not the canonical decoder's: its "
+                "place bins would not index the canonical environment's"
+            )
+
+
+def _device_peak_bytes() -> int | None:
+    """The default device's peak memory in use since the process started, or
+    None where the device does not report it (the CPU)."""
+    stats = jax.local_devices()[0].memory_stats()
+    return None if not stats else int(stats.get("peak_bytes_in_use", 0))
+
+
+def fold_fit_scores(
+    canonical: Any,
+    time: NDArray,
+    head_position: NDArray,
+    spike_times: Sequence[NDArray],
+    marks: Sequence[NDArray],
+    is_training: NDArray,
+    is_missing: NDArray,
+    in_swr: NDArray,
+    *,
+    n_folds: int = N_FOLDS,
+    folds: NDArray | None = None,
+    margin_bins: int = MARGIN_BINS,
+    linear_position: NDArray | None = None,
+    estimate_encoding_model: bool = True,
+    fit: Callable[..., tuple[Any, dict]] = fit_fold_detector,
+    log: Callable[[str], None] = print,
+) -> tuple[pd.DataFrame, dict]:
+    """Every bin's score under the three models, each fold's bins under a whole
+    decoder fit on the other folds.
+
+    For each fold k: the decoder is fit by EM (``fit``, by default
+    :func:`fit_fold_detector`) with the encoding's training bins those of fold
+    k's held-out encoding in :func:`restriction_scores`
+    (:func:`.tetrode_holdout.fold_training_masks`: the decode's training bins
+    outside fold k and its margin) and with every bin of fold k missing, so
+    that no spike of fold k reaches its encoding, transitions or initial
+    conditions. Every bin's likelihood is then computed under that fit
+    (:func:`fold_log_likelihood`, only the decode's missing bins missing) and
+    the three models are run over the epoch with its transitions and initial
+    conditions (:func:`model_scores`); fold k's bins keep that pass's scores,
+    and the ``full`` model's smoothed state probabilities and most likely
+    non-local place bin.
+
+    Parameters
+    ----------
+    canonical : NonLocalClusterlessDetector
+        The epoch's saved decoder: its configuration, and its transitions for
+        the record's comparison.
+    time : ndarray, shape (n_time,)
+    head_position : ndarray, shape (n_time, 2)
+    spike_times, marks : sequence of ndarray, one per tetrode
+    is_training, is_missing : ndarray of bool, shape (n_time,)
+        The decode's masks.
+    in_swr : ndarray of bool, shape (n_time,)
+    n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold (``tetrode_holdout.trial_folds``); by default
+        ``n_folds`` contiguous time blocks.
+    margin_bins : int
+    linear_position : ndarray, shape (n_time,), optional
+        Given, the table also has ``place_sampling_s``.
+    estimate_encoding_model : bool
+        Passed to ``fit``.
+    fit : callable
+        ``fit(canonical, time, position, spike_times, marks, is_training,
+        is_missing, estimate_encoding_model=...)``, returning the fitted
+        detector and its record.
+    log : callable
+
+    Returns
+    -------
+    scores : pd.DataFrame
+        :func:`restriction_scores`' columns, each bin from its own fold's
+        pass, and the ``full`` model's :data:`STATE_PROBABILITY_COLUMNS`
+        (float32) and :data:`NONLOCAL_PLACE_BIN_COLUMN` (int32).
+    record : dict
+        ``folds``: one record per fold (``fold``, ``n_bins``,
+        ``n_training_bins``, ``fit``'s record, the largest absolute difference
+        of its discrete transitions and initial distribution from the
+        canonical's, ``likelihood_s``, ``scoring_s``, :func:`model_scores`'
+        record and ``device_peak_bytes``, the device's peak so far, None on
+        the CPU); ``fit_s``, ``likelihood_s`` and ``scoring_s`` summed over the
+        folds; ``n_in_swr``, ``n_missing``, ``total_s``.
+
+    Raises
+    ------
+    ValueError
+        As :func:`restriction_scores`, when ``folds`` is not one fold per bin
+        in 0 .. n_folds - 1, each with bins, or when a fold's encoding would
+        take spikes from one of its own bins
+        (:func:`.tetrode_holdout.check_no_fold_leakage`), or when a fold's
+        fitted place grid is not the canonical one (:func:`check_place_grid`).
+    """
+    started = clock.time()
+    time = np.asarray(time, dtype=float)
+    in_swr = np.asarray(in_swr, dtype=bool)
+    is_missing = np.asarray(is_missing, dtype=bool)
+    if in_swr.shape != time.shape:
+        raise ValueError(f"in_swr has shape {in_swr.shape}, time {time.shape}")
+    blocks = (
+        time_blocks(time, n_folds)
+        if folds is None
+        else np.asarray(folds, dtype=np.int64)
+    )
+    if blocks.shape != time.shape or not np.array_equal(
+        np.unique(blocks), np.arange(n_folds)
+    ):
+        raise ValueError(
+            f"folds must give each of the {time.size} bins a fold in "
+            f"0 .. {n_folds - 1}, each fold with bins"
+        )
+    masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
+    check_no_fold_leakage(time, head_position, masks, blocks)
+    canonical_discrete = np.asarray(canonical.discrete_state_transitions_)
+    canonical_initial = np.asarray(canonical.discrete_initial_conditions)
+
+    columns: dict[str, NDArray] = {}
+    fold_records = []
+    for k in range(n_folds):
+        mine = blocks == k
+        detector, fit_record = fit(
+            canonical,
+            time,
+            head_position,
+            spike_times,
+            marks,
+            masks[k],
+            is_missing | mine,
+            estimate_encoding_model=estimate_encoding_model,
+        )
+        log(
+            f"fold {k}: fit {fit_record['fit_s']} s, "
+            f"{fit_record['em_iterations']} EM iterations"
+        )
+        check_place_grid(detector, canonical)
+        t0 = clock.time()
+        likelihood = fold_log_likelihood(
+            detector, time, head_position, spike_times, marks, is_missing
+        )
+        likelihood_s = round(clock.time() - t0, 1)
+        t0 = clock.time()
+        scores, part = model_scores(
+            detector, likelihood, in_swr, summary_bins=mine, log=log
+        )
+        scoring_s = round(clock.time() - t0, 1)
+        del likelihood
+        for name, values in scores.items():
+            if name not in columns:
+                columns[name] = np.empty(time.size, dtype=values.dtype)
+            columns[name][mine] = values[mine]
+        fold_records.append(
+            {
+                "fold": k,
+                "n_bins": int(mine.sum()),
+                "n_training_bins": int(masks[k].sum()),
+                **fit_record,
+                "discrete_transition_difference": float(
+                    np.abs(fit_record["discrete_transition"] - canonical_discrete).max()
+                ),
+                "initial_discrete_difference": float(
+                    np.abs(fit_record["initial_discrete"] - canonical_initial).max()
+                ),
+                "likelihood_s": likelihood_s,
+                "scoring_s": scoring_s,
+                **part,
+                "device_peak_bytes": _device_peak_bytes(),
+            }
+        )
+        del detector, scores
+        log(f"fold {k}: likelihood {likelihood_s} s, scoring {scoring_s} s")
+
+    record: dict[str, Any] = {
+        "folds": fold_records,
+        **{
+            key: round(sum(f[key] for f in fold_records), 1)
+            for key in ("fit_s", "likelihood_s", "scoring_s")
+        },
+        "n_in_swr": int(in_swr.sum()),
+        "n_missing": int(is_missing.sum()),
+        "total_s": round(clock.time() - started, 1),
+    }
+    table = pd.DataFrame(
+        {
+            "time": time,
+            **{column: columns[column] for column in SCORE_COLUMNS},
+            "in_swr": in_swr,
+            "block": blocks,
+        }
+    )
+    if linear_position is not None:
+        environment = canonical.encoding_model_[ENCODING_KEY]["environment"]
+        table["place_sampling_s"] = place_sampling(
+            animal_place_bins(environment, linear_position),
+            is_training,
+            blocks,
+            n_folds,
+            margin_bins,
+            float(np.median(np.diff(time))),
+        )
+    for column in (*STATE_PROBABILITY_COLUMNS.values(), NONLOCAL_PLACE_BIN_COLUMN):
+        table[column] = columns[column]
+    return table, record
+
+
+def fold_check_failures(record: dict) -> list[str]:
+    """The checks a :func:`fold_fit_scores` record fails, as messages, each
+    named by its fold: a fold whose EM did not converge (it stopped at the
+    library's ``max_iter``), and :func:`check_failures` of every fold's pass."""
+    failures = []
+    for fold in record["folds"]:
+        if not fold["converged"]:
+            failures.append(
+                f"fold {fold['fold']}: EM did not converge in "
+                f"{fold['em_iterations']} iterations"
+            )
+        failures += [f"fold {fold['fold']}: {m}" for m in check_failures(fold)]
     return failures
 
 

@@ -54,7 +54,7 @@ them importable.
 - `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
-- `score_nonlocal_restriction.py` — per-bin held-out scores of three decoders that allow the non-local states never, only inside SWRs, or always, on every analyzed epoch.
+- `score_nonlocal_restriction.py` — per-bin held-out scores of three decoders that allow the non-local states never, only inside SWRs, or always, on every analyzed epoch. `--fit folds` refits the whole decoder (encoding, transitions, initial conditions) by EM on each fold's training folds and scores each fold under its own fit.
 - `measure_bin_facts.py` — each decode bin's spikes over every tetrode and whether it is inside a well visit, on every epoch of the restriction run (CPU; reads the lab's database, read only).
 - `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control (Figure 2g reads the events), with each window's spike count and its sums over the bins outside SWRs, and each epoch's bins, spikes and scores by category, well visit and event window (CPU; `--restriction-dir` reads another restriction run).
 
