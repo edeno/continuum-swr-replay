@@ -184,23 +184,10 @@ def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
     Cards are assigned, several workers to a card, so the card is set here
     rather than claimed (``configure_jax_gpu`` allows one process per card).
     """
-    import os
-
-    from continuum_swr_replay.runs.device import query_gpus, verify_jax_device
+    from continuum_swr_replay.runs.device import point_jax_at, query_gpus
 
     index = queue.get()
-    card = {c.index: c for c in query_gpus()}[index]
-    os.environ["CUDA_VISIBLE_DEVICES"] = card.uuid
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
-    verify_jax_device(
-        {
-            "jax_backend": "gpu",
-            "gpu_index": card.index,
-            "gpu_uuid": card.uuid,
-            "gpu_name": card.name,
-        }
-    )
+    point_jax_at({c.index: c for c in query_gpus()}[index], mem_fraction)
 
 
 def add_gpu_arguments(parser: argparse.ArgumentParser) -> None:

@@ -595,18 +595,50 @@ def configure_jax_gpu(
             _CONFIGURED = record
             return dict(record)
 
+    record = point_jax_at(chosen, mem_fraction)
+    _CONFIGURED = record
+    return dict(record)
+
+
+def point_jax_at(card: GPUStatus, mem_fraction: float) -> dict[str, object]:
+    """Point JAX at ``card``, before JAX initializes a backend, without
+    claiming it.
+
+    Sets ``CUDA_VISIBLE_DEVICES`` to the card's uuid,
+    ``XLA_PYTHON_CLIENT_PREALLOCATE=false`` and
+    ``XLA_PYTHON_CLIENT_MEM_FRACTION``, then checks with
+    :func:`verify_jax_device` that the process really did end up there.
+    :func:`configure_jax_gpu` calls it after choosing and claiming a card; a
+    pool whose workers share a card calls it directly.
+
+    Parameters
+    ----------
+    card : GPUStatus
+        The card, as :func:`query_gpus` reports it.
+    mem_fraction : float
+        Fraction of the card JAX may take, in (0, 1].
+
+    Returns
+    -------
+    dict
+        ``jax_backend`` (``"gpu"``), ``gpu_index``, ``gpu_uuid``, ``gpu_name``.
+
+    Raises
+    ------
+    WrongJAXDeviceError
+        When JAX did not end up on the card.
+    """
     # By uuid, not by index: an index would be read in CUDA's enumeration
     # order, which need not be the ``nvidia-smi`` order the occupancy was
     # measured in.
-    os.environ["CUDA_VISIBLE_DEVICES"] = chosen.uuid
+    os.environ["CUDA_VISIBLE_DEVICES"] = card.uuid
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
     record = {
         "jax_backend": "gpu",
-        "gpu_index": chosen.index,
-        "gpu_uuid": chosen.uuid,
-        "gpu_name": chosen.name,
+        "gpu_index": card.index,
+        "gpu_uuid": card.uuid,
+        "gpu_name": card.name,
     }
     verify_jax_device(record)
-    _CONFIGURED = record
-    return dict(record)
+    return record
