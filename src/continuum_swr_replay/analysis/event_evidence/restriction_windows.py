@@ -23,11 +23,19 @@ score less its sum of ``b``'s, in nats, for each score family
   time step (``intervals.sample_step`` of the per-bin table's time).
 
 A contrast is also read over a part of the window (:data:`PART_UNITS`): its bins
-in the category ``immobile_outside_swr`` only, per second of them (the window
+in the category ``immobile_outside_swr`` only, per spike in them (the spikes of
+every tetrode the decoder put in those bins, from the per-bin facts,
+:mod:`.bin_facts`; NaN without spikes) and per second of them (the window
 table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
 its bins outside the SWR, where ``swr`` may not use the non-local states; in an
 event without an SWR, all its bins but the few inside an SWR the ``swr`` model
-used. Figure 2g's second axis reads ``full - swr`` there.
+used. Figure 2g's second axis reads ``full - swr`` there, per spike.
+
+The per-bin facts also give each window's sums over its ``immobile_outside_swr``
+bins inside a well visit (:func:`window_bin_fact_sums`,
+:data:`BIN_FACT_COLUMNS`): the numerators of the shares of
+``restriction_totals.epoch_outside_swr_gains``, on the same bins as their
+denominator.
 
 ``full - swr`` in events without an SWR is what the non-local states buy outside
 SWRs, where ``swr`` may not use them; in the Local-rest controls it is the same
@@ -101,10 +109,25 @@ OUTSIDE_SWR_COLUMNS = (
 """The window table's columns over the bins outside SWRs, which a window run
 made before they were added does not have."""
 
-PART_UNITS = {"whole": tuple(UNITS), "outside_swr": ("per_s",)}
+PART_UNITS = {"whole": tuple(UNITS), "outside_swr": tuple(UNITS)}
 """Each part of a window a contrast is read over and its units: the whole
-window, or only its bins in the category ``immobile_outside_swr``, per second
-of them (no per-spike unit: the spike counts are the whole window's)."""
+window, or only its bins in the category ``immobile_outside_swr``, per spike in
+them (``n_spikes_outside_swr``) and per second of them."""
+
+IN_VISIT_SUFFIX = "_outside_swr_in_visit"
+"""The suffix of a window's columns over its bins in the category
+``immobile_outside_swr`` that are inside a well visit
+(:func:`window_bin_fact_sums`)."""
+
+BIN_FACT_COLUMNS = (
+    "n_spikes_outside_swr",
+    "n_bins_outside_swr_in_visit",
+    "n_spikes_outside_swr_in_visit",
+    *(f"{column}{IN_VISIT_SUFFIX}" for column in SCORE_COLUMNS),
+)
+"""The window table's columns from the per-bin facts
+(:func:`window_bin_fact_sums`), which a window run made before they were added
+does not have."""
 
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
@@ -219,6 +242,142 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     return out
 
 
+def window_bin_fact_sums(
+    bins: pd.DataFrame, facts: pd.DataFrame, windows: pd.DataFrame
+) -> pd.DataFrame:
+    """Each window's spikes, and its sums over its bins outside SWRs inside a
+    well visit, from the epoch's per-bin facts.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame
+        The epoch's per-bin table of the restriction run, as
+        :func:`restriction_window_sums` takes it.
+    facts : pd.DataFrame
+        The epoch's per-bin facts (``bin_facts.bin_facts``), one row per bin of
+        the same time grid: ``time``, ``n_spikes`` and ``in_well_visit``.
+    windows : pd.DataFrame
+        The epoch's windows, as :func:`restriction_window_sums` takes them.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per window, in ``windows``' order: ``n_spikes_bins`` (the
+        window's spikes over all its bins, which must be the held-out tetrode
+        run's ``n_spikes``) and :data:`BIN_FACT_COLUMNS`:
+        ``n_spikes_outside_swr`` (spikes in its ``immobile_outside_swr``
+        bins), ``n_bins_outside_swr_in_visit`` and
+        ``n_spikes_outside_swr_in_visit`` (bins and spikes of those inside a
+        well visit) and each score's float64 sum over the latter,
+        ``<score>_outside_swr_in_visit`` (0 without such bins; the restriction
+        run's scores are finite, its sums raise otherwise).
+
+    Raises
+    ------
+    ValueError
+        If the facts' time is not the per-bin table's, or a window is empty or
+        reaches outside ``bins``.
+    """
+    if not np.array_equal(
+        facts["time"].to_numpy(dtype=float), bins["time"].to_numpy(dtype=float)
+    ):
+        raise ValueError("the per-bin facts' time is not the per-bin table's")
+    s = windows["s"].to_numpy(dtype=np.int64)
+    e = windows["e"].to_numpy(dtype=np.int64)
+    if (e < s).any() or (s < 0).any() or (e >= len(bins)).any():
+        raise ValueError("a window is empty or reaches outside the per-bin table")
+    rows = window_rows(s, e)
+    spikes = facts["n_spikes"].to_numpy(dtype=np.float64)[rows]
+    outside = bins["category"].astype(str).to_numpy()[rows] == IMMOBILE_OUTSIDE_SWR
+    in_visit = outside & facts["in_well_visit"].to_numpy(dtype=bool)[rows]
+    scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
+    summed = window_sums(
+        np.column_stack(
+            [
+                spikes,
+                spikes * outside,
+                in_visit,
+                spikes * in_visit,
+                np.where(in_visit[:, np.newaxis], scores, 0.0),
+            ]
+        ),
+        rows,
+        s,
+        e,
+    )
+    out = pd.DataFrame(
+        {
+            name: np.rint(summed[:, j]).astype(np.int64)
+            for j, name in enumerate(["n_spikes_bins", *BIN_FACT_COLUMNS[:3]])
+        }
+    )
+    for j, column in enumerate(SCORE_COLUMNS):
+        out[f"{column}{IN_VISIT_SUFFIX}"] = summed[:, 4 + j]
+    return out
+
+
+def require_bin_fact_sums(windows: pd.DataFrame) -> None:
+    """Refuse a window table without the columns from the per-bin facts.
+
+    Raises
+    ------
+    ValueError
+        If ``windows`` lacks a column of :data:`BIN_FACT_COLUMNS`: the table was
+        made by a window run older than them, and the run must be made again.
+    """
+    missing = [column for column in BIN_FACT_COLUMNS if column not in windows]
+    if missing:
+        raise ValueError(
+            "the restriction window table has no sums from the per-bin facts "
+            f"(missing {missing}): it was made before the window run read them. "
+            "Rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py "
+            "--overwrite on the cohort first."
+        )
+
+
+def outside_swr_window_counts(windows: pd.DataFrame) -> pd.DataFrame:
+    """Per kind and group, the windows, those with bins outside SWRs, those with
+    such bins but no spike in them (no value per spike there), and those with
+    such bins outside a well visit (a window that runs past the final poke-out
+    of its visit, or lies outside one).
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        :func:`restriction_window_sums`' rows with :data:`BIN_FACT_COLUMNS`,
+        ``kind`` and ``group``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``kind`` and ``group``: ``n_windows``,
+        ``n_with_bins_outside_swr``, ``n_without_spikes_outside_swr`` and
+        ``n_with_bins_outside_swr_outside_visit``.
+    """
+    require_bin_fact_sums(windows)
+    with_bins = windows["n_bins_outside_swr"] > 0
+    return (
+        windows.assign(
+            n_windows=1,
+            n_with_bins_outside_swr=with_bins,
+            n_without_spikes_outside_swr=with_bins
+            & (windows["n_spikes_outside_swr"] == 0),
+            n_with_bins_outside_swr_outside_visit=windows["n_bins_outside_swr"]
+            > windows["n_bins_outside_swr_in_visit"],
+        )
+        .groupby(["kind", "group"], sort=True)[
+            [
+                "n_windows",
+                "n_with_bins_outside_swr",
+                "n_without_spikes_outside_swr",
+                "n_with_bins_outside_swr_outside_visit",
+            ]
+        ]
+        .sum()
+        .astype(np.int64)
+    )
+
+
 def window_spike_counts(holdout: pd.DataFrame, windows: pd.DataFrame) -> pd.Series:
     """Each window's spike count over every tetrode, from the held-out tetrode
     run's rows of the same epoch.
@@ -325,24 +484,30 @@ def window_contrasts(
         window without spikes has a value per second and none per spike (153
         Local-rest controls in the cohort; the statistics' ``n_scored`` counts
         the windows with a value). Outside SWRs: the contrast summed over the
-        window's ``immobile_outside_swr`` bins divided by their duration,
-        ``duration_outside_swr_s``; NaN for a window with no such bin (an event
-        wholly inside its SWR). Every contrast of a window with a bin in
-        excluded time is NaN.
+        window's ``immobile_outside_swr`` bins divided by their spikes,
+        ``n_spikes_outside_swr`` (NaN without a spike there), or by their
+        duration, ``duration_outside_swr_s``; NaN for a window with no such bin
+        (an event wholly inside its SWR). Every contrast of a window with a bin
+        in excluded time is NaN.
 
     Raises
     ------
     ValueError
         If ``"outside_swr"`` is asked for and ``windows`` lacks its columns
-        (:func:`require_outside_swr_sums`).
+        (:func:`require_outside_swr_sums`, :func:`require_bin_fact_sums`).
     """
     out = windows.copy()
     kept = out["n_bins_excluded"].to_numpy() == 0
     for part in _chosen(parts, PART_UNITS, "part"):
         if part == "outside_swr":
             require_outside_swr_sums(out)
+            require_bin_fact_sums(out)
             seconds = out["duration_outside_swr_s"]
-            divisors = {"per_s": seconds.where(seconds > 0).to_numpy(float)}
+            spikes = out["n_spikes_outside_swr"]
+            divisors = {
+                "per_spike": spikes.where(spikes > 0).to_numpy(float),
+                "per_s": seconds.where(seconds > 0).to_numpy(float),
+            }
             where = OUTSIDE_SWR_SUFFIX
         else:
             divisors = {
@@ -401,9 +566,10 @@ def restriction_window_statistics(
     parts : sequence of str, optional
         The parts of the window (:data:`PART_UNITS`): ``"whole"`` (the
         default) and ``"outside_swr"``, the window's bins in the category
-        ``immobile_outside_swr``, read per second only (a chosen unit the part
-        has no value in is skipped for it). A window with no such bin has no
-        value there and is counted in ``n_events`` but not in ``n_scored``.
+        ``immobile_outside_swr``, read per spike in them and per second. A
+        window with no such bin, or (per spike) no spike in them, has no value
+        there and is counted in ``n_events`` but not in ``n_scored``
+        (:func:`outside_swr_window_counts` counts the two apart).
 
     Returns
     -------
@@ -419,7 +585,7 @@ def restriction_window_statistics(
     ValueError
         If a choice is unknown, no window is of a chosen kind, or the part
         ``"outside_swr"`` is chosen for a table without its columns
-        (:func:`require_outside_swr_sums`).
+        (:func:`require_outside_swr_sums`, :func:`require_bin_fact_sums`).
     """
     families = _chosen(families, FAMILY_SUFFIX, "family")
     contrasts = _chosen(contrasts, CONTRASTS, "contrast")

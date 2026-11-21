@@ -11,6 +11,7 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.paths import (
+    EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
@@ -73,14 +74,32 @@ def _holdout() -> pd.DataFrame:
     )
 
 
+def _facts() -> pd.DataFrame:
+    """Spikes per bin as the held-out tetrode table counts them: 2 in x (bins 3
+    and 4), none in y, 5 in y's control (bins 14 and 15); one more at bin 18,
+    in no window. Bins 0-3 and 9-16 are inside a well visit."""
+    spikes = np.zeros(N, dtype=np.int32)
+    spikes[[3, 4, 14, 15, 18]] = [1, 1, 4, 1, 1]
+    inside = np.zeros(N, dtype=bool)
+    inside[0:4] = True
+    inside[9:17] = True
+    return pd.DataFrame({"time": TIME, "n_spikes": spikes, "in_well_visit": inside})
+
+
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
+    restriction = tmp_path / EVENT_NONLOCAL_RESTRICTION_DIR
+    restriction.mkdir()
+    output_path(EPOCH, restriction, runner.RESTRICTION_NAME).with_suffix(
+        ".json"
+    ).write_text(json.dumps({"n_spikes": 8}))
     for folder, name, table in (
         (EVENT_NONLOCAL_RESTRICTION_DIR, runner.BINS_NAME, _bins()),
+        (EVENT_BIN_FACTS_DIR, runner.FACTS_NAME, _facts()),
         (EVENT_PARTICIPATION_DIR, runner.PARTICIPATION_NAME, PARTICIPATION),
         (EVENT_TETRODE_HOLDOUT_DIR, runner.HOLDOUT_NAME, _holdout()),
     ):
-        (tmp_path / folder).mkdir()
+        (tmp_path / folder).mkdir(exist_ok=True)
         table.to_parquet(output_path(EPOCH, tmp_path / folder, name))
     monkeypatch.setattr(runner, "decode_time", lambda epoch_id, data_dir: TIME)
     monkeypatch.setattr(runner, "read_swr_table", lambda path: EVENTS)
@@ -116,6 +135,59 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     )
     np.testing.assert_allclose(table["duration_outside_swr_s"], [0.006, 0.002, 0.004])
     assert record["n_events_without_bins_outside_swr"] == 0
+    # from the per-bin facts: x's 2 spikes are outside SWRs, its bins 2-3 are
+    # inside a visit (1 spike); y's bin 8 is outside its SWR, not in a visit
+    assert table["n_spikes_outside_swr"].tolist() == [2, 0, 5]
+    assert table["n_bins_outside_swr_in_visit"].tolist() == [2, 0, 2]
+    assert table["n_spikes_outside_swr_in_visit"].tolist() == [1, 0, 5]
+    np.testing.assert_allclose(
+        table["full_outside_swr_in_visit"] - table["swr_outside_swr_in_visit"],
+        [4, 0, 4],
+    )
+    assert record["n_events_without_spikes_outside_swr"] == 1
+    assert record["n_spikes"] == 8
+    # the time sums: 20 bins, by category, visit and event window
+    sums = pd.read_parquet(output_path(EPOCH, output, runner.TIME_SUMS_NAME))
+    assert len(sums) == 16 and sums["n_bins"].sum() == N
+    assert sums["n_spikes"].sum() == 8
+    rest = sums.set_index(["category", "in_well_visit", "in_event_window"]).loc[
+        ("immobile_outside_swr", True, False)
+    ]
+    # bins 0-1 and 10-16 (bin 9 is in an SWR; 2-4 and 8 are event bins)
+    assert rest["n_bins"] == 9 and rest["n_spikes"] == 5
+    assert rest["full"] - rest["swr"] == pytest.approx(18.0)
+    assert set(sums["epoch_id"]) == {EPOCH}
+
+
+def test_per_bin_facts_that_are_not_the_runs_spikes_raise(data_dir, tmp_path):
+    facts = _facts()
+    facts.loc[18, "n_spikes"] = 0  # the epoch's total is 7, not the run's 8
+    facts.to_parquet(output_path(EPOCH, data_dir / EVENT_BIN_FACTS_DIR, "bin_facts"))
+    with pytest.raises(ValueError, match="restriction run's"):
+        runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, tmp_path)
+    facts = _facts()
+    facts.loc[[3, 18], "n_spikes"] = np.array(
+        [0, 2], dtype=np.int32
+    )  # x holds 1 spike, not its 2
+    facts.to_parquet(output_path(EPOCH, data_dir / EVENT_BIN_FACTS_DIR, "bin_facts"))
+    with pytest.raises(ValueError, match="1 windows' spikes"):
+        runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, tmp_path)
+
+
+def test_another_restriction_run_is_read(data_dir, tmp_path):
+    other = tmp_path / "fold_fit"
+    other.mkdir()
+    bins = _bins()
+    bins["full"] = np.float32(5.0)
+    bins.to_parquet(output_path(EPOCH, other, runner.BINS_NAME))
+    output_path(EPOCH, other, runner.RESTRICTION_NAME).with_suffix(".json").write_text(
+        json.dumps({"n_spikes": 8})
+    )
+    output = tmp_path / "out"
+    output.mkdir()
+    runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, output, other)
+    table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
+    np.testing.assert_allclose(table["full"] - table["swr"], [12, 8, 8])
 
 
 def test_a_time_grid_that_is_not_the_decodes_raises(data_dir, tmp_path, monkeypatch):

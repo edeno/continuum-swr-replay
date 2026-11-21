@@ -166,9 +166,57 @@ def test_a_window_without_one_of_the_tetrodes_rows_raises():
         rw.window_spike_counts(twice, _windows())
 
 
+def _facts() -> pd.DataFrame:
+    """Spikes per bin that give the windows the held-out counts 3, 0, 3, 2;
+    bins 0-5 inside a well visit."""
+    return pd.DataFrame(
+        {
+            "time": 100.0 + STEP * np.arange(N),
+            "n_spikes": np.array([3, 0, 0, 0, 0, 2, 1, 0, 1, 1], dtype=np.int32),
+            "in_well_visit": np.arange(N) < 6,
+        }
+    )
+
+
+def test_bin_fact_sums_count_spikes_outside_swrs_and_inside_a_visit():
+    facts = rw.window_bin_fact_sums(_bins(), _facts(), _windows())
+    assert list(facts.columns) == ["n_spikes_bins", *rw.BIN_FACT_COLUMNS]
+    np.testing.assert_array_equal(facts["n_spikes_bins"], [3, 0, 3, 2])
+    # bins outside SWRs: 0-1; 1; 5 (6 moving); 8 (9 excluded)
+    np.testing.assert_array_equal(facts["n_spikes_outside_swr"], [3, 0, 2, 1])
+    # of those, inside the visit (bins 0-5): 0-1; 1; 5; none
+    np.testing.assert_array_equal(facts["n_bins_outside_swr_in_visit"], [2, 1, 1, 0])
+    np.testing.assert_array_equal(facts["n_spikes_outside_swr_in_visit"], [3, 0, 2, 0])
+    # full - swr is the bin index there: 0 + 1, 1, 5, 0
+    np.testing.assert_allclose(
+        facts["full_outside_swr_in_visit"] - facts["swr_outside_swr_in_visit"],
+        [1, 1, 5, 0],
+    )
+    assert facts["swr_two_sided_outside_swr_in_visit"].dtype == np.float64
+
+
+def test_bin_facts_on_another_time_grid_raise():
+    facts = _facts().assign(time=lambda f: f["time"] + 1.0)
+    with pytest.raises(ValueError, match="time"):
+        rw.window_bin_fact_sums(_bins(), facts, _windows())
+
+
 def _scored() -> pd.DataFrame:
     sums = rw.restriction_window_sums(_bins(), _windows())
-    return sums.assign(n_spikes=[3, 0, 3, 2])
+    facts = rw.window_bin_fact_sums(_bins(), _facts(), _windows())
+    return pd.concat(
+        [sums.assign(n_spikes=[3, 0, 3, 2]), facts[list(rw.BIN_FACT_COLUMNS)]],
+        axis=1,
+    )
+
+
+def test_outside_swr_window_counts_name_the_windows_without_spikes_there():
+    counts = rw.outside_swr_window_counts(_scored())
+    # window 1 (an SWR event) has a bin outside its SWR and no spike in it
+    assert counts.loc[("event", "SWR")].tolist() == [1, 1, 1, 0]
+    assert counts.loc[("event", "no SWR")].tolist() == [1, 1, 0, 0]
+    # window 3 (a control) has its bin 8 outside SWRs after the visit (bins 0-5)
+    assert counts.loc[("control", "SWR")].tolist() == [1, 1, 0, 1]
 
 
 def test_contrasts_per_spike_and_per_second():
@@ -191,7 +239,7 @@ def test_contrasts_per_spike_and_per_second():
     )
 
 
-def test_contrasts_over_the_bins_outside_swrs_per_second():
+def test_contrasts_over_the_bins_outside_swrs_per_second_and_per_spike():
     out = rw.window_contrasts(_scored())
     # full - swr outside SWRs: 1 over 2 bins, 1 over 1, 5 over 1, (excluded)
     np.testing.assert_allclose(
@@ -203,7 +251,10 @@ def test_contrasts_over_the_bins_outside_swrs_per_second():
         out["full_minus_swr_two_sided_outside_swr_per_s"],
         [1 / (2 * STEP), 1 / STEP, 5 / STEP, np.nan],
     )
-    assert "full_minus_swr_outside_swr_per_spike" not in out
+    # per spike there: 1 over 3 spikes, none in window 1's bin, 5 over 2
+    np.testing.assert_allclose(
+        out["full_minus_swr_outside_swr_per_spike"], [1 / 3, np.nan, 5 / 2, np.nan]
+    )
     # a window with no bin outside SWRs has no value there
     inside = _scored().assign(n_bins_outside_swr=0, duration_outside_swr_s=0.0)
     assert rw.window_contrasts(inside)["swr_minus_none_outside_swr_per_s"].isna().all()
@@ -253,6 +304,12 @@ def _cohort() -> pd.DataFrame:
         swr_two_sided=zeros,
         full_two_sided=2 * gain,
         n_bins_outside_swr=np.where(inside, 0, 1),
+        # outside SWRs two spikes, but none in e1's SWR event
+        n_spikes_outside_swr=np.where(
+            inside,
+            0,
+            np.where((table["epoch_id"] == "e1") & (table["group"] == "SWR"), 0, 2),
+        ),
         duration_outside_swr_s=np.where(inside, 0.0, 0.5),
         none_outside_swr=zeros,
         swr_outside_swr=zeros,
@@ -260,6 +317,11 @@ def _cohort() -> pd.DataFrame:
         none_two_sided_outside_swr=zeros,
         swr_two_sided_outside_swr=zeros,
         full_two_sided_outside_swr=np.where(inside, 0.0, 3 * gain),
+        **{
+            column: zeros
+            for column in rw.BIN_FACT_COLUMNS
+            if column != "n_spikes_outside_swr"
+        },
     )
 
 
@@ -289,13 +351,13 @@ def test_statistics_are_the_per_animal_median_of_epoch_medians_and_their_mean():
     assert null["n_animals_positive"] == 0
 
 
-def test_statistics_outside_swrs_are_per_second_and_count_windows_without_bins():
+def test_statistics_outside_swrs_count_windows_without_bins_or_spikes():
     keys = ["family", "contrast", "unit", "kind", "group", "part"]
     both = rw.restriction_window_statistics(
         _cohort(), n_boot=200, seed=1, parts=["whole", "outside_swr"]
     ).set_index(keys)
-    # per spike and per second over the whole window, per second outside SWRs
-    assert len(both) == 2 * 3 * (2 + 1) * 3
+    # per spike and per second over the whole window and outside SWRs
+    assert len(both) == 2 * 3 * (2 + 2) * 3
     whole = rw.restriction_window_statistics(_cohort(), n_boot=200, seed=1)
     for row in whole.itertuples(index=False):
         mine = both.loc[(*row[:5], "whole")]
@@ -314,6 +376,15 @@ def test_statistics_outside_swrs_are_per_second_and_count_windows_without_bins()
     swr = both.loc[("filter", "full_minus_swr", "per_s", "event", "SWR", "outside_swr")]
     assert swr["n_events"] == 3 and swr["n_scored"] == 2
     np.testing.assert_allclose(swr["animals"], [2.0, 2.0])
+    # per spike: half the gain (2 spikes); e1's SWR event has none either
+    row = both.loc[
+        ("filter", "full_minus_swr", "per_spike", "event", "no SWR", "outside_swr")
+    ]
+    np.testing.assert_allclose(row["animals"], [1.5, 10.0])
+    swr = both.loc[
+        ("filter", "full_minus_swr", "per_spike", "event", "SWR", "outside_swr")
+    ]
+    assert swr["n_events"] == 3 and swr["n_scored"] == 1
 
 
 def test_statistics_outside_swrs_need_the_window_runs_new_columns():
@@ -322,6 +393,11 @@ def test_statistics_outside_swrs_need_the_window_runs_new_columns():
     assert set(whole["part"]) == {"whole"}
     with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
         rw.restriction_window_statistics(old, n_boot=10, parts=["outside_swr"])
+    without_facts = _cohort().drop(columns=list(rw.BIN_FACT_COLUMNS))
+    with pytest.raises(ValueError, match="no sums from the per-bin facts"):
+        rw.restriction_window_statistics(
+            without_facts, n_boot=10, parts=["outside_swr"]
+        )
     with pytest.raises(ValueError, match="unknown part"):
         rw.restriction_window_statistics(_cohort(), n_boot=10, parts=["edges"])
 
