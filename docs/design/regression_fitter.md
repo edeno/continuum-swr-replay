@@ -159,6 +159,15 @@ inactive columns, and their coefficients and covariance rows and columns are NaN
 column of a penalty block may not be inactive (the penalty identifies it); that is
 refused.
 
+A stacked design, one `SessionData` per animal holding its sessions' rows with a set of
+columns per session (zero on the other sessions' rows), is a session like any other: a
+separated per-session column gives the whole animal no finite maximum, the animal is set
+aside (below) with that session's columns named as running away, and marking them
+inactive gives the fit, score, derivatives, covariance and edf of the stack built without
+them (`test_a_stack_with_inactive_columns_is_the_stack_without_them`, five animals of
+three sessions). The mask already did this at ef98019d; what was missing was the names of
+the columns, and the whole five-animal search raised.
+
 The search (`select_penalties`):
 
 1. a grid over the log strengths in `[-10, 20]`: every integer for one term (31 points),

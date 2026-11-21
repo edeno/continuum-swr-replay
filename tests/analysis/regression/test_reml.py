@@ -987,3 +987,77 @@ def test_two_smooths_in_their_null_spaces_return() -> None:
     for session in result.sessions:
         np.testing.assert_allclose(session.edf, [1.0, 1.0], rtol=0, atol=1e-5)
         np.testing.assert_array_equal(session.in_null_space, [True, True])
+
+
+def _stack(parts: list[SessionData], n_shared: int = 9) -> SessionData:
+    """Sessions stacked into one: their first ``n_shared`` columns shared (the
+    smooth), the rest one set per session (zero on the other sessions' rows),
+    the group ids made consecutive."""
+    n_own = parts[0].X.shape[1] - n_shared
+    n_rows = sum(part.X.shape[0] for part in parts)
+    X = np.zeros((n_rows, n_shared + n_own * len(parts)))
+    groups, row, offset = [], 0, 0
+    for k, part in enumerate(parts):
+        rows = slice(row, row + part.X.shape[0])
+        X[rows, :n_shared] = part.X[:, :n_shared]
+        X[rows, n_shared + k * n_own : n_shared + (k + 1) * n_own] = part.X[
+            :, n_shared:
+        ]
+        groups.append(part.aux + offset)
+        row += part.X.shape[0]
+        offset = groups[-1][-1] + 1
+    y = np.concatenate([part.y for part in parts])
+    return SessionData(X, y, np.concatenate(groups))
+
+
+def test_a_stack_with_inactive_columns_is_the_stack_without_them() -> None:
+    """Five animals, each a stack of three content sessions with four columns
+    of their own (two roles, an arm and a third role). One session of the
+    third animal is separated: that animal's fit has no finite maximum and
+    names that session's arm and role columns, and the animal is set aside.
+    Marking those columns inactive gives the stack built without them (score,
+    derivatives, coefficients, covariance and edf), and the search keeps the
+    animal."""
+    _, blocks = _content_session(0)
+    animals = []
+    for animal in range(5):
+        parts = []
+        for k in range(3):
+            seed = 3 * animal + k
+            data, _ = _content_session(seed)
+            separated = (animal, k) == (2, 1)
+            parts.append(_with_arm_columns(data, seed, separated=separated))
+        animals.append(_stack(parts))
+    own_columns = 9 + 4 * 1 + np.arange(4)  # the separated session's columns
+    arm, role = own_columns[2], own_columns[3]
+
+    separated = pooled_reml(GroupedSoftmax(), [animals[2]], blocks, [6.0])
+    assert separated.failed_status == NO_FINITE_MAXIMUM
+    reference = select_penalties(GroupedSoftmax(), animals, blocks)
+    (left_out,) = reference.search.set_aside
+    assert left_out.index == 2
+    assert sorted(left_out.running_away.tolist()) == [arm, role]
+
+    active = np.ones(animals[2].X.shape[1], dtype=bool)
+    active[[arm, role]] = False
+    masked = replace(animals[2], active=active)
+    built = SessionData(animals[2].X[:, active], animals[2].y, animals[2].aux)
+    for rho in (0.0, 6.0, 18.0):
+        one = pooled_reml(GroupedSoftmax(), [masked], blocks, [rho])
+        two = pooled_reml(GroupedSoftmax(), [built], blocks, [rho])
+        assert one.score == pytest.approx(two.score, rel=1e-12)
+        np.testing.assert_allclose(one.gradient, two.gradient, rtol=1e-9)
+        np.testing.assert_allclose(one.hessian, two.hessian, rtol=1e-9)
+        fit, alone = one.sessions[0], two.sessions[0]
+        assert np.all(np.isnan(fit.fit.beta[~active]))
+        np.testing.assert_allclose(fit.fit.beta[active], alone.fit.beta, atol=1e-10)
+        np.testing.assert_allclose(
+            fit.covariance[np.ix_(active, active)], alone.covariance, rtol=1e-9
+        )
+        np.testing.assert_allclose(fit.edf, alone.edf, rtol=1e-10)
+
+    repaired = select_penalties(
+        GroupedSoftmax(), [*animals[:2], masked, *animals[3:]], blocks
+    )
+    assert repaired.search.set_aside == ()
+    assert np.all(np.isfinite(repaired.sessions[2].fit.beta[active]))
