@@ -219,8 +219,8 @@ written by one function (new, `analysis/regression/record.py`, Phase 2):
 
 A record whose `status` is not "converged", a failing support entry for a declared term, or a declared term
 over the collinearity threshold is kept and flagged; the summary reads only passing rows and states the count
-left out. A session with a term in `left_out` is kept for its other terms; how such a session is reported is
-part of Phase 2's handling of sessions without a finite maximum (open with the lead).
+left out. A session with a term in `left_out` is kept for its other terms and reported with that term
+missing (lead, 2026-11-21); Phase 2's handling of sessions without a finite maximum builds it.
 
 ## C8. The declared family of tests
 

@@ -5,10 +5,10 @@
 Branch: `regression-convention-tools` from master after Phase 1. Reads no canonical table except one
 real-data smoke test.
 
-**Status:** next. Phase 1 is on master (6e54eda8, 98fe5c06), so this phase can start. Two of its parts wait
-for questions open with the lead: the freedom of a smooth term (the terms task and every line marked
-`WAITS FOR THE LEAD (smooth-term rule)`), and how a session without a finite maximum is reported (the task
-"Sessions without a finite maximum"). Build the rest first.
+**Status:** next. Phase 1 is on master (6e54eda8, 98fe5c06), so this phase can start. One of its parts
+waits for a question open with the lead: the freedom of a smooth term (the terms task and every line marked
+`WAITS FOR THE LEAD (smooth-term rule)`). How a session without a finite maximum is reported is decided
+(lead, 2026-11-21: with those terms missing). Build the rest first.
 
 **Inputs to read first:**
 
@@ -115,11 +115,11 @@ for questions open with the lead: the freedom of a smooth term (the terms task a
      the set-aside sessions": remove that entry). Add the new tests beside the fitter's.
   3. What is recorded for such a session (C7): its `status`, the columns left out with the reason
      (`left_out`), NaN for those terms' coefficients and covariance, and the round count.
-  4. WAITS FOR THE LEAD: how such a session is reported. The author's recommendation (a call): the
-     caller owns this handling, since it owns the support rule, and such a session is reported with those
-     terms missing, not left out, because leaving it out depends on the outcome (the sessions that fail are
-     those with no events in one condition). In simulated content data 4 of 242 sessions were of this
-     kind, with 5 or 6 arm and role columns left out in each (simulation, not a result).
+  4. How such a session is reported (lead, 2026-11-21: "do terms missing"): it is kept, with those terms
+     missing, and it is not left out. The caller owns the handling, since it owns the support rule.
+     Leaving the session out would depend on the outcome (the sessions that fail are those with no events
+     in one condition). In simulated content data 4 of 242 sessions were of this kind, with 5 or 6 arm and
+     role columns left out in each (simulation, not a result).
   Failing tests first, in `tests/analysis/regression/test_sessions.py`:
   `test_a_separated_session_is_kept_with_its_terms_missing` (synthetic sessions at a given penalty, one
   with a 0/1 column whose rows hold no event: `fit_at_penalties` raises on them; the loop returns a fit for

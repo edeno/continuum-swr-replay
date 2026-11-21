@@ -52,9 +52,9 @@ What Phase 2 waits for, and only in the tasks named:
   events, and the belief-variance test is then wrong; a fixed, declared smoothness keeps that test
   correct. Either way the REML choice is not used for per-session smooth terms with few events; it stays
   in the package. Every place that depends on it carries a line `WAITS FOR THE LEAD (smooth-term rule)`.
-- **Open with the lead: a session whose simple terms have no finite maximum.** Only the penalty search
-  handles one today; `fit_at_penalties` raises at the first. The author's recommendation: the caller owns
-  it, and such a session is reported with those terms missing, not left out
+- **Decided (lead, 2026-11-21): a session whose simple terms have no finite maximum is reported with
+  those terms missing**, not left out. Only the penalty search handles one today; `fit_at_penalties` raises
+  at the first, so Phase 2 builds the handling outside the search
   ([phase-2-convention-tools.md](phase-2-convention-tools.md)).
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
