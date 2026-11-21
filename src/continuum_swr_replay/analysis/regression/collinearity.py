@@ -45,7 +45,9 @@ from .likelihoods import Gaussian, GroupedSoftmax, Likelihood
 
 __all__ = [
     "MAX_EXPLAINED",
+    "NOT_VARYING",
     "RANK_TOL",
+    "VARIES_TOL",
     "concurvity",
     "separable",
     "term_collinearity",
@@ -59,6 +61,14 @@ MAX_EXPLAINED = 0.8
 #: A direction of a term's columns is seen by the data when its eigenvalue in
 #: their Gram matrix is above RANK_TOL times the largest.
 RANK_TOL = 1e-12
+
+#: A term varies in a session when its columns keep more than VARIES_TOL of
+#: their squared size once the intercept is projected out; below it what is
+#: left is rounding.
+VARIES_TOL = 1e-10
+
+#: Why a term that does not vary is not measured.
+NOT_VARYING = "does not vary in the session beyond the intercept"
 
 
 def weighted_design(
@@ -120,7 +130,10 @@ def concurvity(
     -------
     dict of str to dict
         Term -> ``{"worst", "observed", "estimate"}``; each 0 for a model with
-        one term.
+        one term. A term whose columns, after the intercept is projected out,
+        keep at most ``VARIES_TOL`` of their own squared size (a column
+        constant in the session, or zero) is not measured: NaN, and
+        ``"not_measured"`` gives the reason.
     """
     columns = [np.asarray(c, dtype=int) for c in terms.values()]
     used = np.concatenate(columns) if columns else np.empty(0, int)
@@ -129,6 +142,7 @@ def concurvity(
     )
     if np.sort(used).tolist() != expected.tolist():
         raise ValueError("the terms and the intercept must cover every column once")
+    size = np.sum(X**2, axis=0)  # each column's own size, before the projection
     if intercept is not None:
         q = X[:, intercept] / np.linalg.norm(X[:, intercept])
         X = X - np.outer(q, q @ X)
@@ -143,6 +157,14 @@ def concurvity(
         b = beta[own]
         seen, total = explained @ b, A @ b
         cross, whole = explained.T @ explained, A.T @ A
+        if not np.trace(whole) > VARIES_TOL * size[own].sum():
+            out[name] = {
+                "worst": np.nan,
+                "observed": np.nan,
+                "estimate": np.nan,
+                "not_measured": NOT_VARYING,
+            }
+            continue
         out[name] = {
             "worst": _largest_ratio(cross, whole),
             "observed": _share(seen @ seen, total @ total),
@@ -213,8 +235,10 @@ def term_collinearity(
     Returns
     -------
     dict of str to dict
-        Term -> ``{"r2", "vif"}`` for a term of one column, else
-        ``{"observed", "worst", "estimate"}``.
+        Term -> ``{"r2", "vif"}`` for a term of one column (``vif`` infinite
+        at ``r2`` 1), else ``{"observed", "worst", "estimate"}``; a term that
+        does not vary in the session has NaN there and ``"not_measured"``
+        with the reason.
     """
     active = np.isfinite(beta)
     if intercept is not None and not active[intercept]:
@@ -235,14 +259,18 @@ def term_collinearity(
         m = measures[name]
         if cols.size == 1:
             r2 = m["estimate"]
-            out[name] = {"r2": r2, "vif": 1.0 / (1.0 - r2)}
+            vif = np.inf if 1.0 - r2 <= RANK_TOL else 1.0 / (1.0 - r2)
+            out[name] = {"r2": r2, "vif": float(np.nan if np.isnan(r2) else vif)}
         else:
             out[name] = {key: m[key] for key in ("observed", "worst", "estimate")}
+        if "not_measured" in m:
+            out[name]["not_measured"] = m["not_measured"]
     return out
 
 
 def separable(collinearity: Mapping[str, Mapping[str, float]]) -> dict[str, bool]:
-    """Term -> True when the others explain less than ``MAX_EXPLAINED`` of it.
+    """Term -> True when the others explain less than ``MAX_EXPLAINED`` of it
+    (False for a term not measured).
 
     Parameters
     ----------
@@ -252,6 +280,6 @@ def separable(collinearity: Mapping[str, Mapping[str, float]]) -> dict[str, bool
         several.
     """
     return {
-        name: (m["r2"] if "r2" in m else m["estimate"]) < MAX_EXPLAINED
+        name: bool((m["r2"] if "r2" in m else m["estimate"]) < MAX_EXPLAINED)
         for name, m in collinearity.items()
     }

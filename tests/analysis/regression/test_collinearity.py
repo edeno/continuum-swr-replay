@@ -202,3 +202,29 @@ def test_a_column_zero_in_the_session_does_not_change_the_measures() -> None:
     for name in terms:
         for key in ("observed", "worst", "estimate"):
             assert two[name][key] == pytest.approx(one[name][key], rel=1e-9)
+
+
+def test_a_column_that_does_not_vary_is_not_measured() -> None:
+    """A column that is twice the intercept, or zero, has nothing left once the
+    intercept is projected out: it is not measured (NaN, with the reason), not
+    read from rounding. An exact copy of other columns has r2 1 and an
+    infinite VIF."""
+    X, y, offset, beta, terms = _poisson_design()
+    n = len(y)
+    flat = np.column_stack([X, np.full(n, 2.0), np.zeros(n), X[:, 8] + X[:, 1]])
+    flat_beta = np.r_[beta, 0.0, 0.0, 0.1]
+    flat_terms = {
+        **terms,
+        "c": np.array([9]),
+        "zero": np.array([10]),
+        "copy": np.array([11]),
+    }
+    record = term_collinearity(
+        Poisson(), flat, y, offset, flat_beta, flat_terms, intercept=0
+    )
+    for name in ("c", "zero"):
+        assert np.isnan(record[name]["r2"]) and np.isnan(record[name]["vif"])
+        assert "does not vary" in record[name]["not_measured"]
+    assert record["copy"]["r2"] == pytest.approx(1.0)
+    assert record["copy"]["vif"] == np.inf
+    assert separable(record)["c"] is False

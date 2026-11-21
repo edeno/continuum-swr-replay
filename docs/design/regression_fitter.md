@@ -469,7 +469,10 @@ intercept alone. Then for each term, with its columns `Xi` and the other terms' 
 (with the fitted coefficients), `worst` and `estimate`. `R0i` is taken in an orthonormal
 basis of the range of `X0`, so a column zero in a session adds no direction. For a term
 of one column the three equal its R² on the others, and the record stores `r2` and
-`VIF = 1 / (1 - R²)`. For a term of several columns it stores the three measures.
+`VIF = 1 / (1 - R²)`. For a term of several columns it stores the three measures. A
+term whose columns keep at most `VARIES_TOL = 1e-10` of their own squared size once the
+intercept is projected out (a column constant in the session, or zero) is not measured:
+NaN, with the reason in `not_measured`, and not separable. The VIF is infinite at R² 1.
 
 A term is separable when the others explain less than `MAX_EXPLAINED = 0.8` of it (a VIF
 of 5): `r2` is read for a term of one column, `estimate` for a term of several. On the
