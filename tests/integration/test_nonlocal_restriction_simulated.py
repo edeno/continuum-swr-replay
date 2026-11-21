@@ -47,6 +47,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
 from tests.support._restriction_tables import restriction_contrasts
+from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 pytestmark = pytest.mark.integration
 
@@ -147,6 +148,8 @@ def _heldout_likelihood(recording, detector) -> np.ndarray:
         recording.spike_times,
         recording.marks,
         recording.is_running,
+        folds=time_blocks(recording.time),
+        margin_bins=TIME_BLOCK_MARGIN_BINS,
         log=sim.quiet,
     )
     state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]

@@ -9,6 +9,7 @@ import pytest
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from tests.support._restriction_tables import restriction_contrasts
+from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 # three discrete states with 1, 2 and 2 state bins
 STATE_IND = np.array([0, 1, 1, 2, 2])
@@ -255,7 +256,16 @@ def test_the_inputs_must_agree():
         _scores(log_likelihood, initial, continuous, discrete[None], allowed)
     with pytest.raises(ValueError, match="in_swr"):
         nr.fold_fit_scores(
-            None, np.arange(5.0), None, [], [], None, None, np.zeros(4, bool)
+            None,
+            np.arange(5.0),
+            None,
+            [],
+            [],
+            None,
+            None,
+            np.zeros(4, bool),
+            folds=np.zeros(5, dtype=int),
+            margin_bins=0,
         )
 
 
@@ -494,7 +504,7 @@ def test_each_failed_check_is_named(changes, expected):
 
 def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
     """``fold_fit_scores``' ``place_sampling_s`` comes from the folds and
-    margin it is given, not the contiguous defaults. The fit, the likelihood,
+    margin it is given, not from other folds. The fit, the likelihood,
     the models and the place bins are stubbed."""
     from types import SimpleNamespace
 
@@ -563,15 +573,15 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
     )
     np.testing.assert_array_equal(table["place_sampling_s"], expected)
     np.testing.assert_array_equal(table["block"], folds)
-    # the contiguous defaults would give something else
-    blocks = th.time_blocks(time)
-    contiguous = th.place_sampling(
+    # other folds and margin (time blocks) would give something else
+    blocks = time_blocks(time)
+    other = th.place_sampling(
         place,
-        th.fold_training_masks(is_training, blocks, 5, th.MARGIN_BINS),
+        th.fold_training_masks(is_training, blocks, 5, TIME_BLOCK_MARGIN_BINS),
         blocks,
         0.002,
     )
-    assert not np.array_equal(expected, contiguous)
+    assert not np.array_equal(expected, other)
 
 
 def test_smoothed_summary_by_hand():

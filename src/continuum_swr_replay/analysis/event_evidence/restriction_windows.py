@@ -6,9 +6,8 @@ over its matched Local-rest control window: the windows of the held-out tetrode
 score (``state_evidence.windows.epoch_windows``), so the two methods are read on
 the same bins and summarized by the same statistic
 (``likelihood_advantage.likelihood_advantage_statistics``: one value per animal,
-their mean and its nested-bootstrap interval). The held-out encodings are the
-same only when the two runs used the same fold design (``fold_design`` in each
-run's manifest settings).
+their mean and its nested-bootstrap interval). Both runs hold out the same
+folds of whole trials (``fold_design`` in each run's manifest settings).
 
 A window's contrast ``a - b`` (:data:`.nonlocal_restriction.CONTRASTS`) is its
 sum of ``a``'s per-bin score less its sum of ``b``'s, in nats, for each score

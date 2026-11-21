@@ -10,8 +10,8 @@ around the animal. The windows are the canonical events
 first and last decode bins, their SWR label) and the Local-rest window of each
 event's length that the participation run drew (``event_participation``).
 
-The encodings are held out by folds of whole trials (``--fold-design trials``,
-the default), as in ``score_nonlocal_restriction.py``: a segment runs from one
+The encodings are held out by folds of whole trials, as in
+``score_nonlocal_restriction.py``: a segment runs from one
 departure from a well (the trial's ``movement_start_time``, the final poke-out
 at its origin) to the next, so the run to a well and the whole stay there are
 one segment, and the segments are dealt into ``N_FOLDS`` folds balanced by
@@ -19,12 +19,11 @@ destination well (``tetrode_holdout.trial_folds``), with a margin of
 ``TRIAL_MARGIN_S``. The time before the first trial and after the last trial's
 end are segments of their own two classes, and a segment longer than
 ``MAX_SEGMENT_S`` is cut into equal pieces, each a group of its own, so that
-long stays are spread over the folds.
-``--fold-design contiguous`` reproduces the earlier design, ``N_FOLDS``
-contiguous time blocks with a margin of ``MARGIN_BINS`` bins. The design and its
-margin are in the header's settings, so a resume cannot mix designs. The run
-made before this option has a header without them, so its records gather or
-resume under neither design (by intent: move its folder aside before a rerun).
+long stays are spread over the folds. The folds are whole trials because the
+animal stays in one patch for long stretches: a place visited in only one
+stretch of time would have no data in that stretch's held-out encoding. The
+design and its margin are in the header's settings, so a run of another design
+does not gather or resume with this one (move its folder aside before a rerun).
 
 Writes ``{epoch_id}_tetrode_holdout.parquet`` per epoch (one row per window and
 tetrode: ``window_id`` (the window's number in the epoch), ``event_id`` (the
@@ -34,10 +33,10 @@ event's, or for a control the event it matches), ``kind`` (``"event"`` or ``"con
 ``nonlocal_prob``, ``gain_silent``, ``agreement``, ``agreement_silent``,
 ``uniform``, ``spread_cm``), each epoch's record
 ``{epoch_id}_tetrode_holdout.json`` (status, the fold design and its margin in
-bins, the folds' ``n_segments``, ``n_groups`` and ``trial_bin_share`` (None for
-``contiguous``), settings, the SHA-256 of the event table and the participation
-tables, provenance) and ``manifest.json`` gathered
-from the records (``runs.epoch_records``).
+bins, the folds' ``n_segments``, ``n_groups`` and ``trial_bin_share``,
+settings, the SHA-256 of the event table and the participation tables,
+provenance) and ``manifest.json`` gathered from the records
+(``runs.epoch_records``).
 
 Spike times and waveform features are read through ``load_data`` (read-only).
 Each worker is given one GPU, ``--workers-per-gpu`` to a card, each allowed
@@ -58,8 +57,6 @@ Usage::
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
         --gpus 1 4 5 --workers-per-gpu 2 --shards 0 1 --n-shards 5
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --gather
-    uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
-        --fold-design contiguous --gpus 1
 """
 
 from __future__ import annotations
@@ -102,7 +99,6 @@ from continuum_swr_replay.tables.io import write_table
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
     WINDOW_EVENT_COLUMNS,
-    add_fold_design_argument,
     add_gpu_arguments,
     add_run_arguments,
     epoch_inputs,
@@ -122,15 +118,12 @@ def run_epoch(
     event_table: Path,
     data_dir: Path,
     output: Path,
-    fold_design: str = th.TRIAL_DESIGN,
 ) -> dict:
     """Score one epoch and write its table; return its status record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == th.TRIAL_DESIGN)
-    folds, margin_bins, fold_counts = th.epoch_folds(
-        epoch.time, epoch.loaded.get("trials"), fold_design
-    )
+    epoch = epoch_inputs(epoch_id, data_dir, trials=True)
+    folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
     participation = pd.read_parquet(
         output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
@@ -171,7 +164,7 @@ def run_epoch(
         "n_windows": len(windows),
         "n_tetrodes": int(scores["tetrode"].nunique()),
         **record,
-        "fold_design": fold_design,
+        "fold_design": th.TRIAL_DESIGN,
         "margin_bins": margin_bins,
         **fold_counts,
         "seconds": round(clock.time() - started, 1),
@@ -184,7 +177,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
-    add_fold_design_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -194,7 +186,7 @@ def main(argv: list[str] | None = None) -> None:
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"n_folds": th.N_FOLDS, **th.fold_settings(args.fold_design)},
+        "settings": {"n_folds": th.N_FOLDS, **th.fold_settings()},
         "inputs": {
             "event_table": file_input(event_table),
             "event_participation": participation_input(data_dir),
@@ -208,7 +200,7 @@ def main(argv: list[str] | None = None) -> None:
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
-        task_args=(event_table, data_dir, output, args.fold_design),
+        task_args=(event_table, data_dir, output),
         output=output,
         name=TETRODE_HOLDOUT_NAME,
         header=header,

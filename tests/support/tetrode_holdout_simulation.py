@@ -36,11 +36,11 @@ from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 from non_local_detector.simulate.simulate import simulate_multiunit_with_place_fields
 
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import time_blocks
 from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.decoding.fit import algorithm_params
 from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
+from tests.support._time_blocks import time_blocks
 
 TRACK_CM = 175.0
 RUN_CM_PER_S = 25.0

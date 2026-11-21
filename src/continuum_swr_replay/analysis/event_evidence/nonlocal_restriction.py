@@ -69,11 +69,10 @@ exp(ll[t])``:
   likelihood.
 
 **Holding out the whole decoder** (:func:`fold_fit_scores`). The epoch's bins
-are split into :data:`~.tetrode_holdout.N_FOLDS` folds; the runner's folds
-are whole trials balanced by destination well
+are split into the :data:`~.tetrode_holdout.N_FOLDS` folds the caller gives;
+the runner's folds are whole trials balanced by destination well
 (:func:`.tetrode_holdout.trial_folds`), with a margin of
-:data:`~.tetrode_holdout.TRIAL_MARGIN_S` (the default without folds is
-contiguous blocks of time). The time before the first trial and after the last
+:data:`~.tetrode_holdout.TRIAL_MARGIN_S`. The time before the first trial and after the last
 are segments of their own two classes, and a segment longer than
 :data:`~.tetrode_holdout.MAX_SEGMENT_S` is cut into equal pieces, so a long stay
 is spread over the folds. For each fold k, a detector configured as the
@@ -114,8 +113,7 @@ SWRs are not padded, so non-local activity that begins before its SWR or ends
 after it is counted outside SWRs. Nor does it show anything about a transition
 matrix other than the fitted one, which each fold's EM fits on the other folds
 with every state allowed. Holding out costs data: with the trial folds' margin
-each fold's encoding is fit on about 75 % of the decode's training bins (about
-80 % with contiguous blocks). And the comparison is biased against the
+each fold's encoding is fit on about 75 % of the decode's training bins. And the comparison is biased against the
 non-local states outside SWRs: the decoder trains on every bin outside SWRs, so
 non-local activity outside SWRs at a well, from the other stays there, is in the
 data the Local state's encoding at that well is fit on, while spikes inside SWRs
@@ -144,7 +142,6 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     LOCAL,
-    MARGIN_BINS,
     N_FOLDS,
     NO_SPIKE,
     animal_place_bins,
@@ -1218,8 +1215,8 @@ def fold_fit_scores(
     in_swr: NDArray,
     *,
     n_folds: int = N_FOLDS,
-    folds: NDArray | None = None,
-    margin_bins: int = MARGIN_BINS,
+    folds: NDArray,
+    margin_bins: int,
     linear_position: NDArray | None = None,
     fit: Callable[..., tuple[Any, dict]] = fit_fold_detector,
     log: Callable[[str], None] = print,
@@ -1251,10 +1248,11 @@ def fold_fit_scores(
         The decode's masks.
     in_swr : ndarray of bool, shape (n_time,)
     n_folds : int
-    folds : ndarray of int, shape (n_time,), optional
-        Each bin's fold (``tetrode_holdout.trial_folds``); by default
-        ``n_folds`` contiguous time blocks.
+    folds : ndarray of int, shape (n_time,)
+        Each bin's fold (``tetrode_holdout.trial_folds``).
     margin_bins : int
+        Training bins within this many bins of a fold are left out of its
+        encoding's fit (``tetrode_holdout.fold_training_masks``).
     linear_position : ndarray, shape (n_time,), optional
         Given, the table also has ``place_sampling_s``.
     fit : callable

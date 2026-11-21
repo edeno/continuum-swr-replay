@@ -22,7 +22,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths, decode_paths
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -141,17 +140,6 @@ def restriction_run_dir(args: argparse.Namespace, data_dir: Path) -> Path:
     """``--restriction-dir``, or by default the canonical restriction run under
     ``data_dir``."""
     return args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
-
-
-def add_fold_design_argument(parser: argparse.ArgumentParser) -> None:
-    """``--fold-design``, one of ``tetrode_holdout.FOLD_DESIGNS``."""
-    parser.add_argument(
-        "--fold-design",
-        choices=th.FOLD_DESIGNS,
-        default=th.TRIAL_DESIGN,
-        help="whole trials balanced by destination well (default), or the "
-        "earlier contiguous time blocks",
-    )
 
 
 def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:

@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
+from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 pytestmark = pytest.mark.integration
 
@@ -48,9 +49,16 @@ def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame
     return pd.DataFrame({"kind": "rest", "s": chosen, "e": chosen + length - 1})
 
 
-def _score(detector, recording, windows, is_missing=None, **folds) -> pd.DataFrame:
-    """The held-out scores of ``windows``; ``folds`` passes ``folds`` and
-    ``margin_bins`` to ``holdout_scores`` (by default its time blocks)."""
+def _score(
+    detector,
+    recording,
+    windows,
+    is_missing=None,
+    folds=None,
+    margin_bins=TIME_BLOCK_MARGIN_BINS,
+) -> pd.DataFrame:
+    """The held-out scores of ``windows`` under ``folds`` and ``margin_bins``
+    (by default the recording's five time blocks, a margin of two bins)."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
     missing = (
         np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
@@ -65,8 +73,9 @@ def _score(detector, recording, windows, is_missing=None, **folds) -> pd.DataFra
         recording.is_running,
         missing,
         windows,
+        folds=time_blocks(recording.time) if folds is None else folds,
+        margin_bins=margin_bins,
         log=sim.quiet,
-        **folds,
     )
     return scores.join(windows.set_index("window_id")["kind"], on="window_id")
 
@@ -356,6 +365,8 @@ def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypa
         is_training,
         np.zeros(recording.time.size, dtype=bool),
         window.assign(window_id=0),
+        folds=time_blocks(recording.time),
+        margin_bins=TIME_BLOCK_MARGIN_BINS,
         refit=refit,
         log=sim.quiet,
     )

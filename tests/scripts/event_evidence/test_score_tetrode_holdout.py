@@ -1,6 +1,5 @@
 """The held-out tetrode runner's wiring: the folds and margin ``run_epoch``
-hands the scores under each fold design, what it records, and the header's
-settings.
+hands the scores, what it records, and the header's settings.
 
 ``epoch_inputs``, the windows and ``holdout_scores`` are replaced at their
 boundaries; the frame, the trials and the scores are made by hand.
@@ -50,8 +49,7 @@ PARTICIPATION = pd.DataFrame({"event_id": ["a"], "control_s": [6]})
 @pytest.fixture
 def patched(tmp_path, monkeypatch):
     """Patch the runner's boundaries; return a function that runs the epoch
-    under a fold design and returns its record and what ``holdout_scores``
-    was given."""
+    and returns its record and what ``holdout_scores`` was given."""
     paths = DecodePaths(
         tmp_path / "dot.pkl",
         tmp_path / "results.nc",
@@ -88,7 +86,7 @@ def patched(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runner, "epoch_windows", epoch_windows)
 
-    def run(fold_design):
+    def run():
         given = {}
 
         def epoch_inputs(epoch_id, data_dir, *, trials):
@@ -97,7 +95,7 @@ def patched(tmp_path, monkeypatch):
                 paths,
                 frame,
                 frame.index.to_numpy(),
-                loaded | ({"trials": TRIALS} if trials else {}),
+                loaded | {"trials": TRIALS},
                 detector,
             )
 
@@ -136,7 +134,7 @@ def patched(tmp_path, monkeypatch):
         monkeypatch.setattr(runner.th, "holdout_scores", holdout_scores)
         output = tmp_path / "out"
         record = runner.run_epoch(
-            EPOCH, tmp_path / "event_table.parquet", tmp_path, output, fold_design
+            EPOCH, tmp_path / "event_table.parquet", tmp_path, output
         )
         table = pd.read_parquet(output_path(EPOCH, output, TETRODE_HOLDOUT_NAME))
         assert list(table["kind"]) == ["event", "control", "event", "control"]
@@ -146,7 +144,7 @@ def patched(tmp_path, monkeypatch):
 
 
 def test_trial_folds_are_made_from_the_trials_and_recorded(patched):
-    record, given = patched("trials")
+    record, given = patched()
     assert given["trials"] is True
     np.testing.assert_array_equal(
         given["folds"],
@@ -166,23 +164,6 @@ def test_trial_folds_are_made_from_the_trials_and_recorded(patched):
     assert record["n_segments"] == 7  # six trials and the time after them
     assert record["n_groups"] == 7
     assert record["trial_bin_share"] == pytest.approx(11 / 12)
-
-
-def test_the_contiguous_design_passes_no_folds(patched):
-    record, given = patched("contiguous")
-    assert given["trials"] is False
-    assert given["folds"] is None and given["margin_bins"] == th.MARGIN_BINS
-    assert record["fold_design"] == "contiguous"
-    assert record["margin_bins"] == th.MARGIN_BINS
-    assert record["n_segments"] is None and record["n_groups"] is None
-    assert record["trial_bin_share"] is None
-
-
-def test_an_unknown_fold_design_is_refused(patched, processed_data_root):
-    with pytest.raises(ValueError, match="unknown fold design"):
-        patched("chunks")
-    with pytest.raises(SystemExit):
-        runner.main(["--gather", "--fold-design", "chunks"])
 
 
 @pytest.fixture
@@ -207,14 +188,5 @@ def header(processed_data_root, monkeypatch):
 def test_the_header_names_the_fold_design_and_its_margin(header):
     assert header()["settings"] == {
         "n_folds": th.N_FOLDS,
-        **th.fold_settings("trials"),
-    }
-    assert header("--fold-design", "trials")["settings"]["fold_design"] == "trials"
-    # the earlier design, with its name and its margin in seconds besides the
-    # earlier run's two settings
-    assert header("--fold-design", "contiguous")["settings"] == {
-        "n_folds": 5,
-        "fold_design": "contiguous",
-        "margin_s": 0.004,
-        "margin_bins": 2,
+        **th.fold_settings(),
     }

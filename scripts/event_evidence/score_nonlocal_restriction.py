@@ -11,8 +11,7 @@ not the SWR was immobile as a whole event, and local everywhere else. That is
 deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
 analyzed-time rule keeps.
 
-The likelihood is held out by folds of whole trials (``--fold-design trials``,
-the default): a segment runs from one departure from a well (the trial's
+The likelihood is held out by folds of whole trials: a segment runs from one departure from a well (the trial's
 ``movement_start_time``, the final poke-out at its origin) to the next, so the
 run to a well and the whole stay there are one segment, and the segments are
 dealt into ``N_FOLDS`` folds balanced by destination well
@@ -20,10 +19,11 @@ dealt into ``N_FOLDS`` folds balanced by destination well
 time before the first trial and after the last trial's end are segments of
 their own two classes, and a segment longer than ``MAX_SEGMENT_S`` is cut into
 equal pieces, each a group of its own, so that long stays are spread over the
-folds.
-``--fold-design contiguous`` reproduces the earlier design, ``N_FOLDS``
-contiguous time blocks with a margin of ``MARGIN_BINS`` bins. The design and its
-margin are in the header's settings, so a resume cannot mix designs.
+folds. The folds are whole trials because the animal stays in one patch for
+long stretches: a place visited in only one stretch of time would have no data
+in that stretch's held-out encoding. The design and its margin are in the
+header's settings, so a run of another design does not gather or resume with
+this one.
 
 The whole decoder is held out (``nonlocal_restriction.fold_fit_scores``): per
 fold, a detector configured as the canonical one is fit by the library's EM on
@@ -134,7 +134,6 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
-    add_fold_design_argument,
     add_gpu_arguments,
     add_run_arguments,
     epoch_inputs,
@@ -164,16 +163,13 @@ def run_epoch(
     epoch_id: str,
     data_dir: Path,
     output: Path,
-    fold_design: str = th.TRIAL_DESIGN,
 ) -> dict:
     """Score one epoch, write its two tables and return its record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == th.TRIAL_DESIGN)
+    epoch = epoch_inputs(epoch_id, data_dir, trials=True)
     frame = epoch.frame
-    folds, margin_bins, fold_counts = th.epoch_folds(
-        epoch.time, epoch.loaded.get("trials"), fold_design
-    )
+    folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
     source_events = swr_source.epoch_source(epoch_id).events
     in_swr = interval_mask(epoch.time, source_events)
     in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
@@ -238,7 +234,7 @@ def run_epoch(
             **record,
             **share,
             "fit": nr.FIT,
-            "fold_design": fold_design,
+            "fold_design": th.TRIAL_DESIGN,
             "margin_bins": margin_bins,
             **fold_counts,
             "fold_share_min": float(fold_share.min()),
@@ -276,7 +272,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
-    add_fold_design_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -287,7 +282,7 @@ def main(argv: list[str] | None = None) -> None:
         "settings": {
             "n_folds": nr.N_FOLDS,
             **fit_settings(),
-            **th.fold_settings(args.fold_design),
+            **th.fold_settings(),
             "sparse_sampling_s": SPARSE_SAMPLING_S,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
@@ -310,7 +305,7 @@ def main(argv: list[str] | None = None) -> None:
             args.epochs or analyzed_epoch_ids(), args.shards, args.n_shards
         ),
         task=run_epoch,
-        task_args=(data_dir, output, args.fold_design),
+        task_args=(data_dir, output),
         output=output,
         name=NONLOCAL_RESTRICTION_NAME,
         header=header,

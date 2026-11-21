@@ -149,7 +149,7 @@ def patched(tmp_path, monkeypatch):
         },
     )
 
-    def run(frame, record, fold_design="trials"):
+    def run(frame, record):
         loaded = {
             "spike_times": [np.array([100.001])],
             "marks": [np.ones((1, 4))],
@@ -159,12 +159,12 @@ def patched(tmp_path, monkeypatch):
         detector = object()
 
         def epoch_inputs(epoch_id, data_dir, *, trials):
-            assert trials == (fold_design == "trials")
+            assert trials is True
             return EpochInputs(
                 paths,
                 frame,
                 frame.index.to_numpy(),
-                loaded | ({"trials": TRIALS} if trials else {}),
+                loaded | {"trials": TRIALS},
                 detector,
             )
 
@@ -185,19 +185,16 @@ def patched(tmp_path, monkeypatch):
             linear_position,
             log,
         ):
-            if fold_design == "trials":
-                np.testing.assert_array_equal(
-                    folds,
-                    th.trial_folds(
-                        TIME,
-                        TIME[[0, 2, 4, 6, 8, 10, 11]],
-                        np.r_[TRIALS["to_well"], th.AFTER_LAST_TRIAL],
-                        nr.N_FOLDS,
-                    ),
-                )
-                assert margin_bins == 500  # 1 s of 2 ms bins
-            else:
-                assert folds is None and margin_bins == th.MARGIN_BINS
+            np.testing.assert_array_equal(
+                folds,
+                th.trial_folds(
+                    TIME,
+                    TIME[[0, 2, 4, 6, 8, 10, 11]],
+                    np.r_[TRIALS["to_well"], th.AFTER_LAST_TRIAL],
+                    nr.N_FOLDS,
+                ),
+            )
+            assert margin_bins == 500  # 1 s of 2 ms bins
             np.testing.assert_array_equal(linear_position, 2.0 * np.arange(N))
             assert d is detector
             np.testing.assert_array_equal(time, TIME)
@@ -216,7 +213,7 @@ def patched(tmp_path, monkeypatch):
 
         monkeypatch.setattr(runner.nr, "fold_fit_scores", fold_fit_scores)
         output = tmp_path / "out"
-        return runner.run_epoch(EPOCH, tmp_path, output, fold_design), output
+        return runner.run_epoch(EPOCH, tmp_path, output), output
 
     return run
 
@@ -274,15 +271,6 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
     assert record["immobile_share_place_sampling_le_10s"] == pytest.approx(3 / 8)
     assert record["n_immobile_without_place"] == 0
     json.dumps(record, allow_nan=False)
-
-
-def test_the_contiguous_design_passes_no_folds(patched):
-    record, _ = patched(_frame(), _record(), fold_design="contiguous")
-    assert record["status"] == "ok"
-    assert record["fold_design"] == "contiguous"
-    assert record["margin_bins"] == th.MARGIN_BINS
-    assert record["n_segments"] is None and record["n_groups"] is None
-    assert record["trial_bin_share"] is None
 
 
 def test_a_failed_check_is_recorded_with_its_message(patched):

@@ -6,6 +6,7 @@ import pytest
 import sklearn
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 STATES = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
 N_BINS = 3
@@ -13,17 +14,8 @@ N_BINS = 3
 STATE_IND = np.array([0, 0, 0, 1, 2, 2, 2, 3, 3, 3])
 
 
-def test_time_blocks_are_contiguous_and_of_equal_duration():
-    time = np.arange(100) * 0.01
-    blocks = th.time_blocks(time, 5)
-    assert blocks[0] == 0 and blocks[-1] == 4
-    assert (np.diff(blocks) >= 0).all()
-    np.testing.assert_array_equal(np.bincount(blocks), [20, 20, 20, 20, 20])
-
-
-def test_fold_blocks_are_the_given_folds_or_the_time_blocks():
+def test_fold_blocks_are_the_given_folds_checked():
     time = np.arange(10) * 0.5
-    np.testing.assert_array_equal(th.fold_blocks(time, 5), th.time_blocks(time, 5))
     folds = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
     np.testing.assert_array_equal(th.fold_blocks(time, 2, folds), folds)
     for bad in (folds[:-1], np.zeros(10, dtype=int), folds + 1):
@@ -64,7 +56,7 @@ def _convolved_masks(is_training, blocks, n_folds, margin_bins):
 def test_fold_training_masks_match_the_earlier_convolution(margin_bins):
     rng = np.random.default_rng(0)
     is_training = rng.random(500) < 0.7
-    for blocks in (th.time_blocks(np.arange(500.0), 5), rng.integers(0, 5, 500)):
+    for blocks in (time_blocks(np.arange(500.0), 5), rng.integers(0, 5, 500)):
         for got, expected in zip(
             th.fold_training_masks(is_training, blocks, 5, margin_bins),
             _convolved_masks(is_training, blocks, 5, margin_bins),
@@ -244,9 +236,12 @@ def test_trial_folds_sample_a_patch_that_contiguous_blocks_leave_unsampled():
     is_training = np.ones(time.size, dtype=bool)
     first_patch = place < 10
 
-    blocks = th.time_blocks(time, 5)
+    blocks = time_blocks(time, 5)
     contiguous = th.place_sampling(
-        place, th.fold_training_masks(is_training, blocks, 5, 2), blocks, bin_s
+        place,
+        th.fold_training_masks(is_training, blocks, 5, TIME_BLOCK_MARGIN_BINS),
+        blocks,
+        bin_s,
     )
     assert (contiguous[first_patch] == 0).all()
 
@@ -396,14 +391,17 @@ def test_trials_off_the_decodes_clock_raise():
         th.task_segment_starts(time, departures[:12], wells[:12], 1129.0)
 
 
-def test_the_leakage_check_passes_the_real_designs():
+def test_the_leakage_check_passes_time_blocks_and_trial_folds():
     rng = np.random.default_rng(3)
     time = np.arange(0.0, 300.0, 0.002)
     position = rng.uniform(0, 100, time.size)
     is_training = rng.random(time.size) < 0.9
-    blocks = th.time_blocks(time, 5)
+    blocks = time_blocks(time, 5)
     th.check_no_fold_leakage(
-        time, position, th.fold_training_masks(is_training, blocks, 5), blocks
+        time,
+        position,
+        th.fold_training_masks(is_training, blocks, 5, TIME_BLOCK_MARGIN_BINS),
+        blocks,
     )
     starts = np.arange(0.0, 300.0, 7.0)
     folds = th.trial_folds(time, starts, np.arange(starts.size) % 3, 5)
@@ -468,8 +466,8 @@ def test_holdout_scores_fit_each_fold_on_the_folds_and_margin_it_is_given(
     monkeypatch,
 ):
     """Interleaved folds (segments of 40 bins dealt to the five folds in turn)
-    and a margin of 7 bins reach the encodings' fit; without them the folds
-    are the five time blocks and the margin :data:`MARGIN_BINS`."""
+    and a margin of 7 bins reach the encodings' fit; other folds and margin
+    (five time blocks, a margin of two bins) give other fits."""
     rng = np.random.default_rng(4)
     is_training = rng.random(1000) < 0.8
     folds = (np.arange(1000) // 40) % th.N_FOLDS
@@ -479,11 +477,15 @@ def test_holdout_scores_fit_each_fold_on_the_folds_and_margin_it_is_given(
     for got, mask in zip(given, expected, strict=True):
         np.testing.assert_array_equal(got, mask)
 
-    default = _fit_masks(monkeypatch, is_training)
-    blocks = th.time_blocks(np.arange(1000) * 0.002)
-    expected = th.fold_training_masks(is_training, blocks, th.N_FOLDS, th.MARGIN_BINS)
-    assert len(default) == th.N_FOLDS
-    for got, mask, other in zip(default, expected, given, strict=True):
+    blocks = time_blocks(np.arange(1000) * 0.002)
+    other_fits = _fit_masks(
+        monkeypatch, is_training, folds=blocks, margin_bins=TIME_BLOCK_MARGIN_BINS
+    )
+    expected = th.fold_training_masks(
+        is_training, blocks, th.N_FOLDS, TIME_BLOCK_MARGIN_BINS
+    )
+    assert len(other_fits) == th.N_FOLDS
+    for got, mask, other in zip(other_fits, expected, given, strict=True):
         np.testing.assert_array_equal(got, mask)
         assert not np.array_equal(got, other)
 
@@ -516,7 +518,7 @@ def test_the_leakage_check_raises_where_the_library_would_reach_a_fold():
 
 
 def test_the_header_names_the_fold_design_and_its_margin():
-    assert th.fold_settings("trials") == {
+    assert th.fold_settings() == {
         "fold_design": "trials",
         "fold_classes": "to_well",
         "margin_s": 1.0,
@@ -524,13 +526,6 @@ def test_the_header_names_the_fold_design_and_its_margin():
         "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
         "sklearn_version": sklearn.__version__,
     }
-    assert th.fold_settings("contiguous") == {
-        "fold_design": "contiguous",
-        "margin_s": 0.004,
-        "margin_bins": 2,
-    }
-    with pytest.raises(ValueError, match="unknown fold design"):
-        th.fold_settings("chunks")
 
 
 def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
@@ -546,7 +541,7 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
             "to_well": [3, 2, 2, 3, 2, 3],
         }
     )
-    folds, margin_bins, counts = th.epoch_folds(time, trials, "trials")
+    folds, margin_bins, counts = th.epoch_folds(time, trials)
     starts = np.array([0.0, 0.5, 2.0, 3.5, 5.0, 6.5, 8.0, 9.5])
     classes = np.r_[th.BEFORE_FIRST_TRIAL, 2, 3, 2, 3, 2, 3, th.AFTER_LAST_TRIAL]
     np.testing.assert_array_equal(
@@ -558,13 +553,3 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
         "n_groups": 8,
         "trial_bin_share": pytest.approx(0.9),
     }
-
-
-def test_epoch_folds_of_the_contiguous_design_are_the_default_blocks():
-    assert th.epoch_folds(np.arange(10.0), None, "contiguous") == (
-        None,
-        th.MARGIN_BINS,
-        {"n_segments": None, "n_groups": None, "trial_bin_share": None},
-    )
-    with pytest.raises(ValueError, match="unknown fold design"):
-        th.epoch_folds(np.arange(10.0), None, "chunks")

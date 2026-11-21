@@ -212,7 +212,7 @@ Spike evidence of non-local events: does the prior-excluded spike likelihood fav
 
 Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode it never saw better than local coding does?
 
-`time_blocks`, `fold_blocks`, `trial_segments`, `trial_bin_share`, `task_segment_starts`, `capped_groups`, `trial_folds`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
+`fold_blocks`, `trial_segments`, `trial_bin_share`, `task_segment_starts`, `capped_groups`, `trial_folds`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
@@ -932,7 +932,7 @@ Does each detector's content reproduce in cells it never saw?
 
 What the per-event runners share: their arguments, the canonical event table, their input records, an epoch's decode inputs, the CPU and GPU worker pools, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `file_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `add_fold_design_argument`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
+`event_table_path`, `file_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
