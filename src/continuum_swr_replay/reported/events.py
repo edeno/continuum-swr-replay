@@ -162,6 +162,7 @@ from continuum_swr_replay.paths import (
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
@@ -364,8 +365,7 @@ def default_inputs() -> EventsInputs:
         nonlocal_restriction_windows=processed_data_dir()
         / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
         bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
-        exposure_in_visits=processed_data_dir()
-        / nonlocal_comparison.EXPOSURE_IN_VISITS_DIR,
+        exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
     )
 
 

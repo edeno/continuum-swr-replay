@@ -13,7 +13,7 @@ epoch's visits (the session cache's port experiences:
 
 For the ``ok`` epochs of an event features run, from the decodes it recorded
 (each decode's sha256 must be the one the run recorded): one row per epoch in
-``Processed-Data/<nonlocal_comparison.EXPOSURE_IN_VISITS_DIR>/exposure.parquet``,
+``Processed-Data/<paths.EXPOSURE_IN_VISITS_DIR>/exposure.parquet``,
 with a ``manifest.json`` recording the subset and the session-cache entries the
 visits were read from (``prepare_data.session_cache_record``).
 
@@ -36,7 +36,6 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.detector_comparison.nonlocal_comparison import (
-    EXPOSURE_IN_VISITS_DIR,
     exposure_in_well_visits,
 )
 from continuum_swr_replay.analysis.detector_comparison.schema import STATE_SPACE
@@ -49,6 +48,7 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     well_visit_times,
 )
 from continuum_swr_replay.paths import (
+    EXPOSURE_IN_VISITS_DIR,
     event_features_root,
     inventory_comparison_root,
     processed_data_dir,

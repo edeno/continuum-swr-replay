@@ -201,6 +201,9 @@ EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root
 (``scripts/event_evidence/measure_event_participation.py``)."""
+EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
+"""Each epoch's non-local detector exposure inside the well visits, under the
+processed-data root (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""
 
 # The behavior summary's inputs that are not one of MODEL_SUBDIRS: each folder is
 # written by its script and read by the behavior summary.

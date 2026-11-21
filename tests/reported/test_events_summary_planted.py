@@ -36,6 +36,7 @@ from continuum_swr_replay.paths import (
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
@@ -51,7 +52,6 @@ EPOCHS = ["ad1_e1_HPC", "ad1_e2_HPC", "bd1_e1_HPC", "cd1_e1_HPC"]
 VISITS = {epoch: (np.array([0.0]), np.array([20.0])) for epoch in EPOCHS}
 """Each epoch's one well visit, 0 to 20 s: the builders' events (10 to 11 s)
 start inside it."""
-EXPOSURE_DIR = nonlocal_comparison.EXPOSURE_IN_VISITS_DIR
 
 #: Each builder the summary calls, with the argument whose rows are checked.
 EVENT_BUILDERS = (
@@ -148,7 +148,7 @@ class _Run:
             EVENT_GAMMA_DIR,
             RIPPLE_CLASS_STRUCTURE_DIR,
             NONLOCAL_BY_RIPPLE_POWER_DIR,
-            EXPOSURE_DIR,
+            EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
@@ -190,7 +190,7 @@ class _Run:
             root / NONLOCAL_BY_RIPPLE_POWER_DIR / "counts.parquet"
         )
         pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
-            root / EXPOSURE_DIR / "exposure.parquet"
+            root / EXPOSURE_IN_VISITS_DIR / "exposure.parquet"
         )
 
     def inputs(self) -> builder.EventsInputs:
@@ -215,7 +215,7 @@ class _Run:
             event_participation=root / EVENT_PARTICIPATION_DIR,
             likelihood_advantage=root / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             tetrode_holdout=root / EVENT_TETRODE_HOLDOUT_DIR,
-            exposure_in_visits=root / EXPOSURE_DIR,
+            exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
         )
 
     def _spy(self, name: str):
@@ -401,8 +401,8 @@ PENDING_CASES = [
         ("session_cache", _other_cache()),
         {"nonlocal_power"},
     ),
-    (EXPOSURE_DIR, ("subset", None), {"left_out"}),
-    (EXPOSURE_DIR, ("session_cache", _other_cache()), {"left_out"}),
+    (EXPOSURE_IN_VISITS_DIR, ("subset", None), {"left_out"}),
+    (EXPOSURE_IN_VISITS_DIR, ("session_cache", _other_cache()), {"left_out"}),
     (
         CONTENT_ALONG_ARMS_DIR,
         ("event_table", {"sha256": "old"}),
