@@ -862,6 +862,12 @@ Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
 
+### `scripts/checks/simulate_interval_coverage.py`
+
+Coverage of the animal-balanced interval under three ways to resample.
+
+`Setting`, `cohort`, `intervals`, `simulate`, `main`
+
 ### `scripts/checks/summarize_cohort_audits.py`
 
 Concatenate and flag every ``*_cohort_audit.csv`` under the outputs dir.
