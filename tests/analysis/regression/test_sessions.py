@@ -156,12 +156,12 @@ def test_an_inactive_role_drops_its_rows() -> None:
         design, sessions, GroupedSoftmax(), response="share", unit="event_id"
     )[0]
 
-    # Counted on the rows the fit used, after the role's rows were dropped.
-    assert record.support["role[previous]"]["n_high"] == 0
-    # The slope by the role fails its own support too (3 events).
+    # A dropped level keeps the counts that made it fail.
+    assert record.support["role[previous]"]["n_high"] == 3
+    # The levels are decided first: the slope by the role leaves with its rows.
     assert record.left_out == {
         "role[previous]": "support",
-        "reward_fraction:role=previous": "support",
+        "reward_fraction:role=previous": "rows of role[previous] dropped",
     }
     assert record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
     assert record.n_rows == len(frames[0]) - 3
@@ -191,8 +191,8 @@ def test_a_role_without_a_finite_maximum_drops_its_rows() -> None:
     )[0]
 
     assert record.status == "converged"
-    # Counted on the rows the fit used, after the role's rows were dropped.
-    assert record.support["role[previous]"]["n_high"] == 0
+    # A level dropped for no finite maximum keeps its counts from before.
+    assert record.support["role[previous]"]["n_high"] == 150
     assert record.left_out["role[previous]"].startswith("no finite maximum (round ")
     assert record.left_out["reward_fraction:role=previous"] == (
         "rows of role[previous] dropped"
@@ -357,7 +357,7 @@ def test_support_is_counted_again_on_the_rows_kept(content_sessions) -> None:
     assert record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
     assert record.support["flag"]["n_high"] == 3
     assert not record.support["flag"]["passes"]
-    assert record.support["role[previous]"]["n_high"] == 0
+    assert record.support["role[previous]"]["n_high"] == 3
     assert record.status == "converged"
 
 
@@ -459,3 +459,63 @@ def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
     assert record.cohort_counts["events_without_response"] == 1
     assert record.cohort_counts["events_emptied_by_dropped_rows"] == 2
     assert record.n_units == 150 - 3
+
+
+def _median_case() -> pd.DataFrame:
+    """15 visits of 21 bins, one event each: x per visit and a category, whose
+    level C (3 visits, all at x = 2) is too thin. On all rows the median of x
+    is 2 and no visit is above it, so x fails; once C's rows are dropped the
+    median moves below 2 and x passes."""
+    spec = (
+        [("A", 0.0)] * 3
+        + [("B", 0.0)] * 3
+        + [("A", 1.0)]
+        + [("A", 2.0)] * 3
+        + [("B", 2.0)] * 2
+        + [("C", 2.0)] * 3
+    )
+    rows = [
+        {
+            "animal": "sim",
+            "session_date": "1",
+            "epoch": "02_r1",
+            "visit": visit,
+            "cat": level,
+            "x": x,
+            "exposure": 0.1,
+            "count": 1.0 if b == 0 else 0.0,
+        }
+        for visit, (level, x) in enumerate(spec)
+        for b in range(21)
+    ]
+    return pd.DataFrame(rows)
+
+
+@pytest.mark.parametrize("category_first", [True, False])
+def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
+    """The levels are decided first (C is thin, its rows are dropped), then
+    every other term once on the rows kept: x, failing on all rows, passes
+    there and is fitted. Its left_out entry and its passes flag agree, the
+    dropped level keeps the counts that made it fail, and the result does not
+    depend on the order of the terms."""
+    rows = _median_case()
+    cat = Category("cat", ("A", "B", "C"), reference="A")
+    terms = [cat, Slope("x"), Offset("exposure")]
+    if not category_first:
+        terms = [Slope("x"), Offset("exposure"), cat]
+    design = build_design(terms, rows, intercept=True)
+    (record,) = _fit(
+        design, {("sim", "1", "02_r1"): rows}, Poisson(), response="count", unit="visit"
+    )
+    assert record.status == "converged"
+    assert record.left_out == {"cat[C]": "support"}
+    assert record.support["x"]["passes"]
+    assert np.isfinite(record.coef[record.coef_names.index("x")])
+    assert record.support["cat[C]"]["n_high"] == 3
+    assert not record.support["cat[C]"]["passes"]
+    for column, why in record.left_out.items():
+        if why == "support":
+            assert not record.support[column]["passes"]
+    for column, entry in record.support.items():
+        if not entry["passes"]:
+            assert column in record.left_out

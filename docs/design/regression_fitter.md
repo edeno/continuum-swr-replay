@@ -508,10 +508,15 @@ was all on dropped rows is dropped too, and counted (`events_emptied_by_dropped_
 apart from `events_without_response`, the events given with no response). The other events' shares are not
 renormalized: the likelihood is the conditional one over the candidates kept.
 
-After any rows are dropped, the support is counted again on the rows kept. A column that
-fails there is made inactive, and its rows are dropped if it is a level; this repeats
-until nothing changes (each round removes a column, so it ends). The record holds the
-counts on the rows the fit used. A session with no rows, or no events of the kind, left
+The levels are decided first, and only accumulate: their support is counted on the rows
+kept, the rows of each thin level are dropped, and this repeats until no level fails
+(each round removes a level, so it ends). Every other term is then judged once, on the
+final rows, and that judgment alone decides whether it is active: a slope split at the
+median can pass once a level's rows are gone, and it is then fitted. A term's `left_out`
+entry and its `passes` flag always agree, and the result does not depend on the order of
+the terms. The record holds the counts on the final rows, and for a dropped level the
+counts that made it fail. After a level is left out for having no finite maximum, the
+two steps run again on the rows then kept. A session with no rows, or no events of the kind, left
 after this is not fitted (below).
 
 A column that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit
@@ -543,9 +548,9 @@ session:
 1. The rows with a missing value the design reads are dropped and counted. A missing
    category value (None or NaN) makes its row missing; any other value outside the
    levels is an error.
-2. The design is built and the support rule is applied. A failing column is made
-   inactive, a failing level drops its rows, and the support is counted again on the rows
-   kept until nothing changes, as above.
+2. The design is built and the support rule is applied: the levels first, dropping the
+   rows of each thin level until no level fails, then every other term once on the final
+   rows, as above.
 3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
    of a category left out there for having no finite maximum drops its rows as the
    support rule does (with the recount), and the session is fitted again with every
