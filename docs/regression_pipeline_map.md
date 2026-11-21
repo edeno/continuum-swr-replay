@@ -172,6 +172,12 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 `local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
+### `src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py`
+
+The non-local restriction contrast over all immobile time outside SWRs.
+
+`epoch_outside_swr_gains`, `outside_swr_gain_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
 The non-local restriction models over the windows of Figure 2's panel h.
