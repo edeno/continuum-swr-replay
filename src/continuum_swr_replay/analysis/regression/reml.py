@@ -1010,6 +1010,23 @@ def _session_score(
     )
 
 
+def _labeled_score(
+    lik: Likelihood,
+    data: SessionData,
+    index: int,
+    blocks: Sequence[PenaltyBlock],
+    rho: Sequence[float],
+    start: np.ndarray | None,
+    derivatives: bool,
+) -> RemlScore:
+    """:func:`_session_score` of session ``index``, an input error raised again
+    with the session's label."""
+    try:
+        return _session_score(lik, data, blocks, rho, start, derivatives)
+    except ValueError as error:
+        raise ValueError(f"{_label(data, index)}: {error}") from error
+
+
 def _failure(data: SessionData, index: int, session: RemlScore) -> str:
     """Why session ``index``'s fit failed, in words, with the columns running
     away and their coordinates for a fit with no finite maximum."""
@@ -1061,6 +1078,8 @@ def pooled_reml(
     """
     if starts is None:
         starts = [data.beta0 for data in sessions]
+    for index, data in enumerate(sessions):
+        _check_active(data, index, blocks)
     return _pooled_reml(
         lik, sessions, range(len(sessions)), blocks, rho, starts, derivatives
     )
@@ -1076,15 +1095,11 @@ def _pooled_reml(
     derivatives: bool,
 ) -> PooledScore:
     """:func:`pooled_reml`, with each session labeled by its index in ``indices``
-    (its place among all of a search's sessions)."""
-    for index, data in zip(indices, sessions, strict=True):
-        _check_active(data, index, blocks)
+    (its place among all of a search's sessions), whose active masks the
+    caller has checked."""
     scores = []
     for index, data, start in zip(indices, sessions, starts, strict=True):
-        try:
-            session = _session_score(lik, data, blocks, rho, start, derivatives)
-        except ValueError as error:
-            raise ValueError(f"{_label(data, index)}: {error}") from error
+        session = _labeled_score(lik, data, index, blocks, rho, start, derivatives)
         if not np.isfinite(session.score):
             failure = _failure(data, index, session)
             return PooledScore(
@@ -1420,10 +1435,7 @@ def _screen(
     kept, set_aside = [], []
     for index, data in enumerate(sessions):
         _check_active(data, index, blocks)
-        try:
-            session = _session_score(lik, data, blocks, reference, data.beta0, False)
-        except ValueError as error:
-            raise ValueError(f"{_label(data, index)}: {error}") from error
+        session = _labeled_score(lik, data, index, blocks, reference, data.beta0, False)
         status = session.fit.status
         if np.isfinite(session.score):
             kept.append(index)
@@ -1519,7 +1531,7 @@ def _refit(
         else data.active.copy()
     )
     left_out: list[int] = []
-    refits = [_session_score(lik, data, blocks, rho, data.beta0, False)]
+    refits = [_labeled_score(lik, data, index, blocks, rho, data.beta0, False)]
     reason = ""
     while not refits[-1].fit.converged:
         last = refits[-1]
@@ -1544,8 +1556,14 @@ def _refit(
         active[new] = False
         left_out.extend(new)
         refits.append(
-            _session_score(
-                lik, replace(data, active=active.copy()), blocks, rho, data.beta0, False
+            _labeled_score(
+                lik,
+                replace(data, active=active.copy()),
+                index,
+                blocks,
+                rho,
+                data.beta0,
+                False,
             )
         )
     if refits[-1].fit.converged:
