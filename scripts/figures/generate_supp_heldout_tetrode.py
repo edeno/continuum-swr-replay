@@ -5,7 +5,8 @@ The immobile non-local events of the canonical event table that start inside a
 well visit (``cohort_selection.select_visit_context``), split by whether they
 overlap an SWR. Each tetrode is left out of the decoder's smoother in turn
 and scored at every bin of each event under the other tetrodes' position
-distribution against local coding around the animal (time-fold encodings); the
+distribution against local coding around the animal (encodings held out in
+folds of whole trials); the
 gain is summed over tetrodes and bins and divided by the event's spikes. A dot
 per animal for no-SWR and SWR events, the animals' mean with its 95 % interval,
 and a line at zero, where local coding predicts the held-out spikes as well.
@@ -17,6 +18,8 @@ The statistics are ``tetrode_holdout.holdout_statistics`` of the held-out
 tetrode run (``scripts/event_evidence/score_tetrode_holdout.py``;
 ``Processed-Data/event_tetrode_holdout``) over the epochs the events summary
 reads: the values its ``*_heldout_*`` keys hold (``paper/reported/events.json``).
+A run not held out in folds of whole trials is refused, as the summary refuses
+it.
 It was a panel of Figure 2; Figure 2g now compares the full decoder with the
 SWR-only decoder.
 
@@ -51,8 +54,13 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME
-from continuum_swr_replay.reported.events import default_inputs
+from continuum_swr_replay.reported.events import (
+    default_inputs,
+    require_tetrode_holdout_folds,
+)
+from continuum_swr_replay.reported.values import rel
 from continuum_swr_replay.runs.io import read_complete_run
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     draw_group_gain,
@@ -82,8 +90,12 @@ YLABEL = "Held-out gain\nover local (nats/spike)"
 def read_inputs() -> pd.DataFrame:
     """The held-out tetrode statistics of the events that start inside a well
     visit, indexed by group, over every analyzed epoch with an event, as the
-    events summary reads them."""
+    events summary reads them; a held-out tetrode run not held out in folds of
+    whole trials is refused (``reported.events.require_tetrode_holdout_folds``)."""
     inputs = default_inputs()
+    require_tetrode_holdout_folds(
+        read_output_manifest(inputs.tetrode_holdout), rel(inputs.tetrode_holdout)
+    )
     table = read_swr_table(inputs.event_table)
     scores = read_complete_run(
         inputs.tetrode_holdout,

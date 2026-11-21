@@ -9,7 +9,9 @@ checks for); the held-out event run's events (one per canonical event that
 starts inside a visit, and two that start outside one), its canonical events
 found again (every canonical event, the planted one too), its time sums (one
 row per epoch) and each epoch's time step; the restriction run (a fold fit) and
-the per-bin facts run only through their manifests.
+the per-bin facts run only through their manifests. The restriction run and the
+held-out tetrode run are held out in folds of whole trials, as their settings
+record.
 
 Every builder is a stand-in recording what it is given and returning one value
 named after it; the readers of the stored outputs are stand-ins too, or tiny
@@ -252,6 +254,11 @@ class _Run:
                 "fold_design": "trials",
                 "em": {"max_iter": 20},
             },
+        }
+        # the held-out tetrode run is held out in folds of whole trials
+        self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
+            "n_folds": 5,
+            "fold_design": "trials",
         }
         for folder, (key, value) in (changes or {}).items():
             if value is None:
@@ -701,3 +708,30 @@ def test_a_restriction_run_that_is_not_the_fold_fit_on_trials_is_refused(
     )
     with pytest.raises(ValueError, match=message):
         run.summarize()
+
+
+@pytest.mark.parametrize(
+    ("settings", "message"),
+    [
+        ({"n_folds": 5, "margin_bins": 2}, "fold_design None, not 'trials'"),
+        (
+            {"n_folds": 5, "fold_design": "contiguous"},
+            "fold_design 'contiguous', not 'trials'",
+        ),
+    ],
+    ids=["no fold design", "another design"],
+)
+def test_a_tetrode_holdout_run_not_on_trial_folds_is_refused(
+    processed_data_root, monkeypatch, settings, message
+):
+    """A held-out tetrode run of an older fold design (none recorded, as the
+    first run's ``{n_folds, margin_bins}``, or another design) cannot give
+    values that describe encodings held out in folds of whole trials."""
+    run = _Run(
+        processed_data_root,
+        monkeypatch,
+        {EVENT_TETRODE_HOLDOUT_DIR: ("settings", settings)},
+    )
+    with pytest.raises(ValueError, match=message) as raised:
+        run.summarize()
+    assert "event_tetrode_holdout is not held out in folds" in str(raised.value)

@@ -462,6 +462,27 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     )
 
 
+def require_trial_folds(manifest: dict, what: str, rerun: str) -> None:
+    """Refuse a held-out run whose folds are not whole trials.
+
+    A held-out run records its fold design in its settings (``fold_design``).
+    A run of an older design (contiguous blocks of time, or no design recorded)
+    cannot give values that describe folds of whole trials.
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fold_design": "trials"``;
+        the message ends with ``rerun``, what to run instead.
+    """
+    design = manifest.get("settings", {}).get("fold_design")
+    if design != TRIAL_DESIGN:
+        raise ValueError(
+            f"{what} is not held out in folds of whole trials (its settings "
+            f"record fold_design {design!r}, not {TRIAL_DESIGN!r}). {rerun}"
+        )
+
+
 def require_fold_fit(manifest: dict, what: str) -> None:
     """Refuse a restriction run that is not the fold fit on folds of whole trials.
 
@@ -469,9 +490,9 @@ def require_fold_fit(manifest: dict, what: str) -> None:
     folds of whole trials balanced by destination well; the fold-fit run's
     settings record ``"fit": "folds"`` and ``"fold_design": "trials"``. A run of
     the earlier design, which held out only the encodings and ran the models
-    with the transitions fit on the whole epoch, records no ``fit``; a fold fit
-    on contiguous blocks of time records ``"fold_design": "contiguous"``.
-    Neither can give these values.
+    with the transitions fit on the whole epoch, records no ``fit``; a run of
+    another fold design is refused by :func:`require_trial_folds`. Neither can
+    give these values.
 
     Raises
     ------
@@ -479,11 +500,10 @@ def require_fold_fit(manifest: dict, what: str) -> None:
         If ``manifest``'s settings do not record ``"fit": "folds"`` and
         ``"fold_design": "trials"``.
     """
-    settings = manifest.get("settings", {})
-    fit, design = settings.get("fit"), settings.get("fold_design")
+    fit = manifest.get("settings", {}).get("fit")
     rerun = (
-        "scripts/event_evidence/score_nonlocal_restriction.py) in this folder, "
-        "then rerun scripts/event_evidence/measure_bin_facts.py, "
+        "Put the fold-fit run (scripts/event_evidence/score_nonlocal_restriction.py) "
+        "in this folder, then rerun scripts/event_evidence/measure_bin_facts.py, "
         "scripts/event_evidence/detect_heldout_events.py and "
         "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
     )
@@ -491,14 +511,27 @@ def require_fold_fit(manifest: dict, what: str) -> None:
         raise ValueError(
             f"{what} is not the fold fit (its settings record fit {fit!r}, not "
             f"{FIT!r}): it is the earlier design, which held out only the "
-            f"encodings. Put the fold-fit run ({rerun}"
+            f"encodings. {rerun}"
         )
-    if design != TRIAL_DESIGN:
-        raise ValueError(
-            f"{what} is not the fold fit on folds of whole trials (its settings "
-            f"record fold_design {design!r}, not {TRIAL_DESIGN!r}). Put the fold-fit "
-            f"run with --fold-design {TRIAL_DESIGN} ({rerun}"
-        )
+    require_trial_folds(manifest, what, rerun)
+
+
+def require_tetrode_holdout_folds(manifest: dict, what: str) -> None:
+    """Refuse a held-out tetrode run whose folds are not whole trials
+    (:func:`require_trial_folds`).
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fold_design": "trials"``.
+    """
+    require_trial_folds(
+        manifest,
+        what,
+        "Put the held-out tetrode run on folds of whole trials "
+        "(scripts/event_evidence/score_tetrode_holdout.py) in this folder, then "
+        "rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py on it.",
+    )
 
 
 def spike_evidence_staleness(
@@ -3525,6 +3558,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             inputs.likelihood_advantage, "likelihood_advantage", analyzed
         ),
         selected,
+    )
+    require_tetrode_holdout_folds(
+        read_output_manifest(inputs.tetrode_holdout), rel(inputs.tetrode_holdout)
     )
     holdout_table = select_events_in(
         read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),

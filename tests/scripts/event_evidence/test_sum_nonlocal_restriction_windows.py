@@ -218,14 +218,25 @@ def test_windows_the_holdout_run_did_not_score_raise(data_dir, tmp_path):
 
 
 def _main_header(
-    tmp_path, monkeypatch, holdout_inputs: dict, event_table: str = "a"
+    tmp_path,
+    monkeypatch,
+    holdout_inputs: dict,
+    event_table: str = "a",
+    holdout_settings: dict | None = None,
+    argv: tuple[str, ...] = (),
 ) -> dict | None:
     """Run ``main`` with its inputs' digests and the held-out tetrode run's
-    manifest replaced; return the header it ran the epochs under, or None when
+    manifest replaced (its settings by default those of a run on folds of
+    whole trials); return the header it ran the epochs under, or None when
     it ran none. Participation tables have digest ``"b"``."""
     ran = {}
     manifests = {
         EVENT_TETRODE_HOLDOUT_DIR: {
+            "settings": (
+                {"n_folds": 5, "fold_design": "trials"}
+                if holdout_settings is None
+                else holdout_settings
+            ),
             "inputs": holdout_inputs,
             "epochs": {EPOCH: {"status": "ok"}},
         },
@@ -242,7 +253,8 @@ def _main_header(
     monkeypatch.setattr(runner, "provenance_record", lambda root: {})
     monkeypatch.setattr(runner, "read_manifest", lambda folder: manifests[folder.name])
     monkeypatch.setattr(runner, "run", lambda **kwargs: ran.update(kwargs))
-    runner.main(["--data-dir", str(tmp_path)])
+    monkeypatch.setattr(runner, "gather_manifest", lambda *args: ran.update(gather=1))
+    runner.main(["--data-dir", str(tmp_path), *argv])
     assert ran["epochs"] == [EPOCH]
     return ran["header"]
 
@@ -286,4 +298,32 @@ def test_other_participation_tables_stop_the_run(tmp_path, monkeypatch):
             tmp_path,
             monkeypatch,
             {"event_table": {"sha256": "z"}, "event_participation": {"sha256": "c"}},
+        )
+
+
+@pytest.mark.parametrize(
+    ("settings", "message"),
+    [
+        ({"n_folds": 5, "margin_bins": 2}, "fold_design None, not 'trials'"),
+        (
+            {"n_folds": 5, "fold_design": "contiguous"},
+            "fold_design 'contiguous', not 'trials'",
+        ),
+    ],
+    ids=["no fold design", "another design"],
+)
+@pytest.mark.parametrize("argv", [(), ("--gather",)], ids=["run", "gather"])
+def test_a_held_out_tetrode_run_not_on_trial_folds_stops_the_run(
+    tmp_path, monkeypatch, settings, message, argv
+):
+    """The window spike counts come from the held-out tetrode run: a run of
+    an older fold design (none recorded, or another) is refused before any
+    epoch runs and before a gather."""
+    with pytest.raises(ValueError, match=message):
+        _main_header(
+            tmp_path,
+            monkeypatch,
+            {"event_table": {"sha256": "a"}, "event_participation": {"sha256": "b"}},
+            holdout_settings=settings,
+            argv=argv,
         )

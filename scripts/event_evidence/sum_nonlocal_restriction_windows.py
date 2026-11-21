@@ -50,7 +50,10 @@ and ``manifest.json`` gathered from the records. The header records the
 digests of the event table, the participation tables, and the restriction,
 held-out tetrode and bin-facts runs' manifests. The participation tables must be the ones the
 held-out tetrode run read (its manifest's inputs), or the run stops before any
-epoch: the control windows come from them. An event table other than the one
+epoch: the control windows come from them. The held-out tetrode run must be
+held out in folds of whole trials, as the restriction run is (its manifest's
+settings, ``reported.events.require_tetrode_holdout_folds``), or the run stops
+before any epoch and does not gather. An event table other than the one
 the held-out tetrode run read does not stop the run: it is logged as a warning
 and the header's settings carry a note with both digests
 (``restriction_windows.EVENT_TABLE_NOTE``; only then, so a run on the held-out
@@ -100,6 +103,7 @@ from continuum_swr_replay.paths import (
     TETRODE_HOLDOUT_NAME,
     processed_data_dir,
 )
+from continuum_swr_replay.reported.events import require_tetrode_holdout_folds
 from continuum_swr_replay.runs.epoch_records import gather_manifest
 from continuum_swr_replay.runs.io import (
     json_ready,
@@ -305,6 +309,7 @@ def main(argv: list[str] | None = None) -> None:
         },
     }
     holdout_manifest = read_manifest(holdout_dir)
+    require_tetrode_holdout_folds(holdout_manifest, str(holdout_dir))
     note = event_table_note(header["inputs"], holdout_manifest)
     if note is not None:
         logging.getLogger(__name__).warning(
