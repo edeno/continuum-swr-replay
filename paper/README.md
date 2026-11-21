@@ -30,7 +30,7 @@ explicitly including stationary representations as well as trajectories.
 | `reported/<summary>.json` | The summary files every reported number is read from, named for what they hold: `survey` (the literature numbers the introduction quotes), `detection`, `events`, `behavior`, `mpfc` |
 | `reported/inputs/detection/` | The tracked input files the detection summary reads: the simulation sweep summaries (`detection_{sweep,controls,heldout}_summary.csv`) and the labeled recording's numbers (`memoryless_comparison_recording.json`). `reference_check_summary.csv`, the memoryless port checked against its reference (`scripts/checks/compare_memoryless_to_reference.py`), is kept beside them; no summary reads it |
 | `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source, the builder function that made it) and the values by figure |
-| `figures/<topic>/` | Figures, one folder per figure, written by the figure scripts; only Figure 1's files are kept in the repository |
+| `figures/<topic>/` | Figures, one folder per figure, written by the figure scripts; a figure's files are kept in the repository only when `.gitignore` lists them (see "Figures") |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:survey.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
 | `Makefile`, `.latexmkrc` | Build settings |
 | `LICENSE` | CC BY 4.0 for the manuscript text and figures |
@@ -58,15 +58,21 @@ regenerate it. `tests/reported/test_manuscript_macros.py` checks that every macr
 
 ## Figures
 
-`main.tex` draws each main figure from `figures/figureNN/figureNN.pdf`. A
-figure that does not exist yet is drawn as a framed box naming the file and the
-script that makes it, so the PDF always builds. `make figures` from the
-repository root regenerates the main figures (it needs the lab's processed
-data).
+`main.tex` draws each main figure from `figures/figureNN/figureNN.pdf`, and,
+in its supplementary material, each supplementary figure from
+`figures/supp_<name>/supp_<name>.pdf`, made by
+`scripts/figures/generate_supp_<name>.py`. Every figure is drawn with
+`\paperfigure[<options>]{<file>}{<script>}`: the optional first argument is the
+graphics options, the text width by default; `[]` draws a small figure at the
+size its script made it. A figure that does not exist yet is drawn as a framed
+box naming the file and the script that makes it, so the PDF always builds.
+`make figures` from the repository root regenerates the main figures (it needs
+the lab's processed data); each supplementary figure is made by its own script.
 
-Git ignores the figure files under `figures/` by default. When a figure is
-final, add a `!paper/figures/<topic>/<name>.pdf` line to `.gitignore`, as
-Figure 1 has, and commit it with the rebuilt `main.pdf`.
+Git ignores the figure files under `figures/` by default. A figure is kept in
+the repository when `.gitignore` lists its files with a
+`!paper/figures/<topic>/<name>.pdf` line (and its `.png`); when a figure is
+final, add those lines and commit the files with the rebuilt `main.pdf`.
 
 ## Supplementary tables
 

@@ -507,7 +507,11 @@ Each builder's statistics:
   sets; the modes, ranges and shares are computed there);
 - events: `analysis/event_properties/event_statistics.py`, `analysis/event_properties/content_along_arms.py`
   (where content sits on the track), `analysis/decode_quality/quality_metrics.py` (the
-  decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`;
+  decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`,
+  and in `analysis/event_evidence/`: `restriction_totals.py` and `restriction_windows.py` (the three
+  restriction decoders over immobile time and over event windows), `heldout_events.py` (the events
+  detected from the held-out decode and how they agree with the canonical ones), `tetrode_holdout.py`
+  (the held-out tetrode score), `participation.py` and `likelihood_advantage.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
