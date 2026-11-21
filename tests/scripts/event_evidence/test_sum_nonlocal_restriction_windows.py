@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.paths import (
     EVENT_BIN_FACTS_DIR,
@@ -39,9 +40,12 @@ PARTICIPATION = pd.DataFrame(
 
 
 def _bins() -> pd.DataFrame:
-    """``none`` 0, ``swr`` 1 and ``full`` 3 nats at every bin; the two-sided
-    scores twice those."""
+    """A fold-fit bins table: ``none`` 0, ``swr`` 1 and ``full`` 3 nats at
+    every bin, the two-sided scores twice those, and the ``full`` model's state
+    probabilities and non-local place bin, which the window run does not read."""
     one = np.ones(N, dtype=np.float32)
+    fold_fit = dict.fromkeys(nr.STATE_PROBABILITY_COLUMNS.values(), 0.25 * one)
+    fold_fit[nr.NONLOCAL_PLACE_BIN_COLUMN] = np.zeros(N, dtype=np.int32)
     return pd.DataFrame(
         {
             "time": TIME,
@@ -55,6 +59,7 @@ def _bins() -> pd.DataFrame:
             "category": pd.Categorical(
                 np.where(np.arange(N) == 9, "immobile_in_swr", "immobile_outside_swr")
             ),
+            **fold_fit,
         }
     )
 
@@ -90,9 +95,10 @@ def _facts() -> pd.DataFrame:
 def data_dir(tmp_path, monkeypatch):
     restriction = tmp_path / EVENT_NONLOCAL_RESTRICTION_DIR
     restriction.mkdir()
-    output_path(EPOCH, restriction, runner.RESTRICTION_NAME).with_suffix(
+    # a fold-fit record: it counts no spikes
+    output_path(EPOCH, restriction, "nonlocal_restriction").with_suffix(
         ".json"
-    ).write_text(json.dumps({"n_spikes": 8}))
+    ).write_text(json.dumps({"status": "ok", "fit": "folds", "n_bins": N}))
     for folder, name, table in (
         (EVENT_NONLOCAL_RESTRICTION_DIR, runner.BINS_NAME, _bins()),
         (EVENT_BIN_FACTS_DIR, runner.FACTS_NAME, _facts()),
@@ -159,12 +165,19 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     assert set(sums["epoch_id"]) == {EPOCH}
 
 
-def test_per_bin_facts_that_are_not_the_runs_spikes_raise(data_dir, tmp_path):
+def test_per_bin_facts_whose_window_spikes_are_not_the_holdout_runs_raise(
+    data_dir, tmp_path
+):
+    """The facts' spikes are tied to the held-out tetrode run's window by
+    window; the restriction run's record counts no spikes, so a change outside
+    every window is not checked."""
     facts = _facts()
-    facts.loc[18, "n_spikes"] = 0  # the epoch's total is 7, not the run's 8
+    facts.loc[18, "n_spikes"] = 0  # bin 18 is in no window
     facts.to_parquet(output_path(EPOCH, data_dir / EVENT_BIN_FACTS_DIR, "bin_facts"))
-    with pytest.raises(ValueError, match="restriction run's"):
-        runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, tmp_path)
+    output = tmp_path / "out"
+    output.mkdir()
+    record = runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, output)
+    assert record["status"] == "ok" and record["n_spikes"] == 7
     facts = _facts()
     facts.loc[[3, 18], "n_spikes"] = np.array(
         [0, 2], dtype=np.int32
@@ -175,14 +188,11 @@ def test_per_bin_facts_that_are_not_the_runs_spikes_raise(data_dir, tmp_path):
 
 
 def test_another_restriction_run_is_read(data_dir, tmp_path):
-    other = tmp_path / "fold_fit"
+    other = tmp_path / "shared_fit"
     other.mkdir()
     bins = _bins()
     bins["full"] = np.float32(5.0)
     bins.to_parquet(output_path(EPOCH, other, runner.BINS_NAME))
-    output_path(EPOCH, other, runner.RESTRICTION_NAME).with_suffix(".json").write_text(
-        json.dumps({"n_spikes": 8})
-    )
     output = tmp_path / "out"
     output.mkdir()
     runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, output, other)

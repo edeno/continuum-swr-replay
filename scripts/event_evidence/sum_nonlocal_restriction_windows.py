@@ -11,19 +11,21 @@ spike count over every tetrode from the epoch's held-out tetrode table
 (``restriction_windows.window_spike_counts``, which fails when the two runs'
 windows differ by id, event, kind, group or length, or a window lacks a
 tetrode's row). From the epoch's per-bin facts (``measure_bin_facts.py``: each
-bin's spikes and well-visit flag; its total spike count must be the restriction
-run's record ``n_spikes``) add each window's spikes over its bins outside SWRs
-and its sums over those inside a well visit
-(``restriction_windows.window_bin_fact_sums``; the facts' spikes over the whole
-window must be the held-out tetrode run's ``n_spikes``), and sum the epoch's
+bin's spikes and well-visit flag, on the per-bin table's time) add each
+window's spikes over its bins outside SWRs and its sums over those inside a
+well visit (``restriction_windows.window_bin_fact_sums``; the facts' spikes over
+the whole window must be the held-out tetrode run's ``n_spikes``, which ties
+the facts' spikes to that run's loader: the restriction run's record counts no
+spikes), and sum the epoch's
 bins by category, well visit and event window
 (``restriction_totals.restriction_time_sums``). An epoch that is ``ok`` in only
 one of the two runs is left out and named in a warning. CPU only: pandas and
 numpy, nothing is decoded or refit.
 
 ``--restriction-dir`` reads another restriction run (a second scoring of the
-same bins) and ``--output-dir`` writes elsewhere; by default the canonical
-restriction run and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
+same bins, such as the earlier design's, which held out only the encodings)
+and ``--output-dir`` writes elsewhere; by default the canonical restriction run
+and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
 
 Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 
@@ -68,14 +70,13 @@ Usage::
     uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py \\
         --workers 8
     uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py \\
-        --restriction-dir Processed-Data/event_nonlocal_restriction_fold_fit \\
-        --output-dir Processed-Data/event_nonlocal_restriction_fold_fit_windows
+        --restriction-dir Processed-Data/event_nonlocal_restriction_shared_fit \\
+        --output-dir Processed-Data/event_nonlocal_restriction_shared_fit_windows
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import multiprocessing
 import sys
@@ -134,7 +135,6 @@ PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction_windows"
 TIME_SUMS_NAME = "nonlocal_restriction_time_sums"
 BINS_NAME = "nonlocal_restriction_bins"
-RESTRICTION_NAME = "nonlocal_restriction"
 FACTS_NAME = "bin_facts"
 HOLDOUT_NAME = "tetrode_holdout"
 PARTICIPATION_NAME = "participation"
@@ -162,10 +162,10 @@ def run_epoch(
     Raises
     ------
     ValueError
-        If the per-bin table's time is not the decode frame's, the windows are
-        not the held-out tetrode run's, or the per-bin facts' spikes are not
-        the restriction run's (in the epoch) or the held-out tetrode run's (in
-        a window).
+        If the per-bin table's time is not the decode frame's, the per-bin
+        facts' time is not the per-bin table's, the windows are not the
+        held-out tetrode run's, or the per-bin facts' spikes in a window are
+        not the held-out tetrode run's.
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
@@ -189,16 +189,6 @@ def run_epoch(
         pd.read_parquet(holdout_path, columns=HOLDOUT_COLUMNS), windows
     ).to_numpy()
     facts = pd.read_parquet(facts_path)
-    restriction_spikes = json.loads(
-        output_path(epoch_id, restriction_dir, RESTRICTION_NAME)
-        .with_suffix(".json")
-        .read_text()
-    )["n_spikes"]
-    if int(facts["n_spikes"].sum()) != int(restriction_spikes):
-        raise ValueError(
-            "the per-bin facts' spikes are not the restriction run's "
-            f"({int(facts['n_spikes'].sum())} against {restriction_spikes})"
-        )
     from_facts = rw.window_bin_fact_sums(bins, facts, windows)
     differ = from_facts["n_spikes_bins"].to_numpy() != table["n_spikes"].to_numpy()
     if differ.any():
