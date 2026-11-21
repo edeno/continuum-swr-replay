@@ -450,7 +450,8 @@ starting point for the figure's own design pass after stage 1.
 Settled by the lead on 2026-11-20 (the rounds below record the words): the nine-arm candidate set; the well
 visit as the unit, ending at the last nose-poke out, with three clocks; both forms of the reward effect; every
 remaining family moved to the convention, and two deleted; the mPFC models in this work; absolute recency;
-reward history asked by models A and D; two more measures of uncertainty. Nothing in this list is open now.
+reward history asked by models A and D; two more measures of uncertainty. One question is open: the common
+data subset of Figures 2 to 5 (fifth round below).
 The questions as first put:
 
 A second reader checked this document as a builder would (2026-11-20). Its questions that only the lead can
@@ -520,6 +521,18 @@ answer are 1 to 5; 6 was open before.
   the decode frames is running to show whether the drop in event starts before a stop ends is made by the
   counting rule or is in the data, and what the small movements at a well are (for decision 2).
 - **Reward history:** models A and D, separately (section 4.2).
+
+### Fifth round (lead, 2026-11-20): one data subset for Figures 2 to 5
+
+- "all our analysis should be on the same real data subset (figure 2-5)". So the data rule of section 4.1
+  is meant for Figures 2, 3 and 5 too, not only for the models of Figure 4. Today Figures 2 and 3 use every
+  immobile non-local event (75,675); 69,011 of them are at a well by the event's own label, and 6,381 are in
+  transit (81 % of those have no SWR, against 54.5 % at a well; 4 to 12 % of an animal's events).
+- **Open, and not to be decided before the data are understood** (lead: "Before we exclude these events,
+  lets make sure we understand what the events that don't correspond to our rule are, when they occur,
+  etc."): whether the common subset is immobile time inside a well visit, and whether the events outside it
+  are described anywhere. An exploration of those events is running (what they are, when and where they
+  occur, how they compare with events at a well, what exclusion changes).
 
 ## 10. Left to the builder
 
