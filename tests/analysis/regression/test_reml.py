@@ -954,3 +954,36 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     )
     with pytest.raises(ValueError, match=message):
         select_penalties(GroupedSoftmax(), many, blocks)
+
+
+def _two_smooth_session(seed: int) -> tuple[SessionData, list[PenaltyBlock]]:
+    """:func:`_content_session` with a second smooth: a P-spline of a share in
+    [0, 1] (8 basis functions, 7 after the constraint) with no effect."""
+    data, blocks = _content_session(seed)
+    rng = np.random.default_rng(1000 + seed)
+    share = rng.uniform(0.0, 1.0, data.X.shape[0])
+    basis = PSplineBasis(0.0, 1.0, 8)
+    B = basis.design(share)
+    Z = sum_to_zero_constraint(B)
+    X = np.column_stack([data.X[:, :9], B @ Z, data.X[:, 9:]])
+    second = PenaltyBlock(np.arange(9, 16), Z.T @ basis.penalty() @ Z)
+    return SessionData(X, data.y, data.aux), [*blocks, second]
+
+
+def test_two_smooths_in_their_null_spaces_return() -> None:
+    """Twenty content sessions with two smooths whose truths are a line and
+    zero: the score is flat toward the bound in both log penalties. The search
+    returns, every grid point finite, each term's edf that of a line in every
+    session and both flagged ``in_null_space``."""
+    sessions = []
+    for seed in range(20):
+        data, blocks = _two_smooth_session(seed)
+        sessions.append(data)
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+
+    assert result.search.n_grid_not_finite == 0
+    assert result.search.set_aside == ()
+    assert np.all(result.rho > 15.0)
+    for session in result.sessions:
+        np.testing.assert_allclose(session.edf, [1.0, 1.0], rtol=0, atol=1e-5)
+        np.testing.assert_array_equal(session.in_null_space, [True, True])

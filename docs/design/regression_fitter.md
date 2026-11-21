@@ -106,7 +106,11 @@ column, each with part of the response on its rows, which a rule on one column a
 cannot see) names each of them. Error texts name them too
 (`session 4 (s4): no finite maximum (columns running away: [11, 12])`), so that a caller
 can mark them inactive in that session (`SessionData.active`); the fit leaves nothing
-regularized to hide the separation.
+regularized to hide the separation. The list can hold a smooth's columns: its penalty
+leaves the straight line free, and a line can take part in a separation (on the
+simulated model with a reward-fraction smooth, 3 of the 7 sessions set aside name some
+of its columns). Those columns may not be inactive; the caller decides what to leave
+out among the unpenalized columns named with them.
 
 ## How the penalties are chosen
 
@@ -212,7 +216,11 @@ its status and its running-away columns. A session that passes the reference poi
 fails at another point makes that point's score infinite, as before. On the simulated
 content model the 242 sessions of the M0 and M1 models without SWR set aside 4 sessions
 each (1.7 %, all "no finite maximum") and select log penalties 2.57 and 2.95; at
-ef98019d both raised.
+ef98019d both raised. With two smooths (recency and reward fraction, M3) the search
+without SWR sets aside 7 sessions (2.9 %) and returns `[5.30, 19.38]`, the second term
+in its null space in every session; with SWR it sets aside 2 (one "information not
+positive definite") and returns `[19.70, 20]`, both terms lines. At ef98019d both raised,
+before and after the study's own screening.
 
 There is no fallback: if no grid point gives a finite score over the sessions kept,
 `select_penalties` raises, naming the sessions that failed and why, and the model is not
