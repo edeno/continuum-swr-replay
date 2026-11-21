@@ -219,3 +219,38 @@ def test_statistics_leave_out_and_count_windows_with_excluded_bins():
     # b: median of 10 and 20 = 15
     np.testing.assert_allclose(row["animals"], [3.0, 15.0])
     assert row["n_events"] == 6 and row["n_scored"] == 5
+
+
+def test_a_chosen_row_is_the_same_row_of_the_full_table():
+    """Each row's bootstrap is seeded on its own, so computing only some rows
+    gives those rows exactly as the full table has them."""
+    keys = ["family", "contrast", "unit", "kind", "group"]
+    full = rw.restriction_window_statistics(_cohort(), n_boot=200, seed=3)
+    chosen = rw.restriction_window_statistics(
+        _cohort(),
+        n_boot=200,
+        seed=3,
+        families=["filter"],
+        contrasts=["full_minus_none"],
+        units=["per_spike"],
+        kinds=["event"],
+    )
+    assert list(chosen.columns) == list(full.columns)
+    assert list(chosen["group"]) == ["SWR", "no SWR"]
+    expected = full.set_index(keys).loc[
+        [tuple(row) for row in chosen[keys].itertuples(index=False)]
+    ]
+    for (_, mine), (_, theirs) in zip(
+        chosen.set_index(keys).iterrows(), expected.iterrows(), strict=True
+    ):
+        for column in ("estimate", "ci_low", "ci_high", "n_events", "n_scored"):
+            assert mine[column] == theirs[column]
+        np.testing.assert_array_equal(mine["animals"], theirs["animals"])
+        assert mine["n_animals_positive"] == theirs["n_animals_positive"]
+
+
+def test_an_unknown_choice_raises():
+    with pytest.raises(ValueError, match="unknown contrast"):
+        rw.restriction_window_statistics(_cohort(), n_boot=10, contrasts=["x"])
+    with pytest.raises(ValueError, match="no windows of kind"):
+        rw.restriction_window_statistics(_cohort(), n_boot=10, kinds=["y"])

@@ -52,6 +52,8 @@ bins the restriction run scored finite (its sums raise otherwise).
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import numpy as np
 import pandas as pd
 
@@ -246,7 +248,14 @@ def window_contrasts(windows: pd.DataFrame) -> pd.DataFrame:
 
 
 def restriction_window_statistics(
-    windows: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+    windows: pd.DataFrame,
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+    families: Sequence[str] | None = None,
+    contrasts: Sequence[str] | None = None,
+    units: Sequence[str] | None = None,
+    kinds: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     """Each contrast's per-animal values, their mean and its interval, by
     score family, unit, kind of window and group.
@@ -266,21 +275,34 @@ def restriction_window_statistics(
         ``n_spikes``, ``epoch_id`` and ``animal``.
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
+    families, contrasts, units, kinds : sequence of str, optional
+        Only these score families (:data:`.nonlocal_restriction.FAMILY_SUFFIX`),
+        contrasts (:data:`CONTRASTS`), units (:data:`UNITS`) and kinds of window;
+        each defaults to all of them. Each row's bootstrap starts from ``seed``
+        on its own, so a row is the same whichever others are computed.
 
     Returns
     -------
     pd.DataFrame
-        One row per family, contrast, unit, kind and group: those keys,
+        One row per chosen family, contrast, unit, kind and group: those keys,
         ``estimate``, ``ci_low``, ``ci_high``, ``animals`` (the animals'
         values), ``animal_names``, ``n_events`` (windows), ``n_scored``
         (windows with a value), ``n_animals`` and ``n_animals_positive``
         (animals whose value is above zero).
     """
+    families = _chosen(families, FAMILY_SUFFIX, "family")
+    contrasts = _chosen(contrasts, CONTRASTS, "contrast")
+    units = _chosen(units, UNITS, "unit")
     scored = window_contrasts(windows)
+    if kinds is not None:
+        missing = set(kinds) - set(scored["kind"])
+        if missing:
+            raise ValueError(f"no windows of kind {sorted(missing)}")
+        scored = scored[scored["kind"].isin(kinds)]
     parts = []
-    for family in FAMILY_SUFFIX:
-        for contrast in CONTRASTS:
-            for unit in UNITS:
+    for family in families:
+        for contrast in contrasts:
+            for unit in units:
                 column = contrast_column(contrast, family, unit)
                 for kind, mine in scored.groupby("kind", sort=True):
                     part = likelihood_advantage_statistics(
@@ -295,3 +317,21 @@ def restriction_window_statistics(
     table["n_animals_positive"] = [int((a > 0).sum()) for a in table["animals"]]
     keys = ["family", "contrast", "unit", "kind", "group"]
     return table[keys + [c for c in table.columns if c not in keys]]
+
+
+def _chosen(
+    chosen: Sequence[str] | None, known: Mapping[str, object], name: str
+) -> list[str]:
+    """``chosen`` in ``known``'s order, or all of ``known`` when None.
+
+    Raises
+    ------
+    ValueError
+        If ``chosen`` names one that ``known`` does not hold.
+    """
+    if chosen is None:
+        return list(known)
+    unknown = set(chosen) - set(known)
+    if unknown:
+        raise ValueError(f"unknown {name}: {sorted(unknown)}")
+    return [key for key in known if key in chosen]
