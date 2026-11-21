@@ -194,3 +194,33 @@ def test_a_start_that_overflows_reports_not_converged() -> None:
         )
     assert not fit.converged
     assert fit.n_iter == 0
+
+
+def test_last_step_below_the_objective_rounding_is_taken() -> None:
+    """From a start whose predicted gain is below the rounding of F, the fit
+    still lands on the optimum: F cannot tell the points apart, the decrement
+    can."""
+    rng = np.random.default_rng(12)
+    X = np.column_stack([np.ones(400), rng.normal(size=(400, 4))])
+    offset = np.log(rng.uniform(0.5, 2.0, size=400))
+    y = rng.poisson(np.exp(1.0 + 0.3 * X[:, 1] + offset)).astype(float)
+    S = np.diag([0.0, 1.0, 1.0, 1.0, 1.0])
+    lik = Poisson()
+    optimum = penalized_newton(lik, X, y, offset, S, np.zeros(5)).beta
+    for _ in range(3):  # polish by plain Newton steps
+        eta = X @ optimum
+        g = X.T @ lik.score_eta(eta, y, offset) - S @ optimum
+        optimum = optimum + np.linalg.solve(lik.information(X, eta, y, offset) + S, g)
+    A = lik.information(X, X @ optimum, y, offset) + S
+    F = -lik.loglik(X @ optimum, y, offset) + 0.5 * optimum @ S @ optimum
+    # A start off the optimum along A's weakest direction, with a predicted
+    # gain delta' A delta / 2 a tenth of the rounding of F.
+    gain = 0.1 * abs(F) * np.finfo(float).eps
+    eigenvalues, vectors = np.linalg.eigh(A)
+    delta = vectors[:, 0] * np.sqrt(2 * gain / eigenvalues[0])
+
+    fit = penalized_newton(lik, X, y, offset, S, optimum + delta)
+
+    assert fit.converged
+    assert np.max(np.abs(delta)) > 1e-9
+    np.testing.assert_allclose(fit.beta, optimum, rtol=0, atol=1e-12)

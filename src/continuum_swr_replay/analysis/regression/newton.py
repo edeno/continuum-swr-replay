@@ -161,16 +161,20 @@ def _last_step(
 ) -> NewtonFit:
     """The converged ``fit`` moved by its full Newton ``step``.
 
-    ``fit`` is returned unchanged when the step does not lower ``F`` (its gain
-    is below the objective's rounding) or lands where ``A`` is not positive
-    definite.
+    The step is taken when it lowers ``F`` or, when its gain is below the
+    rounding of ``F`` (``F`` cannot tell the two points apart), when it lowers
+    the decrement: otherwise a coefficient would stay off by up to
+    ``sqrt(2 eps |F| / lambda_min)``, about 1e-7 on a fit with ``F`` near 400,
+    which the REML score inherits through ``log|A|``. ``fit`` is returned
+    unchanged when neither holds or the step lands where ``A`` is not
+    positive definite.
     """
     beta = fit.beta + step
     eta = X @ beta
     loglik = lik.loglik(eta, y, aux)
     F_old = -fit.loglik + 0.5 * fit.beta @ S @ fit.beta
     F_new = -loglik + 0.5 * beta @ S @ beta
-    if not (np.isfinite(F_new) and F_new <= F_old):
+    if not np.isfinite(F_new):
         return fit
     g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
     A = lik.information(X, eta, y, aux) + S
@@ -179,4 +183,6 @@ def _last_step(
     except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
         return fit
     decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
+    if not (F_new <= F_old or decrement < fit.newton_decrement):
+        return fit
     return NewtonFit(beta, A, True, decrement, fit.n_iter + 1, loglik)
