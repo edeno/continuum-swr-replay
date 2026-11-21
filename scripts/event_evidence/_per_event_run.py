@@ -11,6 +11,7 @@ Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.p
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import multiprocessing
 from collections.abc import Callable, Mapping, Sequence
@@ -56,6 +57,40 @@ def event_table_path(data_dir: Path) -> Path:
 def file_input(path: Path) -> dict[str, str]:
     """A file as a run's input: its digest and where it was read."""
     return {"sha256": sha256_file(path), "path": str(path)}
+
+
+TRIAL_FOLD_COLUMNS = ["movement_start_time", "end_time", "to_well"]
+"""The trials' columns ``tetrode_holdout.epoch_folds`` makes the folds from."""
+
+
+def trials_input(trials: pd.DataFrame) -> dict[str, Any]:
+    """The trials the folds were made from, as a per-epoch input: the SHA-256
+    of :data:`TRIAL_FOLD_COLUMNS`, and the number of trials.
+
+    The trials are sorted by ``movement_start_time``, as
+    ``tetrode_holdout.epoch_folds`` sorts them, and the three columns, in that
+    order, are hashed as little-endian float64 bytes, one row per trial, so the
+    digest does not depend on the frame's index, its column order or pandas'
+    text formatting.
+
+    Parameters
+    ----------
+    trials : pd.DataFrame
+        The epoch's trials, with at least :data:`TRIAL_FOLD_COLUMNS`.
+
+    Returns
+    -------
+    dict
+        ``sha256`` and ``n_trials``.
+    """
+    ordered = trials.sort_values("movement_start_time", kind="stable")
+    values = np.ascontiguousarray(
+        ordered[TRIAL_FOLD_COLUMNS].to_numpy(dtype="<f8"), dtype="<f8"
+    )
+    return {
+        "sha256": hashlib.sha256(values.tobytes()).hexdigest(),
+        "n_trials": len(ordered),
+    }
 
 
 def run_input(run_dir: Path) -> dict[str, str]:

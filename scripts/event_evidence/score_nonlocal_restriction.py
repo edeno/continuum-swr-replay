@@ -4,8 +4,8 @@
 For each analyzed HPC epoch (``data_loaders.epoch_register.analyzed_epoch_ids``):
 the decoders ``none``, ``swr`` and ``full``, which differ only in when the two
 Non-Local states may be occupied, scored at every bin with a likelihood held
-out in time (``analysis.event_evidence.nonlocal_restriction``). ``swr`` is
-non-local in every bin inside a detected SWR of the epoch's SWR source
+out by folds of whole trials (``analysis.event_evidence.nonlocal_restriction``).
+``swr`` is non-local in every bin inside a detected SWR of the epoch's SWR source
 (``swr_source.epoch_source(epoch_id).events``, the Kay inventory), whether or
 not the SWR was immobile as a whole event, and local everywhere else. That is
 deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
@@ -23,7 +23,9 @@ folds. The folds are whole trials because the animal stays in one patch for
 long stretches: a place visited in only one stretch of time would have no data
 in that stretch's held-out encoding. The design and its margin are in the
 header's settings, so a run of another design does not gather or resume with
-this one.
+this one. The trials are ``load_data``'s (parsed from the DIO events), not the
+session cache's, and each epoch's record keeps their digest
+(``_per_event_run.trials_input``).
 
 The whole decoder is held out (``nonlocal_restriction.fold_fit_scores``): per
 fold, a detector configured as the canonical one is fit by the library's EM on
@@ -63,17 +65,20 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
   the folds (``n_segments``, ``n_groups``, the smallest and largest fold's share of the
   bins, the margin in bins), the share of the immobile bins whose fold's
   encoding had 0 s and at most 10 s of training data at the animal's place,
-  the per-epoch input digests, settings, provenance);
+  the per-epoch input digests (the decode frame, the detector, the SWR source's
+  files and the trials the folds were made from), settings, provenance);
 
 and ``manifest.json`` gathered from the records (``runs.epoch_records``).
 
 An epoch whose models fail a check (``nonlocal_restriction.fold_check_failures``:
 a fold whose EM did not converge, or a fold's pass that fails
-``check_failures``, such as a library marginal that disagrees with the summed
-filter scores, or a filtered posterior whose mass is more than
-``CAUSAL_MASS_TOLERANCE`` from 1) gets status
-``failed_check`` and a message naming the failures; its tables are still
-written, for diagnosis.
+``check_failures``: a filtered posterior that is not the library's update of
+its predictive posterior, a filtered or predictive posterior whose mass is
+farther from 1 than its tolerance, or continuous transitions whose rows do not
+sum to 1) gets status ``failed_check`` and a message naming the failures; its
+tables are still written, for diagnosis. The difference between the library's
+marginal and the summed filter scores is recorded per fold
+(``marginal_difference_<model>``), not checked.
 A labeled bin with a score that is not finite fails the epoch when its sums are
 taken (``restriction_sums`` raises), after its per-bin table is written. A
 failed or ``failed_check`` epoch can leave tables on disk (and, after an
@@ -141,6 +146,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     gpu_pool,
     run,
     select_epochs,
+    trials_input,
 )
 
 PRODUCED_BY = produced_by(__file__)
@@ -256,6 +262,7 @@ def run_epoch(
             "epoch_inputs": {
                 "data_over_time": file_input(paths.data_over_time),
                 "detector": file_input(paths.detector),
+                "trials": trials_input(loaded["trials"]),
                 **{
                     f"swr_{name}": entry
                     for name, entry in swr_source.swr_source_files(epoch_id).items()

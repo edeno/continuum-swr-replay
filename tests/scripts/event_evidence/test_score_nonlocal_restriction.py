@@ -21,7 +21,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_nonlocal_restriction as runner
-from scripts.event_evidence._per_event_run import EpochInputs
+from scripts.event_evidence._per_event_run import EpochInputs, trials_input
 
 EPOCH = "wilbur20210329_02_r1_HPC"
 N = 12
@@ -256,7 +256,10 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
         "detector",
         "swr_events",
         "swr_observed",
+        "trials",
     }
+    # the digest of the trials the folds were made from
+    assert record["epoch_inputs"]["trials"] == trials_input(TRIALS)
     # the folds: seven segments, 9 and 3 of the 12 bins in the two folds the
     # scores name; of the 8 immobile bins, 2 had no training data at the
     # animal's place and 3 had 10 s or less

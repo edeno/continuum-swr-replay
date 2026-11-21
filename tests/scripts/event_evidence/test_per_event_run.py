@@ -105,3 +105,36 @@ def test_epoch_inputs_refuse_a_loader_on_another_time_axis(tmp_path, monkeypatch
     _epoch_inputs(tmp_path, monkeypatch, np.array([0.0, 0.002, 0.005]))
     with pytest.raises(ValueError, match="the loader's time axis is not the decode's"):
         per_event.epoch_inputs("e", tmp_path, detector=False)
+
+
+TRIALS = pd.DataFrame(
+    {
+        "movement_start_time": [10.0, 12.5, 15.0],
+        "end_time": [12.0, 14.5, 17.25],
+        "to_well": [2, 3, 2],
+        "trial_number": [1, 2, 3],
+    }
+)
+
+
+def test_the_trials_digest_follows_the_fold_columns():
+    """The digest changes with a trial's time or well, not with the frame's
+    index, its column order, its row order or a column the folds do not use."""
+    digest = per_event.trials_input(TRIALS)
+    assert digest["n_trials"] == 3 and len(digest["sha256"]) == 64
+    same = [
+        TRIALS.set_axis([7, 8, 9]),
+        TRIALS[["to_well", "trial_number", "end_time", "movement_start_time"]],
+        TRIALS.iloc[::-1],
+        TRIALS.assign(trial_number=[4, 5, 6], to_well=TRIALS["to_well"].astype(float)),
+    ]
+    for trials in same:
+        assert per_event.trials_input(trials) == digest
+    changed = [
+        TRIALS.assign(movement_start_time=[10.0, 12.5, 15.002]),
+        TRIALS.assign(end_time=[12.0, 14.5, 17.0]),
+        TRIALS.assign(to_well=[2, 3, 4]),
+        TRIALS.iloc[:2],
+    ]
+    for trials in changed:
+        assert per_event.trials_input(trials)["sha256"] != digest["sha256"]

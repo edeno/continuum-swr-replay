@@ -439,7 +439,9 @@ def epoch_folds(
         The decode's time axis, s.
     trials : pd.DataFrame
         The epoch's trials (``movement_start_time``, ``end_time``,
-        ``to_well``).
+        ``to_well``). The runners give ``load_data``'s trials (parsed from the
+        DIO events), not the session cache's, and each epoch's record keeps
+        their digest (``scripts/event_evidence/_per_event_run.trials_input``).
 
     Returns
     -------

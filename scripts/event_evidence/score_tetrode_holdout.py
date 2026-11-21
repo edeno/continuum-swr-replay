@@ -2,7 +2,7 @@
 """Held-out tetrode score of every canonical non-local event and its Local-rest control.
 
 For each epoch (``analysis.event_evidence.tetrode_holdout``): refit the decode's
-encodings on ``N_FOLDS`` folds of time, leave each tetrode out of the
+encodings on ``N_FOLDS`` folds of whole trials, leave each tetrode out of the
 decoder's smoother over the whole epoch, and score it at every bin of every
 window under the remaining tetrodes' position distribution against local coding
 around the animal. The windows are the canonical events
@@ -24,6 +24,8 @@ animal stays in one patch for long stretches: a place visited in only one
 stretch of time would have no data in that stretch's held-out encoding. The
 design and its margin are in the header's settings, so a run of another design
 does not gather or resume with this one (move its folder aside before a rerun).
+The trials are ``load_data``'s (parsed from the DIO events), not the session
+cache's, and each epoch's record keeps their digest (``_per_event_run.trials_input``).
 
 Writes ``{epoch_id}_tetrode_holdout.parquet`` per epoch (one row per window and
 tetrode: ``window_id`` (the window's number in the epoch), ``event_id`` (the
@@ -34,8 +36,9 @@ event's, or for a control the event it matches), ``kind`` (``"event"`` or ``"con
 ``uniform``, ``spread_cm``), each epoch's record
 ``{epoch_id}_tetrode_holdout.json`` (status, the fold design and its margin in
 bins, the folds' ``n_segments``, ``n_groups`` and ``trial_bin_share``,
-settings, the SHA-256 of the event table and the participation tables,
-provenance) and ``manifest.json`` gathered from the records
+the digest and number of the trials the folds were made from
+(``epoch_inputs["trials"]``), settings, the SHA-256 of the event table and the
+participation tables, provenance) and ``manifest.json`` gathered from the records
 (``runs.epoch_records``).
 
 Spike times and waveform features are read through ``load_data`` (read-only).
@@ -108,6 +111,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     participation_input,
     run,
     select_epochs,
+    trials_input,
 )
 
 PRODUCED_BY = produced_by(__file__)
@@ -124,6 +128,7 @@ def run_epoch(
     log = logging.getLogger(epoch_id).info
     epoch = epoch_inputs(epoch_id, data_dir, trials=True)
     folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
+    trials = trials_input(epoch.loaded["trials"])
     participation = pd.read_parquet(
         output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
@@ -167,6 +172,7 @@ def run_epoch(
         "fold_design": th.TRIAL_DESIGN,
         "margin_bins": margin_bins,
         **fold_counts,
+        "epoch_inputs": {"trials": trials},
         "seconds": round(clock.time() - started, 1),
     }
 

@@ -18,7 +18,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_tetrode_holdout as runner
-from scripts.event_evidence._per_event_run import EpochInputs
+from scripts.event_evidence._per_event_run import EpochInputs, trials_input
 
 EPOCH = "wilbur20210329_02_r1_HPC"
 N = 12
@@ -164,6 +164,8 @@ def test_trial_folds_are_made_from_the_trials_and_recorded(patched):
     assert record["n_segments"] == 7  # six trials and the time after them
     assert record["n_groups"] == 7
     assert record["trial_bin_share"] == pytest.approx(11 / 12)
+    # the digest of the trials the folds were made from
+    assert record["epoch_inputs"] == {"trials": trials_input(TRIALS)}
 
 
 @pytest.fixture
