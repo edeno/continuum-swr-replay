@@ -166,6 +166,12 @@ Per-bin facts of a decode: the spikes of each bin and whether it is inside a wel
 
 `decoder_bin_spike_counts`, `bin_facts`
 
+### `src/continuum_swr_replay/analysis/event_evidence/heldout_events.py`
+
+Non-local events chosen from held-out data: the canonical event rule applied to the fold fit's held-out state probabilities.
+
+`labeled_frame`, `label_bins`, `event_rows`, `shared_bin_events`, `found_again_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py`
 
 Spike likelihood at decoded and actual positions, over each whole non-local event.
@@ -878,13 +884,19 @@ Does each detector's content reproduce in cells it never saw?
 
 What the per-event runners share: their arguments, the canonical event table, an epoch's decode inputs, the held-out runs' fold designs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `fold_settings`, `epoch_folds`, `run`
+`event_table_path`, `event_table_input`, `run_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `fold_settings`, `epoch_folds`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
 `find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+
+### `scripts/event_evidence/detect_heldout_events.py`
+
+Non-local events detected from held-out data, for Figure 2's panel g.
+
+`read_raw_frame`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/measure_bin_facts.py`
 
@@ -930,9 +942,9 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 ### `scripts/event_evidence/sum_nonlocal_restriction_windows.py`
 
-The non-local restriction scores summed over the windows of Figure 2's panel g.
+The non-local restriction scores summed over the canonical events and their controls.
 
-`decode_time`, `run_epoch`, `run_input`, `check_holdout_inputs`, `event_table_note`, `main`
+`decode_time`, `run_epoch`, `check_holdout_inputs`, `event_table_note`, `main`
 
 ### `scripts/event_properties/bootstrap_event_properties.py`
 
