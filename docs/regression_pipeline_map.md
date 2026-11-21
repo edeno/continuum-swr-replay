@@ -778,6 +778,12 @@ Compare the shared regression fitter with mgcv on small synthetic data sets.
 
 `make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
 
+### `scripts/checks/compare_regression_to_neurospatial.py`
+
+Fit a one-term Poisson model with neurospatial's REML and write the fixture.
+
+`make_data`, `main`
+
 ### `scripts/checks/compare_to_golden_baseline.py`
 
 Diff a candidate replay_content root against a frozen golden baseline.

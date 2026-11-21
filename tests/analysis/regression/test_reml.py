@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     reml_and_derivatives,
     select_penalties,
 )
+from scripts.checks import compare_regression_to_neurospatial as neurospatial
 from scripts.checks.compare_regression_to_mgcv import (
     DATA_SETS,
     FIXTURE_DIR,
@@ -432,3 +433,47 @@ def test_matches_mgcv_fixtures(name: str) -> None:
     assert set(differences) == expected_keys
     for key, value in differences.items():
         assert value < MGCV_TOLERANCE[key], f"{key}: {value:.2e}"
+
+
+def test_one_penalty_matches_neurospatial_fixture() -> None:
+    """One penalty shared by three units: the score, the selected strength and
+    the curves equal neurospatial's REML on the committed fixture.
+
+    neurospatial's score leaves out terms that do not depend on the strength
+    (the likelihood's offset term, ``log|S|_+`` at unit strength, the
+    ``2 pi`` constant), so the two scores are compared after removing them.
+    Its own selection stops at ``xatol = 1e-3`` in the log strength; the
+    fixture also holds its objective's minimum found at ``xatol = 1e-10``.
+    """
+    fixture = json.loads(neurospatial.FIXTURE.read_text())
+    data = neurospatial.make_data()
+    assert data["counts"].sum() == fixture["counts_sum"]
+    basis = PSplineBasis(0.0, 1.0, neurospatial.N_BASIS)
+    np.testing.assert_allclose(
+        basis.design(data["x"]), data["basis"], rtol=0, atol=1e-14
+    )
+    X = data["basis"] @ data["rotation"]
+    offset = np.log(data["occupancy"])
+    sessions = [
+        SessionData(X, data["counts"][:, unit], offset)
+        for unit in range(data["counts"].shape[1])
+    ]
+    blocks = [PenaltyBlock(np.arange(X.shape[1]), np.diag(data["weights"]))]
+    assert blocks[0].rank == neurospatial.N_BASIS - 2
+
+    constant = len(sessions) * (
+        -0.5 * blocks[0].log_pdet
+        - 0.5 * (X.shape[1] - blocks[0].rank) * np.log(2 * np.pi)
+    ) - float((data["counts"] * offset[:, None]).sum())
+    for rho, theirs in zip(
+        fixture["score_grid_log_penalty"], fixture["score_grid_objective"], strict=True
+    ):
+        ours = pooled_reml(Poisson(), sessions, blocks, [rho], derivatives=False)
+        assert ours.score - constant == pytest.approx(theirs, abs=1e-7)
+
+    result = select_penalties(Poisson(), sessions, blocks)
+    assert result.search.converged
+    assert result.rho[0] == pytest.approx(fixture["tight_log_penalty"], abs=1e-6)
+    assert abs(result.rho[0] - fixture["select_log_penalty"]) < fixture["select_xatol"]
+    log_rate = np.column_stack([X @ session.fit.beta for session in result.sessions])
+    np.testing.assert_allclose(log_rate, fixture["log_rate"], rtol=0, atol=1e-6)
