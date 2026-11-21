@@ -30,19 +30,20 @@ design and fitter.
 [C5](shared-contracts.md#c5-the-convention), [C6](shared-contracts.md#c6-kinds-contrasts-and-the-two-meanings-of-direct),
 [C7](shared-contracts.md#c7-the-fit-row-record), [C9](shared-contracts.md#c9-where-new-fits-are-stored).
 
-**Decision needed first:** L6 (the total effect per visit or per stop).
+**Decisions this phase applies** (settled 2026-11-20): L6, lead: "We need to be consistent in the repo".
+The visit is the unit; the total reward effect is per visit, and no per-stop variant is kept beside it, not
+even as a literature check (C6, C14). If a per-stop number is ever wanted, it is a question for the lead.
 
 ## Tasks
 
 - **Baseline**: save the current `rate.per_stop.*`, `rate.swr_contrast.*` and `rate.uncertainty.*` values
   from `paper/reported/behavior.json` and the stored fits' session values for the same covariates.
-- **Total reward effect** (`analysis/replay_models/rate/visit_total_rate.py`, new): one row per visit (per
-  L6; per stop as the literature-comparable variant), the count of in-visit events of the kind after the
-  outcome is known, offset `log` of the at-risk seconds after the outcome is known, and the visit's own
+- **Total reward effect** (`analysis/replay_models/rate/visit_total_rate.py`, new): one row per visit (L6),
+  the count of the kind's events that start inside the visit (C3) after the outcome is known, offset `log` of the at-risk seconds after the outcome is known, and the visit's own
   outcome (rewarded, 0/1). Poisson through the shared fitter, no smooth, support rule on the 0/1 term. The
-  estimand: the log rate ratio, rewarded against omitted, "per second of stop", reported beside Phase 5a's
-  Q2 ("at fixed time before leaving"), each named (C6). This is not a member of the declared family unless
-  L1 makes it one.
+  estimand: the log rate ratio, rewarded against omitted, "per second of in-visit at-risk time" (total),
+  reported beside Phase 5a's Q2 ("at fixed time before leaving", direct), each named (C6). It is not a
+  member of the declared family (L1).
 - **SWR-contrast covariates** (`analysis/replay_models/rate/visit_rate_covariates.py`, new): each covariate
   of `_BLOCKS` other than BASE and REWXTIME, added one at a time to model A as a pooled-SD slope per kind
   (C5 rule 2), with its kind difference. A post-outcome covariate (per `covariate_timing.py`) enters only on
@@ -104,7 +105,8 @@ Phase 5a's synthetic visit helpers, extended with the covariates.
 
 - Simulated first, then five real sessions, then all 242. Each covariate model costs about what model A
   costs (Phase 5a's measurement); eight covariates times two kinds: run in `tmux` (`csr-5b-rate`).
-- Compare with the baseline: the per-stop reward ratio (old Family A) against the new total effect, per kind;
+- Compare with the baseline: the old per-stop reward ratio (Family A, from the saved summary) against the new
+  per-visit total effect, per kind, in the old-against-new comparison (no per-stop fit is made);
   each covariate's sign against the old SWR-contrast rung's. A sign change is explained in the PR (cohort,
   scaling or the end-of-visit clock).
 

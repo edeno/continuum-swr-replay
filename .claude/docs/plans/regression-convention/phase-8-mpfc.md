@@ -59,7 +59,9 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   to the marked kernels (`marked_glm.py:1409-1422`).
 - **Fit mask on the common subset**: replace the stop-cohort mask (`cohort.py:65`) with in-visit immobile
   bins (the visit intervals of Phase 3, selected by the one function, C4) and events selected by
-  `select_visit_context` in `canonical_events.py:95`; record counts per label in each bundle's sidecar.
+  `select_visit_context` in `canonical_events.py:95` (the default set: events that start inside a visit,
+  `spans_visit_end` included, C3); record counts per label in each bundle's sidecar. The mPFC models use the
+  same unit, event set, clocks and fitter as every other family (C14).
 - **Trial folds**: replace `assign_blocked_folds` in `heldout.py`, `scoring.py:190` and the two runners
   with Phase 2's fold function on the bins' times, plus a training margin of the kernel half-width (250 ms)
   around each held-out piece (as `fold_training_masks` on master does), so a symmetric kernel cannot see

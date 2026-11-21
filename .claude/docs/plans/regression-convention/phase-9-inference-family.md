@@ -32,7 +32,7 @@ tests, the leave-one-animal-out check, and the curve bands Figure 4 draws.
 - **Family table** (`analysis/regression/family.py`, new): read every declared estimand's per-kind and
   difference session values from the stored records (one function per family already returns them), apply
   `estimand_summary`, and compute Benjamini-Hochberg q-values over the day-level p-values of the whole
-  family (all members times SWR, No SWR and difference, as decided in L1). A missing p is left out of the
+  family (all members times SWR, No SWR and difference, thirteen estimands times three, 39 tests; L1). A missing p is left out of the
   family (`benjamini_hochberg`'s rule) and listed. The output is one table (estimand, kind, estimate,
   interval, animals with sign, day p, q) written to `models_convention/family.parquet`.
 - **Leave-one-animal-out** for each member: the estimate and day-level p without each animal; stored beside

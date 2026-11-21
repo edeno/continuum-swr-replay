@@ -72,7 +72,7 @@ real-data smoke test.
   `estimand_summary(values, animal, day, session, *, n_draws, seed)` returning the animal-balanced estimate,
   the t-corrected nested bootstrap interval, the animals with the estimate's sign, and the day-level p.
 - **Declared tests** (`analysis/regression/declared_tests.py`, new): the list of
-  [C8](shared-contracts.md#c8-the-declared-family-of-tests) as decided in L1, each entry with its question,
+  [C8](shared-contracts.md#c8-the-declared-family-of-tests) (thirteen estimands, 39 tests; L1, settled), each entry with its question,
   estimand id, model, and contrast definition (range pairs or coefficient names). One tuple; nothing else
   hard-codes the count.
 - **Stored analysis: shared against per-session penalty** (`scripts/checks/simulate_shared_penalty.py`,
@@ -134,7 +134,7 @@ fixtures extended with concurvity numbers.
 
 The validation slice passes; the simulation output exists and shows the shared penalty no worse than
 per-session penalties (state the numbers in the PR from the stored file); the declared list matches the
-lead's decision L1.
+lead's decision L1 (thirteen estimands, 39 tests).
 
 ## Review
 

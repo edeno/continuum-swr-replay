@@ -4,8 +4,8 @@
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the
-lead's order: Figures 2 and 3 and the events summary move onto the common data subset (events inside a
-well visit, chosen by one selection function), and every regression model of Figures 4 and 5 is rebuilt
+lead's order: Figures 2 and 3 and the events summary move onto the common data subset (events that start
+inside a well visit, chosen by one selection function), and every regression model of Figures 4 and 5 is rebuilt
 on one convention, with one shared penalized fitter inside this repository. It ends with Figure 4 drawn
 and the replaced models removed.
 
@@ -17,7 +17,8 @@ For agent invocation, **load only the slice you need**:
    upstream files to read, contracts and designs it depends on, tasks, validation slice and fixtures.
 2. **Need shared semantics?** [shared-contracts.md](shared-contracts.md): the convention's rules, the
    selection function, the fit-row record, the declared tests, how to run code and rebuild values, the GPU
-   and coordination rules, and C13 (no legacy left behind).
+   and coordination rules, C13 (no legacy left behind) and C14 (one unit, event set, selection, fitter and
+   clocks everywhere).
 3. **Need a per-component design (math, code)?** [designs.md](designs.md).
 4. **Need broader scope, dependencies, risks, decisions?** [overview.md](overview.md).
    **What to remove, and when?** [legacy-inventory.md](legacy-inventory.md).

@@ -26,7 +26,11 @@ Branch: `choice-stay-power-convention` from master after Phase 6a. CPU only.
 [C5](shared-contracts.md#c5-the-convention), [C7](shared-contracts.md#c7-the-fit-row-record),
 [C8](shared-contracts.md#c8-the-declared-family-of-tests) (Q6).
 
-**Decision needed first:** L7 (stay or leave per visit).
+**Decisions this phase applies:** L7, stay or leave is one decision per visit. The lead did not answer it in
+words; it is the coordinator's application of the lead's rule "We need to be consistent in the repo" (one unit,
+C14), **to be confirmed by the lead at this phase's boundary**. ASK-1 and ASK-3: the ContFrag event sources
+moved onto the new rate and content designs in 5a and 6a; this phase builds their comparison and removes the
+rest of the old event-source suite.
 
 ## Tasks
 
@@ -55,6 +59,13 @@ Branch: `choice-stay-power-convention` from master after Phase 6a. CPU only.
   z-score), `time_since_stop_start_s` replaced by a smooth of time since visit start and a smooth of time
   until leaving (Phase 3's event clocks), the post-outcome gate of `swr_power.py:56` kept for post-outcome
   predictors (the cohort step restricts and counts). REML with the profiled scale.
+- **Event-source comparison (supplementary)** (`analysis/replay_models/event_source_comparison.py`, new;
+  ASK-1, ASK-3): reads the stored rate (5a) and content (6a) fits of the three event sources (non-local,
+  ContFrag SWR, ContFrag MUA) and reports, per source, the declared estimands that apply to a single stream
+  (Q1, Q2, Q3a, Q3b, Q4a, Q4b, Q5a, Q7a, Q7b), with the same reduction, as a supplementary comparison outside
+  the declared family. Values in `reported/behavior/event_sources.py` (new). This replaces the old suite:
+  `scripts/replay_models/content/compare_event_source_models.py`, `choice/switch_analysis.py` and the
+  `behavior.event_source_suite.*` runs are removed by this phase's retire task (inventory 7-1, ASK-3).
 - **Runners** (new): `scripts/replay_models/choice/fit_visit_choice.py`, `fit_visit_stay_leave.py`,
   `scripts/replay_models/coupling/fit_visit_swr_power.py`; registered in `run_refits.py`.
 - **Summary values**: Q6 per kind and difference (declared); choice, stay or leave and ripple power

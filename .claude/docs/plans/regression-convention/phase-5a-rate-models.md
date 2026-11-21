@@ -32,8 +32,9 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
 **Designs referenced:** [rate design](designs.md#rate-design), [smooth terms](designs.md#smooth-terms-and-bases),
 [pooled REML](designs.md#pooled-reml), [session to day to animal](designs.md#session-to-day-to-animal).
 
-**Decision needed first:** L1 (the declared family), fixed in `declared_tests.py` and committed before the
-first real fit of this phase.
+**Decisions this phase applies** (settled 2026-11-20): L1, the declared family of thirteen estimands and 39
+tests (C8), committed in `declared_tests.py` before the first real fit of this phase; L4, the event set (C3);
+ASK-1, the ContFrag event sources; C14.
 
 ## Tasks
 
@@ -62,14 +63,19 @@ first real fit of this phase.
   - model D: the curve over lags 1 to 10 with its band (described, not tested).
 - **Simulations** (stored analysis `scripts/replay_models/rate/simulate_visit_rate.py`, new, from
   `S/proto_rate/proto_core.py`): event starts drawn on the real visits' at-risk time of every session from a
-  known rate `exp(b0 + f_s + f_u + beta * rewarded)`, with the counting rule (an event crossing the last
-  poke-out is not counted, nor at risk once started). Scenarios: (a) no reward effect; (b) rate ratio 1.3;
+  known rate `exp(b0 + f_s + f_u + beta * rewarded)`, with the event definition's counting rule (a candidate
+  that starts in a stop and runs into movement is not an event, at every stop end, small movements and the
+  last one; an event that crosses the final poke-out while immobile is counted, as the event set has it). Scenarios: (a) no reward effect; (b) rate ratio 1.3;
   (c) a sharp lag-1 effect only, to see what D returns; (d) a drop on `u` in the last 0.3 s with no reward
   effect, which must not move to `s` or to the reward term; (e) a drop before small movements only (`f_m`)
   with flat `f_u`, which the model must separate or the rule above must catch. Twenty data sets each over
   all sessions; outputs to `models_convention/simulations/visit_rate.parquet`.
+- **ContFrag event sources** (ASK-1, lead: "Move them"): the same models A and D fit to the SWR-sourced and
+  MUA-sourced ContFrag events of the rebuilt ContFrag tables, as two more event sources (`event_source` in
+  the fit-row record; each source is one stream, with no SWR and No SWR split, call), same bins, same selection, same penalty rule. Their values are a supplementary
+  comparison (Phase 7 builds the comparison values); they are not in the declared family.
 - **Runner** `scripts/replay_models/rate/fit_visit_rate_models.py` (new): reads the tables, fits both
-  models and kinds, writes `models_convention/rate/{A,D}.parquet` and a manifest; registered in
+  models, both kinds and the three event sources (non-local, ContFrag SWR, ContFrag MUA), writes `models_convention/rate/{A,D}.parquet` and a manifest; registered in
   `scripts/workflows/run_refits.py` (`RUNS`, `:152`) as `rate.visit.A` and `rate.visit.D`.
 - **Questions**: add Q1 to Q7 of the design's section 3 as new Part 3 questions in
   `reported/questions.py` (call: ids `3.11` to `3.17`, wording from the design's table); add their tags to
