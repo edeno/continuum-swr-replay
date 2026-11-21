@@ -469,7 +469,7 @@ def _record(
         newton_decrement=decrement,
         n_iter=n_iter,
         left_out=session.left_out(),
-        support={c: s._asdict() for c, s in session.recorded_support().items()},
+        support={c: s.record() for c, s in session.recorded_support().items()},
         collinearity=collinearity,
         basis=design.basis_record(),
         standardization=design.standardization_record(),

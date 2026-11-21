@@ -40,9 +40,10 @@ def test_binary_term_counts() -> None:
     ] = 1
     count[0] = 2  # a second event in visit 0 counts it once
     support = binary_support(term, visit, count > 0)
-    assert support == Support(n_low=3, n_high=6, passes=False, reason=FEW)
+    assert support == Support(n_low=3, n_high=6, reason=FEW)
     count[np.isin(visit, [10, 11]) & (np.arange(visit.size) % 3 == 0)] = 1
-    assert binary_support(term, visit, count > 0) == Support(5, 6, True)
+    assert binary_support(term, visit, count > 0) == Support(5, 6)
+    assert Support(5, 6).passes and not support.passes
     assert MIN_UNITS == 5
 
 
@@ -52,7 +53,7 @@ def test_term_changing_within_a_unit_counts_each_side() -> None:
     visit = np.array([0, 0, 1, 1])
     term = np.array([0.0, 1.0, 0.0, 1.0])
     events = np.array([True, True, False, True])
-    assert binary_support(term, visit, events) == Support(1, 2, False, FEW)
+    assert binary_support(term, visit, events) == Support(1, 2, FEW)
 
 
 def test_role_slope_counts_and_constant() -> None:
@@ -62,11 +63,9 @@ def test_role_slope_counts_and_constant() -> None:
     x = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1])
     every = np.ones(12, dtype=bool)
     # median 0.6: five below, five above, two ties
-    assert slope_support(x, event, every) == Support(5, 5, True)
-    assert slope_support(np.full(12, 0.4), event, every) == Support(0, 0, False, FEW)
-    assert slope_support(x, event, np.zeros(12, dtype=bool)) == Support(
-        0, 0, False, FEW
-    )
+    assert slope_support(x, event, every) == Support(5, 5)
+    assert slope_support(np.full(12, 0.4), event, every) == Support(0, 0, FEW)
+    assert slope_support(x, event, np.zeros(12, dtype=bool)) == Support(0, 0, FEW)
 
 
 def test_design_support_reads_each_columns_rows(content_sessions) -> None:
@@ -99,8 +98,8 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
         "reward_fraction:role=previous",
     ]
     n_events = rows["event_id"].nunique()
-    assert support["role[current]"] == Support(n_events, n_events, True)
-    assert support["role[previous]"] == Support(n_events, 4, False, FEW)
+    assert support["role[current]"] == Support(n_events, n_events)
+    assert support["role[previous]"] == Support(n_events, 4, FEW)
     previous = rows["role"] == "previous"
     assert support["reward_fraction:role=previous"] == slope_support(
         rows.loc[previous, "reward_fraction"].to_numpy(),

@@ -61,32 +61,49 @@ MIN_UNITS = 5
 
 
 class Support(NamedTuple):
-    """One column's support in one session.
+    """One term's support in one session.
 
     Attributes
     ----------
     n_low, n_high : int or None
         Units with an event on each side (0 and 1; below and above the median);
         None for a smooth term that failed the design check.
-    passes : bool
-        The counts reach ``MIN_UNITS`` (both for a slope, ``n_high`` for a
-        level) and the column passes the design check.
     reason : str
         Why it fails, in words; empty when it passes.
     """
 
     n_low: int | None
     n_high: int | None
-    passes: bool
     reason: str = ""
 
+    @property
+    def passes(self) -> bool:
+        """The counts reach ``MIN_UNITS`` (both for a slope, ``n_high`` for a
+        level) and the term passes the design check: no reason to fail."""
+        return self.reason == ""
 
-def _support(n_low: int, n_high: int) -> Support:
-    passes = min(n_low, n_high) >= MIN_UNITS
-    return Support(int(n_low), int(n_high), passes, "" if passes else _FEW)
+    def record(self) -> dict:
+        """The record's entry: ``{"n_low", "n_high", "passes", "reason"}``."""
+        return {
+            "n_low": self.n_low,
+            "n_high": self.n_high,
+            "passes": self.passes,
+            "reason": self.reason,
+        }
 
 
 _FEW = f"fewer than MIN_UNITS = {MIN_UNITS} units with an event"
+
+
+def _n_units(unit: np.ndarray) -> int:
+    """The distinct units among ``unit``, integer codes from 0."""
+    return int(np.count_nonzero(np.bincount(unit))) if unit.size else 0
+
+
+def _two_sided(unit: np.ndarray, low: np.ndarray, high: np.ndarray) -> Support:
+    """The units with a row on each side; both must reach ``MIN_UNITS``."""
+    n_low, n_high = _n_units(unit[low]), _n_units(unit[high])
+    return Support(n_low, n_high, "" if min(n_low, n_high) >= MIN_UNITS else _FEW)
 
 
 def level_support(
@@ -99,12 +116,12 @@ def level_support(
     ----------
     values : np.ndarray, shape (n_rows,)
         The level's column, 0 or 1.
-    unit : np.ndarray, shape (n_rows,)
+    unit : np.ndarray of int, shape (n_rows,)
+        Each row's unit, as integer codes from 0 (``pd.factorize``).
     has_event : np.ndarray of bool, shape (n_rows,)
     """
     both = binary_support(values, unit, has_event)
-    passes = both.n_high >= MIN_UNITS
-    return both._replace(passes=passes, reason="" if passes else _FEW)
+    return both._replace(reason="" if both.n_high >= MIN_UNITS else _FEW)
 
 
 def binary_support(
@@ -116,17 +133,15 @@ def binary_support(
     ----------
     values : np.ndarray, shape (n_rows,)
         The column, 0 or 1.
-    unit : np.ndarray, shape (n_rows,)
-        Each row's unit.
+    unit : np.ndarray of int, shape (n_rows,)
+        Each row's unit, as integer codes from 0 (``pd.factorize``).
     has_event : np.ndarray of bool, shape (n_rows,)
         True for a row that holds an event.
     """
     values = np.asarray(values, dtype=float)
     if not np.isin(values, (0.0, 1.0)).all():
         raise ValueError("a binary column takes only 0 and 1")
-    high = np.unique(unit[has_event & (values == 1.0)]).size
-    low = np.unique(unit[has_event & (values == 0.0)]).size
-    return _support(low, high)
+    return _two_sided(unit, has_event & (values == 0.0), has_event & (values == 1.0))
 
 
 def slope_support(
@@ -139,16 +154,15 @@ def slope_support(
     ----------
     values : np.ndarray, shape (n_rows,)
         The covariate on the rows the slope reads (its level's rows).
-    unit : np.ndarray, shape (n_rows,)
+    unit : np.ndarray of int, shape (n_rows,)
+        Each row's unit, as integer codes from 0 (``pd.factorize``).
     has_event : np.ndarray of bool, shape (n_rows,)
     """
-    x, units = np.asarray(values, dtype=float)[has_event], unit[has_event]
-    if x.size == 0:
-        return _support(0, 0)
-    median = np.median(x)
-    return _support(
-        np.unique(units[x < median]).size, np.unique(units[x > median]).size
-    )
+    x = np.asarray(values, dtype=float)
+    if not has_event.any():
+        return _two_sided(unit, has_event, has_event)
+    median = np.median(x[has_event])
+    return _two_sided(unit, has_event & (x < median), has_event & (x > median))
 
 
 _RULES = {"level": level_support, "binary": binary_support, "slope": slope_support}
@@ -170,7 +184,8 @@ def design_support(
         The session's design.
     level_rows : mapping of tuple to np.ndarray of bool, shape (n_rows,)
         Each level's rows (:attr:`.terms.SessionDesign.level_rows`).
-    unit : np.ndarray, shape (n_rows,)
+    unit : np.ndarray of int, shape (n_rows,)
+        Each row's unit, as integer codes from 0 (``pd.factorize``).
     has_event : np.ndarray of bool, shape (n_rows,)
 
     Returns
@@ -202,10 +217,10 @@ def design_support(
         (j,) = term.columns
         counted = _RULES[term.kind](X[reads, j], unit[reads], has_event[reads])
         if term.name in small:
-            counted = counted._replace(passes=False, reason=small.pop(term.name))
+            counted = counted._replace(reason=small.pop(term.name))
         out[term.name] = counted
     for name, reason in small.items():  # the smooths and lag functionals
-        out[name] = Support(None, None, False, reason)
+        out[name] = Support(None, None, reason)
     return out
 
 
