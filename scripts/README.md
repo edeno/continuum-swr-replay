@@ -84,6 +84,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `fit_cross_history_ridge_cv.py` — ridge cross-validated comparison of self vs self+cross history, per animal.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
+- `describe_visit_clocks.py` — model-free event-start rates per at-risk second on the three visit clocks, per kind and animal, and the stops by how they end; writes `models_convention/descriptive/visit_clock_curves.parquet`.
 
 ## `replay_models/coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power against the behavioral covariates.
