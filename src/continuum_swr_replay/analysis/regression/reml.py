@@ -49,6 +49,7 @@ import itertools
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from typing import NamedTuple
 
 import numpy as np
@@ -166,9 +167,6 @@ class PenaltyBlock:
     log_pdet : float
         ``log|S|_+``, the sum of the logs of its ``rank`` largest
         eigenvalues, set on construction.
-    null_space : np.ndarray, shape (k, k - rank)
-        An orthonormal basis of the null space of ``S`` (for a P-spline, the
-        straight lines), set on construction.
     eigenvalues : np.ndarray, shape (k,)
         The eigenvalues of ``S``, ascending, with the ``k - rank`` smallest
         set to zero: ``S`` as its null space and ``rank`` define it (a matrix
@@ -176,14 +174,13 @@ class PenaltyBlock:
         about ``1e-16`` of its largest eigenvalue). Set on construction.
     eigenvectors : np.ndarray, shape (k, k)
         The orthonormal eigenvectors, in the order of ``eigenvalues``; the
-        first ``k - rank`` are ``null_space``. Set on construction.
+        first ``k - rank`` are :attr:`null_space`. Set on construction.
     """
 
     columns: np.ndarray
     S: np.ndarray
     rank: int = field(init=False)
     log_pdet: float = field(init=False)
-    null_space: np.ndarray = field(init=False)
     eigenvalues: np.ndarray = field(init=False)
     eigenvectors: np.ndarray = field(init=False)
 
@@ -213,13 +210,26 @@ class PenaltyBlock:
             float(np.log(eigenvalues[eigenvalues.size - rank :]).sum()),
         )
         n_null = eigenvalues.size - rank
-        object.__setattr__(self, "null_space", vectors[:, :n_null])
         object.__setattr__(
             self,
             "eigenvalues",
             np.concatenate([np.zeros(n_null), eigenvalues[n_null:]]),
         )
         object.__setattr__(self, "eigenvectors", vectors)
+
+    @property
+    def null_space(self) -> np.ndarray:
+        """An orthonormal basis of the null space of ``S`` (for a P-spline, the
+        straight lines), shape ``(k, k - rank)``: the first ``k - rank``
+        eigenvectors."""
+        return self.eigenvectors[:, : self.columns.size - self.rank]
+
+    @cached_property
+    def in_eigenbasis(self) -> PenaltyBlock:
+        """The block in the eigenbasis of its penalty: the same columns, the
+        penalty ``diag(eigenvalues)``, exactly zero on its null space. Built
+        once per block, when first read."""
+        return PenaltyBlock(self.columns, np.diag(self.eigenvalues))
 
 
 @dataclass(frozen=True)
@@ -556,10 +566,22 @@ def assemble_penalty(
     rho = np.asarray(rho, dtype=float)
     if rho.shape != (len(blocks),):
         raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
-    out = np.zeros((n_columns, n_columns))
-    for block, r in zip(blocks, rho, strict=True):
-        out[np.ix_(block.columns, block.columns)] += np.exp(r) * block.S
-    return out
+    return _summed(_strength_blocks(blocks, rho, n_columns), n_columns)
+
+
+def _strength_blocks(
+    blocks: Sequence[PenaltyBlock], rho: np.ndarray, n_columns: int
+) -> list[np.ndarray]:
+    """Each ``exp(rho_j) S_j``, embedded, shape ``(n_columns, n_columns)``."""
+    return [
+        _embedded(block, np.exp(r), n_columns)
+        for block, r in zip(blocks, rho, strict=True)
+    ]
+
+
+def _summed(S_j: Sequence[np.ndarray], n_columns: int) -> np.ndarray:
+    """The sum of the embedded blocks ``S_j`` (zeros for none)."""
+    return sum(S_j, np.zeros((n_columns, n_columns)))
 
 
 def free_basis(blocks: Sequence[PenaltyBlock], n_columns: int) -> np.ndarray:
@@ -595,9 +617,7 @@ def _eigenbasis(
     """
     _check_blocks(blocks, n_columns)
     vectors = [block.eigenvectors for block in blocks]
-    rotated = [
-        PenaltyBlock(block.columns, np.diag(block.eigenvalues)) for block in blocks
-    ]
+    rotated = [block.in_eigenbasis for block in blocks]
     return vectors, rotated
 
 
@@ -612,6 +632,25 @@ def _rotate(
     for block, V in zip(blocks, vectors, strict=True):
         out[block.columns] = V @ M[block.columns]
     return out
+
+
+def _null_dimension(blocks: Sequence[PenaltyBlock], n_columns: int) -> int:
+    """``M_p``, the dimension of the summed penalty's null space."""
+    return n_columns - sum(block.rank for block in blocks)
+
+
+def _half_log_det(factor: tuple[np.ndarray, bool]) -> float:
+    """``log|A| / 2`` from the Cholesky ``factor`` of ``A``."""
+    return float(np.log(np.diag(factor[0])).sum())
+
+
+def _coefficient_derivatives(
+    S_j: Sequence[np.ndarray], b: np.ndarray, factor: tuple[np.ndarray, bool]
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Per block, ``S_j b`` and ``b_j = db/drho_j = -A^-1 S_j b``, each shape
+    ``(p,)``, from the Cholesky ``factor`` of ``A``."""
+    S_j_b = [Sj @ b for Sj in S_j]
+    return S_j_b, [-scipy.linalg.cho_solve(factor, Sjb) for Sjb in S_j_b]
 
 
 def _covariance_and_edf(
@@ -691,6 +730,8 @@ def reml_and_derivatives(
     if isinstance(lik, Gaussian) and aux is not None:
         raise ValueError("the Gaussian scale is profiled; pass aux=None")
     vectors, rotated = _eigenbasis(blocks, n_columns)
+    if rho.shape != (len(blocks),):
+        raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
     X_rotated = X.copy()
     for block, V in zip(blocks, vectors, strict=True):
         X_rotated[:, block.columns] = X[:, block.columns] @ V
@@ -735,9 +776,10 @@ def _reml_in_basis(
 ) -> RemlScore:
     """:func:`reml_and_derivatives` in the basis of ``X`` and ``blocks`` as given."""
     n_columns = X.shape[1]
-    S = assemble_penalty(blocks, rho, n_columns)
+    S_j = _strength_blocks(blocks, rho, n_columns)
+    S = _summed(S_j, n_columns)
     if isinstance(lik, Gaussian):
-        return _gaussian_profiled(X, y, blocks, rho, S, start, derivatives)
+        return _gaussian_profiled(X, y, blocks, rho, S_j, S, start, derivatives)
 
     fit = penalized_newton(
         lik, X, y, aux, S, start, free_basis=free_basis(blocks, n_columns)
@@ -747,13 +789,12 @@ def _reml_in_basis(
     b, A = fit.beta, fit.A
     factor = scipy.linalg.cho_factor(A, lower=True)
     covariance, edf, edf_total = _covariance_and_edf(factor, A, S, blocks)
-    null_dim = n_columns - sum(block.rank for block in blocks)
     score = (
         -fit.loglik
         + 0.5 * b @ S @ b
         - 0.5 * _log_pdet(blocks, rho)
-        + float(np.log(np.diag(factor[0])).sum())
-        - 0.5 * null_dim * _LOG_2PI
+        + _half_log_det(factor)
+        - 0.5 * _null_dimension(blocks, n_columns) * _LOG_2PI
     )
     summary = {"covariance": covariance, "edf": edf, "edf_total": edf_total}
     if not derivatives:
@@ -761,12 +802,7 @@ def _reml_in_basis(
 
     eta = X @ b
     m = len(blocks)
-    S_j = [
-        _embedded(block, np.exp(r), n_columns)
-        for block, r in zip(blocks, rho, strict=True)
-    ]
-    S_j_b = [Sj @ b for Sj in S_j]
-    b_j = [-scipy.linalg.cho_solve(factor, Sjb) for Sjb in S_j_b]
+    S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
     A_j = [
         Sj + lik.dinformation(X, eta, y, aux, X @ bj)
         for Sj, bj in zip(S_j, b_j, strict=True)
@@ -800,6 +836,7 @@ def _gaussian_profiled(
     y: np.ndarray,
     blocks: Sequence[PenaltyBlock],
     rho: np.ndarray,
+    S_j: Sequence[np.ndarray],
     S: np.ndarray,
     beta0: np.ndarray,
     derivatives: bool,
@@ -841,13 +878,13 @@ def _gaussian_profiled(
     residual = y - X @ b
     S_b = S @ b
     D_p = float(residual @ residual + b @ S_b)
-    dof = n_rows - (n_columns - sum(block.rank for block in blocks))
+    dof = n_rows - _null_dimension(blocks, n_columns)
     scale = D_p / dof
     factor = scipy.linalg.cho_factor(gram, lower=True)
     score = (
         0.5 * dof * (1.0 + _LOG_2PI + np.log(scale))
         - 0.5 * _log_pdet(blocks, rho)
-        + float(np.log(np.diag(factor[0])).sum())
+        + _half_log_det(factor)
     )
     fit = replace(
         pls,
@@ -861,12 +898,7 @@ def _gaussian_profiled(
         return RemlScore(float(score), None, None, fit, scale, **summary)
 
     m = len(blocks)
-    S_j = [
-        _embedded(block, np.exp(r), n_columns)
-        for block, r in zip(blocks, rho, strict=True)
-    ]
-    S_j_b = [Sj @ b for Sj in S_j]
-    b_j = [-scipy.linalg.cho_solve(factor, Sjb) for Sjb in S_j_b]
+    S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
     Ainv_S_j = [scipy.linalg.cho_solve(factor, Sj) for Sj in S_j]
     D_j = np.array([b @ Sjb for Sjb in S_j_b])
     D_jk = np.diag(D_j) + 2.0 * np.array(
