@@ -188,6 +188,10 @@ EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
 non-local event and its Local-rest control (the windows of the held-out tetrode
 score), under the processed-data root
 (``scripts/event_evidence/sum_nonlocal_restriction_windows.py``)."""
+EVENT_BIN_FACTS_DIR = "event_bin_facts"
+"""Each analyzed epoch's per-decode-bin facts, under the processed-data root: the
+spikes of every tetrode in the bin and whether it is inside a well visit
+(``scripts/event_evidence/measure_bin_facts.py``)."""
 EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root

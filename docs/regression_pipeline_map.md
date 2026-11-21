@@ -160,6 +160,12 @@ Which times lie inside a well visit.
 
 `well_visit_index`, `in_well_visit`
 
+### `src/continuum_swr_replay/analysis/event_evidence/bin_facts.py`
+
+Per-bin facts of a decode: the spikes of each bin and whether it is inside a well visit.
+
+`decoder_bin_spike_counts`, `visit_bounds`, `bin_facts`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py`
 
 Spike likelihood at decoded and actual positions, over each whole non-local event.
@@ -885,6 +891,12 @@ What the per-event runners share: their arguments, the canonical event table, an
 Spike-evidence reality analysis for non-SWR non-local events.
 
 `find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+
+### `scripts/event_evidence/measure_bin_facts.py`
+
+Each decode bin's spikes over every tetrode and whether it is inside a well visit.
+
+`well_visits`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/measure_event_participation.py`
 
