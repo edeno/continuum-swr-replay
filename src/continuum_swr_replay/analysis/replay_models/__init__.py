@@ -27,6 +27,8 @@ Modules shared by the subpackages (none of them imports a subpackage):
 - ``contrast_aggregation``, ``coefficient_statistics``, ``fit_comparability``:
   the audited is_swr-contrast aggregation, the across-session coefficient
   statistics, and which rung pairs an information criterion can compare.
+- ``declared_tests``: the declared family of tests, each estimand with its
+  question, model and contrast, tested for SWR, No SWR and their difference.
 
 The package ``__init__`` imports nothing, so importing a leaf module (e.g.
 ``replay_models.model_specs``) loads no JAX or statsmodels.

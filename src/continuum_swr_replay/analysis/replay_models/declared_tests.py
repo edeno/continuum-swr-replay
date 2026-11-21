@@ -1,7 +1,8 @@
 """The declared family of tests: one list, written before any fit.
 
 Each member is a scalar estimand of one model, a linear functional of the
-model's coefficients (:mod:`.contrasts`), so its variance in a session is
+model's coefficients
+(:mod:`continuum_swr_replay.analysis.regression.contrasts`), so its variance in a session is
 exact. Each estimand is tested for SWR events, for No SWR events and for their
 difference (the difference of the two kinds' session estimates, reduced like
 any other estimand): :data:`DECLARED_TESTS` is every (estimand, tested) pair,
@@ -13,21 +14,23 @@ basis, so it holds whatever basis and freedom a model's smooth terms are
 given:
 
 - :class:`CurveContrast`: the mean of a curve over one range less its mean
-  over another, on the grid of :func:`.contrasts.range_grid` (a range whose
+  over another, on the grid of :func:`continuum_swr_replay.analysis.regression.contrasts.range_grid` (a range whose
   ends are equal is one point);
 - :class:`SDChangeContrast`: the curve at the pooled mean plus half a pooled
   standard deviation of its variable less the curve at the mean less half,
   the mean and SD taken on the stated role's rows (a change per pooled SD);
 - :class:`CoefficientContrast`: a sum of named coefficients less another sum.
 
-Names. A smooth term is named by its variable, with ``:<role>`` when it is
-one smooth of a role (``time_until_visit_end_s:current``). A slope by role is
-``<covariate>:<role>``. A level of a category is ``<category>[<level>]``; the
-role category's reference level is ``other_leaf``, so a role's contrast
-against another leaf arm is its own coefficient. The rate models' clocks are
+Names. Terms and coefficients are named as
+:mod:`continuum_swr_replay.analysis.regression.terms` names a design's (the rule is
+stated there once): the role category is the column ``role``, whose reference
+level is ``other_leaf``, so a role's contrast against another leaf arm is its
+own coefficient (``role[current]``); a smooth or a slope fitted for one role
+carries ``:role=<level>``. The rate models' clocks are
 ``time_since_visit_start_s`` (since the first poke-in) and
 ``time_until_visit_end_s`` (until the final poke-out); recency is
-``log_trials_since_last_visit``.
+``log_trials_since_last_visit``; the last outcome is ``last_outcome_rewarded``
+(0/1).
 
 Models: ``visit_rate_A`` (the visit rate with the smooths of both clocks and
 the last outcome, 0/1); ``role_content`` (content on nine arms by arm role:
@@ -150,9 +153,9 @@ class Estimand:
     scale: Literal["log rate ratio", "log share ratio"]
 
 
-_ARRIVAL = "time_since_visit_start_s"
-_LEAVING = "time_until_visit_end_s"
-_RECENCY = "log_trials_since_last_visit"
+_ARRIVAL = "s(time_since_visit_start_s)"
+_LEAVING = "s(time_until_visit_end_s)"
+_RECENCY = "s(log_trials_since_last_visit)"
 
 ESTIMANDS: tuple[Estimand, ...] = (
     Estimand(
@@ -194,7 +197,9 @@ ESTIMANDS: tuple[Estimand, ...] = (
         "change of the current arm's log share over one pooled SD of its reward "
         "fraction, read from the current role's reward-fraction smooth",
         "role_content",
-        SDChangeContrast("reward_fraction:current", "reward_fraction", "current"),
+        SDChangeContrast(
+            "s(reward_fraction):role=current", "reward_fraction", "current"
+        ),
         "log share ratio",
     ),
     Estimand(
@@ -202,7 +207,7 @@ ESTIMANDS: tuple[Estimand, ...] = (
         "Does content follow another arm's value?",
         "slope of another leaf arm's log share on its value, per pooled SD",
         "role_content",
-        CoefficientContrast(plus=("value:other_leaf",)),
+        CoefficientContrast(plus=("value:role=other_leaf",)),
         "log share ratio",
     ),
     Estimand(
@@ -224,7 +229,7 @@ ESTIMANDS: tuple[Estimand, ...] = (
         "SD, with recency, the reward fraction, the trial number and the sample "
         "count in the model",
         "role_content_uncertainty",
-        CoefficientContrast(plus=("belief_variance:other_leaf",)),
+        CoefficientContrast(plus=("belief_variance:role=other_leaf",)),
         "log share ratio",
     ),
     Estimand(
@@ -234,7 +239,7 @@ ESTIMANDS: tuple[Estimand, ...] = (
         "plus the visits to its well with a known outcome earlier in the epoch), "
         "per pooled SD, in the same model",
         "role_content_uncertainty",
-        CoefficientContrast(plus=("sample_count:other_leaf",)),
+        CoefficientContrast(plus=("sample_count:role=other_leaf",)),
         "log share ratio",
     ),
     Estimand(
@@ -261,7 +266,7 @@ ESTIMANDS: tuple[Estimand, ...] = (
         "minus 1 to 2 s before, from the current role's smooth of time until "
         "leaving",
         "role_content",
-        CurveContrast(f"{_LEAVING}:current", (0.0, 0.25), (1.0, 2.0)),
+        CurveContrast(f"{_LEAVING}:role=current", (0.0, 0.25), (1.0, 2.0)),
         "log share ratio",
     ),
 )

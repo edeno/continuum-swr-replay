@@ -20,6 +20,21 @@ sum-to-zero constraints, the penalties and the standardization of each slope.
 Nothing pooled is computed per session. :meth:`Design.session` maps one
 session's rows to its design matrix and offset.
 
+Names. Every term and coefficient is named by one rule, which estimands and
+records use to find them:
+
+- a :class:`Smooth` is the term ``s(<column>)``, its columns
+  ``s(<column>).<b>`` (``b`` from 0);
+- a :class:`Slope` is the term and the coefficient ``<column>``;
+- a :class:`LinearFunctional` is ``lf(<first lag column>..<last lag
+  column>)``, its columns ``lf(...).<b>``;
+- a :class:`Category` is the term ``<column>``, each level's coefficient
+  ``<column>[<level>]``;
+- a smooth or a slope fitted for one level of a category ``by`` appends
+  ``:<by column>=<level>`` to its term name (``s(clock_s):role=current``,
+  ``reward_fraction:role=current``), and its columns follow from it;
+- the intercept is ``(Intercept)``.
+
 Standardization (:func:`standardization`): a slope on a 0/1 column enters as it
 is. A slope on any other column is divided by its pooled standard deviation
 (population form, ``ddof = 0``), and when it is a slope for each level of a

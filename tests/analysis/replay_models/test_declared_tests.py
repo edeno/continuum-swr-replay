@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.regression import declared_tests as dt
 from continuum_swr_replay.analysis.regression.contrasts import (
     range_grid,
     range_mean_contrast,
 )
+from continuum_swr_replay.analysis.replay_models import declared_tests as dt
 
 SETTLED_IDS = {
     "Q1",
