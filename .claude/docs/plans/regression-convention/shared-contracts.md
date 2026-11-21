@@ -18,6 +18,8 @@ numbers as there.
 - [C10. Rebuilding reported values and figures](#c10-rebuilding-reported-values-and-figures)
 - [C11. GPUs, long runs and the other session](#c11-gpus-long-runs-and-the-other-session)
 - [C12. Layering of the new package](#c12-layering-of-the-new-package)
+- [C13. No legacy left behind](#c13-no-legacy-left-behind)
+- [C14. One of everything](#c14-one-of-everything)
 
 ## C1. Running code and tests
 
@@ -84,24 +86,52 @@ uses other names, use master's and note it in the phase PR.
 Facts about those labels that this plan relies on (read from that branch's code):
 
 - A window is `in_visit` exactly when its `occupancy_state` is `at_well`
-  (`table_contracts.require_visit_context_labels`). A stop partly inside a visit is `spans_visit_end` or
-  `spans_visit_start`, and its `well_visit_id` is missing. See [C4](#c4-the-selection-function-is-the-only-filter)
-  for what that means for at-risk time.
+  (`table_contracts.require_visit_context_labels`). A window that starts inside a visit and ends after its
+  final poke-out is `spans_visit_end`; one that starts before a first poke-in and ends inside the visit is
+  `spans_visit_start`. On the labels branch `well_visit_id` was set for `in_visit` rows only; Phase 3 sets
+  it for every row that starts inside a visit (`in_visit` and `spans_visit_end`).
+- The default event set (lead, 2026-11-20, decision L4): **the events that start inside a well visit**,
+  `analysis.constants.STARTS_IN_WELL_VISIT = ("in_visit", "spans_visit_end")`, which `select_visit_context(table)`
+  selects with no argument (being added on the labels branch; if master lacks it, Phase 3 adds it).
+  Diagnostic of 2026-11-20 (not a summary value): 69,011 `in_visit` plus 189 `spans_visit_end` events. The
+  lead chose the start over the whole event because the 189 are 8 to 11 % of the starts in the last 0.25 s
+  before the poke-out and most of those in the last 0.05 s; leaving them out would make the rate fall before
+  the animal leaves by a counting rule.
 - A visit is one port experience, from `arrival_time` (first nose-poke in) to `departure_time` (final
   poke-out) of the port experiences.
+- The label columns are required in every canonical table, the ContFrag tables included (lead: "Label
+  them now"; being added on the labels branch). The allowance that skipped a table with no `visit_context`
+  ("built before the label existed", labels branch head `9b460a90`) is being removed there; if master still
+  has it, remove it in the first phase that reads the tables (C13).
+- The stop table's arrival clock `last_well_arrival_time_s` equals the visit's first poke-in for every stop
+  that starts inside a visit where both exist (all 242 epochs: 93,302 stops, no difference; missing for
+  554), so arrival needs no decision (L3). The visit clocks replace it and the clocks built on it
+  ([inventory C-5](legacy-inventory.md#cohort-selectors-and-stop-clocks)).
 
 ## C4. The selection function is the only filter
 
-- Every summary statistic, summary plot and model of Figures 2 to 5 selects its rows with
-  `select_visit_context(table)` (default: `in_visit`), and records `count_visit_context(table)` (rows or
+- Every summary statistic, summary plot and model of Figures 2 to 5, in every family (rate, content,
+  choice, stay or leave, ripple power, history, mPFC) and for every event source (the hippocampal non-local
+  events and the ContFrag SWR- and MUA-sourced events), selects its events with `select_visit_context(table)`
+  (default: `STARTS_IN_WELL_VISIT`, C3), and records `count_visit_context(table)` (rows or
   `event_id`s per label, kept or not) in its output. No other code filters by occupancy, position or visit.
   New code never calls the older `select_stop_cohort` / `select_event_cohort` (`cohort_selection.py:322`,
-  `:378`); their remaining callers move to the selection function or retire in Phase 12.
-- Time bins carry their own `visit_context` (Phase 3 adds it to the visit bin design), and the rate and mPFC
-  designs select bins with the same function. A bin is `in_visit` when it lies inside a visit interval and
-  inside an immobility stop. Selecting stops by their own label would drop the in-visit part of every
-  `spans_visit_end` stop, which is where the last seconds before leaving are; the bin label keeps it.
-  (Decision L4 in [overview.md](overview.md#decisions-for-the-lead) confirms this reading.)
+  `:378`); each remaining caller moves to the selection function or retires in the phase the inventory names
+  ([legacy-inventory.md](legacy-inventory.md#cohort-selectors-and-stop-clocks)).
+- Time is selected at bin grain. Time bins carry their own `visit_context` (Phase 3 adds it to the visit
+  bin design), and the rate and mPFC designs select bins with the same function. A bin is `in_visit` when
+  it lies inside a visit interval (first poke-in to final poke-out) and inside an immobility stop. So a stop
+  that crosses the final poke-out contributes its bins up to the poke-out (lead, L4, option A), and a stop
+  that starts before the first poke-in contributes its bins after it. With this rule every event of the
+  default set starts in an at-risk bin, and every event that starts in an at-risk bin is in the set: rate
+  and content analyze the same events (lead: "rate and content models should analyze the same events").
+  Diagnostic of 2026-11-20 (all 242 epochs, not summary values): 93,738 stops start inside a visit, 15,803
+  of them cross the final poke-out (part before it median 1.75 s, after it 0.07 s); those parts before the
+  poke-out are 31 % of the immobile time inside visits (11.4 of 36.8 h) and hold 20,497 of the 69,011
+  `in_visit` events; 44,592 visits, median 3.11 s.
+- Figure 2's panels that count SWRs or seconds (L5, lead: "Ok") use only time inside a well visit, by a
+  sample-level mask from the same visit intervals; an SWR counts when it starts inside a visit (the event
+  set's start rule applied to SWRs; Phase 4).
 - A row with a missing value is never dropped inside a fitter. The cohort step drops it, counts it per kind
   and stores the counts with the fit.
 - Figure 5's default is the same subset restricted to the epochs with mPFC units.
@@ -112,7 +142,7 @@ The design's section 4. In short, with the phase that implements each piece:
 
 | Rule | What every model does | Built in |
 |---|---|---|
-| 1. Data | Unit is the well visit (first poke-in to last poke-out); at-risk time is immobile in-visit time less time inside an ongoing event of the outcome's kind; three clocks per bin (time since arrival, time until leaving = until the last poke-out, time until the next movement of any size); whole visit modeled | Phase 3 |
+| 1. Data | Unit is the well visit (first poke-in to last poke-out); the events are those that start inside a visit (C3); at-risk time is immobile in-visit time less time inside an ongoing event of the outcome's kind; three clocks per bin (time since arrival = first poke-in, time until leaving = until the last poke-out, time until the next movement of any size); whole visit modeled | Phase 3 |
 | 2. Design | Clocks, trials since last visit and peri-event lags are penalized cubic B-spline smooths (second-order difference penalty); arm role (current, previous, other leaf, trunk) is a category with a separate slope per role; kind is a category with separate terms per kind; one pooled standardization (population SD, ddof = 0) stored with the fit; a continuous factor in an interaction is centered at a fixed pooled reference, a 0/1 factor is not; reward history by model A (last outcome, 0/1) and model D (penalized smooth over the last ten outcomes, log lag) | Phases 2, 5a, 6a |
 | 3. Fit | Penalized likelihood by the shared fitter; one REML penalty strength per smooth term, shared by all sessions of a model and kind, from a grid start; Newton decrement convergence in float64; a data-based support rule per unpenalized term and session, stored | Phases 1, 2 |
 | 4. Folds | Five folds of whole trials balanced by destination well, long stays cut into pieces (one function); used to compare designs and check over-fitting only; held-out claims summed over sessions | Phase 2 |
@@ -139,8 +169,10 @@ maximum stay piece 30 s. Change a value only there.
   - **length-adjusted / unadjusted** (content kind comparisons): with or without the event-length
     interaction of [designs.md#content-design](designs.md#content-design), evaluated at one pooled
     reference length. Both are reported.
-  - **reward effect at fixed time before leaving / per second of stop** (rate, design decision 3): model A in
-    the three-clock visit design, and the per-stop (total) family of Phase 5b. Both are reported, each named.
+  - **reward effect at fixed time before leaving / per visit** (rate, design decision 3): model A in the
+    three-clock visit design ("direct"), and the total effect per second of in-visit at-risk time of
+    Phase 5b ("total"). Both are reported, each named. There is no per-stop variant (L6, lead: "We need to
+    be consistent in the repo"); a per-stop number, if ever wanted, is a question for the lead.
 
 ## C7. The fit-row record
 
@@ -180,7 +212,9 @@ scalar estimand, tested for SWR, for No SWR and for their difference. The design
 | Q4a | slope of the current arm's log share on its reward fraction (per pooled SD) | content (6a) |
 | Q4b | slope of another arm's log share on its value (per pooled SD) | content (6a) |
 | Q5a | log share ratio of an arm 20 trials since its last visit against one 3 trials since | content, recency smooth (6a) |
-| Q5b | slope on uncertainty with recency in the model (per pooled SD) | content (6a) |
+| Q5b-var | slope on the belief variance with recency in the model (per pooled SD) | content, uncertainty model 1 (6a) |
+| Q5b-rew | slope on the reward variability (variance of the arm's 0/1 outcomes over the last 10 visits to its well) with recency in the model | content, uncertainty model 2 (6a) |
+| Q5b-n | slope on the sample count (log of one plus the visits to the well earlier in the epoch) with recency in the model | content, uncertainty model 3 (6a) |
 | Q6 | log share ratio, next arm against an arm that is neither current nor previous | content with a next-arm role (7) |
 | Q7a | log rate in the last 0.25 s before the last poke-out minus log rate 1 to 2 s before | visit rate, smooth of time until leaving (5a) |
 | Q7b | the same for the current-arm log share | content (6a) |
@@ -189,11 +223,12 @@ A curve-derived estimand is a linear functional of the coefficients (the mean of
 of the clock minus its mean over another, on a 0.01 s or 0.01-log-unit grid), so its session variance is
 exact.
 
-**Unresolved count.** The design calls this "ten estimands ... 30 tests", but its table lists eleven
-(above: 33 tests), and the third round added two more uncertainty measures, each "tested once" (Q5b becomes
-three: 39 tests). Decision L1 ([overview.md](overview.md#decisions-for-the-lead)) settles the list before
-Phase 5a. The code reads the list from one place (new `analysis/regression/declared_tests.py`,
-Phase 2), so the count is not hard-coded anywhere else.
+**Settled (lead, 2026-11-20, L1: "Ok").** Thirteen estimands, each for SWR, No SWR and their difference:
+**39 tests**. (The design's "ten estimands ... 30 tests" predates the Q3, Q4 and Q7 splits and the two added
+uncertainty measures.) The code reads the list from one place (new `analysis/regression/declared_tests.py`,
+Phase 2), so the count is not hard-coded anywhere else. If Phase 6a's uncertainty gate changes a measure's
+definition, the member keeps its id and the change is made before any real fit (the family is still
+declared before the fits).
 
 ## C9. Where new fits are stored
 
@@ -202,7 +237,7 @@ New fits go under `Processed-Data/replay_content/models_convention/<family>/` (`
 `descriptive` for model-free reference curves), one parquet of
 fit-row records per model plus a `manifest.json`, each written with `tables/io.py:215` (`write_atomically`). mPFC bundles keep their own directory layout
 (`analysis/pfc/bundle_files.py`) with the record of C7 added. Old fits are not overwritten; they stay
-until Phase 12.
+on disk, unread once their family is removed (C13).
 
 ## C10. Rebuilding reported values and figures
 
@@ -219,7 +254,8 @@ PYTHONPATH=src JAX_PLATFORMS=cpu $PY scripts/reported/emit_reported_values.py
   build no tool to avoid it, and do not re-run an unrelated family only to clear a pending note.
 - A new value tags a question in `src/continuum_swr_replay/reported/questions.py` and, when it has one, a
   figure (`questions.py:93`, `FIGURES`). Q1 to Q7 are added as new Part 3 questions in Phase 5a (call:
-  ids `3.11` to `3.17`); the old 3.x questions stay until their values leave in Phase 12.
+  ids `3.11` to `3.17`); an old 3.x question is marked `dropped` (reason: superseded by its new id) in the
+  phase that removes its last value.
 - A number in a doc is written inside a `<!--v:<summary>.key-->…<!--/v-->` marker; never typed.
 - Before removing any value, list the macros `paper/main.tex` cites (`make reported-values` prints the
   count; grep the macro names in `paper/*.tex`). A cited value is removed only with the lead's yes on the
@@ -246,3 +282,63 @@ import it (the event-evidence code of Figure 2 included, for the shared fold fun
 rule to `tests/repository/test_import_layering.py` (beside `EVENT_DEFINITION_MAY_IMPORT`,
 `test_import_layering.py:91`) and to the layer list in `docs/README.md:93-133`. Task-aware code (which
 columns, which rows) stays in `replay_models/`, `event_tables/` and `pfc/`.
+
+## C13. No legacy left behind
+
+Lead (2026-11-20): "Let's make sure to cleanup any legacy code." Every phase obeys these rules, and the
+phase that replaces a thing removes it ([legacy-inventory.md](legacy-inventory.md) lists what and where):
+
+- **No compatibility shims.** No wrapper, adapter or alias that keeps an old call working.
+- **No flag or parameter that selects the old path** (no `--legacy`, no `inference="legacy"`, no
+  `fitter="statsmodels"`, no `--stop-cohort` choice among old cohorts). A sensitivity variant the design
+  keeps is a named model with its own record, not a switch back to old code.
+- **No allowance for older files.** No "skip when the column or field is absent", "built before", "older
+  bundle" or version-fallback branch for tables or bundles made before a change. Tables are rebuilt and fits
+  are refit; an old file fails loudly (`require_columns`, a version check that raises).
+- **No re-export of a moved or renamed name.** Callers import from the new home.
+- **A renamed column is renamed everywhere in the same phase** (builders, registry, readers, tests, docs);
+  no deny-list of the old spelling is added for it.
+- **Nothing new under `scripts/exploratory/`.** A check worth keeping is a test or a committed stored
+  analysis; a one-off stays in the phase's scratch directory.
+- **Zero matches at the end of the phase.** Every symbol, file and column the phase removes has no match in
+  `git grep -n -w <name> -- src scripts tests docs` (dated records exempt: `docs/history/`, dated
+  `docs/design/<YYYY-MM-DD>-*.md`, `docs/design/model_history.md`, `paper/reported/removed_part*.md`).
+- **Record every removal**: a row in `docs/history/2026-module-moves.md` ("removed: replaced by ..."), and
+  `docs/regression_pipeline_map.md` regenerated with `scripts/checks/write_pipeline_map.py`.
+- **Old against new before removal.** A phase that removes a family first writes, for the lead, each old
+  reported value beside its replacement with the reason for the change (cohort, clock, scaling, design),
+  read from the two summary files (keep a copy of the old `paper/reported/behavior.json` or `mpfc.json` in
+  the phase scratch directory before rebuilding). The old fits are the only baseline, so this comes first.
+- **A correctness check never keeps dead code alive.** Where a test compares the new fitter with an old one
+  that is being removed (Phase 1's check 1 and check 3), the phase that removes the old fitter first commits
+  the old fitter's coefficients on the same small data as a fixture under
+  `tests/analysis/regression/data/legacy_fitters/` (CSV, with the script line that made them in a README
+  beside it), switches the test to the fixture, then deletes the old fitter.
+
+The guards:
+
+- **Cited values need the lead's yes.** A value `paper/*.tex` cites is removed only after the lead approves
+  the text change, asked at the boundary of the phase that removes it (C10), not saved for the end.
+- **An analysis this plan does not replace is not removed without asking.** The lead's standing rule: "an
+  analysis nothing cites is a question for the lead, not a removal." Those are the ASK items of the
+  inventory; they go to the lead as one list at the latest in Phase 12.
+- Stored outputs in Processed-Data are never deleted by this plan; they are only no longer read.
+
+## C14. One of everything
+
+Lead (2026-11-20): "We need to be consistent in the repo." In every model family, summary and figure,
+including the mPFC models and the ContFrag event sources:
+
+- **one unit**: the well visit (first poke-in to final poke-out). No per-stop, per-trial-segment or
+  per-bout variant is kept beside a per-visit one;
+- **one event set**: the events that start inside a well visit (C3);
+- **one selection function**: `select_visit_context` (C4), at event, stop, event-arm and bin grain;
+- **one fitter**: `analysis/regression/` (NumPy reference, JAX batch twin for units);
+- **one set of clocks**: time since the first poke-in, time until the final poke-out, time until the end of
+  the current immobile stretch (Phase 3); no stop-start or trial-arrival clock;
+- **one fold rule, one convergence rule, one support rule, one standardization, one inference** (C5).
+
+Where a phase finds code that uses another unit, another filter, another clock or another fitter, it moves
+it onto these in the same phase, or, if the thing is outside the phase's family, lists it in the PR and in
+[legacy-inventory.md](legacy-inventory.md) for the lead.
+

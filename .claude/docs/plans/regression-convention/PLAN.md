@@ -4,8 +4,8 @@
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the
-lead's order: Figures 2 and 3 and the events summary move onto the common data subset (events inside a
-well visit, chosen by one selection function), and every regression model of Figures 4 and 5 is rebuilt
+lead's order: Figures 2 and 3 and the events summary move onto the common data subset (events that start
+inside a well visit, chosen by one selection function), and every regression model of Figures 4 and 5 is rebuilt
 on one convention, with one shared penalized fitter inside this repository. It ends with Figure 4 drawn
 and the replaced models removed.
 
@@ -17,9 +17,11 @@ For agent invocation, **load only the slice you need**:
    upstream files to read, contracts and designs it depends on, tasks, validation slice and fixtures.
 2. **Need shared semantics?** [shared-contracts.md](shared-contracts.md): the convention's rules, the
    selection function, the fit-row record, the declared tests, how to run code and rebuild values, the GPU
-   and coordination rules.
+   and coordination rules, C13 (no legacy left behind) and C14 (one unit, event set, selection, fitter and
+   clocks everywhere).
 3. **Need a per-component design (math, code)?** [designs.md](designs.md).
 4. **Need broader scope, dependencies, risks, decisions?** [overview.md](overview.md).
+   **What to remove, and when?** [legacy-inventory.md](legacy-inventory.md).
 5. **Need the scratch prototypes and outside references?** [appendix.md](appendix.md).
 
 ## Files
@@ -59,7 +61,10 @@ For agent invocation, **load only the slice you need**:
     and 5.
   - [phase-11-history-models.md](phase-11-history-models.md) — the two event-history models moved to
     the shared fitter (after Figure 4, as the design orders).
-  - [phase-12-retire-replaced.md](phase-12-retire-replaced.md) — the replaced ladders, runners, values
-    and docs removed.
+  - [phase-12-legacy-sweep.md](phase-12-legacy-sweep.md) — the final sweep: cross-cutting leftovers, the
+    ASK list answered, and audits that prove nothing replaced is left (each phase removes what it
+    replaced).
+- [legacy-inventory.md](legacy-inventory.md) — every piece of legacy in the touched areas, by the phase that
+  removes it, classed REMOVE, ASK or KEEP, with the ASK list for the lead.
 - [appendix.md](appendix.md) — map of the scratch prototypes to the phase, test or stored analysis that
   replaces each; outside references with commits.

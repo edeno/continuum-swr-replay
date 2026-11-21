@@ -59,7 +59,9 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   to the marked kernels (`marked_glm.py:1409-1422`).
 - **Fit mask on the common subset**: replace the stop-cohort mask (`cohort.py:65`) with in-visit immobile
   bins (the visit intervals of Phase 3, selected by the one function, C4) and events selected by
-  `select_visit_context` in `canonical_events.py:95`; record counts per label in each bundle's sidecar.
+  `select_visit_context` in `canonical_events.py:95` (the default set: events that start inside a visit,
+  `spans_visit_end` included, C3); record counts per label in each bundle's sidecar. The mPFC models use the
+  same unit, event set, clocks and fitter as every other family (C14).
 - **Trial folds**: replace `assign_blocked_folds` in `heldout.py`, `scoring.py:190` and the two runners
   with Phase 2's fold function on the bins' times, plus a training margin of the kernel half-width (250 ms)
   around each held-out piece (as `fold_training_masks` on master does), so a symmetric kernel cannot see
@@ -81,8 +83,26 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   over the free cards (`--gpu`, `--sessions`) in `tmux` (`csr-8-mpfc`).
 - **Rebuild and redraw**: `summarize.py --summary mpfc`, emit, `generate_figure05.py`; commit the figure
   files.
-- **Docs**: the mPFC section of `docs/behavior_models.md` (or its own doc): REML over units, trial folds,
+- **Docs**: `docs/design/pfc_unit_glm_estimator.md`, `pfc_marked_event_kernels.md` and `pfc_marked_model_family.md`
+  rewritten for the new estimator (the fixed sigma and blocked folds they describe are removed): REML over units, trial folds,
   the in-visit cohort; remove statements about the fixed sigma 3.0 except as the sensitivity path.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-8](legacy-inventory.md#phase-8)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. First commit fixtures of the batched ridge fitter's coefficients (`batched_glm.fit_poisson_glms` at sigma 3 on the synthetic units of `tests/analysis/pfc/test_batched_glm.py`) for any test of the new fitter that compares with it. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
@@ -118,7 +138,7 @@ Synthetic units and events (the existing `tests/analysis/pfc/` helpers, for exam
 
 ## Rebuilt
 
-The mPFC bundles (new directory or a new suffix; the old ones stay until Phase 12); `paper/reported/mpfc.json`
+The mPFC bundles (new directory or a new suffix; the old ones stay on disk, unread); `paper/reported/mpfc.json`
 and the emitted files; `paper/figures/figure05/`.
 
 ## Exit criteria

@@ -55,6 +55,14 @@ def penalized_newton(lik, X, y, aux, S_lam, beta0, *, tol=NEWTON_DECREMENT_TOL,
 ```
 
 - No clipping of `eta` at the returned optimum; an infinite `F` during halving is a rejected step.
+- As built (`regression/newton.py`): when the decrement is below the tolerance the fit takes that last
+  full Newton step and reports `A` and the decrement where it lands (it stays where it was if the step
+  does not lower `F`). Without it each coefficient is off by up to `sqrt(2 tol / lambda_min)`, more than
+  the checks allow, and REML's derivatives assume the exact optimum. A matrix `A` that is not positive
+  definite or not finite reports not converged.
+- As built, every likelihood method takes `y` and `aux` (`dinformation(X, eta, y, aux, d)`,
+  `d2information(X, eta, y, aux, d1, d2)`): the weights need the offset, the scale or the groups. The
+  shorter signatures written below are shorthand for those.
 - Start: Poisson intercept `log(sum y / sum exposure)`, others 0; during a penalty search, warm start from
   the previous `rho`'s solution of the same session.
 - Unpenalized fits (S = 0) use the same code; then `A = H` must be PD, which the support rule makes likely
@@ -102,8 +110,10 @@ Gaussian scale: REML includes `log phi` as one more parameter of the outer searc
 - Identifiability: one sum-to-zero constraint per smooth, computed once on the pooled cohort rows of the
   model and kind (`c = sum_rows B`; `Z` = null space of `c'` from a complete QR), and the same `Z` used for
   every session, so that the coefficients mean the same thing in every session and the session curves can be
-  summarized together. The constrained penalty is `Z' P Z` (rank `n_basis - 3` after the constraint for a
-  second-order penalty on a cubic basis with an intercept in the model; compute the rank numerically once).
+  summarized together. The constrained penalty is `Z' P Z`, of rank `n_basis - 2`: a second-order difference penalty
+  leaves the constant and the line unpenalized, and the constraint removes one of those two directions
+  (as built: `regression/pspline.py`, whose test asserts the rank; take it from `penalty_rank`, never
+  from a count).
 - Model D (reward history as a linear functional): `eta_i += sum_{l=1}^{10} f(log l) r_{i,l}`,
   `f(x) = sum_b B_b(x) gamma_b` over `x in [0, log 10]`, so column `b` of the design is
   `sum_l B_b(log l) r_{i,l}` with `r_{i,l}` the outcome (1 rewarded, 0 omitted) at lag `l`. No sum-to-zero
@@ -297,13 +307,18 @@ The visit at-risk bin design (Phase 3 builds it; Phase 5a fits it). Per session 
   ongoing event of the outcome's kind (as `aggregate_to_timebins` does with `at_risk_events`,
   `analysis/replay_models/per_bin_design.py:394`).
 - 15 ms bins (`RATE_BIN_S`, `analysis/behavior/design_constants.py:106`) laid from each in-visit immobile
-  stretch's start; the last bin is partial (its `exposure` the remainder). Each bin carries
+  stretch's start; the last bin is partial (its `exposure` the remainder). A stop that crosses the final
+  poke-out is cut there; a stop that starts before the first poke-in starts at it. Each bin carries
   `visit_context = "in_visit"`, `well_visit_id`, `stretch_index` within the visit, and the three clocks at
   the bin center: `s` = t - first poke-in, `u` = last poke-out - t, `m` = end of the current immobile stretch
   (clipped at the last poke-out) - t. In the visit's last stretch `m = u`.
-- Counts: event starts of the kind whose event is `in_visit` (the event table's label). An event that starts
-  in a bin but crosses the last poke-out is not counted and its time is not at risk once it has started; the
-  rate simulation of Phase 5a plants this rule, so its effect is measured, not assumed.
+- Counts: event starts of the kind whose event starts inside a visit (`select_visit_context` default,
+  `STARTS_IN_WELL_VISIT` = `in_visit` and `spans_visit_end`, C3). An event that starts in a bin and crosses
+  the final poke-out is counted (lead, L4); the bins end at the poke-out, so its time after it is not at
+  risk. The counting rule that remains is the event definition's: an event must be immobile as a whole, so
+  a candidate that starts in a stop and runs into movement is not an event. The rate simulation of Phase 5a
+  plants that rule at every stop end (small movements and the last one), so its effect is measured, not
+  assumed.
 - Reward covariates per bin: the last known outcome and the last ten known outcomes at the bin's time, with
   the existing outcome-boundary shift (the outcome of the current trial becomes lag 1 at
   `outcome_known_time_s`; `per_bin_design.py:85-91`, `_OUTCOME_SHIFT_STOP_COLUMNS`).
@@ -316,6 +331,8 @@ The visit at-risk bin design (Phase 3 builds it; Phase 5a fits it). Per session 
 Per session and kind, one row per (event, candidate arm), all nine arms (lead's decision 1):
 
 - Response: the event's share on each arm (`arm_fraction` of the event-arm table), weight one per event.
+- Events: those that start inside a visit (C3), `in_visit` and `spans_visit_end`. The current arm of a
+  `spans_visit_end` event is the arm of the visit's well (Phase 3 sets it so in the event-arm table).
 - Roles, exclusive, per (event, arm): `current` (the arm of the well being visited), `previous` (the arm of
   the previous trial's well, when different), `other_leaf` (any other leaf arm), `trunk` (arms 6 to 8).
   Each role is a category (reference: `other_leaf`). Arm fixed effects stay in every content model, per kind
@@ -331,10 +348,18 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   `log(event duration) - L0`, `L0` the pooled median log duration over both kinds (fixed, stored), so the
   per-kind estimate is at the same reference length; the unadjusted model omits the interactions. Both are
   stored and reported (see [C6](shared-contracts.md#c6-kinds-contrasts-and-the-two-meanings-of-direct)).
-- Uncertainty: three models, each the same design plus one uncertainty measure with its role slopes: the
-  belief variance (`reward_belief_variance_candidate_arm_preoutcome`, built by
-  `behavior/covariates/history/value_block.py:206`), the arm's reward variability, and the number of times
-  the animal has sampled the arm (Phase 3 builds the last two; definitions are decision L2).
+- Uncertainty: three models, each the same design plus one uncertainty measure with its role slopes
+  (lead, L2: "Do your rec. Maybe we should check on simulated"):
+  1. the belief variance (`reward_belief_variance_candidate_arm_preoutcome`, built by
+     `behavior/covariates/history/value_block.py:206`);
+  2. the reward variability: the variance (population form, `ddof = 0`, call) of the arm's 0/1 outcomes over
+     the last 10 visits to its well, outcomes known before the event;
+  3. the sample count: `log(1 + n)`, `n` the visits to the well earlier in the epoch, before the event.
+  Phase 3 builds 2 and 3 in the rebuild. For 0/1 outcomes, measure 2 is `p(1 - p)` of the reward fraction
+  `p` over the same window (a function of a covariate already in the model, separable only through its
+  curvature), and measure 3 grows with time in the epoch. The semi-synthetic identifiability study of the
+  measures against recency, reward fraction and a drift in the epoch is a gate of Phase 6a: its result goes
+  to the lead before any real fit, and the definitions or the model may change with it.
 - Q6 (Phase 7): one more role, `next`, for the arm of the next trial's well when it is neither current nor
   previous (call: when the next arm is the current or previous arm, the event adds nothing to this term).
 

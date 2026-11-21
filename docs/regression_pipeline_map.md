@@ -110,7 +110,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`
 
 ### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
 
@@ -153,6 +153,12 @@ The non-local event rule and the SWR-overlap classification of those events.
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
 `SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `event_epoch_ids`, `event_table_epochs`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
+
+### `src/continuum_swr_replay/analysis/event_definition/well_visits.py`
+
+Which times lie inside a well visit.
+
+`well_visit_index`, `in_well_visit`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py`
 
@@ -284,7 +290,7 @@ Canonical stop-grain builder: one row per stopping period.
 
 Scientific table contracts beyond the generic covariate schema stamp.
 
-`event_bin_total_column`, `validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
+`require_visit_context_labels`, `event_bin_total_column`, `validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
 
 ### `src/continuum_swr_replay/analysis/event_tables/timebin_tables.py`
 
@@ -1225,6 +1231,12 @@ Six-panel summary figure for the per-bin rate ladder (Family B).
 Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 `report`, `plot`, `build_parser`, `main`
+
+### `src/continuum_swr_replay/analysis/event_tables/visit_context.py`
+
+Where an event or a stop lies relative to the well visits.
+
+`window_visit_context`, `visit_context_of_samples`
 
 ### `src/continuum_swr_replay/analysis/replay_models/coefficient_statistics.py`
 

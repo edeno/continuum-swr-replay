@@ -32,6 +32,8 @@ def _make_event_arm_table(cumulative_reward_values):
         {
             "event_id": [1] * n_arms,
             "candidate_arm": arms,
+            "occupancy_state": "at_well",
+            "visit_context": "in_visit",
             "arm_count_hard": np.zeros(n_arms, dtype=float),
             "is_same_patch_as_current": np.zeros(n_arms, dtype=int),
             "reward_count_candidate_arm_last10_known_trials": cumulative_reward_values,
@@ -48,6 +50,8 @@ def _make_event_table():
             "session_date": [20200101],
             "epoch": ["01_r1"],
             "event_id": [1],
+            "occupancy_state": ["at_well"],
+            "visit_context": ["in_visit"],
             "n_nonlocal_bins": [4],
             "n_undecoded_bins": [4],
             "last_rewarded_arm": [np.nan],

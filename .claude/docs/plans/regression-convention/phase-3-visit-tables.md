@@ -39,9 +39,12 @@ so it can run beside them. Ends with one rebuild of the canonical tables.
 **Designs referenced:** [rate design](designs.md#rate-design), [content design](designs.md#content-design)
 (the uncertainty measures).
 
-**Decisions needed first:** L2 (the two uncertainty measures), L3 (arrival = first poke-in), L4 (in-visit
-seconds of partly-inside stops count). If L2 is not settled, ship without the two covariates; Phase 6a then
-builds them at design time from the port experiences.
+**Decisions this phase applies** (all settled by the lead on 2026-11-20; [overview.md](overview.md#decisions-for-the-lead)):
+L2 (the two uncertainty measures, defined in [designs.md#content-design](designs.md#content-design)), L3
+(arrival is the first poke-in; `last_well_arrival_time_s` equals it wherever both exist), L4 (the event set
+is the events that start inside a visit; a stop crossing the final poke-out counts up to it), ASK-1 (the
+ContFrag tables get the same new columns), ASK-4 (the dense stop time-bin table is removed), and C14 (one
+unit, one event set, one set of clocks).
 
 ## Tasks
 
@@ -49,28 +52,45 @@ builds them at design time from the port experiences.
   tables in the PR as the "before" counts.
 - **Stop table: the visit columns** (in `build_stop_table`, `stop_table.py:61`, using the
   `port_experiences` it already takes; vectorized with `np.searchsorted` over visit intervals):
-  - `visit_id_at_start` (`Int64`): the port experience whose `[arrival_time, departure_time)` holds the
-    stop's first analyzed sample; missing when none. Unlike `well_visit_id` (set only for `in_visit`
-    stops), it is set for `spans_visit_end` stops too.
+  - `well_visit_id` (`Int64`) for every row that starts inside a visit, `spans_visit_end` included (the
+    labels branch sets it for `in_visit` rows only): the port experience whose
+    `[arrival_time, departure_time)` holds the row's first analyzed sample. Same change in the event table
+    and the event-arm and event-patch tables (`visit_context.window_visit_context`, its `well_visit_id`
+    assignment).
+  - `overlapping_visit_id` (`Int64`): the visit the stop overlaps at all (a stop overlaps at most one: the
+    animal moves between wells), so a `spans_visit_start` stop (stopped at the well before the first
+    poke-in) is placed too; missing when none.
   - `visit_first_poke_in_s`, `visit_last_poke_out_s`: that visit's `arrival_time` and `departure_time`.
   - `in_visit_immobile_s`: seconds of the stop inside that visit, less excluded time.
   - `visit_stretch_index`: 0, 1, ... for the stops of one visit in time order.
   - `stop_end_kind`: `"leaves"` when no later stop of the same visit starts before
     `visit_last_poke_out_s`, `"small_movement"` when one does, `"outside_visit"` when
-    `visit_id_at_start` is missing. With the visit ending at the last poke-out (design 4.1), no position or
-    speed threshold is needed.
+    `overlapping_visit_id` is missing. With the visit ending at the last poke-out (design 4.1), no position
+    or speed threshold is needed.
 - **Event table: the visit clocks** (in `build_event_table`, `event_table.py:545`, next to the visit context):
-  for `in_visit` events, `time_since_visit_start_s` (event start minus first poke-in),
-  `time_until_visit_end_s` (last poke-out minus event start), `time_until_stretch_end_s` (end of the
-  containing stop, clipped at the last poke-out, minus event start); missing otherwise. Carry them to the
-  event-arm table as event context columns (`arm_patch_tables.py:57`) so the content design reads them per
-  row.
-- **Event-arm table: the two new uncertainty covariates** (per decision L2), computed in
+  for events that start inside a visit (`in_visit` and `spans_visit_end`), `time_since_visit_start_s`
+  (event start minus first poke-in), `time_until_visit_end_s` (last poke-out minus event start, positive for
+  both labels), `time_until_stretch_end_s` (end of the containing stop, clipped at the last poke-out, minus
+  event start); missing otherwise. Carry them to the event-arm table as event context columns
+  (`arm_patch_tables.py:57`) so the content design reads them per row.
+- **Current arm of an event that crosses the final poke-out**: for `spans_visit_end` events, `current_arm`,
+  `is_current_arm` and the current patch are the visit's well's arm and patch (check what the builder gives
+  today; it reads position at the event; set it from the visit if they differ, and count the changed rows in
+  the PR).
+- **Event-arm table: the two new uncertainty covariates** (L2, lead: "Do your rec"), computed in
   `_history_by_event` (`candidate_arm.py:76`) beside the reward count and fraction, from outcomes known
-  before the event (the same rule as `recent_reward_rate_all_events`, `reward_history.py:97`). Default
-  names (calls): `n_completed_visits_candidate_arm` and
-  `reward_outcome_variance_candidate_arm_last10_visits`. Trunk arms get the rule
-  `attach_arm_uncertainty` uses (`value_block.py:206`: 0 where the stop is present, NaN where absent).
+  before the event (the same rule as `recent_reward_rate_all_events`, `reward_history.py:97`):
+  `reward_outcome_variance_candidate_arm_last10_visits` (the variance, `ddof = 0`, of the arm's 0/1
+  outcomes over the last 10 visits to its well) and `log1p_n_visits_candidate_arm` (log of one plus the
+  visits to the well earlier in the epoch). Trunk arms get the rule `attach_arm_uncertainty` uses
+  (`value_block.py:206`: 0 where the stop is present, NaN where absent). Names are calls; Phase 6a's gate may
+  change a definition, in which case it changes here in a follow-up rebuild of the same phase family, not by
+  a second column.
+- **The same columns in the ContFrag tables** (ASK-1, lead: "Move them"): the ContFrag stop, event and
+  event-arm tables (`scripts/tables/prepare_contfrag_replay_content_data.py`, `analysis/contfrag/`) gain
+  `well_visit_id`, the visit clocks, the current-arm rule above and the two uncertainty covariates through
+  the same functions, so Phases 5a and 6a can fit the SWR- and MUA-sourced events as two more event sources.
+  The visit labels themselves come from the labels branch (lead: "Label them now").
 - **Register and document**: every new column in `tables/covariate_registry.py` (producer, table, timing)
   and in `docs/covariate_dictionary.md`; bump `COVARIATE_SCHEMA_VERSION` (`tables/versions.py:25`) only if
   the registry's contract requires it for added columns (read `assert_versions_compatible`, `:37`).
@@ -78,8 +98,10 @@ builds them at design time from the port experiences.
   `visit_timebins(stop_table, onsets, events, *, kind, bin_s=RATE_BIN_S, excluded_intervals=None)` builds
   15 ms bins over every immobility stop of a session (not only the visit's), as in
   [designs.md#rate-design](designs.md#rate-design): each bin carries `visit_context` (`in_visit` when
-  inside a visit interval and a stop; otherwise the stop's own label), `visit_id_at_start`,
-  `visit_stretch_index`, `exposure`, `count` (starts of in-visit events of the kind), the three clocks `s`,
+  inside a visit interval and a stop; otherwise the stop's own label), `well_visit_id` (from the visit
+  intervals, so it is set for the in-visit bins of `spans_visit_start` and `spans_visit_end` stops),
+  `visit_stretch_index`, `exposure`, `count` (starts of the kind's events that start inside a visit, C3),
+  the three clocks `s`,
   `u`, `m` (missing outside a visit), the last known outcome and the ten known lags with the outcome shift
   at `outcome_known_time_s`. At-risk time excludes time inside an ongoing event of the kind (reuse
   `_event_coverage_by_bin`, generalized from stop time to absolute time) and excluded time. The rate model
@@ -91,9 +113,12 @@ builds them at design time from the port experiences.
      `prepare_replay_content_data.py --from-cache --stop-only --output-dir <staging>`, then
      `behavior/build_qvals_table.py --write` against the staging root (or check that the qvals table is
      unchanged and copy it), then `prepare_replay_content_data.py --from-cache --output-dir <staging>`, then
-     `tables/build_timebin_tables.py` if the stop table's change reaches it.
+     `tables/build_timebin_tables.py` (the event-onset table only, ASK-4), then the ContFrag tables
+     (`prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`).
   3. `scripts/checks/compare_to_golden_baseline.py --candidate <staging> --baseline <frozen>
-     --expected-added-columns <every new column>`: every other column and every row identical.
+     --expected-added-columns <every new column> --expected-drift-columns well_visit_id <the current-arm
+     columns, if the current-arm rule changed rows>`: every other column and every row identical; the
+     drifted columns change only on `spans_visit_end` rows (check by a diff restricted to those rows).
   4. Message the other session ([C11](shared-contracts.md#c11-gpus-long-runs-and-the-other-session)) that
      the tables will change; swap the staging tables into `Processed-Data/replay_content/`; write the
      regeneration manifest (`scripts/tables/write_regeneration_manifest.py`).
@@ -101,21 +126,43 @@ builds them at design time from the port experiences.
   (`scripts/replay_models/rate/describe_visit_clocks.py`, new; method from `S/explore_leave/part_b4.py`):
   per kind and animal, event-start rate per at-risk second in bins of `s`, `u` and `m`, and the counts of
   stop-end kinds per animal; writes `Processed-Data/replay_content/models_convention/descriptive/visit_clock_curves.parquet`. Phase 5a compares its model curves to these.
-- **Docs**: `docs/behavior_models.md` (or the doc that describes the stop table) gains a section on the
+- **Docs**: `docs/covariate_dictionary.md` (its "F.1 Two clocks" section, lines 382-423, rewritten for the visit clocks) gains a section on the
   visit unit, its clocks and the stop-end kind; `docs/data-lineage.md` lists the new columns.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-3](legacy-inventory.md#phase-3)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - Any rate or content fit (Phases 5a, 6a).
 - Changing what `visit_context` means or its thresholds (owned by the labels work).
 - Figures 2 and 3 (Phase 4).
-- Removing `aggregate_to_timebins` or the stop-grain clocks (Phase 12).
+- Removing `aggregate_to_timebins` and the stop-grain clock columns: they leave with their last reader
+  (inventory, "Cohort selectors and stop clocks").
 
 ## Validation slice
 
 | Test | Asserts |
 | --- | --- |
-| `tests/analysis/event_tables/test_visit_columns.py::test_stop_end_kind_on_synthetic_visits` | three visits, one with three stops (two small movements, one leaves), one with one stop that crosses the last poke-out (`leaves`, `spans_visit_end`, `visit_id_at_start` set, `well_visit_id` missing), one stop between visits (`outside_visit`) |
+| `tests/analysis/event_tables/test_visit_columns.py::test_stop_end_kind_on_synthetic_visits` | three visits, one with three stops (two small movements, one leaves), one with one stop that crosses the last poke-out (`leaves`, `spans_visit_end`, `well_visit_id` set), one with a stop that starts before the first poke-in (`spans_visit_start`, `overlapping_visit_id` set, `well_visit_id` missing), one stop between visits (`outside_visit`) |
+| `test_visit_columns.py::test_well_visit_id_for_rows_starting_inside` | events and stops labeled `in_visit` or `spans_visit_end` carry `well_visit_id`; others do not |
+| `test_visit_columns.py::test_spans_visit_end_current_arm_is_the_visit_well` | an event crossing the final poke-out has the visit's well's arm as its current arm |
+| `test_visit_columns.py::test_uncertainty_definitions` | on a hand outcome sequence, the variance equals `p(1 - p)` over the last 10 visits and the count equals `log1p` of the earlier visits |
+| `tests/analysis/contfrag/` (updated) | the ContFrag tables carry the same new columns |
 | `test_visit_columns.py::test_in_visit_immobile_seconds` | a stop crossing the poke-out counts only the seconds before it; excluded time is subtracted |
 | `test_visit_columns.py::test_event_visit_clocks` | `time_since_visit_start_s`, `time_until_visit_end_s`, `time_until_stretch_end_s` on hand events; missing outside a visit |
 | `test_visit_columns.py::test_new_uncertainty_covariates_use_known_outcomes_only` | an outcome known after the event start does not enter either covariate; trunk arms follow the stated rule |
@@ -123,7 +170,8 @@ builds them at design time from the port experiences.
 | `test_visit_design.py::test_at_risk_excludes_ongoing_events` | a bin half covered by an ongoing event of the kind has half its exposure; an event of the other kind changes nothing |
 | `test_visit_design.py::test_outcome_shift` | lag 1 switches to the current trial's outcome at `outcome_known_time_s`, not before |
 | `test_visit_design.py::test_exposure_sums_to_in_visit_immobile_seconds` | over a session, in-visit exposure plus in-event time equals the stops' `in_visit_immobile_s` |
-| `test_visit_design.py::test_one_real_epoch` (slow, real data) | on one epoch, bin counts equal in-visit event starts of each kind in the rebuilt event table; exposure equals the stop table's sum |
+| `test_visit_design.py::test_same_events_as_content` | every event of the default set (`STARTS_IN_WELL_VISIT`) starts in an at-risk bin and is counted once; no other event is counted (rate and content analyze the same events) |
+| `test_visit_design.py::test_one_real_epoch` (slow, real data) | on one epoch, bin counts equal the starts of the default-set events of each kind in the rebuilt event table; exposure equals the stop table's `in_visit_immobile_s` sum |
 | `tests/repository/test_models_table_mirrors_specs.py`, `test_canonical_tables_read_with_stamp.py` | still pass with the new columns |
 | table parity (script, not a test) | `compare_to_golden_baseline.py` with `--expected-added-columns` passes on the full rebuild |
 

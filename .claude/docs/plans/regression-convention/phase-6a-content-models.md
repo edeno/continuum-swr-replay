@@ -25,7 +25,8 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 - `src/continuum_swr_replay/analysis/replay_models/content/simulation.py:139` (`sample_arm_design`),
   `:230` (`simulate_counts`), `:306` (`simulate_with_event_covariates`): the repository's content simulator.
 - `reported/behavior/content.py` (`content_contrast_values` `:326`, `leaf_values` `:607`) and the content
-  keys of `paper/reported/behavior.json`; `docs/behavior_models.md`.
+  keys of `paper/reported/behavior.json`; `docs/models_table.md:367-457` (content arm and patch ladders) and
+  `docs/design/content_model_design.md` (the design being replaced).
 - Scratch: `S/proto_content/sim_lib.py`, `run_sim.py`, `diag_centering.py`, `calibrate.py`,
   `S/verify_uncertainty/s06_null.py`, `s01_covariate.py`, `S/verify_content/42_role_slopes.py`,
   `41_value_recency.py`, `S/my_checks/role_slopes_check.py`, `departure_timecourse.py`,
@@ -38,6 +39,21 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 
 **Designs referenced:** [content design](designs.md#content-design), [likelihoods](designs.md#likelihoods)
 (grouped softmax), [collinearity](designs.md#collinearity-measures), [support rule](designs.md#support-rule).
+
+**Decisions this phase applies** (settled 2026-11-20): L1 (thirteen estimands; Q5b once per uncertainty
+measure), L2 (the three uncertainty measures, [designs.md#content-design](designs.md#content-design)), L4
+(the event set: events that start inside a visit, C3; a `spans_visit_end` event's current arm is the visit's
+well's arm), ASK-1 (lead: "Move them": the ContFrag SWR- and MUA-sourced events are two more event sources of
+this runner), C14.
+
+**Gate before any real fit: the uncertainty-measure study.** A semi-synthetic identifiability study of the
+three uncertainty measures on the real data structure is running in scratch
+(`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`,
+its result in `REPORT.md` there when done): false positives and power of each measure against recency, the
+reward fraction and a drift over the epoch. Read `REPORT.md` first. Its result goes to the lead before any
+real fit of this phase; the definitions (Phase 3's columns) or the content model may change with it, and any
+change is made before the first real fit (C8). The phase turns the study into a committed simulation test
+(task "Uncertainty-measure identifiability test" below), since scratch is not kept.
 
 ## Tasks
 
@@ -53,15 +69,15 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
   sessions on trial folds (Phase 2's fold function) and report. Absolute recency stays the design either
   way; the result is stored (`models_convention/content/recency_check.parquet`) and stated in the PR.
 - **Design** (`analysis/replay_models/content/role_content.py`, new), per kind, from the event-arm table:
-  `select_visit_context` (default) -> nine candidate rows per event -> roles (current, previous,
+  `select_visit_context` (default `STARTS_IN_WELL_VISIT`) -> nine candidate rows per event -> roles (current, previous,
   other_leaf, trunk; exclusive; the previous role only when it differs from the current) -> drop rows with a
   missing covariate in the cohort step (counted per kind) -> terms:
   `Category(arm)` (arm fixed effects) + `Category(role)` + `Slope(reward_fraction, by=role)` +
   `Slope(value, by=role)` + `Smooth(log_recency, log 1, log 200)` on leaf rows + never-visited indicator +
   `Smooth(u, 0, 3)` for the current role (Q7b). Two variants per model: length-unadjusted, and
   length-adjusted (every role term and role slope interacting with `log(duration) - L0`, `L0` the pooled
-  median, stored). Three uncertainty models, each adding one measure's role slopes (belief variance; the
-  two Phase 3 columns, or built here from the port experiences if Phase 3 shipped without them).
+  median, stored). Three uncertainty models, each adding one measure's role slopes (belief variance,
+  reward variability, sample count; the last two are Phase 3's columns).
 - **Nine-arm simulation first** (design 4.2: "the nine-arm design goes through the same simulations
   before it is used"): stored analysis `scripts/replay_models/content/simulate_role_content.py` (new, from
   `S/proto_content/sim_lib.py` and `content/simulation.py`) on the real nine-arm design of every session:
@@ -72,30 +88,64 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
   current-arm share toward leaving, recovered on `u` and not on the role slopes. Twenty data sets each;
   output `models_convention/simulations/role_content.parquet`. Do not fit the real data until (a) to (e)
   pass.
+- **Uncertainty-measure identifiability test** (committed form of the gate study): a slow test
+  `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` and a stored analysis
+  `scripts/replay_models/content/simulate_uncertainty_measures.py` (new, from the scratch study's scripts:
+  `build_measures.py`, `check_measures.py`, `collinearity.py` and what `REPORT.md` names). On content
+  simulated over the real nine-arm design (or, in the test, over a synthetic design with the real data's
+  structure: visit sequences, 0/1 outcomes, epoch time), with truths of recency only, reward fraction only, a
+  drift over the epoch only, and each measure alone: each measure's slope is significant at the nominal
+  rate (3 to 7 %) when its truth is absent, and is recovered when planted. Output
+  `models_convention/simulations/uncertainty_measures.parquet`. A measure that fails is reported with its
+  collinear partner only (C5), or redefined, as the lead decides at the gate.
+- **ContFrag event sources** (ASK-1): the same role design fit to the SWR- and MUA-sourced ContFrag events
+  of the rebuilt ContFrag event-arm tables, as two more event sources (`event_source` in the fit-row
+  record; each source is one stream, without an SWR and No SWR split, call). Their values are a
+  supplementary comparison (Phase 7 builds the comparison values), not members of the declared family.
 - **Fit** through `analysis/regression/sessions.py` with the grouped softmax: support rule per role slope
   and role category; one pooled REML selection per smooth, model and kind; collinearity per term (recency
   against uncertainty is the known concern, design 2.3); records.
 - **Estimands** (`analysis/replay_models/content/role_content_statistics.py`, new): Q3a (current role
   minus other_leaf), Q3b (previous minus other_leaf), Q4a (reward-fraction slope on the current role), Q4b
-  (value slope on the other_leaf role), Q5a (recency smooth at log 20 minus at log 3, other_leaf rows), Q5b
-  (the uncertainty slope on other_leaf, one per measure), Q7b (mean of the current role's `f_u` over
+  (value slope on the other_leaf role), Q5a (recency smooth at log 20 minus at log 3, other_leaf rows),
+  Q5b-var, Q5b-rew, Q5b-n (the uncertainty slope on other_leaf, one per measure, each from its own model),
+  Q7b (mean of the current role's `f_u` over
   `[0, 0.25] s` minus over `[1, 2] s`), each per kind and difference, length-adjusted and unadjusted, with
   `estimand_summary`. A term over the collinearity threshold is reported jointly with its partner (for
   example, recency and uncertainty) and its single value is not reported (C5).
-- **Runner** `scripts/replay_models/content/fit_role_content_models.py` (new), registered in `run_refits.py`.
+- **Runner** `scripts/replay_models/content/fit_role_content_models.py` (new; event sources non-local,
+  ContFrag SWR, ContFrag MUA), registered in `run_refits.py`.
 - **Summary values** (`reported/behavior/role_content.py`, new, called from
   `reported/behavior/__init__.py`): per estimand, kind and difference, as ratios of shares with intervals,
   animals with the sign, day-level p, sessions kept and left out, cohort counts; tagged with the new
   questions of Phase 5a.
-- **Docs**: `docs/behavior_models.md` (the role design, nine arms, recency form, the three uncertainty
+- **Docs**: `docs/regression_models.md` (the role design, nine arms, recency form, the three uncertainty
   measures declared before the fit, the length-adjusted and unadjusted comparisons), with value markers;
   the model table.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-6a](legacy-inventory.md#phase-6a)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - The count and Dirichlet-multinomial estimators, and deleting the within-arm comparison (Phase 6b).
 - Q6 and the next-arm role (Phase 7).
-- Removing the old content ladders, runners and values (Phase 12).
+- Removing what Phase 6b or 7 still calls (the Dirichlet-multinomial and estimator-comparison inputs,
+  `fitting.py`'s conditional fitters used by choice): the inventory names the phase.
 - FDR (Phase 9).
 
 ## Validation slice
@@ -110,6 +160,8 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 | `test_role_content.py::test_current_share_toward_leaving_on_u` | a planted rise on `u` is recovered by `f_u` and not by the role slopes |
 | `test_role_content.py::test_length_adjusted_at_reference` | with a planted length interaction, the adjusted per-kind estimate equals the truth at `L0` |
 | `test_role_content_statistics.py::test_share_ratio_from_softmax` | `exp(beta_current - beta_other)` equals the ratio of fitted shares within an event |
+| `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` (slow) | each of the three measures: false positives at 3 to 7 % under recency-only, reward-fraction-only and epoch-drift truths; a planted slope recovered |
+| `test_role_content.py::test_spans_visit_end_events_in_cohort` | events labeled `spans_visit_end` are in the cohort with the visit's well's arm as current |
 | `tests/reported/behavior/test_role_content_values.py::test_values_and_joint_reporting` | an estimand over the collinearity threshold gives a joint value and no single one |
 
 ## Fixtures
@@ -137,7 +189,8 @@ seeds; the synthetic visit helpers of Phase 3 for `u`.
 
 ## Exit criteria
 
-The nine-arm simulations pass before any real fit; the full fits are stored with records; Q3, Q4, Q5 (three
+The lead has seen the uncertainty-measure study and its committed test passes; the nine-arm simulations pass
+before any real fit; the full fits are stored with records; Q3, Q4, Q5 (three
 uncertainty measures) and Q7b values are in the summary, with any collinear pair reported jointly.
 
 ## Review

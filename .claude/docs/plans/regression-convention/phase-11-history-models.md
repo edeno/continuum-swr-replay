@@ -41,15 +41,32 @@ so measure before choosing.
 - **Per session, then reduced**: per-session fits at the shared penalty, reduced session to day to animal,
   replacing the per-animal pooled fits with `C(session)` (the pooled form is stage 3; say so in the docs).
 - **Runner** `scripts/replay_models/rate/fit_visit_history.py` (new), registered in `run_refits.py`; the
-  two old runners stay until Phase 12.
+  two old runners are removed by this phase's retire task.
 - **Summary values**: the self- and cross-history kernels' summaries per kind and difference (outside the
   declared family), with the collinearity record of onset- against end-anchored terms
   (`onset_offset_collinearity` measured the same concern).
 - **Docs**: `docs/rate_models.md` (history on the visit model, REML in place of nested CV).
 
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-11](legacy-inventory.md#phase-11)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. If any test of the shared fitter compares with `ridge_history_cv.fit_ridge_poisson`, first commit that fitter's coefficients on the test's data as a C13 fixture. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
+
 ## Deliberately not in this phase
 
-- Removing the old history code, fits and values (Phase 12).
+- The final audit (Phase 12).
 - Adding history terms to the declared family.
 
 ## Validation slice

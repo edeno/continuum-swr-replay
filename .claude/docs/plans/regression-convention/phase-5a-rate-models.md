@@ -32,8 +32,9 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
 **Designs referenced:** [rate design](designs.md#rate-design), [smooth terms](designs.md#smooth-terms-and-bases),
 [pooled REML](designs.md#pooled-reml), [session to day to animal](designs.md#session-to-day-to-animal).
 
-**Decision needed first:** L1 (the declared family), fixed in `declared_tests.py` and committed before the
-first real fit of this phase.
+**Decisions this phase applies** (settled 2026-11-20): L1, the declared family of thirteen estimands and 39
+tests (C8), committed in `declared_tests.py` before the first real fit of this phase; L4, the event set (C3);
+ASK-1, the ContFrag event sources; C14.
 
 ## Tasks
 
@@ -62,14 +63,19 @@ first real fit of this phase.
   - model D: the curve over lags 1 to 10 with its band (described, not tested).
 - **Simulations** (stored analysis `scripts/replay_models/rate/simulate_visit_rate.py`, new, from
   `S/proto_rate/proto_core.py`): event starts drawn on the real visits' at-risk time of every session from a
-  known rate `exp(b0 + f_s + f_u + beta * rewarded)`, with the counting rule (an event crossing the last
-  poke-out is not counted, nor at risk once started). Scenarios: (a) no reward effect; (b) rate ratio 1.3;
+  known rate `exp(b0 + f_s + f_u + beta * rewarded)`, with the event definition's counting rule (a candidate
+  that starts in a stop and runs into movement is not an event, at every stop end, small movements and the
+  last one; an event that crosses the final poke-out while immobile is counted, as the event set has it). Scenarios: (a) no reward effect; (b) rate ratio 1.3;
   (c) a sharp lag-1 effect only, to see what D returns; (d) a drop on `u` in the last 0.3 s with no reward
   effect, which must not move to `s` or to the reward term; (e) a drop before small movements only (`f_m`)
   with flat `f_u`, which the model must separate or the rule above must catch. Twenty data sets each over
   all sessions; outputs to `models_convention/simulations/visit_rate.parquet`.
+- **ContFrag event sources** (ASK-1, lead: "Move them"): the same models A and D fit to the SWR-sourced and
+  MUA-sourced ContFrag events of the rebuilt ContFrag tables, as two more event sources (`event_source` in
+  the fit-row record; each source is one stream, with no SWR and No SWR split, call), same bins, same selection, same penalty rule. Their values are a supplementary
+  comparison (Phase 7 builds the comparison values); they are not in the declared family.
 - **Runner** `scripts/replay_models/rate/fit_visit_rate_models.py` (new): reads the tables, fits both
-  models and kinds, writes `models_convention/rate/{A,D}.parquet` and a manifest; registered in
+  models, both kinds and the three event sources (non-local, ContFrag SWR, ContFrag MUA), writes `models_convention/rate/{A,D}.parquet` and a manifest; registered in
   `scripts/workflows/run_refits.py` (`RUNS`, `:152`) as `rate.visit.A` and `rate.visit.D`.
 - **Questions**: add Q1 to Q7 of the design's section 3 as new Part 3 questions in
   `reported/questions.py` (call: ids `3.11` to `3.17`, wording from the design's table); add their tags to
@@ -78,15 +84,37 @@ first real fit of this phase.
   per kind and difference, the estimate as a rate ratio, its interval, animals with the sign, day-level p,
   sessions kept and left out (support, convergence, collinearity), cohort counts per label. No q-values
   yet (Phase 9). Pending notes follow C10.
-- **Docs**: `docs/rate_models.md` gains a section on the visit model (unit, clocks, A and D, the rule for
-  the third clock, what is tested and what is described), written with value markers; a model table for
-  the new models (in `docs/models_table.md`, a new section, or a new doc linked from it).
+- **Docs**: create `docs/regression_models.md` (new; the one doc for the convention's models, linked from
+  `docs/README.md` in place of `rate_models.md` once that is gone) with the visit rate model (unit, clocks,
+  A and D, the rule for the third clock, what is tested and what is described), written with value markers,
+  and its model table. Later family phases add their sections to it.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-5a](legacy-inventory.md#phase-5a)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. First commit the fixture of C13 for Phase 1's check 1 (the `fit_per_bin_glm` coefficients of
+     `M7r_time_histcos_rew` on the synthetic design of `tests/analysis/regression/test_no_penalty_equals_current.py`),
+     switch the test to it, then remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
 - The per-stop (total) reward effect, the SWR-contrast covariates, the uncertainty rate model (Phase 5b).
 - FDR over the family and figure bands (Phase 9), Figure 4 (Phase 10).
-- Removing the per-bin ladder, its runner, its values (Phase 12). Its stored fits stay as the baseline.
+- Removing what other families still call (`per_bin_design.py`, `PerBinRateModelSpec`, `_fit_diagnostics.py`,
+  `coefficient_statistics.py`, the cohort selectors): each leaves with its last caller (the inventory names
+  the phase). The per-bin ladder's stored fits stay on disk, unread.
 - The duration-aware and ridge history models (Phase 11).
 
 ## Validation slice

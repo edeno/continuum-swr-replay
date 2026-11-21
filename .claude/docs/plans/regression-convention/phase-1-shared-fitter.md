@@ -106,14 +106,14 @@ basis of [smooth terms](designs.md#smooth-terms-and-bases) (Phase 2 adds the res
 | `test_reml.py::test_gaussian_scale_matches_closed_form` | the Gaussian with one smooth: the profiled scale equals the closed form at the selected penalty, and the fit equals penalized least squares |
 | `test_reml.py::test_one_penalty_matches_neurospatial_fixture` | check 2: on a one-term Poisson model, the selected lambda and curve match a committed fixture produced by neurospatial's `select_penalty_by_reml` with the same basis and penalty (see the reference-script task; neurospatial is not installed in this environment and is not imported) to 1e-4 |
 | `test_simulation.py::test_coverage_and_size` (slow) | check 5: over 200 simulated data sets (the `rise` and `flat` truths of `S/proto_basic/sim.py`), the 95 % pointwise interval of a 0/1 coefficient covers 93-97 %, a null 0/1 term is significant in 3-7 %, and a flat truth shrinks to a line (edf below 2.5 in at least 90 %) |
-| `tests/analysis/replay_models/test_regression_no_penalty_equals_current.py` (slow, real data) | check 1: on three real sessions (one each of chimi, j16, wilbur), the shared fitter with no penalty gives the per-bin `M7r_time_histcos_rew` coefficients (`model_specs.py:956`) of `fit_per_bin_glm` to 1e-6 relative, and the content M0a coefficients of `fit_conditional_poisson` to 1e-6 relative; skipped when the data root is the sentinel |
+| `tests/analysis/regression/test_no_penalty_equals_current.py` | check 1 in the suite: on a small synthetic per-bin design and a small synthetic content design, the shared fitter with no penalty gives the coefficients of `fit_per_bin_glm` (`M7r_time_histcos_rew`, `model_specs.py:956`) and of `fit_conditional_poisson` (M0a) to 1e-6 relative. When a later phase removes one of those fitters it first commits that fitter's coefficients on the same synthetic design as a fixture (C13) and the test reads the fixture; no test keeps a removed fitter alive |
+| `scripts/checks/compare_regression_to_current_fitters.py` (new; real data, run once) | check 1 on three real sessions (one each of chimi, j16, wilbur): the same comparison; its printed agreement goes in the PR. Removed in the phase that removes the second of the two old fitters (Phase 7) |
 | `tests/repository/test_import_layering.py` | the new rule holds |
 
 ## Fixtures
 
 Synthetic data sets built in the tests with fixed seeds (no data files) except the mgcv outputs under
-`tests/analysis/regression/data/mgcv/`. Check 1 reads three real sessions from the canonical tables through the
-`processed_data_root` fixture.
+`tests/analysis/regression/data/mgcv/`. Check 1's real-data run is a script, not a test.
 
 ## Verification and runtime
 

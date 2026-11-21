@@ -630,6 +630,54 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
   windows refuses to run until the held-out tetrode run and the participation run record the new event
   table.
 
+### Ninth round (lead, 2026-11-20): legacy code and the ContFrag tables
+
+- "Let's make sure to cleanup any legacy code." Each phase of the plan removes the code it replaces, with
+  no compatibility code left for older tables or fits, and the last phase is a sweep that proves nothing
+  is left (`.claude/docs/plans/regression-convention/`). A value the manuscript cites is still removed
+  only with the lead's yes, and an analysis the plan does not replace is a question for the lead.
+- The ContFrag tables (the SWR-event and MUA-event content tables) get the same well-visit label as the
+  non-local tables ("Label them now"), so that every table with `occupancy_state` carries `visit_context`
+  and the table contract requires it.
+
+### Tenth round (lead, 2026-11-20): the plan's first decisions
+
+- **The two new uncertainty measures** (plan decision L2): as recommended, and "maybe we should check on
+  simulated". Reward variability is the variance of the arm's 0/1 outcomes over the last 10 visits to its
+  well; sample count is the log of one plus the visits to the well earlier in the epoch. Before any real
+  fit, a simulation on the real data structure checks that each of the three measures can be told apart
+  from recency, the reward fraction and the time in the epoch (false positives and power for each).
+- **A stop that crosses the last nose-poke out** (L4): keep its time before the poke-out (option A). A
+  check on all 242 epochs: 15,803 of the 93,738 stops that start inside a visit cross the final poke-out;
+  their part before the poke-out has a median of 1.75 s and their part after it 0.07 s; that part before
+  the poke-out is 31 % of the immobile time inside visits and holds 20,497 of the 69,011 in-visit events.
+- **"Rate and content models should analyze the same events."** One event set for both families. Open
+  point put to the lead: 189 events start inside a visit and end after the final poke-out. If the set is
+  "the whole event inside the visit", the rate model must not count them, and it then loses 8 to 11 % of
+  the event starts in the last 0.25 s before the poke-out and most starts in the last 0.05 s (a counting
+  artifact at the end of the visit). If the set is "the event starts inside the visit", there is no
+  artifact and the content models gain those 189 events.
+- **"Arrival"** (L3) needs no decision: the stop table's arrival clock equals the first nose-poke in for
+  every stop that starts inside a visit where both exist (93,302 stops, no difference), and is missing for
+  554. The visit starts at the first nose-poke in.
+
+### Eleventh round (lead, 2026-11-20): the remaining decisions
+
+- **The event set**: the events that start inside a well visit (`visit_context` of `in_visit` or
+  `spans_visit_end`; 69,011 + 189 events), for every model family and every figure. It replaces "the whole
+  event inside the visit" wherever this document says so. The selection function's default selects it.
+- **The dense time-bin table** is removed ("Remove"); the bins of the visit replace it.
+- **The ContFrag regressions** (content and rate models of SWR-sourced and MUA-sourced events) move onto
+  the new design ("Move them"), as two more event sources of the same runners, for a supplementary
+  comparison.
+- **The list of tests** is thirteen quantities, 39 tests ("Ok"). Section 4.5's "ten" was a miscount.
+- **Figure 2's panels that count SWRs or seconds** use only time inside a well visit ("Ok").
+- **The total reward effect: per stop or per visit?** The lead: "We need to be consistent in the repo."
+  Read as (**call**): the well visit is the unit everywhere, the total reward effect is per visit, no
+  per-stop variant is kept beside it, and stay or leave is one decision per visit. The same rule holds
+  for the event set, the selection function, the fitter and the clocks, in every family, summary and
+  figure.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions

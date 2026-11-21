@@ -44,7 +44,9 @@ adopted the selection function in its branch, this phase shrinks to what it left
 [C10](shared-contracts.md#c10-rebuilding-reported-values-and-figures),
 [C11](shared-contracts.md#c11-gpus-long-runs-and-the-other-session).
 
-**Decision needed first:** L5 (whether the SWR-grain and time-grain panels move to the subset).
+**Decisions this phase applies** (settled 2026-11-20): the event set is the events that start inside a well
+visit (`STARTS_IN_WELL_VISIT`, C3; L4), and every Figure 2 panel that counts SWRs or seconds uses only time
+inside a well visit, by a sample-level mask from the same visit intervals (L5, lead: "Ok").
 
 ## Tasks
 
@@ -57,24 +59,27 @@ adopted the selection function in its branch, this phase shrinks to what it left
   | `event_participation` | `scripts/event_evidence/measure_event_participation.py` | event (`event_id`) | keep the rows of selected `event_id`s at read |
   | `tetrode_holdout`, `likelihood_advantage` | `scripts/event_evidence/score_tetrode_holdout.py`, `score_event_likelihood_advantage.py` (the other session's) | event windows | as the other session's code reads them; filter by `event_id` if the rows carry it, else re-run with the selected events |
   | `spike_evidence_dir`, `heldout_by_swr` | `scripts/event_evidence/...`, `split_state_evidence_by_swr.py` | event or bout | read; filter by `event_id` or re-run |
-  | `event_features_run` | `analysis/detector_comparison/feature_run.py` | event and SWR | event rows by `event_id`; SWR rows per L5 |
+  | `event_features_run` | `analysis/detector_comparison/feature_run.py` | event and SWR | event rows by `event_id`; SWR rows: the SWRs that start inside a visit |
   | `content_along_arms` | `scripts/event_properties/measure_content_along_arms.py` | event time bin | keep rows of selected events |
   | `event_gamma`, `event_start_rest_theta`, `class_structure` | `scripts/event_properties/measure_event_gamma.py`, `measure_event_start_and_rest_theta.py`, `measure_ripple_class_structure.py` | event | keep rows of selected events |
   | `property_bootstrap` | `scripts/event_properties/bootstrap_event_properties.py` | bootstrap over events | re-run on the selected events |
-  | `brain_state_reference` | `scripts/event_properties/measure_brain_state_reference.py` | immobile time | per L5: re-run with an in-visit mask |
-  | `nonlocal_by_ripple_power` | `scripts/event_properties/measure_nonlocal_by_ripple_power.py` | immobile time bins (Figure 2j) | per L5: re-run with an in-visit mask |
+  | `brain_state_reference` | `scripts/event_properties/measure_brain_state_reference.py` | immobile time | re-run with the in-visit mask |
+  | `nonlocal_by_ripple_power` | `scripts/event_properties/measure_nonlocal_by_ripple_power.py` | immobile time bins (Figure 2j) | re-run with the in-visit mask |
   | `decoder_quality` | decode quality scripts | decode | unchanged (not an event statistic) |
   | Figure 2's cached render inputs (`_figure02_cache_path`, `:380`) | `generate_figure02.py` | example session | recompute with `--force-recompute` |
 
 - **Apply the selection at every event read**: `generate_figure02.py:1326` (after
   `check_table_against_frames`, which keeps the full table), `generate_figure03.py:178`,
-  `reported/events.py:2172`, and in each re-run producer. One call, the default subset; no other filter.
-- **In-visit mask for time-grain inputs** (if L5 says yes): a sample-level mask from the visit intervals of
+  `reported/events.py:2172`, and in each re-run producer. One call, the default event set (events that start inside a visit); no other filter.
+- **In-visit mask for SWR-grain and time-grain inputs** (L5): a sample-level mask from the visit intervals of
   the port experiences (`visit_context.visit_context_of_samples` on master gives the label per sample) and
-  the producers' immobility mask; the producers take it through one new argument and record counts.
+  the producers' immobility mask; the producers take it through one new argument and record counts. Seconds
+  count only inside a visit; an SWR counts when its first sample is inside a visit (the event set's start
+  rule, applied to SWRs: a call, stated in each value's description). Panels 2c (SWR counts), 2e (detector
+  overlap), 2j (immobile time by ripple power) and the brain-state reference move with it.
 - **Counts per label in the summary**: `reported/events.py` adds values from `count_visit_context` (events
   per label, kept and dropped, per kind) and states in each affected value's description that it is over
-  events inside a well visit.
+  events that start inside a well visit.
 - **The fold function**: make the event-evidence `trial_folds` (`analysis/event_evidence/tetrode_holdout.py`
   on master after the merge) call `analysis/regression/folds.py`'s function, or move it there and import it,
   and add a parity test on a synthetic epoch. Needs Phase 2 on master; if Phase 2 is not yet merged, leave
@@ -89,8 +94,25 @@ adopted the selection function in its branch, this phase shrinks to what it left
 - **Rebuild and redraw**: commit, `summarize.py --summary events`, `emit_reported_values.py`, then
   `generate_figure02.py --force-recompute` and `generate_figure03.py`; commit the figure files under
   `paper/figures/figure02/` and `figure03/`.
-- **Docs**: `docs/figure-pipeline.md` (Figures 2 and 3 are over events inside a well visit) and the captions'
+- **Docs**: `docs/figure-pipeline.md` (Figures 2 and 3 are over events that start inside a well visit, and Figure 2's SWR and time panels over time inside a visit) and the captions'
   source (if captions are generated) say the subset and the count per label.
+
+- **Retire what this phase replaced** (C13; the items are the REMOVE rows of
+  [legacy-inventory.md#phase-4](legacy-inventory.md#phase-4)). In this PR, or in a second PR of this phase
+  that merges right after it:
+  1. Write the old-against-new comparison for the lead: each old value the section lists, read from the
+     copy of the summary saved before the rebuild, beside its replacement from the rebuilt summary, with the
+     reason for each change. Put it in the PR description.
+  2. List the macros `paper/*.tex` cites from those old values (none of `behavior.json` or `mpfc.json` was
+     cited on 2026-11-20; check again). Ask the lead about any that are; remove a cited value only after
+     the yes.
+  3. Remove every REMOVE item of the section: modules, specs, runners, `RUNS` entries, plotters,
+     value groups and their summary wiring, question-list entries (mark the replaced 3.x questions
+     `dropped`, reason "superseded by" the new id), tests and doc sections.
+  4. Check: `git grep -n -w <name> -- src scripts tests docs` gives no match for any removed symbol, file or
+     column (dated records exempt, C13); `scripts/checks/write_pipeline_map.py` regenerated; one row per
+     removal in `docs/history/2026-module-moves.md`; the full suite passes.
+  The ASK rows of the section are not removed here; list them in the PR for the lead.
 
 ## Deliberately not in this phase
 
@@ -103,7 +125,7 @@ adopted the selection function in its branch, this phase shrinks to what it left
 
 | Test | Asserts |
 | --- | --- |
-| `tests/reported/test_events_summary_subset.py::test_summary_reads_selected_events` | on a synthetic event table with every label, the summary's class counts equal those of the `in_visit` rows, and the per-label count values equal `count_visit_context` |
+| `tests/reported/test_events_summary_subset.py::test_summary_reads_selected_events` | on a synthetic event table with every label, the summary's class counts equal those of the `in_visit` and `spans_visit_end` rows, and the per-label count values equal `count_visit_context` |
 | `tests/scripts/figures/test_figure02_subset.py::test_frame_check_sees_full_table` | `check_table_against_frames` passes on the full table and the figure draws from the selected rows |
 | `tests/analysis/event_evidence/test_trial_folds_shared.py::test_same_folds` | the event-evidence fold function and the shared one give identical folds on a synthetic epoch (if the fold task is done here) |
 | producer smoke tests (real data, slow) | for each re-run producer, one epoch: rows only for selected events; counts per label written |
@@ -121,7 +143,7 @@ producer smoke tests.
   events; the No SWR share lower, as the design's diagnostic of section 9 shows, without quoting it); list
   the changed keys in the PR with old and new values read from the two files.
 - Spot-check: for three epochs (one with many outside events, one with few, `chimi20200212_02_r1`), the
-  number of events dropped by the selection equals the event table's count of non-`in_visit` labels.
+  number of events dropped by the selection equals the event table's count of labels outside `STARTS_IN_WELL_VISIT`.
 - Runtime: each producer on one epoch, then extrapolate; the property bootstrap and the in-visit re-runs of
   the time-grain producers are the long ones.
 
