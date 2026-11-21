@@ -2159,6 +2159,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "participation_statistics": lambda table: None,
         "well_visit_times": lambda identifier: None,
         "check_visit_context_starts": lambda table, visits: None,
+        "restriction_inputs_note": lambda folder, epochs: None,
     }.items():
         monkeypatch.setattr(figure02, name, value)
     return figure02
@@ -2293,6 +2294,35 @@ def test_figure02_refuses_a_heldout_event_run_not_from_the_current_fold_fit(
     with pytest.raises(ValueError, match=message) as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert "detect_heldout_events.py" in str(refused.value)
+
+
+def test_figure02_refuses_a_restriction_run_off_the_current_decodes_or_swr_source(
+    offline, tmp_path, monkeypatch
+):
+    """Panel g is not drawn from a restriction run made from other decode
+    frames or another SWR source than the current ones: the summary's reason,
+    and the runner to make again."""
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _heldout_events_run(tmp_path)
+    seen = []
+
+    def note(folder, epochs):
+        seen.append((folder.name, list(epochs)))
+        return "the restriction run records another SWR source; rerun x before citing"
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from other decodes")
+
+    monkeypatch.setattr(figure02, "restriction_inputs_note", note)
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(ValueError) as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert str(refused.value) == (
+        "panel g is not drawn: the restriction run records another SWR source. "
+        "Rerun scripts/event_evidence/score_nonlocal_restriction.py and the runs "
+        "made from it."
+    )
+    assert seen == [("event_nonlocal_restriction", ["e"])]
 
 
 def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(

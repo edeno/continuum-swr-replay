@@ -174,11 +174,11 @@ The review of the restriction and held-out tetrode runs before the
   the held-out tetrode run's; the restriction run records no spike count, so the facts'
   spikes elsewhere (the time sums, the held-out events) are not checked.
   *When:* if the restriction run is changed to record its spike counts.
-- [ ] **Figure 2 draws panel g when the summary marks its values pending.** The figure
-  refuses panel g for another restriction run, per-bin facts run or session cache, but
-  not when only the event table changed (the held-out event run's canonical check), nor
-  for the restriction run's decodes or SWR source, while the events summary marks the
-  values pending in both cases.
+- [ ] **Figure 2 draws panel g when only the event table changed.** The figure
+  refuses panel g for another restriction run, per-bin facts run or session cache, and
+  for a restriction run made from other decode frames or another SWR source
+  (`restriction_inputs_note`), but not when only the event table changed (the held-out
+  event run's canonical check), while the events summary marks the values pending.
   *When:* when Figure 2's checks are next changed.
 - [ ] **The supplementary held-out tetrode figure checks no staleness.**
   `scripts/figures/generate_supp_heldout_tetrode.py` refuses a run not on folds of whole
