@@ -1,0 +1,16 @@
+"""The shared regression fitter: arrays in, fits out.
+
+It knows nothing of the task. It imports only the foundation,
+``analysis.constants`` and ``analysis.shared_statistics``; any ``analysis``
+package may import it.
+
+- ``constants``: the fitter's numerical rules (convergence, step control,
+  penalty bounds, support and collinearity thresholds, folds).
+- ``likelihoods``: Poisson with an offset, Bernoulli, Gaussian with a scale and
+  the grouped softmax, each with its derivatives on the linear-predictor scale.
+- ``newton``: the penalized Newton fit at fixed penalty strengths.
+- ``pspline``: the cubic B-spline basis on fixed, equally spaced knots, its
+  second-order difference penalty and the sum-to-zero constraint.
+
+Submodules are imported by name; nothing is re-exported here.
+"""
