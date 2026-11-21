@@ -7,9 +7,12 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax, Poisson
+from continuum_swr_replay.analysis.regression.record import NoFit
 from continuum_swr_replay.analysis.regression.reml import SessionData, fit_at_penalties
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
+from continuum_swr_replay.analysis.regression.support import Removed
 from continuum_swr_replay.analysis.regression.terms import (
+    SMALLEST_COLUMN_SIZE,
     Category,
     Offset,
     Slope,
@@ -108,13 +111,14 @@ def test_a_separated_session_is_kept_with_its_terms_missing() -> None:
                     GroupedSoftmax(), [data], design.blocks, design.log_penalties
                 )
             assert record.left_out == {
-                "a": "no finite maximum (round 1)",
-                "b": "no finite maximum (round 1)",
+                "a": Removed.NO_FINITE_MAXIMUM,
+                "b": Removed.NO_FINITE_MAXIMUM,
             }
+            assert record.left_out_round == {"a": 1, "b": 1}
             assert np.isnan(record.coef[9:]).all()
             assert np.isnan(np.asarray(record.vcov)[9:]).all()
             assert np.isfinite(record.coef[:9]).all()
-            assert "inactive" in record.fit_reason
+            assert record.no_fit == ""
             assert record.edf["a"] == 0.0 and set(record.collinearity) == {"s(clock)"}
             continue
         alone = fit_at_penalties(
@@ -122,7 +126,7 @@ def test_a_separated_session_is_kept_with_its_terms_missing() -> None:
         ).sessions[0]
         np.testing.assert_array_equal(record.coef, alone.fit.beta)
         np.testing.assert_array_equal(record.vcov, alone.covariance)
-        assert record.left_out == {} and record.fit_reason == ""
+        assert record.left_out == {} and record.no_fit == ""
         assert record.edf["s(clock)"] == pytest.approx(alone.edf[0])
 
 
@@ -167,9 +171,10 @@ def test_an_inactive_role_drops_its_rows() -> None:
     assert record.support["role[previous]"]["n_high"] == 3
     # The levels are decided first: the slope by the role leaves with its rows.
     assert record.left_out == {
-        "role[previous]": "support",
-        "reward_fraction:role=previous": "rows of role[previous] dropped",
+        "role[previous]": Removed.SUPPORT,
+        "reward_fraction:role=previous": Removed.WITH_LEVEL,
     }
+    assert record.left_out_round == {}
     assert record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
     assert record.n_rows == len(frames[0]) - 3
 
@@ -200,10 +205,9 @@ def test_a_role_without_a_finite_maximum_drops_its_rows() -> None:
     assert record.status == "converged"
     # A level dropped for no finite maximum keeps its counts from before.
     assert record.support["role[previous]"]["n_high"] == 150
-    assert record.left_out["role[previous]"].startswith("no finite maximum (round ")
-    assert record.left_out["reward_fraction:role=previous"] == (
-        "rows of role[previous] dropped"
-    )
+    assert record.left_out["role[previous]"] == Removed.NO_FINITE_MAXIMUM
+    assert record.left_out_round == {"role[previous]": 1}
+    assert record.left_out["reward_fraction:role=previous"] == Removed.WITH_LEVEL
     assert record.cohort_counts["rows_dropped"] == {"role[previous]": 150}
     assert record.n_rows == len(frames[0]) - 150
 
@@ -299,10 +303,11 @@ def test_a_session_with_no_rows_left_is_recorded_not_fitted(rate_sessions) -> No
     }
     records = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
     assert [r.status for r in records] == ["not fitted"] * 3 + ["converged"]
-    assert "no rows" in records[0].fit_reason
+    assert records[0].no_fit == NoFit.NO_ROWS
     assert records[1].cohort_counts["rows_missing_values"] == len(missing)
-    assert "no rows" in records[1].fit_reason
-    assert "no events" in records[2].fit_reason
+    assert records[1].no_fit == NoFit.NO_ROWS
+    assert records[2].no_fit == NoFit.NO_EVENTS
+    assert records[3].no_fit == ""
     for record in records[:3]:
         assert np.isnan(record.coef).all() and record.edf == {}
 
@@ -359,7 +364,10 @@ def test_support_is_counted_again_on_the_rows_kept(content_sessions) -> None:
     record = _fit(
         design, sessions, GroupedSoftmax(), response="share", unit="event_id"
     )[0]
-    assert record.left_out == {"role[previous]": "support", "flag": "support"}
+    assert record.left_out == {
+        "role[previous]": Removed.SUPPORT,
+        "flag": Removed.SUPPORT,
+    }
     assert record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
     assert record.support["flag"]["n_high"] == 3
     assert not record.support["flag"]["passes"]
@@ -383,9 +391,9 @@ def test_a_session_left_without_events_by_the_row_rule_is_not_fitted(
     first, second = _fit(
         design, sessions, Poisson(), response="count", unit="well_visit_id"
     )
-    assert first.status == "not fitted" and "no events" in first.fit_reason
+    assert first.status == "not fitted" and first.no_fit == NoFit.NO_EVENTS
     # The slope has its events on the level's rows only, so it fails too.
-    assert first.left_out == {"grp[b]": "support", "x": "support"}
+    assert first.left_out == {"grp[b]": Removed.SUPPORT, "x": Removed.SUPPORT}
     assert second.status == "converged"
 
 
@@ -415,9 +423,10 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
     )
     assert [r.status for r in records] == ["converged"] * 3
     last = records[-1]
-    assert last.left_out == {"reward_fraction:role=previous": "support"}
+    assert last.left_out == {"reward_fraction:role=previous": Removed.TOO_SMALL}
     entry = last.support["reward_fraction:role=previous"]
-    assert not entry["passes"] and "SMALLEST_COLUMN_SIZE" in entry["reason"]
+    assert not entry["passes"] and entry["reason"] == Removed.TOO_SMALL
+    assert 0.0 < entry["size"] < SMALLEST_COLUMN_SIZE
 
 
 def test_a_session_without_reference_rows_names_the_session_and_columns(
@@ -513,13 +522,13 @@ def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
         design, {("sim", "1", "02_r1"): rows}, Poisson(), response="count", unit="visit"
     )
     assert record.status == "converged"
-    assert record.left_out == {"cat[C]": "support"}
+    assert record.left_out == {"cat[C]": Removed.SUPPORT}
     assert record.support["x"]["passes"]
     assert np.isfinite(record.coef[record.coef_names.index("x")])
     assert record.support["cat[C]"]["n_high"] == 3
     assert not record.support["cat[C]"]["passes"]
     for column, why in record.left_out.items():
-        if why == "support":
+        if why == Removed.SUPPORT:
             assert not record.support[column]["passes"]
     for column, entry in record.support.items():
         if not entry["passes"]:
@@ -560,7 +569,7 @@ def test_no_finite_maximum_along_the_intercept_is_not_fitted() -> None:
         unit="visit",
     )
     assert first.status == "not fitted"
-    assert "no finite maximum along the intercept" in first.fit_reason
+    assert first.no_fit == NoFit.ALONG_THE_INTERCEPT
     assert first.left_out == {} and first.cohort_counts["rows_dropped"] == {}
     assert np.isnan(first.coef).all()
     assert second.status == "converged"

@@ -31,13 +31,16 @@ slice. For each session, in order:
 
 A session with no rows, or no events, left is not fitted: its record says why
 and the loop goes on. When the refit ends because its fit has no finite
-maximum along the intercept (:data:`.reml.ALONG_THE_INTERCEPT`), nothing is
-dropped or left out: the session gets the not-fitted record with that reason.
-A refit that ends along a penalty direction or with any other status leaves
-the session without a fit, with the reason in words.
+maximum along the intercept, nothing is dropped or left out: the session gets
+the not-fitted record with that cause. A refit that ends along a penalty
+direction, after too many rounds or with any other status leaves the session
+without a fit, with its cause. Every cause is a code of a closed set
+(:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term;
+:func:`.record.describe` gives their words).
 
 A session with columns left out keeps its other terms: those columns'
-coefficients and covariance are NaN and ``left_out`` says why. The units are
+coefficients and covariance are NaN and ``left_out`` says why (with the
+refit's round in ``left_out_round`` for no finite maximum). The units are
 the ``unit`` column (a visit for a rate model; for the grouped softmax, each
 unit is one event, a group of rows). A row holds an event when its response is
 above zero (Poisson, Bernoulli), and every row does under the softmax and the
@@ -56,16 +59,16 @@ import pandas as pd
 from .collinearity import term_collinearity
 from .likelihoods import Bernoulli, GroupedSoftmax, Likelihood, Poisson
 from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
-from .record import FitRecord
+from .record import FitRecord, NoFit
 from .reml import (
-    ALONG_THE_INTERCEPT,
     PenaltyBlock,
+    RefitEnd,
     RemlScore,
     SessionData,
     SessionRefit,
     refit_session,
 )
-from .support import Support, design_support
+from .support import Removed, Support, design_support
 from .terms import Design, DesignTerm
 
 __all__ = ["NOT_FITTED", "SessionKey", "fit_sessions"]
@@ -86,11 +89,10 @@ class _Removal:
     (with the refit's round of each, for a fit with no finite maximum) and,
     for a level, the support counts when it was removed."""
 
-    cause: str  # "support", "with_level" or "no_finite_maximum"
+    cause: Removed
     columns: list[int]
     rounds: list[int] = field(default_factory=list)
     counts: Support | None = None
-    level: str | None = None  # "with_level": the level it left with
 
 
 @dataclass(frozen=True)
@@ -129,7 +131,7 @@ class _Session:
         self.support: dict[str, Support] = {}
         self.events_counted = False
         self.rounds = 0  # the refit rounds before the current fit
-        self.fit_reason = ""
+        self.no_fit = ""
         self.fitted_with: tuple[SessionData, list[str]] | None = None
 
     @property
@@ -138,12 +140,13 @@ class _Session:
         return self.reason == _KEPT
 
     def _not_fittable(self) -> str:
-        """Why the rows kept cannot be fitted, in words; empty when they can."""
+        """Why the rows kept cannot be fitted (a ``NoFit`` code); empty when
+        they can."""
         kept = self.kept
         if not kept.any():
-            return "no rows left to fit"
+            return NoFit.NO_ROWS
         if not _holds_event(self.lik, self.y[kept]).any():
-            return "no events of the kind in the rows left to fit"
+            return NoFit.NO_EVENTS
         return ""
 
     def _remove_empty_events(self) -> None:
@@ -166,7 +169,7 @@ class _Session:
         for name in level.dependents:
             if name not in self.removed:
                 columns = self.design.by_name[name].columns.tolist()
-                self.removed[name] = _Removal("with_level", columns, level=level.name)
+                self.removed[name] = _Removal(Removed.WITH_LEVEL, columns)
 
     def judge(self) -> str:
         """The levels to a fixed point, then every other term once on the
@@ -175,7 +178,8 @@ class _Session:
         Returns
         -------
         str
-            Why the session cannot be fitted, in words; empty when it can.
+            Why the session cannot be fitted (a ``NoFit`` code); empty when
+            it can.
         """
         while True:
             why = self._not_fittable()
@@ -197,7 +201,8 @@ class _Session:
                 term = self.design.by_name[name]
                 if term.kind == "level" and not counted.passes:
                     self.removed.setdefault(
-                        name, _Removal("support", term.columns.tolist(), counts=counted)
+                        name,
+                        _Removal(counted.reason, term.columns.tolist(), counts=counted),
                     )
             pending = [
                 term
@@ -212,25 +217,37 @@ class _Session:
                 self._drop_level(term)
 
     def left_out(self) -> dict[str, str]:
-        """Coefficient name -> why it is inactive: the levels removed, the
-        terms that left with them, the columns the refit left out, then the
-        other terms that fail the support rule on the final rows."""
+        """Coefficient name -> why it is inactive (a ``Removed`` code): the
+        levels removed, the terms that left with them, the columns the refit
+        left out, then the other terms that fail the support rule on the
+        final rows."""
         names = self.design.coef_names
         out: dict[str, str] = {}
-        for cause in ("level", "with_level", "no_finite_maximum"):
+        for cause in ("level", Removed.WITH_LEVEL, Removed.NO_FINITE_MAXIMUM):
             for name, removal in self.removed.items():
                 is_level = self.design.by_name[name].kind == "level"
                 if (cause == "level") != is_level or (
                     not is_level and removal.cause != cause
                 ):
                     continue
-                for k, j in enumerate(removal.columns):
-                    out[names[j]] = _words(removal, k)
+                for j in removal.columns:
+                    out[names[j]] = removal.cause
         for name, counted in self.support.items():
             if not counted.passes:
                 for j in self.design.by_name[name].columns:
-                    out.setdefault(names[j], "support")
+                    out.setdefault(names[j], counted.reason)
         return out
+
+    def left_out_round(self) -> dict[str, int]:
+        """Coefficient name -> the refit's round that left it out, for the
+        coefficients left out for no finite maximum."""
+        names = self.design.coef_names
+        return {
+            names[j]: at
+            for removal in self.removed.values()
+            if removal.cause == Removed.NO_FINITE_MAXIMUM
+            for j, at in zip(removal.columns, removal.rounds, strict=True)
+        }
 
     def recorded_support(self) -> dict[str, Support]:
         """The support counts on the final rows; a removed level's when it was
@@ -325,7 +342,7 @@ class _Session:
             at = self.rounds + int(round_)
             if term.kind == "level":
                 self.removed[term.name] = _Removal(
-                    "no_finite_maximum",
+                    Removed.NO_FINITE_MAXIMUM,
                     [int(column)],
                     [at],
                     counts=self.support[term.name],
@@ -333,23 +350,14 @@ class _Session:
                 level_left = True
             else:
                 removal = self.removed.setdefault(
-                    term.name, _Removal("no_finite_maximum", [])
+                    term.name, _Removal(Removed.NO_FINITE_MAXIMUM, [])
                 )
                 removal.columns.append(int(column))
                 removal.rounds.append(at)
         self.rounds += len(refit.refits) - 1
-        if refit.left_out.size or not refit.fitted:
-            self.fit_reason = refit.reason
+        if not refit.fitted:
+            self.no_fit = NoFit(refit.ended.value)
         return refit.fitted and level_left
-
-
-def _words(removal: _Removal, k: int) -> str:
-    """Why column ``k`` of a removal is inactive, in words."""
-    if removal.cause == "with_level":
-        return f"rows of {removal.level} dropped"
-    if removal.cause == "no_finite_maximum":
-        return f"no finite maximum (round {removal.rounds[k]})"
-    return removal.cause
 
 
 def _holds_event(lik: Likelihood, y: np.ndarray) -> np.ndarray:
@@ -410,16 +418,16 @@ def _fit_session(
             return _record(session, identity, why)
         refit = session.fit(first)
         first = False
-        if refit.reason == ALONG_THE_INTERCEPT:
-            return _record(session, identity, refit.reason)
+        if refit.ended == RefitEnd.ALONG_THE_INTERCEPT:
+            return _record(session, identity, NoFit.ALONG_THE_INTERCEPT)
         if not session.apply(refit):
-            return _record(session, identity, session.fit_reason, refit)
+            return _record(session, identity, session.no_fit, refit)
 
 
 def _record(
     session: _Session,
     identity: _Identity,
-    reason: str,
+    no_fit: str,
     refit: SessionRefit | None = None,
 ) -> FitRecord:
     """The session's :class:`.record.FitRecord`: of its last fit, or, with no
@@ -471,12 +479,13 @@ def _record(
         newton_decrement=decrement,
         n_iter=n_iter,
         left_out=session.left_out(),
+        left_out_round=session.left_out_round(),
         support={c: s.record() for c, s in session.recorded_support().items()},
         collinearity=collinearity,
         basis=design.basis_record(),
         standardization=design.standardization_record(),
         table_sha256=dict(identity.table_sha256),
-        fit_reason=reason,
+        no_fit=no_fit,
     )
 
 

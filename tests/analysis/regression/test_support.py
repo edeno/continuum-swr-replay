@@ -10,6 +10,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.support import (
     MIN_UNITS,
+    Removed,
     Support,
     binary_support,
     design_support,
@@ -24,7 +25,7 @@ from continuum_swr_replay.analysis.regression.terms import (
 
 from .conftest import ROLE
 
-FEW = f"fewer than MIN_UNITS = {MIN_UNITS} units with an event"
+FEW = Removed.SUPPORT
 
 
 def test_binary_term_counts() -> None:

@@ -1078,6 +1078,7 @@ def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
     with np.errstate(over="ignore"):
         refit = refit_session(Bernoulli(), SessionData(X, y), blocks, [6.0])
     assert refit.fitted and len(refit.refits) > 2
+    assert refit.ended == reml.RefitEnd.CONVERGED
     assert refit.rounds.size == refit.left_out.size
     assert refit.rounds[0] == 1 and refit.rounds[-1] == len(refit.refits) - 1
     assert np.all(np.diff(refit.rounds) >= 0)
@@ -1085,6 +1086,7 @@ def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
     data, blocks = _content_session(6, by_the_clock=True)
     line = refit_session(GroupedSoftmax(), data, blocks, [6.0])
     assert not line.fitted and line.left_out.size == 0
+    assert line.ended == reml.RefitEnd.ALONG_A_PENALTY
     assert "block 0's null space" in line.reason
 
 
@@ -1143,11 +1145,12 @@ def test_refit_session_does_not_make_the_intercept_inactive() -> None:
     assert not refit.fitted and refit.left_out.size == 0
     assert len(refit.refits) == 1
     assert 0 in refit.refits[0].fit.running_away
+    assert refit.ended == reml.RefitEnd.ALONG_THE_INTERCEPT
     assert refit.reason == reml.ALONG_THE_INTERCEPT
     # Doubling the intercept column is still an intercept.
     doubled = replace(data, X=np.column_stack([2.0 * data.X[:, :1], data.X[:, 1:]]))
-    assert refit_session(Poisson(), doubled, blocks, [6.0]).reason == (
-        reml.ALONG_THE_INTERCEPT
+    assert refit_session(Poisson(), doubled, blocks, [6.0]).ended == (
+        reml.RefitEnd.ALONG_THE_INTERCEPT
     )
 
 

@@ -38,16 +38,18 @@ the sessions with a fit leaves the per-session model
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from enum import StrEnum
 from typing import NamedTuple, Protocol
 
 import numpy as np
 
 from .constants import MAX_FAILING_SHARE
 from .newton import CONVERGED
-from .terms import SMALLEST_COLUMN_SIZE, Design
+from .terms import Design
 
 __all__ = [
     "MIN_UNITS",
+    "Removed",
     "Support",
     "binary_support",
     "design_support",
@@ -60,6 +62,19 @@ __all__ = [
 MIN_UNITS = 5
 
 
+class Removed(StrEnum):
+    """Why a term is inactive in a session's fit (a record's ``left_out``)."""
+
+    #: Fewer than ``MIN_UNITS`` units with an event (the support rule).
+    SUPPORT = "support"
+    #: Below ``SMALLEST_COLUMN_SIZE`` on the session's rows (the design check).
+    TOO_SMALL = "too_small"
+    #: Fitted for a level whose rows were dropped.
+    WITH_LEVEL = "with_level"
+    #: Left out by the refit of a fit with no finite maximum, in a round.
+    NO_FINITE_MAXIMUM = "no_finite_maximum"
+
+
 class Support(NamedTuple):
     """One term's support in one session.
 
@@ -69,12 +84,17 @@ class Support(NamedTuple):
         Units with an event on each side (0 and 1; below and above the median);
         None for a smooth term that failed the design check.
     reason : str
-        Why it fails, in words; empty when it passes.
+        Why it fails: ``Removed.SUPPORT`` or ``Removed.TOO_SMALL``; empty when
+        it passes.
+    size : float or None
+        For a term that fails the design check, its largest absolute value in
+        the session; None otherwise.
     """
 
     n_low: int | None
     n_high: int | None
     reason: str = ""
+    size: float | None = None
 
     @property
     def passes(self) -> bool:
@@ -83,16 +103,15 @@ class Support(NamedTuple):
         return self.reason == ""
 
     def record(self) -> dict:
-        """The record's entry: ``{"n_low", "n_high", "passes", "reason"}``."""
+        """The record's entry: ``{"n_low", "n_high", "passes", "reason",
+        "size"}``."""
         return {
             "n_low": self.n_low,
             "n_high": self.n_high,
             "passes": self.passes,
             "reason": self.reason,
+            "size": self.size,
         }
-
-
-_FEW = f"fewer than MIN_UNITS = {MIN_UNITS} units with an event"
 
 
 def _n_units(unit: np.ndarray) -> int:
@@ -103,7 +122,9 @@ def _n_units(unit: np.ndarray) -> int:
 def _two_sided(unit: np.ndarray, low: np.ndarray, high: np.ndarray) -> Support:
     """The units with a row on each side; both must reach ``MIN_UNITS``."""
     n_low, n_high = _n_units(unit[low]), _n_units(unit[high])
-    return Support(n_low, n_high, "" if min(n_low, n_high) >= MIN_UNITS else _FEW)
+    return Support(
+        n_low, n_high, "" if min(n_low, n_high) >= MIN_UNITS else Removed.SUPPORT
+    )
 
 
 def level_support(
@@ -121,7 +142,7 @@ def level_support(
     has_event : np.ndarray of bool, shape (n_rows,)
     """
     both = binary_support(values, unit, has_event)
-    return both._replace(reason="" if both.n_high >= MIN_UNITS else _FEW)
+    return both._replace(reason="" if both.n_high >= MIN_UNITS else Removed.SUPPORT)
 
 
 def binary_support(
@@ -198,13 +219,7 @@ def design_support(
         without counts. A slope that fails the design check fails, with that
         reason.
     """
-    small = {
-        name: (
-            f"largest absolute value {size:.2g} below SMALLEST_COLUMN_SIZE = "
-            f"{SMALLEST_COLUMN_SIZE:g} in the session"
-        )
-        for name, size in design.small_terms(X).items()
-    }
+    small = design.small_terms(X)
     out = {}
     for term in design.terms:
         if term.kind not in _RULES:
@@ -217,10 +232,12 @@ def design_support(
         (j,) = term.columns
         counted = _RULES[term.kind](X[reads, j], unit[reads], has_event[reads])
         if term.name in small:
-            counted = counted._replace(reason=small.pop(term.name))
+            counted = counted._replace(
+                reason=Removed.TOO_SMALL, size=small.pop(term.name)
+            )
         out[term.name] = counted
-    for name, reason in small.items():  # the smooths and lag functionals
-        out[name] = Support(None, None, reason)
+    for name, size in small.items():  # the smooths and lag functionals
+        out[name] = Support(None, None, Removed.TOO_SMALL, size)
     return out
 
 

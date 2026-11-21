@@ -19,13 +19,82 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields
+from enum import StrEnum
 from pathlib import Path
 
 import pandas as pd
 
 from continuum_swr_replay.tables.io import read_table, write_table
 
-__all__ = ["JSON_FIELDS", "FitRecord", "read_records", "records_frame", "write_records"]
+from .constants import REFIT_MAX_ROUNDS
+from .reml import ALONG_THE_INTERCEPT
+from .support import MIN_UNITS, Removed
+from .terms import SMALLEST_COLUMN_SIZE
+
+__all__ = [
+    "JSON_FIELDS",
+    "FitRecord",
+    "NoFit",
+    "describe",
+    "read_records",
+    "records_frame",
+    "write_records",
+]
+
+
+class NoFit(StrEnum):
+    """Why a session has no kept fit (a record's ``no_fit``)."""
+
+    #: No rows left to fit: none given, all missing, or all dropped.
+    NO_ROWS = "no_rows"
+    #: No events of the kind in the rows left to fit.
+    NO_EVENTS = "no_events"
+    #: The refit's fit has no finite maximum along the intercept.
+    ALONG_THE_INTERCEPT = "along_the_intercept"
+    #: The refit's fit has no finite maximum along a penalty block.
+    ALONG_A_PENALTY = "along_a_penalty"
+    #: Still no finite maximum after ``REFIT_MAX_ROUNDS`` rounds.
+    TOO_MANY_ROUNDS = "too_many_rounds"
+    #: The refit's fit ended with another status than converged or no finite
+    #: maximum.
+    OTHER_STATUS = "other_status"
+
+
+_WORDS = {
+    Removed.SUPPORT: f"fewer than MIN_UNITS = {MIN_UNITS} units with an event",
+    Removed.TOO_SMALL: (
+        f"largest absolute value below SMALLEST_COLUMN_SIZE = "
+        f"{SMALLEST_COLUMN_SIZE:g} in the session"
+    ),
+    Removed.WITH_LEVEL: "left with its level, whose rows were dropped",
+    NoFit.NO_ROWS: "no rows left to fit",
+    NoFit.NO_EVENTS: "no events of the kind in the rows left to fit",
+    NoFit.ALONG_THE_INTERCEPT: ALONG_THE_INTERCEPT,
+    NoFit.ALONG_A_PENALTY: (
+        "no finite maximum along a penalty block, whose columns cannot be made inactive"
+    ),
+    NoFit.TOO_MANY_ROUNDS: (
+        f"no finite maximum after REFIT_MAX_ROUNDS = {REFIT_MAX_ROUNDS} rounds of "
+        "columns made inactive"
+    ),
+    NoFit.OTHER_STATUS: "the fit at the log penalties ended with another status",
+}
+
+
+def describe(code: str, round_: int | None = None) -> str:
+    """A cause of a record (``Removed`` or ``NoFit``) in words, for a person.
+
+    Parameters
+    ----------
+    code : str
+        A ``left_out`` value, a support entry's ``reason`` or ``no_fit``.
+    round_ : int or None
+        The round of a term left out for no finite maximum
+        (``left_out_round``).
+    """
+    if code == Removed.NO_FINITE_MAXIMUM:
+        return f"no finite maximum (round {round_})"
+    return _WORDS[code]
 
 
 @dataclass(frozen=True)
@@ -71,11 +140,13 @@ class FitRecord:
     n_iter : int
         The last fit's Newton steps.
     left_out : dict
-        Coefficient name -> why it is inactive: ``support``, ``rows of <level>
-        dropped`` or ``no finite maximum (round k)``.
+        Coefficient name -> why it is inactive, a ``Removed`` code.
+    left_out_round : dict
+        Coefficient name -> the refit's round that left it out, for the
+        coefficients left out for no finite maximum.
     support : dict
-        Term name -> ``{"n_low", "n_high", "passes", "reason"}``
-        (:class:`.support.Support`).
+        Term name -> ``{"n_low", "n_high", "passes", "reason", "size"}``
+        (:class:`.support.Support`; ``reason`` a ``Removed`` code or empty).
     collinearity : dict
         Term -> ``{"r2", "vif"}`` or ``{"observed", "worst", "estimate"}``;
         empty for a session without a fit.
@@ -86,9 +157,9 @@ class FitRecord:
         Covariate -> ``{"sd", "ddof", "reference"}``.
     table_sha256 : dict
         The tables the fit read -> their hashes.
-    fit_reason : str
-        How the fit ended, in words, when columns were left out for a fit
-        with no finite maximum or the session has no fit; else empty.
+    no_fit : str
+        Why the session has no kept fit, a ``NoFit`` code; empty for a kept
+        fit. :func:`describe` gives the words of every code.
     """
 
     model: str
@@ -110,12 +181,13 @@ class FitRecord:
     newton_decrement: float
     n_iter: int
     left_out: dict
+    left_out_round: dict
     support: dict
     collinearity: dict
     basis: dict
     standardization: dict
     table_sha256: dict
-    fit_reason: str
+    no_fit: str
 
 
 #: The fields stored as JSON strings.

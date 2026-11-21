@@ -45,6 +45,7 @@ import itertools
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from enum import StrEnum
 from functools import cached_property
 from typing import NamedTuple
 
@@ -84,6 +85,7 @@ __all__ = [
     "PenaltySearch",
     "PooledFit",
     "PooledScore",
+    "RefitEnd",
     "RemlScore",
     "SessionData",
     "SessionRefit",
@@ -1502,6 +1504,16 @@ def _unidentified_text(session: RemlScore) -> str:
     return f"coordinates the likelihood cannot see {why}: {names}"
 
 
+class RefitEnd(StrEnum):
+    """How :func:`refit_session` ended: with a fit, or why without one."""
+
+    CONVERGED = "converged"
+    ALONG_THE_INTERCEPT = "along_the_intercept"
+    ALONG_A_PENALTY = "along_a_penalty"
+    TOO_MANY_ROUNDS = "too_many_rounds"
+    OTHER_STATUS = "other_status"
+
+
 @dataclass(frozen=True)
 class SessionRefit:
     """One session's fit at given log penalties with the columns running away
@@ -1517,19 +1529,23 @@ class SessionRefit:
     rounds : np.ndarray of int, shape (k,)
         The refit in which each of ``left_out`` was made inactive (1 for the
         first).
+    ended : RefitEnd
+        How it ended.
     reason : str
-        How it ended, in words.
+        How it ended, in words for a message (with the directions or the
+        columns still running away).
     """
 
     refits: tuple[RemlScore, ...]
     left_out: np.ndarray
     rounds: np.ndarray
+    ended: RefitEnd
     reason: str
 
     @property
     def fitted(self) -> bool:
         """True when its last fit converged."""
-        return self.refits[-1].fit.converged
+        return self.ended == RefitEnd.CONVERGED
 
 
 #: Why a refit leaves a session without a fit when its fit has no finite
@@ -1607,14 +1623,16 @@ def refit_session(
     left_out: list[int] = []
     rounds: list[int] = []
     refits = [_labeled_score(lik, data, index, blocks, rho, None, False)]
-    reason = ""
+    ended, reason = RefitEnd.CONVERGED, ""
     while not refits[-1].fit.converged:
         last = refits[-1]
         if last.fit.status != NO_FINITE_MAXIMUM:
+            ended = RefitEnd.OTHER_STATUS
             reason = f"its fit at the chosen log penalties ended as {last.fit.status}"
             break
         along = last.running_away_directions
         if any(d.block is not None for d in along):
+            ended = RefitEnd.ALONG_A_PENALTY
             reason = (
                 "no finite maximum along a penalty block ("
                 + ", ".join(str(d) for d in along)
@@ -1622,13 +1640,14 @@ def refit_session(
             )
             break
         if len(refits) > REFIT_MAX_ROUNDS:
+            ended = RefitEnd.TOO_MANY_ROUNDS
             reason = (
                 f"no finite maximum after {REFIT_MAX_ROUNDS} rounds of columns "
                 f"made inactive (still running away: {last.fit.running_away.tolist()})"
             )
             break
         if np.intersect1d(last.fit.running_away, _intercepts(data.X)).size:
-            reason = ALONG_THE_INTERCEPT
+            ended, reason = RefitEnd.ALONG_THE_INTERCEPT, ALONG_THE_INTERCEPT
             break
         new = [int(c) for c in last.fit.running_away if active[c]]
         active[new] = False
@@ -1653,6 +1672,7 @@ def refit_session(
         tuple(refits),
         np.array(left_out, dtype=int),
         np.array(rounds, dtype=int),
+        ended,
         reason,
     )
 
