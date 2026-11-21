@@ -32,7 +32,7 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
 **Designs referenced:** [rate design](designs.md#rate-design), [smooth terms](designs.md#smooth-terms-and-bases),
 [pooled REML](designs.md#pooled-reml), [session to day to animal](designs.md#session-to-day-to-animal).
 
-**Decisions this phase applies** (settled 2026-11-20): L1, the declared family of thirteen estimands and 39
+**Decisions this phase applies** (settled 2026-11-20): L1, the declared family of twelve estimands and 36
 tests (C8), committed in `declared_tests.py` before the first real fit of this phase; L4, the event set (C3);
 ASK-1, the ContFrag event sources; C14.
 

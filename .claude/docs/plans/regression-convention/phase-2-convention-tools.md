@@ -32,9 +32,12 @@ real-data smoke test.
 ## Tasks
 
 - **Terms and design assembly** (`analysis/regression/terms.py`, new). A small, explicit term vocabulary:
-  `Smooth(column, lo, hi, n_basis, clamp=True)`, `LinearFunctional(lag_columns, lags, lo, hi, n_basis)`
-  (model D), `Category(column, levels, reference)`, `Slope(column, by=None)` (a slope, optionally one per
-  level of a category column such as the arm role), `Offset(column)`. A `Design` built from a list of terms
+  `Smooth(column, lo, hi, n_basis, clamp=True, by=None, penalty="reml")` (`by`: one smooth per level of a
+  category column such as the arm role, each with its own penalty; `penalty`: `"reml"`, `"none"` for an
+  unpenalized B-spline of the same basis, or a fixed log-lambda held from another fit, as the uncertainty
+  model may need), `LinearFunctional(lag_columns, lags, lo, hi, n_basis)` (model D),
+  `Category(column, levels, reference)`, `Slope(column, by=None)` (a slope, optionally one per level of a
+  category column such as the arm role), `Offset(column)`. A `Design` built from a list of terms
   and pooled reference rows holds the fixed knots, the pooled sum-to-zero constraints, the penalty blocks,
   the pooled standardization (population SD, `ddof = 0`) and centering references, and maps any session's
   rows to `(X, offset, blocks)`. Pooled quantities are computed once from the cohort rows and stored; never
@@ -72,7 +75,7 @@ real-data smoke test.
   `estimand_summary(values, animal, day, session, *, n_draws, seed)` returning the animal-balanced estimate,
   the t-corrected nested bootstrap interval, the animals with the estimate's sign, and the day-level p.
 - **Declared tests** (`analysis/regression/declared_tests.py`, new): the list of
-  [C8](shared-contracts.md#c8-the-declared-family-of-tests) (thirteen estimands, 39 tests; L1, settled), each entry with its question,
+  [C8](shared-contracts.md#c8-the-declared-family-of-tests) (twelve estimands, 36 tests; settled), each entry with its question,
   estimand id, model, and contrast definition (range pairs or coefficient names). One tuple; nothing else
   hard-codes the count.
 - **Stored analysis: shared against per-session penalty** (`scripts/checks/simulate_shared_penalty.py`,
@@ -134,7 +137,7 @@ fixtures extended with concurvity numbers.
 
 The validation slice passes; the simulation output exists and shows the shared penalty no worse than
 per-session penalties (state the numbers in the PR from the stored file); the declared list matches the
-lead's decision L1 (thirteen estimands, 39 tests).
+lead's decisions (twelve estimands, 36 tests).
 
 ## Review
 

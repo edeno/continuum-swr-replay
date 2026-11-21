@@ -345,9 +345,13 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   the previous trial's well, when different), `other_leaf` (any other leaf arm), `trunk` (arms 6 to 8).
   Each role is a category (reference: `other_leaf`). Arm fixed effects stay in every content model, per kind
   (`model_specs.py:2072`, `add_arm_fixed_effects`); a role contrast is then read against them.
-- Leaf-arm covariates enter as one slope per role (current, previous, other_leaf): reward fraction over the
-  last ten visits, value (beta-belief mean), and the uncertainty measure of the model. Trunk rows carry none
-  (set to 0 with the trunk role absorbing the level).
+- Leaf-arm covariates by role (current, previous, other_leaf): the reward fraction over the last ten visits
+  enters as a **penalized smooth per role** (lead, 2026-11-20: a curved reward effect belongs to Q4, not to an
+  uncertainty test), over `[0, 1]` with 6 basis functions (call; the fraction takes the values k/10, so a
+  small basis); value (beta-belief mean) as one slope per role. Trunk rows carry none (set to 0, with the
+  trunk role absorbing the level). Q4a, the "slope" of the current arm's share on its reward fraction, is
+  then a linear functional of the smooth: `f(m + sd/2) - f(m - sd/2)`, `m` and `sd` the pooled mean and SD
+  of the fraction on current-arm rows (call), so it stays a change per pooled SD with an exact variance.
 - Recency: a smooth of `log(trials since last visit)` on leaf rows, not centered within the event (lead:
   absolute recency), with the never-visited indicator; recency is clamped at 200 trials. The shipped
   within-event centering (`behavior/covariates/history/visit_recency.py:23`) is not used.
@@ -356,18 +360,31 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   `log(event duration) - L0`, `L0` the pooled median log duration over both kinds (fixed, stored), so the
   per-kind estimate is at the same reference length; the unadjusted model omits the interactions. Both are
   stored and reported (see [C6](shared-contracts.md#c6-kinds-contrasts-and-the-two-meanings-of-direct)).
-- Uncertainty: three models, each the same design plus one uncertainty measure with its role slopes
-  (lead, L2: "Do your rec. Maybe we should check on simulated"):
+- Uncertainty: **one model** (lead, 2026-11-20, after the simulation: "Yes"), the main design plus, by role
+  on the leaf arms:
   1. the belief variance (`reward_belief_variance_candidate_arm_preoutcome`, built by
-     `behavior/covariates/history/value_block.py:206`);
-  2. the reward variability: the variance (population form, `ddof = 0`, call) of the arm's 0/1 outcomes over
-     the last 10 visits to its well, outcomes known before the event;
-  3. the sample count: `log(1 + n)`, `n` the visits to the well earlier in the epoch, before the event.
-  Phase 3 builds 2 and 3 in the rebuild. For 0/1 outcomes, measure 2 is `p(1 - p)` of the reward fraction
-  `p` over the same window (a function of a covariate already in the model, separable only through its
-  curvature), and measure 3 grows with time in the epoch. The semi-synthetic identifiability study of the
-  measures against recency, reward fraction and a drift in the epoch is a gate of Phase 6a: its result goes
-  to the lead before any real fit, and the definitions or the model may change with it.
+     `behavior/covariates/history/value_block.py:206`), pooled-SD slope per role;
+  2. the sample count: `log(1 + n)`, `n` the visits to the well with a known outcome earlier in the epoch,
+     before the event, pooled-SD slope per role;
+  3. the trial number in the epoch (the visits the animal has arrived at by the event start), a pooled-SD
+     slope per role on the same leaf roles the measures enter on. It is an event-level quantity, so it is
+     identified only as a role interaction; without it the sample count is a drift with the trial number;
+  with the smooth reward fraction above. The reward variability (the variance of the arm's 0/1 outcomes
+  over its last 10 visits) is dropped (lead, "Yes"): for 0/1 outcomes it is `p(1 - p)` of the reward
+  fraction and could not be told from a curved reward-fraction effect in the simulation.
+  - Recency in this model (call, stated before the fit): the simulation found the belief-variance test
+    calibrated only when the recency curve is flexible and not shrunk (a straight line, a small ridge or the
+    production centered spline moved recency into the belief variance). A repeat with the shared fitter's
+    REML-penalized recency smooth is running (same scratch folder). If the selected penalty moves recency
+    into the belief variance, the recency curve of the uncertainty model is fitted unpenalized (a cubic
+    B-spline of the same basis without its penalty), or with the penalty selected in the model without the
+    uncertainty terms and then held fixed; which one is stated before the first real fit.
+  - The belief variance is predicted by recency within a session (VIF far above the collinearity limit by
+    construction), and its simulated power is low; it is reported under C5's rule for a term that fails the
+    collinearity rule by design, and a null is reported as "no evidence beyond recency; the design cannot
+    detect an effect of this size", with the simulated power beside it (call, stated before the fits).
+  The identifiability study, and its repeat with the shared fitter's recency penalty, are the gate of
+  Phase 6a.
 - Q6 (Phase 7): one more role, `next`, for the arm of the next trial's well when it is neither current nor
   previous (call: when the next arm is the current or previous arm, the event adds nothing to this term).
 

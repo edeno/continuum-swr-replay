@@ -47,7 +47,7 @@ For agent invocation, **load only the slice you need**:
   - [phase-5b-rate-families-moved.md](phase-5b-rate-families-moved.md) — the per-stop (total) family,
     the SWR-contrast covariates and the uncertainty rate model moved to the convention.
   - [phase-6a-content-models.md](phase-6a-content-models.md) — content on nine arms by arm role, smooth
-    uncentered recency, the three uncertainty measures, current-arm share against time until leaving;
+    uncentered recency, the belief variance and sample count tested together, current-arm share against time until leaving;
     Q3, Q4, Q5, Q7.
   - [phase-6b-content-robustness.md](phase-6b-content-robustness.md) — count and Dirichlet-multinomial
     estimators on the new design; the within-arm comparison deleted.

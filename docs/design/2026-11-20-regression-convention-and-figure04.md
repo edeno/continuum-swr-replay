@@ -678,6 +678,31 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
   for the event set, the selection function, the fitter and the clocks, in every family, summary and
   figure.
 
+### Twelfth round (lead, 2026-11-20): the uncertainty measures after the simulation
+
+A simulation on the real data structure (content made from a known model; 100 data sets for each of seven
+truths; `.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/REPORT.md`) gave:
+
+- The belief variance is nearly recency within a session. Its test is correct (about 5 % false positives
+  when the truth is recency alone) only when the recency curve in the model is flexible and not shrunk; a
+  straight line in log recency gives 86 %, and the present production model 66 % (No SWR) and 100 % (SWR).
+  Fitted alone it reports a true sample-count effect. A true effect of the size of the recency effect's
+  linear part is found in 30 to 50 % of the data sets.
+- The reward variability cannot be told apart from a curved effect of the reward fraction.
+- The sample count is a drift with the trial number unless the trial number is in the model.
+
+Decisions:
+
+- **Reward variability is dropped** as an uncertainty measure ("Yes"). The reward fraction gets a smooth
+  term instead. The declared family is twelve quantities, 36 tests.
+- **The belief variance and the sample count are tested together in one model, with the trial number**
+  ("Yes").
+- (**call**) Before any real fit, the simulation is repeated with the shared fitter's penalty selection
+  on the recency curve; if the selected penalty moves recency into the belief variance, the recency curve
+  of this model is fitted without a penalty. The low power of the belief-variance test is stated before
+  the fits: a null result is "no evidence beyond recency, and the design cannot detect an effect of this
+  size".
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
