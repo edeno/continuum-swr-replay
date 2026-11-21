@@ -622,16 +622,28 @@ def _eigenbasis(
 
 
 def _rotate(
-    blocks: Sequence[PenaltyBlock], vectors: Sequence[np.ndarray], M: np.ndarray
+    blocks: Sequence[PenaltyBlock],
+    vectors: Sequence[np.ndarray],
+    M: np.ndarray,
+    *,
+    inverse: bool = False,
 ) -> np.ndarray:
-    """``Q M`` with ``Q`` the block-diagonal rotation (identity off the blocks).
+    """``Q M``, or ``Q' M`` when ``inverse``, with ``Q`` the block-diagonal
+    rotation (identity off the blocks).
 
     ``M`` has shape ``(p,)`` or ``(p, k)``.
     """
     out = np.array(M, dtype=float)
     for block, V in zip(blocks, vectors, strict=True):
-        out[block.columns] = V @ M[block.columns]
+        out[block.columns] = (V.T if inverse else V) @ M[block.columns]
     return out
+
+
+def _rotate_both(
+    blocks: Sequence[PenaltyBlock], vectors: Sequence[np.ndarray], M: np.ndarray
+) -> np.ndarray:
+    """``Q M Q'`` for a symmetric ``M`` of shape ``(p, p)``."""
+    return _rotate(blocks, vectors, _rotate(blocks, vectors, M).T)
 
 
 def _null_dimension(blocks: Sequence[PenaltyBlock], n_columns: int) -> int:
@@ -736,21 +748,26 @@ def reml_and_derivatives(
     for block, V in zip(blocks, vectors, strict=True):
         X_rotated[:, block.columns] = X[:, block.columns] @ V
     start = np.zeros(n_columns) if beta0 is None else np.asarray(beta0, dtype=float)
-    start_rotated = start.copy()
-    for block, V in zip(blocks, vectors, strict=True):
-        start_rotated[block.columns] = V.T @ start[block.columns]
     session = _reml_in_basis(
-        lik, X_rotated, y, aux, rotated, rho, start_rotated, derivatives
+        lik,
+        X_rotated,
+        y,
+        aux,
+        rotated,
+        rho,
+        _rotate(blocks, vectors, start, inverse=True),
+        derivatives,
     )
-    fit = session.fit
-    beta = _rotate(blocks, vectors, fit.beta)
-    A = _rotate(blocks, vectors, _rotate(blocks, vectors, fit.A).T)
+    fit = replace(
+        session.fit,
+        beta=_rotate(blocks, vectors, session.fit.beta),
+        A=_rotate_both(blocks, vectors, session.fit.A),
+    )
     covariance = (
         None
         if session.covariance is None
-        else _rotate(blocks, vectors, _rotate(blocks, vectors, session.covariance).T)
+        else _rotate_both(blocks, vectors, session.covariance)
     )
-    fit = replace(fit, beta=beta, A=A)
     directions: tuple[FreeDirection, ...] = ()
     if fit.step is not None:
         directions = _directions(rotated, fit.running_away)
