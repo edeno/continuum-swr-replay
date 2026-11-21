@@ -531,13 +531,20 @@ poke-out counts up to it.
   that starts before the first poke-in counts from it. Summed over a session's
   stops it is the immobile in-visit time, the rate models' at-risk time before
   the time inside ongoing events is removed.
-- `visit_stretch_index` — 0, 1, ... for the stops of one visit in time order;
-  missing without a visit.
-- `stop_end_kind` — `"leaves"` for the last stop of its visit (no later stop of
-  the visit starts before its final poke-out), `"small_movement"` for the
-  visit's other stops, `"outside_visit"` for a stop with no visit. No position
-  or speed threshold is used: the visit ends at the final poke-out. How a stop
+- `visit_stretch_index` — 0, 1, ... in time order for the stretches of one
+  visit: the stops placed in it (`overlapping_visit_id`) that have analyzed
+  seconds inside it. A stop with none (one that ends on the first poke-in, or
+  lies wholly in excluded time) has no stretch index.
+- `stop_end_kind` — `"leaves"` for the last stretch of its visit (no later
+  stretch of the visit starts before its final poke-out), `"small_movement"`
+  for the visit's other stretches, `"outside_visit"` for a stop that is no
+  stretch of a visit (no visit, or no analyzed seconds in it). No position or
+  speed threshold is used: the visit ends at the final poke-out. How a stop
   ends is known only afterward, so it is future-referencing.
+- A stop across two visits is placed in the later one: its
+  `overlapping_visit_id`, poke times, stretch index and end kind are the later
+  visit's, the earlier visit gets no stretch from it, and its
+  `in_visit_immobile_s` counts its seconds in both.
 
 **Event table** (non-local and ContFrag, carried to the event × arm and event ×
 patch tables; `event_tables/visit_context.py:event_visit_columns`), for the

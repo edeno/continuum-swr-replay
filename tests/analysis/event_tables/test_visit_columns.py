@@ -244,6 +244,54 @@ def test_a_stop_across_two_visits_is_placed_in_the_later():
     np.testing.assert_allclose(columns["in_visit_immobile_s"], [1.0])
 
 
+def _stretches(columns: pd.DataFrame) -> list[int]:
+    """The stretch indices, -1 where missing."""
+    return columns["visit_stretch_index"].fillna(-1).astype(int).tolist()
+
+
+def test_stretches_are_the_stops_with_analyzed_time_in_the_visit():
+    """Only a stop with analyzed seconds inside its visit is one of the visit's
+    stretches: a stop that ends on the first poke-in, or lies wholly in
+    excluded time, is ``outside_visit`` with no stretch index, and does not
+    take the visit's ``leaves``."""
+    starts = np.array([2.0, 3.3, 4.0, 5.0])
+    ends = np.array([3.0, 3.6, 4.5, 6.0])
+    # stop 2 (4.0 - 4.5) lies wholly in excluded time
+    excluded = pd.DataFrame({"start_time": [3.9], "end_time": [4.6]})
+    columns = stop_visit_columns(starts, ends, _experiences(), excluded)
+    np.testing.assert_allclose(columns["in_visit_immobile_s"], [0.0, 0.3, 0.0, 1.0])
+    assert columns["overlapping_visit_id"].tolist() == [1, 1, 1, 1]
+    assert _stretches(columns) == [-1, 0, -1, 1]
+    assert columns["stop_end_kind"].tolist() == [
+        "outside_visit",
+        "small_movement",
+        "outside_visit",
+        "leaves",
+    ]
+    # the visit's last stop wholly in excluded time: the stop before it leaves
+    excluded = pd.DataFrame({"start_time": [4.9], "end_time": [6.1]})
+    columns = stop_visit_columns(starts[:2], ends[:2], _experiences(), excluded)
+    assert _stretches(columns) == [-1, 0]
+    columns = stop_visit_columns(
+        np.array([3.3, 5.0]), np.array([3.6, 6.0]), _experiences(), excluded
+    )
+    assert _stretches(columns) == [0, -1]
+    assert columns["stop_end_kind"].tolist() == ["leaves", "outside_visit"]
+
+
+def test_a_stop_across_two_visits_with_no_time_in_the_later():
+    """A stop placed in the later of two visits with no analyzed second in it
+    is a stretch of neither: its seconds in the earlier visit still count in
+    ``in_visit_immobile_s``."""
+    columns = stop_visit_columns(
+        np.array([0.5]), np.array([3.0]), _experiences(), _no_excluded_time()
+    )
+    assert columns["overlapping_visit_id"].tolist() == [1]
+    np.testing.assert_allclose(columns["in_visit_immobile_s"], [0.5])
+    assert _stretches(columns) == [-1]
+    assert columns["stop_end_kind"].tolist() == ["outside_visit"]
+
+
 def test_event_visit_clocks(tables):
     events = tables["event"]
     # Event 1 starts at 4.1 s in stop 1 (ends 4.6 s); event 2 at 6.3 s in

@@ -409,19 +409,26 @@ def stop_visit_columns(
         - ``in_visit_immobile_s``: seconds of the stop inside the well visits,
           less excluded time; 0.0 for a stop outside every visit. A stop that
           crosses the final poke-out counts up to it.
-        - ``visit_stretch_index`` (``Int64``): 0, 1, ... for the stops of one
-          visit in time order; missing without a visit.
-        - ``stop_end_kind``: ``"leaves"`` for the visit's last stop (no later
-          stop of the visit starts before its final poke-out),
-          ``"small_movement"`` for its other stops, ``"outside_visit"`` for a
-          stop with no visit.
+        - ``visit_stretch_index`` (``Int64``): 0, 1, ... in time order for the
+          stretches of one visit: the stops placed in it with analyzed seconds
+          inside it (outside excluded time, from the first poke-in to the
+          final poke-out); missing for every other stop, so also for a stop
+          that only touches the visit (one that ends on the first poke-in) or
+          lies wholly in excluded time.
+        - ``stop_end_kind``: ``"leaves"`` for the visit's last stretch (no
+          later stretch of the visit starts before its final poke-out),
+          ``"small_movement"`` for its other stretches, ``"outside_visit"`` for
+          a stop that is no stretch of a visit.
 
     Notes
     -----
     A stop overlaps at most one visit when the animal moves between wells. A
     stop that overlaps two (a stop at the start of an epoch, across the first
-    visits at the two wells of one patch) is placed in the later one, and its
-    ``in_visit_immobile_s`` counts its seconds in both.
+    visits at the two wells of one patch) is placed in the later one: its
+    ``overlapping_visit_id``, poke times, stretch index and end kind are the
+    later visit's (a stretch of it only with analyzed seconds in it), the
+    earlier visit gets no stretch from it, and its ``in_visit_immobile_s``
+    counts its seconds in both.
     """
     start = np.asarray(stop_start, dtype=float)
     end = np.asarray(stop_end, dtype=float)
@@ -437,25 +444,34 @@ def stop_visit_columns(
     first_poke_in[overlaps] = arrivals[visit[overlaps]]
     last_poke_out[overlaps] = departures[visit[overlaps]]
 
-    analyzed_visits = subtract(
-        np.column_stack([arrivals, departures]),
-        excluded[["start_time", "end_time"]].to_numpy(dtype=float),
+    analyzed_visits = as_frame(
+        subtract(
+            np.column_stack([arrivals, departures]),
+            excluded[["start_time", "end_time"]].to_numpy(dtype=float),
+        )
     )
-    in_visit = covered_seconds(start, end, as_frame(analyzed_visits))
+    in_visit = covered_seconds(start, end, analyzed_visits)
+    # The stop's analyzed seconds inside the visit it is placed in: only a stop
+    # with some is one of that visit's stretches.
+    lo = np.where(overlaps, np.maximum(start, first_poke_in), 0.0)
+    hi = np.where(overlaps, np.minimum(end, last_poke_out), 0.0)
+    hi = np.maximum(hi, lo)
+    in_own_visit = covered_seconds(lo, hi, analyzed_visits)
+    stretches = overlaps & (in_own_visit > 0)
 
     stretch = (
-        pd.Series(start[overlaps])
-        .groupby(visit[overlaps])
+        pd.Series(start[stretches])
+        .groupby(visit[stretches])
         .rank(method="first")
         .to_numpy(dtype=np.int64)
         - 1
     )
-    n_stretches = np.bincount(visit[overlaps], minlength=len(arrivals))
+    n_stretches = np.bincount(visit[stretches], minlength=len(arrivals))
     stretch_index = pd.array([pd.NA] * n_stops, dtype="Int64")
-    stretch_index[overlaps] = stretch
+    stretch_index[stretches] = stretch
     end_kind = np.full(n_stops, "outside_visit", dtype=object)
-    end_kind[overlaps] = np.where(
-        stretch == n_stretches[visit[overlaps]] - 1, "leaves", "small_movement"
+    end_kind[stretches] = np.where(
+        stretch == n_stretches[visit[stretches]] - 1, "leaves", "small_movement"
     )
     overlapping_visit_id = pd.array([pd.NA] * n_stops, dtype="Int64")
     overlapping_visit_id[overlaps] = visit[overlaps]
