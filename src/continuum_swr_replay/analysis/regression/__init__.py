@@ -17,6 +17,8 @@ package may import it.
   coefficient differences) with their exact variance.
 - ``folds``: the one fold rule, five folds of whole trials balanced by
   destination well, long stays cut into pieces.
+- ``bands``: simultaneous 95 % bands for a curve, one fit's and the
+  animal-balanced curve's across sessions.
 
 Submodules are imported by name; nothing is re-exported here.
 """

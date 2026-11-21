@@ -512,3 +512,63 @@ def test_animal_curve_sem_is_over_animals_at_each_lag():
 
     np.testing.assert_allclose(sem, [np.sqrt(7 / 3) / np.sqrt(3), 0.0])
     assert np.isnan(stats.animal_curve_sem({"a": np.array([1.0, 5.0])})).all()
+
+
+# --- session -> recording day -> animal --------------------------------------------
+
+# Two animals. Animal "a": day 1 holds sessions 1.0 and 3.0, day 2 holds 8.0;
+# animal "b": one day of sessions -1.0, 0.0 and 4.0.
+THREE_LEVEL = pd.DataFrame(
+    {
+        "value": [1.0, 3.0, 8.0, -1.0, 0.0, 4.0],
+        "animal": ["a", "a", "a", "b", "b", "b"],
+        "day": ["d1", "d1", "d2", "d1", "d1", "d1"],
+        "session": ["s1", "s2", "s3", "s1", "s2", "s3"],
+    }
+)
+
+
+def test_the_three_level_bootstrap_estimate_is_the_mean_of_animal_means_of_day_means():
+    # a: days (2 + 8) / 2 = 5; b: 1. Mean over animals 3. The day label d1 of
+    # animal b is not animal a's day d1.
+    result = stats.animal_day_session_bootstrap(
+        THREE_LEVEL.value, THREE_LEVEL.animal, THREE_LEVEL.day, n_draws=50, seed=0
+    )
+    assert result.estimate == pytest.approx(3.0)
+    assert result.n_animals == 2
+    assert result.draws.shape == (50,)
+
+
+def test_each_three_level_draw_is_the_mean_of_means_of_its_drawn_counts():
+    rng = np.random.default_rng(0)
+    animal = np.repeat([0, 1, 2], 6)
+    day = np.repeat(np.arange(6), 3)  # two days of three sessions per animal
+    values = rng.normal(size=(18, 4))  # a curve of four points per session
+    result = stats.animal_day_session_bootstrap(values, animal, day, n_draws=30, seed=7)
+    # The same counts, drawn again with the same seed: animals, days, sessions.
+    codes = stats.nested_codes(animal, day)
+    draws = stats.nested_bootstrap_draws(*codes, np.random.default_rng(7), 30)
+    for k in range(30):
+        expected = np.zeros(4)
+        for a in range(3):
+            if draws.animals[k, a] == 0:
+                continue
+            day_means, day_counts = [], []
+            for d in np.unique(day[animal == a]):
+                rows = draws.rows[k, day == d]
+                if draws.sessions[k, d] == 0:
+                    continue
+                day_means.append(rows @ values[day == d] / rows.sum())
+                day_counts.append(draws.sessions[k, d])
+            animal_mean = np.average(day_means, axis=0, weights=day_counts)
+            expected += draws.animals[k, a] * animal_mean / 3
+        np.testing.assert_allclose(result.draws[k], expected, rtol=1e-12)
+
+
+def test_the_three_level_bootstrap_leaves_out_a_session_without_a_finite_value():
+    values = THREE_LEVEL.value.to_numpy().copy()
+    values[2] = np.nan  # animal a keeps one day, mean 2
+    result = stats.animal_day_session_bootstrap(
+        values, THREE_LEVEL.animal, THREE_LEVEL.day, n_draws=10, seed=0
+    )
+    assert result.estimate == pytest.approx((2.0 + 1.0) / 2)

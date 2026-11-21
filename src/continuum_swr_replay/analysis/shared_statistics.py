@@ -20,6 +20,9 @@
   :func:`weighted_median`.
 - :func:`bootstrap_interval`: the 95 % interval from those draws, a
   small-sample t correction over the animals.
+- :func:`animal_day_session_bootstrap`: a per-session number (or curve) taken
+  session -> recording day -> animal as a mean of means, with its nested
+  bootstrap draws (animals, then their days, then each day's sessions).
 - :func:`session_mean_curve`, :func:`animal_balanced_curve` and
   :func:`animal_curve_sem`: a curve (one value per lag) taken unit -> session
   -> animal, the mean over animals of each animal's mean over its sessions, and
@@ -507,6 +510,133 @@ def bootstrap_interval(
     if bounds is not None:
         low, high = max(low, bounds[0]), min(high, bounds[1])
     return BootstrapInterval(low, high, sd)
+
+
+class ThreeLevelDraws(NamedTuple):
+    """A mean of means over sessions, days and animals, and its bootstrap draws
+    (:func:`animal_day_session_bootstrap`).
+
+    Attributes
+    ----------
+    estimate : NDArray, shape (*value_shape)
+        The mean over animals of each animal's mean over its days of each
+        day's mean over its sessions.
+    draws : NDArray, shape (n_draws, *value_shape)
+        The same statistic on each nested bootstrap replicate.
+    n_animals : int
+        The animals with a session (the draws' top level).
+    """
+
+    estimate: NDArray[np.float64]
+    draws: NDArray[np.float64]
+    n_animals: int
+
+
+def _three_level_weights(
+    animal: NDArray[np.int64], day: NDArray[np.int64], draws: NestedDraw
+) -> NDArray[np.float64]:
+    """Each session's weight in the mean of means of each replicate.
+
+    A session's weight is ``A_a / n_animals * D_d / sum_{d' of a} D_d' *
+    R_s / sum_{s' of d} R_s'``, with ``A``, ``D`` and ``R`` how often its
+    animal, day and the session itself are drawn. A copy of an animal (or day)
+    drawn ``k`` times draws ``k`` times as many members, pooled
+    (:func:`nested_bootstrap_draws`), and with copies of one size the mean of
+    the copies' means is the mean over the pooled members, so the weights are
+    exact for a mean of means.
+
+    Returns
+    -------
+    NDArray, shape (n_draws, n_sessions)
+    """
+    n_animals = draws.animals.shape[1]
+    day_animal = np.zeros(draws.sessions.shape[1], dtype=np.int64)
+    day_animal[day] = animal
+    day_total = np.stack([np.bincount(day, weights=r) for r in draws.rows])
+    animal_total = np.stack(
+        [np.bincount(day_animal, weights=d) for d in draws.sessions]
+    )
+    within_day = np.divide(
+        draws.rows,
+        day_total[:, day],
+        out=np.zeros(draws.rows.shape),
+        where=draws.rows > 0,
+    )
+    within_animal = np.divide(
+        draws.sessions,
+        animal_total[:, day_animal],
+        out=np.zeros(draws.sessions.shape),
+        where=draws.sessions > 0,
+    )
+    return draws.animals[:, animal] / n_animals * within_animal[:, day] * within_day
+
+
+def animal_day_session_bootstrap(
+    values: ArrayLike,
+    animal: ArrayLike,
+    day: ArrayLike,
+    *,
+    n_draws: int,
+    seed: int,
+) -> ThreeLevelDraws:
+    """A per-session number taken session -> day -> animal, with its draws.
+
+    The estimate is the mean over animals of each animal's mean over its
+    recording days of each day's mean over its sessions. The draws resample
+    the same three levels (:func:`nested_bootstrap_draws` with the days as its
+    sessions and the sessions as its rows): animals with replacement, then
+    each drawn animal's days, then each drawn day's sessions.
+
+    Parameters
+    ----------
+    values : array_like, shape (n_sessions,) or (n_sessions, n_points)
+        One number, or one curve on a common grid, per session. A session
+        with a value that is not finite (anywhere on its curve) is left out.
+    animal, day : array_like, shape (n_sessions,)
+        Each session's animal and recording day. A day label names a day
+        within its animal: the same label in two animals is two days.
+    n_draws : int
+        Bootstrap replicates.
+    seed : int
+        The draws' seed (``numpy.random.default_rng(seed)``).
+
+    Returns
+    -------
+    ThreeLevelDraws
+    """
+    values = np.asarray(values, dtype=float)
+    finite = np.isfinite(values.reshape(values.shape[0], -1)).all(axis=1)
+    values = values[finite]
+    animal = np.asarray(animal)[finite]
+    day = np.asarray(day)[finite]
+    animal_codes, day_codes = _animal_day_codes(animal, day)
+    flat = values.reshape(values.shape[0], -1)
+    n_animals = int(animal_codes.max()) + 1
+    n_days = int(day_codes.max()) + 1
+    once = NestedDraw(
+        np.ones((1, n_animals), dtype=np.int64),
+        np.ones((1, n_days), dtype=np.int64),
+        np.ones((1, values.shape[0]), dtype=np.int64),
+    )
+    estimate = _three_level_weights(animal_codes, day_codes, once) @ flat
+    draws = nested_bootstrap_draws(
+        animal_codes, day_codes, np.random.default_rng(seed), n_draws
+    )
+    replicates = _three_level_weights(animal_codes, day_codes, draws) @ flat
+    return ThreeLevelDraws(
+        estimate.reshape(values.shape[1:]),
+        replicates.reshape((n_draws, *values.shape[1:])),
+        n_animals,
+    )
+
+
+def _animal_day_codes(
+    animal: NDArray, day: NDArray
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """Codes of each session's animal and of its (animal, day) pair."""
+    pairs = pd.MultiIndex.from_arrays([animal, day])
+    day_labels = pd.factorize(pairs, sort=True)[0]
+    return nested_codes(animal, day_labels)
 
 
 def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
