@@ -64,15 +64,15 @@ class Contrast(NamedTuple):
         return float(np.sqrt(self.variance))
 
 
-def range_grid(lo: float, hi: float, step: float = GRID_STEP) -> np.ndarray:
-    """The equally spaced grid from ``lo`` to ``hi``, both ends included.
+def range_grid(lo: float, hi: float) -> np.ndarray:
+    """The grid from ``lo`` to ``hi`` in steps of :data:`GRID_STEP`, both ends
+    included.
 
     Parameters
     ----------
     lo, hi : float
-        The range. ``lo == hi`` is one point.
-    step : float
-        The spacing; it must split the range into a whole number of steps.
+        The range. ``lo == hi`` is one point. The step must split it into a
+        whole number of steps.
 
     Returns
     -------
@@ -81,15 +81,15 @@ def range_grid(lo: float, hi: float, step: float = GRID_STEP) -> np.ndarray:
     Raises
     ------
     ValueError
-        If ``hi < lo`` or ``step`` does not split the range into a whole
+        If ``hi < lo`` or the step does not split the range into a whole
         number of steps.
     """
     if hi < lo:
         raise ValueError(f"the range ends before it starts: [{lo}, {hi}]")
-    n_steps = (hi - lo) / step
+    n_steps = (hi - lo) / GRID_STEP
     if not np.isclose(n_steps, round(n_steps), rtol=0.0, atol=1e-6):
         raise ValueError(
-            f"step {step} does not split [{lo}, {hi}] into a whole number of steps"
+            f"step {GRID_STEP} does not split [{lo}, {hi}] into a whole number of steps"
         )
     return np.linspace(lo, hi, int(round(n_steps)) + 1)
 
@@ -100,7 +100,6 @@ def range_mean_contrast(
     second: tuple[float, float],
     *,
     term_range: tuple[float, float],
-    step: float = GRID_STEP,
 ) -> np.ndarray:
     """The ``c`` of a curve's mean over ``first`` less its mean over ``second``.
 
@@ -119,8 +118,6 @@ def range_mean_contrast(
         The two ranges ``(lo, hi)``.
     term_range : tuple of float
         The range ``(lo, hi)`` the term's basis covers.
-    step : float
-        The grid step.
 
     Returns
     -------
@@ -138,8 +135,8 @@ def range_mean_contrast(
             raise ValueError(
                 f"the {name} range [{a}, {b}] lies outside the term's range [{lo}, {hi}]"
             )
-    return curve_rows(range_grid(*first, step)).mean(axis=0) - curve_rows(
-        range_grid(*second, step)
+    return curve_rows(range_grid(*first)).mean(axis=0) - curve_rows(
+        range_grid(*second)
     ).mean(axis=0)
 
 
