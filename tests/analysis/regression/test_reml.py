@@ -477,3 +477,38 @@ def test_one_penalty_matches_neurospatial_fixture() -> None:
     assert abs(result.rho[0] - fixture["select_log_penalty"]) < fixture["select_xatol"]
     log_rate = np.column_stack([X @ session.fit.beta for session in result.sessions])
     np.testing.assert_allclose(log_rate, fixture["log_rate"], rtol=0, atol=1e-6)
+
+
+def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
+    """An outcome scaled by 1, 1e3 and 1e6: the Newton fit takes one exact step
+    to the same curve up to the scale, and the selected log penalty (on the
+    residual-sum-of-squares scale, as mgcv's ``sp``) is the same, with every
+    grid point finite."""
+    rng = np.random.default_rng(1)
+    n_rows = 400
+    s = rng.uniform(0.0, 4.0, n_rows)
+    basis = PSplineBasis(0.0, 4.0, 15)
+    B = basis.design(s)
+    Z = sum_to_zero_constraint(B)
+    X = np.column_stack([np.ones(n_rows), B @ Z])
+    blocks = [PenaltyBlock(np.arange(1, 15), Z.T @ basis.penalty() @ Z)]
+    base = np.sin(2.0 * s) + rng.normal(scale=0.5, size=n_rows)
+    S = assemble_penalty(blocks, [2.0], X.shape[1])
+
+    unit = penalized_newton(Gaussian(), X, base, 1.0, S, np.zeros(X.shape[1]))
+    reference = select_penalties(Gaussian(), [SessionData(X, base)], blocks)
+    for scale in (1.0, 1e3, 1e6):
+        fit = penalized_newton(
+            Gaussian(), X, scale * base, 1.0, S, np.zeros(X.shape[1]), max_iter=1
+        )
+        assert fit.converged
+        np.testing.assert_allclose(fit.beta / scale, unit.beta, rtol=1e-10)
+
+        result = select_penalties(Gaussian(), [SessionData(X, scale * base)], blocks)
+        assert result.search.n_grid_not_finite == 0
+        np.testing.assert_allclose(result.rho, reference.rho, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(
+            result.sessions[0].fit.beta / scale,
+            reference.sessions[0].fit.beta,
+            rtol=1e-6,
+        )

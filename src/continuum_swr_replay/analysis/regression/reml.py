@@ -233,6 +233,8 @@ class PenaltySearch:
         The pooled score there.
     n_grid_points : int
         Grid points evaluated (0 for a given start).
+    n_grid_not_finite : int
+        Grid points whose pooled score was not finite (an inner fit failed).
     converged : bool
         True when the gradient rule was met (components at a bound whose
         gradient points out of the bounds are not counted).
@@ -246,6 +248,7 @@ class PenaltySearch:
     start_rho: np.ndarray
     start_score: float
     n_grid_points: int
+    n_grid_not_finite: int
     converged: bool
     n_outer_steps: int
     at_boundary: np.ndarray
@@ -429,34 +432,40 @@ def _gaussian_profiled(
 ) -> RemlScore:
     """The Gaussian score with the scale profiled out (Wood 2011, eq. 4).
 
-    ``b`` minimizes ``D_p = ||y - X b||^2 + b' S b`` (the Newton fit at unit
-    scale), ``phi = D_p / (n - M_p)`` and
+    ``b`` minimizes ``D_p = ||y - X b||^2 + b' S b``, ``phi = D_p / (n - M_p)``
+    and
 
         V = (n - M_p) (1 + log(2 pi phi)) / 2 - log|S|_+ / 2 + log|X'X + S| / 2.
+
+    The Newton fit that finds ``b`` runs at the working scale ``var(y)`` with
+    the penalty ``S / var(y)`` (the same minimizer), so that its decrement, and
+    the tolerance it is held to, do not depend on the outcome's units.
 
     ``D_p`` has derivatives ``b' S_j b`` and ``delta_jk b' S_j b + 2 b_k' S_j b``
     (``b_k = -(X'X + S)^-1 S_k b``), as in the Laplace case with ``H`` fixed.
     """
     n_rows, n_columns = X.shape
-    unit = penalized_newton(Gaussian(), X, y, 1.0, S, beta0)
-    if not unit.converged:
-        return RemlScore(np.inf, None, None, unit, np.nan)
-    b = unit.beta
+    working = float(np.var(y))
+    pls = penalized_newton(Gaussian(), X, y, working, S / working, beta0)
+    if not pls.converged:
+        return RemlScore(np.inf, None, None, pls, np.nan)
+    b = pls.beta
+    gram = X.T @ X + S
     residual = y - X @ b
     S_b = S @ b
     D_p = float(residual @ residual + b @ S_b)
     dof = n_rows - (n_columns - sum(block.rank for block in blocks))
     scale = D_p / dof
-    factor = scipy.linalg.cho_factor(unit.A, lower=True)  # X'X + S
+    factor = scipy.linalg.cho_factor(gram, lower=True)
     score = (
         0.5 * dof * (1.0 + _LOG_2PI + np.log(scale))
         - 0.5 * _log_pdet(blocks, rho)
         + float(np.log(np.diag(factor[0])).sum())
     )
     fit = replace(
-        unit,
-        A=unit.A / scale,
-        newton_decrement=unit.newton_decrement / scale,
+        pls,
+        A=gram / scale,
+        newton_decrement=pls.newton_decrement * working / scale,
         loglik=Gaussian().loglik(X @ b, y, scale),
     )
     if not derivatives:
@@ -571,19 +580,21 @@ def _grid(m: int) -> list[np.ndarray]:
     return [np.array(point) for point in itertools.product(REML_GRID_POINTS, repeat=m)]
 
 
-def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int]:
-    """The best grid point and the number of points evaluated.
+def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int, int]:
+    """The best grid point, the number of points evaluated and the number of
+    them whose score was not finite.
 
     Raises
     ------
     ValueError
         If no grid point gives a finite score.
     """
-    best_rho, best_score, n_points = np.full(m, np.nan), np.inf, 0
+    best_rho, best_score, n_points, n_not_finite = np.full(m, np.nan), np.inf, 0, 0
     if m <= 3:
         for rho in _grid(m):
             score = evaluate(rho, derivatives=False).score
             n_points += 1
+            n_not_finite += not np.isfinite(score)
             if score < best_score:
                 best_rho, best_score = rho, score
     else:
@@ -596,6 +607,7 @@ def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int]:
                     rho[j] = value
                     score = evaluate(rho, derivatives=False).score
                     n_points += 1
+                    n_not_finite += not np.isfinite(score)
                     if score < best_score:
                         best_rho, best_score = rho, score
                 if np.isfinite(best_score):
@@ -605,7 +617,7 @@ def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int]:
             f"no finite REML score on the grid over {LOG_PENALTY_BOUNDS}: no penalty "
             "gives a converged inner fit in every session"
         )
-    return best_rho, n_points
+    return best_rho, n_points, n_not_finite
 
 
 def _free(rho: np.ndarray, gradient: np.ndarray) -> np.ndarray:
@@ -649,7 +661,7 @@ def _try_step(
 
 
 def _search(
-    evaluate: _Evaluator, start: np.ndarray, n_grid_points: int
+    evaluate: _Evaluator, start: np.ndarray, n_grid_points: int, n_not_finite: int
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
@@ -686,6 +698,7 @@ def _search(
         np.array(start, dtype=float),
         start_score,
         n_grid_points,
+        n_not_finite,
         converged,
         n_steps,
         at_boundary,
@@ -741,7 +754,7 @@ def refine_penalties(
     """
     evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
-    rho, pooled, search = _search(evaluate, rho0, 0)
+    rho, pooled, search = _search(evaluate, rho0, 0, 0)
     return _pooled_fit(rho, pooled, blocks, search)
 
 
@@ -776,8 +789,8 @@ def select_penalties(
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")
     evaluate = _Evaluator(lik, sessions, blocks)
-    start, n_points = _grid_start(evaluate, len(blocks))
-    rho, pooled, search = _search(evaluate, start, n_points)
+    start, n_points, n_not_finite = _grid_start(evaluate, len(blocks))
+    rho, pooled, search = _search(evaluate, start, n_points, n_not_finite)
     return _pooled_fit(rho, pooled, blocks, search)
 
 

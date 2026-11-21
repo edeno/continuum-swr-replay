@@ -7,7 +7,9 @@ solves ``A step = g`` by Cholesky, with ``g`` the gradient of ``-F`` and
 decrement ``g' A^-1 g / 2`` -- the gain in ``-F`` the step predicts -- is below
 the tolerance. A step is shortened so no coefficient moves more than
 ``max_step``, then halved until ``F`` does not rise; a step whose ``F`` is not
-finite is rejected the same way. ``eta`` is never clipped.
+finite is rejected the same way. A quadratic likelihood (the Gaussian) takes
+its full step, uncapped: it is the exact optimum, whatever the scale of the
+outcome. ``eta`` is never clipped.
 
 Once the decrement is below the tolerance the fit still takes that last full
 step, and reports ``A`` and the decrement where it lands. Stopping before it
@@ -98,7 +100,8 @@ def penalized_newton(
     max_halvings : int
         Most halvings of one step.
     max_step : float
-        Longest step, as the largest change of any coefficient.
+        Longest step, as the largest change of any coefficient; not applied
+        to a quadratic likelihood, whose full step is the optimum.
 
     Returns
     -------
@@ -109,6 +112,7 @@ def penalized_newton(
         ``F``, or after ``max_iter`` steps.
     """
     beta = np.array(beta0, dtype=float)
+    cap = np.inf if lik.quadratic else max_step
 
     def objective(b: np.ndarray) -> tuple[float, float]:
         loglik = lik.loglik(X @ b, y, aux)
@@ -137,7 +141,7 @@ def penalized_newton(
             )
         if n_iter == max_iter:
             break
-        scale = min(1.0, max_step / np.max(np.abs(step)))
+        scale = min(1.0, cap / np.max(np.abs(step)))
         for _ in range(max_halvings):
             candidate = beta + scale * step
             F_new, loglik_new = objective(candidate)

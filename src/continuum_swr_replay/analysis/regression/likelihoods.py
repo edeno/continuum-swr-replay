@@ -31,6 +31,10 @@ group id of each row as ``aux``, sorted so that a group's rows are contiguous.
 Constants are left out where they do not depend on ``beta``: the Poisson
 ``-log y!`` and the multinomial coefficient. The Gaussian keeps its
 normalizing constant, which depends on the scale.
+
+A family's ``quadratic`` is True when its log-likelihood is quadratic in
+``eta`` (the Gaussian): one full Newton step from any start is then the exact
+optimum, and the fit takes it without a cap on its length.
 """
 
 from __future__ import annotations
@@ -54,6 +58,7 @@ class Likelihood(Protocol):
     """The interface the Newton fit and REML read."""
 
     name: str
+    quadratic: bool
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float: ...
 
@@ -121,6 +126,7 @@ class Poisson(_DiagonalFamily):
     """
 
     name = "poisson"
+    quadratic = False
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> float:
         log_mu = eta + aux
@@ -143,6 +149,7 @@ class Bernoulli(_DiagonalFamily):
     """
 
     name = "bernoulli"
+    quadratic = False
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float:
         return float(y @ eta - np.logaddexp(0.0, eta).sum())
@@ -165,6 +172,7 @@ class Gaussian(_DiagonalFamily):
     """
 
     name = "gaussian"
+    quadratic = True
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: float) -> float:
         residual = y - eta
@@ -221,6 +229,7 @@ class GroupedSoftmax:
     """
 
     name = "grouped_softmax"
+    quadratic = False
 
     @staticmethod
     def _parts(

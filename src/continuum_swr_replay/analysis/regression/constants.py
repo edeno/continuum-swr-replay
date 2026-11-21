@@ -10,8 +10,9 @@ from __future__ import annotations
 # is below NEWTON_DECREMENT_TOL; the value is the content fitter's
 # (``analysis/replay_models/fitting.py``). A step is first shortened so that no
 # coefficient moves more than MAX_STEP_LENGTH (from a start whose
-# probabilities saturate the information is tiny and the raw step enormous),
-# then halved at most MAX_STEP_HALVINGS times until the objective does not
+# probabilities saturate the information is tiny and the raw step enormous;
+# a quadratic likelihood, the Gaussian, is not capped: its full step is the
+# optimum), then halved at most MAX_STEP_HALVINGS times until the objective does not
 # rise: 2**-30 of a step is below the objective's floating-point resolution.
 NEWTON_DECREMENT_TOL = 1e-8
 NEWTON_MAX_STEPS = 100
