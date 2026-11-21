@@ -661,6 +661,23 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
   every stop that starts inside a visit where both exist (93,302 stops, no difference), and is missing for
   554. The visit starts at the first nose-poke in.
 
+### Eleventh round (lead, 2026-11-20): the remaining decisions
+
+- **The event set**: the events that start inside a well visit (`visit_context` of `in_visit` or
+  `spans_visit_end`; 69,011 + 189 events), for every model family and every figure. It replaces "the whole
+  event inside the visit" wherever this document says so. The selection function's default selects it.
+- **The dense time-bin table** is removed ("Remove"); the bins of the visit replace it.
+- **The ContFrag regressions** (content and rate models of SWR-sourced and MUA-sourced events) move onto
+  the new design ("Move them"), as two more event sources of the same runners, for a supplementary
+  comparison.
+- **The list of tests** is thirteen quantities, 39 tests ("Ok"). Section 4.5's "ten" was a miscount.
+- **Figure 2's panels that count SWRs or seconds** use only time inside a well visit ("Ok").
+- **The total reward effect: per stop or per visit?** The lead: "We need to be consistent in the repo."
+  Read as (**call**): the well visit is the unit everywhere, the total reward effect is per visit, no
+  per-stop variant is kept beside it, and stay or leave is one decision per visit. The same rule holds
+  for the event set, the selection function, the fitter and the clocks, in every family, summary and
+  figure.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
