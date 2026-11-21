@@ -207,11 +207,13 @@ def freeze_common_cohort(
 #: 14,845 of the 107,400 canonical stops are -- but they are at-well bouts:
 #: every one that has a last-well arrival begins after it (median 0.73 s), their
 #: median nearest-well distance is 0 cm at both ends, and 96.8% of their events
-#: are themselves event-grain ``at_well``. Their first settling samples read
-#: as in-transit. Excluding them from the stop cohort would drop 18,274 of the
+#: are themselves event-grain ``at_well``. Nearly all of them start inside a
+#: well visit and run past its final poke-out (``visit_context ==
+#: "spans_visit_end"``), so it is their last samples that read as in-transit.
+#: Excluding them from the stop cohort would drop 18,274 of the
 #: 59,699 content events' stops (30.6%) and make the two cohorts CROSS rather
 #: than nest, so the stop predicate is "well-anchored": ``at_well`` or
-#: ``mixed``. An event carries no such settling ambiguity -- an event window
+#: ``mixed``. An event carries no such ambiguity -- an event window
 #: that is not wholly at one well has no defined current arm -- so the event
 #: predicate stays the strict one.
 STOP_COHORT_RULES = {
@@ -337,8 +339,9 @@ def select_stop_cohort(
     cohort : {"at_well", "all_stops", "in_transit"}
         Population to keep.  ``at_well`` is canonical and, at the stop grain,
         means *well-anchored*: ``occupancy_state`` of ``at_well`` **or**
-        ``mixed``.  A ``mixed`` stop is an at-well bout whose first settling
-        samples read as in-transit (see :data:`STOP_COHORT_RULES`); excluding
+        ``mixed``.  A ``mixed`` stop is an at-well bout that runs past the
+        visit's final poke-out, so its last samples read as in-transit (see
+        :data:`STOP_COHORT_RULES`); excluding
         those stops would leave 30.6% of the content cohort's events with no
         stop in the rate cohort.
 

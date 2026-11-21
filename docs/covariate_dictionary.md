@@ -541,7 +541,8 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   (`track_patch_junction`) or the center (`track_center`); else
   `track_leaf_arm` / `track_trunk_arm` by the observed segment, or
   `track_no_position`. `well_visit_id` is the `experience_id` of an `in_visit`
-  window's visit (missing otherwise); `last_completed_well_visit_id` the latest
+  window's visit (numbered from 0 within the epoch, so it identifies a visit
+  only with the session columns; missing otherwise); `last_completed_well_visit_id` the latest
   visit whose final poke-out is at or before the window start. The two times
   (window start less that poke-out; next poke-in after the window end less the
   end) are defined only for windows wholly outside a visit and missing for

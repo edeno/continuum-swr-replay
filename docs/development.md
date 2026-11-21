@@ -297,6 +297,21 @@ The artifact rule drops events without renumbering the rest, so kept
 `event_id`s do not shift; the atomic set is still regenerated together,
 because dropped events leave every table.
 
+**One well-visit label, one selection.** A well visit runs from the animal's first
+nose-poke in at a reward well to its final poke-out there. Every event and every
+stop carries `visit_context` (`analysis/event_tables/visit_context.py`; the values
+and the two 10 cm radii are in `analysis/constants.py`): `in_visit` exactly when
+`occupancy_state == "at_well"`, and otherwise where the window lies (across a visit
+boundary, still next to the well just left, on the track, before the first visit).
+The event, event × arm, event × patch and stop tables carry it, with the visit's id
+and the times since the last poke-out and until the next poke-in. No row is dropped
+for its label: an analysis that reads only the events inside a well visit calls
+`analysis/event_definition/cohort_selection.py:select_visit_context` (default
+`in_visit`), and `count_visit_context` gives the rows kept and dropped per label.
+Do not re-implement the filter. At the stop grain the label is about the whole stop:
+most `mixed` stops start inside a visit and run past its final poke-out
+(`spans_visit_end`), so selecting stops by `in_visit` drops their in-visit seconds.
+
 ### Spatial Variables
 
 Position is tracked in multiple coordinate systems:
