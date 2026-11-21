@@ -1,7 +1,10 @@
 """One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-Two tests over the immobile non-local events of the canonical event table
-(``analysis.event_properties.class_or_continuum`` holds the method):
+Two tests over the immobile non-local events of the canonical event table that
+start inside a well visit (``cohort_selection.select_visit_context``; the
+``measure`` stage measures every event, the ``analyze`` stage reads the
+selected ones) (``analysis.event_properties.class_or_continuum`` holds the
+method):
 
 1. **One mode or two.** Per animal and pooled, the distribution of event ripple
    power (the event's peak and mean of the z-scored Kay consensus, and the Kay
@@ -65,6 +68,11 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: 
 )
 from continuum_swr_replay.analysis.event_definition import analyzed_time  # noqa: E402
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+    count_visit_context,
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import (  # noqa: E402
     swr_epoch_id_of_session,
 )
@@ -174,12 +182,14 @@ def run_measure(args: argparse.Namespace) -> None:
 
 
 def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
-    """The canonical events with their ripple power, spike counts and spike evidence.
+    """The canonical events that start inside a well visit, with their ripple
+    power, spike counts and spike evidence.
 
     The spike counts are read from the features tables of the epochs the event
     features run's manifest marks ``ok`` (``runs.io.ok_table_paths``)."""
     event_table = table_path("event_table", replay_content_dir())
-    events = read_swr_table(event_table)
+    table = read_swr_table(event_table)
+    events = select_visit_context(table)
     n_events = len(events)
     if not events.whole_event_speed_eligible.all():
         raise ValueError(
@@ -216,6 +226,9 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     if events[["features_z_max", "ripple_z_criterion"]].isna().any().any():
         raise ValueError("an event has no features-run or criterion row")
     checks = {
+        "visit_context_counts": {
+            label: int(n) for label, n in count_visit_context(table)["n"].items()
+        },
         "n_events": n_events,
         "peak_differs_from_features_run": int(
             (np.abs(events.ripple_z_max - events.features_z_max) > 1e-9).sum()
@@ -711,6 +724,7 @@ def run_analyze(args: argparse.Namespace) -> None:
     manifest = {
         "produced_by": produced_by(__file__),
         "commit": described_commit(),
+        "subset": ANALYZED_SUBSET,
         "inputs": record["inputs"],
         "checks": record["checks"],
         "settings": {

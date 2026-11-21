@@ -1,11 +1,14 @@
 """Measure each event's start distance and the theta-like share of duration-matched quiet rest.
 
-For every immobile non-local event of the canonical event table, from its
+For every immobile non-local event of the canonical event table that starts
+inside a well visit (``cohort_selection.select_visit_context``), from its
 epoch's decode frame (read through the SWR source; the decode's sha256 must be
 the one the event features run recorded) and environment: the start distance
 (track-graph distance from the animal to the event's first decoded position)
 and the share of ``--n-windows`` duration-matched windows of quiet rest whose
-theta is theta-like. The measures are
+theta is theta-like; quiet rest is the rest inside a well visit (the epoch's
+port experiences, read from the session cache:
+``event_tables.prepare_data.well_visit_times``). The measures are
 ``analysis/event_properties/start_and_rest_theta.py``'s; this script selects the
 epochs, reads the frames and writes the tables.
 
@@ -33,12 +36,19 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 )
 from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+    count_visit_context,
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id_of_session,
 )
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.event_properties.start_and_rest_theta import (
     start_and_rest_theta,
 )
+from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
@@ -67,9 +77,10 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame, int]) -> pd.DataFrame:
         paths.data_over_time, expected_sha256
     )
     env = pd.read_pickle(paths.environment)
+    in_visit = in_well_visit(dot.index.to_numpy(), *well_visit_times(identifier))
     rng = np.random.default_rng([SEED, zlib.crc32(identifier.encode())])
     try:
-        table = start_and_rest_theta(dot, env, events, n_windows, rng)
+        table = start_and_rest_theta(dot, env, events, in_visit, n_windows, rng)
     except ValueError as error:
         raise ValueError(f"{identifier}: {error}") from error
     table.insert(1, "epoch_id", identifier)
@@ -85,10 +96,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     manifest = read_manifest(event_features_root() / STATE_SPACE_FEATURES_RUN)
     event_table = table_path("event_table", replay_content_dir())
-    events = read_swr_table(
+    table = read_swr_table(
         event_table,
-        columns=["event_id", "animal", "session_date", "epoch", "non_local_event"],
+        columns=[
+            "event_id",
+            "animal",
+            "session_date",
+            "epoch",
+            "non_local_event",
+            "visit_context",
+        ],
     )
+    events = select_visit_context(table)
     events["epoch_id"] = [
         swr_epoch_id_of_session(animal, day, epoch)
         for animal, day, epoch in zip(
@@ -132,6 +151,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "path": str(event_table),
                     "sha256": sha256_file(event_table),
                 },
+                "subset": ANALYZED_SUBSET,
+                "visit_context_counts": {
+                    label: int(n)
+                    for label, n in count_visit_context(table)["n"].items()
+                },
                 "n_epochs": len(jobs),
                 "n_windows": args.n_windows,
                 "seed": SEED,
@@ -139,7 +163,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "from the animal's linear position to the MAP at the event's first "
                 "bin with a finite MAP, both on their nearest real place bins",
                 "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
-                "outside excluded time; windows of the event's number of bins, "
+                "inside a well visit (first poke-in to final poke-out), outside "
+                "excluded time; windows of the event's number of bins, "
                 "uniform over every such window of the epoch",
                 "theta_like": "window mean of theta_power_zscore at or above the "
                 "epoch's median running theta (above 10 cm/s)",

@@ -488,7 +488,7 @@ def test_nonlocal_event_memberships_keep_what_the_directional_table_counts(tmp_p
             "day": 1,
             "epoch": "02_r1",
             "detector": "state_space",
-            "event_key": ["n1", "n2", "n3", "n4"],
+            "event_key": [f"state_space:a1_02_r1:{k}" for k in (11, 12, 13, 14)],
             "other_detector": "kay",
             "membership": ["matched", "unmatched", "unknown", "matched"],
             # n4 lies outside the two detectors' shared exposure
@@ -503,11 +503,20 @@ def test_nonlocal_event_memberships_keep_what_the_directional_table_counts(tmp_p
             "n_matched": [1],
         }
     )
-    kept = comparison.nonlocal_event_memberships(run_dir, directional)
-    assert list(kept["event_key"]) == ["n1", "n2"]
+    kept = comparison.nonlocal_event_memberships(run_dir, directional, [11, 12, 14])
+    assert list(kept["event_key"]) == [
+        "state_space:a1_02_r1:11",
+        "state_space:a1_02_r1:12",
+    ]
     assert list(kept["matched"]) == [True, False]
+    # the counts are checked over every event; then the selected ones are kept
+    # (event 11 starts outside a well visit here)
+    kept = comparison.nonlocal_event_memberships(run_dir, directional, [12, 14])
+    assert list(kept["matched"]) == [False]
     with pytest.raises(ValueError, match="directional counts"):
-        comparison.nonlocal_event_memberships(run_dir, directional.assign(n_matched=2))
+        comparison.nonlocal_event_memberships(
+            run_dir, directional.assign(n_matched=2), [11, 12]
+        )
 
 
 def test_content_classes_and_their_animal_shares():
@@ -542,3 +551,69 @@ def test_content_classes_and_their_animal_shares():
     # a: epoch (d1) 1/2 with, 1/2 mostly Local; epoch (d2) all other -> means
     assert shares.loc["a"].tolist() == pytest.approx([0.25, 0.25, 0.5])
     assert shares.loc["b"].tolist() == pytest.approx([0.5, 0.0, 0.5])
+
+
+def _write_features(run_dir, starts: dict[str, float]) -> None:
+    """The ok epoch ``a``'s features table: each event's start (s)."""
+    pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "detector": ["kay" if key.startswith("k") else "mua" for key in starts],
+            "event_key": list(starts),
+            "event_start_s": list(starts.values()),
+        }
+    ).to_parquet(run_dir / "a_features.parquet")
+
+
+def test_visit_starts_flag_the_events_whose_first_sample_is_inside_a_visit(tmp_path):
+    _write_memberships(tmp_path / "run")
+    # one visit, 10 s to 20 s: k1 starts at its first poke-in (inside), k2 at
+    # its final poke-out (outside), m1 between two visits
+    _write_features(tmp_path / "run", {"k1": 10.0, "k2": 20.0, "k3": 15.0, "m1": 25.0})
+    visits = {"a": (np.array([10.0, 30.0]), np.array([20.0, 40.0]))}
+    flags = comparison.visit_starts(tmp_path / "run", visits).set_index("event_key")
+    assert flags["starts_in_well_visit"].to_dict() == {
+        "k1": True,
+        "k2": False,
+        "k3": True,
+        "m1": False,
+    }
+    with pytest.raises(ValueError, match="no well visits"):
+        comparison.visit_starts(tmp_path / "run", {})
+
+
+def test_read_comparison_checks_every_event_then_keeps_those_starting_in_a_visit(
+    processed_data_root,
+):
+    run_dir = processed_data_root / "run"
+    _write_memberships(run_dir)
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    manifest["settings"] = {"input_runs": {"inventory": "inv"}}
+    (run_dir / "manifest.json").write_text(json.dumps(manifest))
+    _write_features(run_dir, {"k1": 10.0, "k2": 25.0, "k3": 15.0, "m1": 12.0})
+    report = comparison.inventory_comparison_root() / "inv" / "report"
+    report.mkdir(parents=True)
+    # the directional counts of every known event: k1 and k2 (one matched), m1
+    pd.DataFrame(
+        {
+            "source_detector": ["kay", "mua"],
+            "target_detector": ["state_space", "state_space"],
+            "n_eligible": [2, 1],
+            "n_matched": [1, 1],
+        }
+    ).to_csv(report / "directional_by_animal.csv", index=False)
+    visits = {"a": (np.array([10.0]), np.array([20.0]))}
+
+    read = comparison.read_comparison(run_dir, visits)
+
+    # k2 starts after the visit's final poke-out: counted in the check, not kept
+    assert list(read.others["event_key"]) == ["k1", "m1"]
+    assert read.visit_counts.to_dict("index") == {
+        "kay": {"n_in_visit": 1, "n_outside_visit": 1},
+        "mua": {"n_in_visit": 1, "n_outside_visit": 0},
+    }
+    statistics = comparison.other_detector_statistics(read.others)
+    assert statistics.loc["kay", "n_events"] == 1
+    assert statistics.loc["kay", "no_nonlocal_fraction"] == 0.0

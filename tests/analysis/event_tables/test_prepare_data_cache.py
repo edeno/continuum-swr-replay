@@ -415,3 +415,12 @@ def test_cache_only_population_fails_if_any_session_is_unavailable(monkeypatch):
 
     with pytest.raises(RuntimeError, match="1 of 2 session"):
         prepare_cli.populate_behavioral_context_cache(sessions, from_cache=True)
+
+
+def test_well_visit_times_reads_the_visits_from_the_cache(patched, fake_session):
+    calls, _ = patched
+    pdm.load_behavioral_context(fake_session, from_cache=False)
+    arrivals, departures = pdm.well_visit_times(fake_session["session_id"])
+    assert calls["n"] == 1  # served from the cache
+    assert arrivals.tolist() == [0.0]
+    assert departures.tolist() == [2.0]

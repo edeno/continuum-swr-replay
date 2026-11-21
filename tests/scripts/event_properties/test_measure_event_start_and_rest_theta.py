@@ -46,15 +46,23 @@ def stored(processed_data_root, monkeypatch) -> str:
         )
     )
     monkeypatch.setattr(script.analyzed_time, "with_swr_source", lambda dot: dot)
+    # one well visit holding the whole frame (it spans 0 to 0.038 s)
+    monkeypatch.setattr(
+        script,
+        "well_visit_times",
+        lambda identifier: (np.array([-1.0]), np.array([1.0])),
+    )
     monkeypatch.setattr(
         start_and_rest_theta,
         "regime_masks",
-        lambda dot: {"rest": dot["non_local_event"].to_numpy() == 0},
+        lambda dot, in_visit: {
+            "rest": (dot["non_local_event"].to_numpy() == 0) & in_visit
+        },
     )
     monkeypatch.setattr(
         start_and_rest_theta,
         "brain_state_reference",
-        lambda dot: {"theta_running_median": 0.5, "theta_rest_median": 0.0},
+        lambda dot, in_visit: {"theta_running_median": 0.5, "theta_rest_median": 0.0},
     )
     monkeypatch.setattr(
         start_and_rest_theta,
@@ -90,3 +98,16 @@ def test_a_refusal_of_the_measures_names_the_epoch(stored):
     events = pd.DataFrame({"event_id": ["e9"], "non_local_event": [9]})
     with pytest.raises(ValueError, match=f"{IDENTIFIER}: an event's label has no bin"):
         script.measure_epoch((IDENTIFIER, stored, events, 4))
+
+
+def test_the_rest_windows_are_drawn_inside_the_epochs_well_visits(stored, monkeypatch):
+    """With the visits ending before the frame, no bin is rest: every event's
+    rest windows are empty."""
+    monkeypatch.setattr(
+        script,
+        "well_visit_times",
+        lambda identifier: (np.array([-1.0]), np.array([-0.5])),
+    )
+    table = script.measure_epoch((IDENTIFIER, stored, EVENTS, 4))
+    assert table.rest_windows.eq(0).all()
+    assert table.rest_theta_like_share.isna().all()

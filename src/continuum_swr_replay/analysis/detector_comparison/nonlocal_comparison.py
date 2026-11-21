@@ -10,6 +10,15 @@ The non-local detector's inventory is ``state_space``. An event's membership
 against another inventory is known (``matched`` or ``unmatched``) only when the
 event lies wholly inside the pair's shared exposure.
 
+The comparison is over the events that start inside a well visit (from the
+first poke-in at a well to the final poke-out): a non-local event when the event
+table's selection keeps it (``cohort_selection.select_visit_context``, passed as
+its ``event_id``), another detector's event (an SWR, a MUA event, a Widloski
+event) when its first sample is inside a visit (:func:`visit_starts`, from each
+epoch's visits; ``event_definition.well_visits.in_well_visit``). The runs'
+counts are checked against the inventory run's directional table over every
+event first, and the selection is made after.
+
 A row of an event is in a state when that state's probability is above 0.8, so
 an event's state shares are the shares of its rows in each state, and in none
 (:data:`~continuum_swr_replay.analysis.detector_comparison.features.STATE_SHARE_COLUMNS`).
@@ -17,6 +26,7 @@ an event's state shares are the shares of its rows in each state, and in none
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,11 +50,13 @@ from continuum_swr_replay.analysis.detector_comparison.pooling import (
 from continuum_swr_replay.analysis.detector_comparison.schema import (
     MEMORYLESS,
     STATE_SPACE,
+    native_event_keys,
     typed_table,
 )
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.paths import inventory_comparison_root
-from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
+from continuum_swr_replay.runs.io import ok_epochs, ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
 
 COVERINGS = {
@@ -84,14 +96,61 @@ def _read_epochs(run_dir: Path, name: str, **kwargs) -> pd.DataFrame:
     )
 
 
+_EVENT_KEYS = ["animal", "day", "epoch", "detector", "event_key"]
+
+#: An epoch's well visits: each one's first poke-in and final poke-out (s).
+Visits = tuple[np.ndarray, np.ndarray]
+
+
+def visit_starts(run_dir: Path, visits: Mapping[str, Visits]) -> pd.DataFrame:
+    """Whether each compared event of the run starts inside a well visit.
+
+    Parameters
+    ----------
+    run_dir : Path
+        The event features run; its ``*_features.parquet`` of the epochs its
+        manifest marks ``ok`` give each event's ``event_start_s``.
+    visits : Mapping
+        Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per compared event: the event keys and
+        ``starts_in_well_visit`` (its first sample is inside a visit).
+
+    Raises
+    ------
+    ValueError
+        If an ok epoch has no visits in ``visits``.
+    """
+    identifiers = ok_epochs(read_manifest(run_dir))
+    missing = sorted(set(identifiers) - set(visits))
+    if missing:
+        raise ValueError(
+            f"no well visits for {len(missing)} epochs, e.g. {missing[:3]}"
+        )
+    tables = []
+    for identifier, path in zip(
+        identifiers, _epoch_paths(run_dir, "features"), strict=True
+    ):
+        table = pd.read_parquet(path, columns=[*_EVENT_KEYS, "event_start_s"])
+        starts = in_well_visit(
+            table["event_start_s"].to_numpy(dtype=np.float64), *visits[identifier]
+        )
+        tables.append(table[_EVENT_KEYS].assign(starts_in_well_visit=starts))
+    return pd.concat(tables, ignore_index=True)
+
+
 def other_detector_events(run_dir: Path) -> pd.DataFrame:
     """Each other detector's compared events: whether it overlaps a non-local
     event (``matched``), and its four state shares.
 
     Only events with a known membership are kept, as the comparison's
-    ``directional`` table counts them.
+    ``directional`` table counts them. Every such event, in a visit or not
+    (:func:`read_comparison` selects).
     """
-    keys = ["animal", "day", "epoch", "detector", "event_key"]
+    keys = _EVENT_KEYS
     shares = _read_epochs(run_dir, "state_shares")
     membership = _read_epochs(
         run_dir, "pair_membership", filters=[("other_detector", "==", STATE_SPACE)]
@@ -104,18 +163,30 @@ def other_detector_events(run_dir: Path) -> pd.DataFrame:
 
 
 def nonlocal_event_memberships(
-    run_dir: Path, directional: pd.DataFrame
+    run_dir: Path, directional: pd.DataFrame, event_ids: Iterable[object]
 ) -> pd.DataFrame:
-    """Each non-local event's membership against each other detector: whether
-    that detector's events overlap it (``matched``).
+    """Each selected non-local event's membership against each other detector:
+    whether that detector's events overlap it (``matched``).
 
-    Only the memberships the comparison's ``directional`` table counts are kept:
-    known ones (matched or unmatched) within the two detectors' shared exposure.
+    The memberships the comparison's ``directional`` table counts (known ones,
+    matched or unmatched, within the two detectors' shared exposure) are
+    checked against it, and then those of the non-local events in
+    ``event_ids`` are kept.
+
+    Parameters
+    ----------
+    run_dir : Path
+        The event features run.
+    directional : pd.DataFrame
+        The inventory run's directional table.
+    event_ids : iterable
+        The event table's ``event_id`` of the selected non-local events (a
+        non-local event's native key in the run is its ``event_id``).
 
     Raises
     ------
     ValueError
-        Unless the kept memberships give the directional table's counts.
+        Unless the memberships give the directional table's counts.
     """
     memberships = _read_epochs(
         run_dir, "pair_membership", filters=[("detector", "==", STATE_SPACE)]
@@ -133,7 +204,10 @@ def nonlocal_event_memberships(
         .groupby("target_detector")[["n_eligible", "n_matched"]]
         .sum(),
     )
-    return kept
+    selected = native_event_keys(kept["event_key"]).isin(
+        {str(event_id) for event_id in event_ids}
+    )
+    return kept.loc[selected.to_numpy()].reset_index(drop=True)
 
 
 def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -> None:
@@ -163,7 +237,12 @@ class Comparison:
     Attributes
     ----------
     others : pd.DataFrame
-        Each other detector's compared events (:func:`other_detector_events`).
+        Each other detector's compared events (:func:`other_detector_events`)
+        that start inside a well visit.
+    visit_counts : pd.DataFrame
+        Indexed by detector: ``n_in_visit``, its compared events that start
+        inside a well visit (the rows of ``others``), and ``n_outside_visit``,
+        those left out.
     inventory_dir : Path
         The inventory comparison run the features run read.
     directional_path : Path
@@ -173,30 +252,45 @@ class Comparison:
     """
 
     others: pd.DataFrame
+    visit_counts: pd.DataFrame
     inventory_dir: Path
     directional_path: Path
     directional: pd.DataFrame
 
 
 def comparison_files(run_dir: Path) -> list[Path]:
-    """Every file :func:`read_comparison` and :func:`nonlocal_event_memberships`
-    read: the run's manifest and per-epoch tables, and the inventory run's
-    directional table."""
+    """Every file of the run :func:`read_comparison` and
+    :func:`nonlocal_event_memberships` read: the run's manifest and per-epoch
+    tables, and the inventory run's directional table (the well visits are the
+    caller's)."""
     inventory_dir = (
         inventory_comparison_root()
         / read_manifest(run_dir)["settings"]["input_runs"]["inventory"]
     )
     return [
         run_dir / "manifest.json",
+        *_epoch_paths(run_dir, "features"),
         *_epoch_paths(run_dir, "state_shares"),
         *_epoch_paths(run_dir, "pair_membership"),
         inventory_dir / "report" / "directional_by_animal.csv",
     ]
 
 
-def read_comparison(run_dir: Path) -> Comparison:
-    """The features run's compared events and its inventory run's directional
-    table, checked against each other."""
+def read_comparison(run_dir: Path, visits: Mapping[str, Visits]) -> Comparison:
+    """The features run's compared events that start inside a well visit, and
+    its inventory run's directional table.
+
+    Every compared event is checked against the directional table first; then
+    the events whose first sample is inside a visit are kept
+    (:func:`visit_starts`).
+
+    Parameters
+    ----------
+    run_dir : Path
+        The event features run.
+    visits : Mapping
+        Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
+    """
     others = other_detector_events(run_dir)
     inventory_dir = (
         inventory_comparison_root()
@@ -205,7 +299,25 @@ def read_comparison(run_dir: Path) -> Comparison:
     directional_path = inventory_dir / "report" / "directional_by_animal.csv"
     directional = pd.read_csv(directional_path)
     check_against_directional(others, directional)
-    return Comparison(others, inventory_dir, directional_path, directional)
+    others = others.merge(
+        visit_starts(run_dir, visits), on=_EVENT_KEYS, how="left", validate="1:1"
+    )
+    if others["starts_in_well_visit"].isna().any():
+        raise ValueError("a compared event has no row in the run's features tables")
+    inside = others["starts_in_well_visit"].astype(bool)
+    visit_counts = pd.DataFrame(
+        {
+            "n_in_visit": inside.groupby(others["detector"]).sum(),
+            "n_outside_visit": (~inside).groupby(others["detector"]).sum(),
+        }
+    ).astype(int)
+    return Comparison(
+        others.loc[inside.to_numpy()].reset_index(drop=True),
+        visit_counts,
+        inventory_dir,
+        directional_path,
+        directional,
+    )
 
 
 def _matched_shares(

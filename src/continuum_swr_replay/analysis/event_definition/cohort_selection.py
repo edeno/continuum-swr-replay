@@ -553,6 +553,15 @@ def events_in_stops(event_starts: np.ndarray, stops: pd.DataFrame) -> np.ndarray
 
 _VISIT_CONTEXT_COLUMN = "visit_context"
 
+ANALYZED_SUBSET = (
+    "the events that start inside a well visit (visit_context in_visit or "
+    "spans_visit_end); seconds, time bins and SWRs inside a well visit (from the "
+    "first poke-in at a well to the final poke-out; an SWR counts when its first "
+    "sample is inside)"
+)
+"""What an output made over the analyses' one subset records as its ``subset``
+(in its manifest), so a reader can refuse or mark pending one made otherwise."""
+
 
 def _visit_contexts(contexts: str | Sequence[str]) -> tuple[str, ...]:
     """The requested labels as a tuple, refusing one the vocabulary lacks."""

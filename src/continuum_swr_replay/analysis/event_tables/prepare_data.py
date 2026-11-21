@@ -12,7 +12,8 @@ loops, the shard assembly and the publishing) call these.
 
 Also the home of the behavioral-context cache (:func:`load_behavioral_context`,
 :func:`session_cache_dir`), the per-session pickle of the Spyglass trials,
-port experiences and track graph that the replay and ContFrag builds share.
+port experiences and track graph that the replay and ContFrag builds share,
+and of :func:`well_visit_times`, an epoch's well visits read from it.
 """
 
 from __future__ import annotations
@@ -25,6 +26,9 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import assert_qvals_aligned
+from continuum_swr_replay.analysis.behavior.covariates.history._common import (
+    _prepare_port_experiences,
+)
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
@@ -57,6 +61,7 @@ from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.data_types import SessionDataKeys
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.paths import replay_content_dir
 from continuum_swr_replay.tables.io import write_atomically
 from continuum_swr_replay.tables.session_keys import present_session_columns
@@ -261,6 +266,47 @@ def load_behavioral_context(
 
         write_atomically(cache_path, write_cache)
     return trials, port_experiences, track_graph, False
+
+
+def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
+    """An epoch's well visits: each one's first poke-in and final poke-out.
+
+    A well visit is one port experience, from ``arrival_time`` (the first
+    nose-poke in at a well) to ``departure_time`` (the final poke-out there),
+    read from the behavioral-context cache (:func:`load_behavioral_context`
+    with ``from_cache=True``) and checked as the table builders check them.
+    ``event_definition.well_visits.in_well_visit`` takes the two arrays.
+
+    Parameters
+    ----------
+    epoch_id : str
+        The epoch identifier, such as ``"chimi20200212_02_r1_HPC"``: the
+        cache's key.
+
+    Returns
+    -------
+    arrival_times, departure_times : np.ndarray, each shape (n_visits,)
+        Seconds, in visit order (``arrival_times`` ascending).
+
+    Raises
+    ------
+    ValueError
+        If the epoch has no port experiences.
+    """
+    key = parse_epoch_identifier(epoch_id)
+    session = {
+        "nwb_file_name": key.nwb_file_name,
+        "epoch_name": key.epoch_name,
+        "session_id": epoch_id,
+    }
+    _, experiences, _, _ = load_behavioral_context(session, from_cache=True)
+    if experiences is None:
+        raise ValueError(f"{epoch_id} has no port experiences")
+    experiences = _prepare_port_experiences(experiences)
+    return (
+        experiences["arrival_time"].to_numpy(dtype=float),
+        experiences["departure_time"].to_numpy(dtype=float),
+    )
 
 
 def build_session_tables(
