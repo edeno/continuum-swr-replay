@@ -1948,3 +1948,24 @@ def test_figure02_checks_every_event_s_label_against_the_visits(
     )
     with pytest.raises(ValueError, match="1 of 9 events' visit_context disagrees"):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+
+
+def test_figure02_cache_is_keyed_on_the_event_table_it_reads(offline, tmp_path):
+    """The figure reads the event table of its data folder; a change to that
+    table, not to the default root's, gives another cache path."""
+    from continuum_swr_replay.paths import (
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    write_table(_figure02_events(), table)
+    before = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    write_table(_figure02_events().iloc[:3], table)
+    after = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
+    assert before != after

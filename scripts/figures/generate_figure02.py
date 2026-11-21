@@ -384,18 +384,25 @@ def _stat_fingerprint(files: Sequence[Path]) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
-def _comparison_fingerprint() -> str:
+def _event_table_path(data_dir: Path) -> Path:
+    """The canonical event table the figure reads, in ``data_dir``."""
+    return table_path(
+        "event_table", data_dir / replay_content_dir().relative_to(processed_data_dir())
+    )
+
+
+def _comparison_fingerprint(data_dir: Path) -> str:
     """A stat fingerprint of the detector comparison's files, of the canonical
-    event table (the selected events) and of the session cache's entries (the
-    well visits); a run without a manifest is fingerprinted as missing
-    (``detector_comparison`` then raises)."""
+    event table read from ``data_dir`` (the selected events) and of the session
+    cache's entries (the well visits); a run without a manifest is
+    fingerprinted as missing (``detector_comparison`` then raises)."""
     run = event_features_root() / EVENT_FEATURES_RUN
     if not (run / "manifest.json").exists():
-        return _stat_fingerprint([run / "manifest.json"])
+        return _stat_fingerprint([run / "manifest.json", _event_table_path(data_dir)])
     return _stat_fingerprint(
         [
             *nonlocal_comparison.comparison_files(run),
-            table_path("event_table", replay_content_dir()),
+            _event_table_path(data_dir),
             *(
                 behavioral_context_cache_path({"session_id": identifier})
                 for identifier in ok_epochs(read_manifest(run))
@@ -424,7 +431,7 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     """
     cohort = hashlib.sha256("\n".join(analyzed_epoch_ids()).encode()).hexdigest()
     decodes = _decode_files_fingerprint(nwb_file_name, epoch_name, data_dir)
-    comparison = _comparison_fingerprint()
+    comparison = _comparison_fingerprint(data_dir)
     return (
         data_dir
         / "intermediates"
@@ -1372,12 +1379,7 @@ def generate_figure(
     """
     if data_dir is None:
         data_dir = processed_data_dir()
-    table = read_swr_table(
-        table_path(
-            "event_table",
-            data_dir / replay_content_dir().relative_to(processed_data_dir()),
-        )
-    )
+    table = read_swr_table(_event_table_path(data_dir))
     # the one selection: the events that start inside a well visit
     events = select_visit_context(table)
     cache_path = _figure02_cache_path(nwb_file_name, epoch_name, data_dir)
