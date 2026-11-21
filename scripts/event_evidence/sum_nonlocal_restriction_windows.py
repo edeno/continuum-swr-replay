@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""The non-local restriction scores summed over the windows of Figure 2's panel h.
+"""The non-local restriction scores summed over the windows of Figure 2's panel g.
 
 For each epoch of the restriction run (``score_nonlocal_restriction.py``, its
 ``ok`` records): read its per-bin table, check that its time is the decode
@@ -19,11 +19,15 @@ Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
   ``epoch_id``, ``animal``, ``window_id``, ``event_id``, ``kind``, ``group``,
   ``s``, ``e``, ``n_bins``, ``n_bins_in_swr``, ``n_bins_immobile``,
   ``n_bins_excluded``, ``n_bins_not_finite``, ``duration_s``, the six summed
-  scores (float64 nats) and ``n_spikes``;
+  scores (float64 nats), the same over the window's ``immobile_outside_swr``
+  bins only (``n_bins_outside_swr``, ``duration_outside_swr_s`` and the six
+  ``<score>_outside_swr``; ``restriction_windows.OUTSIDE_SWR_COLUMNS``) and
+  ``n_spikes``;
 - ``{epoch_id}_nonlocal_restriction_windows.json``: the epoch's record (the
   windows by kind and group, the windows with a bin in excluded time, outside
-  the immobile categories, with a score that is not finite, without spikes, and
-  the "no SWR" events with a bin inside an SWR the ``swr`` model used; the time
+  the immobile categories, with a score that is not finite, without spikes, the
+  "no SWR" events with a bin inside an SWR the ``swr`` model used, and the
+  events with no bin outside SWRs; the time
   step; the digests of the per-bin table, the held-out tetrode table and the
   participation table; provenance);
 
@@ -170,6 +174,9 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
             ),
             "n_in_swr_bins_of_no_swr_events": int(
                 table.loc[no_swr_events, "n_bins_in_swr"].sum()
+            ),
+            "n_events_without_bins_outside_swr": int(
+                ((table["kind"] == "event") & (table["n_bins_outside_swr"] == 0)).sum()
             ),
             "bin_s": sample_step(time),
             "epoch_inputs": {

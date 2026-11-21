@@ -109,6 +109,13 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     assert record["n_no_swr_events_with_in_swr_bins"] == 0
     assert record["bin_s"] == pytest.approx(0.002)
     json.dumps(record, allow_nan=False)
+    # outside SWRs: y's bin 9 is inside its SWR, the rest are outside
+    assert table["n_bins_outside_swr"].tolist() == [3, 1, 2]
+    np.testing.assert_allclose(
+        table["full_outside_swr"] - table["swr_outside_swr"], [6, 2, 4]
+    )
+    np.testing.assert_allclose(table["duration_outside_swr_s"], [0.006, 0.002, 0.004])
+    assert record["n_events_without_bins_outside_swr"] == 0
 
 
 def test_a_time_grid_that_is_not_the_decodes_raises(data_dir, tmp_path, monkeypatch):

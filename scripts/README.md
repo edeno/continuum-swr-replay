@@ -55,7 +55,7 @@ them importable.
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
 - `score_nonlocal_restriction.py` — per-bin held-out scores of three decoders that allow the non-local states never, only inside SWRs, or always, on every analyzed epoch.
-- `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control (the windows of Figure 2h), with each window's spike count (CPU).
+- `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control (Figure 2g reads the events), with each window's spike count and its sums over the bins outside SWRs (CPU).
 
 ## `event_properties/` — what the events are like (Part 2)
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.

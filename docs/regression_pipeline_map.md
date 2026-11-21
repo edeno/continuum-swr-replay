@@ -174,15 +174,15 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py`
 
-The non-local restriction contrast over all immobile time outside SWRs.
+The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`epoch_outside_swr_gains`, `outside_swr_gain_statistics`
+`epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_gain_statistics`, `immobile_gain_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
-The non-local restriction models over the windows of Figure 2's panel h.
+The non-local restriction models over the windows of Figure 2's panel g.
 
-`restriction_window_sums`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+`restriction_window_sums`, `window_spike_counts`, `contrast_column`, `require_outside_swr_sums`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -918,7 +918,7 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 ### `scripts/event_evidence/sum_nonlocal_restriction_windows.py`
 
-The non-local restriction scores summed over the windows of Figure 2's panel h.
+The non-local restriction scores summed over the windows of Figure 2's panel g.
 
 `decode_time`, `run_epoch`, `run_input`, `check_holdout_inputs`, `event_table_note`, `main`
 

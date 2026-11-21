@@ -1,4 +1,4 @@
-"""The non-local restriction models over the windows of Figure 2's panel h.
+"""The non-local restriction models over the windows of Figure 2's panel g.
 
 The per-bin scores of the three models (``none``, ``swr``, ``full``;
 :mod:`.nonlocal_restriction`) summed over each canonical non-local event and
@@ -21,6 +21,13 @@ score less its sum of ``b``'s, in nats, for each score family
   spikes, as ``tetrode_holdout.window_scores`` does;
 - per second: divided by the window's duration, its bins times the decode's
   time step (``intervals.sample_step`` of the per-bin table's time).
+
+A contrast is also read over a part of the window (:data:`PART_UNITS`): its bins
+in the category ``immobile_outside_swr`` only, per second of them (the window
+table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
+its bins outside the SWR, where ``swr`` may not use the non-local states; in an
+event without an SWR, all its bins but the few inside an SWR the ``swr`` model
+used. Figure 2g's second axis reads ``full - swr`` there.
 
 ``full - swr`` in events without an SWR is what the non-local states buy outside
 SWRs, where ``swr`` may not use them; in the Local-rest controls it is the same
@@ -82,6 +89,23 @@ CONTRASTS = {
 UNITS = {"per_spike": "n_spikes", "per_s": "duration_s"}
 """Each unit of a contrast and the window's column it is divided by."""
 
+OUTSIDE_SWR_SUFFIX = "_outside_swr"
+"""The suffix of a window's columns over its bins in the category
+``immobile_outside_swr`` only (:func:`restriction_window_sums`)."""
+
+OUTSIDE_SWR_COLUMNS = (
+    "n_bins_outside_swr",
+    "duration_outside_swr_s",
+    *(f"{column}{OUTSIDE_SWR_SUFFIX}" for column in SCORE_COLUMNS),
+)
+"""The window table's columns over the bins outside SWRs, which a window run
+made before they were added does not have."""
+
+PART_UNITS = {"whole": tuple(UNITS), "outside_swr": ("per_s",)}
+"""Each part of a window a contrast is read over and its units: the whole
+window, or only its bins in the category ``immobile_outside_swr``, per second
+of them (no per-spike unit: the spike counts are the whole window's)."""
+
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
 
@@ -117,7 +141,12 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
         (bins in excluded time), ``n_bins_not_finite`` (bins with any score
         that is not finite), ``duration_s`` (``n_bins`` times the time grid's
         step) and the float64 sum of each score column (NaN where a bin of the
-        window has that score not finite).
+        window has that score not finite); then the same over the window's
+        bins in the category ``immobile_outside_swr`` only
+        (:data:`OUTSIDE_SWR_COLUMNS`): ``n_bins_outside_swr``,
+        ``duration_outside_swr_s`` and each score's float64 sum over them,
+        ``<score>_outside_swr`` (0 without such bins, NaN where one of them has
+        that score not finite).
 
     Raises
     ------
@@ -132,32 +161,61 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
     finite = np.isfinite(scores)
     category = bins["category"].astype(str).to_numpy()[rows]
+    outside = (category == IMMOBILE_OUTSIDE_SWR)[:, np.newaxis]
+    count_names = [
+        "n_bins_in_swr",
+        "n_bins_immobile",
+        "n_bins_excluded",
+        "n_bins_not_finite",
+        "n_bins_outside_swr",
+    ]
     counts = np.column_stack(
         [
             bins["in_swr"].to_numpy(dtype=bool)[rows],
             np.isin(category, [IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR]),
             category == "excluded",
             ~finite.all(axis=1),
-            ~finite,
+            outside[:, 0],
         ]
     ).astype(np.float64)
+    # every bin, then the bins outside SWRs only: each block is the bins with
+    # a score not finite, then the scores summed over the finite ones
+    blocks = [
+        (~finite, np.where(finite, scores, 0.0)),
+        (~finite & outside, np.where(finite & outside, scores, 0.0)),
+    ]
     summed = window_sums(
-        np.column_stack([counts, np.where(finite, scores, 0.0)]), rows, s, e
+        np.column_stack([counts, *(part for block in blocks for part in block)]),
+        rows,
+        s,
+        e,
     )
-    n_counts = 4
-    n_not_finite = summed[:, n_counts : n_counts + len(SCORE_COLUMNS)]
-    sums = summed[:, n_counts + len(SCORE_COLUMNS) :]
-    sums[n_not_finite > 0] = np.nan
     n_bins = e - s + 1
+    step = sample_step(bins["time"].to_numpy(dtype=float))
+    counted = {
+        name: np.rint(summed[:, j]).astype(np.int64)
+        for j, name in enumerate(count_names)
+    }
+    n_scores = len(SCORE_COLUMNS)
+    block_sums = []
+    for b in range(len(blocks)):
+        start = len(count_names) + 2 * b * n_scores
+        sums = summed[:, start + n_scores : start + 2 * n_scores]
+        sums[summed[:, start : start + n_scores] > 0] = np.nan
+        block_sums.append(sums)
+    # the columns of the whole window first, as they were before the bins
+    # outside SWRs were summed, then those
     out = windows[[*WINDOW_KEYS, "s", "e"]].reset_index(drop=True)
     out["n_bins"] = n_bins
-    for j, name in enumerate(
-        ["n_bins_in_swr", "n_bins_immobile", "n_bins_excluded", "n_bins_not_finite"]
-    ):
-        out[name] = np.rint(summed[:, j]).astype(np.int64)
-    out["duration_s"] = n_bins * sample_step(bins["time"].to_numpy(dtype=float))
+    for name in count_names[:-1]:
+        out[name] = counted[name]
+    out["duration_s"] = n_bins * step
     for j, column in enumerate(SCORE_COLUMNS):
-        out[column] = sums[:, j]
+        out[column] = block_sums[0][:, j]
+    out["n_bins_outside_swr"] = counted["n_bins_outside_swr"]
+    out["duration_outside_swr_s"] = counted["n_bins_outside_swr"] * step
+    for j, column in enumerate(SCORE_COLUMNS):
+        out[f"{column}{OUTSIDE_SWR_SUFFIX}"] = block_sums[1][:, j]
     return out
 
 
@@ -215,44 +273,93 @@ def window_spike_counts(holdout: pd.DataFrame, windows: pd.DataFrame) -> pd.Seri
     return spikes.reindex(windows["window_id"].to_numpy())
 
 
-def contrast_column(contrast: str, family: str, unit: str) -> str:
-    """The name of a window's contrast column, e.g. ``full_minus_swr_per_spike``
-    or ``full_minus_swr_two_sided_per_s``."""
-    return f"{contrast}{FAMILY_SUFFIX[family]}_{unit}"
+def contrast_column(contrast: str, family: str, unit: str, part: str = "whole") -> str:
+    """The name of a window's contrast column, e.g. ``full_minus_swr_per_spike``,
+    ``full_minus_swr_two_sided_per_s`` or, over the bins outside SWRs,
+    ``full_minus_swr_outside_swr_per_s``."""
+    where = OUTSIDE_SWR_SUFFIX if part == "outside_swr" else ""
+    return f"{contrast}{FAMILY_SUFFIX[family]}{where}_{unit}"
 
 
-def window_contrasts(windows: pd.DataFrame) -> pd.DataFrame:
-    """Each window's contrasts, per spike and per second, in both families.
+def require_outside_swr_sums(windows: pd.DataFrame) -> None:
+    """Refuse a window table without the sums over the bins outside SWRs.
+
+    Raises
+    ------
+    ValueError
+        If ``windows`` lacks a column of :data:`OUTSIDE_SWR_COLUMNS`: the table
+        was made by a window run older than those sums, and the run must be
+        made again.
+    """
+    missing = [column for column in OUTSIDE_SWR_COLUMNS if column not in windows]
+    if missing:
+        raise ValueError(
+            "the restriction window table has no sums over the bins outside SWRs "
+            f"(missing {missing}): it was made before the window run summed them. "
+            "Rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py "
+            "--overwrite on the cohort first."
+        )
+
+
+def window_contrasts(
+    windows: pd.DataFrame, parts: Sequence[str] = tuple(PART_UNITS)
+) -> pd.DataFrame:
+    """Each window's contrasts, per spike and per second, in both families,
+    over the whole window and over its bins outside SWRs.
 
     Parameters
     ----------
     windows : pd.DataFrame
         :func:`restriction_window_sums`' rows with ``n_spikes``.
+    parts : sequence of str, optional
+        The parts of the window (:data:`PART_UNITS`); by default both. The part
+        ``"outside_swr"`` needs the columns :data:`OUTSIDE_SWR_COLUMNS`.
 
     Returns
     -------
     pd.DataFrame
-        ``windows`` with one column per contrast, family and unit
-        (:func:`contrast_column`): the contrast's window sum (nats) divided by
-        ``n_spikes`` (NaN without spikes) or by ``duration_s``. Every contrast
-        of a window with a bin in excluded time is NaN. So the two units do not
-        cover the same windows: a window without spikes has a value per second
-        and none per spike (153 Local-rest controls in the cohort; the
-        statistics' ``n_scored`` counts the windows with a value).
+        ``windows`` with one column per part, contrast, family and unit
+        (:func:`contrast_column`). Over the whole window: the contrast's window
+        sum (nats) divided by ``n_spikes`` (NaN without spikes) or by
+        ``duration_s``. So the two units do not cover the same windows: a
+        window without spikes has a value per second and none per spike (153
+        Local-rest controls in the cohort; the statistics' ``n_scored`` counts
+        the windows with a value). Outside SWRs: the contrast summed over the
+        window's ``immobile_outside_swr`` bins divided by their duration,
+        ``duration_outside_swr_s``; NaN for a window with no such bin (an event
+        wholly inside its SWR). Every contrast of a window with a bin in
+        excluded time is NaN.
+
+    Raises
+    ------
+    ValueError
+        If ``"outside_swr"`` is asked for and ``windows`` lacks its columns
+        (:func:`require_outside_swr_sums`).
     """
     out = windows.copy()
     kept = out["n_bins_excluded"].to_numpy() == 0
-    divisors = {
-        "per_spike": out["n_spikes"].where(out["n_spikes"] > 0).to_numpy(float),
-        "per_s": out["duration_s"].to_numpy(float),
-    }
-    for contrast, (a, b) in CONTRASTS.items():
-        for family, suffix in FAMILY_SUFFIX.items():
-            difference = out[f"{a}{suffix}"].to_numpy() - out[f"{b}{suffix}"].to_numpy()
-            for unit in UNITS:
-                out[contrast_column(contrast, family, unit)] = np.where(
-                    kept, difference / divisors[unit], np.nan
+    for part in _chosen(parts, PART_UNITS, "part"):
+        if part == "outside_swr":
+            require_outside_swr_sums(out)
+            seconds = out["duration_outside_swr_s"]
+            divisors = {"per_s": seconds.where(seconds > 0).to_numpy(float)}
+            where = OUTSIDE_SWR_SUFFIX
+        else:
+            divisors = {
+                "per_spike": out["n_spikes"].where(out["n_spikes"] > 0).to_numpy(float),
+                "per_s": out["duration_s"].to_numpy(float),
+            }
+            where = ""
+        for contrast, (a, b) in CONTRASTS.items():
+            for family, suffix in FAMILY_SUFFIX.items():
+                difference = (
+                    out[f"{a}{suffix}{where}"].to_numpy()
+                    - out[f"{b}{suffix}{where}"].to_numpy()
                 )
+                for unit in PART_UNITS[part]:
+                    out[contrast_column(contrast, family, unit, part)] = np.where(
+                        kept, difference / divisors[unit], np.nan
+                    )
     return out
 
 
@@ -265,17 +372,19 @@ def restriction_window_statistics(
     contrasts: Sequence[str] | None = None,
     units: Sequence[str] | None = None,
     kinds: Sequence[str] | None = None,
+    parts: Sequence[str] = ("whole",),
 ) -> pd.DataFrame:
     """Each contrast's per-animal values, their mean and its interval, by
-    score family, unit, kind of window and group.
+    score family, unit, kind of window, group and part of the window.
 
-    For each family, contrast and unit (:func:`window_contrasts`' columns) and
-    each kind of window (``"event"``, ``"control"``):
+    For each part of the window, family, contrast and unit
+    (:func:`window_contrasts`' columns) and each kind of window (``"event"``,
+    ``"control"``):
     ``likelihood_advantage_statistics`` over that kind's windows, per group
     (an animal's value is the median over its epochs of each epoch's median
     window; the estimate is the mean over animals; the 95 % interval is from
-    the nested bootstrap of animals, epochs and windows), as panel h's
-    ``tetrode_holdout.holdout_statistics`` does.
+    the nested bootstrap of animals, epochs and windows), as the held-out
+    tetrode figure's ``tetrode_holdout.holdout_statistics`` does.
 
     Parameters
     ----------
@@ -289,42 +398,61 @@ def restriction_window_statistics(
         contrasts (:data:`CONTRASTS`), units (:data:`UNITS`) and kinds of window;
         each defaults to all of them. Each row's bootstrap starts from ``seed``
         on its own, so a row is the same whichever others are computed.
+    parts : sequence of str, optional
+        The parts of the window (:data:`PART_UNITS`): ``"whole"`` (the
+        default) and ``"outside_swr"``, the window's bins in the category
+        ``immobile_outside_swr``, read per second only (a chosen unit the part
+        has no value in is skipped for it). A window with no such bin has no
+        value there and is counted in ``n_events`` but not in ``n_scored``.
 
     Returns
     -------
     pd.DataFrame
-        One row per chosen family, contrast, unit, kind and group: those keys,
-        ``estimate``, ``ci_low``, ``ci_high``, ``animals`` (the animals'
+        One row per chosen family, contrast, unit, kind, group and part: those
+        keys, ``estimate``, ``ci_low``, ``ci_high``, ``animals`` (the animals'
         values), ``animal_names``, ``n_events`` (windows), ``n_scored``
         (windows with a value), ``n_animals`` and ``n_animals_positive``
         (animals whose value is above zero).
+
+    Raises
+    ------
+    ValueError
+        If a choice is unknown, no window is of a chosen kind, or the part
+        ``"outside_swr"`` is chosen for a table without its columns
+        (:func:`require_outside_swr_sums`).
     """
     families = _chosen(families, FAMILY_SUFFIX, "family")
     contrasts = _chosen(contrasts, CONTRASTS, "contrast")
     units = _chosen(units, UNITS, "unit")
-    scored = window_contrasts(windows)
+    parts = _chosen(parts, PART_UNITS, "part")
+    scored = window_contrasts(windows, parts)
     if kinds is not None:
         missing = set(kinds) - set(scored["kind"])
         if missing:
             raise ValueError(f"no windows of kind {sorted(missing)}")
         scored = scored[scored["kind"].isin(kinds)]
-    parts = []
-    for family in families:
-        for contrast in contrasts:
-            for unit in units:
-                column = contrast_column(contrast, family, unit)
-                for kind, mine in scored.groupby("kind", sort=True):
-                    part = likelihood_advantage_statistics(
-                        mine, column=column, n_boot=n_boot, seed=seed
-                    ).reset_index()
-                    parts.append(
-                        part.assign(
-                            family=family, contrast=contrast, unit=unit, kind=kind
+    rows = []
+    for part in parts:
+        for family in families:
+            for contrast in contrasts:
+                for unit in (u for u in units if u in PART_UNITS[part]):
+                    column = contrast_column(contrast, family, unit, part)
+                    for kind, mine in scored.groupby("kind", sort=True):
+                        statistics = likelihood_advantage_statistics(
+                            mine, column=column, n_boot=n_boot, seed=seed
+                        ).reset_index()
+                        rows.append(
+                            statistics.assign(
+                                family=family,
+                                contrast=contrast,
+                                unit=unit,
+                                kind=kind,
+                                part=part,
+                            )
                         )
-                    )
-    table = pd.concat(parts, ignore_index=True)
+    table = pd.concat(rows, ignore_index=True)
     table["n_animals_positive"] = [int((a > 0).sum()) for a in table["animals"]]
-    keys = ["family", "contrast", "unit", "kind", "group"]
+    keys = ["family", "contrast", "unit", "kind", "group", "part"]
     return table[keys + [c for c in table.columns if c not in keys]]
 
 
