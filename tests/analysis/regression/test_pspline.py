@@ -90,3 +90,18 @@ def test_constraint_removes_the_constant() -> None:
     assert np.linalg.norm(rows @ Z @ coef - 1.0) == pytest.approx(np.sqrt(n_rows))
     # The constrained penalty keeps one null direction: the centered line.
     assert penalty_rank(Z.T @ BASIS.penalty() @ Z) == 10 - 2
+
+
+def test_constrained_smooth_is_the_basis_times_the_constraint() -> None:
+    """``constrained`` gives ``B Z``, ``Z' P Z`` and ``Z``, with the constraint
+    computed on the rows given: each column of the design sums to zero over
+    them, and the penalty keeps the centered line as its null space."""
+    x = np.random.default_rng(2).uniform(0.0, 4.0, size=200)
+    design, penalty, Z = BASIS.constrained(x)
+    B = BASIS.design(x)
+    np.testing.assert_array_equal(Z, sum_to_zero_constraint(B))
+    np.testing.assert_array_equal(design, B @ Z)
+    np.testing.assert_array_equal(penalty, Z.T @ BASIS.penalty() @ Z)
+    assert design.shape == (200, 9) and penalty.shape == (9, 9)
+    np.testing.assert_allclose(design.sum(axis=0), 0.0, atol=1e-10)
+    assert penalty_rank(penalty) == 10 - 2

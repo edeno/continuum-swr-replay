@@ -29,10 +29,7 @@ from continuum_swr_replay.analysis.regression.newton import (
     STEP_LIMIT,
     penalized_newton,
 )
-from continuum_swr_replay.analysis.regression.pspline import (
-    PSplineBasis,
-    sum_to_zero_constraint,
-)
+from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
     SessionData,
@@ -50,6 +47,7 @@ from scripts.checks.compare_regression_to_mgcv import (
     agreement,
     fit_ours,
     make_data,
+    stop_bins,
 )
 
 FAMILIES = ("poisson", "bernoulli", "gaussian", "grouped_softmax")
@@ -63,10 +61,8 @@ def _relative_error(analytic: np.ndarray, numeric: np.ndarray) -> float:
 
 def _smooth(x: np.ndarray, n_basis: int = N_BASIS) -> tuple[np.ndarray, np.ndarray]:
     """The constrained P-spline design of ``x`` over [0, 1] and its penalty."""
-    basis = PSplineBasis(0.0, 1.0, n_basis)
-    B = basis.design(x)
-    Z = sum_to_zero_constraint(B)
-    return B @ Z, Z.T @ basis.penalty() @ Z
+    design, penalty, _ = PSplineBasis(0.0, 1.0, n_basis).constrained(x)
+    return design, penalty
 
 
 def _session(
@@ -106,6 +102,33 @@ def _session(
     return GroupedSoftmax(), SessionData(X, y, groups), blocks
 
 
+def _numeric_gradient(V, point: np.ndarray, h: float) -> np.ndarray:
+    """Central differences of ``V`` at ``point`` with step ``h``, shape ``(m,)``."""
+    unit = np.eye(point.size)
+    return np.array([(V(point + h * e) - V(point - h * e)) / (2 * h) for e in unit])
+
+
+def _numeric_hessian(V, point: np.ndarray, h: float) -> np.ndarray:
+    """Central second differences of ``V`` at ``point`` with step ``h``, shape
+    ``(m, m)``."""
+    unit = np.eye(point.size)
+    return np.array(
+        [
+            [
+                (
+                    V(point + h * (a + c))
+                    - V(point + h * (a - c))
+                    - V(point - h * (a - c))
+                    + V(point - h * (a + c))
+                )
+                / (4 * h * h)
+                for c in unit
+            ]
+            for a in unit
+        ]
+    )
+
+
 def _score(lik, data, blocks, rho, beta0=None):
     return reml_and_derivatives(lik, data.X, data.y, data.aux, blocks, rho, beta0)
 
@@ -129,27 +152,8 @@ def test_gradient_and_hessian_finite_differences(family: str, n_smooths: int) ->
     def V(r: np.ndarray) -> float:
         return _score(lik, data, blocks, r, warm).score
 
-    unit = np.eye(n_smooths)
-    h = 1e-4  # first differences
-    numeric_gradient = np.array(
-        [(V(rho + h * e) - V(rho - h * e)) / (2 * h) for e in unit]
-    )
-    h = 1e-3  # second differences
-    numeric_hessian = np.array(
-        [
-            [
-                (
-                    V(rho + h * (ej + ek))
-                    - V(rho + h * (ej - ek))
-                    - V(rho - h * (ej - ek))
-                    + V(rho - h * (ej + ek))
-                )
-                / (4 * h * h)
-                for ek in unit
-            ]
-            for ej in unit
-        ]
-    )
+    numeric_gradient = _numeric_gradient(V, rho, 1e-4)
+    numeric_hessian = _numeric_hessian(V, rho, 1e-3)
 
     assert _relative_error(at.gradient, numeric_gradient) < 1e-5
     assert _relative_error(at.hessian, numeric_hessian) < 1e-5
@@ -214,13 +218,12 @@ def test_a_session_whose_design_is_not_identified_raises() -> None:
     sessions = []
     for seed in range(10):
         x = rng.uniform(0.0, 4.0, 600)
-        B = basis.design(x)
-        Z = sum_to_zero_constraint(B)
+        design, penalty, _ = basis.constrained(x)
         reward = (rng.uniform(size=600) < 0.5).astype(float) * (seed != 3)
-        X = np.column_stack([np.ones(600), reward, B @ Z])
+        X = np.column_stack([np.ones(600), reward, design])
         y = rng.poisson(np.exp(-1.0 + np.sin(x) + 0.3 * reward)).astype(float)
         sessions.append(SessionData(X, y, np.zeros(600), name=f"s{seed}"))
-    blocks = [PenaltyBlock(np.arange(2, 11), Z.T @ basis.penalty() @ Z)]
+    blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     message = (
         r"session 3 \(s3\): design not identified .*cannot see .*: "
         r"\[1\]\).*inactive \(SessionData.active\)"
@@ -277,34 +280,22 @@ def _one_clock_counts(
 ) -> tuple[SessionData, list[PenaltyBlock]]:
     """Poisson counts over time since a stop began, with a flat truth.
 
-    350 stops of lognormal duration (median 1 s after a reward, 0.3 s
-    after none), 15 ms bins over the first 4 s, the counts and exposures
+    The mgcv comparison's stop bins (:func:`stop_bins`: 350 stops of
+    lognormal duration, 15 ms bins over the first 4 s), the counts and exposures
     summed over bins at the same time (which leaves the likelihood unchanged
     up to a constant); a cubic P-spline with 15 basis functions over [0, 4].
     """
     rng = np.random.default_rng(seed)
-    bin_s, n_stops = 0.015, 350
-    rewarded = rng.random(n_stops) < 0.5
-    duration = np.where(rewarded, 1.0, 0.3) * np.exp(rng.normal(size=n_stops))
-    duration = np.maximum(duration, bin_s)
-    n_bins = np.ceil(duration / bin_s).astype(int)
-    stop = np.repeat(np.arange(n_stops), n_bins)
-    k = np.arange(n_bins.sum()) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
-    start = k * bin_s
-    end = np.minimum(start + bin_s, duration[stop])
-    exposure, clock = end - start, 0.5 * (start + end)
-    keep = clock < 4.0
-    exposure, clock, k = exposure[keep], clock[keep], k[keep]
+    bins = stop_bins(rng)
+    exposure, clock = bins["expo"].to_numpy(), bins["s"].to_numpy()
     y = rng.poisson(n_events / exposure.sum() * exposure).astype(float)
-    _, cell = np.unique(k, return_inverse=True)
+    _, cell = np.unique(bins["k"].to_numpy(), return_inverse=True)
     cell_exposure = np.bincount(cell, weights=exposure)
     cell_clock = np.bincount(cell, weights=clock * exposure) / cell_exposure
-    basis = PSplineBasis(0.0, 4.0, 15)
-    B = basis.design(cell_clock)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([np.ones(cell_clock.size), B @ Z])
+    design, penalty, _ = PSplineBasis(0.0, 4.0, 15).constrained(cell_clock)
+    X = np.column_stack([np.ones(cell_clock.size), design])
     data = SessionData(X, np.bincount(cell, weights=y), np.log(cell_exposure))
-    return data, [PenaltyBlock(np.arange(1, 15), Z.T @ basis.penalty() @ Z)]
+    return data, [PenaltyBlock(np.arange(1, 15), penalty)]
 
 
 def test_grid_start_finds_better_optimum() -> None:
@@ -442,11 +433,9 @@ def test_shrunk_to_null_space() -> None:
     rng = np.random.default_rng(2)
     n_rows = 400
     x = rng.uniform(size=n_rows)
-    basis = PSplineBasis(0.0, 1.0, 10)
-    B = basis.design(x)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([np.ones(n_rows), B @ Z])
-    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    design, penalty = _smooth(x, n_basis=10)
+    X = np.column_stack([np.ones(n_rows), design])
+    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     line_y = (x - 0.5) + rng.normal(size=n_rows)
     curve_y = np.sin(2 * np.pi * x) + rng.normal(size=n_rows)
 
@@ -550,11 +539,9 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
     rng = np.random.default_rng(1)
     n_rows = 400
     s = rng.uniform(0.0, 4.0, n_rows)
-    basis = PSplineBasis(0.0, 4.0, 15)
-    B = basis.design(s)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([np.ones(n_rows), B @ Z])
-    blocks = [PenaltyBlock(np.arange(1, 15), Z.T @ basis.penalty() @ Z)]
+    design, penalty, _ = PSplineBasis(0.0, 4.0, 15).constrained(s)
+    X = np.column_stack([np.ones(n_rows), design])
+    blocks = [PenaltyBlock(np.arange(1, 15), penalty)]
     base = np.sin(2.0 * s) + rng.normal(scale=0.5, size=n_rows)
     S = assemble_penalty(blocks, [2.0], X.shape[1])
 
@@ -746,17 +733,15 @@ def test_softmax_penalty_selection_is_stationary() -> None:
     n_events, n_arms = 300, 9
     n_rows = n_events * n_arms
     s = rng.uniform(0.0, 4.0, n_rows)
-    basis = PSplineBasis(0.0, 4.0, 12)
-    B = basis.design(s)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([B @ Z, rng.normal(size=n_rows)])
+    design, penalty, _ = PSplineBasis(0.0, 4.0, 12).constrained(s)
+    X = np.column_stack([design, rng.normal(size=n_rows)])
     eta = np.sin(1.5 * s) + 0.4 * X[:, -1]
     groups = np.repeat(np.arange(n_events), n_arms)
     weight = np.exp(eta).reshape(-1, n_arms)
     p = weight / weight.sum(axis=1, keepdims=True)
     y = np.concatenate([rng.dirichlet(10.0 * row) for row in p])
     data = SessionData(X, y, groups)
-    blocks = [PenaltyBlock(np.arange(11), Z.T @ basis.penalty() @ Z)]
+    blocks = [PenaltyBlock(np.arange(11), penalty)]
 
     result = select_penalties(GroupedSoftmax(), [data], blocks)
 
@@ -828,14 +813,12 @@ def _content_session(
     rng = np.random.default_rng(seed)
     n_rows = n_events * n_arms
     x = rng.uniform(0.0, 5.0, n_rows)
-    basis = PSplineBasis(0.0, 5.0, 10)
-    B = basis.design(x)
-    Z = sum_to_zero_constraint(B)
+    design, penalty, _ = PSplineBasis(0.0, 5.0, 10).constrained(x)
     role = np.zeros((n_rows, 2))
     first = np.arange(n_events) * n_arms
     role[first, 0] = 1.0
     role[first + 1 + rng.integers(0, n_arms - 1, n_events), 1] = 1.0
-    X = np.column_stack([B @ Z, role])
+    X = np.column_stack([design, role])
     eta = -1.2 * x + role @ np.array([1.0, -0.5])
     weight = np.exp(eta).reshape(n_events, n_arms)
     p = weight / weight.sum(axis=1, keepdims=True)
@@ -845,7 +828,7 @@ def _content_session(
         y = np.zeros((n_events, n_arms))
         y[np.arange(n_events), np.argmin(x.reshape(n_events, n_arms), axis=1)] = 1.0
     groups = np.repeat(np.arange(n_events), n_arms)
-    blocks = [PenaltyBlock(np.arange(9), Z.T @ basis.penalty() @ Z)]
+    blocks = [PenaltyBlock(np.arange(9), penalty)]
     return SessionData(X, y.ravel(), groups), blocks
 
 
@@ -1050,16 +1033,15 @@ def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
     sessions = []
     for seed in range(6):
         x = rng.uniform(0.0, 4.0, 600)
-        B = basis.design(x)
-        Z = sum_to_zero_constraint(B)
+        design, penalty, _ = basis.constrained(x)
         indicator = (rng.uniform(size=600) < 0.2).astype(float)
         copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
-        X = np.column_stack([np.ones(600), B @ Z, *copies])
+        X = np.column_stack([np.ones(600), design, *copies])
         y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
         if seed == 2:
             y[indicator == 1] = 1.0
         sessions.append(SessionData(X, y, name=f"s{seed}"))
-    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     with np.errstate(over="ignore"):
         result = select_penalties(Bernoulli(), sessions, blocks)
     (left_out,) = result.search.set_aside
@@ -1076,11 +1058,9 @@ def _two_smooth_session(seed: int) -> tuple[SessionData, list[PenaltyBlock]]:
     data, blocks = _content_session(seed)
     rng = np.random.default_rng(1000 + seed)
     share = rng.uniform(0.0, 1.0, data.X.shape[0])
-    basis = PSplineBasis(0.0, 1.0, 8)
-    B = basis.design(share)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([data.X[:, :9], B @ Z, data.X[:, 9:]])
-    second = PenaltyBlock(np.arange(9, 16), Z.T @ basis.penalty() @ Z)
+    design, penalty = _smooth(share, n_basis=8)
+    X = np.column_stack([data.X[:, :9], design, data.X[:, 9:]])
+    second = PenaltyBlock(np.arange(9, 16), penalty)
     return SessionData(X, data.y, data.aux), [*blocks, second]
 
 
@@ -1188,11 +1168,9 @@ def test_a_separation_by_a_smooths_line_is_named_as_its_null_space(rho: float) -
     intercept, which says that the smooth's own line is in the direction."""
     rng = np.random.default_rng(0)
     x = rng.uniform(0.0, 4.0, 300)
-    basis = PSplineBasis(0.0, 4.0, 10)
-    B = basis.design(x)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([np.ones(300), B @ Z])
-    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    design, penalty, _ = PSplineBasis(0.0, 4.0, 10).constrained(x)
+    X = np.column_stack([np.ones(300), design])
+    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     y = (x > 2.0).astype(float)
     with np.errstate(over="ignore"):
         score = reml_and_derivatives(Bernoulli(), X, y, None, blocks, [rho])
@@ -1288,29 +1266,11 @@ def test_gradient_and_hessian_at_strong_penalties(rho: float) -> None:
             derivatives=False,
         ).score
 
-    unit = np.eye(2)
-
     def gradient(h: float) -> np.ndarray:
-        return np.array(
-            [(value(point + h * e) - value(point - h * e)) / (2 * h) for e in unit]
-        )
+        return _numeric_gradient(value, point, h)
 
     def hessian(h: float) -> np.ndarray:
-        return np.array(
-            [
-                [
-                    (
-                        value(point + h * (a + c))
-                        - value(point + h * (a - c))
-                        - value(point - h * (a - c))
-                        + value(point - h * (a + c))
-                    )
-                    / (4 * h * h)
-                    for c in unit
-                ]
-                for a in unit
-            ]
-        )
+        return _numeric_hessian(value, point, h)
 
     numeric_gradient = (4 * gradient(0.025) - gradient(0.05)) / 3
     numeric_hessian = (4 * hessian(0.025) - hessian(0.05)) / 3

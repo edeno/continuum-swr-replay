@@ -17,16 +17,37 @@ construction for ``bs = "ps"``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 from scipy.interpolate import BSpline
 
 __all__ = [
+    "ConstrainedSmooth",
     "PSplineBasis",
     "difference_penalty",
     "penalty_rank",
     "sum_to_zero_constraint",
 ]
+
+
+class ConstrainedSmooth(NamedTuple):
+    """A smooth term with its sum-to-zero constraint (:meth:`PSplineBasis.constrained`).
+
+    Attributes
+    ----------
+    design : np.ndarray, shape (n_rows, n_basis - 1)
+        ``B Z``, the constrained design at the rows given.
+    penalty : np.ndarray, shape (n_basis - 1, n_basis - 1)
+        ``Z' P Z``, the difference penalty of the constrained coefficients.
+    constraint : np.ndarray, shape (n_basis, n_basis - 1)
+        ``Z`` (:func:`sum_to_zero_constraint`), to build the design at other
+        rows as ``basis.design(x) @ Z``.
+    """
+
+    design: np.ndarray
+    penalty: np.ndarray
+    constraint: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -102,6 +123,25 @@ class PSplineBasis:
     def penalty(self, order: int = 2) -> np.ndarray:
         """The difference penalty of the coefficients, shape ``(n_basis, n_basis)``."""
         return difference_penalty(self.n_basis, order)
+
+    def constrained(self, x: np.ndarray, order: int = 2) -> ConstrainedSmooth:
+        """The smooth at ``x`` with the sum-to-zero constraint computed on ``x``.
+
+        Parameters
+        ----------
+        x : np.ndarray, shape (n_rows,)
+            The rows the constraint is computed on (the pooled rows of a model).
+        order : int
+            The order of the difference penalty.
+
+        Returns
+        -------
+        ConstrainedSmooth
+            ``B Z``, ``Z' P Z`` and ``Z``, with ``B`` the basis at ``x``.
+        """
+        B = self.design(x)
+        Z = sum_to_zero_constraint(B)
+        return ConstrainedSmooth(B @ Z, Z.T @ self.penalty(order) @ Z, Z)
 
 
 def difference_penalty(n_basis: int, order: int = 2) -> np.ndarray:

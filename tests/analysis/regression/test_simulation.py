@@ -1,9 +1,10 @@
 """The shared fitter's intervals and tests on simulated rate data.
 
-Each data set is 350 synthetic stops in 15 ms bins (lognormal durations,
-median 1 s after a reward and 0.3 s after none, half rewarded) with Poisson
-events at a log rate ``f(s) + b * rewarded`` over the time ``s`` since the stop
-began, ``s`` below 4 s, about 300 events in all. The counts and exposures are
+Each data set is the mgcv comparison's stop bins (``stop_bins``: 350 synthetic
+stops in 15 ms bins, lognormal durations, median 1 s after a reward and 0.3 s
+after none, half rewarded) with Poisson events at a log rate
+``f(s) + b * rewarded`` over the time ``s`` since the stop began, ``s`` below
+4 s, about 300 events in all. The counts and exposures are
 summed over bins in the same 15 ms of ``s`` and the same reward, which leaves
 the likelihood unchanged up to a constant. The model is an intercept, the 0/1
 reward and a cubic P-spline of ``s`` on 15 basis functions over [0, 4] with
@@ -17,19 +18,15 @@ import pytest
 import scipy.stats
 
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
-from continuum_swr_replay.analysis.regression.pspline import (
-    PSplineBasis,
-    sum_to_zero_constraint,
-)
+from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
     SessionData,
     select_penalties,
 )
+from scripts.checks.compare_regression_to_mgcv import HI as CLOCK_MAX_S
+from scripts.checks.compare_regression_to_mgcv import stop_bins
 
-BIN_S = 0.015
-CLOCK_MAX_S = 4.0
-N_STOPS = 350
 N_EVENTS = 300
 N_DATA_SETS = 1000
 N_BASIS = 15
@@ -48,17 +45,9 @@ def _simulate(
     """One data set's summed cells, their design (intercept, reward, smooth),
     the smooth's penalty, shape ``(N_BASIS - 1, N_BASIS - 1)``, and the
     cells' clock, shape ``(n_cells,)``."""
-    rewarded = rng.random(N_STOPS) < 0.5
-    duration = np.where(rewarded, 1.0, 0.3) * np.exp(rng.normal(size=N_STOPS))
-    duration = np.maximum(duration, BIN_S)
-    n_bins = np.ceil(duration / BIN_S).astype(int)
-    stop = np.repeat(np.arange(N_STOPS), n_bins)
-    k = np.arange(n_bins.sum()) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
-    start = k * BIN_S
-    end = np.minimum(start + BIN_S, duration[stop])
-    s, exposure, reward = 0.5 * (start + end), end - start, rewarded[stop]
-    keep = s < CLOCK_MAX_S
-    s, exposure, reward, k = s[keep], exposure[keep], reward[keep], k[keep]
+    bins = stop_bins(rng)
+    s, exposure = bins["s"].to_numpy(), bins["expo"].to_numpy()
+    reward, k = bins["rew"].to_numpy(), bins["k"].to_numpy()
     expected = exposure * np.exp(SHAPES[shape](s) + log_rate_ratio * reward)
     y = rng.poisson(N_EVENTS * expected / expected.sum())
 
@@ -68,12 +57,10 @@ def _simulate(
     cell_s = np.bincount(cell, weights=s * exposure) / cell_exposure
     cell_reward = np.bincount(cell, weights=reward) / np.bincount(cell)
 
-    basis = PSplineBasis(0.0, CLOCK_MAX_S, N_BASIS)
-    B = basis.design(cell_s)
-    Z = sum_to_zero_constraint(B)
-    X = np.column_stack([np.ones(cell_s.size), cell_reward, B @ Z])
+    design, penalty, _ = PSplineBasis(0.0, CLOCK_MAX_S, N_BASIS).constrained(cell_s)
+    X = np.column_stack([np.ones(cell_s.size), cell_reward, design])
     data = SessionData(X, cell_y, np.log(cell_exposure))
-    return data, Z.T @ basis.penalty() @ Z, cell_s
+    return data, penalty, cell_s
 
 
 def _fits(shape: str, log_rate_ratio: float, seed: int) -> np.ndarray:

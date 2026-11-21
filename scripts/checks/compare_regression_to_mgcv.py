@@ -56,10 +56,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Likelihood,
     Poisson,
 )
-from continuum_swr_replay.analysis.regression.pspline import (
-    PSplineBasis,
-    sum_to_zero_constraint,
-)
+from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
     SessionData,
@@ -93,19 +90,28 @@ SMOOTHS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _stop_bins(rng: np.random.Generator) -> pd.DataFrame:
-    """15 ms bins of ``N_STOPS`` synthetic stops.
+def stop_bins(
+    rng: np.random.Generator, until_end_max_s: float = np.inf
+) -> pd.DataFrame:
+    """15 ms bins of ``N_STOPS`` synthetic stops, over their first ``HI`` s.
 
     Stop durations are lognormal (sigma 1, median 1 s when rewarded, 0.3 s
     when not, half rewarded); bins run from each stop's start, the last one
-    partial.
+    partial. The tests' simulated rate data use the same bins.
+
+    Parameters
+    ----------
+    rng : np.random.Generator
+    until_end_max_s : float
+        Keep only the bins less than this long before their stop ends.
 
     Returns
     -------
-    pd.DataFrame, shape (n_bins, 4)
+    pd.DataFrame, shape (n_bins, 5)
         ``s`` (time since the stop began, s), ``u`` (time until it ends, s),
-        ``expo`` (the bin's length, s) and ``rew`` (0/1), for the bins with
-        ``s`` and ``u`` below 4 s.
+        ``expo`` (the bin's length, s), ``rew`` (0/1) and ``k`` (the bin's
+        index in its stop), for the bins with ``s`` below ``HI`` and ``u``
+        below ``until_end_max_s``.
     """
     rewarded = rng.random(N_STOPS) < 0.5
     duration = np.where(rewarded, 1.0, 0.3) * np.exp(rng.normal(size=N_STOPS))
@@ -117,13 +123,14 @@ def _stop_bins(rng: np.random.Generator) -> pd.DataFrame:
     end = np.minimum(start + BIN_S, duration[stop])
     s = 0.5 * (start + end)
     u = duration[stop] - s
-    keep = (s < HI) & (u < HI)
+    keep = (s < HI) & (u < until_end_max_s)
     return pd.DataFrame(
         {
             "s": s[keep],
             "u": u[keep],
             "expo": (end - start)[keep],
             "rew": rewarded[stop][keep].astype(float),
+            "k": k[keep],
         }
     )
 
@@ -145,7 +152,7 @@ def make_data(name: str) -> pd.DataFrame:
     """
     rng = np.random.default_rng(DATA_SETS[name])
     if name.startswith("poisson"):
-        frame = _stop_bins(rng)
+        frame = stop_bins(rng, until_end_max_s=HI).drop(columns="k")
         s, u = frame["s"].to_numpy(), frame["u"].to_numpy()
         log_rate = np.log(4.0) * (1.0 - np.exp(-s / 0.5)) + 0.26 * frame["rew"]
         if name == "poisson_two_smooths":
@@ -186,15 +193,10 @@ def fit_ours(name: str, frame: pd.DataFrame) -> dict:
     blocks, constraints = [], []
     start = len(columns)
     for variable in SMOOTHS[name]:
-        B = basis.design(frame[variable].to_numpy(dtype=float))
-        Z = sum_to_zero_constraint(B)
+        design, penalty, Z = basis.constrained(frame[variable].to_numpy(dtype=float))
         constraints.append(Z)
-        columns.append(B @ Z)
-        blocks.append(
-            PenaltyBlock(
-                np.arange(start, start + Z.shape[1]), Z.T @ basis.penalty() @ Z
-            )
-        )
+        columns.append(design)
+        blocks.append(PenaltyBlock(np.arange(start, start + Z.shape[1]), penalty))
         start += Z.shape[1]
     X = np.hstack(columns)
     lik: Likelihood
