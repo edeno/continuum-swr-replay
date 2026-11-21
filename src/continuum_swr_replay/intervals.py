@@ -65,6 +65,7 @@ __all__ = [
     "contiguous_true_runs",
     "min_gap_to_intervals",
     "covered_seconds",
+    "decoder_time_bin",
     "get_spikecount_per_time_bin",
     "as_frame",
     "GAP_STEP_RATIO",
@@ -643,6 +644,40 @@ def min_gap_to_intervals(
     # gap = max(0, os - e, s - oe) elementwise; 0 if overlapping
     gap = np.maximum.reduce([np.zeros_like(s + os), os - e, s - oe])
     return gap.min(axis=1)
+
+
+def decoder_time_bin(spike_times: NDArray, time: NDArray) -> NDArray[np.intp]:
+    """The decode bin of each spike, as the decoder assigns it.
+
+    ``np.digitize(spike_times, time[1:-1])``, the rule of ``non_local_detector``
+    (``likelihoods.common.get_spikecount_per_time_bin``,
+    ``get_spike_time_bin_ind``). With ``n = time.size`` and ``time`` ascending,
+    a spike at ``t`` goes to bin
+
+    - ``0`` when ``t < time[1]``, so also every spike before ``time[0]``;
+    - ``k`` when ``time[k] <= t < time[k + 1]``, for ``1 <= k <= n - 3``: a spike
+      exactly on a bin time ``time[k]`` goes to bin ``k``, the bin that starts
+      there;
+    - ``n - 2`` when ``t >= time[n - 2]``, so also every spike after
+      ``time[-1]`` and a NaN.
+
+    Bin ``n - 1`` is never assigned. Nothing is dropped here: a caller that
+    keeps only the spikes in ``[time[0], time[-1]]``, as the decoder does,
+    selects them first.
+
+    Parameters
+    ----------
+    spike_times : NDArray, shape (n_spikes,)
+        Spike times in seconds.
+    time : NDArray, shape (n_time,)
+        The decode's time grid in seconds, ascending, at least two samples.
+
+    Returns
+    -------
+    NDArray of intp, shape (n_spikes,)
+        Each spike's bin, in ``0..n_time - 2``.
+    """
+    return np.digitize(spike_times, time[1:-1])
 
 
 def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
