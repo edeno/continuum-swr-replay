@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -128,3 +129,53 @@ def test_an_output_not_made_over_the_subset_is_named():
         note = subset_staleness(manifest, "out")
         assert note.startswith("out was not made over")
 
+
+def _timed_events() -> pd.DataFrame:
+    """Two epochs' events: a and b each with one event inside its visit
+    (0 to 10 s) and one after it."""
+    return pd.DataFrame(
+        {
+            "animal": ["chimi"] * 4,
+            "session_date": [20200212] * 4,
+            "epoch": ["02_r1", "02_r1", "04_r2", "04_r2"],
+            "event_start_s": [1.0, 12.0, 9.5, 10.0],
+            "visit_context": [
+                "in_visit",
+                "after_visit_at_well",
+                "spans_visit_end",
+                "track_center",
+            ],
+        }
+    )
+
+
+_VISITS = {
+    "chimi20200212_02_r1_HPC": (np.array([0.0]), np.array([10.0])),
+    "chimi20200212_04_r2_HPC": (np.array([0.0]), np.array([10.0])),
+}
+
+
+def test_labels_that_agree_with_the_visits_pass():
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        check_visit_context_starts,
+    )
+
+    check_visit_context_starts(_timed_events(), _VISITS)
+
+
+def test_a_label_that_disagrees_with_the_visits_is_refused_with_the_count():
+    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+        check_visit_context_starts,
+    )
+
+    events = _timed_events()
+    # the departure is not inside the visit: an event starting there is outside
+    events.loc[3, "visit_context"] = "in_visit"
+    events.loc[1, "visit_context"] = "spans_visit_end"
+    with pytest.raises(ValueError, match="2 of 4 events.*12.0 s.*outside"):
+        check_visit_context_starts(events, _VISITS)
+    with pytest.raises(ValueError, match="no well visits for 1 epochs"):
+        check_visit_context_starts(
+            _timed_events(),
+            {"chimi20200212_02_r1_HPC": _VISITS["chimi20200212_02_r1_HPC"]},
+        )

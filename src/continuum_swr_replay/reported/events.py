@@ -90,6 +90,7 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    check_visit_context_starts,
     count_visit_context,
     select_events_in,
     select_visit_context,
@@ -2376,6 +2377,11 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # the one selection: the events that start inside a well visit
     table = read_swr_table(inputs.event_table)
     events = select_visit_context(table)
+    # the time masks read the visits themselves: they and the labels must agree
+    run = inputs.event_features_run
+    run_epochs = ok_epochs(read_manifest(run))
+    visits = {identifier: well_visit_times(identifier) for identifier in run_epochs}
+    check_visit_context_starts(table, visits)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
     current_sha256 = event_table_record["sha256"]
     # every per-epoch input must hold the epoch register's analyzed epochs
@@ -2505,9 +2511,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
 
-    run = inputs.event_features_run
-    run_epochs = ok_epochs(read_manifest(run))
-    visits = {identifier: well_visit_times(identifier) for identifier in run_epochs}
     comparison = nonlocal_comparison.read_comparison(run, visits)
     others = comparison.others
     inventory_dir, directional_path = (

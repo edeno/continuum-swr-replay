@@ -116,6 +116,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     swr_intervals,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    check_visit_context_starts,
     select_events_in,
     select_visit_context,
     subset_staleness,
@@ -1416,6 +1417,10 @@ def generate_figure(
     )
     # every analyzed epoch with an event: an epoch with none has no table
     event_epochs = event_table_epochs(table, analyzed_epoch_ids())
+    # the time masks read the visits themselves: they and the labels must agree
+    check_visit_context_starts(
+        table, {identifier: well_visit_times(identifier) for identifier in event_epochs}
+    )
     participation = participation_statistics(
         select_events_in(
             read_complete_run(

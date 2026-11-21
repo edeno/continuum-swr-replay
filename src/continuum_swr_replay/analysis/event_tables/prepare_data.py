@@ -61,7 +61,6 @@ from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.data_types import SessionDataKeys
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.paths import replay_content_dir
 from continuum_swr_replay.tables.io import write_atomically
 from continuum_swr_replay.tables.session_keys import present_session_columns
@@ -141,6 +140,53 @@ def _behavioral_cache_version_error(cache_version: object) -> str | None:
     return None
 
 
+def _read_cache_entry(cache_path: Path) -> dict:
+    """The pickled behavioral context at ``cache_path``."""
+    with open(cache_path, "rb") as f:
+        return pickle.load(f)
+
+
+def _cache_entry_problem(cached: dict) -> str | None:
+    """Why a cache entry is off the current behavioral-context contract, or None.
+
+    The entry's version stamp, its trials' outcome-clock columns, its port
+    experiences' columns and their pump audit are checked, in that order;
+    the first that fails is named.
+    """
+    cache_version_error = _behavioral_cache_version_error(
+        cached.get("cache_schema_version")
+    )
+    if cache_version_error is not None:
+        return f"is off the current behavioral-context contract ({cache_version_error})"
+    stale_trials = [
+        column
+        for column in OUTCOME_CLOCK_TRIAL_COLUMNS
+        if column not in cached["trials"].columns
+    ]
+    if stale_trials:
+        return f"predates the outcome clock (missing {', '.join(stale_trials)})"
+    experiences = cached.get("port_experiences")
+    stale_experiences = (
+        list(PORT_EXPERIENCE_CACHE_COLUMNS)
+        if experiences is None
+        else [
+            column
+            for column in PORT_EXPERIENCE_CACHE_COLUMNS
+            if column not in experiences.columns
+        ]
+    )
+    if stale_experiences:
+        return (
+            "predates the physical-poke experience contract "
+            f"(missing {', '.join(stale_experiences)})"
+        )
+    try:
+        validate_port_experience_pump_audit(experiences)
+    except (KeyError, ValueError) as exc:
+        return f"has invalid post-recovery pump audit metadata ({exc})"
+    return None
+
+
 def load_behavioral_context(
     session: dict, *, from_cache: bool, cache_key: str | None = None
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None, object | None, bool]:
@@ -170,66 +216,20 @@ def load_behavioral_context(
     # session_id rather than paying for (or duplicating) its own Spyglass fetch.
     cache_path = behavioral_context_cache_path(session, cache_key=cache_key)
     if from_cache and cache_path.exists():
-        with open(cache_path, "rb") as f:
-            cached = pickle.load(f)
-        stale_trials = [
-            column
-            for column in OUTCOME_CLOCK_TRIAL_COLUMNS
-            if column not in cached["trials"].columns
-        ]
-        cache_version = cached.get("cache_schema_version")
-        cache_version_error = _behavioral_cache_version_error(cache_version)
-        experiences = cached.get("port_experiences")
-        stale_experiences = (
-            list(PORT_EXPERIENCE_CACHE_COLUMNS)
-            if experiences is None
-            else [
-                column
-                for column in PORT_EXPERIENCE_CACHE_COLUMNS
-                if column not in experiences.columns
-            ]
-        )
-        pump_audit_error = None
-        if experiences is not None:
-            try:
-                validate_port_experience_pump_audit(experiences)
-            except (KeyError, ValueError) as exc:
-                pump_audit_error = str(exc)
-        if cache_version_error is not None:
-            logging.warning(
-                "session cache entry %s is off the current behavioral-context "
-                "contract (%s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                cache_version_error,
-            )
-        elif stale_trials:
-            logging.warning(
-                "session cache entry %s predates the outcome clock (missing %s); "
-                "ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                ", ".join(stale_trials),
-            )
-        elif stale_experiences:
-            logging.warning(
-                "session cache entry %s predates the physical-poke experience "
-                "contract (missing %s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                ", ".join(stale_experiences),
-            )
-        elif pump_audit_error is not None:
-            logging.warning(
-                "session cache entry %s has invalid post-recovery pump audit "
-                "metadata (%s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                pump_audit_error,
-            )
-        else:
+        cached = _read_cache_entry(cache_path)
+        problem = _cache_entry_problem(cached)
+        if problem is None:
             return (
                 cached["trials"],
                 cached["port_experiences"],
                 cached["track_graph"],
                 True,
             )
+        logging.warning(
+            "session cache entry %s %s; ignoring it and re-fetching from Spyglass",
+            cache_path.name,
+            problem,
+        )
 
     # Imported lazily: `data_loaders` imports `spyglass.common` at module top
     # level, which opens a DataJoint connection. Keeping this out of module
@@ -273,8 +273,11 @@ def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
 
     A well visit is one port experience, from ``arrival_time`` (the first
     nose-poke in at a well) to ``departure_time`` (the final poke-out there),
-    read from the behavioral-context cache (:func:`load_behavioral_context`
-    with ``from_cache=True``) and checked as the table builders check them.
+    read from the behavioral-context cache entry the table builders wrote
+    (:func:`behavioral_context_cache_path`), checked as
+    :func:`load_behavioral_context` checks an entry. Only the cache is read:
+    a missing or off-contract entry is refused, never re-fetched from
+    Spyglass, and nothing is written.
     ``event_definition.well_visits.in_well_visit`` takes the two arrays.
 
     Parameters
@@ -290,19 +293,22 @@ def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
 
     Raises
     ------
+    FileNotFoundError
+        If the epoch has no cache entry.
     ValueError
-        If the epoch has no port experiences.
+        If its entry is off the current behavioral-context contract.
     """
-    key = parse_epoch_identifier(epoch_id)
-    session = {
-        "nwb_file_name": key.nwb_file_name,
-        "epoch_name": key.epoch_name,
-        "session_id": epoch_id,
-    }
-    _, experiences, _, _ = load_behavioral_context(session, from_cache=True)
-    if experiences is None:
-        raise ValueError(f"{epoch_id} has no port experiences")
-    experiences = _prepare_port_experiences(experiences)
+    cache_path = behavioral_context_cache_path({"session_id": epoch_id})
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"{epoch_id} has no session cache entry ({cache_path}); the table "
+            "builders write it"
+        )
+    cached = _read_cache_entry(cache_path)
+    problem = _cache_entry_problem(cached)
+    if problem is not None:
+        raise ValueError(f"session cache entry {cache_path} {problem}")
+    experiences = _prepare_port_experiences(cached["port_experiences"])
     return (
         experiences["arrival_time"].to_numpy(dtype=float),
         experiences["departure_time"].to_numpy(dtype=float),

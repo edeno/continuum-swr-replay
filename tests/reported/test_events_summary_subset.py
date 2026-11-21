@@ -71,6 +71,9 @@ def test_summary_reads_the_selected_events(monkeypatch):
         builder, "file_record", lambda path, root: {"path": "p", "sha256": "0"}
     )
     monkeypatch.setattr(builder, "with_start_and_rest_theta", stop)
+    # (the label check against the visits is tested in cohort_selection)
+    monkeypatch.setattr(builder, "read_manifest", lambda run: {"epochs": {}})
+    monkeypatch.setattr(builder, "check_visit_context_starts", lambda t, v: None)
     # (the state shares are not columns of these events)
     monkeypatch.setattr(builder, "state_composition_values", lambda events, s: [])
     added = []
