@@ -534,6 +534,44 @@ answer are 1 to 5; 6 was open before.
   are described anywhere. An exploration of those events is running (what they are, when and where they
   occur, how they compare with events at a well, what exclusion changes).
 
+### What the events outside the well visits are (exploration of all 242 epochs, 2026-11-20)
+
+Diagnostics; the scripts, tables and plots are scratch in the main checkout under
+.claude/research/2026-11-20-regression-prototypes/explore_outside_visits/.
+
+- The at-well label already is the lead's rule: a well visit runs from the first nose-poke in at a well to
+  the last nose-poke out, and position is not used. The nose-poke times are cached for every epoch (an
+  earlier note in this document said five; that was one of two caches). So "inside a well visit" is the
+  69,011 events the event table labels at a well, and no database read is needed for the rule.
+- 6,664 events are outside (5,383 No SWR, 1,281 SWR; 8.8 % of all events, 4 to 12 % per animal):
+
+  | Where the animal is | No SWR | SWR | Share of outside |
+  |---|---|---|---|
+  | still next to the well it just left, after the last nose-poke out | 2,584 | 420 | 45 % |
+  | the event spans the last nose-poke out | 144 | 45 | 3 % |
+  | stopped on a leaf arm (mostly the arm of the well just left, about 30 cm from it) | 1,654 | 526 | 33 % |
+  | at a patch junction | 597 | 105 | 10.5 % |
+  | at the center | 149 | 96 | 4 % |
+  | on a trunk arm | 118 | 48 | 2.5 % |
+  | next to the next well, before the first nose-poke in | 54 | 13 | 1 % |
+  | before the epoch's first nose-poke in | 70 | 21 | 1.4 % |
+  | other (some are a disagreement of label and tracked position) | 13 | 7 | under 1 % |
+
+- So about half are the animal still at the well after its last nose-poke out (a median 1.6 s after it for
+  No SWR events), and about half are stops on the track during a run (a median 6 s after the nose-poke out,
+  about 40 % of the way to the next well, more often on a run that changes patch).
+- They are concentrated: ten epochs hold 42 % of them, eight of those from one animal's first days; 768 occur
+  after an epoch's last visit, where a few recordings run on for up to two minutes.
+- No SWR events at a stop on the track differ most from No SWR events at a well: lower ripple power and
+  multiunit activity (0 of 5 animals higher), content that ends at a well 57 % of the time against 20 %
+  (5 of 5), and a higher held-out spike gain (5 of 5). No SWR events next to the well just left are like
+  events at a well in duration, extent and speed, with a lower held-out gain (0 of 5 higher).
+- Excluding all of them takes the events from 75,675 to 69,011, the No SWR share from 56.8 % to 54.5 %,
+  5.75 % of the SWRs, 8.3 % of the immobile time, and 1.2 % of the mPFC cohort's events.
+- Two data points to check: one epoch (chimi20200212_02_r1) has 141 events with the head 50 to 90 cm off the
+  track while its projection is at the well; and a few events are labeled at one well while the tracked
+  position is far from it.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
