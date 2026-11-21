@@ -1,22 +1,29 @@
 """Tetrode participation and spike rate of non-local events, against Local rest.
 
 Are the non-local events population events? For each canonical event, and for
-one control window of the same length drawn from Local rest in the same epoch:
+one control window of the same length drawn from Local rest inside a well visit
+of the same epoch:
 
 - **participation**: the share of the epoch's tetrodes with at least one spike;
 - **spike rate**: spikes per second, summed over tetrodes.
 
 Local rest is a bin the decoder calls Local (above :data:`LOCAL_THRESHOLD`), with
 the animal immobile and outside excluded time (``analyzed_time``), and no SWR or
-non-local event within :data:`MARGIN_S`. A control window is every bin of Local
-rest, drawn as :func:`~.state_evidence.windows.matched_windows` draws a bout's
-(a seeded order of every valid start per length); an event longer than any
-Local-rest stretch of its epoch has no control.
+non-local event within :data:`MARGIN_S`.
+
+The control rule (:data:`CONTROL_RULE`): a control window lies wholly inside one
+well visit, every bin of it Local rest and inside the same visit
+(``event_definition.well_visits``: from the first poke-in at a well to the final
+poke-out, ``arrival <= t < departure``). Windows are drawn as
+:func:`~.state_evidence.windows.matched_windows` draws a bout's (a seeded order
+of every valid start per length). Every event gets one by the same rule,
+wherever the event itself starts; an event longer than any stretch of Local
+rest inside one visit of its epoch has no control.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -38,6 +45,16 @@ MARGIN_S = 0.1
 
 LOCAL_REST = "local_rest"
 """The regime label of a Local-rest bin, for ``matched_windows``."""
+
+CONTROL_RULE = (
+    "a control window has the event's number of decode bins and lies wholly inside "
+    "one well visit (first poke-in to final poke-out): every bin of it is Local "
+    f"rest (Local probability above {LOCAL_THRESHOLD}, immobile, outside excluded "
+    f"time, at least {MARGIN_S} s from every SWR and non-local event) and in the "
+    "same visit; drawn for every event of the epoch, a seeded order of every valid "
+    "start per length"
+)
+"""The control windows' rule, as the run's settings record it."""
 
 MEASURES = ("participation", "spike_rate_hz")
 """The per-window measures :func:`participation_statistics` summarizes."""
@@ -83,15 +100,77 @@ def local_rest_mask(
     )
 
 
-def control_windows(
-    s: NDArray, e: NDArray, local_rest: NDArray, *, seed: Seed
-) -> pd.DataFrame:
-    """One Local-rest window of each event's length, or none.
+def control_starts(
+    local_rest: NDArray, visit_index: NDArray, length: int
+) -> NDArray[np.int64]:
+    """Every first bin of a ``length``-bin window wholly in Local rest and one visit.
 
-    For each length, the windows of that length lying wholly in Local rest are
-    put in one seeded random order, and the events of that length take them in
-    that order, by start (``matched_windows``' rule). Events left without one
+    Parameters
+    ----------
+    local_rest : ndarray of bool, shape (n_time,)
+        :func:`local_rest_mask`.
+    visit_index : ndarray of int, shape (n_time,)
+        Each bin's well visit, -1 outside every visit
+        (``well_visits.well_visit_index`` on the decode times).
+    length : int
+        The window's number of bins.
+
+    Returns
+    -------
+    ndarray of int
+        The valid first bins, ascending.
+    """
+    visit_index = np.asarray(visit_index, dtype=np.int64)
+    candidate = np.asarray(local_rest, dtype=bool) & (visit_index >= 0)
+    starts = _valid_starts(candidate, length)
+    return starts[visit_index[starts] == visit_index[starts + length - 1]]
+
+
+def _assign_windows(
+    s: NDArray, e: NDArray, starts_of_length: Callable[[int], NDArray], seed: Seed
+) -> pd.DataFrame:
+    """Each event's window from the valid starts of its length, or -1.
+
+    For each length, the valid starts are put in one seeded random order, and
+    the events of that length take them in that order, by start
+    (``matched_windows``' rule).
+    """
+    s, e = np.asarray(s, dtype=np.int64), np.asarray(e, dtype=np.int64)
+    lengths = e - s + 1
+    starts = np.full(s.size, -1, dtype=np.int64)
+    for length in np.unique(lengths):
+        rows = np.flatnonzero(lengths == length)
+        rows = rows[np.argsort(s[rows], kind="stable")]
+        order = keyed_rng(seed, LOCAL_REST, int(length), "baseline").permutation(
+            starts_of_length(int(length))
+        )
+        n = min(rows.size, order.size)
+        starts[rows[:n]] = order[:n]
+    return pd.DataFrame(
+        {"s": starts, "e": np.where(starts >= 0, starts + lengths - 1, -1)}
+    )
+
+
+def control_windows(
+    s: NDArray, e: NDArray, local_rest: NDArray, visit_index: NDArray, *, seed: Seed
+) -> pd.DataFrame:
+    """One window of each event's length inside one well visit, or none.
+
+    The windows of each length lying wholly in Local rest and in one well visit
+    (:func:`control_starts`) are put in one seeded random order, and the events
+    of that length take them in that order, by start. Events left without one
     get -1.
+
+    Parameters
+    ----------
+    s, e : ndarray of int, shape (n_events,)
+        Each event's first and last decode bin.
+    local_rest : ndarray of bool, shape (n_time,)
+        :func:`local_rest_mask`.
+    visit_index : ndarray of int, shape (n_time,)
+        Each bin's well visit, -1 outside every visit.
+    seed : Seed
+        The draw's seed (``keyed_rng``).
 
     Returns
     -------
@@ -99,21 +178,28 @@ def control_windows(
         Aligned with the events: ``s`` and ``e``, the window's first and last
         bin, -1 for an event with no control.
     """
-    s, e = np.asarray(s, dtype=np.int64), np.asarray(e, dtype=np.int64)
-    lengths = e - s + 1
-    mask = np.asarray(local_rest, dtype=bool)
-    starts = np.full(s.size, -1, dtype=np.int64)
-    for length in np.unique(lengths):
-        rows = np.flatnonzero(lengths == length)
-        rows = rows[np.argsort(s[rows], kind="stable")]
-        order = keyed_rng(seed, LOCAL_REST, int(length), "baseline").permutation(
-            _valid_starts(mask, int(length))
-        )
-        n = min(rows.size, order.size)
-        starts[rows[:n]] = order[:n]
-    return pd.DataFrame(
-        {"s": starts, "e": np.where(starts >= 0, starts + lengths - 1, -1)}
+    return _assign_windows(
+        s, e, lambda length: control_starts(local_rest, visit_index, length), seed
     )
+
+
+def windows_in_local_rest_anywhere(
+    s: NDArray, e: NDArray, local_rest: NDArray, *, seed: Seed
+) -> pd.DataFrame:
+    """The windows Local rest alone would give, anywhere in the epoch.
+
+    Drawn as :func:`control_windows` draws, without the well visits: the run
+    counts the events this leaves without a window beside those the control
+    rule leaves without one, so that what the visit restriction costs is
+    recorded. These windows are not controls.
+
+    Returns
+    -------
+    pd.DataFrame
+        As :func:`control_windows`.
+    """
+    mask = np.asarray(local_rest, dtype=bool)
+    return _assign_windows(s, e, lambda length: _valid_starts(mask, length), seed)
 
 
 def window_stops(time: NDArray, last: NDArray) -> NDArray:

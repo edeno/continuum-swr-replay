@@ -31,6 +31,7 @@ from pathlib import Path
 
 import pytest
 
+from continuum_swr_replay.analysis.behavior import design_constants
 from continuum_swr_replay.analysis.replay_models import model_specs as ms
 from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (
     _design_columns,
@@ -54,8 +55,8 @@ CONTRAST_LADDERS = {
 # The grid's self- and cross-history settings: (lags, basis).
 HISTORY = {
     "none": (0, 0),
-    "lags": (ms.N_HISTORY_LAGS, 0),
-    "basis": (ms.N_HISTORY_LAGS, ms.N_HISTORY_BASIS),
+    "lags": (design_constants.N_HISTORY_LAGS, 0),
+    "basis": (design_constants.N_HISTORY_LAGS, design_constants.N_HISTORY_BASIS),
 }
 
 
@@ -175,5 +176,5 @@ def test_formula_and_columns_come_from_the_same_terms() -> None:
             term_columns = {c for t in terms for c in t.columns}
             support = {"count"}
             if spec.time_clock == "arrival":
-                support.add(ms.ARRIVAL_CLOCK_COLUMN)
+                support.add(design_constants.ARRIVAL_CLOCK_COLUMN)
             assert set(spec.design_columns()) == term_columns | support, name

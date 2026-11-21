@@ -23,10 +23,14 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_tables.stop_table import (
     build_stop_table as _build_stop_table,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def build_stop_table(dot, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_stop_table(
         dot,
         trials,
@@ -72,6 +76,7 @@ def _trials_starting_at_t1() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "movement_start_time": [1.0],
+            "destination_first_poke_in_time": [1.5],
             "end_time": [1.5],
             "from_well": [1],
             "to_well": [0],
@@ -102,9 +107,11 @@ class TestBoutStartContextNoLeak:
         assert pd.isna(row["did_last_completed_trip_switch_patch"]), (
             f"is_after_switch leaked: {row['did_last_completed_trip_switch_patch']}"
         )
-        assert pd.isna(row["occupancy_well_arm"]), (
-            f"occupancy_well_arm leaked: {row['occupancy_well_arm']}"
-        )
+        # The stop starts inside the starting port's visit (well 1, poked in
+        # at t=0, final poke-out at t=1) and crosses its final poke-out, so its
+        # current arm is that visit's well, known at the stop's start: arm 0.
+        assert row["visit_context"] == "spans_visit_end"
+        assert row["occupancy_well_arm"] == 0.0
         # The bout-start clocks are the same leak surface: the trip completes
         # at t=1.5, inside the bout, so a NaN-skipping first would report its
         # arrival/outcome times as if the animal had already been sitting at

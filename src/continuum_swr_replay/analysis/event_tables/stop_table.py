@@ -57,7 +57,13 @@ from .bouts import (
 from .bouts import (
     nearest_well_distance_cm as _nearest_well_distance_cm,
 )
-from .visit_context import VISIT_CONTEXT_COLUMNS, visit_context_of_samples
+from .visit_context import (
+    STOP_VISIT_COLUMNS,
+    VISIT_CONTEXT_COLUMNS,
+    assign_visit_current_arm,
+    stop_visit_columns,
+    visit_context_of_samples,
+)
 
 
 def build_stop_table(
@@ -91,7 +97,16 @@ def build_stop_table(
     ``last_completed_well_visit_id``, ``time_since_last_poke_out_s``,
     ``time_until_next_poke_in_s``; ``visit_context.window_visit_context``)
     reads the same rows as the location summaries: a stop wholly inside
-    excluded time is ``no_analyzed_samples``.
+    excluded time is ``no_analyzed_samples``. A stop that starts inside a visit
+    and crosses its final poke-out (``spans_visit_end``) takes the visit's
+    well, as its events do: its ``occupancy_well_arm``, ``current_patch`` and
+    ``is_stay`` are the visit's (``visit_context.assign_visit_current_arm``),
+    and ``occupancy_well_id`` stays the whole-stop location (missing). The visit the stop overlaps
+    (``overlapping_visit_id``, ``visit_first_poke_in_s``,
+    ``visit_last_poke_out_s``, ``in_visit_immobile_s``,
+    ``visit_stretch_index``, ``stop_end_kind``;
+    ``visit_context.stop_visit_columns``) is read from the stop's span and the
+    port experiences.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -272,6 +287,14 @@ def build_stop_table(
     )
     for column in VISIT_CONTEXT_COLUMNS:
         per_bout[column] = visit[column].array
+    # A stop that starts inside a visit and crosses its final poke-out takes
+    # the visit's well, as its events do.
+    per_bout = assign_visit_current_arm(per_bout, port_experiences, track_graph)
+    # The visit the stop overlaps, its poke times, the stop's seconds inside
+    # the visits and how the stop ends.
+    stop_visit = stop_visit_columns(bout_starts, bout_ends, port_experiences, excluded)
+    for column in STOP_VISIT_COLUMNS:
+        per_bout[column] = stop_visit[column].array
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)
@@ -299,21 +322,19 @@ def add_nonlocal_swr_split(
     needs both canonical tables and so lives outside :func:`build_stop_table`,
     which is deliberately event-table-independent.
     """
-    # Idempotent: drop any prior split so re-calling never produces _x/_y dups.
-    out = stop_table.drop(
-        columns=["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"],
-        errors="ignore",
-    ).copy()
-    require_columns(out, ["n_selected_events"], "add_nonlocal_swr_split's stop_table")
-    total = out["n_selected_events"]
-    if (
-        len(event_table) == 0
-        or "stop_id" not in event_table.columns
-        or "is_swr" not in event_table.columns
-    ):
-        out["n_nonlocal_swr_events"] = 0
-        out["n_nonlocal_non_swr_events"] = total.astype(np.int64)
-        return out
+    require_columns(
+        stop_table,
+        ["stop_id", "n_selected_events"],
+        "add_nonlocal_swr_split's stop_table",
+    )
+    require_columns(
+        event_table, ["stop_id", "is_swr"], "add_nonlocal_swr_split's event_table"
+    )
+    # The shard assembly recomputes the split on stop tables that already carry
+    # it (each shard's build added its own): drop it first, so that the merge
+    # below does not make _x/_y duplicates.
+    split_cols = ["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]
+    out = stop_table.drop(columns=[c for c in split_cols if c in stop_table.columns])
 
     ev = event_table.dropna(subset=["stop_id"]).copy()
     # A non-local event whose stop_id is absent from stop_table would be silently
@@ -333,6 +354,9 @@ def add_nonlocal_swr_split(
         ev.groupby(["stop_id", "_swr"])
         .size()
         .unstack("_swr", fill_value=0)
+        # A session with no SWR (or no non-SWR) event has a zero count, not an
+        # absent column.
+        .reindex(columns=[True, False], fill_value=0)
         .rename(
             columns={
                 True: "n_nonlocal_swr_events",
@@ -340,15 +364,11 @@ def add_nonlocal_swr_split(
             }
         )
     )
-    for col in ("n_nonlocal_swr_events", "n_nonlocal_non_swr_events"):
-        if col not in counts.columns:
-            counts[col] = 0
     out = out.merge(
         counts[["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]],
         left_on="stop_id",
         right_index=True,
         how="left",
     )
-    split_cols = ["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]
     out[split_cols] = out[split_cols].fillna(0).astype(np.int64)
     return out

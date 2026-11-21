@@ -1,13 +1,10 @@
 #!/usr/bin/env python
-"""Build the Part B within-stop time-binned tables over all sessions.
+"""Build the within-stop event-onset table over all sessions.
 
 Per session: load ``dot`` + pump-event times, build the sparse event-onset
-table and the dense 4 ms stop-timebin table (see
-``analysis.event_tables.timebin_tables``), concatenate, stamp with the canonical
-covariate schema, and save:
-
-- ``event_onset_table.parquet``  (sparse, ~one row per onset)
-- ``stop_timebin_table.parquet`` (dense, ~one row per (stop, 4 ms bin))
+table (see ``analysis.event_tables.timebin_tables``), concatenate, stamp with
+the canonical covariate schema, and save ``event_onset_table.parquet`` (one row
+per onset).
 
 Usage:
     uv run python scripts/tables/build_timebin_tables.py --max-per-animal 1   # smoke
@@ -32,10 +29,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.event_tables.timebin_tables import (  # noqa: E402
-    ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
-    build_stop_timebin_table,
-    concat_session_timebin_tables,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
@@ -53,7 +47,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+def build_one(session: dict) -> pd.DataFrame:
     # SWR labels from the one SWR source, not the decode's stored ripples
     dot = read_dot_with_swr_source(session["dot_file"])
     data = load_data(
@@ -67,45 +61,18 @@ def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
         if pumps is not None and len(pumps)
         else np.array([])
     )
-    return build_event_onset_table(dot, pump_times), build_stop_timebin_table(
-        dot, pump_times
-    )
+    return build_event_onset_table(dot, pump_times)
 
 
-def validate(
-    onset: pd.DataFrame, dense: pd.DataFrame, in_excluded: dict[str, int]
-) -> None:
-    # Dense onset totals reconstruct the sparse onset counts. Both derive from
-    # the same _event_onset_times + assign_bout, so they must agree exactly,
-    # once the onsets whose bin the dense table dropped for touching excluded
-    # time (`in_excluded`, summed over sessions) are added back.
-    for etype, col in [
-        ("SWR", "n_swr_events"),
-        ("non_local", "n_nonlocal_events"),
-        ("MUA", "n_mua_events"),
-    ]:
-        a = int((onset.event_type == etype).sum())
-        b = int(dense[col].sum())
-        c = int(in_excluded.get(etype, 0))
-        assert a == b + c, (
-            f"{etype}: onset rows {a} != dense {col} sum {b} + {c} onsets in "
-            "excluded bins"
-        )
-    assert (dense.t_since_stop_onset >= 0).all(), "negative t_since_stop_onset"
+def validate(onset: pd.DataFrame) -> None:
     assert (onset.t_since_stop_onset >= 0).all(), "negative onset t_since_stop_onset"
-    # Reward stops: at least some bins land soon after the pump.
-    rw = dense[dense.is_reward_stop & dense.t_since_pump.notna()]
-    near = float((rw.t_since_pump < 2.0).mean()) if len(rw) else float("nan")
     logger.info(
-        "validation OK | onsets: SWR=%d non_local=%d MUA=%d | dense bins=%d "
-        "(reward-stop bins=%d, %.0f%% within 2s of pump) | t_since_pump non-null %.0f%%",
+        "validation OK | onsets: SWR=%d non_local=%d MUA=%d | t_since_pump "
+        "non-null %.0f%%",
         int((onset.event_type == "SWR").sum()),
         int((onset.event_type == "non_local").sum()),
         int((onset.event_type == "MUA").sum()),
-        len(dense),
-        int(dense.is_reward_stop.sum()),
-        100 * near,
-        100 * dense.t_since_pump.notna().mean(),
+        100 * onset.t_since_pump.notna().mean(),
     )
 
 
@@ -118,7 +85,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         type=Path,
         default=replay_content_dir(),
         help=(
-            "Directory both tables are written to. Defaults to the canonical "
+            "Directory the table is written to. Defaults to the canonical "
             "replay_content root; pass a staging directory to build without "
             "overwriting it."
         ),
@@ -126,70 +93,46 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = ap.parse_args(argv)
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
-    logger.info("building time-binned tables for %d sessions...", len(sessions))
+    logger.info("building the event-onset table for %d sessions...", len(sessions))
     session_tables, failures, t0 = [], [], time.time()
     for i, s in enumerate(sessions):
         try:
-            o, d = build_one(s)
+            session_tables.append(build_one(s))
         except Exception as e:  # noqa: BLE001
             failures.append((s["nwb_file_name"], s["epoch_name"], str(e)))
             continue
-        if not len(d):
-            failures.append((s["nwb_file_name"], s["epoch_name"], "no stop bins"))
-            continue
-        session_tables.append((o, d))
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
 
-    # Fail closed. These tables are joined to event/stop tables on stop keys;
-    # the onset table feeds every Family-B rate fit (which rebuilds its own
-    # 15 ms bins from stop_table, so it never reads the dense table) and the
-    # dense table feeds the exploratory time-course scripts. A silently dropped
-    # session would ship a timebin table covering fewer sessions than its
-    # siblings, which no downstream reader (they only check the schema stamp)
-    # would catch.
+    # Fail closed. The table is joined to the event and stop tables on stop
+    # keys and feeds every Family-B rate fit; a silently dropped session would
+    # ship a table covering fewer sessions than its siblings, which no
+    # downstream reader (they only check the schema stamp) would catch.
     if failures:
         raise RuntimeError(
-            f"{len(failures)} of {len(sessions)} session(s) failed to build a "
-            f"timebin table; sample={failures[:10]}. Nothing was written."
+            f"{len(failures)} of {len(sessions)} session(s) failed to build an "
+            f"event-onset table; sample={failures[:10]}. Nothing was written."
         )
-    onset, dense = concat_session_timebin_tables(session_tables)
-    in_excluded = dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]
-    for label, frame in (("event_onset", onset), ("stop_timebin", dense)):
-        n = n_sessions(frame)
-        if n != len(sessions):
-            raise RuntimeError(
-                f"{label} table has {n} sessions; expected {len(sessions)}"
-            )
-    logger.info("onsets in bins dropped for excluded time: %s", in_excluded)
-    validate(onset, dense, in_excluded)
+    onset = pd.concat(session_tables, ignore_index=True)
+    n = n_sessions(onset)
+    if n != len(sessions):
+        raise RuntimeError(
+            f"event_onset table has {n} sessions; expected {len(sessions)}"
+        )
+    validate(onset)
 
     if args.no_save:
-        logger.info(
-            "--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense)
-        )
+        logger.info("--no-save: onsets=%d, not written", len(onset))
         return
-    # publish_swr_table checks the source; publish_canonical stamps and writes
-    # atomically.
-    # Both were built from decode frames read through the SWR source.
+    # publish_swr_table checks the source and writes atomically; the table was
+    # built from decode frames read through the SWR source.
     publish_swr_table(
         stamp_swr_source(onset),
         args.output_dir,
         table="event_onset",
         basename="event_onset_table",
     )
-    publish_swr_table(
-        stamp_swr_source(dense),
-        args.output_dir,
-        table="stop_timebin",
-        basename="stop_timebin_table",
-    )
-    logger.info(
-        "saved %d onsets -> event_onset_table.parquet, "
-        "%d bins -> stop_timebin_table.parquet",
-        len(onset),
-        len(dense),
-    )
+    logger.info("saved %d onsets -> event_onset_table.parquet", len(onset))
 
 
 if __name__ == "__main__":

@@ -169,8 +169,6 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
     # Validate using the same helper as the canonical table builders.
     trial_context_at_times(np.array([lo]), ordered, ctx.port_experiences)
     completion_times = trial_arrival_times(ordered)
-    if not np.isfinite(completion_times).all():
-        raise ValueError("canonical trial cutoff times must be finite")
 
     drew_interval = False
     for trial_idx, (_, row) in enumerate(ordered.iterrows()):

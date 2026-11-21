@@ -37,7 +37,7 @@ from continuum_swr_replay.tables.standardization import (
     load_reference,
 )
 
-from ..constants import IN_WELL_VISIT, VISIT_CONTEXTS
+from ..constants import IN_WELL_VISIT, STARTS_IN_WELL_VISIT, VISIT_CONTEXTS
 from ._common import EVENT_ARM_STANDARDIZED_COLS
 from .content_response import validate_fraction_response
 from .summaries import PROBABILITY_ROW_SUM_ATOL
@@ -100,8 +100,10 @@ def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
     Every event and stop table carries the label, the non-local tables and the
     ContFrag tables (SWR and MUA events) alike, so a table without
     ``visit_context`` or ``occupancy_state`` is refused, also when it has no
-    rows. Every value is one of ``analysis.constants.VISIT_CONTEXTS``, and a
-    row is ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``.
+    rows. Every value is one of ``analysis.constants.VISIT_CONTEXTS``, a row
+    is ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``, and a
+    row that crosses a visit boundary (``spans_visit_end``,
+    ``spans_visit_start``) is ``mixed``.
 
     Raises
     ------
@@ -123,6 +125,12 @@ def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
         raise ValueError(
             f"{table_name} has visit_context in_visit rows that are not at_well, "
             "or at_well rows that are not in_visit"
+        )
+    spans = labels.isin(("spans_visit_end", "spans_visit_start")).to_numpy()
+    if (frame["occupancy_state"].astype(object).to_numpy()[spans] != "mixed").any():
+        raise ValueError(
+            f"{table_name} has visit_context spans_visit_end or "
+            "spans_visit_start rows that are not mixed"
         )
 
 
@@ -550,39 +558,52 @@ def validate_canonical_table_contract(
             "inconsistent with location_state"
         )
 
-    # A current candidate is scientifically defined only for whole-window
-    # at-well events. Numeric zeros off-well would retain those events in the
-    # common cohort and silently change the estimand.
+    # A current candidate is scientifically defined only for the events that
+    # start inside a well visit (wholly inside it, or crossing its final
+    # poke-out, whose current arm is the visit's well). Numeric zeros
+    # elsewhere would retain those events in the common cohort and silently
+    # change the estimand.
+    require_visit_context_labels(long_df, f"canonical table {table_label}")
+    in_visit = long_df["visit_context"].isin(STARTS_IN_WELL_VISIT)
     current_col = "is_current_arm" if hierarchy_kind == "arm" else "is_current_patch"
     current = long_df[current_col]
     if not current.dropna().isin([0.0, 1.0]).all():
         raise ValueError(
             f"Canonical content table {table_label} has non-binary {current_col}"
         )
-    if current.loc[~at_well].notna().any() or current.loc[at_well].isna().any():
+    if current.loc[~in_visit].notna().any() or current.loc[in_visit].isna().any():
         raise ValueError(
             f"Canonical content table {table_label} must encode {current_col} "
-            "as one-hot at wells and NaN off-well"
+            "as one-hot for events that start inside a well visit and NaN "
+            "elsewhere"
         )
     current_sums = (
-        long_df.loc[at_well]
+        long_df.loc[in_visit]
         .groupby(unit_cols, sort=False, observed=True)[current_col]
         .sum()
     )
     if not current_sums.eq(1.0).all():
         raise ValueError(
             f"Canonical content table {table_label} must encode exactly one "
-            f"{current_col} candidate for every at-well event"
+            f"{current_col} candidate for every event that starts inside a "
+            "well visit"
         )
 
-    for location_col in ("occupancy_well_id", "occupancy_well_arm"):
+    for location_col, defined, where in (
+        ("occupancy_well_id", at_well, "at-well events"),
+        (
+            "occupancy_well_arm",
+            in_visit,
+            "events that start inside a well visit",
+        ),
+    ):
         if (
-            long_df.loc[at_well, location_col].isna().any()
-            or long_df.loc[~at_well, location_col].notna().any()
+            long_df.loc[defined, location_col].isna().any()
+            or long_df.loc[~defined, location_col].notna().any()
         ):
             raise ValueError(
                 f"Canonical content table {table_label} must define "
-                f"{location_col} only for at-well events"
+                f"{location_col} only for {where}"
             )
     current_reference = (
         long_df["occupancy_well_arm"]
@@ -590,7 +611,7 @@ def validate_canonical_table_contract(
         else long_df["occupancy_well_arm"].map(TRACK_SEGMENT_TO_PATCH)
     )
     expected_current = long_df[candidate_col].eq(current_reference).astype(float)
-    if not current.loc[at_well].eq(expected_current.loc[at_well]).all():
+    if not current.loc[in_visit].eq(expected_current.loc[in_visit]).all():
         relation = (
             "occupancy_well_arm"
             if hierarchy_kind == "arm"

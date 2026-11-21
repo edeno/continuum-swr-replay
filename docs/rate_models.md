@@ -207,9 +207,7 @@ offset. Its limitation is exactly that offset — see below.
   session; and the time courses' support over the well-anchored stops. Not
   every panel is a reported value: the descriptive onset rate, the self-history
   kernel by lag and each rung's change in AIC from M0 are not, and each
-  script's docstring names which are. The
-  descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
-  (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
+  script's docstring names which are.
 
   The four rate fitters — `scripts/replay_models/rate/fit_per_bin_rate_models.py`,
   `scripts/replay_models/rate/fit_per_stop_rate_models.py`, `scripts/replay_models/rate/fit_swr_contrast_rate.py`

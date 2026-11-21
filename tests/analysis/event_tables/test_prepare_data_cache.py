@@ -415,3 +415,52 @@ def test_cache_only_population_fails_if_any_session_is_unavailable(monkeypatch):
 
     with pytest.raises(RuntimeError, match="1 of 2 session"):
         prepare_cli.populate_behavioral_context_cache(sessions, from_cache=True)
+
+
+def test_well_visit_times_reads_the_visits_from_the_cache(patched, fake_session):
+    calls, _ = patched
+    pdm.load_behavioral_context(fake_session, from_cache=False)
+    arrivals, departures = pdm.well_visit_times(fake_session["session_id"])
+    assert calls["n"] == 1  # served from the cache
+    assert arrivals.tolist() == [0.0]
+    assert departures.tolist() == [2.0]
+
+
+def test_well_visit_times_refuse_a_missing_entry_and_never_fetch(patched, fake_session):
+    calls, cache_dir = patched
+    with pytest.raises(FileNotFoundError, match="no session cache entry"):
+        pdm.well_visit_times(fake_session["session_id"])
+    assert calls["n"] == 0  # Spyglass was not asked
+    assert not any(cache_dir.rglob("*.pkl"))  # and nothing was written
+
+
+def test_well_visit_times_refuse_an_off_contract_entry_and_leave_it(
+    patched, fake_session
+):
+    calls, _ = patched
+    pdm.load_behavioral_context(fake_session, from_cache=False)
+    path = pdm.behavioral_context_cache_path(fake_session)
+    with path.open("rb") as f:
+        entry = pickle.load(f)
+    entry["cache_schema_version"] = "an older contract"
+    with path.open("wb") as f:
+        pickle.dump(entry, f)
+    written = path.read_bytes()
+    with pytest.raises(ValueError, match="off the current behavioral-context"):
+        pdm.well_visit_times(fake_session["session_id"])
+    assert calls["n"] == 1  # only the priming call
+    assert path.read_bytes() == written  # the entry is not rewritten
+
+
+def test_cached_port_experiences_read_the_entry_and_refuse_a_miss(
+    patched, fake_session
+):
+    calls, cache_dir = patched
+    with pytest.raises(FileNotFoundError, match="no session cache entry"):
+        pdm.cached_port_experiences(fake_session["session_id"])
+    assert calls["n"] == 0 and not any(cache_dir.rglob("*.pkl"))
+    _, experiences, _, _ = pdm.load_behavioral_context(fake_session, from_cache=False)
+    pd.testing.assert_frame_equal(
+        pdm.cached_port_experiences(fake_session["session_id"]), experiences
+    )
+    assert calls["n"] == 1  # served from the cache

@@ -31,7 +31,7 @@ hand-joined string. Nothing under the root is committed.
 | SWR inventories (Kay, Karlsson, Yu, Zugaro) | `replay_detection_comparison/swr/<run id>/` | `scripts/detection/run_swr_detection.py` |
 | Decodes, non-local detector | `{epoch_id}_results.nc`, `_detector.pkl`, `_environment.pkl`, `_80_data_over_time.pkl` | `scripts/decoding/run_decoding_bandit.py` |
 | Decodes, ContFrag | `{epoch_id}_contfrag_results.nc`, `_contfrag_detector.pkl`, `_contfrag_environment.pkl`, `_contfrag_data_over_time.pkl`; the SWR or MUA event source is chosen later, by `prepare_contfrag_replay_content_data.py --event-source` | `scripts/decoding/run_decoding_contfrag.py` |
-| Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset,stop_timebin}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
+| Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
 | Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/replay_models/` (`rate/`, `content/`, `coupling/`, `choice/`), all run by `scripts/workflows/run_refits.py` |
 | Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` (the detectors), `scripts/detector_comparison/` (the comparison and event features) |
 | Part 4 fits (mPFC) | `{epoch_id}_mPFC_modulation.pkl` and its `.npy` arrays | `scripts/pfc/run_pfc_analysis_bandit.py` |
@@ -47,6 +47,17 @@ The event, event × arm, event × patch, event sequence and stop tables share
 event ids, and the qvals table joins to them, so they are rebuilt together; a
 partial rebuild mis-joins silently
 ([development.md](development.md#canonical-per-event-classification-table)).
+
+The stop, event, event × arm and event × patch tables (non-local and ContFrag)
+carry the well-visit columns, built from the port experiences of the behavioral
+cache: the stop table's `well_visit_id`, `overlapping_visit_id`,
+`visit_first_poke_in_s`, `visit_last_poke_out_s`, `in_visit_immobile_s`,
+`visit_stretch_index` and `stop_end_kind`; the event table's
+`time_since_visit_start_s`, `time_until_visit_end_s`,
+`time_until_stretch_end_s` and `n_visits_arrived`, carried to the event × arm
+and event × patch tables; and the event × arm table's
+`log1p_n_known_visits_candidate_arm`
+([covariate_dictionary.md](covariate_dictionary.md), F.5).
 
 The canonical tables sit at the root of `replay_content/`, beside their
 standardization references (`standardization_reference.json`,

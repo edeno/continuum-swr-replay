@@ -3,8 +3,10 @@
 
 For every canonical immobile non-local event (``replay_content/event_table.parquet``,
 read through the SWR source) and one control window of the same length drawn from
-Local rest in the same epoch (``analysis.event_evidence.participation``), count each
-HPC tetrode's spikes and write:
+Local rest inside one well visit of the same epoch
+(``analysis.event_evidence.participation``: every bin of the window is Local rest
+and in the same visit, the visits read from the session cache only,
+``prepare_data.well_visit_times``), count each HPC tetrode's spikes and write:
 
 - ``{epoch_id}_participation.parquet`` per epoch: one row per window (``kind`` ``"event"`` or
   ``"control"``), with ``event_id``, ``group`` (``"SWR"`` or ``"no SWR"``, the
@@ -14,6 +16,17 @@ HPC tetrode's spikes and write:
   settings and inputs, the code's provenance), and ``manifest.json`` gathered
   from every epoch's record (``runs.epoch_records``); an epoch with an ``ok``
   record of the same settings and inputs is not run again.
+
+Every event of the epoch has its ``"event"`` row, whatever its well-visit label
+(the readers select the events); the control rule is the same for all of them.
+An event with no window of its length inside one visit has no ``"control"`` row:
+each epoch's record counts those per group (``n_without_control``) and, beside
+them, the events Local rest anywhere in the epoch would leave without one
+(``n_without_control_any_local_rest``). The settings record the subset
+(``cohort_selection.ANALYZED_SUBSET``) and the control rule
+(``participation.CONTROL_RULE``); the inputs, the event table's SHA-256 and the
+session-cache entries' (``prepare_data.session_cache_record``, over every epoch
+of the event table).
 
 Spike times are read from the lab's database through ``load_data`` (read only).
 
@@ -40,13 +53,23 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
     read_swr_table,
 )
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_epoch_ids,
+)
+from continuum_swr_replay.analysis.event_definition.well_visits import (
+    well_visit_index,
 )
 from continuum_swr_replay.analysis.event_evidence import participation as pt
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
     event_bins,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
@@ -97,8 +120,20 @@ def load_spike_times(epoch_id: str) -> list[np.ndarray]:
     return [np.sort(np.asarray(t)) for t in data["spike_times"][key.brain_area]]
 
 
-def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataFrame:
-    """One epoch's windows: its events and their Local-rest controls."""
+def epoch_table(
+    epoch_id: str, events: pd.DataFrame, data_dir: Path
+) -> tuple[pd.DataFrame, dict[str, dict[str, int]]]:
+    """One epoch's windows: its events and their Local-rest controls inside a visit.
+
+    Returns
+    -------
+    table : pd.DataFrame
+        One row per window, the events first, then the controls.
+    without_control : dict
+        Per group (``"SWR"``, ``"no SWR"``), the events with no control
+        (``n_without_control``) and those Local rest anywhere in the epoch would
+        leave without a window (``n_without_control_any_local_rest``).
+    """
     frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
     time = frame.index.to_numpy(dtype=float)
     bin_s = sample_step(time)  # for the margin only
@@ -114,12 +149,21 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     s, e = event_bins(
         time, events["event_start_s"].to_numpy(), events["event_end_s"].to_numpy()
     )
-    controls = pt.control_windows(s, e, local_rest, seed=(SEED, epoch_id))
+    visit_index = well_visit_index(time, *well_visit_times(epoch_id))
+    seed = (SEED, epoch_id)
+    controls = pt.control_windows(s, e, local_rest, visit_index, seed=seed)
+    anywhere = pt.windows_in_local_rest_anywhere(s, e, local_rest, seed=seed)
     spike_times = load_spike_times(epoch_id)
     group = np.where(
         events["is_swr"].to_numpy(dtype=bool), SWR_LABELS[True], SWR_LABELS[False]
     )
     has_control = controls["s"].to_numpy() >= 0
+    without_control = {
+        "n_without_control": _count_by_group(group, ~has_control),
+        "n_without_control_any_local_rest": _count_by_group(
+            group, anywhere["s"].to_numpy() < 0
+        ),
+    }
     parts = []
     for kind, keep, first, last in (
         ("event", np.ones(len(events), dtype=bool), s, e),
@@ -141,19 +185,26 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
                 duration_s=stop - start,
             )
         )
-    return pd.concat(parts, ignore_index=True)
+    return pd.concat(parts, ignore_index=True), without_control
+
+
+def _count_by_group(group: np.ndarray, flagged: np.ndarray) -> dict[str, int]:
+    """How many flagged events each group has (both groups, zero included)."""
+    return {
+        label: int((flagged & (group == label)).sum()) for label in SWR_LABELS.values()
+    }
 
 
 def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) -> dict:
     """Measure one epoch and write its table; return its status record."""
     started = clock.time()
     events = epoch_events(read_swr_table(event_table), epoch_id)
-    table = epoch_table(epoch_id, events, data_dir)
+    table, without_control = epoch_table(epoch_id, events, data_dir)
     write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
     return {
         "status": "ok",
         "n_events": len(events),
-        "n_without_control": int(len(events) - (table["kind"] == "control").sum()),
+        **without_control,
         "seconds": round(clock.time() - started, 1),
     }
 
@@ -169,6 +220,7 @@ def main(argv: list[str] | None = None) -> None:
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_PARTICIPATION_DIR
     event_table = event_table_path(data_dir)
+    every_epoch = sorted(set(event_epoch_ids(read_swr_table(event_table))))
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
@@ -176,13 +228,17 @@ def main(argv: list[str] | None = None) -> None:
             "seed": SEED,
             "local_threshold": pt.LOCAL_THRESHOLD,
             "margin_s": pt.MARGIN_S,
+            "subset": ANALYZED_SUBSET,
+            "control_rule": pt.CONTROL_RULE,
         },
-        "inputs": {"event_table": event_table_input(event_table)},
+        "inputs": {
+            "event_table": event_table_input(event_table),
+            "session_cache": session_cache_record(every_epoch),
+        },
     }
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    every_epoch = sorted(set(event_epoch_ids(read_swr_table(event_table))))
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,

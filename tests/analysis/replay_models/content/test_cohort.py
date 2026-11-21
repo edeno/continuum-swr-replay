@@ -172,6 +172,7 @@ def test_unknown_location_events_are_accepted_with_null_at_well():
     event_mask = frame["event_id"].eq(0)
     frame["at_well"] = frame["at_well"].astype("boolean")
     frame.loc[event_mask, "occupancy_state"] = "unknown"
+    frame.loc[event_mask, "visit_context"] = "before_first_visit"
     frame.loc[event_mask, "at_well"] = pd.NA
     for column in ("occupancy_well_id", "occupancy_well_arm", "is_current_arm"):
         frame.loc[event_mask, column] = np.nan

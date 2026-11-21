@@ -41,7 +41,10 @@ from tests.analysis.event_tables.test_replay_tables import (
     _tiny_dot_with_two_events,
     _tiny_posterior,
 )
-from tests.support._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import (
+    port_experiences_from_trials,
+    with_outcome_known_time,
+)
 
 
 def _experiences(trials: pd.DataFrame, *, initial: bool = True) -> pd.DataFrame:
@@ -49,10 +52,12 @@ def _experiences(trials: pd.DataFrame, *, initial: bool = True) -> pd.DataFrame:
 
 
 def build_event_table(dot, env, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_event_table(dot, env, trials, _experiences(trials), graph, **kwargs)
 
 
 def build_event_arm_table(event_table, dot, env, trials, graph, **kwargs):
+    trials = with_outcome_known_time(trials)
     return _build_event_arm_table(
         event_table, dot, env, trials, _experiences(trials), graph, **kwargs
     )
@@ -65,6 +70,7 @@ def visit_recency_all_events(event_times, trials, well_to_arm):
 
 
 def add_trial_context(dot, trials):
+    trials = with_outcome_known_time(trials)
     return _add_trial_context(dot, trials, _experiences(trials))
 
 

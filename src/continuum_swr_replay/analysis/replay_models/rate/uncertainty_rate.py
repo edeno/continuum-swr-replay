@@ -18,6 +18,12 @@ import logging
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+    TMAX,
+)
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.data_loaders.epoch_register import first_exposure_epochs
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
@@ -30,12 +36,8 @@ from ..model_specs import (
     MODEL_UNCERTAINTY_RATE,
     MU_UNCERTAINTY_COVARIATES,
     MU_UNCERTAINTY_RL_COVARIATES,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     PER_BIN_DESIGN,
-    RATE_BIN_S,
     STOP_COVARIATES,
-    TMAX,
     longest_history_window_s,
 )
 from ..per_bin_design import POPULATIONS, aggregate_to_timebins

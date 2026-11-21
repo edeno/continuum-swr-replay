@@ -344,8 +344,7 @@ def _validated_stop_table(
         "completed_trial_arm",
         "did_last_completed_trip_switch_patch",
         # wsls_deviation reads the *realized* outcome, not the gated flags --
-        # validate the column actually consumed. The gated primitive is retained
-        # because a stop table lacking it predates the outcome clock entirely.
+        # validate the column actually consumed.
         "completed_trial_reward",
         "is_rewarded_outcome",
         "is_stay",

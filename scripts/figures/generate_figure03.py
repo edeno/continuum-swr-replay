@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 """Generate Figure 3: what SWR and no-SWR non-local events are like.
 
-The immobile non-local events of the canonical event table, split by whether
-they overlap an SWR (Kay's detector, the SWR source). The starting hypothesis
+The immobile non-local events of the canonical event table that start inside
+a well visit (from the first poke-in at a well to the final poke-out; selected
+once, where the table is read, by ``cohort_selection.select_visit_context``;
+the content's time bins are read for those events), split by whether they
+overlap an SWR (Kay's detector, the SWR source). The starting hypothesis
 is that the two are different kinds of event, so every panel draws them
 separately and none pools them; the legend gives each kind's number of events.
 Each row asks one thing:
@@ -82,6 +85,9 @@ from matplotlib.gridspec import GridSpec
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
@@ -175,7 +181,7 @@ HISTOGRAMS = {
 def read_inputs() -> dict:
     """The events, their content's time bins, and the other inputs."""
     inputs = default_inputs()
-    events = read_swr_table(inputs.event_table)
+    events = select_visit_context(read_swr_table(inputs.event_table))
     n_epochs = len(analyzed_epoch_ids())
     along, _ = content_along_arms_bins(
         events,

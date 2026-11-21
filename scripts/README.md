@@ -46,16 +46,22 @@ them importable.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal, with figures.
 - `run_event_features.py` — the features of every compared event of the nine inventories.
 - `add_state_shares.py` — adds each compared event's decoder-state shares to an event features run.
+- `measure_exposure_in_well_visits.py` — each epoch's non-local detector exposure, rebuilt from an inventory comparison run's tables, and its part inside the well visits (the events summary's left-out rates).
 - `report_event_features.py` — the features of one event features run, per session and per animal, with figures.
 - `sweep_memoryless_heldout.py` — held-out content of both detectors on simulated data; writes `detection_heldout_summary.csv` beside the sweep summaries.
 
 ## `event_evidence/` — are the events real (Part 2)
 - `run_state_evidence.py` — held-out spike evidence for each decoder state on every canonical HPC decode.
-- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
+- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling, over the bouts that start inside a well visit (it records `cohort_selection.ANALYZED_SUBSET` and the bouts kept and left out in its provenance).
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
-- `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
+- `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux). It scores every event; the summary reads the events that start inside a well visit and the quiet windows whose first sample is inside one.
 
 ## `event_properties/` — what the events are like (Part 2)
+Each is over the events that start inside a well visit and the time inside one
+(`docs/figure-pipeline.md`, "The data subset of Figures 2 and 3"), and records
+`cohort_selection.ANALYZED_SUBSET` in its manifest; `measure_content_along_arms.py`
+and the `measure` stage of `measure_ripple_class_structure.py` measure every event,
+and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
 - `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2j).
@@ -63,13 +69,11 @@ them importable.
 
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables (event / event-arm / event-patch / event-sequence / stop).
-- `regenerate_stop_table.py` — rebuild the per-stop immobility table.
-- `build_timebin_tables.py` — build the per-(stop×bin) design tables.
+- `build_timebin_tables.py` — build the event-onset table.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
 - `assemble_replay_content_shards.py`, `assemble_contfrag_shards.py` — assemble per-animal table shards into one bundle.
 - `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing a preserved bundle's posterior aggregates.
 - `write_regeneration_manifest.py` — validate candidate covariate bundles and write the release manifest.
-- `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the tables.
 - `_table_runner.py` — not a script: the session selection, shard reading and publishing the drivers above share.
 
 ## `behavior/` — what the animal did and what the behavioral model says
@@ -86,6 +90,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `fit_cross_history_ridge_cv.py` — ridge cross-validated comparison of self vs self+cross history, per animal.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
+- `describe_visit_clocks.py` — model-free event-start rates per at-risk second on the three visit clocks, per kind and animal, and the stops by how they end; writes `models_convention/descriptive/visit_clock_curves.parquet`.
 
 ## `replay_models/coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power against the behavioral covariates.

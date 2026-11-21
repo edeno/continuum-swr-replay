@@ -65,6 +65,9 @@ from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     add_uncertainty_covariates,
     assert_qvals_aligned,
 )
+from continuum_swr_replay.analysis.behavior.design_constants import (  # noqa: E402
+    RATE_BIN_S,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     require_swr_source,
 )
@@ -81,9 +84,6 @@ from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
 )
 from continuum_swr_replay.analysis.replay_models.cohort_audit import (  # noqa: E402
     write_cohort_audit,
-)
-from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
-    RATE_BIN_S,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
     attach_is_swr_to_onsets,

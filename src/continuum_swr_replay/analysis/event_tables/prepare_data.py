@@ -12,19 +12,27 @@ loops, the shard assembly and the publishing) call these.
 
 Also the home of the behavioral-context cache (:func:`load_behavioral_context`,
 :func:`session_cache_dir`), the per-session pickle of the Spyglass trials,
-port experiences and track graph that the replay and ContFrag builds share.
+port experiences and track graph that the replay and ContFrag builds share,
+and of :func:`well_visit_times`, an epoch's well visits read from it, with
+the record a time-masked output keeps of them (:func:`session_cache_record`,
+checked by :func:`session_cache_staleness` and :func:`time_mask_staleness`).
 """
 
 from __future__ import annotations
 
 import logging
 import pickle
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import assert_qvals_aligned
+from continuum_swr_replay.analysis.behavior.covariates.history._common import (
+    _prepare_port_experiences,
+)
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
@@ -33,6 +41,9 @@ from continuum_swr_replay.analysis.detection.nonlocal_events import (
 )
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -58,6 +69,8 @@ from continuum_swr_replay.data_loaders.trials import (
 )
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.paths import replay_content_dir
+from continuum_swr_replay.runs.io import files_sha256
+from continuum_swr_replay.runs.staleness import recorded_sha256
 from continuum_swr_replay.tables.io import write_atomically
 from continuum_swr_replay.tables.session_keys import present_session_columns
 from continuum_swr_replay.tables.standardization import (
@@ -136,6 +149,53 @@ def _behavioral_cache_version_error(cache_version: object) -> str | None:
     return None
 
 
+def _read_cache_entry(cache_path: Path) -> dict:
+    """The pickled behavioral context at ``cache_path``."""
+    with open(cache_path, "rb") as f:
+        return pickle.load(f)
+
+
+def _cache_entry_problem(cached: dict) -> str | None:
+    """Why a cache entry is off the current behavioral-context contract, or None.
+
+    The entry's version stamp, its trials' outcome-clock columns, its port
+    experiences' columns and their pump audit are checked, in that order;
+    the first that fails is named.
+    """
+    cache_version_error = _behavioral_cache_version_error(
+        cached.get("cache_schema_version")
+    )
+    if cache_version_error is not None:
+        return f"is off the current behavioral-context contract ({cache_version_error})"
+    stale_trials = [
+        column
+        for column in OUTCOME_CLOCK_TRIAL_COLUMNS
+        if column not in cached["trials"].columns
+    ]
+    if stale_trials:
+        return f"predates the outcome clock (missing {', '.join(stale_trials)})"
+    experiences = cached.get("port_experiences")
+    stale_experiences = (
+        list(PORT_EXPERIENCE_CACHE_COLUMNS)
+        if experiences is None
+        else [
+            column
+            for column in PORT_EXPERIENCE_CACHE_COLUMNS
+            if column not in experiences.columns
+        ]
+    )
+    if stale_experiences:
+        return (
+            "predates the physical-poke experience contract "
+            f"(missing {', '.join(stale_experiences)})"
+        )
+    try:
+        validate_port_experience_pump_audit(experiences)
+    except (KeyError, ValueError) as exc:
+        return f"has invalid post-recovery pump audit metadata ({exc})"
+    return None
+
+
 def load_behavioral_context(
     session: dict, *, from_cache: bool, cache_key: str | None = None
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None, object | None, bool]:
@@ -165,66 +225,20 @@ def load_behavioral_context(
     # session_id rather than paying for (or duplicating) its own Spyglass fetch.
     cache_path = behavioral_context_cache_path(session, cache_key=cache_key)
     if from_cache and cache_path.exists():
-        with open(cache_path, "rb") as f:
-            cached = pickle.load(f)
-        stale_trials = [
-            column
-            for column in OUTCOME_CLOCK_TRIAL_COLUMNS
-            if column not in cached["trials"].columns
-        ]
-        cache_version = cached.get("cache_schema_version")
-        cache_version_error = _behavioral_cache_version_error(cache_version)
-        experiences = cached.get("port_experiences")
-        stale_experiences = (
-            list(PORT_EXPERIENCE_CACHE_COLUMNS)
-            if experiences is None
-            else [
-                column
-                for column in PORT_EXPERIENCE_CACHE_COLUMNS
-                if column not in experiences.columns
-            ]
-        )
-        pump_audit_error = None
-        if experiences is not None:
-            try:
-                validate_port_experience_pump_audit(experiences)
-            except (KeyError, ValueError) as exc:
-                pump_audit_error = str(exc)
-        if cache_version_error is not None:
-            logging.warning(
-                "session cache entry %s is off the current behavioral-context "
-                "contract (%s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                cache_version_error,
-            )
-        elif stale_trials:
-            logging.warning(
-                "session cache entry %s predates the outcome clock (missing %s); "
-                "ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                ", ".join(stale_trials),
-            )
-        elif stale_experiences:
-            logging.warning(
-                "session cache entry %s predates the physical-poke experience "
-                "contract (missing %s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                ", ".join(stale_experiences),
-            )
-        elif pump_audit_error is not None:
-            logging.warning(
-                "session cache entry %s has invalid post-recovery pump audit "
-                "metadata (%s); ignoring it and re-fetching from Spyglass",
-                cache_path.name,
-                pump_audit_error,
-            )
-        else:
+        cached = _read_cache_entry(cache_path)
+        problem = _cache_entry_problem(cached)
+        if problem is None:
             return (
                 cached["trials"],
                 cached["port_experiences"],
                 cached["track_graph"],
                 True,
             )
+        logging.warning(
+            "session cache entry %s %s; ignoring it and re-fetching from Spyglass",
+            cache_path.name,
+            problem,
+        )
 
     # Imported lazily: `data_loaders` imports `spyglass.common` at module top
     # level, which opens a DataJoint connection. Keeping this out of module
@@ -261,6 +275,161 @@ def load_behavioral_context(
 
         write_atomically(cache_path, write_cache)
     return trials, port_experiences, track_graph, False
+
+
+def cached_port_experiences(epoch_id: str) -> pd.DataFrame:
+    """An epoch's port experiences, read from the session cache only.
+
+    Read from the behavioral-context cache entry the table builders wrote
+    (:func:`behavioral_context_cache_path`) and checked as
+    :func:`load_behavioral_context` checks an entry. Only the cache is read:
+    a missing or off-contract entry is refused, never re-fetched from
+    Spyglass, and nothing is written.
+
+    Parameters
+    ----------
+    epoch_id : str
+        The epoch identifier, such as ``"chimi20200212_02_r1_HPC"``: the
+        cache's key.
+
+    Returns
+    -------
+    pd.DataFrame
+        The entry's port experiences, one row per well visit, as cached.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the epoch has no cache entry.
+    ValueError
+        If its entry is off the current behavioral-context contract.
+    """
+    cache_path = behavioral_context_cache_path({"session_id": epoch_id})
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"{epoch_id} has no session cache entry ({cache_path}); the table "
+            "builders write it"
+        )
+    cached = _read_cache_entry(cache_path)
+    problem = _cache_entry_problem(cached)
+    if problem is not None:
+        raise ValueError(f"session cache entry {cache_path} {problem}")
+    return cached["port_experiences"]
+
+
+def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
+    """An epoch's well visits: each one's first poke-in and final poke-out.
+
+    A well visit is one port experience, from ``arrival_time`` (the first
+    nose-poke in at a well) to ``departure_time`` (the final poke-out there),
+    read from the session cache only (:func:`cached_port_experiences`).
+    ``event_definition.well_visits.in_well_visit`` takes the two arrays.
+
+    Parameters
+    ----------
+    epoch_id : str
+        The epoch identifier, such as ``"chimi20200212_02_r1_HPC"``: the
+        cache's key.
+
+    Returns
+    -------
+    arrival_times, departure_times : np.ndarray, each shape (n_visits,)
+        Seconds, in visit order (``arrival_times`` ascending).
+
+    Raises
+    ------
+    FileNotFoundError
+        If the epoch has no cache entry.
+    ValueError
+        If its entry is off the current behavioral-context contract.
+    """
+    experiences = _prepare_port_experiences(cached_port_experiences(epoch_id))
+    return (
+        experiences["arrival_time"].to_numpy(dtype=float),
+        experiences["departure_time"].to_numpy(dtype=float),
+    )
+
+
+def session_cache_record(epoch_ids: Iterable[str]) -> dict[str, object]:
+    """The record a time-masked output keeps of the well visits it read.
+
+    An output whose content depends on the visits (quiet rest, immobile time
+    or bouts inside a visit) records one SHA-256 over the session-cache
+    entries of the epochs it read (``runs.io.files_sha256``), under
+    ``session_cache`` in its manifest, so that a refreshed cache cannot pass
+    as the one it was made from (:func:`session_cache_staleness`).
+
+    Parameters
+    ----------
+    epoch_ids : iterable of str
+        The epochs the output read the visits of.
+
+    Returns
+    -------
+    dict
+        ``path`` (the cache folder), ``n_files`` and ``sha256``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If an epoch has no cache entry.
+    """
+    paths = [
+        behavioral_context_cache_path({"session_id": identifier})
+        for identifier in sorted(set(epoch_ids))
+    ]
+    return {
+        "path": str(session_cache_dir() / BEHAVIORAL_CONTEXT_CACHE_VERSION),
+        "n_files": len(paths),
+        "sha256": files_sha256(paths),
+    }
+
+
+def session_cache_staleness(
+    manifest: Mapping[str, Any], epoch_ids: Iterable[str], what: str
+) -> str | None:
+    """Why a time-masked output was not made from the current well visits, or None.
+
+    Parameters
+    ----------
+    manifest : Mapping
+        The output's manifest, with its ``session_cache`` record
+        (:func:`session_cache_record`).
+    epoch_ids : iterable of str
+        The epochs the output holds; the current digest is taken over their
+        cache entries.
+    what : str
+        The output, for the note.
+
+    Raises
+    ------
+    FileNotFoundError
+        If an epoch has no cache entry.
+    """
+    recorded = recorded_sha256(manifest, "session_cache")
+    if recorded is None:
+        return f"{what} records no session-cache SHA-256; rerun it before citing"
+    current = session_cache_record(epoch_ids)["sha256"]
+    if recorded != current:
+        return (
+            f"{what} was made from other well visits than the current session "
+            f"cache's (sha256 {recorded[:12]}, current {current[:12]}); rerun it "
+            "before citing"
+        )
+    return None
+
+
+def time_mask_staleness(
+    manifest: Mapping[str, Any], epoch_ids: Iterable[str], what: str
+) -> str | None:
+    """Why a time-masked output is not over the analyses' subset and the current
+    well visits, or None: ``cohort_selection.subset_staleness`` and
+    :func:`session_cache_staleness`, joined."""
+    notes = [
+        subset_staleness(manifest, what),
+        session_cache_staleness(manifest, epoch_ids, what),
+    ]
+    return "; ".join(note for note in notes if note) or None
 
 
 def build_session_tables(

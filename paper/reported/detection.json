@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "96fc11f4e81d",
+ "commit": "605b86c17d89",
  "code": {
-  "head": "96fc11f4e81d204a89565433cb9032aa5696bb32",
+  "head": "605b86c17d89d6c6b6a5f8cf41f09160e322e9bb",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -195,8 +195,8 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "e47174c87512da6a3ea19e7eda09682265041cd2468c305531aa8584b6756db5",
-    "code_sha256": "e7f0b6faf0bce1487c45fabd50b5c119ba1c8f213299f14e73276d3bcb50058a"
+    "sha256": "cfb0bc0d6d0c906f8afd0b94a09279994f461fe9ac9295019d16b28e8ab226f0",
+    "code_sha256": "d06883a1fdf533621643d2eee7befa1fd78acfc899b9db8f67d94f761dd6eb64"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
@@ -211,8 +211,8 @@
     "code_sha256": "d866ba8479cbc8d226b4737d5d51dae5a5cdfa8fb1b34d523c3e89ba9735001a"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "ce20c399c0f12c2d0f0d0e0d67bc0b63c8ded247c4b31212e1621af9b48d2590",
-    "code_sha256": "71c87b8e9dfcd841b366dd795b935cd3cd47eb16cde2c3755123f14f3297127a"
+    "sha256": "78756d3df88b11d80073dbe49e154d99071dd4e7ac27b5e8db563df6486ac002",
+    "code_sha256": "169ece09d286064b8dc65a9dec4d16763c4ab3fad9af22bee2030c62898e3f27"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "c34171cfb2f0267f7404cebb42fae67a1fa11a3ed990733205b6c442c99d101e",
@@ -235,8 +235,8 @@
     "code_sha256": "4794146952f6ae960fb2bb4959ed614989c0f8b373e9d047b312eae3f1b12ae3"
    },
    "src/continuum_swr_replay/tables/covariate_registry.py": {
-    "sha256": "c733feba112569836bb2666c7b96b611ff2a8f42098f6dcbdf7e4b2f7d26a85b",
-    "code_sha256": "0d3ccc246085b3b01b07217fa15c92f81e1de167ba5cb67d8d3b559ac3bb619d"
+    "sha256": "4d738e3165abe7d44fb13b7a5a4bd78d4264851df6e11ea380e5b1cb54fe6cd7",
+    "code_sha256": "8b373ac0e01be5b7d246c65111ba338265a1b552b516b499360926ea4c4c3d48"
    },
    "src/continuum_swr_replay/tables/event_ids.py": {
     "sha256": "1ce56f9b1a3f5fde906890fbb47d7ae6527d9cd2c9a8f3c03956aa61d6b2a4a6",

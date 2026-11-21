@@ -17,11 +17,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.covariates.history.reward_history import (
-    reward_basis_from_lags,
-)
 from continuum_swr_replay.analysis.behavior.history_basis import (
     raised_cosine_history_basis,
+    reward_basis_from_lags,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (
     aggregate_to_timebins,

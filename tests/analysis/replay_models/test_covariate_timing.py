@@ -217,7 +217,12 @@ def test_rejects_a_raw_absolute_session_clock():
             assert_predictor_timing([f"is_swr:{clock}"], descriptive=True)
 
     assert ABSOLUTE_SESSION_CLOCKS == frozenset(
-        {"last_well_arrival_time_s", "outcome_known_time_s"}
+        {
+            "last_well_arrival_time_s",
+            "outcome_known_time_s",
+            "visit_first_poke_in_s",
+            "visit_last_poke_out_s",
+        }
     )
 
     # The per-bin durations derived from those clocks are usable, gated only by

@@ -409,18 +409,6 @@ def run_prepare_data(args: argparse.Namespace) -> None:
     contingency_path = table_path("qvals_table", contingency_dir)
     contingency = load_contingency(contingency_path)
 
-    # Warn if the output directory still holds artifacts from the
-    # legacy pipeline — silent coexistence lets downstream scripts
-    # accidentally read stale pickles.
-    for legacy_name in ("events.pkl", "long_count.pkl", "long_binary.pkl"):
-        legacy_path = output_dir / legacy_name
-        if legacy_path.exists():
-            logging.warning(
-                "legacy output %s still present — delete it to avoid "
-                "stale reads downstream",
-                legacy_path,
-            )
-
     t0 = time.time()
     collected = _build_all_session_tables(
         sessions, contingency, from_cache=args.from_cache, t0=t0

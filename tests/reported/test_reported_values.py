@@ -12,6 +12,7 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    over,
 )
 
 GOOD: dict[str, Any] = {
@@ -31,6 +32,14 @@ GOOD: dict[str, Any] = {
 
 def test_a_well_formed_value_is_accepted():
     assert Value(**GOOD).value == 0.5
+
+
+def test_over_adds_the_subset_to_each_description():
+    (value,) = over([Value(**GOOD)], "the events inside a visit")
+    assert value.description == (
+        "the share of events outside SWRs; over the events inside a visit"
+    )
+    assert value.value == 0.5 and value.source == GOOD["source"]
 
 
 @pytest.mark.parametrize(

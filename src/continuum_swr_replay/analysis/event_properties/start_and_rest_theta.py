@@ -7,7 +7,7 @@ From one epoch's decode frame (read through the SWR source) and environment:
   MAP), both on real place bins, never a junction placeholder
   (``posterior_analysis.track_distance_cm``);
 - **duration-matched quiet rest**: windows of quiet rest (below 4 cm/s, in no
-  non-local, SWR or MUA event, outside excluded time:
+  non-local, SWR or MUA event, inside a well visit, outside excluded time:
   ``brain_state_reference.regime_masks``) with as many bins as the event, drawn
   uniformly over every such window of the epoch
   (``brain_state_reference.matched_window_means``). Each window's theta is the
@@ -42,6 +42,7 @@ def start_and_rest_theta(
     dot: pd.DataFrame,
     environment: Any,
     events: pd.DataFrame,
+    in_visit: np.ndarray,
     n_windows: int,
     rng: np.random.Generator,
 ) -> pd.DataFrame:
@@ -61,6 +62,10 @@ def start_and_rest_theta(
     events : pd.DataFrame, shape (n_events, n_columns)
         The epoch's events, with ``event_id`` and ``non_local_event``, the
         frame label of each.
+    in_visit : np.ndarray of bool, shape (n_time,)
+        Whether each bin of ``dot`` is inside a well visit; the rest windows
+        are drawn from the quiet rest inside a visit
+        (``brain_state_reference.regime_masks``).
     n_windows : int
         Rest windows drawn per event.
     rng : np.random.Generator
@@ -116,8 +121,8 @@ def start_and_rest_theta(
         environment.distance_between_nodes_,
     )
 
-    rest = regime_masks(dot)["rest"]
-    reference = brain_state_reference(dot)
+    rest = regime_masks(dot, in_visit)["rest"]
+    reference = brain_state_reference(dot, in_visit)
     windows = matched_window_means(theta, rest, n_rows, n_windows, rng)
     valid = np.isfinite(windows)
     above = windows >= reference["theta_running_median"]

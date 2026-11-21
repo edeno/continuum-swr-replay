@@ -343,30 +343,6 @@ def test_the_timebin_tables_build_on_the_sources_labels(
     assert_source_labels(seen[0])
 
 
-def test_the_stop_table_rebuild_builds_on_the_sources_labels(
-    source, saved_decode, monkeypatch, offline
-):
-    script = offline("scripts.tables.regenerate_stop_table")
-    data_loaders = importlib.import_module("continuum_swr_replay.data_loaders")
-    monkeypatch.setattr(
-        data_loaders,
-        "load_data",
-        lambda *args, **kwargs: {
-            "trials": pd.DataFrame(),
-            "port_experiences": pd.DataFrame(),
-            "track_graph": object(),
-        },
-        raising=False,
-    )
-    seen: list = []
-    monkeypatch.setattr(script, "build_stop_table", recorder(seen))
-
-    with pytest.raises(_Stop):
-        script.build_one(saved_decode)
-
-    assert_source_labels(seen[0])
-
-
 # --------------------------------------------------------------------------
 # The QA and content scans of decode frames
 # --------------------------------------------------------------------------
@@ -563,19 +539,15 @@ def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
     assert stop.attrs["swr_source"] == swr_source.swr_source_name()
 
 
-def test_the_timebin_tables_are_published_with_the_sources_stamp(
+def test_the_onset_table_is_published_with_the_sources_stamp(
     source, monkeypatch, offline, tmp_path
 ):
     script = offline("scripts.tables.build_timebin_tables")
     key = {"animal": "j16", "session_date": 20210706, "epoch": EPOCH}
     session = {"nwb_file_name": NWB, "epoch_name": EPOCH}
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: [session])
-    monkeypatch.setattr(
-        script,
-        "build_one",
-        lambda s: (pd.DataFrame([key]), pd.DataFrame([{**key, "n_swr_events": 0}])),
-    )
-    monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
+    monkeypatch.setattr(script, "build_one", lambda s: pd.DataFrame([key]))
+    monkeypatch.setattr(script, "validate", lambda onset: None)
     stamps: dict = {}
     monkeypatch.setattr(
         script,
@@ -588,23 +560,7 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
 
     assert stamps == {
         "event_onset": swr_source.swr_source_name(),
-        "stop_timebin": swr_source.swr_source_name(),
     }
-
-
-def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
-    source, monkeypatch, offline, tmp_path
-):
-    script = offline("scripts.tables.regenerate_stop_table")
-    event_table = _stop_frame(STALE)
-    monkeypatch.setattr(
-        script, "find_sessions", lambda max_per_animal: [{"nwb_file_name": NWB}]
-    )
-    monkeypatch.setattr(script, "build_one", lambda s: _stop_frame())
-    monkeypatch.setattr(script, "read_table", lambda path: event_table)
-    monkeypatch.setattr(script, "require_covariate_schema", lambda frame, table: None)
-    with pytest.raises(SwrSourceError, match="an_earlier_run"):
-        script.main(["--no-save"])
 
 
 @pytest.mark.parametrize("stale_shard", [False, True], ids=["current", "stale"])

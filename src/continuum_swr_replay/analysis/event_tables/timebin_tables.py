@@ -1,52 +1,29 @@
-"""Within-stop time-binned tables (Part B).
+"""Within-stop event-onset table.
 
-Two complementary structures over immobility stops, for the time-resolved
-event-rate analyses (consummatory time course, autocorrelation, time-since-
-reward at both within- and across-stop scales):
+:func:`build_event_onset_table` is **sparse**: one row per event *onset* (SWR /
+non-local / MUA) in an immobility stop, with absolute ``onset_time``,
+``t_since_stop_onset``, the continuous ``t_since_pump`` (carries across the
+movement gaps), and the within-stop inter-onset interval. For autocorrelation
+and the time-course numerator, and the onset input of every Family-B per-bin
+rate fit, which builds its own 15 ms (stop x bin) design from ``stop_table``
+and this table (``per_bin_design.aggregate_to_timebins``).
 
-- :func:`build_event_onset_table` — **sparse**: one row per event *onset*
-  (SWR / non-local / MUA), with absolute ``onset_time``, ``t_since_stop_onset``,
-  the continuous ``t_since_pump`` (carries across the movement gaps), and the
-  within-stop inter-onset interval. For autocorrelation and the time-course
-  numerator, and the onset input of every Family-B per-bin rate fit.
-
-- :func:`build_stop_timebin_table` — **dense**: one row per (stop, ``bin_s``-wide
-  bin, 4 ms by default), with onset counts, the same two clocks,
-  ``is_reward_stop`` and mean ``head_speed``. An equal-exposure grid for the
-  exploratory time-course scripts (``scripts/exploratory/_timeresolved_psth.py``).
-  The Family-B rate fits do not read it: they rebuild their own 15 ms
-  (stop x bin) design from ``stop_table`` and the sparse onset table
-  (``per_bin_design.aggregate_to_timebins``).
-
-Both recompute immobility bouts from ``dot`` with the canonical helpers, so
-``stop_id`` matches ``build_stop_table`` row-for-row. Movement is absence of
-rows; ``t_since_pump`` (from absolute time) is the bridge across stops. So is
-excluded time: a dense bin that touches the epoch's excluded time (the artifact
-mask widened by 0.3 s) has no row.
+It recomputes immobility bouts from ``dot`` with the canonical helpers, so
+``stop_id`` matches ``build_stop_table`` row-for-row.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    excluded_intervals_of,
-)
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 from continuum_swr_replay.tables.session_keys import one_session
 
-from ...intervals import overlaps_intervals
 from .bouts import assign_bout, immobility_bout_intervals
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
-ONSETS_IN_EXCLUDED_BINS_ATTR = "onsets_in_excluded_bins_by_event_type"
-"""The dense table's ``attrs`` key: per event type, the onsets whose bin it
-dropped for touching excluded time. Their events lie wholly outside excluded
-time, so the sparse table keeps them."""
 
 
 def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.ndarray:
@@ -55,8 +32,7 @@ def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.nda
     All three sources arrive held to the same atomic whole-event speed rule,
     and Non-Local labels to the saved probability threshold, by the read
     (``analyzed_time.with_swr_source``). An absent event column (e.g.
-    ``MUA_event`` on older decodes) yields no onsets; the dense builder then
-    zero-fills that count.
+    ``MUA_event`` on older decodes) yields no onsets.
     """
     if col not in dot.columns:
         return np.array([], dtype=float)
@@ -153,142 +129,3 @@ def build_event_onset_table(
     )
     out["isi_within_stop"] = out.groupby(["event_type", "stop_id"])["onset_time"].diff()
     return stamp_covariate_schema(out[cols], table="event_onset")
-
-
-def build_stop_timebin_table(
-    dot: pd.DataFrame,
-    pump_times: np.ndarray,
-    *,
-    bin_s: float = 0.004,
-) -> pd.DataFrame:
-    """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms).
-
-    ``dot`` is a read frame, as :func:`build_event_onset_table`. A bin
-    ``[left, min(left + bin_s, stop end)]`` that touches the epoch's excluded
-    time (``analyzed_time.excluded_intervals``; closed) is not analyzed and has
-    no row; the other bins keep their ``bin_in_stop``. An event kept by the
-    event rule (wholly outside excluded time) can still start in such a bin;
-    its onset stays in the sparse table and is counted, per event type, in
-    ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]``.
-    """
-    animal, day, epoch = _session_keys(dot)
-    times = dot.index.to_numpy()
-    speed = dot["head_speed"].to_numpy()
-    bout_starts, bout_ends = immobility_bout_intervals(dot)
-    n_bouts = bout_starts.size
-    cols = [
-        "animal",
-        "session_date",
-        "epoch",
-        "stop_id",
-        "bin_in_stop",
-        "t_since_stop_onset",
-        "t_since_pump",
-        "is_reward_stop",
-        "n_swr_events",
-        "n_nonlocal_events",
-        "n_mua_events",
-        "head_speed",
-    ]
-    if n_bouts == 0:
-        return stamp_covariate_schema(pd.DataFrame(columns=cols), table="stop_timebin")
-
-    # Variable bins-per-bout; build the (bout, within-bin) index for every bin.
-    n_bins = np.maximum(1, np.ceil((bout_ends - bout_starts) / bin_s).astype(int))
-    bout_of_bin = np.repeat(np.arange(n_bouts), n_bins)
-    within = np.concatenate([np.arange(n) for n in n_bins])
-    bin_offset = np.concatenate([[0], np.cumsum(n_bins)])
-    n_total = int(bin_offset[-1])
-    bin_center = bout_starts[bout_of_bin] + (within + 0.5) * bin_s
-
-    def _global_bin(query: np.ndarray, qbidx: np.ndarray) -> np.ndarray:
-        wb = np.floor((query - bout_starts[qbidx]) / bin_s).astype(int)
-        wb = np.clip(wb, 0, n_bins[qbidx] - 1)
-        return bin_offset[qbidx] + wb
-
-    # Onset counts per bin.
-    counts = {}
-    for etype, col in EVENT_TYPES.items():
-        onset_t = _event_onset_times(dot, times, col)
-        bidx = assign_bout(onset_t, bout_starts, bout_ends)
-        v = bidx >= 0
-        gbin = _global_bin(onset_t[v], bidx[v])
-        counts[etype] = np.bincount(gbin, minlength=n_total).astype(np.int32)
-
-    # Mean head_speed per bin (from the 2 ms dot rows that fall in each bin).
-    row_b = assign_bout(times, bout_starts, bout_ends)
-    rv = row_b >= 0
-    rgbin = _global_bin(times[rv], row_b[rv])
-    ssum = np.bincount(rgbin, weights=speed[rv], minlength=n_total)
-    scnt = np.bincount(rgbin, minlength=n_total)
-    speed_mean = np.where(scnt > 0, ssum / np.maximum(scnt, 1), np.nan)
-
-    pump_times = np.sort(np.asarray(pump_times, dtype=float))
-    reward_mask = _reward_bout_mask(pump_times, bout_starts, bout_ends)
-    out = pd.DataFrame(
-        {
-            "animal": animal,
-            "session_date": day,
-            "epoch": epoch,
-            "stop_id": hash_stop_id(animal, day, epoch, bout_of_bin),
-            "bin_in_stop": within.astype(np.int32),
-            "t_since_stop_onset": (bin_center - bout_starts[bout_of_bin]).astype(
-                np.float32
-            ),
-            "t_since_pump": _time_since_pump(bin_center, pump_times).astype(np.float32),
-            "is_reward_stop": reward_mask[bout_of_bin],
-            "n_swr_events": counts["SWR"],
-            "n_nonlocal_events": counts["non_local"],
-            "n_mua_events": counts["MUA"],
-            "head_speed": speed_mean.astype(np.float32),
-        }
-    )[cols]
-    excluded = excluded_intervals_of(dot)
-    in_excluded_bins = dict.fromkeys(counts, 0)
-    if len(excluded):
-        left = bout_starts[bout_of_bin] + within * bin_s
-        right = np.minimum(left + bin_s, bout_ends[bout_of_bin])
-        dropped = overlaps_intervals(left, right, excluded)
-        in_excluded_bins = {
-            etype: int(count[dropped].sum()) for etype, count in counts.items()
-        }
-        out = out.loc[~dropped].reset_index(drop=True)
-    out = stamp_covariate_schema(out, table="stop_timebin")
-    out.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded_bins
-    return out
-
-
-def concat_session_timebin_tables(
-    session_tables: Sequence[tuple[pd.DataFrame, pd.DataFrame]],
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Concatenate the sessions' onset and dense tables into one pair.
-
-    Each dense table's ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]`` is taken off it
-    (unequal attrs would make ``pd.concat`` drop every attr, the schema stamp
-    included) and the dense table of all sessions carries their sum, per event
-    type.
-
-    Parameters
-    ----------
-    session_tables : sequence of (pd.DataFrame, pd.DataFrame)
-        Per session, its :func:`build_event_onset_table` and
-        :func:`build_stop_timebin_table`, in session order. The dense tables'
-        count attrs are removed.
-
-    Returns
-    -------
-    onset : pd.DataFrame
-        The sessions' onset tables, concatenated.
-    dense : pd.DataFrame
-        The sessions' dense tables, concatenated, with
-        ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]`` the summed counts (an event type
-        no session counted is absent).
-    """
-    in_excluded: dict[str, int] = {}
-    for _, dense in session_tables:
-        for etype, n in dense.attrs.pop(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
-            in_excluded[etype] = in_excluded.get(etype, 0) + n
-    onset = pd.concat([onset for onset, _ in session_tables], ignore_index=True)
-    dense = pd.concat([dense for _, dense in session_tables], ignore_index=True)
-    dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded
-    return onset, dense
