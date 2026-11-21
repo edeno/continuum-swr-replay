@@ -772,6 +772,12 @@ Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
 
+### `scripts/checks/compare_regression_to_mgcv.py`
+
+Compare the shared regression fitter with mgcv on small synthetic data sets.
+
+`make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
+
 ### `scripts/checks/compare_to_golden_baseline.py`
 
 Diff a candidate replay_content root against a frozen golden baseline.

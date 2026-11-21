@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 import scipy.optimize
@@ -30,6 +32,13 @@ from continuum_swr_replay.analysis.regression.reml import (
     refine_penalties,
     reml_and_derivatives,
     select_penalties,
+)
+from scripts.checks.compare_regression_to_mgcv import (
+    DATA_SETS,
+    FIXTURE_DIR,
+    agreement,
+    fit_ours,
+    make_data,
 )
 
 FAMILIES = ("poisson", "bernoulli", "gaussian", "grouped_softmax")
@@ -384,3 +393,42 @@ def test_shrunk_to_null_space() -> None:
     np.testing.assert_array_equal(line.search.at_boundary, [False])
     assert curve.sessions[0].edf[0] > 3.0
     np.testing.assert_array_equal(curve.sessions[0].in_null_space, [False])
+
+
+#: Largest difference from mgcv allowed per quantity (``agreement``): absolute
+#: for the log penalty, edf, REML score and curves, relative for the 0/1
+#: coefficient, its standard error and the scale. The fixtures agree to about
+#: 2e-8 in the log penalty and edf, 1e-11 in the score and 6e-10 in the curves.
+MGCV_TOLERANCE = {
+    "log_penalty": 1e-6,
+    "edf": 1e-6,
+    "reml": 1e-8,
+    "curve": 1e-7,
+    "se_curve": 1e-7,
+    "coef_rew": 1e-7,
+    "se_rew": 1e-7,
+    "scale": 1e-7,
+}
+
+
+@pytest.mark.parametrize("name", list(DATA_SETS))
+def test_matches_mgcv_fixtures(name: str) -> None:
+    """The shared fitter's REML fit equals mgcv's on the committed fixtures."""
+    mgcv = json.loads((FIXTURE_DIR / f"{name}.json").read_text())
+    frame = make_data(name)
+    assert len(frame) == mgcv["n_rows"]
+    assert frame["y"].sum() == pytest.approx(mgcv["y_sum"], rel=1e-12)
+
+    ours = fit_ours(name, frame)
+    differences = agreement(name, ours, mgcv)
+
+    assert ours["converged"] and mgcv["converged"]
+    assert not ours["in_null_space"].any()
+    expected_keys = {"log_penalty", "edf", "reml", "curve", "se_curve"}
+    if name.startswith("poisson"):
+        expected_keys |= {"coef_rew", "se_rew"}
+    if name == "gaussian_one_smooth":
+        expected_keys |= {"scale"}
+    assert set(differences) == expected_keys
+    for key, value in differences.items():
+        assert value < MGCV_TOLERANCE[key], f"{key}: {value:.2e}"
