@@ -714,3 +714,11 @@ def test_a_session_without_a_finite_value_is_left_out_of_everything():
         infinite.value, infinite.animal, infinite.day, infinite.session, "mean"
     )
     assert np.isfinite(values).all()
+
+
+def test_no_finite_value_is_refused_by_name():
+    t = THREE_LEVEL.assign(value=[np.nan, np.inf, np.nan, np.nan, -np.inf, np.nan])
+    with pytest.raises(ValueError, match="no session has a finite value"):
+        stats.animal_balanced_bootstrap(t.value, t.animal, t.day, n_draws=10, seed=0)
+    with pytest.raises(ValueError, match="no session has a finite value"):
+        stats.estimand_summary(t.value, t.animal, t.day, t.session, n_draws=10, seed=0)

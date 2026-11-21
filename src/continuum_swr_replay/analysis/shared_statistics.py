@@ -621,9 +621,16 @@ def animal_balanced_bootstrap(
     Returns
     -------
     AnimalBalancedDraws
+
+    Raises
+    ------
+    ValueError
+        If no session has a finite value.
     """
     values = np.asarray(values, dtype=float)
-    finite = np.isfinite(values.reshape(values.shape[0], -1)).all(axis=1)
+    finite = np.isfinite(values).all(axis=tuple(range(1, values.ndim)))
+    if not finite.any():
+        raise ValueError("no session has a finite value")
     values = values[finite]
     animal = np.asarray(animal)[finite]
     day = np.asarray(day)[finite]
@@ -792,8 +799,8 @@ def estimand_summary(
     Raises
     ------
     ValueError
-        If a session has more than one value, or the labels are not indexed
-        as ``values``.
+        If no session has a finite value, a session has more than one value,
+        or the labels are not indexed as ``values``.
     """
     if not all(values.index.equals(s.index) for s in (animal, day, session)):
         raise ValueError("values, animal, day and session are not indexed alike")
