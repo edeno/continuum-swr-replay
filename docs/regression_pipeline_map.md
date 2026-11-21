@@ -548,19 +548,19 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 
 The per-session fitting loop: one design, every session fitted alone.
 
-`fit_session`, `fit_sessions`
+`fit_sessions`
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
 The support rule: whether a session's data can estimate an unpenalized term.
 
-`Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `level_rows_dropped`, `terms_failing_share`
+`Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 
 Model terms and the design they build, the same for every session.
 
-`Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `check_column_sizes`, `DesignColumn`, `Design`, `build_design`
+`Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -848,7 +848,7 @@ Compare the shared fitter without a penalty with the current fitters on real ses
 
 Compare the shared regression fitter with mgcv on small synthetic data sets.
 
-`stop_bins`, `make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
+`stop_bins`, `bins_of`, `make_data`, `fit_ours`, `agreement`, `run_mgcv`, `main`
 
 ### `scripts/checks/compare_regression_to_neurospatial.py`
 
