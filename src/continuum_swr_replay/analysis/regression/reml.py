@@ -427,11 +427,9 @@ class PenaltySearch:
         given start.
     n_grid_points : int
         Grid points evaluated (0 for a given start).
-    n_grid_not_finite : int
-        Grid points whose pooled score was not finite (an inner fit failed).
     grid_failures : dict of str to int
-        Those points counted by the status of their first failing session's
-        fit.
+        Grid points whose pooled score was not finite (an inner fit failed),
+        counted by the status of their first failing session's fit.
     n_outer_steps : int
         Newton steps on ``rho`` taken.
     at_boundary : np.ndarray of bool, shape (m,)
@@ -444,10 +442,14 @@ class PenaltySearch:
     set_aside: tuple[SetAsideSession, ...]
     start_score: float
     n_grid_points: int
-    n_grid_not_finite: int
     grid_failures: dict[str, int]
     n_outer_steps: int
     at_boundary: np.ndarray
+
+    @property
+    def n_grid_not_finite(self) -> int:
+        """Grid points whose pooled score was not finite."""
+        return sum(self.grid_failures.values())
 
     @property
     def share_without_fit(self) -> float:
@@ -1582,6 +1584,15 @@ def _pooled_fit(
     return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
 
 
+def _by_status(failures: Counter[tuple[int, str]]) -> dict[str, int]:
+    """Grid points that failed, counted by status: the sum over the sessions
+    that failed first with that status."""
+    counts: Counter[str] = Counter()
+    for (_, status), n in failures.items():
+        counts[status] += n
+    return dict(counts)
+
+
 def _screened_search(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -1605,8 +1616,7 @@ def _screened_search(
         set_aside=_refit_set_aside(lik, sessions, blocks, rho, set_aside),
         start_score=start_score,
         n_grid_points=n_points,
-        n_grid_not_finite=sum(failures.values()),
-        grid_failures=dict(Counter({status: n for (_, status), n in failures.items()})),
+        grid_failures=_by_status(failures),
         n_outer_steps=n_steps,
         at_boundary=_at_boundary(rho),
     )

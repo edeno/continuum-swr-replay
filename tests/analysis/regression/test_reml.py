@@ -648,6 +648,30 @@ def test_grid_points_that_fail_are_counted_by_status(
     assert result.search.grid_failures == {STEP_LIMIT: 6}
 
 
+def test_grid_failures_of_two_sessions_with_one_status_are_summed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two sessions that fail at different grid points with the same status:
+    the count for that status is the sum over both, not the count of one."""
+    lik, first, blocks = _session("poisson", 1, seed=4)
+    _, second, _ = _session("poisson", 1, seed=5)
+    newton_fit = reml.penalized_newton
+
+    def fails_at_one_end(*args, **kwargs):
+        fit = newton_fit(*args, **kwargs)
+        strength = np.linalg.eigvalsh(args[4])[-1] / blocks[0].eigenvalues[-1]
+        if args[2] is first.y:
+            fails = strength < np.exp(-4.5)  # log penalties -10 to -5
+        else:
+            fails = strength > np.exp(17.5)  # log penalties 18 to 20
+        return replace(fit, status=STEP_LIMIT) if fails else fit
+
+    monkeypatch.setattr(reml, "penalized_newton", fails_at_one_end)
+    search = select_penalties(lik, [first, second], blocks).search
+    assert search.grid_failures == {STEP_LIMIT: 9}
+    assert search.n_grid_not_finite == 9
+
+
 def test_an_inactive_column_is_left_out_of_its_session() -> None:
     """A session without support for an unpenalized 0/1 column marks it
     inactive: its fit, score and derivatives are those of its design built
