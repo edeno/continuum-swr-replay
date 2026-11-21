@@ -48,8 +48,10 @@ class FitRecord:
     cohort_counts : dict
         Rows left out before the fit, by reason: ``rows_missing_values``,
         ``rows_dropped`` (level coefficient -> its rows, the support rule's
-        row rule), ``events_without_response`` (softmax groups whose response
-        was all on dropped rows); a caller adds its own cohort counts.
+        row rule), and under the grouped softmax
+        ``events_without_response`` (events given with no response) and
+        ``events_emptied_by_dropped_rows`` (events whose response was all on
+        dropped rows); a caller adds its own cohort counts.
     coef_names : list of str
     coef : list of float
         NaN at the columns left out, and everywhere for a session without a

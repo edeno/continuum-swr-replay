@@ -504,7 +504,8 @@ the session's rows of that level are dropped from its fit and counted. They are 
 merged into the reference level: in simulation, merging inflated the belief variance's
 false positives, to 20 % in one case. Every term fitted for that level leaves the session
 with it, its penalty block included. Under the grouped softmax, an event whose response
-was all on dropped rows is dropped too, and counted. The other events' shares are not
+was all on dropped rows is dropped too, and counted (`events_emptied_by_dropped_rows`,
+apart from `events_without_response`, the events given with no response). The other events' shares are not
 renormalized: the likelihood is the conditional one over the candidates kept.
 
 After any rows are dropped, the support is counted again on the rows kept. A column that

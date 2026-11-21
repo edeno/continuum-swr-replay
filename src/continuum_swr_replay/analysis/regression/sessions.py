@@ -83,18 +83,19 @@ def _prepare(
     unit: str,
     keep: np.ndarray | None,
     counts: dict,
+    counted_as: str,
 ) -> _Prepared:
     """The rows kept (all when ``keep`` is None), ordered for the likelihood,
     with their design; softmax events with no response left are dropped and
-    counted."""
+    counted under ``counted_as``."""
     rows = (rows if keep is None else rows[keep]).reset_index(drop=True)
     if isinstance(lik, GroupedSoftmax):
         rows = rows.sort_values(unit, kind="stable").reset_index(drop=True)
         total = rows.groupby(unit, sort=False)[response].transform("sum").to_numpy()
         empty = total <= 0
-        counts["events_without_response"] = counts.get(
-            "events_without_response", 0
-        ) + int(rows.loc[empty, unit].nunique())
+        counts[counted_as] = counts.get(counted_as, 0) + int(
+            rows.loc[empty, unit].nunique()
+        )
         rows = rows[~empty].reset_index(drop=True)
         if rows.empty:  # nothing left to fit: the caller records why
             return _Prepared(
@@ -200,6 +201,8 @@ def fit_session(
     left_out: dict[str, str] = {}
     support: dict = {}
     counts["rows_dropped"] = {}
+    if isinstance(lik, GroupedSoftmax):
+        counts["events_emptied_by_dropped_rows"] = 0
     applied: set[str] = set()
     round_offset, first, reason = 0, True, ""
     while True:
@@ -208,7 +211,16 @@ def fit_session(
         while True:
             empty = _no_data(lik, rows, response)
             if not empty:
-                prepared = _prepare(design, lik, rows, response, unit, None, counts)
+                # Events with no response as given; then those emptied by
+                # dropped rows.
+                counted_as = (
+                    "events_emptied_by_dropped_rows"
+                    if "events_without_response" in counts
+                    else "events_without_response"
+                )
+                prepared = _prepare(
+                    design, lik, rows, response, unit, None, counts, counted_as
+                )
                 rows = prepared.rows
                 empty = _no_data(lik, rows, response)
             if empty:

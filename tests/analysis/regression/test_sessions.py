@@ -440,3 +440,22 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     )
     with pytest.raises(ValueError, match=message):
         _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
+
+
+def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
+    """Under the softmax, an event given with no response and an event whose
+    response was all on dropped rows are counted under two names."""
+    frames = [_role_rows(0, n_previous=3), *(_role_rows(s, 150) for s in (1, 2))]
+    first = frames[0]
+    first.loc[first["event_id"] == 10, "share"] = 0.0
+    for event in (0, 1):
+        rows = first["event_id"] == event
+        first.loc[rows, "share"] = (first.loc[rows, "role"] == "previous") * 1.0
+    sessions = by_session(frames)
+    design = _role_design(pd.concat(sessions.values(), ignore_index=True))
+    record = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )[0]
+    assert record.cohort_counts["events_without_response"] == 1
+    assert record.cohort_counts["events_emptied_by_dropped_rows"] == 2
+    assert record.n_units == 150 - 3
