@@ -131,15 +131,17 @@ def session_bins(
     keys = list(SESSION_COLUMNS)
     excluded = excluded_intervals_by_session(stops)
     events_by_session = dict(tuple(events.groupby(keys, sort=False, observed=True)))
+    excluded_by_session = dict(tuple(excluded.groupby(keys, sort=False, observed=True)))
     parts, records = [], []
     for key, session_stops in stops.groupby(keys, sort=True, observed=True):
         session_events = events_by_session.get(key, events.iloc[:0])
+        session_excluded = excluded_by_session.get(key, excluded.iloc[:0])
         for kind in EVENT_KINDS:
             bins = visit_timebins(
                 session_stops,
                 session_events,
                 kind=kind,
-                excluded_intervals=excluded,
+                excluded_intervals=session_excluded,
             )
             parts.append(
                 select_visit_context(bins)[

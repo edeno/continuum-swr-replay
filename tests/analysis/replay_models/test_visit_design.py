@@ -52,7 +52,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 BIN_S = 0.1
 SESSION = {"animal": "rat", "session_date": "20200101", "epoch": "02_r1"}
 VISITS = np.array([[10.0, 13.0], [20.0, 24.0]])
-EXCLUDED = pd.DataFrame({"start_time": [22.0], "end_time": [22.2]})
+EXCLUDED = pd.DataFrame({"start_time": [22.0], "end_time": [22.2]}).assign(**SESSION)
 LAGS = [f"known_reward_outcome_lag_{j}" for j in range(1, 11)]
 
 
@@ -395,3 +395,26 @@ def test_one_real_epoch() -> None:
         assert set(
             selected[list(SESSION_COLUMNS)].astype(str).itertuples(index=False)
         ) == {tuple(session.values())}
+
+
+def test_events_and_excluded_time_name_their_session() -> None:
+    """The events and the excluded time are matched to the stop table's session
+    by its columns, compared as text: an integer ``session_date`` is the same
+    session as its string, a frame without the session columns is refused, and
+    a non-empty frame with no row of the session is refused rather than read as
+    a session with no events."""
+    expected = _bins("SWR")
+    as_int = _events().assign(session_date=int(SESSION["session_date"]))
+    pd.testing.assert_frame_equal(_bins("SWR", as_int), expected)
+    with pytest.raises(ValueError, match="session_date"):
+        _bins("SWR", _events().drop(columns="session_date"))
+    with pytest.raises(ValueError, match="no row of the session"):
+        _bins("SWR", _events().assign(epoch="04_r2"))
+    with pytest.raises(ValueError, match="no row of the session"):
+        visit_timebins(
+            _stop_table(),
+            _events(),
+            kind="SWR",
+            bin_s=BIN_S,
+            excluded_intervals=EXCLUDED.assign(**{**SESSION, "epoch": "04_r2"}),
+        )

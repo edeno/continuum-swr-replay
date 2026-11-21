@@ -298,9 +298,11 @@ def visit_timebins(
         The session's events (an event table: ``event_start_s``,
         ``event_end_s``, ``visit_context``, ``well_visit_id``,
         ``time_since_visit_start_s``, ``time_until_visit_end_s``, and
-        ``is_swr`` when ``kind`` is given). Rows of other sessions are ignored.
-        All of them place the visits; only the kind's are counted and reduce
-        the at-risk time.
+        ``is_swr`` when ``kind`` is given) and the session columns. Rows of
+        other sessions are ignored; a non-empty frame must hold rows of this
+        session (a session with no events passes an empty frame). All of them
+        place the visits; only the kind's are counted and reduce the at-risk
+        time.
     kind : {"SWR", "No SWR"} or None
         The events modeled, by ``is_swr`` (:data:`EVENT_KINDS`); None models
         every event (an event source with one stream, such as the ContFrag
@@ -308,10 +310,11 @@ def visit_timebins(
     bin_s : float
         Bin width (s); default ``RATE_BIN_S``.
     excluded_intervals : pd.DataFrame, optional
-        The session's excluded time: ``start_time`` and ``end_time`` (absolute
-        s), with or without the session columns (rows of other sessions are
-        ignored). None reads it from the SWR source
-        (``analyzed_time.excluded_intervals_by_session``).
+        The session's excluded time: the session columns, ``start_time`` and
+        ``end_time`` (absolute s). Rows of other sessions are ignored; a
+        non-empty frame must hold rows of this session (a session with no
+        excluded time passes an empty frame). None reads it from the SWR
+        source (``analyzed_time.excluded_intervals_by_session``).
 
     Returns
     -------
@@ -353,7 +356,9 @@ def visit_timebins(
     Raises
     ------
     ValueError
-        If ``stop_table`` holds more than one session, ``kind`` is unknown, two
+        If ``stop_table`` holds no stop or more than one session, ``events``
+        or ``excluded_intervals`` lacks the session columns or holds rows of
+        other sessions only, ``kind`` is unknown, two
         events of the kind overlap, an event of the kind starts outside every
         stop's analyzed time, or an event's label disagrees with its bin's
         (the event and stop tables place the visits differently).
@@ -381,12 +386,14 @@ def visit_timebins(
         raise ValueError(
             f"visit_timebins builds one session; stop_table holds {len(sessions)}"
         )
-    events = _of_session(events, sessions)
+    if not len(sessions):
+        raise ValueError("visit_timebins needs the stops of one session; got none")
+    events = _of_session(events, sessions, "events (visit bins)")
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stop_table)
-    excluded = _of_session(excluded_intervals, sessions)[
-        ["start_time", "end_time"]
-    ].to_numpy(dtype=float)
+    excluded = _of_session(
+        excluded_intervals, sessions, "excluded_intervals (visit bins)"
+    )[["start_time", "end_time"]].to_numpy(dtype=float)
 
     stops = stop_table.sort_values("stop_start", kind="stable").reset_index(drop=True)
     stop_start = stops["stop_start"].to_numpy(dtype=float)
@@ -529,17 +536,32 @@ def visit_timebins(
     return out
 
 
-def _of_session(frame: pd.DataFrame, sessions: pd.DataFrame) -> pd.DataFrame:
-    """The rows of ``frame`` in the one session of ``sessions`` (all rows when
-    ``frame`` has no session columns)."""
-    if not all(column in frame.columns for column in SESSION_COLUMNS) or not len(
-        sessions
-    ):
-        return frame
+def _of_session(frame: pd.DataFrame, sessions: pd.DataFrame, name: str) -> pd.DataFrame:
+    """The rows of ``frame`` in the one session of ``sessions``.
+
+    The session columns are compared as text, so an integer ``session_date``
+    matches its string.
+
+    Raises
+    ------
+    ValueError
+        If ``frame`` lacks a session column, or is not empty but holds no row
+        of the session (the frames name the session differently).
+    """
+    require_columns(frame, list(SESSION_COLUMNS), name)
     key = sessions.iloc[0]
     keep = np.logical_and.reduce(
-        [frame[column].to_numpy() == key[column] for column in SESSION_COLUMNS]
+        [
+            frame[column].astype(str).to_numpy() == str(key[column])
+            for column in SESSION_COLUMNS
+        ]
     )
+    if len(frame) and not keep.any():
+        raise ValueError(
+            f"{name} holds {len(frame)} row(s) and no row of the session "
+            f"{tuple(str(key[column]) for column in SESSION_COLUMNS)}; pass an "
+            "empty frame for a session with none"
+        )
     return frame.loc[keep]
 
 
