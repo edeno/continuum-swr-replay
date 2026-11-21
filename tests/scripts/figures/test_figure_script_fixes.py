@@ -1712,75 +1712,71 @@ def _gain_statistics(no_swr: list[float], swr: list[float]) -> pd.DataFrame:
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
 
 
-def test_figure02_panel_h_draws_both_held_out_scores_on_a_shared_axis(offline):
-    """Panel h's two axes: a dot per animal and the mean with its interval for
-    each group, the held-out tetrode score left and the held-out time score
-    right, on one y axis with one label and one "no gain" note."""
+def assert_draws_group_gain(ax, statistics: pd.DataFrame) -> None:
+    """``ax`` holds, for each group, its animals' dots in the group's color at
+    its x, the mean beside them and the dashed zero line."""
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    for group, color in panels.GROUP_COLORS.items():
+        x = panels.HELDOUT_X[group]
+        mine = [
+            c
+            for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.allclose(c.get_offsets()[:, 0], x)
+        ]
+        assert len(mine) == 1
+        np.testing.assert_allclose(
+            mine[0].get_offsets()[:, 1], statistics.loc[group, "animals"]
+        )
+        np.testing.assert_allclose(
+            mine[0].get_facecolor()[0], matplotlib.colors.to_rgba(color)
+        )
+        # the mean, as an errorbar's marker beside the dots
+        means = [
+            line.get_ydata()
+            for line in ax.lines
+            if np.allclose(line.get_xdata(), x + 0.25)
+        ]
+        assert np.allclose(means, statistics.loc[group, "estimate"])
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    assert [t.get_text() for t in ax.texts] == ["no gain"]
+
+
+def test_figure02_panel_h_draws_the_full_decoders_gain_over_the_swr_only(offline):
+    """Panel h, one axis: a dot per animal and the mean with its interval for
+    each group, a dashed zero line with its "no gain" note, and labels that say
+    what is compared."""
     import matplotlib.pyplot as plt
 
     figure02 = offline("scripts.figures.generate_figure02")
-    tetrode = _gain_statistics([0.3, 0.5, 0.4], [0.7, 0.8, 0.6])
-    time = _gain_statistics([0.2, 0.4, 0.3], [0.9, 1.0, 0.8])
-    fig = plt.figure()
-    ax_tetrode = fig.add_subplot(1, 2, 1)
-    ax_time = fig.add_subplot(1, 2, 2, sharey=ax_tetrode)
-    figure02.draw_heldout_gain(ax_tetrode, ax_time, tetrode, time)
+    statistics = _gain_statistics([0.46, 0.45, 0.25, 0.43, 0.47], [-0.03] * 5)
+    fig, ax = plt.subplots()
+    figure02.draw_restriction_gain(ax, statistics)
     fig.canvas.draw()
-    for ax, statistics, title in (
-        (ax_tetrode, tetrode, "Held-out\ntetrode"),
-        (ax_time, time, "Held-out\ntime"),
-    ):
-        assert ax.get_title() == title
-        for group, color in (
-            ("no SWR", figure02.C_NO_SWR),
-            ("SWR", figure02.C_SWR),
-        ):
-            x = figure02.HELDOUT_X[group]
-            mine = [
-                c
-                for c in ax.collections
-                if isinstance(c, matplotlib.collections.PathCollection)
-                and np.allclose(c.get_offsets()[:, 0], x)
-            ]
-            assert len(mine) == 1
-            np.testing.assert_allclose(
-                mine[0].get_offsets()[:, 1], statistics.loc[group, "animals"]
-            )
-            np.testing.assert_allclose(
-                mine[0].get_facecolor()[0], matplotlib.colors.to_rgba(color)
-            )
-            # the mean, as an errorbar's marker beside the dots
-            means = [
-                line.get_ydata()
-                for line in ax.lines
-                if np.allclose(line.get_xdata(), x + 0.25)
-            ]
-            assert np.allclose(means, statistics.loc[group, "estimate"])
-        # the dashed zero line
-        assert any(
-            line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-            for line in ax.lines
-        )
-    assert [t.get_text() for t in ax_tetrode.texts] == ["no gain"]
-    assert len(ax_time.texts) == 0
-    assert ax_tetrode.get_ylabel() == "Held-out gain\nover local (nats/spike)"
-    assert ax_time.get_ylabel() == ""
-    assert ax_time.get_shared_y_axes().joined(ax_tetrode, ax_time)
-    assert not ax_time.yaxis.get_tick_params()["labelleft"]
+    assert_draws_group_gain(ax, statistics)
+    assert ax.get_title() == "Full vs. SWR-only"
+    assert ax.get_ylabel() == "Gain over SWR-only\ndecoder (nats/spike)"
+    assert ax.get_ylim()[0] == pytest.approx(-0.12)
     plt.close(fig)
 
 
 def test_figure02_panel_h_draws_the_comparison_the_events_summary_tags(offline):
-    """The held-out time axis draws the restriction comparison whose values the
-    events summary tags with panel h."""
+    """Panel h draws the restriction comparison whose values the events summary
+    tags with panel h: the filter family's full - swr per spike over events."""
     from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
     assert figure02.RESTRICTION_FIGURE == events.RESTRICTION_FIGURE
     assert events.RESTRICTION_FIGURE == (
         "filter",
-        "full_minus_none",
+        "full_minus_swr",
         "per_spike",
         "event",
     )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2h",)
+    assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)
