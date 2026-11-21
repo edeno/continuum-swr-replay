@@ -179,10 +179,8 @@ def patched(tmp_path, monkeypatch):
             folds,
             margin_bins,
             linear_position,
-            estimate_encoding_model,
             log,
         ):
-            assert estimate_encoding_model is nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL
             if fold_design == "trials":
                 np.testing.assert_array_equal(
                     folds,
@@ -320,7 +318,7 @@ def test_the_header_names_the_fit():
     the earlier design (no fit setting) is not gathered with them."""
     assert runner.fit_settings() == {
         "fit": "folds",
-        "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
+        "em": nr.em_settings(),
     }
 
 

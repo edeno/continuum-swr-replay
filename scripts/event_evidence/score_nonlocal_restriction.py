@@ -162,7 +162,7 @@ def fit_settings() -> dict:
     fold's fit (``nonlocal_restriction.em_settings``)."""
     return {
         "fit": FIT,
-        "em": nr.em_settings(nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL),
+        "em": nr.em_settings(),
     }
 
 
@@ -202,7 +202,6 @@ def run_epoch(
         folds=folds,
         margin_bins=margin_bins,
         linear_position=frame["linear_position"].to_numpy(dtype=float),
-        estimate_encoding_model=nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL,
         log=log,
     )
     failures = nr.fold_check_failures(record)

@@ -431,7 +431,6 @@ def fold_fit():
         folds=folds,
         margin_bins=margin,
         linear_position=recording.position,
-        estimate_encoding_model=nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL,
         fit=recording_fit,
         log=_quiet,
     )
@@ -570,7 +569,6 @@ def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
         marks,
         masks[0],
         is_missing | zero,
-        estimate_encoding_model=nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL,
     )
     original = fits[0][2]
     np.testing.assert_array_equal(

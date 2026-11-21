@@ -906,10 +906,10 @@ transitions differ by at most 2.9e-7 (GPU run-to-run level); the fit took 305 s
 and 249 s."""
 
 
-def em_settings(estimate_encoding_model: bool) -> dict[str, Any]:
+def em_settings() -> dict[str, Any]:
     """The EM settings of a fold fit: the library's defaults of
     :data:`EM_SETTING_NAMES`, as the canonical decode takes them, and
-    ``estimate_encoding_model``."""
+    ``estimate_encoding_model`` (:data:`FOLD_FIT_ESTIMATE_ENCODING_MODEL`)."""
     import inspect
 
     from non_local_detector import NonLocalClusterlessDetector
@@ -919,7 +919,7 @@ def em_settings(estimate_encoding_model: bool) -> dict[str, Any]:
     ).parameters
     return {
         **{name: parameters[name].default for name in EM_SETTING_NAMES},
-        "estimate_encoding_model": bool(estimate_encoding_model),
+        "estimate_encoding_model": bool(FOLD_FIT_ESTIMATE_ENCODING_MODEL),
     }
 
 
@@ -1070,8 +1070,6 @@ def fit_fold_detector(
     marks: Sequence[NDArray],
     is_training: NDArray,
     is_missing: NDArray,
-    *,
-    estimate_encoding_model: bool = True,
 ) -> tuple[Any, dict]:
     """The whole decoder fit by the library's EM on some bins, as the canonical
     decode is fit.
@@ -1084,7 +1082,8 @@ def fit_fold_detector(
     transitions from the configured ``discrete_transition_type`` and the
     initial conditions from the configured ``discrete_initial_conditions``, so
     nothing is warm-started. Only ``is_training``, ``is_missing`` and
-    ``estimate_encoding_model`` may differ from the decode's. The decode also
+    ``estimate_encoding_model`` (:data:`FOLD_FIT_ESTIMATE_ENCODING_MODEL`) differ
+    from the decode's. The decode also
     asks for its log-likelihood back (``return_outputs``), which changes no
     parameter and is not asked for here.
 
@@ -1100,8 +1099,6 @@ def fit_fold_detector(
     is_missing : ndarray of bool, shape (n_time,)
         The bins whose likelihood EM sets to 0, so that their spikes reach no
         parameter.
-    estimate_encoding_model : bool
-        The library's M-step refit of the encoding.
 
     Returns
     -------
@@ -1113,7 +1110,7 @@ def fit_fold_detector(
         ``fit_s``.
     """
     started = clock.time()
-    settings = em_settings(estimate_encoding_model)
+    settings = em_settings()
     detector = fresh_detector(canonical)
     results = detector.estimate_parameters(
         position_time=np.asarray(time),
@@ -1124,7 +1121,7 @@ def fit_fold_detector(
         discrete_transition_covariate_data=None,
         is_training=np.asarray(is_training, dtype=bool),
         is_missing=np.asarray(is_missing, dtype=bool),
-        estimate_encoding_model=estimate_encoding_model,
+        estimate_encoding_model=FOLD_FIT_ESTIMATE_ENCODING_MODEL,
     )
     trace = np.asarray(results.attrs["marginal_log_likelihoods"])
     del results
@@ -1211,7 +1208,6 @@ def fold_fit_scores(
     folds: NDArray | None = None,
     margin_bins: int = MARGIN_BINS,
     linear_position: NDArray | None = None,
-    estimate_encoding_model: bool = True,
     fit: Callable[..., tuple[Any, dict]] = fit_fold_detector,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
@@ -1248,12 +1244,9 @@ def fold_fit_scores(
     margin_bins : int
     linear_position : ndarray, shape (n_time,), optional
         Given, the table also has ``place_sampling_s``.
-    estimate_encoding_model : bool
-        Passed to ``fit``.
     fit : callable
         ``fit(canonical, time, position, spike_times, marks, is_training,
-        is_missing, estimate_encoding_model=...)``, returning the fitted
-        detector and its record.
+        is_missing)``, returning the fitted detector and its record.
     log : callable
 
     Returns
@@ -1322,7 +1315,6 @@ def fold_fit_scores(
             marks,
             masks[k],
             is_missing | mine,
-            estimate_encoding_model=estimate_encoding_model,
         )
         log(
             f"fold {k}: fit {fit_record['fit_s']} s, "

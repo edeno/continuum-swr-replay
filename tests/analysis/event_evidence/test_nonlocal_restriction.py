@@ -515,7 +515,7 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
     )
     linear_position = np.arange(n, dtype=float)
 
-    def fit(c, t, position, spikes, marks, training, missing, estimate_encoding_model):
+    def fit(c, t, position, spikes, marks, training, missing):
         return SimpleNamespace(), {
             "discrete_transition": np.eye(4),
             "initial_discrete": np.array([1.0, 0, 0, 0]),
@@ -554,7 +554,6 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
         folds=folds,
         margin_bins=margin,
         linear_position=linear_position,
-        estimate_encoding_model=False,
         fit=fit,
         log=lambda message: None,
     )
@@ -655,7 +654,7 @@ def test_em_record_reads_the_librarys_loop():
 def test_em_settings_are_the_librarys_defaults():
     from non_local_detector import NonLocalClusterlessDetector
 
-    settings = nr.em_settings(False)
+    settings = nr.em_settings()
     assert settings["estimate_encoding_model"] is False
     assert settings["max_iter"] == 20 and settings["tolerance"] == 1e-4
     import inspect
@@ -778,8 +777,8 @@ def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatc
     )
     fits = []
 
-    def fit(c, t, position, spikes, marks, training, missing, estimate_encoding_model):
-        assert c is canonical and estimate_encoding_model is False
+    def fit(c, t, position, spikes, marks, training, missing):
+        assert c is canonical
         fits.append((training.copy(), missing.copy()))
         k = len(fits) - 1
         return SimpleNamespace(k=k), {
@@ -819,7 +818,6 @@ def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatc
         np.zeros(n, dtype=bool),
         folds=folds,
         margin_bins=margin,
-        estimate_encoding_model=False,
         fit=fit,
         log=lambda message: None,
     )
