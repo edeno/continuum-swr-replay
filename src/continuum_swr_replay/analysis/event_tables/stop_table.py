@@ -322,7 +322,11 @@ def add_nonlocal_swr_split(
     require_columns(
         event_table, ["stop_id", "is_swr"], "add_nonlocal_swr_split's event_table"
     )
-    out = stop_table.copy()
+    # The shard assembly recomputes the split on stop tables that already carry
+    # it (each shard's build added its own): drop it first, so that the merge
+    # below does not make _x/_y duplicates.
+    split_cols = ["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]
+    out = stop_table.drop(columns=[c for c in split_cols if c in stop_table.columns])
 
     ev = event_table.dropna(subset=["stop_id"]).copy()
     # A non-local event whose stop_id is absent from stop_table would be silently
@@ -358,6 +362,5 @@ def add_nonlocal_swr_split(
         right_index=True,
         how="left",
     )
-    split_cols = ["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"]
     out[split_cols] = out[split_cols].fillna(0).astype(np.int64)
     return out
