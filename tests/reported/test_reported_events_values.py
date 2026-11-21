@@ -26,6 +26,7 @@ from tests.analysis.detector_comparison.test_inventory_nonlocal_comparison impor
     _exposure,
     _write_run,
 )
+from tests.support._restriction_tables import time_sums
 
 NAN = np.nan
 
@@ -1097,25 +1098,6 @@ def test_restriction_agreement_values_are_the_shares_found_again():
     assert {v.questions for v in values.values()} == {("2c.3",)}
 
 
-def _time_sums(rows: list[tuple]) -> pd.DataFrame:
-    """Time sums from (epoch, category, in visit, in an event window, bins,
-    spikes, swr, full) rows, ``none`` 0, two-sided twice the filter scores."""
-    table = pd.DataFrame(
-        rows,
-        columns=[
-            "epoch_id", "category", "in_well_visit", "in_event_window", "n_bins",
-            "n_spikes", "swr", "full",
-        ],
-    )  # fmt: skip
-    return table.assign(
-        animal=table["epoch_id"].str[0],
-        none=0.0,
-        none_two_sided=0.0,
-        swr_two_sided=2 * table["swr"],
-        full_two_sided=2 * table["full"],
-    )
-
-
 def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     """Animals a (epochs a1, a2), b (b1, b2) and c (c1, c2), 10 bins of 1 s
     outside SWRs inside a well visit each, 5 spikes, ``full - swr`` there of 20,
@@ -1164,7 +1146,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     selected = windows[~windows["event_id"].str.endswith("away")]
     bin_s = pd.Series(1.0, index=["a1", "a2", "b1", "b2", "c1", "c2"])
     groups = builder.restriction_outside_swr_values(
-        _time_sums(rows), bin_s, selected, "s"
+        time_sums(rows), bin_s, selected, "s"
     )
     values = _by_key([*groups.with_events, *groups.outside_events])
     numbers = {key: value.value for key, value in values.items()}
@@ -1231,7 +1213,7 @@ def _immobile_time_sums() -> pd.DataFrame:
             (epoch, "immobile_outside_swr", False, False, 5, 10, 0.0, 500.0),
             (epoch, "moving", True, False, 50, 10, 1000.0, 0.0),
         ]
-    return _time_sums(rows)
+    return time_sums(rows)
 
 
 def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
@@ -1292,12 +1274,12 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
 def test_restriction_figure_statistics_are_the_tagged_values():
     """Figure 2g's two axes are the rows the drawn values are made from."""
     windows = _restriction_windows()
-    time_sums = _immobile_time_sums()
+    sums = _immobile_time_sums()
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
     decoders, parts = builder.restriction_totals.restriction_figure_statistics(
-        windows, time_sums, bin_s
+        windows, sums, bin_s
     )
-    numbers = _numbers(builder.restriction_immobile_values(time_sums, bin_s, "s"))
+    numbers = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
     for measure in builder.RESTRICTION_FIGURE_DECODERS:
         assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
             numbers[f"restriction_immobile_{measure}"]
