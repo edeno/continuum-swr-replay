@@ -223,6 +223,25 @@ reported.
 - A row with a missing value is never dropped inside a fitter. The cohort step drops it and counts it, per
   kind.
 
+**Label in the tables, filter at analysis** (lead, 2026-11-20: "lets label these events in the data
+structures and then when it comes to analyze them (summary stats, summary plots, before regression, etc)
+then we can filter, we can always choose to add them later or analyze them as groups").
+
+- No event leaves the canonical tables. The event table and the stop table gain a label that says where each
+  event or stop is relative to the well visits (**call** for the names and thresholds, from the exploration
+  of section 9): inside a visit; next to the well just left, after the last nose-poke out; crossing the last
+  nose-poke out; stopped on the track (leaf arm, trunk arm, patch junction, center); next to the next well
+  before its first nose-poke in; before the epoch's first visit; other. Beside the label: the visit
+  identifier, time since the last nose-poke out and time until the next nose-poke in. Position is the
+  animal's projected position at the event's midpoint; "next to" a well or a junction is within 10 cm (the
+  counts do not hinge on it).
+- The labels add columns and drop nothing, so the eligible events and their identifiers do not change.
+- One function owns the filter, and every summary statistic, summary plot and model of Figures 2 to 5 calls
+  it; none filters by itself. Its default is the common subset: events inside a well visit, in the 242
+  analyzed epochs (Figure 5: in the epochs with mPFC units). Each summary records how many events each
+  label holds and how many the filter kept.
+- The events outside the visits can be added later or analyzed as groups by a change of that one call.
+
 ### 4.2 Design
 
 - A variable has one form in every model:
@@ -391,6 +410,11 @@ Each is a test in the suite unless marked.
 Stage 1 comes first (lead: "I want to do the 242 fits first").
 
 - **Stage 0, the fitter.** The module of section 5 and checks 1 to 6. No model changes.
+- **Stage 0b, the labels and the one subset.** The visit labels and the visit's clocks in the canonical
+  tables (one regeneration of the table set; identifiers unchanged), the one filter function, and Figures 2
+  and 3 with the events summary rebuilt on the common subset. Their numbers change: 75,675 events become
+  69,011 and the No SWR share goes from 56.8 % to about 54.5 % (diagnostics of 2026-11-20). The two data
+  points of section 9 (one epoch's head positions; a few label and position disagreements) are checked here.
 - **Stage 1, per-session fits on the convention.** In this order, each with its refit, its summary values
   and its tests:
   1. rate (Q1, Q2, Q7): two clocks, whole stop, the reward term, by kind;
@@ -450,8 +474,8 @@ starting point for the figure's own design pass after stage 1.
 Settled by the lead on 2026-11-20 (the rounds below record the words): the nine-arm candidate set; the well
 visit as the unit, ending at the last nose-poke out, with three clocks; both forms of the reward effect; every
 remaining family moved to the convention, and two deleted; the mPFC models in this work; absolute recency;
-reward history asked by models A and D; two more measures of uncertainty. One question is open: the common
-data subset of Figures 2 to 5 (fifth round below).
+reward history asked by models A and D; two more measures of uncertainty; one data subset for Figures 2 to 5,
+made by labels in the tables and one filter at analysis. Nothing in this list is open now.
 The questions as first put:
 
 A second reader checked this document as a builder would (2026-11-20). Its questions that only the lead can
@@ -571,6 +595,15 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
 - Two data points to check: one epoch (chimi20200212_02_r1) has 141 events with the head 50 to 90 cm off the
   track while its projection is at the well; and a few events are labeled at one well while the tracked
   position is far from it.
+
+### Sixth round (lead, 2026-11-20)
+
+- No field for "where the animal was" in the literature survey: "no field survey, lets just categorize the
+  events and understand them".
+- The lead expects events at stops in the middle of a run "might be different functionally", and the
+  exploration agrees for No SWR events (above).
+- Decision: label the events in the data structures and filter at analysis (section 4.1). The outside
+  events are not described in a supplement for now ("We might decide to at some point").
 
 ## 10. Left to the builder
 
