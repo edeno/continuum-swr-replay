@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f79f2722d629",
+ "commit": "d9d721da686a",
  "code": {
-  "head": "f79f2722d6293e9323b296f580566da716f230a0",
+  "head": "d9d721da686af610899ef212c78e0c72e6819724",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -171,8 +171,8 @@
     "code_sha256": "42b43912795dbeec5fa1aeef1b0f8526ae3e4d16ef068519ee8fe9e65fc68d07"
    },
    "src/continuum_swr_replay/decoding/fit.py": {
-    "sha256": "7fecd637578f370c22d1e3eb8ed9b20309051b2a5393811613022962455f3dec",
-    "code_sha256": "b210ffb0bd8d2b3bbf0d8ae86e2f8d96776fe5c6c7a81a8ea67df97d008a4993"
+    "sha256": "934b6d19b059a2a45c4af537177f4c874e95950582d89ee3615cab93ece07d8a",
+    "code_sha256": "925fc2a741497bddc863dda58a87564ba68152e535475fbe391eba62b74bd2a2"
    },
    "src/continuum_swr_replay/decoding/identifiers.py": {
     "sha256": "84db19f5b6d850321c26737048814bcae19377dd41ede3edc360459fa16a4bba",
@@ -187,8 +187,8 @@
     "code_sha256": "3d66cc898ddc30477866a00d1618776e61008b281f33d1520365cfe40122ca73"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "68a20d6a093aee3525b46a4576bf1daa96c59128f978ccdf7c664be4223a5dd5",
-    "code_sha256": "d580ad0663706ace187d9cfc4d88e5a898523e6080cb4154e2ecbf4f3eeec7da"
+    "sha256": "39764f2cfc1e97b95dd5ec19951c84fa8ad4e72d5a939e718e60ddb6fb940333",
+    "code_sha256": "29b8f0bd66291815e2424c396880e7cd07db1d626650c9d72c356c8b6c91c7ec"
    },
    "src/continuum_swr_replay/parameters.py": {
     "sha256": "835ea24f95b3b52b7f1283e9c3076faa4b98cabd2e140ed0db90a1989386fbac",
