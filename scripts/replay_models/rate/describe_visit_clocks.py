@@ -4,8 +4,8 @@
 For every session of the canonical stop and event tables, builds the visit
 time-bin design of each kind (``replay_models.visit_design.visit_timebins``:
 SWR and No SWR non-local events) from the tables and the session's port
-experiences (read as the table builders read them: the behavioral-context
-cache, ``event_tables.prepare_data.load_behavioral_context``), keeps the bins inside the well visits
+experiences (read from the behavioral-context cache only,
+``event_tables.prepare_data.cached_port_experiences``), keeps the bins inside the well visits
 (``select_visit_context``, the default subset: the events that start inside a
 visit), and sums the event starts and the at-risk seconds in bins of each visit
 clock (``replay_models.rate.visit_clock_curves``):
@@ -121,27 +121,17 @@ def output_path(smoke: bool) -> Path:
 def session_port_experiences(
     animal: str, session_date: object, epoch: str
 ) -> pd.DataFrame:
-    """One session's port experiences, read as the table builders read them.
+    """One session's port experiences, read from the session cache only.
 
     From the behavioral-context cache (``prepare_data.session_cache_dir()``),
-    keyed by the session's HPC epoch identifier, and from Spyglass when the
-    cache has no current entry (``load_behavioral_context``).
-
-    Raises
-    ------
-    RuntimeError
-        If the session's behavioral context cannot be loaded.
+    keyed by the session's HPC epoch identifier
+    (``prepare_data.cached_port_experiences``); a missing or off-contract
+    entry raises, and nothing is fetched or written.
     """
     nwb = nwb_file_name(animal, session_date)
-    key = format_epoch_identifier(nwb, epoch, "HPC")
-    _, experiences, _, _ = prepare_data.load_behavioral_context(
-        {"nwb_file_name": nwb, "epoch_name": epoch, "session_id": key},
-        from_cache=True,
-        cache_key=key,
+    return prepare_data.cached_port_experiences(
+        format_epoch_identifier(nwb, epoch, "HPC")
     )
-    if experiences is None:
-        raise RuntimeError(f"no port experiences for {key}")
-    return experiences
 
 
 def session_bins(

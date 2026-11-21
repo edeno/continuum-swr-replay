@@ -272,7 +272,7 @@ Canonical event-grain builders: one row per non-local event.
 
 The per-session replay-table build and the corpus-level steps around it.
 
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `well_visit_times`, `session_cache_record`, `session_cache_staleness`, `time_mask_staleness`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `cached_port_experiences`, `well_visit_times`, `session_cache_record`, `session_cache_staleness`, `time_mask_staleness`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
 

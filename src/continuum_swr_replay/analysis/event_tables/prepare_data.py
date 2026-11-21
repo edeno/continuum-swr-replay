@@ -277,16 +277,52 @@ def load_behavioral_context(
     return trials, port_experiences, track_graph, False
 
 
+def cached_port_experiences(epoch_id: str) -> pd.DataFrame:
+    """An epoch's port experiences, read from the session cache only.
+
+    Read from the behavioral-context cache entry the table builders wrote
+    (:func:`behavioral_context_cache_path`) and checked as
+    :func:`load_behavioral_context` checks an entry. Only the cache is read:
+    a missing or off-contract entry is refused, never re-fetched from
+    Spyglass, and nothing is written.
+
+    Parameters
+    ----------
+    epoch_id : str
+        The epoch identifier, such as ``"chimi20200212_02_r1_HPC"``: the
+        cache's key.
+
+    Returns
+    -------
+    pd.DataFrame
+        The entry's port experiences, one row per well visit, as cached.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the epoch has no cache entry.
+    ValueError
+        If its entry is off the current behavioral-context contract.
+    """
+    cache_path = behavioral_context_cache_path({"session_id": epoch_id})
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"{epoch_id} has no session cache entry ({cache_path}); the table "
+            "builders write it"
+        )
+    cached = _read_cache_entry(cache_path)
+    problem = _cache_entry_problem(cached)
+    if problem is not None:
+        raise ValueError(f"session cache entry {cache_path} {problem}")
+    return cached["port_experiences"]
+
+
 def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
     """An epoch's well visits: each one's first poke-in and final poke-out.
 
     A well visit is one port experience, from ``arrival_time`` (the first
     nose-poke in at a well) to ``departure_time`` (the final poke-out there),
-    read from the behavioral-context cache entry the table builders wrote
-    (:func:`behavioral_context_cache_path`), checked as
-    :func:`load_behavioral_context` checks an entry. Only the cache is read:
-    a missing or off-contract entry is refused, never re-fetched from
-    Spyglass, and nothing is written.
+    read from the session cache only (:func:`cached_port_experiences`).
     ``event_definition.well_visits.in_well_visit`` takes the two arrays.
 
     Parameters
@@ -307,17 +343,7 @@ def well_visit_times(epoch_id: str) -> tuple[np.ndarray, np.ndarray]:
     ValueError
         If its entry is off the current behavioral-context contract.
     """
-    cache_path = behavioral_context_cache_path({"session_id": epoch_id})
-    if not cache_path.exists():
-        raise FileNotFoundError(
-            f"{epoch_id} has no session cache entry ({cache_path}); the table "
-            "builders write it"
-        )
-    cached = _read_cache_entry(cache_path)
-    problem = _cache_entry_problem(cached)
-    if problem is not None:
-        raise ValueError(f"session cache entry {cache_path} {problem}")
-    experiences = _prepare_port_experiences(cached["port_experiences"])
+    experiences = _prepare_port_experiences(cached_port_experiences(epoch_id))
     return (
         experiences["arrival_time"].to_numpy(dtype=float),
         experiences["departure_time"].to_numpy(dtype=float),
