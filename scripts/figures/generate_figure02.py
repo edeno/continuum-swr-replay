@@ -71,15 +71,14 @@ features run the summary reads; i's between-events and running lines from
 the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
 ``nonlocal_below_threshold_statistics``); g from the held-out event run's
-events and time sums by the events summary's own function
-(``reported.events.restriction_figure_statistics``: the events detected from
-the held-out decode that start inside a well visit, and the time inside a well
-visit), refused when the per-bin facts run that gave the time and the events'
-start their well-visit flag records no session cache or another than the
-current one (``prepare_data.session_cache_staleness``), when the restriction
-run is not the fold fit on folds of whole trials (``require_fold_fit``), or when
-the held-out event run was not made from that per-bin facts run or that
-restriction run (its recorded digests of their manifests). Panel i is a
+events and time sums as the events summary reads them
+(``reported.events.read_heldout_restriction``: the events detected from the
+held-out decode that start inside a well visit, and the time inside a well
+visit) and by its function (``restriction_figure_statistics``), refused when
+the restriction run is not the fold fit on folds of whole trials, when the
+held-out event run was not made from the current restriction run or per-bin
+facts run, or when the per-bin facts, which give the time and the events' start
+their well-visit flag, were not made from the current session cache. Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -175,7 +174,6 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
-    session_cache_staleness,
     time_mask_staleness,
     well_visit_times,
 )
@@ -212,7 +210,7 @@ from continuum_swr_replay.reported.events import (
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
-    require_fold_fit,
+    read_heldout_restriction,
     restriction_figure_statistics,
 )
 from continuum_swr_replay.reported.formatting import format_number
@@ -222,7 +220,7 @@ from continuum_swr_replay.runs.io import (
     read_manifest,
     sha256_file,
 )
-from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     REFERENCE_COLOR,
@@ -1123,6 +1121,9 @@ title and h's tick labels."""
 PANEL_G_PARTS_YLABEL = "Full minus SWR-only\ndecoder (nats/spike)"
 GAIN_FLOOR = 0.13
 """Panel g: each axis' floor below zero, as a share of its top."""
+PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
+BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
+"""The runners to make again when panel g refuses its inputs."""
 
 ROW4_GRID = {"width_ratios": (1.05, 0.85, 1.0, 1.0), "wspace": 0.85}
 """Row 4's grid of four cells: j keeps the last, so its left edge, which also
@@ -1603,58 +1604,28 @@ def generate_figure(
             events["event_id"],
         )
     )
-    # the time sums' well-visit flag is the per-bin facts': refuse facts made
-    # from other visits than the current session cache's
-    facts_dir = data_dir / EVENT_BIN_FACTS_DIR
-    manifest = read_output_manifest(facts_dir)
-    note = session_cache_staleness(
-        manifest,
-        ok_epochs(manifest),
-        f"the per-bin facts run ({facts_dir}, "
-        "scripts/event_evidence/measure_bin_facts.py)",
+    # the events summary's restriction inputs: the same runs, cohorts, time
+    # steps and subset; panel g draws the fold fit on whole trials, and only
+    # from a held-out event run made from the restriction run and the per-bin
+    # facts run as they are now, with facts made from the current session
+    # cache: content of another design, decoder run or visits is refused, not
+    # drawn (the event-table reason is the summary's alone)
+    heldout = read_heldout_restriction(
+        data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+        data_dir / EVENT_NONLOCAL_RESTRICTION_DIR,
+        data_dir / EVENT_BIN_FACTS_DIR,
+        event_epochs,
+        sha256_file(_event_table_path(data_dir)),
     )
-    if note is not None:
-        raise ValueError(
-            f"{note}, then scripts/event_evidence/detect_heldout_events.py"
-        )
-    # the events summary's restriction values: the same run, cohorts, time
-    # steps, subset and function
-    heldout_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
-    heldout_manifest = read_manifest(heldout_dir)
-    # panel g draws the fold fit on whole trials, and only from a held-out
-    # event run made from the restriction run as it is now: content of another
-    # design or another decoder run is refused, not drawn
-    restriction_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
-    require_fold_fit(read_output_manifest(restriction_dir), str(restriction_dir))
-    if recorded_sha256(heldout_manifest, "nonlocal_restriction") != sha256_file(
-        restriction_dir / "manifest.json"
+    for reason, rerun in (
+        (heldout.restriction_run, PANEL_G_RERUN),
+        (heldout.bin_facts_run, PANEL_G_RERUN),
+        (heldout.session_cache, f"{BIN_FACTS_RERUN}, then {PANEL_G_RERUN}"),
     ):
-        raise ValueError(
-            f"the held-out event run ({heldout_dir}) was not made from the "
-            f"current restriction run ({restriction_dir}); rerun "
-            "scripts/event_evidence/detect_heldout_events.py"
-        )
-    # the held-out event run must have read these per-bin facts, or its
-    # well-visit flags are not the ones checked above
-    if recorded_sha256(heldout_manifest, "bin_facts") != sha256_file(
-        facts_dir / "manifest.json"
-    ):
-        raise ValueError(
-            f"the held-out event run ({heldout_dir}) was not made from the "
-            f"current per-bin facts run ({facts_dir}); rerun "
-            "scripts/event_evidence/detect_heldout_events.py"
-        )
-    restriction_bin_s = pd.Series(
-        {
-            epoch_id: record["bin_s"]
-            for epoch_id, record in heldout_manifest["epochs"].items()
-        }
-    )
-    heldout_events = read_complete_run(heldout_dir, "heldout_events", event_epochs)
+        if reason is not None:
+            raise ValueError(f"panel g is not drawn: {reason} (with {rerun})")
     restriction_decoders, restriction_parts = restriction_figure_statistics(
-        heldout_events[heldout_events["starts_in_well_visit"].astype(bool)],
-        read_complete_run(heldout_dir, "heldout_time_sums", event_epochs),
-        restriction_bin_s,
+        heldout.events, heldout.time_sums, heldout.bin_s
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))

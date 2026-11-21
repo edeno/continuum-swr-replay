@@ -186,6 +186,8 @@ from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EXPOSURE_IN_VISITS_DIR,
+    HELDOUT_EVENTS_NAME,
+    HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
@@ -214,6 +216,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.epoch_records import MANIFEST
 from continuum_swr_replay.runs.io import (
     files_sha256,
     ok_epochs,
@@ -1938,6 +1941,98 @@ def restriction_figure_statistics(
     return decoders, parts
 
 
+def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str | None:
+    """Why the output in ``folder`` (its ``manifest``) is stale for the run
+    ``name`` in ``run_dir`` that it read, or None: it records no digest of that
+    run's manifest, or another than the current one."""
+    return _input_staleness(
+        manifest,
+        name,
+        file_record(run_dir / MANIFEST, ROOT_DIR)["sha256"],
+        rel(folder),
+        f"{name} run",
+        f"{name} run",
+    )
+
+
+@dataclass(frozen=True)
+class HeldoutRestriction:
+    """The held-out event run's inputs to the restriction values and Figure 2g
+    (:func:`read_heldout_restriction`), and why a value read from them is
+    pending (each None when it is not)."""
+
+    events: pd.DataFrame
+    """The events detected from the held-out decode that start inside a well
+    visit (``starts_in_well_visit``)."""
+    time_sums: pd.DataFrame
+    """The time sums of every epoch (``restriction_totals.restriction_time_sums``)."""
+    bin_s: pd.Series
+    """Each epoch's decode time step (s), indexed by ``epoch_id``, as the run read
+    it from the decode frame's time (checked there against the per-bin table's)."""
+    restriction_run: str | None
+    """The run was not made from the current restriction run."""
+    bin_facts_run: str | None
+    """The run was not made from the current per-bin facts run."""
+    session_cache: str | None
+    """The per-bin facts, which give the time sums, the events' start and the
+    windows' bins their well-visit flag, were not made from the current
+    session cache."""
+    event_table: str | None
+    """The run was not made from the current event table."""
+
+
+def read_heldout_restriction(
+    heldout_dir: Path,
+    restriction_dir: Path,
+    bin_facts_dir: Path,
+    epoch_ids: Iterable[str],
+    event_table_sha256: str,
+) -> HeldoutRestriction:
+    """The held-out event run's events, time sums and time steps, with the
+    reasons a value read from them is pending.
+
+    Parameters
+    ----------
+    heldout_dir, restriction_dir, bin_facts_dir : Path
+        The held-out event run, the restriction run and the per-bin facts run.
+    epoch_ids : iterable of str
+        The epochs read (every analyzed epoch with an event).
+    event_table_sha256 : str
+        The current event table's SHA-256.
+
+    Raises
+    ------
+    ValueError
+        If the restriction run is not the fold fit on folds of whole trials
+        (:func:`require_fold_fit`).
+    """
+    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
+    epoch_ids = list(epoch_ids)
+    manifest = read_output_manifest(heldout_dir)
+    events = read_complete_run(heldout_dir, HELDOUT_EVENTS_NAME, epoch_ids)
+    facts_manifest = read_output_manifest(bin_facts_dir)
+    return HeldoutRestriction(
+        events=events[events["starts_in_well_visit"].astype(bool)],
+        time_sums=read_complete_run(heldout_dir, HELDOUT_TIME_SUMS_NAME, epoch_ids),
+        bin_s=pd.Series(
+            {
+                epoch_id: record["bin_s"]
+                for epoch_id, record in manifest["epochs"].items()
+            }
+        ),
+        restriction_run=run_staleness(
+            manifest, heldout_dir, "nonlocal_restriction", restriction_dir
+        ),
+        bin_facts_run=run_staleness(manifest, heldout_dir, "bin_facts", bin_facts_dir),
+        session_cache=session_cache_staleness(
+            facts_manifest, ok_epochs(facts_manifest), rel(bin_facts_dir)
+        ),
+        event_table=event_table_staleness(
+            manifest, event_table_sha256, rel(heldout_dir)
+        ),
+    )
+
+
 class WindowValues(NamedTuple):
     """The restriction window values, by what they read."""
 
@@ -3645,9 +3740,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     restriction_dir = inputs.nonlocal_restriction
     restriction_windows_dir = inputs.nonlocal_restriction_windows
     heldout_dir = inputs.nonlocal_restriction_heldout_events
-    # the values describe the fold fit: refuse a run of the earlier design (the
-    # window and held-out event runs must have read this run, staleness below)
-    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
+    # the held-out event run (Figure 2g): its events that start inside a well
+    # visit, its time sums and time steps, and why a value read from them is
+    # pending; a restriction run of the earlier design is refused (the window
+    # and held-out event runs must have read this run, staleness below)
+    heldout = read_heldout_restriction(
+        heldout_dir, restriction_dir, inputs.bin_facts, analyzed, current_sha256
+    )
     # the run holds the windows of every event: those of the selected events
     # (and their controls, under their event's id) are read
     restriction_windows_table = select_events_in(
@@ -3657,19 +3756,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         selected,
     )
     windows_manifest = read_output_manifest(restriction_windows_dir)
-    heldout_manifest = read_output_manifest(heldout_dir)
-
-    def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path):
-        """Why the run in ``folder`` is stale for a run it read, or None."""
-        return _input_staleness(
-            manifest,
-            name,
-            file_record(run_dir / "manifest.json", ROOT_DIR)["sha256"],
-            rel(folder),
-            f"{name} run",
-            f"{name} run",
-        )
-
     restriction_stale = (
         stale(restriction_windows_dir),
         participation_staleness(restriction_windows_dir),
@@ -3690,12 +3776,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
         window_run_note_staleness(windows_manifest, rel(restriction_windows_dir)),
     )
-    # the well visits reach the time sums, the held-out events' start and the
-    # windows' parts inside a visit through the per-bin facts: pending when the
-    # facts were not made from the current session cache
-    facts_off_visits = off_visits(
-        inputs.bin_facts, ok_epochs(read_output_manifest(inputs.bin_facts))
-    )
     restriction_source = (
         f"{rel(restriction_windows_dir)} "
         "(scripts/event_evidence/sum_nonlocal_restriction_windows.py, from "
@@ -3711,39 +3791,23 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     window_stale = (*restriction_stale, participation_off_subset())
     summary.add(*over(pend(window_values.windows, *window_stale), CONTROL_SUBSET))
     # of the window values, only the counts after the visit read the visits
+    # (through the per-bin facts)
     summary.add(
         *over(
-            pend(window_values.after_visit, *window_stale, facts_off_visits),
+            pend(window_values.after_visit, *window_stale, heldout.session_cache),
             CONTROL_SUBSET,
         )
     )
 
-    # the events detected from the held-out decode (Figure 2g), read over those
-    # that start inside a well visit; the canonical events found again, over
-    # the selected events; and the time sums with the held-out events' windows
-    heldout_table = read_complete_run(heldout_dir, "heldout_events", analyzed)
-    heldout_selected = heldout_table[heldout_table["starts_in_well_visit"].astype(bool)]
+    # the canonical events found again, over the selected events
     found_table = select_events_in(
         read_complete_run(heldout_dir, "canonical_events_found", analyzed), selected
     )
-    restriction_time_sums = read_complete_run(
-        heldout_dir, "heldout_time_sums", analyzed
-    )
-    # each epoch's decode time step, as the held-out event run read it from the
-    # decode frame's time (checked there against the per-bin table's)
-    restriction_bin_s = pd.Series(
-        {
-            epoch_id: record["bin_s"]
-            for epoch_id, record in heldout_manifest["epochs"].items()
-        }
-    )
-    heldout_runs_stale = (
-        run_staleness(
-            heldout_manifest, heldout_dir, "nonlocal_restriction", restriction_dir
-        ),
-        run_staleness(heldout_manifest, heldout_dir, "bin_facts", inputs.bin_facts),
-    )
-    heldout_stale = (stale(heldout_dir), *heldout_runs_stale, facts_off_visits)
+    heldout_selected = heldout.events
+    restriction_time_sums = heldout.time_sums
+    restriction_bin_s = heldout.bin_s
+    heldout_runs_stale = (heldout.restriction_run, heldout.bin_facts_run)
+    heldout_stale = (heldout.event_table, *heldout_runs_stale, heldout.session_cache)
     heldout_source = (
         f"{rel(heldout_dir)} (scripts/event_evidence/detect_heldout_events.py, from "
         f"{rel(restriction_dir)}, scripts/event_evidence/score_nonlocal_restriction.py, "
@@ -3801,7 +3865,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     f"{heldout_source} (its time sums)",
                 ),
                 *heldout_runs_stale,
-                facts_off_visits,
+                heldout.session_cache,
             ),
             TIME_SUBSET,
         )

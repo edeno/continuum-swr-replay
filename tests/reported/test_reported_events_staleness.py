@@ -3,13 +3,18 @@ and nothing is dropped silently from the values behind a quoted number."""
 
 from __future__ import annotations
 
+import json
 from dataclasses import fields
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+)
 from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.reported import events
 from continuum_swr_replay.reported.events import (
     _PROPERTIES,
     class_step_values_with_staleness,
@@ -23,10 +28,12 @@ from continuum_swr_replay.reported.events import (
     window_run_note_staleness,
 )
 from continuum_swr_replay.reported.values import Value, pend
+from continuum_swr_replay.runs.io import sha256_file
 from tests.reported.test_reported_events_values import (
     _restriction_windows,
     step_fits,
 )
+from tests.support._session_cache_fixtures import write_session_cache_entries
 
 CURRENT = "a" * 64
 
@@ -293,3 +300,123 @@ def test_window_values_are_not_pending_without_the_note():
         window_run_note_staleness(_window_manifest(None), "w"),
     )
     assert all(v.pending is None for v in values)
+
+
+def _heldout_runs(root, change=None):
+    """A restriction run (the fold fit on whole trials), a per-bin facts run made
+    from the current session cache, and a held-out event run made from both and
+    from the event table ``CURRENT``, under ``root``; ``change`` replaces one
+    record of one manifest: (run, key, value)."""
+    write_session_cache_entries(["e1", "e2"])
+    runs = {name: root / name for name in ("restriction", "facts", "heldout")}
+    manifests = {
+        "restriction": {"settings": {"fit": "folds", "fold_design": "trials"}},
+        "facts": {
+            "inputs": {"session_cache": session_cache_record(["e1", "e2"])},
+            "epochs": {"e1": {"status": "ok"}, "e2": {"status": "ok"}},
+        },
+    }
+    for name in ("restriction", "facts"):
+        if change and change[0] == name:
+            manifests[name][change[1]] = change[2]
+        runs[name].mkdir()
+        (runs[name] / "manifest.json").write_text(json.dumps(manifests[name]))
+    heldout = {
+        "inputs": {
+            "event_table": {"sha256": CURRENT},
+            "nonlocal_restriction": {
+                "sha256": sha256_file(runs["restriction"] / "manifest.json")
+            },
+            "bin_facts": {"sha256": sha256_file(runs["facts"] / "manifest.json")},
+        },
+        "epochs": {"e1": {"bin_s": 0.002}, "e2": {"bin_s": 0.004}},
+    }
+    if change and change[0] == "heldout":
+        heldout["inputs"][change[1]] = change[2]
+    runs["heldout"].mkdir()
+    (runs["heldout"] / "manifest.json").write_text(json.dumps(heldout))
+    return runs
+
+
+def _read_heldout(runs, monkeypatch):
+    tables = {
+        "heldout_events": pd.DataFrame(
+            {"heldout_event_id": range(4), "starts_in_well_visit": [1, 0, 1, 0]}
+        ),
+        "heldout_time_sums": pd.DataFrame({"epoch_id": ["e1", "e2"]}),
+    }
+    read = []
+
+    def read_complete_run(folder, name, epochs):
+        read.append((folder, name, epochs))
+        return tables[name]
+
+    monkeypatch.setattr(events, "read_complete_run", read_complete_run)
+    heldout = events.read_heldout_restriction(
+        runs["heldout"], runs["restriction"], runs["facts"], iter(["e1", "e2"]), CURRENT
+    )
+    assert read == [
+        (runs["heldout"], name, ["e1", "e2"])
+        for name in ("heldout_events", "heldout_time_sums")
+    ]
+    return heldout
+
+
+REASONS = ("restriction_run", "bin_facts_run", "session_cache", "event_table")
+
+
+def test_the_heldout_restriction_reader_selects_the_events_in_a_visit(
+    processed_data_root, monkeypatch
+):
+    """The held-out events that start inside a well visit, the time sums whole,
+    each epoch's time step, and no reason to pend when every run is current."""
+    heldout = _read_heldout(_heldout_runs(processed_data_root), monkeypatch)
+    assert heldout.events["heldout_event_id"].tolist() == [0, 2]
+    assert heldout.time_sums["epoch_id"].tolist() == ["e1", "e2"]
+    assert heldout.bin_s.to_dict() == {"e1": 0.002, "e2": 0.004}
+    assert all(getattr(heldout, reason) is None for reason in REASONS)
+
+
+@pytest.mark.parametrize(
+    ("change", "reason", "note"),
+    [
+        (
+            ("heldout", "nonlocal_restriction", {"sha256": "0" * 64}),
+            "restriction_run",
+            "another nonlocal_restriction run than the current one",
+        ),
+        (
+            ("heldout", "bin_facts", {"sha256": "0" * 64}),
+            "bin_facts_run",
+            "another bin_facts run than the current one",
+        ),
+        (
+            ("facts", "inputs", {}),
+            "session_cache",
+            "facts records no session-cache SHA-256",
+        ),
+        (
+            ("heldout", "event_table", {"sha256": "0" * 64}),
+            "event_table",
+            "another event table than the current one",
+        ),
+    ],
+    ids=REASONS,
+)
+def test_the_heldout_restriction_reader_names_each_reason_to_pend(
+    processed_data_root, monkeypatch, change, reason, note
+):
+    """Each input not current sets its own reason, and only that one."""
+    heldout = _read_heldout(_heldout_runs(processed_data_root, change), monkeypatch)
+    assert note in getattr(heldout, reason)
+    assert [r for r in REASONS if getattr(heldout, r) is not None] == [reason]
+
+
+def test_the_heldout_restriction_reader_refuses_a_run_not_the_fold_fit(
+    processed_data_root, monkeypatch
+):
+    runs = _heldout_runs(
+        processed_data_root, ("restriction", "settings", {"fit": "folds"})
+    )
+    with pytest.raises(ValueError, match="fold_design None, not 'trials'"):
+        _read_heldout(runs, monkeypatch)

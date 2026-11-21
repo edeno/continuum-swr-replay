@@ -2048,6 +2048,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         replay_content_dir,
         table_path,
     )
+    from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
     inside = _figure02_events().assign(event_id=range(8))
@@ -2090,8 +2091,12 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
             }
         )
     )
-    # each stored per-event table holds a row of every event, the ninth too
+    # each stored per-event table holds a row of every event, the ninth too;
+    # the held-out event run is read by the events summary's reader
     rows = pd.DataFrame({"event_id": [*range(8), 99]})
+    monkeypatch.setattr(
+        events, "read_complete_run", lambda *args: rows.assign(starts_in_well_visit=1)
+    )
     for name, value in {
         "parse_nwb_filename": lambda name: ("a", "d1"),
         "example_windows": lambda *args: {},
@@ -2210,7 +2215,10 @@ def _heldout_events_run(
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        ({"restriction_sha256": "0" * 64}, "not made from the current restriction run"),
+        (
+            {"restriction_sha256": "0" * 64},
+            "made from another nonlocal_restriction run than the current one",
+        ),
         ({"restriction_settings": {"n_folds": 5}}, "is not the fold fit"),
         (
             {"restriction_settings": {"fit": "folds", "fold_design": "contiguous"}},
@@ -2241,15 +2249,16 @@ def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
 ):
     """Panel g reads the held-out event run: its events that start inside a
     well visit (not the two planted outside one) and its time sums whole."""
+    from continuum_swr_replay.reported import events
+
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
     _heldout_events_run(tmp_path)
     heldout = pd.DataFrame(
         {"heldout_event_id": range(5), "starts_in_well_visit": [1, 0, 1, 1, 0]}
     ).astype({"starts_in_well_visit": bool})
     read = {"heldout_events": heldout, "heldout_time_sums": pd.DataFrame(range(9))}
-    rows = pd.DataFrame({"event_id": [*range(8), 99]})
     monkeypatch.setattr(
-        figure02, "read_complete_run", lambda folder, name, epochs: read.get(name, rows)
+        events, "read_complete_run", lambda folder, name, epochs: read[name]
     )
     seen = []
 
@@ -2277,7 +2286,7 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
 
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
     # the facts' own record changes; the cache, which participation read too,
-    # does not
+    # does not; the held-out event run read these facts
     path = tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
     manifest = json.loads(path.read_text())
     if problem == "no session cache":
@@ -2285,6 +2294,7 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
     else:
         manifest["inputs"]["session_cache"] = {"sha256": "0" * 64}
     path.write_text(json.dumps(manifest))
+    _heldout_events_run(tmp_path)
     note = {
         "no session cache": "records no session-cache SHA-256",
         "another session cache": "other well visits than the current",
@@ -2294,7 +2304,7 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
         raise AssertionError("panel g was drawn from the facts without their check")
 
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
-    with pytest.raises(ValueError, match=f"per-bin facts run .*{note}") as refused:
+    with pytest.raises(ValueError, match=f"{EVENT_BIN_FACTS_DIR}.*{note}") as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     message = str(refused.value)
     assert "scripts/event_evidence/measure_bin_facts.py" in message
@@ -2315,7 +2325,7 @@ def test_figure02_refuses_a_heldout_event_run_not_made_from_the_current_bin_fact
 
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
     with pytest.raises(
-        ValueError, match="not made from the current per-bin facts run"
+        ValueError, match="made from another bin_facts run than the current one"
     ) as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert "detect_heldout_events.py" in str(refused.value)
