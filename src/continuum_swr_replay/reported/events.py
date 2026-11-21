@@ -182,6 +182,7 @@ TAGS = {
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("2h",)),
     "nonlocal_restriction": Tags(("2c.3",)),
+    "nonlocal_restriction_figure": Tags(("2c.3",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -1520,6 +1521,7 @@ _RESTRICTION_HELD_OUT = (
 #: The window comparisons reported: kind of window, group, contrast.
 _RESTRICTION_WINDOWS = (
     ("event", SWR_LABELS[False], "full_minus_swr"),
+    ("event", SWR_LABELS[False], "full_minus_none"),
     ("event", SWR_LABELS[True], "swr_minus_none"),
     ("event", SWR_LABELS[True], "full_minus_none"),
     ("event", SWR_LABELS[True], "full_minus_swr"),
@@ -1530,14 +1532,21 @@ _RESTRICTION_KINDS = {
     "event": ("events", "events"),
     "control": ("controls", "matched Local-rest controls"),
 }
+#: The comparison Figure 2h's "Held-out time" axis draws, for both groups:
+#: score family, contrast, unit and kind of window.
+RESTRICTION_FIGURE = ("filter", "full_minus_none", "per_spike", "event")
 
 
 def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the three restriction decoders compared per spike over the
     events and their Local-rest controls (the windows of Figure 2h), in both
-    score families."""
-    make = value_factory(
+    score families. The comparison Figure 2h draws (:data:`RESTRICTION_FIGURE`)
+    carries that panel's tag."""
+    make_text = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_figure = value_factory(
+        restriction_window_values, source, TAGS["nonlocal_restriction_figure"]
     )
     statistics = restriction_windows.restriction_window_statistics(windows).set_index(
         ["family", "contrast", "unit", "kind", "group"]
@@ -1547,6 +1556,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
     for family, suffix in FAMILY_SUFFIX.items():
         for kind, group, contrast in _RESTRICTION_WINDOWS:
             row = statistics.loc[(family, contrast, "per_spike", kind, group)]
+            drawn = (family, contrast, "per_spike", kind) == RESTRICTION_FIGURE
+            make = make_figure if drawn else make_text
             kind_word, label = _RESTRICTION_KINDS[kind]
             a, b = restriction_windows.CONTRASTS[contrast]
             key = (
@@ -1578,14 +1589,14 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
         for word, group in _RUN_GROUPS.items():
             row = statistics.loc[("filter", "full_minus_swr", "per_spike", kind, group)]
             values += [
-                make(
+                make_text(
                     f"restriction_{word}_{kind_word}",
                     row["n_events"],
                     "count",
                     "count",
                     f"{group} {label} summed",
                 ),
-                make(
+                make_text(
                     f"restriction_{word}_{kind_word}_scored",
                     row["n_scored"],
                     "count",
@@ -1594,7 +1605,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> list[Value]
                 ),
             ]
     values.append(
-        make(
+        make_text(
             "restriction_animals",
             row["n_animals"],
             "count",

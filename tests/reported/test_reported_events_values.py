@@ -915,6 +915,16 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     assert numbers["restriction_non_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(4.0)
     )
+    assert numbers["restriction_non_swr_events_full_minus_none_per_spike"] == (
+        pytest.approx(4.0)
+    )
+    assert numbers[
+        "restriction_non_swr_events_full_minus_none_two_sided_per_spike"
+    ] == pytest.approx(8.0)
+    assert (
+        numbers["restriction_non_swr_events_full_minus_none_per_spike_animals_positive"]
+        == 3
+    )
     assert numbers["restriction_swr_events_swr_minus_none_per_spike"] == (
         pytest.approx(6.0)
     )
@@ -949,11 +959,19 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     assert numbers["restriction_non_swr_controls_scored"] == 3
     assert numbers["restriction_swr_events_scored"] == 3
     assert numbers["restriction_animals"] == 3
-    # two families x six comparisons x (estimate, two bounds, animals positive),
+    # two families x seven comparisons x (estimate, two bounds, animals positive),
     # two counts for each kind and group, and the animals
-    assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1
+    assert len(numbers) == 2 * 7 * 4 + 2 * 4 + 1
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    assert {v.figures for v in values.values()} == {()}
+    # Figure 2h draws the filter family's full - none per spike over both groups'
+    # events: those values carry its tag, no other value does
+    drawn = {
+        f"restriction_{word}_events_full_minus_none_per_spike{end}"
+        for word in ("non_swr", "swr")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    }
+    assert {k for k, v in values.items() if v.figures == ("2h",)} == drawn
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
 def test_restriction_outside_swr_values_are_the_gain_per_second_and_its_share():
