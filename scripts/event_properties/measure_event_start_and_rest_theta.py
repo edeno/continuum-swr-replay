@@ -134,12 +134,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     folder = processed_data_dir() / EVENT_START_REST_THETA_DIR
     folder.mkdir(parents=True, exist_ok=True)
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
-        for table in pool.map(measure_epoch, jobs):
-            identifier = table.epoch_id.iloc[0]
+        for measured in pool.map(measure_epoch, jobs):
+            identifier = measured.epoch_id.iloc[0]
             tmp = folder / f"{identifier}.parquet.tmp"
-            table.to_parquet(tmp, index=False)
+            measured.to_parquet(tmp, index=False)
             tmp.replace(folder / f"{identifier}.parquet")
-            print(f"{identifier}: {len(table)} events", flush=True)
+            print(f"{identifier}: {len(measured)} events", flush=True)
     if not args.epochs:
         write_json(
             folder / "manifest.json",
