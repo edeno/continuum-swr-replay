@@ -85,6 +85,14 @@ UNITS = {"per_spike": "n_spikes", "per_s": "duration_s"}
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
 
+EVENT_TABLE_NOTE = "event_table_note"
+"""The window run's settings key of the note it records when the event table it
+read is not the one the held-out tetrode run read: ``event_table_sha256`` (the
+window run's) and ``tetrode_holdout_event_table_sha256`` (the held-out tetrode
+run's). The windows are still matched to the held-out tetrode run's
+(:func:`window_spike_counts`), and the events summary marks every value read
+from a run with the note pending."""
+
 
 def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.DataFrame:
     """Each window's bins and summed scores of the three models.
@@ -176,8 +184,9 @@ def window_spike_counts(holdout: pd.DataFrame, windows: pd.DataFrame) -> pd.Seri
         If the two runs' windows differ by id, event, kind, group or length
         (the held-out tetrode table does not hold a window's first bin, so a
         window of the same length at another place is not seen here; the
-        runner checks that both runs read the same event and participation
-        tables), or if a window does not have one row for each of the table's
+        runner stops unless both runs read the same participation tables, and
+        records a note, :data:`EVENT_TABLE_NOTE`, when they read different
+        event tables), or if a window does not have one row for each of the table's
         tetrodes (its spike count would miss a tetrode).
     """
     keys = list(WINDOW_KEYS)

@@ -29,9 +29,15 @@ Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 
 and ``manifest.json`` gathered from the records. The header records the
 digests of the event table, the participation tables, and the restriction and
-held-out tetrode runs' manifests; the event table and participation tables must
-be the ones the held-out tetrode run read (its manifest's inputs), or the run
-stops before any epoch.
+held-out tetrode runs' manifests. The participation tables must be the ones the
+held-out tetrode run read (its manifest's inputs), or the run stops before any
+epoch: the control windows come from them. An event table other than the one
+the held-out tetrode run read does not stop the run: it is logged as a warning
+and the header's settings carry a note with both digests
+(``restriction_windows.EVENT_TABLE_NOTE``; only then, so a run on the held-out
+tetrode run's table keeps its header and resumes), and the events summary marks
+every value read from the run pending. Each epoch's windows must still be the
+held-out tetrode run's (``restriction_windows.window_spike_counts``).
 
 Usage::
 
@@ -186,25 +192,47 @@ def run_input(run_dir: Path) -> dict[str, str]:
 
 
 def check_holdout_inputs(header_inputs: dict, holdout_manifest: dict) -> None:
-    """Fail unless the event table and participation tables are the ones the
-    held-out tetrode run read.
+    """Fail unless the participation tables are the ones the held-out tetrode
+    run read: the control windows come from them.
 
     Raises
     ------
     ValueError
-        Naming each input whose digest differs.
+        If the participation tables' digest differs.
     """
-    differ = [
-        name
-        for name in ("event_table", "event_participation")
-        if header_inputs[name]["sha256"]
-        != holdout_manifest["inputs"].get(name, {}).get("sha256")
-    ]
-    if differ:
+    name = "event_participation"
+    if header_inputs[name]["sha256"] != holdout_manifest["inputs"].get(name, {}).get(
+        "sha256"
+    ):
         raise ValueError(
-            f"not the held-out tetrode run's inputs: {differ}; its windows would "
+            f"not the held-out tetrode run's inputs: ['{name}']; its windows would "
             "not be these"
         )
+
+
+def event_table_note(header_inputs: dict, holdout_manifest: dict) -> dict | None:
+    """The note the run records when its event table is not the one the
+    held-out tetrode run read, or None when it is.
+
+    Returns
+    -------
+    dict or None
+        ``event_table_sha256`` (this run's) and
+        ``tetrode_holdout_event_table_sha256`` (the held-out tetrode run's; None
+        when its manifest records none), with a sentence saying what differs.
+    """
+    ours = header_inputs["event_table"]["sha256"]
+    theirs = holdout_manifest["inputs"].get("event_table", {}).get("sha256")
+    if ours == theirs:
+        return None
+    return {
+        "note": (
+            "the event table is not the one the held-out tetrode run read; its "
+            "spike counts are matched window by window"
+        ),
+        "event_table_sha256": ours,
+        "tetrode_holdout_event_table_sha256": theirs,
+    }
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -239,10 +267,20 @@ def main(argv: list[str] | None = None) -> None:
             "tetrode_holdout": run_input(holdout_dir),
         },
     }
+    holdout_manifest = read_manifest(holdout_dir)
+    note = event_table_note(header["inputs"], holdout_manifest)
+    if note is not None:
+        logging.getLogger(__name__).warning(
+            "%s (this run's sha256 %s, the held-out tetrode run's %s); the run's "
+            "values will be pending",
+            note["note"],
+            note["event_table_sha256"],
+            note["tetrode_holdout_event_table_sha256"],
+        )
+        header["settings"][rw.EVENT_TABLE_NOTE] = note
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    holdout_manifest = read_manifest(holdout_dir)
     check_holdout_inputs(header["inputs"], holdout_manifest)
     restriction_ok = set(ok_epochs(read_manifest(restriction_dir)))
     holdout_ok = set(ok_epochs(holdout_manifest))

@@ -18,10 +18,12 @@ from continuum_swr_replay.reported.events import (
     gamma_db_values,
     property_interval_values,
     rest_theta_values,
+    restriction_window_values,
     spike_evidence_staleness,
+    window_run_note_staleness,
 )
 from continuum_swr_replay.reported.values import Value, pend
-from tests.reported.test_reported_events_values import step_fits
+from tests.reported.test_reported_events_values import _restriction_windows, step_fits
 
 CURRENT = "a" * 64
 
@@ -251,3 +253,37 @@ def test_every_step_value_is_pending_for_another_event_table():
     assert {pending[key] for key in _EVIDENCE_KEYS} == {
         "stale table; steps records no spike-evidence SHA-256; rerun it before citing"
     }
+
+
+def _window_manifest(note: dict | None) -> dict:
+    """A window run's manifest, with the event-table note when given."""
+    settings = {"contrasts": {}}
+    if note is not None:
+        settings["event_table_note"] = note
+    return {"settings": settings, "inputs": {}, "epochs": {}}
+
+
+def test_window_values_are_pending_when_the_window_run_carries_a_note():
+    """A window run on another event table than the held-out tetrode run's:
+    every restriction window value is pending, and the reason names both
+    tables and the runs to rerun."""
+    note = {
+        "note": "the event table is not the one the held-out tetrode run read",
+        "event_table_sha256": "c" * 64,
+        "tetrode_holdout_event_table_sha256": "d" * 64,
+    }
+    reason = window_run_note_staleness(_window_manifest(note), "Processed-Data/w")
+    assert reason.startswith("Processed-Data/w read another event table")
+    assert "cccccccccccc" in reason and "dddddddddddd" in reason
+    assert "held-out tetrode run" in reason and "rerun" in reason
+    values = pend(restriction_window_values(_restriction_windows(), "s"), reason)
+    assert values and all(v.pending == reason for v in values)
+
+
+def test_window_values_are_not_pending_without_the_note():
+    assert window_run_note_staleness(_window_manifest(None), "w") is None
+    values = pend(
+        restriction_window_values(_restriction_windows(), "s"),
+        window_run_note_staleness(_window_manifest(None), "w"),
+    )
+    assert all(v.pending is None for v in values)

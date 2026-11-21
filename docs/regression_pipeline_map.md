@@ -920,7 +920,7 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 The non-local restriction scores summed over the windows of Figure 2's panel h.
 
-`decode_time`, `run_epoch`, `run_input`, `check_holdout_inputs`, `main`
+`decode_time`, `run_epoch`, `run_input`, `check_holdout_inputs`, `event_table_note`, `main`
 
 ### `scripts/event_properties/bootstrap_event_properties.py`
 

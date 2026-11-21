@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_PARTICIPATION_DIR,
@@ -126,20 +127,72 @@ def test_windows_the_holdout_run_did_not_score_raise(data_dir, tmp_path):
         runner.run_epoch(EPOCH, tmp_path / "e.parquet", data_dir, tmp_path)
 
 
-def test_inputs_the_holdout_run_did_not_read_stop_the_run():
-    inputs = {"event_table": {"sha256": "a"}, "event_participation": {"sha256": "b"}}
-    same = {
-        "inputs": {
-            "event_table": {"sha256": "a"},
-            "event_participation": {"sha256": "b"},
-        }
+def _main_header(
+    tmp_path, monkeypatch, holdout_inputs: dict, event_table: str = "a"
+) -> dict | None:
+    """Run ``main`` with its inputs' digests and the held-out tetrode run's
+    manifest replaced; return the header it ran the epochs under, or None when
+    it ran none. Participation tables have digest ``"b"``."""
+    ran = {}
+    manifests = {
+        EVENT_TETRODE_HOLDOUT_DIR: {
+            "inputs": holdout_inputs,
+            "epochs": {EPOCH: {"status": "ok"}},
+        },
+        EVENT_NONLOCAL_RESTRICTION_DIR: {"epochs": {EPOCH: {"status": "ok"}}},
     }
-    runner.check_holdout_inputs(inputs, same)
-    other = {
-        "inputs": {
-            "event_table": {"sha256": "a"},
-            "event_participation": {"sha256": "c"},
-        }
-    }
+    monkeypatch.setattr(runner, "event_table_path", lambda data_dir: tmp_path / "e")
+    monkeypatch.setattr(
+        runner, "event_table_input", lambda path: {"sha256": event_table, "path": "e"}
+    )
+    monkeypatch.setattr(runner, "files_sha256", lambda paths: "b")
+    monkeypatch.setattr(runner, "ok_table_paths", lambda folder, name: [])
+    monkeypatch.setattr(runner, "run_input", lambda run_dir: {"sha256": run_dir.name})
+    monkeypatch.setattr(runner, "provenance_record", lambda root: {})
+    monkeypatch.setattr(runner, "read_manifest", lambda folder: manifests[folder.name])
+    monkeypatch.setattr(runner, "run", lambda **kwargs: ran.update(kwargs))
+    runner.main(["--data-dir", str(tmp_path)])
+    assert ran["epochs"] == [EPOCH]
+    return ran["header"]
+
+
+def test_the_held_out_tetrode_runs_event_table_adds_no_note(tmp_path, monkeypatch):
+    """The run on the held-out tetrode run's own event table keeps the header
+    it had, so its records resume."""
+    header = _main_header(
+        tmp_path,
+        monkeypatch,
+        {"event_table": {"sha256": "a"}, "event_participation": {"sha256": "b"}},
+    )
+    assert set(header["settings"]) == {"contrasts"}
+
+
+def test_another_event_table_runs_with_a_note_of_both_digests(
+    tmp_path, monkeypatch, caplog
+):
+    header = _main_header(
+        tmp_path,
+        monkeypatch,
+        {"event_table": {"sha256": "z"}, "event_participation": {"sha256": "b"}},
+    )
+    note = header["settings"][rw.EVENT_TABLE_NOTE]
+    assert note["event_table_sha256"] == "a"
+    assert note["tetrode_holdout_event_table_sha256"] == "z"
+    assert "not the one the held-out tetrode run read" in note["note"]
+    assert "will be pending" in caplog.text
+
+
+def test_other_participation_tables_stop_the_run(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="event_participation"):
-        runner.check_holdout_inputs(inputs, other)
+        _main_header(
+            tmp_path,
+            monkeypatch,
+            {"event_table": {"sha256": "a"}, "event_participation": {"sha256": "c"}},
+        )
+    # with another event table as well: still stopped
+    with pytest.raises(ValueError, match="event_participation"):
+        _main_header(
+            tmp_path,
+            monkeypatch,
+            {"event_table": {"sha256": "z"}, "event_participation": {"sha256": "c"}},
+        )

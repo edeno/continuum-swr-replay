@@ -55,7 +55,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
 current one, or recording none, makes the values read from it pending
-(:func:`event_table_staleness`).
+(:func:`event_table_staleness`). The restriction window values are also pending
+when the window run read another event table than the held-out tetrode run whose
+spike counts it adds (:func:`window_run_note_staleness`).
 
 Pooled values sum events over sessions and animals; "animals in direction"
 counts the animals whose own value points the way the claim states, an
@@ -290,6 +292,26 @@ def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str
     """Why an output made from the canonical event table is stale, or None."""
     return _input_staleness(
         manifest, "event_table", current_sha256, what, "event-table", "event table"
+    )
+
+
+def window_run_note_staleness(manifest: dict, what: str) -> str | None:
+    """Why the restriction window run's values are pending for its note, or None.
+
+    The window run records a note (``restriction_windows.EVENT_TABLE_NOTE``, in
+    its settings) when the event table it read is not the one the held-out
+    tetrode run read, whose spike counts it adds; its windows still matched that
+    run's window by window, but the two runs are not on one table.
+    """
+    note = manifest.get("settings", {}).get(restriction_windows.EVENT_TABLE_NOTE)
+    if note is None:
+        return None
+    theirs = note["tetrode_holdout_event_table_sha256"]
+    return (
+        f"{what} read another event table (sha256 "
+        f"{note['event_table_sha256'][:12]}) than the held-out tetrode run whose "
+        f"spike counts it adds (sha256 {'none' if theirs is None else theirs[:12]}); "
+        "rerun the held-out tetrode run and then the window run before citing"
     )
 
 
@@ -2678,7 +2700,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # the restriction scores over panel h's windows, and over every immobile bin
     # outside SWRs; the window run sums the restriction run's bins and takes its
     # spike counts from the held-out tetrode run, so it must be made from both
-    # runs as they are now
+    # runs as they are now, and on the held-out tetrode run's event table (the
+    # window run's note when it is not; the event-table check above covers the
+    # window run's own table)
     restriction_dir = inputs.nonlocal_restriction
     restriction_windows_dir = inputs.nonlocal_restriction_windows
     restriction_windows_table = read_complete_run(
@@ -2713,6 +2737,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         participation_staleness(restriction_windows_dir),
         run_staleness("tetrode_holdout", inputs.tetrode_holdout),
         run_staleness("nonlocal_restriction", restriction_dir),
+        window_run_note_staleness(windows_manifest, rel(restriction_windows_dir)),
     )
     restriction_source = (
         f"{rel(restriction_windows_dir)} "
