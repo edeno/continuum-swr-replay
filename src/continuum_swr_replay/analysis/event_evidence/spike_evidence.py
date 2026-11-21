@@ -14,11 +14,18 @@ Every bin lookup is the nearest interior place bin (track-graph bins). The
 windows (:func:`build_session_events`) are the immobile non-local events of
 the decode frame in three groups, and the matched quiet windows outside
 excluded time.
+
+The run scores every such window of every analyzed epoch. Its events are the
+canonical event table's, so the analyses read it over their one subset: each
+scored event takes its ``event_id`` by its epoch and start time
+(:func:`with_event_ids`), and :func:`in_analyzed_subset` keeps the events the
+event table's selection keeps (those that start inside a well visit) and the
+quiet windows whose first sample is inside a well visit.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -35,6 +42,8 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_mask,
     nonlocal_probability,
 )
+from continuum_swr_replay.analysis.event_definition.swr_source import event_epoch_ids
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     nearest_interior_bins,
 )
@@ -56,6 +65,9 @@ MAX_BASELINE_BINS = 40
 SPIKE_EVIDENCE_METRICS = "event_spike_evidence_metrics.parquet"
 """An epoch's per-event metrics table in the spike-evidence run, in the epoch's
 folder."""
+
+BASELINE_GROUP = "baseline"
+"""The group of the matched quiet windows, which are not events."""
 
 
 def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
@@ -270,3 +282,113 @@ def event_metrics(
         "map_mean": map_mean,
         "dist_to_gpi_peak": dist_gpi,
     }
+
+
+def with_event_ids(metrics: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
+    """The spike-evidence metrics with each scored event's ``event_id``.
+
+    A scored event is one of the canonical event table's events: it takes the
+    ``event_id`` of the event of its epoch whose ``event_start_s`` equals its
+    ``start_time`` exactly (both are the event's first decode sample). A quiet
+    window (group :data:`BASELINE_GROUP`) is no event; its ``event_id`` is
+    missing.
+
+    Parameters
+    ----------
+    metrics : pd.DataFrame
+        The run's per-window metrics: ``epoch_id``, ``group``, ``start_time``.
+    events : pd.DataFrame
+        The canonical event table, every event of it (``animal``,
+        ``session_date``, ``epoch``, ``event_start_s``, ``event_id``).
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of ``metrics``, its rows in their order, with ``event_id``
+        (nullable ``UInt64``, so that no id is rounded through a float).
+
+    Raises
+    ------
+    ValueError
+        If a scored event matches no event of the table, or two events of the
+        table share an epoch and start time.
+    """
+    keys = pd.DataFrame(
+        {
+            "epoch_id": event_epoch_ids(events).to_numpy(),
+            "start_time": events["event_start_s"].to_numpy(dtype=float),
+            "event_id": events["event_id"].astype("UInt64").to_numpy(),
+        }
+    )
+    if keys.duplicated(["epoch_id", "start_time"]).any():
+        raise ValueError("two events of the event table share an epoch and start")
+    out = metrics.reset_index(drop=True)
+    is_event = (out["group"] != BASELINE_GROUP).to_numpy()
+    matched = (
+        out.loc[is_event, ["epoch_id", "start_time"]]
+        .astype({"start_time": float})
+        .merge(keys, on=["epoch_id", "start_time"], how="left", validate="many_to_one")
+    )
+    missing = matched["event_id"].isna()
+    if missing.any():
+        first = matched.loc[missing].iloc[0]
+        raise ValueError(
+            f"{int(missing.sum())} scored events match no event of the event "
+            f"table, e.g. {first['epoch_id']} at {first['start_time']!r} s"
+        )
+    event_id = pd.array([pd.NA] * len(out), dtype="UInt64")
+    event_id[np.flatnonzero(is_event)] = matched["event_id"].to_numpy()
+    return out.assign(event_id=event_id)
+
+
+def in_analyzed_subset(
+    metrics: pd.DataFrame,
+    event_ids: Sequence[int],
+    visits: Mapping[str, tuple[np.ndarray, np.ndarray]],
+) -> np.ndarray:
+    """Which scored windows the analyses read.
+
+    A scored event is read when its ``event_id`` is among ``event_ids`` (the
+    events the event table's selection keeps,
+    ``cohort_selection.select_visit_context``: those that start inside a well
+    visit). A quiet window is read when its first sample (``start_time``) is
+    inside a well visit of its epoch
+    (``event_definition.well_visits.in_well_visit``), so the reference is
+    the same time as the events.
+
+    Parameters
+    ----------
+    metrics : pd.DataFrame
+        From :func:`with_event_ids`: ``epoch_id``, ``group``, ``start_time``,
+        ``event_id``.
+    event_ids : sequence of int
+        The selected events' ``event_id``.
+    visits : Mapping
+        Each epoch's id to its visits' ``(arrival_times, departure_times)``
+        (``event_tables.prepare_data.well_visit_times``).
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_windows,)
+        Aligned with ``metrics``'s rows.
+
+    Raises
+    ------
+    ValueError
+        If an epoch with a quiet window has no visits in ``visits``.
+    """
+    is_event = (metrics["group"] != BASELINE_GROUP).to_numpy()
+    keep = np.zeros(len(metrics), dtype=bool)
+    selected = pd.unique(np.asarray(event_ids, dtype=np.uint64))
+    keep[is_event] = metrics.loc[is_event, "event_id"].isin(selected).to_numpy()
+    baseline = metrics.loc[~is_event, ["epoch_id", "start_time"]]
+    if missing := sorted(set(baseline["epoch_id"]) - set(visits)):
+        raise ValueError(
+            f"no well visits for {len(missing)} epochs, e.g. {missing[:3]}"
+        )
+    rows = np.flatnonzero(~is_event)
+    for epoch_id, at in baseline.groupby("epoch_id").indices.items():
+        keep[rows[at]] = in_well_visit(
+            baseline["start_time"].to_numpy(dtype=float)[at], *visits[epoch_id]
+        )
+    return keep

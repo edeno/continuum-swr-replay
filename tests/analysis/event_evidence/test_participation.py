@@ -43,13 +43,70 @@ def test_control_windows_have_the_events_lengths_and_lie_in_local_rest():
     mask[100:200] = True
     s = np.array([10, 40])
     e = np.array([14, 59])
-    windows = pt.control_windows(s, e, mask, seed=(1, "epoch"))
+    one_visit = np.zeros(200, dtype=np.int64)
+    windows = pt.control_windows(s, e, mask, one_visit, seed=(1, "epoch"))
     np.testing.assert_array_equal(windows["e"] - windows["s"], e - s)
     for a, b in zip(windows["s"], windows["e"], strict=True):
         assert mask[a : b + 1].all()
     # the same seed draws the same windows
-    again = pt.control_windows(s, e, mask, seed=(1, "epoch"))
+    again = pt.control_windows(s, e, mask, one_visit, seed=(1, "epoch"))
     pd.testing.assert_frame_equal(windows, again)
+
+
+def test_local_rest_outside_a_visit_is_no_longer_a_control():
+    # Local rest: bins 10-19 inside visit 0, bins 60-89 between visits
+    local_rest = np.zeros(120, dtype=bool)
+    local_rest[10:20] = True
+    local_rest[60:90] = True
+    visit_index = np.full(120, -1, dtype=np.int64)
+    visit_index[5:30] = 0
+    visit_index[100:115] = 1
+    s, e = np.array([0, 40]), np.array([14, 44])  # 15 and 5 bins
+    seed = (1, "epoch")
+    # under Local rest alone, the 15-bin event's control is the stretch outside
+    # the visits, the only one long enough
+    anywhere = pt.windows_in_local_rest_anywhere(s, e, local_rest, seed=seed)
+    assert 60 <= anywhere.loc[0, "s"] and anywhere.loc[0, "e"] < 90
+    windows = pt.control_windows(s, e, local_rest, visit_index, seed=seed)
+    # inside the visits there is none of 15 bins; the 5-bin event's is in visit 0
+    assert windows.loc[0, "s"] == -1 and windows.loc[0, "e"] == -1
+    assert 10 <= windows.loc[1, "s"] and windows.loc[1, "e"] < 20
+
+
+def test_a_control_never_crosses_a_visit_boundary():
+    # two visits back to back, Local rest throughout: 10 bins each
+    local_rest = np.ones(20, dtype=bool)
+    visit_index = np.repeat([0, 1], 10)
+    s = np.arange(20) * 100  # twenty 5-bin events (their bins need not exist)
+    e = s + 4
+    windows = pt.control_windows(s, e, local_rest, visit_index, seed=(3, "epoch"))
+    drawn = windows[windows["s"] >= 0]
+    # 6 starts in each visit; a window across bins 9 and 10 is never drawn
+    assert len(drawn) == 12
+    assert (visit_index[drawn["s"]] == visit_index[drawn["e"]]).all()
+    assert sorted(drawn["s"]) == [0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]
+    # under Local rest alone, the 4 windows across the boundary would be drawn too
+    anywhere = pt.windows_in_local_rest_anywhere(s, e, local_rest, seed=(3, "epoch"))
+    assert (anywhere["s"] >= 0).sum() == 16
+
+
+def test_controls_inside_visits_are_reproducible_for_a_seed():
+    rng = np.random.default_rng(0)
+    local_rest = rng.random(500) > 0.1
+    visit_index = np.repeat(np.arange(5), 100)
+    visit_index[::37] = -1
+    s = np.sort(rng.choice(400, 30, replace=False))
+    e = s + rng.integers(0, 6, 30)
+    first = pt.control_windows(s, e, local_rest, visit_index, seed=(7, "epoch"))
+    again = pt.control_windows(s, e, local_rest, visit_index, seed=(7, "epoch"))
+    pd.testing.assert_frame_equal(first, again)
+    other = pt.control_windows(s, e, local_rest, visit_index, seed=(7, "other"))
+    assert not first.equals(other)
+    for a, b in zip(first["s"], first["e"], strict=True):
+        if a >= 0:
+            assert local_rest[a : b + 1].all()
+            assert (visit_index[a : b + 1] == visit_index[a]).all()
+            assert visit_index[a] >= 0
 
 
 def test_tetrode_spike_counts_count_each_tetrode_in_half_open_windows():
@@ -94,7 +151,11 @@ def test_an_event_longer_than_any_local_rest_stretch_has_no_control():
     mask = np.zeros(100, dtype=bool)
     mask[10:30] = True
     windows = pt.control_windows(
-        np.array([0, 40, 60]), np.array([4, 69, 64]), mask, seed=(1, "epoch")
+        np.array([0, 40, 60]),
+        np.array([4, 69, 64]),
+        mask,
+        np.zeros(100, dtype=np.int64),
+        seed=(1, "epoch"),
     )
     # the 30-bin event has no 30-bin stretch of Local rest; the 5-bin ones do
     assert windows.loc[1, "s"] == -1

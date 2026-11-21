@@ -7,16 +7,32 @@ coincide with an SWR. This runner labels each Non-Local bout of a finished run,
 and its matched window, by its full span
 (:func:`~continuum_swr_replay.analysis.event_evidence.state_evidence.split_non_local_by_swr`):
 "SWR" when some bin of the bout is in an SWR of the decode frame read through
-the SWR source (``read_dot_with_swr_source``), else "no SWR". ``bout_statistics``
-then runs on each subset as on any state (animal-level interval, the paired
-bout - matched-window difference) over the primary metrics, their per-held-out-
-spike versions and MAP_S's distance from the animal.
+the SWR source (``read_dot_with_swr_source``), else "no SWR". An immobile bout
+counts when its first sample is inside a well visit, a running bout wherever it
+happens (running is counted wherever it happens: the animal does not run inside
+a visit), and its matched window goes with it
+(:func:`~continuum_swr_replay.analysis.event_evidence.state_evidence.mark_bouts_in_well_visits`,
+each epoch's visits from ``event_tables.prepare_data.well_visit_times``).
+``bout_statistics`` then runs on each subset of those bouts as on any state
+(animal-level interval, the paired bout - matched-window difference) over the
+primary metrics, their per-held-out-spike versions and MAP_S's distance from the
+animal. The matched windows were drawn from all of the epoch's time in the
+bout's regime, so some of the kept bouts' matched windows start outside every
+visit; the provenance counts them.
 
 Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the run:
 
-- ``nl_bouts_by_swr.parquet``: the labeled windows;
-- ``nl_bouts_by_swr_stats.csv``: the statistics (the events summary reads it, question 2c.3);
-- ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source and the epochs.
+- ``nl_bouts_by_swr.parquet``: the labeled windows, every bout and its matched
+  window, with ``starts_in_well_visit``, ``matched_starts_in_well_visit`` and
+  ``in_analyzed_subset``;
+- ``nl_bouts_by_swr_stats.csv``: the statistics over the immobile bouts that
+  start inside a well visit and every running bout (the events summary reads
+  it, question 2c.3);
+- ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source, the epochs,
+  the subset (``cohort_selection.ANALYZED_SUBSET``), the session-cache entries
+  the visits were read from (``prepare_data.session_cache_record``) and the
+  bouts kept and left out per state, SWR label and regime (``bouts``, from
+  ``bout_visit_counts``).
 
 Usage::
 
@@ -35,15 +51,29 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     bout_statistics,
+    bout_visit_counts,
+    mark_bouts_in_well_visits,
     split_non_local_by_swr,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import NL_BOUTS_BY_SWR_STEM, processed_data_dir
-from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
+from continuum_swr_replay.runs.io import (
+    json_ready,
+    ok_epochs,
+    read_manifest,
+    write_json,
+)
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import read_table, write_table
 
@@ -59,11 +89,14 @@ METRICS = (
 
 
 def label_epoch(run_dir: Path, epoch_id: str, decode_dir: Path) -> pd.DataFrame:
-    """One epoch's Non-Local windows labeled by SWR."""
+    """One epoch's Non-Local windows labeled by SWR and marked by the well visits."""
     windows = read_table(run_dir / "per_epoch" / f"{epoch_id}_windows.parquet")
     frame = read_dot_with_swr_source(decode_paths(epoch_id, decode_dir).data_over_time)
     try:
-        return split_non_local_by_swr(windows, frame["SWR_event"].to_numpy() > 0)
+        labeled = split_non_local_by_swr(windows, frame["SWR_event"].to_numpy() > 0)
+        return mark_bouts_in_well_visits(
+            labeled, frame.index.to_numpy(dtype=float), *well_visit_times(epoch_id)
+        )
     except ValueError as exc:
         raise ValueError(f"{epoch_id}: {exc}") from exc
 
@@ -81,8 +114,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     windows = pd.concat(
         [label_epoch(run_dir, e, decode_dir) for e in epochs], ignore_index=True
     )
+    kept = windows[windows["in_analyzed_subset"]]
     states = sorted(windows["state"].unique())
-    stats = bout_statistics(windows, metrics=dict.fromkeys(states, METRICS))
+    stats = bout_statistics(kept, metrics=dict.fromkeys(states, METRICS))
+    counts = bout_visit_counts(windows)
 
     write_table(windows, run_dir / f"{NL_BOUTS_BY_SWR_STEM}.parquet")
     stats.to_csv(run_dir / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv", index=False)
@@ -94,11 +129,16 @@ def main(argv: Sequence[str] | None = None) -> None:
             "swr_source": swr_source_name(),
             "decode_dir": str(decode_dir),
             "epochs": epochs,
+            "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(epochs),
+            "bouts": json_ready(counts.to_dict(orient="records")),
         },
         indent=1,
     )
+    print(counts.to_string(index=False))
     print(
-        f"{len(epochs)} epochs, {len(windows)} windows -> {run_dir / NL_BOUTS_BY_SWR_STEM}_stats.csv"
+        f"{len(epochs)} epochs, {len(kept)} of {len(windows)} windows -> "
+        f"{run_dir / NL_BOUTS_BY_SWR_STEM}_stats.csv"
     )
 
 

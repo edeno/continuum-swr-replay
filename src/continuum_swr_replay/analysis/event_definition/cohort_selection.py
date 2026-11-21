@@ -18,11 +18,17 @@ visit (``analysis.constants.STARTS_IN_WELL_VISIT``: ``in_visit`` and
 ``spans_visit_end``), the one subset the analyses of Figures 2 to 5 read.
 :func:`count_visit_context`
 counts the rows per label, kept and dropped, for a summary to record.
+:func:`subset_staleness` says why an output's manifest does not record the
+subset (:data:`ANALYZED_SUBSET`), and :func:`check_visit_context_starts`
+refuses a table whose labels disagree with the visits a time mask reads.
+:func:`select_events_in` keeps the rows of a stored per-event table (one that
+carries ``event_id``) whose event is among those selected, so a table made over
+every event is read over the same events.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -33,6 +39,8 @@ from continuum_swr_replay.analysis.constants import (
     STARTS_IN_WELL_VISIT,
     VISIT_CONTEXTS,
 )
+from continuum_swr_replay.analysis.event_definition.swr_source import event_epoch_ids
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.tables.columns import require_columns
 
 
@@ -550,6 +558,38 @@ def events_in_stops(event_starts: np.ndarray, stops: pd.DataFrame) -> np.ndarray
 
 _VISIT_CONTEXT_COLUMN = "visit_context"
 
+ANALYZED_SUBSET = (
+    "the events that start inside a well visit (visit_context in_visit or "
+    "spans_visit_end); seconds, time bins and SWRs inside a well visit (from the "
+    "first poke-in at a well to the final poke-out; an SWR counts when its first "
+    "sample is inside)"
+)
+"""What an output made over the analyses' one subset records as its ``subset``
+(in its manifest), so a reader can refuse or mark pending one made otherwise."""
+
+
+def subset_staleness(manifest: Mapping[str, Any], what: str) -> str | None:
+    """Why an output is not over the analyses' subset, or None.
+
+    An output made over the subset records :data:`ANALYZED_SUBSET` as its
+    ``subset``; one recording another or none was made over other events or
+    other time. The events summary marks the values read from such an output
+    pending; a figure refuses it.
+
+    Parameters
+    ----------
+    manifest : Mapping
+        The output's manifest.
+    what : str
+        The output, for the note.
+    """
+    if manifest.get("subset") != ANALYZED_SUBSET:
+        return (
+            f"{what} was not made over the events that start inside a well visit "
+            "and the time inside one; rerun it before citing"
+        )
+    return None
+
 
 def _visit_contexts(contexts: str | Sequence[str]) -> tuple[str, ...]:
     """The requested labels as a tuple, refusing one the vocabulary lacks."""
@@ -657,3 +697,90 @@ def count_visit_context(
     )
     out.index.name = _VISIT_CONTEXT_COLUMN
     return out
+
+
+def select_events_in(table: pd.DataFrame, event_ids: Sequence[Any]) -> pd.DataFrame:
+    """Keep the rows of a per-event table whose ``event_id`` is among ``event_ids``.
+
+    A stored table made over every event (a per-event measure, its time bins,
+    an event with its matched control row under the same id) is read over the
+    events :func:`select_visit_context` keeps by passing their ``event_id``.
+    Every row of a kept id is kept, however many it has.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        A table carrying ``event_id``.
+    event_ids : sequence
+        The ids to keep, for example ``select_visit_context(events)["event_id"]``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of the kept rows, in their order, with a fresh integer index;
+        ``table`` is not changed.
+
+    Raises
+    ------
+    ValueError
+        If ``table`` has no ``event_id``.
+    """
+    require_columns(table, ["event_id"], "the per-event table to select from")
+    keep = table["event_id"].isin(pd.unique(np.asarray(event_ids)))
+    return table.loc[keep].reset_index(drop=True)
+
+
+def check_visit_context_starts(
+    events: pd.DataFrame, visits: Mapping[str, tuple[np.ndarray, np.ndarray]]
+) -> None:
+    """Raise unless each event's label says what its start says about the visits.
+
+    The selection reads ``visit_context``; the time-masked outputs read the
+    visits themselves (``well_visits.in_well_visit``). They describe one subset
+    only if, for every event, ``visit_context`` is one of
+    ``STARTS_IN_WELL_VISIT`` exactly when ``event_start_s`` is inside one of
+    its epoch's visits. A table labeled from other visits than ``visits`` (a
+    refreshed session cache, another table) fails here.
+
+    Parameters
+    ----------
+    events : pandas.DataFrame
+        Every event of the table: ``animal``, ``session_date``, ``epoch``,
+        ``event_start_s`` and ``visit_context``.
+    visits : Mapping
+        Each epoch id (``swr_source.swr_epoch_id_of_session``) to its visits'
+        ``(arrival_times, departure_times)``.
+
+    Raises
+    ------
+    ValueError
+        If an epoch of ``events`` has no visits in ``visits``, or some events'
+        label and start disagree (their count, and an example).
+    """
+    require_columns(
+        events,
+        ["event_start_s", _VISIT_CONTEXT_COLUMN],
+        "the events to check against the visits",
+    )
+    epoch_ids = event_epoch_ids(events).to_numpy()
+    if missing := sorted(set(epoch_ids) - set(visits)):
+        raise ValueError(
+            f"no well visits for {len(missing)} epochs of the events, e.g. "
+            f"{missing[:3]}"
+        )
+    starts = events["event_start_s"].to_numpy(dtype=np.float64)
+    inside = np.zeros(len(events), dtype=bool)
+    for identifier in pd.unique(epoch_ids):
+        rows = epoch_ids == identifier
+        inside[rows] = in_well_visit(starts[rows], *visits[identifier])
+    labeled = events[_VISIT_CONTEXT_COLUMN].isin(STARTS_IN_WELL_VISIT).to_numpy()
+    disagree = np.flatnonzero(inside != labeled)
+    if disagree.size:
+        example = events.iloc[disagree[0]]
+        raise ValueError(
+            f"{disagree.size} of {len(events)} events' visit_context disagrees with "
+            "their start against the well visits, e.g. the event of "
+            f"{epoch_ids[disagree[0]]} starting at {example['event_start_s']} s, "
+            f"labeled {example[_VISIT_CONTEXT_COLUMN]!r} but "
+            f"{'inside' if inside[disagree[0]] else 'outside'} a visit"
+        )

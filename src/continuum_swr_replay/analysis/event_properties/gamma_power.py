@@ -288,6 +288,7 @@ def epoch_gamma(
     grid_time: NDArray[np.float64],
     excluded: pd.DataFrame,
     events: pd.DataFrame,
+    in_visit: NDArray[np.bool_],
     n_windows: int,
     rng: np.random.Generator,
 ) -> tuple[
@@ -323,6 +324,9 @@ def epoch_gamma(
         The epoch's excluded time, ``start_time`` and ``end_time``.
     events : pd.DataFrame, shape (n_events, n_columns)
         The epoch's events: ``event_start_s``, ``event_end_s``, ``is_swr``.
+    in_visit : NDArray of bool, shape (n_time,)
+        Whether each bin of the grid is inside a well visit; quiet rest is the
+        rest inside a visit (``brain_state_reference.regime_masks``).
     n_windows : int
         Windows of each regime drawn per event.
     rng : np.random.Generator
@@ -362,7 +366,7 @@ def epoch_gamma(
     signals["in_excluded_time"] = (
         signals["in_excluded_time"].to_numpy(dtype=bool) | ~recorded
     )
-    regimes = regime_masks(signals)
+    regimes = regime_masks(signals, in_visit)
     rest = regimes["rest"]
     # The bins of each event, by the rule of ``event_means``.
     n_bins = np.searchsorted(grid_time, ends, side="right") - np.searchsorted(
@@ -402,6 +406,7 @@ def epoch_gamma(
             change_db[f"{word}_db_{group}"] = power_change_db(power_on_grid, mask, rest)
     reference = brain_state_reference(
         signals,
+        in_visit,
         {
             **{word: f"{word}_z" for word in GAMMA_BANDS},
             **{f"{word}_power": f"{word}_power" for word in GAMMA_BANDS},

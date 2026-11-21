@@ -2,7 +2,8 @@
 
 For each Part 2 event property (``reported.events`` ``property_values`` and the
 two added ones, start distance and arms visited), over the immobile non-local
-events of the canonical event table: the median of each class, the SWR minus
+events of the canonical event table that start inside a well visit
+(``cohort_selection.select_visit_context``): the median of each class, the SWR minus
 non-SWR difference, and the duration-matched difference (within ten quantile
 strata of the pooled event durations in whole decode samples, averaged by
 stratum size; ``analysis.event_properties.property_contrast``), each with a 95 %
@@ -33,6 +34,11 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+    count_visit_context,
+    select_visit_context,
+)
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
@@ -70,8 +76,11 @@ PROPERTIES = {
 }
 
 
-def load_events() -> tuple[pd.DataFrame, list[Path]]:
-    events = read_swr_table(table_path("event_table", replay_content_dir()))
+def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path]]:
+    """The events that start inside a well visit, with their start distance; the
+    counts per well-visit label (``count_visit_context``); the files read."""
+    table = read_swr_table(table_path("event_table", replay_content_dir()))
+    events = select_visit_context(table)
     paths = sorted(
         (processed_data_dir() / EVENT_START_REST_THETA_DIR).glob("*.parquet")
     )
@@ -90,7 +99,7 @@ def load_events() -> tuple[pd.DataFrame, list[Path]]:
             events.animal, events.session_date, events.epoch, strict=True
         )
     ]
-    return events, paths
+    return events, count_visit_context(table), paths
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -99,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--properties", nargs="*", default=list(PROPERTIES))
     parser.add_argument("--out-name", default=EVENT_PROPERTY_BOOTSTRAP_DIR)
     args = parser.parse_args(argv)
-    events, start_paths = load_events()
+    events, visit_counts, start_paths = load_events()
     values = {
         word: events[PROPERTIES[word][0]].to_numpy(dtype=float) * PROPERTIES[word][1]
         for word in args.properties
@@ -136,6 +145,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "folder": EVENT_START_REST_THETA_DIR,
                 "n_files": len(start_paths),
                 "sha256": files_sha256(start_paths),
+            },
+            "subset": ANALYZED_SUBSET,
+            "visit_context_counts": {
+                label: int(n) for label, n in visit_counts["n"].items()
             },
             "n_events": len(events),
             "n_replicates": args.n_replicates,

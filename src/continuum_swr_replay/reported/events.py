@@ -16,10 +16,14 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   (``*_state_shares.parquet``, from ``scripts/detector_comparison/add_state_shares.py``);
 - the spike-evidence run that scores every event
   (``Processed-Data/event_spike_evidence``, one folder per epoch, from
-  ``scripts/event_evidence/run_event_spike_evidence.sh``);
+  ``scripts/event_evidence/run_event_spike_evidence.sh``), read over the
+  selected events (each scored event matched to its ``event_id``,
+  ``spike_evidence.with_event_ids``) and the quiet windows that start inside a
+  well visit (``spike_evidence.in_analyzed_subset``);
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
   the state-evidence run the detection summary reads, from
-  ``scripts/event_evidence/split_state_evidence_by_swr.py``);
+  ``scripts/event_evidence/split_state_evidence_by_swr.py``), over the bouts
+  that start inside a well visit, which its provenance records;
 - each event time bin's content placed on the track, with its track distance to
   the animal and to the nearest well (``Processed-Data/content_along_arms``, from
   ``scripts/event_properties/measure_content_along_arms.py``);
@@ -55,6 +59,18 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``analysis.event_evidence.restriction_totals`` on the events that start
   inside a well visit and the time inside a well visit.
 
+Every value is over the analyses' one subset: the events that start inside a
+well visit (``cohort_selection.select_visit_context``, applied once, where the
+event table is read; a stored per-event output is read over the same events,
+``cohort_selection.select_events_in``), and time, SWRs and the other detectors'
+events inside a well visit. Each value's description says which
+(:data:`EVENTS_SUBSET`, :data:`TIME_SUBSET`, :data:`DETECTOR_SUBSET`), and the
+summary counts the events of every well-visit label, kept and left out
+(:func:`visit_context_values`). An output re-run over the subset records it
+(``cohort_selection.ANALYZED_SUBSET``); one that does not makes the values read
+from it pending (``cohort_selection.subset_staleness``). The decoder's quality is over each
+epoch's decode, not over events.
+
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
 current one, or recording none, makes the values read from it pending
@@ -70,10 +86,12 @@ medians, a mean of its epochs' means).
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.decode_quality import quality_metrics
@@ -85,7 +103,11 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    check_visit_context_starts,
+    count_visit_context,
+    select_events_in,
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
@@ -98,7 +120,10 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FAMILY_SUFFIX,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
+    BASELINE_GROUP,
     SPIKE_EVIDENCE_METRICS,
+    in_analyzed_subset,
+    with_event_ids,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -112,6 +137,12 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
 )
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    behavioral_context_cache_path,
+    session_cache_staleness,
+    time_mask_staleness,
+    well_visit_times,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
@@ -154,14 +185,17 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    over,
     pend,
     rel,
     value_factory,
 )
 from continuum_swr_replay.runs.io import (
     files_sha256,
+    ok_epochs,
     ok_table_paths,
     read_complete_run,
+    read_manifest,
 )
 from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -171,6 +205,7 @@ TAGS = {
     "calibration": Tags(("2a.1",), ("decoder_validation",)),
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
     "cohort": Tags(("2b.2",), ("2d",)),
+    "visit_context": Tags(("2b.2",)),
     "left_out": Tags(("2b.2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
     "other_detectors": Tags(("2b.3",)),
@@ -222,6 +257,61 @@ DETECTORS = {
 }
 MAIN_DETECTOR = "kay"
 
+EVENTS_SUBSET = (
+    "the immobile non-local events that start inside a well visit (from the first "
+    "poke-in at a well to the final poke-out; visit_context in_visit or "
+    "spans_visit_end)"
+)
+"""What the values of the events are over, as their descriptions say."""
+
+CONTROL_SUBSET = (
+    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
+    "lying wholly inside one well visit"
+)
+"""What the participation values are over: their controls are Local rest inside
+one well visit (``event_evidence.participation.CONTROL_RULE``)."""
+
+HOLDOUT_CONTROL_SUBSET = (
+    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
+    "drawn from the whole epoch (not only inside a well visit)"
+)
+"""What the held-out tetrode values are over: their run took its controls from
+participation tables whose controls were Local rest anywhere in the epoch."""
+
+TIME_SUBSET = (
+    "time inside a well visit (from the first poke-in at a well to the final poke-out)"
+)
+"""What the values of time (rest, immobile bins) are over."""
+
+DETECTOR_SUBSET = (
+    "the other detectors' events whose first sample is inside a well visit and "
+    "the non-local events that start inside one, each selected by its own start; "
+    "whether an event overlaps an event of the other side is read against all of "
+    "that side's events, so its partner may start outside a visit"
+)
+"""What the values of the detector comparison are over."""
+
+LEFT_OUT_SUBSET = (
+    f"{EVENTS_SUBSET}, and the non-local detector's exposure inside a well visit; "
+    "an event is left out when no event of the other inventory overlaps it, "
+    "wherever that event starts"
+)
+"""What the values of what another inventory leaves out are over."""
+
+SPIKE_EVIDENCE_SUBSET = (
+    f"{EVENTS_SUBSET}, against the matched quiet windows whose first sample is "
+    "inside a well visit"
+)
+"""What the values of the spike-evidence run are over."""
+
+BOUT_SUBSET = (
+    "the decoder's immobile Non-Local Continuous bouts whose first sample is inside "
+    "a well visit (from the first poke-in at a well to the final poke-out); the "
+    "bouts' matched windows are drawn from all of the epoch's time in the regime, "
+    "and the values reported here do not use them"
+)
+"""What the values of the held-out test split by SWR are over."""
+
 
 @dataclass(frozen=True)
 class EventsInputs:
@@ -245,6 +335,7 @@ class EventsInputs:
     nonlocal_restriction: Path
     nonlocal_restriction_windows: Path
     bin_facts: Path
+    exposure_in_visits: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -273,6 +364,8 @@ def default_inputs() -> EventsInputs:
         nonlocal_restriction_windows=processed_data_dir()
         / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
         bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
+        exposure_in_visits=processed_data_dir()
+        / nonlocal_comparison.EXPOSURE_IN_VISITS_DIR,
     )
 
 
@@ -550,6 +643,69 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
+def visit_context_values(table: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.2: the event table's events by well-visit label, and how many
+    the analyses keep (those that start inside a well visit) and leave out, of
+    each kind (``cohort_selection.count_visit_context``)."""
+    make = value_factory(visit_context_values, source, TAGS["visit_context"])
+    counts = count_visit_context(table)
+    values = [
+        make(
+            f"events_label_{label}",
+            row["n"],
+            "count",
+            "count",
+            f"immobile non-local events of the canonical event table with "
+            f"visit_context {label} ({'kept' if row['kept'] else 'left out'}: the "
+            "analyses keep the events that start inside a well visit)",
+        )
+        for label, row in counts.iterrows()
+    ]
+    for word, name, rows in (
+        ("", "", table),
+        ("swr_", "SWR ", table[table["is_swr"]]),
+        ("non_swr_", "non-SWR ", table[~table["is_swr"]]),
+    ):
+        kind = count_visit_context(rows)
+        values += [
+            make(
+                f"{word}events_in_subset",
+                kind.loc[kind["kept"], "n"].sum(),
+                "count",
+                "count",
+                f"immobile non-local {name}events that start inside a well visit "
+                "(visit_context in_visit or spans_visit_end): the events the "
+                "analyses read",
+            ),
+            make(
+                f"{word}events_left_out",
+                kind.loc[~kind["kept"], "n"].sum(),
+                "count",
+                "count",
+                f"immobile non-local {name}events that start outside every well "
+                "visit, left out of the analyses",
+            ),
+        ]
+    return values
+
+
+def detector_visit_values(visit_counts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.3: each other detector's compared events left out because
+    their first sample is outside every well visit."""
+    make = value_factory(detector_visit_values, source, TAGS["other_detectors"])
+    return [
+        make(
+            f"{word}_events_outside_visit",
+            visit_counts.loc[detector, "n_outside_visit"],
+            "count",
+            "count",
+            f"{detector} events compared with the non-local detector whose first "
+            "sample is outside every well visit, left out of the comparison",
+        )
+        for word, detector in DETECTORS.items()
+    ]
+
+
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2f)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
@@ -744,21 +900,31 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
 # --- what an analysis without the non-local detector leaves out -----------------
 
 
-def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Value]:
-    """Question 2b.2: how many non-local events, and how much of their time, an
-    analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
-    from the Widloski detector) does not include, in total and per hour of rest.
-    """
+def left_out_values(
+    run_dir: Path,
+    inventory_dir: Path,
+    event_ids: Iterable[object],
+    visits: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    exposure: pd.DataFrame,
+    source: str,
+) -> list[Value]:
+    """Question 2b.2: how many of the selected non-local events, and how much of
+    their time, an analysis that starts from SWRs (or from any LFP- or
+    rate-based trigger, or from the Widloski detector) does not include, in
+    total and per hour of rest inside the well visits
+    (``nonlocal_comparison.left_out_statistics``)."""
     make = value_factory(left_out_values, source, TAGS["left_out"])
-    stats = nonlocal_comparison.left_out_statistics(run_dir, inventory_dir)
+    stats = nonlocal_comparison.left_out_statistics(
+        run_dir, inventory_dir, event_ids, visits, exposure
+    )
     values = [
         make(
             "rest_hours",
             stats["rest_hours"],
             "quantity",
             "sig2",
-            "hours of analyzed immobility the non-local detector observed (exposure), "
-            "summed over epochs",
+            "hours of analyzed immobility inside a well visit the non-local detector "
+            "observed (its exposure inside the visits), summed over epochs",
             "h",
         ),
         make(
@@ -774,8 +940,8 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             stats["kay_time_s"],
             "quantity",
             "int",
-            "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis "
-            "examines",
+            "seconds the Kay SWRs whose first sample is inside a well visit span "
+            "(compared events): what an SWR-triggered analysis examines",
             "s",
         ),
     ]
@@ -826,7 +992,8 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
                 stats[f"nonlocal_events_outside_{word}_per_hour"],
                 "quantity",
                 "sig2",
-                f"non-local events {label}, per hour of analyzed immobility",
+                f"non-local events {label}, per hour of analyzed immobility inside a "
+                "well visit",
                 "per h",
             ),
         ]
@@ -853,7 +1020,7 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
-            "analyzed immobility",
+            "analyzed immobility inside a well visit",
             "per h",
         ),
     ]
@@ -1255,6 +1422,33 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+def spike_evidence_visit_values(
+    metrics: pd.DataFrame, kept: np.ndarray, source: str
+) -> list[Value]:
+    """Questions 2c.3 and 2d.9: the scored events and quiet windows of each group
+    left out because they start outside every well visit
+    (``spike_evidence.in_analyzed_subset``)."""
+    make = value_factory(spike_evidence_visit_values, source, TAGS["spike"])
+    left_out = metrics.loc[~kept, "group"].value_counts()
+    groups = {"baseline": BASELINE_GROUP, **_SPIKE_EVIDENCE_GROUPS}
+    return [
+        make(
+            f"{word}_left_out",
+            int(left_out.get(group, 0)),
+            "count",
+            "count",
+            (
+                "matched quiet windows scored whose first sample is outside every "
+                "well visit, left out"
+                if word == "baseline"
+                else f"{group} events scored that start outside every well visit, "
+                "left out"
+            ),
+        )
+        for word, group in groups.items()
+    ]
+
+
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
@@ -1311,6 +1505,50 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 "animals in that test",
+            ),
+        ]
+    return values
+
+
+def heldout_bout_values(bouts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.3: the immobile Non-Local Continuous bouts of the held-out test
+    split by SWR that start inside a well visit and are read, those left out, and
+    the read ones whose matched window starts outside every visit (the matched
+    windows were drawn from all immobile time). ``bouts`` is the split's count
+    table (``state_evidence.bout_visit_counts``, recorded in its provenance)."""
+    make = value_factory(heldout_bout_values, source, TAGS["spike_evidence"])
+    rows = bouts[bouts["regime"] == "immobile"].set_index("state")
+    values = []
+    for word, state in (
+        ("swr", "Non-Local Continuous | SWR"),
+        ("non_swr", "Non-Local Continuous | no SWR"),
+    ):
+        row = rows.loc[state]
+        label = "with an SWR" if word == "swr" else "without an SWR"
+        values += [
+            make(
+                f"heldout_{word}_bouts_in_subset",
+                row["n_kept"],
+                "count",
+                "count",
+                f"immobile Non-Local Continuous bouts {label} whose first sample is "
+                "inside a well visit, read",
+            ),
+            make(
+                f"heldout_{word}_bouts_left_out",
+                row["n_left_out"],
+                "count",
+                "count",
+                f"immobile Non-Local Continuous bouts {label} whose first sample is "
+                "outside every well visit, left out",
+            ),
+            make(
+                f"heldout_{word}_bouts_matched_outside_visit",
+                row["n_kept_matched_outside_visit"],
+                "count",
+                "count",
+                f"of the read bouts {label}, those whose matched window starts "
+                "outside every well visit",
             ),
         ]
     return values
@@ -1409,7 +1647,8 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             int((table["kind"] == "event").sum() - (table["kind"] == "control").sum()),
             "count",
             "count",
-            "events longer than any Local-rest stretch of their epoch (no control)",
+            "events longer than any stretch of Local rest inside one well visit of "
+            "their epoch (no control)",
         )
     )
     return values
@@ -2674,21 +2913,26 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
 def content_along_arms_bins(
     events: pd.DataFrame, folder: Path, n_epochs: int, columns: list[str]
 ) -> tuple[pd.DataFrame, list[Path]]:
-    """Every event time bin of the content-along-arms run with ``columns``, each
-    with its event's ``animal`` and ``is_swr``; and the files read.
+    """Every time bin of the events of ``events`` in the content-along-arms run,
+    with ``columns``, each with its event's ``animal`` and ``is_swr``; and the
+    files read. The run holds the bins of every event of the table; the bins of
+    the events in ``events`` are read (``cohort_selection.select_events_in``).
 
     Raises
     ------
     ValueError
         If ``folder`` does not hold ``n_epochs`` epochs, or its bins do not cover
-        exactly the events of ``events``.
+        every event of ``events``.
     """
     paths = sorted(folder.glob("*.parquet"))
     if len(paths) != n_epochs:
         raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
-    bins = pd.concat(
-        pd.read_parquet(path, columns=["event_id", "epoch_id", *columns])
-        for path in paths
+    bins = select_events_in(
+        pd.concat(
+            pd.read_parquet(path, columns=["event_id", "epoch_id", *columns])
+            for path in paths
+        ),
+        events["event_id"],
     )
     n_bins = len(bins)
     bins = bins.merge(
@@ -2768,7 +3012,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     """The events summary from ``inputs``."""
     summary = Summary(name="events", produced_by=produced_by)
 
-    events = read_swr_table(inputs.event_table)
+    # the one selection: the events that start inside a well visit
+    table = read_swr_table(inputs.event_table)
+    events = select_visit_context(table)
+    # the time masks read the visits themselves: they and the labels must agree
+    run = inputs.event_features_run
+    run_epochs = ok_epochs(read_manifest(run))
+    visits = {identifier: well_visit_times(identifier) for identifier in run_epochs}
+    check_visit_context_starts(table, visits)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
     current_sha256 = event_table_record["sha256"]
     # every per-epoch input must hold the epoch register's analyzed epochs
@@ -2779,10 +3030,20 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             read_output_manifest(folder), current_sha256, rel(folder)
         )
 
+    def off_subset(folder: Path) -> str | None:
+        return subset_staleness(read_output_manifest(folder), rel(folder))
+
+    def off_visits(folder: Path, epoch_ids: Iterable[str]) -> str | None:
+        """Why a time-masked output was not made from the current visits."""
+        return session_cache_staleness(
+            read_output_manifest(folder), epoch_ids, rel(folder)
+        )
+
     source = f"{rel(inputs.event_table)} (canonical event table)"
-    summary.add(*event_cohort_values(events, source))
-    summary.add(*boundary_offset_values(events, source))
-    summary.add(*state_composition_values(events, source))
+    summary.add(*visit_context_values(table, source))
+    summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(boundary_offset_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(state_composition_values(events, source), EVENTS_SUBSET))
     summary.inputs.append(event_table_record)
     events_with_extras, extra_paths = with_start_and_rest_theta(
         events, inputs.event_start_rest_theta, n_epochs
@@ -2792,12 +3053,30 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         "(scripts/event_properties/measure_event_start_and_rest_theta.py)"
     )
     extras_stale = stale(inputs.event_start_rest_theta)
-    summary.add(*property_values(events_with_extras, extras_source))
     summary.add(
-        *pend(start_distance_values(events_with_extras, extras_source), extras_stale)
+        *over(property_values(events_with_extras, extras_source), EVENTS_SUBSET)
     )
     summary.add(
-        *pend(rest_theta_values(events_with_extras, extras_source), extras_stale)
+        *over(
+            pend(
+                start_distance_values(events_with_extras, extras_source),
+                extras_stale,
+            ),
+            EVENTS_SUBSET,
+        )
+    )
+    summary.add(
+        *over(
+            pend(
+                rest_theta_values(events_with_extras, extras_source),
+                extras_stale,
+                off_subset(inputs.event_start_rest_theta),
+                off_visits(
+                    inputs.event_start_rest_theta, (path.stem for path in extra_paths)
+                ),
+            ),
+            f"{EVENTS_SUBSET}, against quiet rest in {TIME_SUBSET}",
+        )
     )
     summary.inputs += [
         files_record("*.parquet", extra_paths, ROOT_DIR),
@@ -2805,13 +3084,17 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     ]
     intervals = pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0)
     summary.add(
-        *pend(
-            property_interval_values(
-                intervals,
-                f"{rel(inputs.property_bootstrap)} "
-                "(scripts/event_properties/bootstrap_event_properties.py)",
+        *over(
+            pend(
+                property_interval_values(
+                    intervals,
+                    f"{rel(inputs.property_bootstrap)} "
+                    "(scripts/event_properties/bootstrap_event_properties.py)",
+                ),
+                stale(inputs.property_bootstrap),
+                off_subset(inputs.property_bootstrap),
             ),
-            stale(inputs.property_bootstrap),
+            EVENTS_SUBSET,
         )
     )
     summary.inputs += [
@@ -2827,11 +3110,28 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         "measure_brain_state_reference.py) and the gamma pass "
         f"{rel(inputs.event_gamma)} (scripts/event_properties/measure_event_gamma.py)"
     )
-    summary.add(*brain_state_values(events_with_gamma, reference, signal_source))
+    against_rest = f"{EVENTS_SUBSET}, against quiet rest in {TIME_SUBSET}"
     summary.add(
-        *pend(
-            gamma_z_values(events_with_gamma, reference, signal_source),
-            stale(inputs.event_gamma),
+        *over(
+            pend(
+                brain_state_values(events_with_gamma, reference, signal_source),
+                off_subset(inputs.brain_state_reference.parent),
+                off_visits(inputs.brain_state_reference.parent, reference["epoch_id"]),
+            ),
+            against_rest,
+        )
+    )
+    summary.add(
+        *over(
+            pend(
+                gamma_z_values(events_with_gamma, reference, signal_source),
+                stale(inputs.event_gamma),
+                off_subset(inputs.brain_state_reference.parent),
+                off_subset(inputs.event_gamma),
+                off_visits(inputs.brain_state_reference.parent, reference["epoch_id"]),
+                off_visits(inputs.event_gamma, gamma_reference["epoch_id"]),
+            ),
+            against_rest,
         )
     )
     summary.inputs += [
@@ -2839,13 +3139,18 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(inputs.event_gamma / "manifest.json", ROOT_DIR),
     ]
     summary.add(
-        *pend(
-            gamma_db_values(
-                gamma_reference,
-                f"{rel(inputs.event_gamma)}/reference.parquet "
-                "(scripts/event_properties/measure_event_gamma.py)",
+        *over(
+            pend(
+                gamma_db_values(
+                    gamma_reference,
+                    f"{rel(inputs.event_gamma)}/reference.parquet "
+                    "(scripts/event_properties/measure_event_gamma.py)",
+                ),
+                stale(inputs.event_gamma),
+                off_subset(inputs.event_gamma),
+                off_visits(inputs.event_gamma, gamma_reference["epoch_id"]),
             ),
-            stale(inputs.event_gamma),
+            against_rest,
         )
     )
     summary.inputs.append(
@@ -2857,29 +3162,57 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
 
-    run = inputs.event_features_run
-    comparison = nonlocal_comparison.read_comparison(run)
+    comparison = nonlocal_comparison.read_comparison(run, visits)
     others = comparison.others
     inventory_dir, directional_path = (
         comparison.inventory_dir,
         comparison.directional_path,
     )
-    summary.add(
-        *other_detector_values(
-            others,
-            f"event features run {run.name}: pair_membership against state_space and "
-            "state_shares (scripts/detector_comparison/add_state_shares.py)",
+    detector_source = (
+        f"event features run {run.name}: pair_membership against state_space and "
+        "state_shares (scripts/detector_comparison/add_state_shares.py), with each "
+        "epoch's well visits (the session cache's port experiences)"
+    )
+    summary.add(*over(other_detector_values(others, detector_source), DETECTOR_SUBSET))
+    summary.add(*detector_visit_values(comparison.visit_counts, detector_source))
+    summary.inputs.append(
+        files_record(
+            "*.pkl",
+            [
+                behavioral_context_cache_path({"session_id": identifier})
+                for identifier in run_epochs
+            ],
+            ROOT_DIR,
+            "each epoch's well visits",
         )
     )
+    folder = inputs.exposure_in_visits
+    exposure = pd.read_parquet(folder / "exposure.parquet")
     summary.add(
-        *left_out_values(
-            run,
-            inventory_dir,
-            f"event features run {run.name} (every inventory's compared events) and "
-            f"inventory comparison run {inventory_dir.name} (its observations, counts "
-            "and cells, pooled by animal)",
+        *over(
+            pend(
+                left_out_values(
+                    run,
+                    inventory_dir,
+                    events["event_id"],
+                    visits,
+                    exposure,
+                    f"event features run {run.name} (every inventory's compared "
+                    f"events), inventory comparison run {inventory_dir.name} (its "
+                    f"observations and cells) and {rel(folder)} (scripts/"
+                    "detector_comparison/measure_exposure_in_well_visits.py: the "
+                    "non-local detector's exposure inside the well visits)",
+                ),
+                off_subset(folder),
+                off_visits(folder, exposure["epoch_id"]),
+            ),
+            LEFT_OUT_SUBSET,
         )
     )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("exposure.parquet", "manifest.json")
+    ]
 
     # the run's tables are read, and so recorded, for the epochs its manifest marks ok
     def run_tables(name: str) -> dict[str, object]:
@@ -2901,14 +3234,24 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(directional_path, ROOT_DIR),
     ]
 
-    metrics = spike_evidence_metrics(inputs.spike_evidence_dir, n_epochs)
+    # the run scores every event: each scored event takes its event_id, and the
+    # events the selection keeps and the quiet windows in a visit are read
+    metrics = with_event_ids(
+        spike_evidence_metrics(inputs.spike_evidence_dir, n_epochs), table
+    )
+    in_subset = in_analyzed_subset(metrics, events["event_id"], visits)
+    evidence_source = (
+        f"{rel(inputs.spike_evidence_dir)}/*/{SPIKE_EVIDENCE_METRICS} (every event, "
+        "no cap), each scored event matched to the event table by epoch and start, "
+        "with each epoch's well visits"
+    )
     summary.add(
-        *spike_evidence_values(
-            metrics,
-            f"{rel(inputs.spike_evidence_dir)}/*/{SPIKE_EVIDENCE_METRICS} "
-            "(every event, no cap)",
+        *over(
+            spike_evidence_values(metrics[in_subset], evidence_source),
+            SPIKE_EVIDENCE_SUBSET,
         )
     )
+    summary.add(*spike_evidence_visit_values(metrics, in_subset, evidence_source))
     spike_evidence_record = files_record(
         SPIKE_EVIDENCE_METRICS,
         inputs.spike_evidence_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"),
@@ -2917,13 +3260,31 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.inputs.append(spike_evidence_record)
 
     stats = pd.read_csv(inputs.heldout_by_swr)
-    summary.add(*heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)))
+    heldout_provenance_path = inputs.heldout_by_swr.with_name(
+        f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"
+    )
+    heldout_provenance = json.loads(heldout_provenance_path.read_text())
+    heldout_off_subset = time_mask_staleness(
+        heldout_provenance, heldout_provenance["epochs"], rel(heldout_provenance_path)
+    )
+    summary.add(
+        *over(
+            pend(
+                heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)),
+                heldout_off_subset,
+            ),
+            BOUT_SUBSET,
+        )
+    )
+    if heldout_off_subset is None:
+        summary.add(
+            *heldout_bout_values(
+                pd.DataFrame(heldout_provenance["bouts"]), rel(heldout_provenance_path)
+            )
+        )
     summary.inputs += [
         file_record(inputs.heldout_by_swr, ROOT_DIR),
-        file_record(
-            inputs.heldout_by_swr.with_name(f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"),
-            ROOT_DIR,
-        ),
+        file_record(heldout_provenance_path, ROOT_DIR),
     ]
 
     along_bins, along_paths = content_along_arms_bins(
@@ -2939,13 +3300,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ],
     )
     summary.add(
-        *pend(
-            content_occupancy_values(
-                along_bins,
-                f"{rel(inputs.content_along_arms)} "
-                "(scripts/event_properties/measure_content_along_arms.py)",
+        *over(
+            pend(
+                content_occupancy_values(
+                    along_bins,
+                    f"{rel(inputs.content_along_arms)} "
+                    "(scripts/event_properties/measure_content_along_arms.py)",
+                ),
+                stale(inputs.content_along_arms),
             ),
-            stale(inputs.content_along_arms),
+            EVENTS_SUBSET,
         )
     )
     summary.inputs += [
@@ -2954,18 +3318,36 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     ]
 
     # every analyzed epoch with an event: an epoch with none has no table
-    analyzed = swr_source.event_table_epochs(events, analyzed_epoch_ids())
-    participation_table = read_complete_run(
-        inputs.event_participation, "participation", analyzed
+    analyzed = swr_source.event_table_epochs(table, analyzed_epoch_ids())
+    selected = events["event_id"]
+    participation_table = select_events_in(
+        read_complete_run(inputs.event_participation, "participation", analyzed),
+        selected,
     )
-    advantage_table = read_complete_run(
-        inputs.likelihood_advantage, "likelihood_advantage", analyzed
+    advantage_table = select_events_in(
+        read_complete_run(
+            inputs.likelihood_advantage, "likelihood_advantage", analyzed
+        ),
+        selected,
     )
-    holdout_table = read_complete_run(
-        inputs.tetrode_holdout, "tetrode_holdout", analyzed
+    holdout_table = select_events_in(
+        read_complete_run(inputs.tetrode_holdout, "tetrode_holdout", analyzed),
+        selected,
     )
     participation_paths = ok_table_paths(inputs.event_participation, "participation")
     participation_sha256 = files_sha256(participation_paths)
+
+    def participation_off_subset() -> str | None:
+        """Why the participation run's controls are not Local rest inside the
+        current well visits, or None: its settings record no subset or another,
+        or it read other visits than the current session cache's."""
+        manifest = read_output_manifest(inputs.event_participation)
+        what = rel(inputs.event_participation)
+        notes = [
+            subset_staleness(manifest.get("settings", {}), what),
+            session_cache_staleness(manifest, analyzed, what),
+        ]
+        return "; ".join(note for note in notes if note) or None
 
     def participation_staleness(folder: Path) -> str | None:
         """Why a run made from the participation tables is stale, or None."""
@@ -2979,35 +3361,45 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
 
     summary.add(
-        *pend(
-            participation_values(
-                participation_table,
-                f"{rel(inputs.event_participation)} "
-                "(scripts/event_evidence/measure_event_participation.py)",
+        *over(
+            pend(
+                participation_values(
+                    participation_table,
+                    f"{rel(inputs.event_participation)} "
+                    "(scripts/event_evidence/measure_event_participation.py)",
+                ),
+                stale(inputs.event_participation),
+                participation_off_subset(),
             ),
-            stale(inputs.event_participation),
+            CONTROL_SUBSET,
         )
     )
     summary.add(
-        *pend(
-            likelihood_advantage_values(
-                advantage_table,
-                f"{rel(inputs.likelihood_advantage)} "
-                "(scripts/event_evidence/score_event_likelihood_advantage.py)",
+        *over(
+            pend(
+                likelihood_advantage_values(
+                    advantage_table,
+                    f"{rel(inputs.likelihood_advantage)} "
+                    "(scripts/event_evidence/score_event_likelihood_advantage.py)",
+                ),
+                stale(inputs.likelihood_advantage),
+                participation_staleness(inputs.likelihood_advantage),
             ),
-            stale(inputs.likelihood_advantage),
-            participation_staleness(inputs.likelihood_advantage),
+            EVENTS_SUBSET,
         )
     )
     summary.add(
-        *pend(
-            tetrode_holdout_values(
-                tetrode_holdout.window_scores(holdout_table),
-                f"{rel(inputs.tetrode_holdout)} "
-                "(scripts/event_evidence/score_tetrode_holdout.py)",
+        *over(
+            pend(
+                tetrode_holdout_values(
+                    tetrode_holdout.window_scores(holdout_table),
+                    f"{rel(inputs.tetrode_holdout)} "
+                    "(scripts/event_evidence/score_tetrode_holdout.py)",
+                ),
+                stale(inputs.tetrode_holdout),
+                participation_staleness(inputs.tetrode_holdout),
             ),
-            stale(inputs.tetrode_holdout),
-            participation_staleness(inputs.tetrode_holdout),
+            HOLDOUT_CONTROL_SUBSET,
         )
     )
     summary.inputs += [
@@ -3133,14 +3525,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     folder = inputs.decoder_quality
     quality_sessions = pd.read_parquet(folder / "sessions.parquet")
     calibration = pd.read_parquet(folder / "calibration.parquet")
-    for name, table in (
+    for name, quality_table in (
         ("sessions.parquet", quality_sessions),
         ("calibration.parquet", calibration),
     ):
-        if set(table["epoch_id"]) != set(analyzed_epoch_ids()):
+        if set(quality_table["epoch_id"]) != set(analyzed_epoch_ids()):
             raise ValueError(
-                f"{folder / name} holds {table['epoch_id'].nunique()} epochs, not "
-                f"the {n_epochs} analyzed ones"
+                f"{folder / name} holds {quality_table['epoch_id'].nunique()} "
+                f"epochs, not the {n_epochs} analyzed ones"
             )
     quality_source = (
         f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analyzed "
@@ -3161,21 +3553,31 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         f"event table, event features run {STATE_SPACE_FEATURES_RUN}, the decode frames "
         "and the spike-evidence run)"
     )
-    class_stale = stale(folder)
+    class_stale = (
+        "; ".join(note for note in (stale(folder), off_subset(folder)) if note) or None
+    )
     summary.add(
-        *pend(
-            class_distribution_values(pd.read_csv(folder / "distribution.csv"), source),
-            class_stale,
+        *over(
+            pend(
+                class_distribution_values(
+                    pd.read_csv(folder / "distribution.csv"), source
+                ),
+                class_stale,
+            ),
+            EVENTS_SUBSET,
         )
     )
     summary.add(
-        *class_step_values_with_staleness(
-            read_output_manifest(folder),
-            spike_evidence_record["sha256"],
-            class_stale,
-            pd.read_csv(folder / "step_fits.csv"),
-            source,
-            rel(folder),
+        *over(
+            class_step_values_with_staleness(
+                read_output_manifest(folder),
+                spike_evidence_record["sha256"],
+                class_stale,
+                pd.read_csv(folder / "step_fits.csv"),
+                source,
+                rel(folder),
+            ),
+            EVENTS_SUBSET,
         )
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
@@ -3188,10 +3590,17 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             f"epochs, not the {n_epochs} analyzed ones"
         )
     summary.add(
-        *nonlocal_power_values(
-            power_counts,
-            f"{rel(folder)} (scripts/event_properties/"
-            "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+        *over(
+            pend(
+                nonlocal_power_values(
+                    power_counts,
+                    f"{rel(folder)} (scripts/event_properties/"
+                    "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+                ),
+                off_subset(folder),
+                off_visits(folder, power_counts["epoch_id"]),
+            ),
+            f"the immobile {TIME_SUBSET}",
         )
     )
     summary.inputs += [

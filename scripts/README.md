@@ -46,20 +46,26 @@ them importable.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal, with figures.
 - `run_event_features.py` — the features of every compared event of the nine inventories.
 - `add_state_shares.py` — adds each compared event's decoder-state shares to an event features run.
+- `measure_exposure_in_well_visits.py` — each epoch's non-local detector exposure, rebuilt from an inventory comparison run's tables, and its part inside the well visits (the events summary's left-out rates).
 - `report_event_features.py` — the features of one event features run, per session and per animal, with figures.
 - `sweep_memoryless_heldout.py` — held-out content of both detectors on simulated data; writes `detection_heldout_summary.csv` beside the sweep summaries.
 
 ## `event_evidence/` — are the events real (Part 2)
 - `run_state_evidence.py` — held-out spike evidence for each decoder state on every canonical HPC decode.
-- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
+- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling, over the bouts that start inside a well visit (it records `cohort_selection.ANALYZED_SUBSET` and the bouts kept and left out in its provenance).
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
-- `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
+- `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux). It scores every event; the summary reads the events that start inside a well visit and the quiet windows whose first sample is inside one.
 - `score_nonlocal_restriction.py` — per-bin held-out scores of three decoders that allow the non-local states never, only inside SWRs, or always, on every analyzed epoch. `--fit folds` refits the whole decoder (encoding, transitions, initial conditions) by EM on each fold's training folds and scores each fold under its own fit.
 - `score_tetrode_holdout.py` — the held-out tetrode score of every canonical non-local event and its Local-rest control: each tetrode left out of the decoder in turn and scored under the other tetrodes' position distribution against local coding, with encodings held out in folds of whole trials balanced by destination well (`--fold-design trials`, the default) or in contiguous time blocks (`--fold-design contiguous`, the earlier design).
 - `measure_bin_facts.py` — each decode bin's spikes over every tetrode and whether it is inside a well visit, on every epoch of the restriction run (CPU; reads the lab's database, read only).
 - `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control (Figure 2g reads the events), with each window's spike count and its sums over the bins outside SWRs, and each epoch's bins, spikes and scores by category, well visit and event window (CPU; `--restriction-dir` reads another restriction run).
 
 ## `event_properties/` — what the events are like (Part 2)
+Each is over the events that start inside a well visit and the time inside one
+(`docs/figure-pipeline.md`, "The data subset of Figures 2 and 3"), and records
+`cohort_selection.ANALYZED_SUBSET` in its manifest; `measure_content_along_arms.py`
+and the `measure` stage of `measure_ripple_class_structure.py` measure every event,
+and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
 - `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2j).

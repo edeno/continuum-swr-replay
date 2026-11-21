@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Generate the supplementary figure: the held-out tetrode gain over local coding.
 
-The immobile non-local events of the canonical event table, split by whether
-they overlap an SWR. Each tetrode is left out of the decoder's smoother in turn
+The immobile non-local events of the canonical event table that start inside a
+well visit (``cohort_selection.select_visit_context``), split by whether they
+overlap an SWR. Each tetrode is left out of the decoder's smoother in turn
 and scored at every bin of each event under the other tetrodes' position
 distribution against local coding around the animal (time-fold encodings); the
 gain is summed over tetrodes and bins and divided by the event's spikes. A dot
@@ -36,6 +37,10 @@ import pandas as pd
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_events_in,
+    select_visit_context,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
@@ -74,16 +79,18 @@ YLABEL = "Held-out gain\nover local (nats/spike)"
 
 
 def read_inputs() -> pd.DataFrame:
-    """The held-out tetrode statistics of the events, indexed by group, over
-    every analyzed epoch with an event, as the events summary reads them."""
+    """The held-out tetrode statistics of the events that start inside a well
+    visit, indexed by group, over every analyzed epoch with an event, as the
+    events summary reads them."""
     inputs = default_inputs()
-    events = read_swr_table(inputs.event_table)
-    table = read_complete_run(
+    table = read_swr_table(inputs.event_table)
+    scores = read_complete_run(
         inputs.tetrode_holdout,
         "tetrode_holdout",
-        event_table_epochs(events, analyzed_epoch_ids()),
+        event_table_epochs(table, analyzed_epoch_ids()),
     )
-    return holdout_statistics(window_scores(table), "event")
+    selected = select_events_in(scores, select_visit_context(table)["event_id"])
+    return holdout_statistics(window_scores(selected), "event")
 
 
 def draw_heldout_tetrode(ax, statistics: pd.DataFrame) -> None:

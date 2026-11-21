@@ -87,6 +87,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import t as student_t
 
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     REGIMES,
     STATES,
@@ -1421,3 +1422,113 @@ def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFra
         raise ValueError("a matched window has no bout")
     w["state"] = w["state"] + " | " + w["swr"]
     return w
+
+
+def mark_bouts_in_well_visits(
+    windows: pd.DataFrame,
+    time: np.ndarray,
+    arrival_times: np.ndarray,
+    departure_times: np.ndarray,
+) -> pd.DataFrame:
+    """One epoch's Non-Local bouts and matched windows, marked by the well visits.
+
+    An immobile bout counts when its first sample (``time[bout_s]``) is inside
+    a well visit (``event_definition.well_visits.in_well_visit``); a running
+    bout counts wherever it happens, as running time does (the animal does not
+    run inside a visit). The matched window goes with its bout: both rows of
+    the pair carry the bout's ``starts_in_well_visit`` and
+    ``in_analyzed_subset`` (whether the pair is read). The matched windows were
+    drawn from all of the epoch's time in the bout's regime, so each pair also
+    carries ``matched_starts_in_well_visit``, whether the matched window's
+    first sample (``time[s]``) is inside a visit, to be counted
+    (:func:`bout_visit_counts`), not to select by.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        From :func:`split_non_local_by_swr`: ``kind`` (``"bout"`` or
+        ``"baseline"``), ``state``, ``regime``, ``s``, ``bout_s``,
+        ``matched_bout_s`` and ``start_time`` (``time[s]``, the scored window's
+        first sample).
+    time : np.ndarray, shape (n_time,)
+        The decode's time bins (s), which ``s`` and ``bout_s`` index.
+    arrival_times, departure_times : np.ndarray, shape (n_visits,)
+        The epoch's well visits (``event_tables.prepare_data.well_visit_times``).
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of ``windows`` with ``starts_in_well_visit``,
+        ``matched_starts_in_well_visit`` and ``in_analyzed_subset``.
+
+    Raises
+    ------
+    ValueError
+        If a window's ``start_time`` is not ``time[s]`` (the windows were made
+        on another time grid), or a matched window has no bout.
+    """
+    time = np.asarray(time, dtype=float)
+    s = windows["s"].to_numpy(dtype=int)
+    if not np.array_equal(time[s], windows["start_time"].to_numpy(dtype=float)):
+        raise ValueError("the windows' start_time is not the decode time at s")
+    is_bout = (windows["kind"] == "bout").to_numpy()
+    first = np.where(is_bout, windows["bout_s"], windows["matched_bout_s"]).astype(int)
+    key = pd.MultiIndex.from_arrays([windows["state"], windows["regime"], first])
+    bout_in = pd.Series(
+        in_well_visit(time[first[is_bout]], arrival_times, departure_times),
+        index=key[is_bout],
+    )
+    matched_in = pd.Series(
+        in_well_visit(time[s[~is_bout]], arrival_times, departure_times),
+        index=key[~is_bout],
+    )
+    out = windows.copy()
+    out["starts_in_well_visit"] = bout_in.reindex(key).to_numpy()
+    out["matched_starts_in_well_visit"] = matched_in.reindex(key).to_numpy()
+    if out["starts_in_well_visit"].isna().any():
+        raise ValueError("a matched window has no bout")
+    if out["matched_starts_in_well_visit"].isna().any():
+        raise ValueError("a bout has no matched window")
+    out = out.astype(
+        {"starts_in_well_visit": bool, "matched_starts_in_well_visit": bool}
+    )
+    out["in_analyzed_subset"] = out["starts_in_well_visit"] | (
+        out["regime"] == "running"
+    )
+    return out
+
+
+def bout_visit_counts(windows: pd.DataFrame) -> pd.DataFrame:
+    """The bouts kept and left out by the well visits, per state and regime.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        From :func:`mark_bouts_in_well_visits`, over any epochs.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per ``state`` (with its SWR label) and ``regime``:
+        ``n_bouts``; ``n_kept``, the bouts read (``in_analyzed_subset``: an
+        immobile bout whose first sample is inside a well visit, every running
+        bout); ``n_left_out``, the others; and ``n_kept_matched_outside_visit``,
+        the kept bouts whose matched window starts outside every visit.
+    """
+    bouts = windows[windows["kind"] == "bout"]
+    kept = bouts["in_analyzed_subset"]
+    return (
+        bouts.assign(
+            kept=kept,
+            left_out=~kept,
+            matched_outside=kept & ~bouts["matched_starts_in_well_visit"],
+        )
+        .groupby(["state", "regime"])
+        .agg(
+            n_bouts=("kept", "size"),
+            n_kept=("kept", "sum"),
+            n_left_out=("left_out", "sum"),
+            n_kept_matched_outside_visit=("matched_outside", "sum"),
+        )
+        .reset_index()
+    )

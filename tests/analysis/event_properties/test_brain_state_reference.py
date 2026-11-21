@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
@@ -37,8 +38,13 @@ def frame() -> pd.DataFrame:
     )
 
 
+def everywhere(dot: pd.DataFrame) -> np.ndarray:
+    """Every bin inside a well visit."""
+    return np.ones(len(dot), dtype=bool)
+
+
 def test_running_and_rest_exclude_events_excluded_time_and_middle_speeds():
-    ref = brain_state_reference(frame())
+    ref = brain_state_reference(frame(), everywhere(frame()))
     assert ref["n_running_bins"] == 10
     assert ref["n_rest_bins"] == 10
     assert ref["theta_running_median"] == 2.0
@@ -48,13 +54,36 @@ def test_running_and_rest_exclude_events_excluded_time_and_middle_speeds():
 
 def test_a_regime_with_no_bin_reads_nan():
     dot = frame().assign(head_speed=1.0)
-    ref = brain_state_reference(dot)
+    ref = brain_state_reference(dot, everywhere(dot))
     assert ref["n_running_bins"] == 0
     assert np.isnan(ref["theta_running_median"])
 
 
+def test_quiet_rest_is_the_rest_inside_a_well_visit():
+    # the visits hold the first 15 bins: 10 running (kept, running is the
+    # epoch's wherever it is) and 5 of the 10 quiet-rest bins (theta -1)
+    dot = frame()
+    dot.loc[15:19, "theta_power_zscore"] = 3.0  # rest outside every visit
+    in_visit = np.arange(len(dot)) < 15
+    masks = regime_masks(dot, in_visit)
+    np.testing.assert_array_equal(np.flatnonzero(masks["running"]), np.arange(10))
+    np.testing.assert_array_equal(np.flatnonzero(masks["rest"]), np.arange(10, 15))
+    ref = brain_state_reference(dot, in_visit)
+    assert ref["n_rest_bins"] == 5
+    assert ref["n_rest_bins_outside_visit"] == 5
+    assert ref["theta_rest_median"] == -1.0
+    assert ref["n_running_bins"] == 10
+
+
+def test_the_visit_mask_must_be_one_bool_per_bin():
+    with pytest.raises(ValueError, match="one bool per bin"):
+        regime_masks(frame(), np.ones(3, dtype=bool))
+    with pytest.raises(ValueError, match="one bool per bin"):
+        regime_masks(frame(), np.ones(len(frame())))
+
+
 def test_regime_masks():
-    masks = regime_masks(frame())
+    masks = regime_masks(frame(), everywhere(frame()))
     np.testing.assert_array_equal(np.flatnonzero(masks["running"]), np.arange(10))
     np.testing.assert_array_equal(np.flatnonzero(masks["rest"]), np.arange(10, 20))
 

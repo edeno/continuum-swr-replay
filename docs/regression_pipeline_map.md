@@ -110,7 +110,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `subset_staleness`, `select_visit_context`, `count_visit_context`, `select_events_in`, `check_visit_context_starts`
 
 ### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
 
@@ -182,7 +182,7 @@ Is the non-local activity of rest the activity of sharp-wave ripples? Three deco
 
 Tetrode participation and spike rate of non-local events, against Local rest.
 
-`local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
+`local_rest_mask`, `control_starts`, `control_windows`, `windows_in_local_rest_anywhere`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py`
 
@@ -200,7 +200,7 @@ The non-local restriction models over the windows of Figure 2's panel g.
 
 Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
 
-`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
+`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`, `with_event_ids`, `in_analyzed_subset`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py`
 
@@ -266,7 +266,7 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -296,7 +296,7 @@ Canonical event-grain builders: one row per non-local event.
 
 The per-session replay-table build and the corpus-level steps around it.
 
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `cached_port_experiences`, `well_visit_times`, `session_cache_record`, `session_cache_staleness`, `time_mask_staleness`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
 
@@ -838,6 +838,12 @@ Add each compared event's Local, No-Spike, non-local and uncertain shares to an 
 
 `shares_path`, `epoch_state_shares`, `main`
 
+### `scripts/detector_comparison/measure_exposure_in_well_visits.py`
+
+Measure each epoch's non-local detector exposure, and its part inside the well visits.
+
+`main`
+
 ### `scripts/detector_comparison/report_event_features.py`
 
 Report one event features run: its features per session and per animal.
@@ -1076,7 +1082,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `mark_bouts_in_well_visits`, `bout_visit_counts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 

@@ -41,20 +41,23 @@ def _features(event_id: int, ripple_z_max: float) -> pd.DataFrame:
 
 
 def _lay_out_inputs() -> None:
-    """One event of epoch ``e1``; the features run marks ``e1`` ok and ``e2``
-    failed, and ``e2`` left a features table behind holding the same event."""
+    """One event of epoch ``e1`` that starts inside a well visit; the features
+    run marks ``e1`` ok and ``e2`` failed, and ``e2`` left a features table
+    behind holding the same event. A second event, on the track between two
+    visits, has no criterion, features or evidence row: it is not read."""
     event_table = table_path("event_table", replay_content_dir())
     event_table.parent.mkdir(parents=True)
     write_table(
         stamp_swr_source(
             pd.DataFrame(
                 {
-                    "event_id": pd.Series([5], dtype="uint64"),
+                    "event_id": pd.Series([5, 6], dtype="uint64"),
+                    "visit_context": ["in_visit", "track_center"],
                     "whole_event_speed_eligible": True,
                     "ripple_power_z": 1.0,
                     "is_swr": False,
-                    "event_start_s": 1.0,
-                    "event_end_s": 1.2,
+                    "event_start_s": [1.0, 3.0],
+                    "event_end_s": [1.2, 3.2],
                     "mean_abs_ahead_behind_cm": 10.0,
                 }
             )
@@ -108,6 +111,10 @@ def test_load_events_reads_the_features_of_the_ok_epochs_only(processed_data_roo
         "sha256": files_sha256([output_path("e1", run, "features")]),
     }
     assert record["checks"]["peak_differs_from_features_run"] == 0
+    assert events["event_id"].tolist() == [5]
+    assert record["checks"]["n_events"] == 1
+    counts = record["checks"]["visit_context_counts"]
+    assert counts["in_visit"] == 1 and counts["track_center"] == 1
 
 
 def test_measure_refuses_a_features_run_without_an_epochs_record(processed_data_root):

@@ -323,7 +323,20 @@ arm, patch and `is_stay` (`visit_context.assign_visit_current_arm`), in every ta
 A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
 visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
 grid: a time is inside a visit from the first poke-in (included) to the final poke-out
-(not included), the per-sample rule the labels summarize.
+(not included), the per-sample rule the labels summarize. An epoch's visits are read
+from the session cache only, by `analysis/event_tables/prepare_data.py:well_visit_times`
+(a missing or off-contract entry is refused: nothing is fetched from Spyglass or
+written; a script loads the visits and passes the arrays or the mask down), and where
+the event table and the visits meet (the events summary, Figure 2) every event's label
+must agree with its start (`cohort_selection.check_visit_context_starts`). An SWR, or
+another detector's event, counts when its first sample is inside a visit. A stored
+table made over every event is read over the selected ones with
+`cohort_selection.select_events_in` (every row of a selected `event_id`), and an
+output re-run over the subset records `cohort_selection.ANALYZED_SUBSET` as its
+`subset`; an output whose content depends on the visits also records one digest of the
+session-cache entries it read (`prepare_data.session_cache_record`). The readers check
+both (`cohort_selection.subset_staleness`, `prepare_data.time_mask_staleness`;
+[figure-pipeline.md](figure-pipeline.md)).
 
 ### Spatial Variables
 

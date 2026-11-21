@@ -7,11 +7,13 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
 from scripts.figures import generate_supp_heldout_tetrode as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
+    _figure02_events,
     _gain_statistics,
     assert_draws_group_gain,
 )
@@ -36,3 +38,26 @@ def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
     assert FIGURES["heldout_tetrode"].script == (
         "scripts/figures/generate_supp_heldout_tetrode.py"
     )
+
+
+def test_the_figure_reads_the_held_out_run_over_the_events_that_start_in_a_visit(
+    monkeypatch,
+):
+    """The stored run scores every event; the figure, like the events summary,
+    reads the rows (every tetrode's) of the events that start inside a well
+    visit."""
+    inside = _figure02_events().assign(event_id=range(8))
+    outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
+    stored = pd.DataFrame({"event_id": [0, 0, *range(1, 8), 99, 99]})
+    seen = []
+    for name, value in {
+        "read_swr_table": lambda path: pd.concat([inside, outside]),
+        "event_table_epochs": lambda table, analyzed: ["e"],
+        "analyzed_epoch_ids": lambda: ["e"],
+        "read_complete_run": lambda folder, name, epochs: stored,
+        "window_scores": lambda table: seen.append(table) or table,
+        "holdout_statistics": lambda windows, kind: windows,
+    }.items():
+        monkeypatch.setattr(figure, name, value)
+    figure.read_inputs()
+    assert list(seen[0]["event_id"]) == [0, 0, *range(1, 8)]

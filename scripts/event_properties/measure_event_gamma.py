@@ -8,8 +8,11 @@ Is a non-local event at rest accompanied by a rise in slow or fast gamma
    (``get_ripple_band_inputs``; the run's manifest lists them);
 2. each band's power, averaged over those tetrodes, z-scored over the decode
    span outside excluded time, and read onto the decode grid;
-3. each immobile non-local event's mean (the canonical event table's events),
-   and the epoch's running and quiet-rest levels (``brain_state_reference``);
+3. each immobile non-local event's mean (the canonical event table's events
+   that start inside a well visit, ``cohort_selection.select_visit_context``),
+   and the epoch's running and quiet-rest levels (``brain_state_reference``;
+   quiet rest is the rest inside a well visit, the epoch's port experiences
+   read from the session cache: ``event_tables.prepare_data.well_visit_times``);
 4. the level of quiet-rest and of running windows as long as each class's
    events, ``--n-windows`` drawn per event (``gamma_power.matched_level``): an
    event's mean over its bins is compared with these, not with the median of
@@ -24,9 +27,12 @@ Writes ``Processed-Data/<--out-name>/{epoch_id}_events.parquet`` per epoch,
 decode grid, so that gamma around the events can be drawn without the LFP),
 ``reference.parquet`` (one row per epoch) and ``manifest.json``. Each epoch's
 ``{epoch_id}_reference.json`` and the manifest record the SHA-256 of the
-canonical event table the events were read from. A failing epoch is recorded
-and the rest run; a rerun skips the epochs already written from the same event
-table unless ``--overwrite``.
+canonical event table the events were read from, the subset they are
+(``cohort_selection.ANALYZED_SUBSET``) and the session-cache entry the visits
+were read from (the manifest one digest over the entries,
+``prepare_data.session_cache_record``). A failing epoch is recorded and the
+rest run; a rerun skips the epochs already written from the same event table,
+subset and cache entry unless ``--overwrite``.
 
 Usage::
 
@@ -51,12 +57,23 @@ import pandas as pd
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+    count_visit_context,
+    select_visit_context,
+)
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.event_properties.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import (
     epoch_gamma as epoch_gamma_measures,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    behavioral_context_cache_path,
+    session_cache_record,
+    well_visit_times,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.paths import (
@@ -97,6 +114,7 @@ def epoch_gamma(
         pd.read_pickle(inventory_run.decode_path(identifier))
     )
     grid_time, _ = inventory_run.speed_trace(dot)
+    in_visit = in_well_visit(grid_time, *well_visit_times(identifier))
     columns, reference, on_grid = epoch_gamma_measures(
         lfp,
         lfp_time,
@@ -105,6 +123,7 @@ def epoch_gamma(
         grid_time,
         analyzed_time.excluded_intervals(identifier),
         events,
+        in_visit,
         n_windows,
         np.random.default_rng([SEED, zlib.crc32(identifier.encode())]),
     )
@@ -164,11 +183,17 @@ def epochs_to_measure(
     ]
 
 
-def _written_from(ref_path: Path) -> str | None:
-    """The event-table SHA-256 an epoch's written reference records, if any."""
+def _written_from(ref_path: Path) -> tuple[str | None, str | None, str | None]:
+    """The event-table SHA-256, the subset and the session-cache entry's SHA-256
+    an epoch's written reference records."""
     if not ref_path.exists():
-        return None
-    return json.loads(ref_path.read_text()).get("event_table_sha256")
+        return None, None, None
+    reference = json.loads(ref_path.read_text())
+    return (
+        reference.get("event_table_sha256"),
+        reference.get("subset"),
+        reference.get("session_cache_sha256"),
+    )
 
 
 def _run(
@@ -178,11 +203,16 @@ def _run(
     path = out_dir(name) / f"{identifier}_events.parquet"
     ref_path = out_dir(name) / f"{identifier}_reference.json"
     per_bin_path = out_dir(name) / f"{identifier}_gamma_z.parquet"
-    # An epoch written from another event table describes other events.
+    # An epoch written from another event table, subset or set of well visits
+    # describes other events or other rest.
+    cache_sha256 = sha256_file(
+        behavioral_context_cache_path({"session_id": identifier})
+    )
     if (
         path.exists()
         and per_bin_path.exists()
-        and _written_from(ref_path) == event_table_sha256
+        and _written_from(ref_path)
+        == (event_table_sha256, ANALYZED_SUBSET, cache_sha256)
         and not overwrite
     ):
         return identifier, {"status": "ok", "reused": True}
@@ -197,6 +227,8 @@ def _run(
     table.to_parquet(path, index=False)
     per_bin.to_parquet(per_bin_path, index=False)
     reference["event_table_sha256"] = event_table_sha256
+    reference["subset"] = ANALYZED_SUBSET
+    reference["session_cache_sha256"] = cache_sha256
     write_json(ref_path, reference, default=float, final_newline=True)
     return identifier, {"status": "ok", "wall_clock_s": time.perf_counter() - started}
 
@@ -217,10 +249,18 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     event_table = table_path("event_table", replay_content_dir())
     event_table_sha256 = sha256_file(event_table)
-    events = read_swr_table(
+    table = read_swr_table(
         event_table,
-        columns=[*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"],
+        columns=[
+            *KEYS,
+            "event_id",
+            "event_start_s",
+            "event_end_s",
+            "is_swr",
+            "visit_context",
+        ],
     )
+    events = select_visit_context(table)
     jobs = [
         (
             identifier,
@@ -259,13 +299,23 @@ def main(argv: Sequence[str] | None = None) -> None:
             "commit": described_commit(),
             "swr_run": swr_source.SWR_INVENTORY_RUN_ID,
             "event_table": {"path": str(event_table), "sha256": event_table_sha256},
+            "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(
+                identifier
+                for identifier, result in epochs.items()
+                if result["status"] == "ok"
+            ),
+            "visit_context_counts": {
+                label: int(n) for label, n in count_visit_context(table)["n"].items()
+            },
             "bands_hz": GAMMA_BANDS,
             "filter": f"Butterworth order {FILTER_ORDER}, zero phase (sosfiltfilt)",
             "power": "squared Hilbert envelope, mean over the kept CA1 tetrodes",
             "zscore": "over the decode span outside excluded time",
             "change_db": "10 log10 of the mean band power over each class's event "
             "samples over the mean over quiet rest (below 4 cm/s, in no non-local, "
-            "SWR or MUA event, outside excluded time), on the decode grid",
+            "SWR or MUA event, inside a well visit, outside excluded time), on the "
+            "decode grid",
             "matched_windows": "for each class of events, the median over its events "
             "of the mean z over a quiet-rest (running) window as long as the event, "
             "averaged over the draws; windows drawn uniformly over every window of "
