@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
+from tests.support._restriction_tables import restriction_contrasts
 
 pytestmark = pytest.mark.integration
 
@@ -269,8 +270,8 @@ def _contrasts(scenarios, name: str) -> tuple[dict, dict, dict]:
     only), and its share of the non-local gain outside SWRs."""
     _, scores = scenarios
     sums = nr.restriction_sums(scores[name], _labels(scenarios, name))
-    inside = nr.restriction_contrasts(sums, [nr.IMMOBILE_IN_SWR], BIN_S)
-    outside = nr.restriction_contrasts(sums, [nr.IMMOBILE_OUTSIDE_SWR], BIN_S)
+    inside = restriction_contrasts(sums, [nr.IMMOBILE_IN_SWR], BIN_S)
+    outside = restriction_contrasts(sums, [nr.IMMOBILE_OUTSIDE_SWR], BIN_S)
     return inside, outside, nr.share_outside_swr(sums)
 
 

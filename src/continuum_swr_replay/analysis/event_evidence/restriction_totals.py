@@ -72,13 +72,14 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     CATEGORIES,
+    CONTRASTS,
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
     SCORE_COLUMNS,
+    ratio_or_nan,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
-    CONTRASTS,
     IN_VISIT_SUFFIX,
     OUTSIDE_SWR_SUFFIX,
 )
@@ -205,11 +206,6 @@ def _chosen_time(
     )
 
 
-def _per(value: float, divisor: float) -> float:
-    """``value / divisor``, NaN when ``divisor`` is not positive."""
-    return value / divisor if divisor > 0 else np.nan
-
-
 def _check_time_sums(time_sums: pd.DataFrame, bin_s: pd.Series) -> None:
     """Refuse time sums with an epoch's row of :data:`TIME_SUM_KEYS` twice, or
     an epoch without a time step."""
@@ -311,18 +307,20 @@ def epoch_outside_swr_gains(
             for group in ("no_swr", "swr")
         )
         out[f"full_minus_swr{suffix}"] = gain
-        out[f"gain_per_spike{suffix}"] = list(map(_per, gain, out["n_spikes"]))
-        out[f"gain_per_s{suffix}"] = list(map(_per, gain, out["seconds"]))
+        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
+        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
         out[f"no_swr_events_full_minus_swr{suffix}"] = no_swr
-        out[f"share_in_no_swr_events{suffix}"] = list(map(_per, no_swr, gain))
+        out[f"share_in_no_swr_events{suffix}"] = list(map(ratio_or_nan, no_swr, gain))
         out[f"swr_events_outside_swr_full_minus_swr{suffix}"] = flanks
-        out[f"share_in_swr_events_outside_swr{suffix}"] = list(map(_per, flanks, gain))
+        out[f"share_in_swr_events_outside_swr{suffix}"] = list(
+            map(ratio_or_nan, flanks, gain)
+        )
         out[f"outside_events_full_minus_swr{suffix}"] = rest_gain
         out[f"outside_events_gain_per_spike{suffix}"] = list(
-            map(_per, rest_gain, out["outside_events_n_spikes"])
+            map(ratio_or_nan, rest_gain, out["outside_events_n_spikes"])
         )
         out[f"outside_events_gain_per_s{suffix}"] = list(
-            map(_per, rest_gain, out["outside_events_seconds"])
+            map(ratio_or_nan, rest_gain, out["outside_events_seconds"])
         )
     return out
 
@@ -351,7 +349,7 @@ def epoch_immobile_gains(
         ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds`` of
         the chosen immobile bins (both immobile categories), and for each
         family (suffix ``""`` for the filter score, ``"_two_sided"``): each
-        contrast of :data:`.restriction_windows.CONTRASTS` per spike and per
+        contrast of :data:`.nonlocal_restriction.CONTRASTS` per spike and per
         second (``<contrast>_per_spike``, ``<contrast>_per_s``; NaN without
         spikes or bins), ``share_captured_by_swr_only`` (``swr - none`` over
         ``full - none``, NaN when ``full - none`` is not positive) and
@@ -385,9 +383,11 @@ def epoch_immobile_gains(
         }
         for unit, divisor in (("per_spike", spikes), ("per_s", seconds)):
             for contrast, gain in gains.items():
-                out[f"{contrast}_{unit}{suffix}"] = list(map(_per, gain, divisor))
+                out[f"{contrast}_{unit}{suffix}"] = list(
+                    map(ratio_or_nan, gain, divisor)
+                )
         out[f"share_captured_by_swr_only{suffix}"] = list(
-            map(_per, gains["swr_minus_none"], gains["full_minus_none"])
+            map(ratio_or_nan, gains["swr_minus_none"], gains["full_minus_none"])
         )
         out[f"full_above_swr_only{suffix}"] = gains["full_minus_swr"] > 0
     return out

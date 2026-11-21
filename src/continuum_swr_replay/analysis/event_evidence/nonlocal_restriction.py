@@ -176,6 +176,13 @@ SCORE_COLUMNS = tuple(
 )
 """The six score columns, the filter scores first."""
 
+CONTRASTS = {
+    "full_minus_swr": ("full", "swr"),
+    "swr_minus_none": ("swr", "none"),
+    "full_minus_none": ("full", "none"),
+}
+"""Each contrast's name and its two models, ``a - b``."""
+
 IMMOBILE_IN_SWR = "immobile_in_swr"
 IMMOBILE_OUTSIDE_SWR = "immobile_outside_swr"
 CATEGORIES = ("excluded", IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR, "moving")
@@ -1441,45 +1448,6 @@ def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
     return sums
 
 
-def restriction_contrasts(
-    sums: pd.DataFrame, categories: Sequence[str], bin_s: float
-) -> dict[str, float]:
-    """The model contrasts over the bins of ``categories``, both score families.
-
-    Parameters
-    ----------
-    sums : pd.DataFrame
-        :func:`restriction_sums`' output.
-    categories : sequence of str
-        The categories to combine (a category with no bins adds nothing).
-    bin_s : float
-        The bin width, s.
-
-    Returns
-    -------
-    dict
-        ``n_bins``, ``seconds``; for each family (no suffix for the filter score,
-        ``_two_sided`` for the two-sided one): ``swr_minus_none``,
-        ``full_minus_swr`` and ``full_minus_none`` (nats), each per second
-        (``..._per_s``, NaN without bins).
-    """
-    combined = sums.reindex(list(categories)).fillna(0.0).sum()
-    seconds = float(combined["n_bins"]) * bin_s
-    out: dict[str, float] = {"n_bins": int(combined["n_bins"]), "seconds": seconds}
-    for suffix in FAMILY_SUFFIX.values():
-        for name, (a, b) in {
-            "swr_minus_none": ("swr", "none"),
-            "full_minus_swr": ("full", "swr"),
-            "full_minus_none": ("full", "none"),
-        }.items():
-            difference = float(combined[f"{a}{suffix}"] - combined[f"{b}{suffix}"])
-            out[f"{name}{suffix}"] = difference
-            out[f"{name}{suffix}_per_s"] = (
-                difference / seconds if seconds > 0 else float("nan")
-            )
-    return out
-
-
 def share_outside_swr(
     sums: pd.DataFrame,
     inside: str = IMMOBILE_IN_SWR,
@@ -1512,8 +1480,12 @@ def share_outside_swr(
     out: dict[str, float] = {}
     for suffix in FAMILY_SUFFIX.values():
         gain = rows[f"full{suffix}"] - rows[f"none{suffix}"]
-        total = float(gain.sum())
-        out[f"share_outside_swr{suffix}"] = (
-            float(gain[outside]) / total if total > 0 else float("nan")
+        out[f"share_outside_swr{suffix}"] = ratio_or_nan(
+            float(gain[outside]), float(gain.sum())
         )
     return out
+
+
+def ratio_or_nan(value: float, divisor: float) -> float:
+    """``value / divisor``, NaN when ``divisor`` is not positive."""
+    return value / divisor if divisor > 0 else np.nan

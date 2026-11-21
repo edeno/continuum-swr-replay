@@ -8,6 +8,7 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
+from tests.support._restriction_tables import restriction_contrasts
 
 # three discrete states with 1, 2 and 2 state bins
 STATE_IND = np.array([0, 1, 1, 2, 2])
@@ -373,13 +374,13 @@ def test_a_labeled_bin_with_a_score_that_is_not_finite_raises():
 
 def test_restriction_contrasts_by_hand():
     sums = nr.restriction_sums(_table(), LABELS)
-    inside = nr.restriction_contrasts(sums, ["inside"], bin_s=0.5)
+    inside = restriction_contrasts(sums, ["inside"], bin_s=0.5)
     assert inside["n_bins"] == 2 and inside["seconds"] == 1.0
     assert inside["swr_minus_none"] == 2.0
     assert inside["swr_minus_none_per_s"] == 2.0
     assert inside["full_minus_swr"] == 0.0
     assert inside["swr_minus_none_two_sided"] == 2.0
-    immobile = nr.restriction_contrasts(sums, ["inside", "outside"], bin_s=0.5)
+    immobile = restriction_contrasts(sums, ["inside", "outside"], bin_s=0.5)
     assert immobile["seconds"] == 2.0
     assert immobile["swr_minus_none"] == 1.5
     assert immobile["full_minus_swr"] == 1.5
@@ -387,7 +388,7 @@ def test_restriction_contrasts_by_hand():
     assert immobile["full_minus_none_per_s"] == 1.5
     assert immobile["full_minus_swr_two_sided"] == 1.5
     # moving is its own category, not part of the immobile result
-    moving = nr.restriction_contrasts(sums, ["moving"], bin_s=0.5)
+    moving = restriction_contrasts(sums, ["moving"], bin_s=0.5)
     assert moving["full_minus_none"] == 1.0 and moving["full_minus_swr"] == 1.0
 
 
@@ -414,7 +415,7 @@ def test_the_share_is_nan_without_a_full_model_gain():
     share = nr.share_outside_swr(sums, "inside", "outside")
     assert np.isnan(share["share_outside_swr"])
     assert np.isnan(share["share_outside_swr_two_sided"])
-    empty = nr.restriction_contrasts(sums, ["excluded"], bin_s=0.002)
+    empty = restriction_contrasts(sums, ["excluded"], bin_s=0.002)
     assert empty["n_bins"] == 0
     assert np.isnan(empty["full_minus_none_per_s"])
 

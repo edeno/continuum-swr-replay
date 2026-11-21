@@ -13,9 +13,9 @@ run's manifest settings; both runners default to whole trials,
 of time (``tetrode_holdout.time_blocks``), as the run made before that option
 was, differs from the restriction run in more than what is scored.
 
-A window's contrast ``a - b`` (:data:`CONTRASTS`) is its sum of ``a``'s per-bin
-score less its sum of ``b``'s, in nats, for each score family
-(:data:`.nonlocal_restriction.FAMILY_SUFFIX`). It is read two ways:
+A window's contrast ``a - b`` (:data:`.nonlocal_restriction.CONTRASTS`) is its
+sum of ``a``'s per-bin score less its sum of ``b``'s, in nats, for each score
+family (:data:`.nonlocal_restriction.FAMILY_SUFFIX`). It is read two ways:
 
 - per spike: divided by the window's spike count over every tetrode (the
   held-out tetrode run's ``n_spikes``, summed over tetrodes), NaN without
@@ -80,6 +80,7 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    CONTRASTS,
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
@@ -90,13 +91,6 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     window_sums,
 )
 from continuum_swr_replay.intervals import sample_step
-
-CONTRASTS = {
-    "full_minus_swr": ("full", "swr"),
-    "swr_minus_none": ("swr", "none"),
-    "full_minus_none": ("full", "none"),
-}
-"""Each contrast's name and its two models, ``a - b``."""
 
 UNITS = {"per_spike": "n_spikes", "per_s": "duration_s"}
 """Each unit of a contrast and the window's column it is divided by."""
@@ -515,8 +509,8 @@ def restriction_window_statistics(
         The bootstrap's replicates and seed, the same for every row.
     families, contrasts, units, kinds : sequence of str, optional
         Only these score families (:data:`.nonlocal_restriction.FAMILY_SUFFIX`),
-        contrasts (:data:`CONTRASTS`), units (:data:`UNITS`) and kinds of window;
-        each defaults to all of them. Each row's bootstrap starts from ``seed``
+        contrasts (:data:`.nonlocal_restriction.CONTRASTS`), units
+        (:data:`UNITS`) and kinds of window; each defaults to all of them. Each row's bootstrap starts from ``seed``
         on its own, so a row is the same whichever others are computed.
     parts : sequence of str, optional
         The parts of the window (:data:`PARTS`): ``"whole"`` (the
