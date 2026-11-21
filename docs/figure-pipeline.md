@@ -47,8 +47,16 @@ the gamma reference, the immobile time bins of Figure 2j, and the SWRs and other
 detectors' events of Figure 2c and 2e, which count when their first sample is
 inside a visit (running, the theta-like benchmark, is the epoch's running
 wherever it is). Each producer re-run over the subset records
-`cohort_selection.ANALYZED_SUBSET` in its manifest; Figure 2 refuses a reference
-that does not, and the events summary marks the values read from one pending.
+`cohort_selection.ANALYZED_SUBSET` in its manifest, and one whose content depends
+on the visits the digest of the session-cache entries it read them from
+(`prepare_data.session_cache_record`); Figure 2 and the gamma figure refuse a
+reference that records another subset or other visits than the current cache's
+(`prepare_data.time_mask_staleness`), and the events summary marks the values
+read from one pending. What another inventory leaves out (question 2b.2) is over
+the selected non-local events and the non-local detector's exposure inside a
+visit (`scripts/detector_comparison/measure_exposure_in_well_visits.py`, which
+rebuilds the inventory comparison's exposure from its stored tables and refuses
+one that is not the stored one).
 The summary counts the events of every well-visit label, kept and left out
 (`events.json`, `events_label_*`, `*events_in_subset`, `*events_left_out`).
 The spike-evidence run (`event_spike_evidence/`) scores every event and every
@@ -59,8 +67,9 @@ match is an error), and the summary reads the selected events and the quiet
 windows whose first sample is inside a visit (`in_analyzed_subset`;
 `*_left_out` counts the others). The held-out test split by SWR
 (`scripts/event_evidence/split_state_evidence_by_swr.py`) reads the decoder's
-Non-Local bouts whose first sample is inside a visit, each with its matched
-window (`state_evidence.mark_bouts_in_well_visits`); the matched windows were
+immobile Non-Local bouts whose first sample is inside a visit, and every running
+bout, each with its matched window (`state_evidence.mark_bouts_in_well_visits`);
+the matched windows were
 drawn from all of the epoch's time in the bout's regime, so some of the kept
 bouts' windows start outside every visit, which its provenance counts
 (`bouts`, with the bouts kept and left out per state, SWR label and regime;

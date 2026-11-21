@@ -110,7 +110,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `select_visit_context`, `count_visit_context`, `select_events_in`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`, `subset_staleness`, `select_visit_context`, `count_visit_context`, `select_events_in`, `check_visit_context_starts`
 
 ### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
 
@@ -272,7 +272,7 @@ Canonical event-grain builders: one row per non-local event.
 
 The per-session replay-table build and the corpus-level steps around it.
 
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `well_visit_times`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `well_visit_times`, `session_cache_record`, `session_cache_staleness`, `time_mask_staleness`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
 
@@ -825,6 +825,12 @@ What the two detection-comparison reports share.
 Add each compared event's Local, No-Spike, non-local and uncertain shares to an event features run.
 
 `shares_path`, `epoch_state_shares`, `main`
+
+### `scripts/detector_comparison/measure_exposure_in_well_visits.py`
+
+Measure each epoch's non-local detector exposure, and its part inside the well visits.
+
+`main`
 
 ### `scripts/detector_comparison/report_event_features.py`
 
