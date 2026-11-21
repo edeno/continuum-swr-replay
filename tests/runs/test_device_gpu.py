@@ -23,6 +23,7 @@ from continuum_swr_replay.runs.device import (
     configure_jax_gpu,
     occupancy_table,
     parse_gpu_query,
+    point_jax_at,
     require_configured_device,
     select_free_gpu,
     verify_jax_device,
@@ -241,6 +242,29 @@ class TestConfiguration:
         assert gpu_module._claim(7)
         assert gpu_module._claim(7)
         assert (claims / "gpu7.claim").read_text().strip() == str(os.getpid())
+
+
+class TestPointingJaxAtACard:
+    def test_the_card_is_set_checked_and_not_claimed(self, claims, monkeypatch):
+        checked = []
+        monkeypatch.setattr(gpu_module, "verify_jax_device", checked.append)
+        card = parse_gpu_query(OCCUPANCY)[2]
+
+        record = point_jax_at(card, 0.25)
+
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "GPU-ccc"
+        assert os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false"
+        assert os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] == "0.25"
+        assert record == {
+            "jax_backend": "gpu",
+            "gpu_index": 2,
+            "gpu_uuid": "GPU-ccc",
+            "gpu_name": "NVIDIA A100 80GB PCIe",
+        }
+        assert checked == [record]
+        # Pointing is not claiming, and it leaves this process unconfigured.
+        assert not claims.exists()
+        assert gpu_module._CONFIGURED is None
 
 
 class TestDeviceVerification:

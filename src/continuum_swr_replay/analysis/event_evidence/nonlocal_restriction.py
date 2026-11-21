@@ -968,15 +968,16 @@ def _same_setting(a: Any, b: Any) -> bool:
 def fresh_detector(canonical: Any) -> Any:
     """An unfitted detector configured as the canonical decode's.
 
-    Built as ``decoding.fit.perform_decoding`` builds it (the NonLocal
-    clusterless detector, ``NonLocalDecodingConfig``'s algorithm parameters,
-    ``decoding.transitions.nonlocal_detector_kwargs`` and an ``Environment`` of
-    ``PLACE_BIN_SIZE_1D`` on the decode's track graph, edge order and spacing),
-    never by copying ``canonical``: the library's EM writes its fitted discrete
-    initial distribution into the detector's ``discrete_initial_conditions``
-    setting, so a fit of a copy would start from the canonical fit. Every
-    other setting must equal ``canonical``'s, so a configuration changed since
-    the decode raises.
+    Built by the builders ``decoding.fit.perform_decoding`` uses
+    (``create_detector`` with the HPC entry of
+    ``decoding.config.nonlocal_detector_classes``, ``NonLocalDecodingConfig``
+    and ``decoding.transitions.nonlocal_detector_kwargs``, and
+    ``linear_environment`` on the decode's track graph, edge order and
+    spacing), never by copying ``canonical``: the library's EM writes its
+    fitted discrete initial distribution into the detector's
+    ``discrete_initial_conditions`` setting, so a fit of a copy would start
+    from the canonical fit. Every other setting must equal ``canonical``'s, so
+    a configuration changed since the decode raises.
 
     Parameters
     ----------
@@ -991,26 +992,25 @@ def fresh_detector(canonical: Any) -> Any:
     """
     import dataclasses
 
-    from non_local_detector import NonLocalClusterlessDetector
     from non_local_detector.environment import Environment
 
-    from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
-    from continuum_swr_replay.decoding.fit import algorithm_params
+    from continuum_swr_replay.decoding.config import (
+        NonLocalDecodingConfig,
+        nonlocal_detector_classes,
+    )
+    from continuum_swr_replay.decoding.fit import create_detector, linear_environment
     from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
-    from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 
     (decoded,) = canonical.environments
-    config = NonLocalDecodingConfig()
-    environment = Environment(
-        place_bin_size=PLACE_BIN_SIZE_1D,
-        track_graph=decoded.track_graph,
-        edge_order=decoded.edge_order,
-        edge_spacing=decoded.edge_spacing,
+    environment = linear_environment(
+        decoded.track_graph, decoded.edge_order, decoded.edge_spacing
     )
-    detector = NonLocalClusterlessDetector(
-        environments=environment,
-        **algorithm_params(config, "clusterless"),
-        **nonlocal_detector_kwargs(config),
+    detector = create_detector(
+        nonlocal_detector_classes(),
+        nonlocal_detector_kwargs,
+        "HPC",
+        environment,
+        NonLocalDecodingConfig(),
     )
     # the environment's settings; its fitted grid (the names ending in an
     # underscore, and track_graphDD, the graph a 1-D grid without a track graph

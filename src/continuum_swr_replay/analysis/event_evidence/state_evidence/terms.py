@@ -22,7 +22,7 @@ from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
-from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.intervals import decoder_time_bin, sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -497,7 +497,7 @@ def per_tetrode_terms(
                 dtype=np.float32,
             )
         )
-        time_bins.append(np.digitize(st[in_bounds], time[1:-1]))
+        time_bins.append(decoder_time_bin(st[in_bounds], time))
         tetrodes.append(np.full(int(in_bounds.sum()), e))
     n_place_bins = centers.shape[0]
     return TetrodeTerms(
@@ -585,10 +585,9 @@ def training_spike_bins(
     delta = valid_time[1] - valid_time[0]  # as the library takes it
     low = np.maximum(valid_time[first] - delta, time[0])
     high = np.minimum(valid_time[last] + delta, time[-1])
-    edges = time[1:-1]
     change = np.zeros(time.size + 1, dtype=np.int64)
-    np.add.at(change, np.digitize(low, edges), 1)
-    np.add.at(change, np.digitize(high, edges) + 1, -1)
+    np.add.at(change, decoder_time_bin(low, time), 1)
+    np.add.at(change, decoder_time_bin(high, time) + 1, -1)
     covered[:] = np.cumsum(change[:-1]) > 0
     return covered
 
@@ -696,7 +695,7 @@ def spikes_in_bins(
     for st, mk in zip(spike_times, marks, strict=True):
         st = np.asarray(st)
         inside = np.flatnonzero((st >= time[0]) & (st <= time[-1]))
-        mine = inside[keep[np.digitize(st[inside], time[1:-1])]]
+        mine = inside[keep[decoder_time_bin(st[inside], time)]]
         kept_times.append(st[mine])
         kept_marks.append(np.asarray(mk)[mine])
     return kept_times, kept_marks

@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f79f2722d629",
+ "commit": "d9d721da686a",
  "code": {
-  "head": "f79f2722d6293e9323b296f580566da716f230a0",
+  "head": "d9d721da686af610899ef212c78e0c72e6819724",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -291,8 +291,8 @@
     "code_sha256": "5614fe932b5e718f9523f7ef02f2bdc54f2cc029835f648d38d20a3f22fb918c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py": {
-    "sha256": "ab53e19ae1b1d1fc6800c1720f830f9512c8c585e9c10096a2035cc5f47bb78c",
-    "code_sha256": "115722d9a898db91264add9969d2324f194e9d5afeceedaa7ef2e77d33240ce0"
+    "sha256": "8151eed80d63bf3bef722b80426e5442721b8451de1408945bb44aa2cfbc137e",
+    "code_sha256": "7a15e36c5099566c40dcf3684f1dafd7e4c768883fa1aad43b20a37618bfb146"
    },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
     "sha256": "f38b55578e657527fd62904f201de5ce673b480026e7793fef1981217511968f",
@@ -327,8 +327,8 @@
     "code_sha256": "0521b7dd9a2c5a7acd734befba30f954e315997c446ecaf9494273012a2a9bb2"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
-    "sha256": "2ff95f1fe7faf3f56928984be814e73e457f3ca6e4ec3bd17043686a26b6d7ce",
-    "code_sha256": "d1c86fcf13159783faba00c4972c880ee6aec76f1846328ca9bf1aedd043ec56"
+    "sha256": "bc55c36f4e7dfedb75454f1d58ef6e553f17552adc6f5a982660faff9fbe4314",
+    "code_sha256": "9ffdbb354685e2c7bf995773f9e57f53087d64ff1fcbbd5851b0332a5c122498"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
     "sha256": "cb406e092117fce59392221b1e0a7b8beb6f3be2d215d1202c35fafffd6b2117",
@@ -479,8 +479,8 @@
     "code_sha256": "85b2a3aeba9a9b958c2d610fdff4f3f12ac0e907d5716ddd53426289809a2d53"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "68a20d6a093aee3525b46a4576bf1daa96c59128f978ccdf7c664be4223a5dd5",
-    "code_sha256": "d580ad0663706ace187d9cfc4d88e5a898523e6080cb4154e2ecbf4f3eeec7da"
+    "sha256": "39764f2cfc1e97b95dd5ec19951c84fa8ad4e72d5a939e718e60ddb6fb940333",
+    "code_sha256": "29b8f0bd66291815e2424c396880e7cd07db1d626650c9d72c356c8b6c91c7ec"
    },
    "src/continuum_swr_replay/parameters.py": {
     "sha256": "835ea24f95b3b52b7f1283e9c3076faa4b98cabd2e140ed0db90a1989386fbac",

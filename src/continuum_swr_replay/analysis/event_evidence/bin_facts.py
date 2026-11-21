@@ -29,6 +29,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
+from continuum_swr_replay.intervals import decoder_time_bin
 
 BIN_FACTS_COLUMNS = ("time", "n_spikes", "in_well_visit")
 """The columns of a per-bin facts table, in order."""
@@ -67,7 +68,7 @@ def decoder_bin_spike_counts(
     for st in spike_times:
         st = np.asarray(st, dtype=float)
         inside = st[(st >= time[0]) & (st <= time[-1])]
-        counts += np.bincount(np.digitize(inside, time[1:-1]), minlength=time.size)
+        counts += np.bincount(decoder_time_bin(inside, time), minlength=time.size)
     return counts
 
 
