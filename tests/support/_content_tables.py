@@ -36,13 +36,17 @@ def canonical_arm_table(
     fraction_scale: float = 1.0,
     undecoded_event: str | None = None,
     partial_event: str | None = None,
+    crossing_event: str | None = None,
 ) -> pd.DataFrame:
     """A minimal table satisfying the canonical arm contract.
 
     ``fraction_scale`` rescales every event's fractions (1.0 is the contract).
     ``undecoded_event`` leaves one event's fraction missing on every candidate,
     as an event with no real-arm bins; ``partial_event`` leaves it missing on
-    one candidate only, which the contract forbids.
+    one candidate only, which the contract forbids. ``crossing_event`` starts
+    inside its visit and crosses the final poke-out: ``mixed``,
+    ``spans_visit_end``, no whole-window well, and the visit's well as its
+    current arm.
     """
     rows = []
     for index in range(n_events):
@@ -68,10 +72,7 @@ def canonical_arm_table(
                     "candidate_arm": arm,
                     "arm_count_hard": counts[arm],
                     "arm_fraction": fraction,
-                    "occupancy_state": "at_well",
-                    "visit_context": "in_visit",
-                    "at_well": True,
-                    "occupancy_well_id": current,
+                    **_location(current, crossing=event == crossing_event),
                     "occupancy_well_arm": current,
                     "is_current_arm": float(arm == current),
                     "visit_recency_trials_event_leaf_centered": float(arm),
@@ -81,8 +82,31 @@ def canonical_arm_table(
     return pd.DataFrame(rows)
 
 
-def canonical_patch_table(*, n_events: int = 4) -> pd.DataFrame:
-    """A minimal table satisfying the canonical patch contract."""
+def _location(well: int, *, crossing: bool) -> dict[str, object]:
+    """The whole-window location of an event at ``well``, or crossing the
+    final poke-out of a visit there."""
+    if crossing:
+        return {
+            "occupancy_state": "mixed",
+            "visit_context": "spans_visit_end",
+            "at_well": False,
+            "occupancy_well_id": np.nan,
+        }
+    return {
+        "occupancy_state": "at_well",
+        "visit_context": "in_visit",
+        "at_well": True,
+        "occupancy_well_id": well,
+    }
+
+
+def canonical_patch_table(
+    *, n_events: int = 4, crossing_event: str | None = None
+) -> pd.DataFrame:
+    """A minimal table satisfying the canonical patch contract.
+
+    ``crossing_event`` is as in :func:`canonical_arm_table`.
+    """
     patches = sorted(set(TRACK_SEGMENT_TO_PATCH.values()))
     rows = []
     for index in range(n_events):
@@ -102,10 +126,7 @@ def canonical_patch_table(*, n_events: int = 4) -> pd.DataFrame:
                     "patch": patch,
                     "patch_count_hard": counts[patch],
                     "patch_fraction": counts[patch] / total,
-                    "occupancy_state": "at_well",
-                    "visit_context": "in_visit",
-                    "at_well": True,
-                    "occupancy_well_id": current_arm,
+                    **_location(current_arm, crossing=f"e{index}" == crossing_event),
                     "occupancy_well_arm": current_arm,
                     "is_current_patch": float(patch == current_patch),
                     "visit_recency_trials_patch": float(patch),

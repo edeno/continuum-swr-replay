@@ -100,8 +100,10 @@ def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
     Every event and stop table carries the label, the non-local tables and the
     ContFrag tables (SWR and MUA events) alike, so a table without
     ``visit_context`` or ``occupancy_state`` is refused, also when it has no
-    rows. Every value is one of ``analysis.constants.VISIT_CONTEXTS``, and a
-    row is ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``.
+    rows. Every value is one of ``analysis.constants.VISIT_CONTEXTS``, a row
+    is ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``, and a
+    row that crosses a visit boundary (``spans_visit_end``,
+    ``spans_visit_start``) is ``mixed``.
 
     Raises
     ------
@@ -123,6 +125,12 @@ def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
         raise ValueError(
             f"{table_name} has visit_context in_visit rows that are not at_well, "
             "or at_well rows that are not in_visit"
+        )
+    spans = labels.isin(("spans_visit_end", "spans_visit_start")).to_numpy()
+    if (frame["occupancy_state"].astype(object).to_numpy()[spans] != "mixed").any():
+        raise ValueError(
+            f"{table_name} has visit_context spans_visit_end or "
+            "spans_visit_start rows that are not mixed"
         )
 
 
@@ -555,7 +563,7 @@ def validate_canonical_table_contract(
     # poke-out, whose current arm is the visit's well). Numeric zeros
     # elsewhere would retain those events in the common cohort and silently
     # change the estimand.
-    require_columns(long_df, ["visit_context"], f"canonical table {table_label}")
+    require_visit_context_labels(long_df, f"canonical table {table_label}")
     in_visit = long_df["visit_context"].isin(STARTS_IN_WELL_VISIT)
     current_col = "is_current_arm" if hierarchy_kind == "arm" else "is_current_patch"
     current = long_df[current_col]

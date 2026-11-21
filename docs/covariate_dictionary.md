@@ -585,7 +585,10 @@ indicators (`is_current_arm`, `is_same_patch_as_current`,
 `is_current_patch`, the distance and rank, the recency spline and the products)
 follow. `occupancy_well_id` stays the whole-window location (missing). The
 content table contract defines the current arm exactly for the events that start
-inside a visit (`table_contracts.validate_canonical_table_contract`).
+inside a visit (`table_contracts.validate_canonical_table_contract`), and every
+table's label contract (`table_contracts.require_visit_context_labels`, which the
+content contract also applies) holds `in_visit` exactly on the `at_well` rows and
+the `spans_*` labels only on `mixed` rows.
 
 **Event × arm table: the sample count** (`behavior/covariates/history/reward_history.py:log1p_known_visit_count_all_events`):
 
