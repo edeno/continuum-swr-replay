@@ -627,17 +627,15 @@ def test_em_record_reads_the_librarys_loop():
     """The trace holds each iteration's E-step marginal, then the final one;
     the loop stops when the last two iterations' change is below the
     tolerance relative to their mean."""
-    record = nr.em_record(np.array([-200.0, -100.0, -99.999, -99.99]), 20, 1e-4)
+    record = nr.em_record(np.array([-200.0, -100.0, -99.999, -99.99]), 1e-4)
     assert record == {
         "em_iterations": 3,
         "converged": True,
         "marginal_log_likelihoods": [-200.0, -100.0, -99.999, -99.99],
     }
     # stopped by max_iter, still changing
-    record = nr.em_record(np.array([-200.0, -100.0, -90.0]), 2, 1e-4)
+    record = nr.em_record(np.array([-200.0, -100.0, -90.0]), 1e-4)
     assert record["em_iterations"] == 2 and record["converged"] is False
-    with pytest.raises(ValueError, match="without converging"):
-        nr.em_record(np.array([-200.0, -100.0, -90.0]), 20, 1e-4)
 
 
 def test_em_settings_are_the_librarys_defaults():
@@ -695,16 +693,51 @@ def test_a_changed_configuration_raises():
         nr.fresh_detector(_configured_detector(discrete_transition_concentration=2.0))
 
 
-def test_each_fold_failure_is_named_by_its_fold():
-    record = {
-        "folds": [
-            {"fold": 0, **_record()},
-            {"fold": 1, **_record(causal_mass_deviation_swr=2e-3)},
-        ]
+def _fold(k, converged=True, iterations=4, **changes):
+    return {
+        "fold": k,
+        "converged": converged,
+        "em_iterations": iterations,
+        **_record(**changes),
     }
+
+
+def test_each_fold_failure_is_named_by_its_fold():
+    record = {"folds": [_fold(0), _fold(1, causal_mass_deviation_swr=2e-3)]}
     failures = nr.fold_check_failures(record)
     assert len(failures) == 1 and failures[0].startswith("fold 1: swr: filtered")
-    assert nr.fold_check_failures({"folds": [{"fold": 0, **_record()}]}) == []
+    assert nr.fold_check_failures({"folds": [_fold(0)]}) == []
+
+
+def test_a_fold_whose_em_did_not_converge_fails_the_check():
+    record = {"folds": [_fold(0), _fold(1), _fold(2, converged=False, iterations=20)]}
+    assert nr.fold_check_failures(record) == [
+        "fold 2: EM did not converge in 20 iterations"
+    ]
+
+
+def test_a_fold_on_another_place_grid_raises():
+    from types import SimpleNamespace
+
+    from continuum_swr_replay.decoding.results import ENCODING_KEY
+
+    def detector(centers, interior):
+        environment = SimpleNamespace(
+            place_bin_centers_=np.asarray(centers, dtype=float)[:, None],
+            is_track_interior_=np.asarray(interior, dtype=bool),
+        )
+        return SimpleNamespace(
+            encoding_model_={ENCODING_KEY: {"environment": environment}}
+        )
+
+    canonical = detector([1.0, 3.0, 5.0], [True, False, True])
+    nr.check_place_grid(detector([1.0, 3.0, 5.0], [True, False, True]), canonical)
+    with pytest.raises(ValueError, match="place_bin_centers_"):
+        nr.check_place_grid(detector([1.0, 3.0, 5.5], [True, False, True]), canonical)
+    with pytest.raises(ValueError, match="place_bin_centers_"):
+        nr.check_place_grid(detector([1.0, 3.0], [True, False]), canonical)
+    with pytest.raises(ValueError, match="is_track_interior_"):
+        nr.check_place_grid(detector([1.0, 3.0, 5.0], [True, True, True]), canonical)
 
 
 def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatch):
@@ -760,6 +793,7 @@ def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatc
 
     monkeypatch.setattr(nr, "fold_log_likelihood", likelihood)
     monkeypatch.setattr(nr, "model_scores", scores)
+    monkeypatch.setattr(nr, "check_place_grid", lambda detector, c: None)
     table, record = nr.fold_fit_scores(
         canonical,
         time,

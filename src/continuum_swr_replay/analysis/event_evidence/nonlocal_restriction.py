@@ -497,7 +497,9 @@ def smoothed_summary(
     place_bin = np.empty(rows.size, dtype=np.int32)
     for start in range(0, rows.size, chunk_bins):
         stop = min(start + chunk_bins, rows.size)
-        batch = jnp.asarray(smoothed)[jnp.asarray(rows[start:stop])]
+        # index where the posterior is (the host, from the library), so that
+        # only the batch is copied to the device
+        batch = jnp.asarray(smoothed[rows[start:stop]])
         p, x = _summary_batch(batch, membership, place_columns)
         probability[start:stop] = np.asarray(p)
         place_bin[start:stop] = np.asarray(x)
@@ -1219,7 +1221,7 @@ def fresh_detector(canonical: Any) -> Any:
     return detector
 
 
-def em_record(marginal_log_likelihoods: NDArray, max_iter: int, tolerance: float):
+def em_record(marginal_log_likelihoods: NDArray, tolerance: float) -> dict[str, Any]:
     """The EM iterations and convergence of a fit, from its trace.
 
     Parameters
@@ -1227,15 +1229,17 @@ def em_record(marginal_log_likelihoods: NDArray, max_iter: int, tolerance: float
     marginal_log_likelihoods : ndarray, shape (n_iterations + 1,)
         The library's trace (``results.attrs["marginal_log_likelihoods"]``):
         each iteration's E-step marginal, then the final E-step's.
-    max_iter, tolerance
+    tolerance : float
         The fit's.
 
     Returns
     -------
     dict
         ``em_iterations``; ``converged``, as the library's loop decides it
-        (``core.check_converged`` on the last two iterations' marginals);
-        ``marginal_log_likelihoods`` (the trace).
+        (``core.check_converged`` on the last two iterations' marginals;
+        False when the loop stopped at ``max_iter``, which
+        :func:`fold_check_failures` fails); ``marginal_log_likelihoods`` (the
+        trace).
     """
     from non_local_detector.core import check_converged
 
@@ -1244,10 +1248,6 @@ def em_record(marginal_log_likelihoods: NDArray, max_iter: int, tolerance: float
     converged = n_iter > 1 and bool(
         check_converged(trace[n_iter - 1], trace[n_iter - 2], tolerance)[0]
     )
-    if n_iter < max_iter and not converged:
-        raise ValueError(
-            f"EM stopped after {n_iter} of {max_iter} iterations without converging"
-        )
     return {
         "em_iterations": int(n_iter),
         "converged": converged,
@@ -1324,7 +1324,7 @@ def fit_fold_detector(
     return detector, {
         "discrete_transition": np.asarray(detector.discrete_state_transitions_),
         "initial_discrete": np.asarray(detector.discrete_initial_conditions),
-        **em_record(trace, settings["max_iter"], settings["tolerance"]),
+        **em_record(trace, settings["tolerance"]),
         "fit_s": round(clock.time() - started, 1),
     }
 
@@ -1357,6 +1357,30 @@ def fold_log_likelihood(
         list(marks),
         is_missing=missing,
     )
+
+
+def check_place_grid(detector: Any, canonical: Any) -> None:
+    """Raise unless a fold's fitted place grid is the canonical decoder's: the
+    same place-bin centers and track-interior bins.
+
+    ``full_nonlocal_place_bin`` indexes the fold detector's interior bins, and
+    ``place_sampling_s`` and every reader of the table use the canonical
+    environment's.
+
+    Raises
+    ------
+    ValueError
+        Naming what differs.
+    """
+    fitted = detector.encoding_model_[ENCODING_KEY]["environment"]
+    decoded = canonical.encoding_model_[ENCODING_KEY]["environment"]
+    for name in ("place_bin_centers_", "is_track_interior_"):
+        a, b = np.asarray(getattr(fitted, name)), np.asarray(getattr(decoded, name))
+        if a.shape != b.shape or not np.array_equal(a, b):
+            raise ValueError(
+                f"the fold's fitted {name} is not the canonical decoder's: its "
+                "place bins would not index the canonical environment's"
+            )
 
 
 def _device_peak_bytes() -> int | None:
@@ -1447,7 +1471,8 @@ def fold_fit_scores(
         As :func:`restriction_scores`, when ``folds`` is not one fold per bin
         in 0 .. n_folds - 1, each with bins, or when a fold's encoding would
         take spikes from one of its own bins
-        (:func:`.tetrode_holdout.check_no_fold_leakage`).
+        (:func:`.tetrode_holdout.check_no_fold_leakage`), or when a fold's
+        fitted place grid is not the canonical one (:func:`check_place_grid`).
     """
     started = clock.time()
     time = np.asarray(time, dtype=float)
@@ -1490,6 +1515,7 @@ def fold_fit_scores(
             f"fold {k}: fit {fit_record['fit_s']} s, "
             f"{fit_record['em_iterations']} EM iterations"
         )
+        check_place_grid(detector, canonical)
         t0 = clock.time()
         likelihood = fold_log_likelihood(
             detector, time, head_position, spike_times, marks, is_missing
@@ -1560,13 +1586,18 @@ def fold_fit_scores(
 
 
 def fold_check_failures(record: dict) -> list[str]:
-    """The model checks a :func:`fold_fit_scores` record fails, as messages:
-    :func:`check_failures` of every fold's pass, each named by its fold."""
-    return [
-        f"fold {fold['fold']}: {message}"
-        for fold in record["folds"]
-        for message in check_failures(fold)
-    ]
+    """The checks a :func:`fold_fit_scores` record fails, as messages, each
+    named by its fold: a fold whose EM did not converge (it stopped at the
+    library's ``max_iter``), and :func:`check_failures` of every fold's pass."""
+    failures = []
+    for fold in record["folds"]:
+        if not fold["converged"]:
+            failures.append(
+                f"fold {fold['fold']}: EM did not converge in "
+                f"{fold['em_iterations']} iterations"
+            )
+        failures += [f"fold {fold['fold']}: {m}" for m in check_failures(fold)]
+    return failures
 
 
 def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:

@@ -210,7 +210,7 @@ def patched(tmp_path, monkeypatch):
         def fold_fit_scores(*args, estimate_encoding_model, **options):
             assert estimate_encoding_model is nr.FOLD_FIT_ESTIMATE_ENCODING_MODEL
             return restriction_scores(*args, **options)[0], {
-                "folds": [{"fold": 0, **record}],
+                "folds": [{"fold": 0, "converged": True, "em_iterations": 4, **record}],
                 "fit_s": 1.0,
             }
 
@@ -332,6 +332,9 @@ def test_the_fold_fit_scores_and_checks_every_fold(patched):
     record, _ = patched(_frame(), _record(causal_mass_deviation_none=1.0), fit="folds")
     assert record["status"] == "failed_check"
     assert record["error"].startswith("fold 0: none: filtered posterior mass")
+    record, _ = patched(_frame(), _record(converged=False), fit="folds")
+    assert record["status"] == "failed_check"
+    assert record["error"] == "fold 0: EM did not converge in 4 iterations"
 
 
 def test_the_header_names_the_fit_mode():
