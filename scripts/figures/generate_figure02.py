@@ -208,6 +208,7 @@ from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
+    PARTICIPATION_NAME,
     event_features_root,
     processed_data_dir,
     replay_content_dir,
@@ -1617,7 +1618,7 @@ def generate_figure(
         raise ValueError(note)
     participation = participation_statistics(
         select_events_in(
-            read_complete_run(participation_dir, "participation", event_epochs),
+            read_complete_run(participation_dir, PARTICIPATION_NAME, event_epochs),
             events["event_id"],
         )
     )

@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     window_scores,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
+from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME
 from continuum_swr_replay.reported.events import default_inputs
 from continuum_swr_replay.runs.io import read_complete_run
 from continuum_swr_replay.visualization.figure_utilities import save_figure
@@ -86,7 +87,7 @@ def read_inputs() -> pd.DataFrame:
     table = read_swr_table(inputs.event_table)
     scores = read_complete_run(
         inputs.tetrode_holdout,
-        "tetrode_holdout",
+        TETRODE_HOLDOUT_NAME,
         event_table_epochs(table, analyzed_epoch_ids()),
     )
     selected = select_events_in(scores, select_visit_context(table)["event_id"])

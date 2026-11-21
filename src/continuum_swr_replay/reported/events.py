@@ -140,6 +140,7 @@ from continuum_swr_replay.analysis.event_evidence import (
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FAMILY_SUFFIX,
+    FIT,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE,
@@ -157,6 +158,7 @@ from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import TRIAL_DESIGN
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
@@ -180,6 +182,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    CANONICAL_EVENTS_FOUND_NAME,
     CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
@@ -197,10 +200,13 @@ from continuum_swr_replay.paths import (
     HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_RESTRICTION_WINDOWS_NAME,
+    PARTICIPATION_NAME,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
+    TETRODE_HOLDOUT_NAME,
     event_features_root,
     event_spike_evidence_dir,
     processed_data_dir,
@@ -481,17 +487,17 @@ def require_fold_fit(manifest: dict, what: str) -> None:
         "scripts/event_evidence/detect_heldout_events.py and "
         "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
     )
-    if fit != "folds":
+    if fit != FIT:
         raise ValueError(
             f"{what} is not the fold fit (its settings record fit {fit!r}, not "
-            "'folds'): it is the earlier design, which held out only the "
+            f"{FIT!r}): it is the earlier design, which held out only the "
             f"encodings. Put the fold-fit run ({rerun}"
         )
-    if design != "trials":
+    if design != TRIAL_DESIGN:
         raise ValueError(
             f"{what} is not the fold fit on folds of whole trials (its settings "
-            f"record fold_design {design!r}, not 'trials'). Put the fold-fit run "
-            f"with --fold-design trials ({rerun}"
+            f"record fold_design {design!r}, not {TRIAL_DESIGN!r}). Put the fold-fit "
+            f"run with --fold-design {TRIAL_DESIGN} ({rerun}"
         )
 
 
@@ -3511,7 +3517,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     analyzed = swr_source.event_table_epochs(table, analyzed_epoch_ids())
     selected = events["event_id"]
     participation_table = select_events_in(
-        read_complete_run(inputs.event_participation, "participation", analyzed),
+        read_complete_run(inputs.event_participation, PARTICIPATION_NAME, analyzed),
         selected,
     )
     advantage_table = select_events_in(
@@ -3521,10 +3527,10 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         selected,
     )
     holdout_table = select_events_in(
-        read_complete_run(inputs.tetrode_holdout, "tetrode_holdout", analyzed),
+        read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),
         selected,
     )
-    participation_paths = ok_table_paths(inputs.event_participation, "participation")
+    participation_paths = ok_table_paths(inputs.event_participation, PARTICIPATION_NAME)
     participation_sha256 = files_sha256(participation_paths)
 
     def participation_off_subset() -> str | None:
@@ -3595,12 +3601,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     summary.inputs += [
         files_record(
-            "*_tetrode_holdout.parquet",
-            ok_table_paths(inputs.tetrode_holdout, "tetrode_holdout"),
+            f"*_{TETRODE_HOLDOUT_NAME}.parquet",
+            ok_table_paths(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME),
             ROOT_DIR,
         ),
         file_record(inputs.tetrode_holdout / "manifest.json", ROOT_DIR),
-        files_record("*_participation.parquet", participation_paths, ROOT_DIR),
+        files_record(f"*_{PARTICIPATION_NAME}.parquet", participation_paths, ROOT_DIR),
         file_record(inputs.event_participation / "manifest.json", ROOT_DIR),
         files_record(
             "*_likelihood_advantage.parquet",
@@ -3630,7 +3636,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # (and their controls, under their event's id) are read
     restriction_windows_table = select_events_in(
         read_complete_run(
-            restriction_windows_dir, "nonlocal_restriction_windows", analyzed
+            restriction_windows_dir, NONLOCAL_RESTRICTION_WINDOWS_NAME, analyzed
         ),
         selected,
     )
@@ -3680,7 +3686,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     # the canonical events found again, over the selected events
     found_table = select_events_in(
-        read_complete_run(heldout_dir, "canonical_events_found", analyzed), selected
+        read_complete_run(heldout_dir, CANONICAL_EVENTS_FOUND_NAME, analyzed),
+        selected,
     )
     heldout_selected = heldout.events
     restriction_time_sums = heldout.time_sums
@@ -3750,25 +3757,25 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
     summary.inputs += [
-        file_record(restriction_dir / "manifest.json", ROOT_DIR),
+        file_record(restriction_dir / MANIFEST, ROOT_DIR),
         files_record(
-            "*_nonlocal_restriction_windows.parquet",
-            ok_table_paths(restriction_windows_dir, "nonlocal_restriction_windows"),
+            f"*_{NONLOCAL_RESTRICTION_WINDOWS_NAME}.parquet",
+            ok_table_paths(restriction_windows_dir, NONLOCAL_RESTRICTION_WINDOWS_NAME),
             ROOT_DIR,
         ),
-        file_record(restriction_windows_dir / "manifest.json", ROOT_DIR),
+        file_record(restriction_windows_dir / MANIFEST, ROOT_DIR),
         *(
             files_record(
                 f"*_{name}.parquet", ok_table_paths(heldout_dir, name), ROOT_DIR
             )
             for name in (
-                "heldout_events",
-                "canonical_events_found",
-                "heldout_time_sums",
+                HELDOUT_EVENTS_NAME,
+                CANONICAL_EVENTS_FOUND_NAME,
+                HELDOUT_TIME_SUMS_NAME,
             )
         ),
-        file_record(heldout_dir / "manifest.json", ROOT_DIR),
-        file_record(inputs.bin_facts / "manifest.json", ROOT_DIR),
+        file_record(heldout_dir / MANIFEST, ROOT_DIR),
+        file_record(inputs.bin_facts / MANIFEST, ROOT_DIR),
     ]
 
     folder = inputs.decoder_quality
