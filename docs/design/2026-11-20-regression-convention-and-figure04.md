@@ -617,6 +617,19 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
   merged early so that other work can use them. That step changes no number. Figures 2 and 3 move to the
   filter in a second step, timed with the other session's Figure 2 work.
 
+### Eighth round (lead, 2026-11-20): the order
+
+- "whatever it is most efficient, we want to ... make sure figure 2-3 use the same data and then we want to
+  execute our regression plan for figure 4-5."
+- Order chosen for that (**call**): the labels merge and the canonical tables change first, before any long
+  run, so that each stored run records the new tables once; the other session (Figure 2's held-out analysis)
+  then takes master and uses the selection function, and its branch goes to master with the lead's approval;
+  Figures 2 and 3 and the events summary move onto the common subset; then the regression plan of section 7
+  for Figures 4 and 5. The plan is written in `.claude/docs/plans/regression-convention/`.
+- One known cost of the table change: the other session's step that sums its scores over Figure 2's event
+  windows refuses to run until the held-out tetrode run and the participation run record the new event
+  table.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
