@@ -271,3 +271,28 @@ def test_missing_rows_are_dropped_and_counted(rate_sessions) -> None:
     )
     assert record.cohort_counts["rows_missing_values"] == 2
     assert record.n_rows == len(rows) - 2
+
+
+def test_a_session_with_no_rows_left_is_recorded_not_fitted(rate_sessions) -> None:
+    """A session given with no rows, or whose rows are all missing, or with no
+    events, is not fitted: one record says why, and the loop goes on."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    design = build_design([Slope("x"), Offset("exposure")], pooled, intercept=True)
+    keys = list(rate_sessions)
+    frames = list(rate_sessions.values())
+    missing = frames[1].assign(x=np.nan)
+    quiet = frames[2].assign(count=0.0)
+    sessions = {
+        keys[0]: frames[0].iloc[:0],
+        keys[1]: missing,
+        keys[2]: quiet,
+        keys[3]: frames[3],
+    }
+    records = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
+    assert [r.status for r in records] == ["not fitted"] * 3 + ["converged"]
+    assert "no rows" in records[0].fit_reason
+    assert records[1].cohort_counts["rows_missing_values"] == len(missing)
+    assert "no rows" in records[1].fit_reason
+    assert "no events" in records[2].fit_reason
+    for record in records[:3]:
+        assert np.isnan(record.coef).all() and record.edf == {}

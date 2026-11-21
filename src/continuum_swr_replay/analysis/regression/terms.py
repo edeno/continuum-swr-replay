@@ -10,7 +10,9 @@ A model is a list of terms and, for the diagonal families, an intercept:
 - :class:`LinearFunctional`: a smooth curve over lags whose column ``b`` is
   ``sum_l B_b(log l) r_l`` (``r_l`` the value at lag ``l``), with no constraint
   and the same required ``penalty``.
-- :class:`Category`: one 0/1 column for each level but the reference.
+- :class:`Category`: one 0/1 column for each level but the reference. A
+  missing value (None or NaN) makes its row missing; any other value outside
+  the levels is an error.
 - :class:`Slope`: one column, or one for each level of a category.
 - :class:`Offset`: ``log`` of a column (an exposure), the Poisson offset.
 
@@ -402,21 +404,27 @@ class _Built:
         if isinstance(term, Category):
             value = _category_values(rows, term)
             levels = [level for level in term.levels if level != term.reference]
-            return np.column_stack([value == level for level in levels]).astype(float)
-        mask = np.ones(n, dtype=bool) if self.level is None else _in_level(rows, self)
+            out = np.column_stack([value == level for level in levels]).astype(float)
+            out[pd.isna(value)] = np.nan
+            return out
         if isinstance(term, LinearFunctional):
             lags = rows[list(term.lag_columns)].to_numpy(dtype=float)
             return lags @ self.basis.design(np.log(np.asarray(term.lags, float)))
+        mask = np.ones(n, dtype=bool) if self.level is None else _in_level(rows, self)
         x = rows[term.column].to_numpy(dtype=float)
         x = np.where(mask, x, 0.0)
         if isinstance(term, Smooth):
             out = self.basis.design(np.nan_to_num(x)) @ self.constraint
             out[~np.isfinite(x)] = np.nan
-            return out * mask[:, None]
-        if self.scale is not None:
-            reference = self.scale.reference if self.centered else 0.0
-            x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
-        return x[:, None]
+            out *= mask[:, None]
+        else:
+            if self.scale is not None:
+                reference = self.scale.reference if self.centered else 0.0
+                x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
+            out = x[:, None]
+        if self.level is not None:
+            out[pd.isna(rows[term.by.column].to_numpy())] = np.nan
+        return out
 
     def record(self) -> dict | None:
         """The term's basis record (C7 ``basis``); None for a term without one."""
@@ -434,9 +442,10 @@ class _Built:
 
 
 def _category_values(rows: pd.DataFrame, category: Category) -> np.ndarray:
-    """The category's column, checked to hold only its levels."""
+    """The category's column, checked to hold only its levels or a missing
+    value (None or NaN: the row is missing)."""
     value = rows[category.column].to_numpy()
-    unknown = ~pd.Series(value).isin(category.levels).to_numpy()
+    unknown = ~(pd.Series(value).isin(category.levels).to_numpy() | pd.isna(value))
     if unknown.any():
         raise ValueError(
             f"{category.column}: values outside the levels {category.levels}: "

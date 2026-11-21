@@ -349,3 +349,25 @@ def test_every_built_column_passes_the_design_check(
             for name, columns in design.size_groups:
                 largest = size[columns].max()
                 assert largest == 0.0 or largest >= SMALLEST_COLUMN_SIZE, name
+
+
+def test_a_missing_category_value_is_a_missing_row(content_sessions) -> None:
+    """A category value that is missing (None or NaN) makes its row missing,
+    for the category's own columns and for the terms by it; a value outside
+    the levels is still refused."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    design = build_design(_content_terms(), pooled, intercept=False)
+    rows = next(iter(content_sessions.values())).copy()
+    rows["role"] = rows["role"].astype(object)
+    rows.loc[0, "role"] = None
+    rows.loc[5, "role"] = np.nan
+    np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [0, 5])
+    by_only = build_design(
+        [Slope("clock_s", by=Category("role", ROLES, reference="other"))],
+        pooled,
+        intercept=False,
+    )
+    np.testing.assert_array_equal(np.flatnonzero(by_only.missing_rows(rows)), [0, 5])
+    rows.loc[1, "role"] = "unknown"
+    with pytest.raises(ValueError, match="values outside the levels"):
+        design.missing_rows(rows)

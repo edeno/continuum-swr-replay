@@ -516,7 +516,9 @@ and holds NaN for those coefficients and their covariance.
 table_sha256=...)` fits every session alone and returns one record per session. For each
 session:
 
-1. The rows with a missing value the design reads are dropped and counted.
+1. The rows with a missing value the design reads are dropped and counted. A missing
+   category value (None or NaN) makes its row missing; any other value outside the
+   levels is an error.
 2. The design is built, with the design check, and the support rule is applied. A failing
    column is made inactive, and a failing level drops its rows as above.
 3. The session is fitted at the design's fixed log penalties by `refit_session`. A level
@@ -540,8 +542,10 @@ their names and the Bayesian covariance `(H + S)^-1`; how each smooth's penalty 
 decrement and step count; the columns left out and why; the support counts; the
 collinearity measures; each smooth's basis (knots, degree, range, constraint, clamp);
 the standardizations; the hashes of the tables read; and `fit_reason`, how the fit ended
-when columns were left out or the session has no fit. A record whose status is not
-"converged" is kept; its readers flag it. `write_records` writes a parquet table
+when columns were left out or the session has no fit. A session with no rows left to
+fit (none given, or all missing), or no events of the kind, is not fitted: its record
+has the status "not fitted", NaN coefficients and the reason in words, and the loop
+goes on. A record whose status is not "converged" is kept; its readers flag it. `write_records` writes a parquet table
 atomically, the structured fields as JSON strings, and `read_records` reads it back.
 
 ## Contrasts

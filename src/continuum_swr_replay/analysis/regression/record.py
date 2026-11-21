@@ -63,7 +63,8 @@ class FitRecord:
         Term -> effective degrees of freedom (an unpenalized term: its active
         columns; a term left out: 0); empty for a session without a fit.
     status : str
-        The last fit's ``NewtonFit.status``; only "converged" is a fit.
+        The last fit's ``NewtonFit.status``; only "converged" is a fit. "not
+        fitted" for a session with no rows, or no events, left to fit.
     newton_decrement : float
     n_iter : int
         The last fit's Newton steps.

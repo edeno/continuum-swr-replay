@@ -49,7 +49,7 @@ from .reml import PenaltyBlock, RemlScore, SessionData, refit_session
 from .support import design_support, level_rows_dropped
 from .terms import INTERCEPT, Design
 
-__all__ = ["SessionKey", "fit_session", "fit_sessions"]
+__all__ = ["NOT_FITTED", "SessionKey", "fit_session", "fit_sessions"]
 
 SessionKey = tuple[str, str, str]
 
@@ -183,6 +183,10 @@ def fit_session(
     rows = rows.reset_index(drop=True)
     missing = design.missing_rows(rows)
     counts["rows_missing_values"] = int(missing.sum())
+    identity = {"key": key, "model": model, "kind": kind, "table_sha256": table_sha256}
+    empty = _no_data(lik, rows[~missing], response)
+    if empty:
+        return _not_fitted(design, lik, rows[~missing], unit, counts, empty, **identity)
     prepared = _prepare(design, lik, rows, response, unit, ~missing, counts)
     has_event = _has_event(lik, prepared.y)
     support = design_support(
@@ -242,6 +246,67 @@ def fit_session(
         support=support,
         table_sha256=table_sha256,
         reason=reason,
+    )
+
+
+#: The status of a session left without a fit before any fit: no rows, or no
+#: events of the kind, are left.
+NOT_FITTED = "not fitted"
+
+
+def _no_data(lik: Likelihood, rows: pd.DataFrame, response: str) -> str:
+    """Why rows cannot be fitted, in words; empty when they can."""
+    if rows.empty:
+        return "no rows left to fit"
+    if isinstance(lik, Poisson | Bernoulli) and not (rows[response] > 0).any():
+        return "no events of the kind in the rows left to fit"
+    return ""
+
+
+def _not_fitted(
+    design: Design,
+    lik: Likelihood,
+    rows: pd.DataFrame,
+    unit: str,
+    counts: dict,
+    reason: str,
+    *,
+    key: SessionKey,
+    model: str,
+    kind: str,
+    table_sha256: Mapping[str, str],
+    support: Mapping[str, object] | None = None,
+    left_out: Mapping[str, str] | None = None,
+) -> FitRecord:
+    """The record of a session left without a fit before any fit."""
+    p = len(design.coef_names)
+    animal, session_date, epoch = key
+    return FitRecord(
+        model=model,
+        kind=kind,
+        animal=animal,
+        session_date=session_date,
+        epoch=epoch,
+        likelihood=_NAMES[type(lik)],
+        n_rows=len(rows),
+        n_units=int(rows[unit].nunique()) if len(rows) else 0,
+        n_events=0.0,
+        cohort_counts=counts,
+        coef_names=design.coef_names,
+        coef=[float("nan")] * p,
+        vcov=np.full((p, p), np.nan).tolist(),
+        log_penalty=design.log_penalty_record(),
+        edf={},
+        status=NOT_FITTED,
+        newton_decrement=float("nan"),
+        n_iter=0,
+        left_out=dict(left_out or {}),
+        support={c: s._asdict() for c, s in (support or {}).items()},
+        collinearity={},
+        basis=design.basis_record(),
+        standardization=design.standardization_record(),
+        table_sha256=dict(table_sha256),
+        fit_reason=reason,
     )
 
 
