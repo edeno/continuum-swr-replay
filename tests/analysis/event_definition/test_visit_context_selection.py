@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     count_visit_context,
+    select_events_in,
     select_visit_context,
 )
 
@@ -92,3 +93,25 @@ def test_counts_units_on_a_candidate_row_table():
     assert by_event.loc["track_center", "kept"]
     with pytest.raises(ValueError, match="stop_id"):
         count_visit_context(long, unit_col="stop_id")
+
+
+def test_select_events_in_keeps_every_row_of_a_selected_event():
+    # An event row and its matched control row share one event_id.
+    table = pd.DataFrame(
+        {
+            "event_id": [11, 11, 12, 12, 13, 15, 99],
+            "kind": ["event", "control"] * 2 + ["event"] * 3,
+        },
+        index=[3, 4, 5, 6, 7, 8, 9],
+    )
+    selected = select_events_in(table, select_visit_context(_events())["event_id"])
+    assert selected["event_id"].tolist() == [11, 11, 13, 15]
+    assert selected["kind"].tolist() == ["event", "control", "event", "event"]
+    assert selected.index.tolist() == [0, 1, 2, 3]
+    assert len(table) == 7  # the input is not changed
+    assert select_events_in(table, []).empty
+
+
+def test_select_events_in_refuses_a_table_without_event_id():
+    with pytest.raises(ValueError, match="event_id"):
+        select_events_in(pd.DataFrame({"stop_id": [1]}), [1])

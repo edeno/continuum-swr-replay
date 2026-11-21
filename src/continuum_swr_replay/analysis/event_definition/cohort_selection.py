@@ -18,6 +18,9 @@ visit (``analysis.constants.STARTS_IN_WELL_VISIT``: ``in_visit`` and
 ``spans_visit_end``), the one subset the analyses of Figures 2 to 5 read.
 :func:`count_visit_context`
 counts the rows per label, kept and dropped, for a summary to record.
+:func:`select_events_in` keeps the rows of a stored per-event table (one that
+carries ``event_id``) whose event is among those selected, so a table made over
+every event is read over the same events.
 """
 
 from __future__ import annotations
@@ -657,3 +660,34 @@ def count_visit_context(
     )
     out.index.name = _VISIT_CONTEXT_COLUMN
     return out
+
+
+def select_events_in(table: pd.DataFrame, event_ids: Sequence[Any]) -> pd.DataFrame:
+    """Keep the rows of a per-event table whose ``event_id`` is among ``event_ids``.
+
+    A stored table made over every event (a per-event measure, its time bins,
+    an event with its matched control row under the same id) is read over the
+    events :func:`select_visit_context` keeps by passing their ``event_id``.
+    Every row of a kept id is kept, however many it has.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        A table carrying ``event_id``.
+    event_ids : sequence
+        The ids to keep, for example ``select_visit_context(events)["event_id"]``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of the kept rows, in their order, with a fresh integer index;
+        ``table`` is not changed.
+
+    Raises
+    ------
+    ValueError
+        If ``table`` has no ``event_id``.
+    """
+    require_columns(table, ["event_id"], "the per-event table to select from")
+    keep = table["event_id"].isin(pd.unique(np.asarray(event_ids)))
+    return table.loc[keep].reset_index(drop=True)
