@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 from dataclasses import replace
 
 import numpy as np
@@ -1231,8 +1230,8 @@ def test_a_stiff_term_does_not_set_the_floor_of_a_weak_one(weak: float) -> None:
         value = 5e4 + weak * (r[0] - 12) ** 2
         return value, np.array([2 * weak * (r[0] - 12)]), np.array([[2 * weak]])
 
-    rho, _, _ = reml._search(_Quadratic(score), np.array([3.0, 4.0]), 0, Counter())
-    single, _, _ = reml._search(_Quadratic(alone), np.array([4.0]), 0, Counter())
+    rho, _, _, _ = reml._search(_Quadratic(score), np.array([3.0, 4.0]))
+    single, _, _, _ = reml._search(_Quadratic(alone), np.array([4.0]))
     assert rho[0] == pytest.approx(3.0, abs=1e-9)
     assert rho[1] == pytest.approx(single[0], abs=1e-6)
     assert weak * (rho[1] - 12) ** 2 < 1e-7
@@ -1249,7 +1248,7 @@ def test_the_search_does_not_stop_where_the_curvature_is_negative() -> None:
         value = 100 - d**2 + 0.01 * d**4
         return value, np.array([-2 * d + 0.04 * d**3]), np.array([[-2 + 0.12 * d**2]])
 
-    rho, current, _ = reml._search(_Quadratic(score), np.array([5.00001]), 0, Counter())
+    rho, current, _, _ = reml._search(_Quadratic(score), np.array([5.00001]))
     assert abs(rho[0] - 5) == pytest.approx(np.sqrt(50), abs=1e-6)
     assert current.hessian[0, 0] > 0
 

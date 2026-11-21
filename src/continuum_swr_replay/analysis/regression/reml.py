@@ -472,13 +472,9 @@ class PenaltySearch:
     set_aside : tuple of SetAsideSession
         The sessions set aside, in order, each with its refits at the chosen
         penalties.
-    share_without_fit : float
-        The share of the sessions given that end without a fit (set aside and
-        not fitted by their refits); at most ``MAX_FAILING_SHARE``.
-    start_rho : np.ndarray, shape (m,)
-        Where Newton started: the best grid point, or the given start.
     start_score : float
-        The pooled score there.
+        The pooled score where Newton started: the best grid point, or the
+        given start.
     n_grid_points : int
         Grid points evaluated (0 for a given start).
     n_grid_not_finite : int
@@ -496,14 +492,20 @@ class PenaltySearch:
     reference_rho: np.ndarray
     in_choice: np.ndarray
     set_aside: tuple[SetAsideSession, ...]
-    share_without_fit: float
-    start_rho: np.ndarray
     start_score: float
     n_grid_points: int
     n_grid_not_finite: int
     grid_failures: dict[str, int]
     n_outer_steps: int
     at_boundary: np.ndarray
+
+    @property
+    def share_without_fit(self) -> float:
+        """The share of the sessions given (those in the choice and those set
+        aside) that end without a fit (set aside and not fitted by their
+        refits); at most ``MAX_FAILING_SHARE``."""
+        n_sessions = self.in_choice.size + len(self.set_aside)
+        return sum(not r.fitted for r in self.set_aside) / n_sessions
 
 
 @dataclass(frozen=True)
@@ -1291,12 +1293,12 @@ def _try_step(
 
 
 def _search(
-    evaluate: _Evaluator,
-    start: np.ndarray,
-    n_grid_points: int,
-    failures: Counter[tuple[str, str]],
-) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
+    evaluate: _Evaluator, start: np.ndarray
+) -> tuple[np.ndarray, PooledScore, float, int]:
     """Newton on the log penalties from ``start``.
+
+    Returns the log penalties found, the pooled score there, the score at
+    ``start`` and the number of steps taken.
 
     Stops when the Newton decrement in the log penalties, ``g' H~^-1 g / 2``
     on the free terms with the floored Hessian ``H~`` (the gain in the score
@@ -1330,60 +1332,70 @@ def _search(
     current = evaluate(rho, derivatives=True)
     if not np.isfinite(current.score):
         raise ValueError(f"no finite REML score at the start {rho}: {current.failure}")
-    start_score = current.score
-    n_steps = 0
+    start_score, n_steps = current.score, 0
     while True:
         curvature = _Curvature.at(rho, current)
         step = curvature.newton_step(current.gradient)
         rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
-        if -0.5 * float(current.gradient @ step) < max(REML_DECREMENT_TOL, rounding):
-            probes = curvature.downhill_probes(current.gradient)
-            if probes and n_steps < REML_MAX_STEPS:
-                for probe in probes:
-                    moved = _try_step(evaluate, rho, current, probe, MAX_STEP_HALVINGS)
-                    if not isinstance(moved, str) and moved[1].score < current.score:
-                        break
-                else:
-                    raise ValueError(
-                        "the penalty search did not converge: it stopped where the "
-                        "score's curvature is negative and no step along that "
-                        f"direction lowered it, after {n_steps} steps; log penalties "
-                        f"{rho}, gradient {current.gradient}"
-                    )
-                (rho, current), n_steps = moved, n_steps + 1
-                continue
+        small = -0.5 * float(current.gradient @ step) < max(
+            REML_DECREMENT_TOL, rounding
+        )
+        probes = curvature.downhill_probes(current.gradient) if small else []
+        if probes and n_steps < REML_MAX_STEPS:
+            moved = _probe(evaluate, rho, current, probes)
+            if moved is None:
+                raise _not_converged(
+                    "it stopped where the score's curvature is negative and no step "
+                    "along that direction lowered it",
+                    n_steps,
+                    rho,
+                    current,
+                )
+        elif small:  # the last step, taken when the score does not rise
             moved = _try_step(evaluate, rho, current, step, 1, rounding)
             if not isinstance(moved, str):
                 (rho, current), n_steps = moved, n_steps + 1
-            break
-        if n_steps == REML_MAX_STEPS:
-            reason = f"no stationary point in {REML_MAX_STEPS} steps"
+            return rho, current, start_score, n_steps
+        elif n_steps == REML_MAX_STEPS:
+            raise _not_converged(
+                f"no stationary point in {REML_MAX_STEPS} steps", n_steps, rho, current
+            )
         else:
             moved = _try_step(evaluate, rho, current, step, MAX_STEP_HALVINGS)
-            if not isinstance(moved, str):
-                (rho, current), n_steps = moved, n_steps + 1
-                continue
-            reason = moved
-        raise ValueError(
-            f"the penalty search did not converge: {reason}, after {n_steps} "
-            f"steps; log penalties {rho}, gradient {current.gradient}"
-        )
-    lo, hi = LOG_PENALTY_BOUNDS
-    at_boundary = (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
-    search = PenaltySearch(
-        np.full(rho.size, np.nan),  # the screen's fields, set by the caller
-        np.empty(0, dtype=int),
-        (),
-        0.0,
-        np.array(start, dtype=float),
-        start_score,
-        n_grid_points,
-        sum(failures.values()),
-        dict(Counter({status: n for (_, status), n in failures.items()})),
-        n_steps,
-        at_boundary,
+            if isinstance(moved, str):
+                raise _not_converged(moved, n_steps, rho, current)
+        (rho, current), n_steps = moved, n_steps + 1
+
+
+def _probe(
+    evaluate: _Evaluator,
+    rho: np.ndarray,
+    current: PooledScore,
+    probes: list[np.ndarray],
+) -> tuple[np.ndarray, PooledScore] | None:
+    """The first of ``probes`` (each halved as needed) that lowers the score
+    strictly, and its score; None when none does."""
+    for probe in probes:
+        moved = _try_step(evaluate, rho, current, probe, MAX_STEP_HALVINGS)
+        if not isinstance(moved, str) and moved[1].score < current.score:
+            return moved
+    return None
+
+
+def _not_converged(
+    reason: str, n_steps: int, rho: np.ndarray, current: PooledScore
+) -> ValueError:
+    """The error of a search that did not converge, with its last point."""
+    return ValueError(
+        f"the penalty search did not converge: {reason}, after {n_steps} "
+        f"steps; log penalties {rho}, gradient {current.gradient}"
     )
-    return rho, current, search
+
+
+def _at_boundary(rho: np.ndarray) -> np.ndarray:
+    """True for a log penalty within ``AT_BOUNDARY_MARGIN`` of a bound."""
+    lo, hi = LOG_PENALTY_BOUNDS
+    return (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
 
 
 def _screen(
@@ -1556,9 +1568,8 @@ def _refit_set_aside(
     blocks: Sequence[PenaltyBlock],
     rho: np.ndarray,
     set_aside: Sequence[tuple[int, RemlScore]],
-) -> tuple[tuple[SetAsideSession, ...], float]:
-    """Each set-aside session refitted at ``rho`` (:func:`_refit`), and the
-    share of the sessions given that end without a fit.
+) -> tuple[SetAsideSession, ...]:
+    """Each set-aside session refitted at ``rho`` (:func:`_refit`).
 
     Raises
     ------
@@ -1582,7 +1593,7 @@ def _refit_set_aside(
             f"MAX_FAILING_SHARE = {MAX_FAILING_SHARE:.0%}) have no fit at the log "
             f"penalties {rho}: {detail}"
         )
-    return records, share
+    return records
 
 
 def _session_fit(
@@ -1653,14 +1664,17 @@ def _screened_search(
         start, n_points, failures = _grid_start(evaluate, len(blocks))
     else:
         n_points, failures = 0, Counter()
-    rho, pooled, search = _search(evaluate, start, n_points, failures)
-    records, share = _refit_set_aside(lik, sessions, blocks, rho, set_aside)
-    search = replace(
-        search,
+    rho, pooled, start_score, n_steps = _search(evaluate, start)
+    search = PenaltySearch(
         reference_rho=reference.copy(),
         in_choice=np.array(kept, dtype=int),
-        set_aside=records,
-        share_without_fit=share,
+        set_aside=_refit_set_aside(lik, sessions, blocks, rho, set_aside),
+        start_score=start_score,
+        n_grid_points=n_points,
+        n_grid_not_finite=sum(failures.values()),
+        grid_failures=dict(Counter({status: n for (_, status), n in failures.items()})),
+        n_outer_steps=n_steps,
+        at_boundary=_at_boundary(rho),
     )
     return _pooled_fit(rho, pooled, blocks, search)
 
