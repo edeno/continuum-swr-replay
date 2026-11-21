@@ -989,10 +989,19 @@ def _search(
 
     Stops when the Newton decrement in the log penalties, ``g' H~^-1 g / 2``
     on the free terms with the floored Hessian ``H~`` (the gain in the score
-    the next step predicts), is below ``REML_DECREMENT_TOL``, then takes that
-    last step when the score does not rise by more than its rounding,
-    ``8 eps max(1, |V|)`` (as the inner fit does), so ``rho`` is the optimum
-    to rounding.
+    the next step predicts), is below ``REML_DECREMENT_TOL`` or below the
+    rounding of the score, ``8 eps max(1, |V|)`` (a gain no halving can
+    show), then takes that last step when the score does not rise by more
+    than its rounding (as the inner fit does), so ``rho`` is the optimum to
+    rounding.
+
+    On a flat score (the data do not support curvature; the score falls
+    toward its limit in the null space as ``c exp(-rho)``) the gradient is
+    ``-c exp(-rho)``, the gain left on the way to the bound, and the Hessian
+    the same, below the eigenvalue floor ``REML_EIGEN_FLOOR``: the search
+    stops where that gain is below ``sqrt(2 REML_DECREMENT_TOL
+    REML_EIGEN_FLOOR)`` (1.4e-7), or at the bound, where a gradient pointing
+    out of it holds the term.
 
     Raises
     ------
@@ -1010,8 +1019,8 @@ def _search(
     n_steps = 0
     while True:
         step = _outer_step(rho, current)
-        if -0.5 * float(current.gradient @ step) < REML_DECREMENT_TOL:
-            rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
+        rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
+        if -0.5 * float(current.gradient @ step) < max(REML_DECREMENT_TOL, rounding):
             moved = _try_step(evaluate, rho, current, step, 1, rounding)
             if not isinstance(moved, str):
                 (rho, current), n_steps = moved, n_steps + 1

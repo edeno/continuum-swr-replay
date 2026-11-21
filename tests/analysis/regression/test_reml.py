@@ -822,3 +822,42 @@ def test_inner_fits_converge_at_strong_penalties() -> None:
         np.testing.assert_allclose(
             data.X @ strong.beta, X_null @ line.beta, rtol=0, atol=1e-6
         )
+
+
+def test_a_flat_pooled_score_ends_converged_in_the_null_space() -> None:
+    """Forty content sessions whose clock truth is a straight line: the pooled
+    score falls toward its limit at the bound by less than 1e-6 from log
+    penalty 14 on. The search ends converged, every grid point finite, at a
+    point where each session's smooth is the line (edf 1, ``in_null_space``),
+    and the score is within the decrement rule's reach of its limit."""
+    sessions = []
+    for seed in range(40):
+        data, blocks = _content_session(seed)
+        sessions.append(data)
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+
+    assert result.search.n_grid_not_finite == 0
+    assert result.rho[0] > 15.0
+    for session in result.sessions:
+        assert session.edf[0] == pytest.approx(1.0, abs=1e-5)
+        np.testing.assert_array_equal(session.in_null_space, [True])
+    limit = pooled_reml(GroupedSoftmax(), sessions, blocks, [LOG_PENALTY_BOUNDS[1]])
+    # Warm and cold inner starts differ by the inner fits' accuracy (6e-10 here).
+    assert abs(result.score - limit.score) < 1e-6
+
+
+def test_a_gain_below_the_rounding_of_the_score_ends_the_search(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the decrement's tolerance at zero, the search still stops: once the
+    gain the next step predicts is below the rounding of the pooled score,
+    ``8 eps max(1, |V|)``, no halving can show it, and the point is the optimum
+    to rounding."""
+    lik, data, blocks = _session("poisson", 2, seed=7)
+    reference = select_penalties(lik, [data], blocks)
+    monkeypatch.setattr(reml, "REML_DECREMENT_TOL", 0.0)
+    result = select_penalties(lik, [data], blocks)
+    np.testing.assert_allclose(result.rho, reference.rho, rtol=0, atol=1e-6)
+    assert result.score <= reference.score + 8 * np.finfo(float).eps * abs(
+        reference.score
+    )

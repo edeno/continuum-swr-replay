@@ -159,7 +159,23 @@ The search (`select_penalties`):
    scale). On 30 synthetic sessions of 40,000 bins (score 63,852) the old rule stopped
    4.6e-6 from the optimum in one log strength; the new one ends within 1e-11 of it.
    On the four mgcv fixtures the selected log strengths are the same to the last bit,
-   and over the 17 searches of the REML tests they move by at most 3e-9.
+   and over the 17 searches of the REML tests they move by at most 3e-9. A decrement
+   below the rounding of the score also ends the search: no halving can show a gain
+   that small, and the point is the optimum to rounding (with the tolerance set to zero
+   the search ends there instead of on a step too small to move `rho`).
+
+**A flat score.** When the data do not support curvature the score falls toward its
+limit in the penalty's null space as `c exp(-rho)`: the gradient is `-c exp(-rho)`,
+the gain left on the way to the bound, and the Hessian the same, soon below the
+eigenvalue floor of `1e-6`. The search then stops where the gain left is below
+`sqrt(2 * 1e-8 * 1e-6) = 1.4e-7`, or at the bound, which a grid start on such a score
+usually is (the bound is its lowest grid point) and where a gradient pointing out holds
+the term. Either point is converged: the term's edf is its null space's dimension
+(`in_null_space`; `at_boundary` only at the bound) and the score is within about
+`1.4e-7` of its limit. On 242 simulated content sessions with a flat score from log
+penalty 5 on, the search raised at ef98019d (the score's rounding at strong penalties,
+above, made it rise where it falls, by 3e-4 from 14 to 16, and inner fits failed from
+17); it now ends at the bound, the edf 1.000 in every session.
 
 There is no fallback: if no grid point gives a finite score, `select_penalties` raises,
 naming the sessions that failed and why, and the model is not fitted. A search that does
