@@ -109,6 +109,7 @@ TABLE = pd.DataFrame(
         "event_id": np.array([11, 22], dtype="uint64"),
         "non_local_event": [1, 2],
         "is_swr": [False, False],
+        "visit_context": ["in_visit", "spans_visit_end"],
         "animal": "j16",
         "session_date": 20210706,
         "epoch": "02_r1",
@@ -191,12 +192,9 @@ def test_canonical_labels_that_are_not_the_event_tables_raise(data_dir, monkeypa
         _run_epoch(data_dir)
 
 
-def test_canonical_labels_the_rule_does_not_give_fail_the_epoch(data_dir, monkeypatch):
-    """The decode's canonical event 1 ends a bin before its trace does: the rule
-    on its own probabilities does not give its labels, and the epoch fails."""
-    _raw({1: (100, 108), 2: (400, 409)}).to_pickle(
-        decode_paths(EPOCH, data_dir).data_over_time
-    )
+def _failed_record(data_dir, monkeypatch) -> dict:
+    """Run the one epoch through the batch loop, which must fail it, and return
+    its record."""
     monkeypatch.setattr(_per_event_run, "ProcessPoolExecutor", ThreadPoolExecutor)
     output = data_dir / "out"
     with pytest.raises(SystemExit, match="1 epochs failed"):
@@ -217,8 +215,41 @@ def test_canonical_labels_the_rule_does_not_give_fail_the_epoch(data_dir, monkey
         )
     record = json.loads((output / "manifest.json").read_text())["epochs"][EPOCH]
     assert record["status"] == "failed"
-    assert "other labels than its canonical ones at 1 bins" in record["error"]
     assert not output_path(EPOCH, output, runner.OUTPUT_NAME).exists()
+    return record
+
+
+def test_canonical_labels_the_rule_does_not_give_fail_the_epoch(data_dir, monkeypatch):
+    """The decode's canonical event 1 ends a bin before its trace does: the rule
+    on its own probabilities does not give its labels, and the epoch fails."""
+    _raw({1: (100, 108), 2: (400, 409)}).to_pickle(
+        decode_paths(EPOCH, data_dir).data_over_time
+    )
+    record = _failed_record(data_dir, monkeypatch)
+    assert "other labels than its canonical ones at 1 bins" in record["error"]
+
+
+@pytest.mark.parametrize(
+    ("column", "values", "message"),
+    [
+        # event 1 (bins 100-109) ends before the SWR (110-120): no strict overlap
+        ("is_swr", [True, False], "another SWR group than the event table's is_swr"),
+        # event 2 (bins 400-409) starts inside the visit (bins 0-499)
+        (
+            "visit_context",
+            ["in_visit", "track_leaf_arm"],
+            "another start inside a well visit than select_visit_context",
+        ),
+    ],
+)
+def test_an_event_tables_group_or_visit_start_the_rule_does_not_give_fails_the_epoch(
+    data_dir, monkeypatch, column, values, message
+):
+    monkeypatch.setattr(
+        runner, "read_swr_table", lambda path: TABLE.assign(**{column: values})
+    )
+    record = _failed_record(data_dir, monkeypatch)
+    assert f"{message} for 1 of the epoch's events" in record["error"]
 
 
 def test_main_runs_the_restriction_runs_ok_epochs_and_records_its_inputs(

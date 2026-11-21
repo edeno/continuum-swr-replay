@@ -22,8 +22,10 @@ CPU only: pandas and numpy, nothing is decoded or refit.
 
 The epoch fails (status ``failed``, with the reason) unless the same rule
 applied to the canonical decode's own non-local probabilities gives the decode
-frame's canonical labels as read through the SWR source exactly, and unless
-those labels are the event table's events of the epoch.
+frame's canonical labels as read through the SWR source exactly, unless
+those labels are the event table's events of the epoch, and unless, for each of
+those events, the rule's SWR group is the table's ``is_swr`` and its start
+inside a well visit is what ``cohort_selection.select_visit_context`` gives.
 
 ``--restriction-dir`` reads another restriction run and ``--output-dir`` writes
 elsewhere; by default the canonical restriction run and
@@ -81,6 +83,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
     with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_visit_context,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     NON_LOCAL_STATES,
@@ -162,8 +167,10 @@ def run_epoch(
     ValueError
         If the per-bin table's or the per-bin facts' time is not the decode
         frame's, the rule on the canonical decode's probabilities does not give
-        its canonical labels, or those labels are not the event table's events
-        of the epoch.
+        its canonical labels, those labels are not the event table's events
+        of the epoch, or the rule gives one of them another SWR group than the
+        table's ``is_swr`` or another start inside a well visit than
+        ``cohort_selection.select_visit_context``.
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
@@ -180,9 +187,10 @@ def run_epoch(
 
     # the canonical labels as every analysis reads them, and the rule's check
     canonical = with_swr_source(raw)["non_local_event"].to_numpy()
-    again = he.labeled_frame(
+    again_frame = he.labeled_frame(
         raw, *(raw[column].to_numpy() for column in he.PROBABILITY_COLUMNS)
-    )["non_local_event"].to_numpy()
+    )
+    again = again_frame["non_local_event"].to_numpy()
     if not np.array_equal(again, canonical):
         raise ValueError(
             f"the rule on the canonical decode's probabilities gives other labels "
@@ -196,13 +204,37 @@ def run_epoch(
             "the decode frame's canonical labels are not the event table's events "
             "of the epoch"
         )
+    # the rule's SWR group and start inside a well visit of each canonical event
+    in_visit = facts["in_well_visit"].to_numpy(dtype=bool)
+    rule = (
+        he.event_rows(again_frame, in_visit)
+        .set_index("label")
+        .loc[table["non_local_event"].to_numpy()]
+    )
+    selected = table["event_id"].isin(select_visit_context(table)["event_id"])
+    for name, theirs, ours in (
+        (
+            "SWR group than the event table's is_swr",
+            table["is_swr"].to_numpy(dtype=bool),
+            rule["group"].to_numpy() == SWR_LABELS[True],
+        ),
+        (
+            "start inside a well visit than select_visit_context",
+            selected.to_numpy(),
+            rule["starts_in_well_visit"].to_numpy(dtype=bool),
+        ),
+    ):
+        if (theirs != ours).any():
+            raise ValueError(
+                f"the rule on the canonical decode's probabilities gives another "
+                f"{name} for {int((theirs != ours).sum())} of the epoch's events"
+            )
 
     # the held-out events
     frame = he.labeled_frame(
         raw, *(bins[column].to_numpy() for column in HELDOUT_PROBABILITIES)
     )
     heldout = frame["non_local_event"].to_numpy()
-    in_visit = facts["in_well_visit"].to_numpy(dtype=bool)
     events = he.event_rows(frame, in_visit)
     animal = parse_epoch_identifier(epoch_id).animal
     windows = events.assign(
