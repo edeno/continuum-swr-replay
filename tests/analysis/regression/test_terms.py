@@ -22,12 +22,14 @@ from continuum_swr_replay.analysis.regression.reml import (
 from continuum_swr_replay.analysis.regression.terms import (
     SMALLEST_COLUMN_SIZE,
     Category,
+    DesignTerm,
     LinearFunctional,
     Offset,
     Slope,
     Smooth,
+    _refuse_small,
+    _small_terms,
     build_design,
-    check_column_sizes,
     standardization,
 )
 
@@ -142,7 +144,7 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
     column is neither centered nor scaled."""
     values = np.array([0.0, 1.0, 3.0, 4.0])
     scale = standardization(values)
-    assert scale.sd == pytest.approx(np.std(values, ddof=0)) and scale.ddof == 0
+    assert scale.sd == pytest.approx(np.std(values, ddof=0))
     assert scale.reference == pytest.approx(2.0)
     assert standardization(np.array([0.0, 1.0, 1.0])) is None
 
@@ -173,7 +175,7 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
     rate = pd.concat([pd.DataFrame({"r": [0.0, 1.0, 1.0, 0.0], "x": values})])
     by = Category("r", (0.0, 1.0), reference=0.0)
     built = build_design([Slope("r"), Slope("x", by=by)], rate, intercept=True)
-    assert built.coef_names == ["(Intercept)", "r", "x:r=0.0", "x:r=1.0"]
+    assert built.coef_names == ("(Intercept)", "r", "x:r=0.0", "x:r=1.0")
     X, _ = built.session(rate)
     np.testing.assert_array_equal(X[:, 1], rate["r"])  # 0/1: as it is
 
@@ -227,14 +229,20 @@ def test_category_and_by_terms(content_sessions) -> None:
     trunk's missing reward fraction); a value outside the levels is refused."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     design = build_design(_content_terms(), pooled, intercept=False)
-    assert design.coef_names[:3] == ["role[current]", "role[previous]", "role[trunk]"]
-    assert [c.level for c in design.columns[:3]] == [
+    assert design.coef_names[:3] == ("role[current]", "role[previous]", "role[trunk]")
+    assert [t.level for t in design.terms[:3]] == [
         ("role", "current"),
         ("role", "previous"),
         ("role", "trunk"),
     ]
-    assert [c.drops_rows for c in design.columns[:4]] == [True, True, True, False]
-    assert design.columns[3].level == ("role", "current")
+    assert [t.kind for t in design.terms[:4]] == ["level", "level", "level", "slope"]
+    assert design.terms[3].level == ("role", "current")
+    # The terms fitted for a level leave a session with it.
+    assert design.by_name["role[current]"].dependents == (
+        "reward_fraction:role=current",
+        "s(clock_s):role=current",
+    )
+    assert design.by_name["role[trunk]"].dependents == ()
     assert not design.missing_rows(pooled).any()
     X, _ = design.session(pooled)
     smooth = design.term_columns["s(clock_s):role=current"]
@@ -299,18 +307,20 @@ def test_tiny_column_is_refused(family: str) -> None:
     with pytest.raises(ValueError, match="step limit reached"):
         fit_at_penalties(lik, [tiny], blocks, [2.0])
     p = tiny.X.shape[1]
-    groups = [(f"c{j}", np.array([j])) for j in range(p - 7)]
-    groups.append(("smooth", np.arange(p - 7, p)))
+    terms = [DesignTerm(f"c{j}", f"c{j}", "slope", np.array([j])) for j in range(p - 7)]
+    terms.append(DesignTerm("smooth", "smooth", "smooth", np.arange(p - 7, p)))
     column = 0 if family == "softmax" else 1
     with pytest.raises(ValueError, match=re.escape(f"c{column} (")):
-        check_column_sizes(tiny.X, groups)
+        _refuse_small(_small_terms(tiny.X, terms))
 
     lik, small, blocks = _scaled_session(family, 1e-2)
-    check_column_sizes(small.X, groups)
+    _refuse_small(_small_terms(small.X, terms))
     assert fit_at_penalties(lik, [small], blocks, [2.0]).sessions[0].fit.converged
     # A column zero on every row is left to the support rule, not refused.
     zero = np.column_stack([small.X, np.zeros(len(small.y))])
-    check_column_sizes(zero, [*groups, ("z", np.array([p]))])
+    _refuse_small(
+        _small_terms(zero, [*terms, DesignTerm("z", "z", "slope", np.array([p]))])
+    )
 
 
 def test_a_smooth_is_measured_as_one_term(rate_sessions) -> None:
@@ -326,9 +336,10 @@ def test_a_smooth_is_measured_as_one_term(rate_sessions) -> None:
     )
     X, _ = design.session(short)
     assert np.max(np.abs(X[:, 1:]), axis=0).min() < SMALLEST_COLUMN_SIZE
-    assert design.size_groups[0][0] == "s(time_since_s)"
+    assert design.small_terms(X) == {}
+    assert list(design.small_terms(X * 1e-3)) == ["s(time_since_s)"]
     with pytest.raises(ValueError, match=re.escape("s(time_since_s) (")):
-        check_column_sizes(X * 1e-3, design.size_groups)
+        _refuse_small(design.small_terms(X * 1e-3))
 
 
 def test_every_built_column_passes_the_design_check(
@@ -346,9 +357,9 @@ def test_every_built_column_passes_the_design_check(
         for rows in sessions.values():
             X, _ = design.session(rows)
             size = np.max(np.abs(X), axis=0)
-            for name, columns in design.size_groups:
-                largest = size[columns].max()
-                assert largest == 0.0 or largest >= SMALLEST_COLUMN_SIZE, name
+            for term in design.terms:
+                largest = size[term.columns].max()
+                assert largest == 0.0 or largest >= SMALLEST_COLUMN_SIZE, term.name
 
 
 def test_a_missing_category_value_is_a_missing_row(content_sessions) -> None:
@@ -410,5 +421,5 @@ def test_a_missing_level_is_not_the_reference(content_sessions) -> None:
     rows["role"] = rows["role"].astype(object)
     rows.loc[2, "role"] = None
     np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [2])
-    X, _ = design._matrix(rows)
+    X = design.build(rows).X
     assert np.isnan(X[2, :3]).all()

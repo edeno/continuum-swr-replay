@@ -62,7 +62,7 @@ from .reml import (
     refit_session,
 )
 from .support import design_support, level_rows_dropped
-from .terms import INTERCEPT, Design
+from .terms import Design
 
 __all__ = ["NOT_FITTED", "SessionKey", "fit_session", "fit_sessions"]
 
@@ -85,6 +85,7 @@ class _Prepared:
     y: np.ndarray
     aux: object
     unit: np.ndarray
+    level_rows: dict
 
 
 def _prepare(
@@ -116,8 +117,10 @@ def _prepare(
                 np.empty(0),
                 None,
                 np.empty(0),
+                {},
             )
-    X, offset = design.session(rows)
+    built = design.build(rows)
+    X, offset = built.X, built.offset
     y = rows[response].to_numpy(dtype=float)
     units = rows[unit].to_numpy()
     if isinstance(lik, GroupedSoftmax):
@@ -128,7 +131,7 @@ def _prepare(
         if offset is not None:
             raise ValueError("an Offset term needs the Poisson likelihood")
         aux = None
-    return _Prepared(rows, X, y, aux, units)
+    return _Prepared(rows, X, y, aux, units, built.level_rows)
 
 
 def _session_blocks(
@@ -137,16 +140,17 @@ def _session_blocks(
     """The design's blocks with at least one active column, their log
     penalties and term names (a block whose term left with a dropped level
     has every column inactive)."""
+    names = {t.block: t.name for t in design.terms if t.block is not None}
     kept = [
         k for k, block in enumerate(design.blocks) if not inactive[block.columns].all()
     ]
     for k in kept:
         if inactive[design.blocks[k].columns].any():
-            raise ValueError(f"{design.block_terms[k]}: part of a smooth is inactive")
+            raise ValueError(f"{names[k]}: part of a smooth is inactive")
     return (
         [design.blocks[k] for k in kept],
         design.log_penalties[kept],
-        [design.block_terms[k] for k in kept],
+        [names[k] for k in kept],
     )
 
 
@@ -263,11 +267,12 @@ def fit_session(
                     **identity,
                 )
             has_event = _has_event(lik, prepared.y)
-            support = design_support(design, rows, prepared.X, prepared.unit, has_event)
+            support = design_support(
+                design, prepared.X, prepared.level_rows, prepared.unit, has_event
+            )
             for column, counted in support.items():
                 if (
-                    column in design.coef_names
-                    and _drops_rows(design, column)
+                    design.by_name[column].kind == "level"
                     and not counted.passes
                     and column not in levels_out
                 ):
@@ -276,7 +281,9 @@ def fit_session(
             levels = [c for c in levels_out if c not in counts["rows_dropped"]]
             if not levels:
                 break
-            keep, dropped, by_level = level_rows_dropped(design, rows, levels)
+            keep, dropped, by_level = level_rows_dropped(
+                design, prepared.level_rows, levels
+            )
             counts["rows_dropped"].update(dropped)
             for column, level in by_level.items():
                 with_them.setdefault(column, f"rows of {level} dropped")
@@ -313,7 +320,7 @@ def fit_session(
         for column, round_ in zip(refit.left_out, refit.rounds, strict=True):
             coefficient = design.coef_names[column]
             why = f"no finite maximum (round {round_offset + round_})"
-            if _drops_rows(design, coefficient):
+            if design.column_terms[column].kind == "level":
                 levels_out[coefficient] = why
                 level_counts[coefficient] = support[coefficient]
                 pending = True
@@ -386,7 +393,7 @@ def _not_fitted(
         n_units=int(rows[unit].nunique()) if len(rows) else 0,
         n_events=0.0,
         cohort_counts=counts,
-        coef_names=design.coef_names,
+        coef_names=list(design.coef_names),
         coef=[float("nan")] * p,
         vcov=np.full((p, p), np.nan).tolist(),
         log_penalty=design.log_penalty_record(),
@@ -422,15 +429,8 @@ def _named(
 
 
 def _columns_of(design: Design, name: str) -> list[str]:
-    """The coefficients of a support entry: itself, or a smooth term's."""
-    if name in design.coef_names:
-        return [name]
-    return [design.coef_names[j] for j in design.term_columns[name]]
-
-
-def _drops_rows(design: Design, coefficient: str) -> bool:
-    """True for a level of a category (its rows leave with it)."""
-    return design.columns[design.coef_names.index(coefficient)].drops_rows
+    """The coefficients of a term."""
+    return [design.coef_names[j] for j in design.by_name[name].columns]
 
 
 def _has_event(lik: Likelihood, y: np.ndarray) -> np.ndarray:
@@ -472,7 +472,7 @@ def _record(
             prepared.aux,
             beta,
             terms,
-            intercept=0 if design.intercept else None,
+            intercept=design.intercept_column,
         )
         edf = _edf(design, last, block_terms, active)
     if isinstance(lik, Poisson | Bernoulli):
@@ -493,7 +493,7 @@ def _record(
         n_units=int(np.unique(prepared.unit).size),
         n_events=n_events,
         cohort_counts=counts,
-        coef_names=design.coef_names,
+        coef_names=list(design.coef_names),
         coef=beta.tolist(),
         vcov=vcov.tolist(),
         log_penalty=design.log_penalty_record(),
@@ -538,7 +538,7 @@ def fit_sessions(
     list of FitRecord
         One per session.
     """
-    if INTERCEPT in design.coef_names and isinstance(lik, GroupedSoftmax):
+    if design.intercept_column is not None and isinstance(lik, GroupedSoftmax):
         raise ValueError("the grouped softmax cannot see an intercept")
     return [
         fit_session(

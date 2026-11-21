@@ -52,23 +52,27 @@ at the pooled mean, the fixed reference; a slope alone is not centered.
 The design check: the fitter limits each Newton step to ``MAX_STEP_LENGTH`` in
 coefficient units, so a column whose values are all very small needs a
 coefficient too large to reach in the steps allowed, and its fit ends at the
-step limit. A column's size is its largest absolute value over the rows; a
-smooth's columns are measured together, as one term. On the pooled rows, a
-term below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
-:func:`build_design` raises, naming it (:func:`check_column_sizes`), measured on
-the pooled rows that are not missing (:meth:`Design.missing_rows`). The
-session's design is built on rows without missing values, so its measure has
-none. In one
-session, a term below it there (:meth:`Design.small_terms`) fails the support
-rule in that session and is made inactive. A column zero on every row of a
-session (a level the session does not have) is not small: the support rule's
-counts make it inactive.
+step limit. A term's size is its largest absolute value over the rows; a
+smooth's columns are measured together, as one term. Only the terms whose
+columns take values other than 0 and 1 are measured (a continuous slope, a
+smooth, a lag functional). On the pooled rows that are not missing, a term
+below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
+:func:`build_design` raises, naming it. In one session, a term below it on the
+session's rows (:meth:`Design.small_terms`) fails the support rule in that
+session and is made inactive. A term zero on every row of a session (a level
+the session does not have) is not small: the support rule's counts make it
+inactive.
+
+Each term of a built design is described once, by a :class:`DesignTerm`: its
+kind, columns, level, covariate, penalty block and the terms that leave a
+session with it. The fitting loop and the support rule read these.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import cached_property
 from typing import Literal, NamedTuple
 
 import numpy as np
@@ -83,14 +87,14 @@ __all__ = [
     "SMALLEST_COLUMN_SIZE",
     "Category",
     "Design",
-    "DesignColumn",
+    "DesignTerm",
     "LinearFunctional",
     "Offset",
+    "SessionDesign",
     "Slope",
     "Smooth",
     "Standardization",
     "build_design",
-    "check_column_sizes",
     "standardization",
 ]
 
@@ -288,14 +292,11 @@ class Standardization(NamedTuple):
     ----------
     sd : float
         The pooled population standard deviation (``ddof = 0``).
-    ddof : int
-        0.
     reference : float
         The pooled mean.
     """
 
     sd: float
-    ddof: int
     reference: float
 
 
@@ -324,111 +325,117 @@ def standardization(values: np.ndarray) -> Standardization | None:
     sd = float(np.std(values, ddof=0))
     if not sd > 0:
         raise ValueError("a constant column cannot be standardized")
-    return Standardization(sd, 0, float(np.mean(values)))
+    return Standardization(sd, float(np.mean(values)))
 
 
-def _small(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) -> dict[str, float]:
-    """Group name -> its largest absolute value, for the groups above zero and
-    below ``SMALLEST_COLUMN_SIZE``."""
-    size = np.max(np.abs(X), axis=0, initial=0.0)
-    out = {}
-    for name, columns in groups:
-        largest = float(np.max(size[columns], initial=0.0))
-        if 0.0 < largest < SMALLEST_COLUMN_SIZE:
-            out[name] = largest
-    return out
+Kind = Literal["intercept", "level", "binary", "slope", "smooth", "lag"]
+
+#: The kinds whose columns take values other than 0 and 1, so that they can be
+#: below ``SMALLEST_COLUMN_SIZE`` (the design check measures only these).
+_MEASURED = ("slope", "smooth", "lag")
 
 
-def check_column_sizes(X: np.ndarray, groups: Sequence[tuple[str, np.ndarray]]) -> None:
-    """Refuse a column, or a smooth's set of columns, whose values are all very
-    small.
-
-    Parameters
-    ----------
-    X : np.ndarray, shape (n_rows, p)
-    groups : sequence of (str, np.ndarray of int)
-        A name and the columns measured together: one column, or every column
-        of a smooth term. A smooth's single columns can be tiny in a session
-        that covers a small part of its range while the term is not.
-
-    Raises
-    ------
-    ValueError
-        If a group's largest absolute value is above zero and below
-        ``SMALLEST_COLUMN_SIZE``; the message names each such group.
-    """
-    small = [f"{name} ({size:.2g})" for name, size in _small(X, groups).items()]
-    if small:
-        raise ValueError(
-            "columns whose largest absolute value is below SMALLEST_COLUMN_SIZE = "
-            f"{SMALLEST_COLUMN_SIZE:g}: {', '.join(small)}; the fit would end at the "
-            "step limit: rescale them"
-        )
-
-
-class DesignColumn(NamedTuple):
-    """One column of a design.
+@dataclass(frozen=True, eq=False)
+class DesignTerm:
+    """One term of a design as a session's fit judges it and removes it.
 
     Attributes
     ----------
     name : str
-        The coefficient's name.
+        A level's or a slope's coefficient name; a smooth's or a lag
+        functional's term name; the intercept's. The support rule and the
+        records name the term by it.
     term : str
-        The term's name.
-    support : {"level", "binary", "slope"} or None
-        The support rule that applies (:mod:`.support`): ``"level"`` for a
-        level of a :class:`Category`, ``"binary"`` for a 0/1 slope,
-        ``"slope"`` for a continuous slope; None for a smooth's column and the
-        intercept.
+        The model term it belongs to: a level's category (``role`` for
+        ``role[previous]``); else ``name``. The edf and the collinearity are
+        per model term.
+    kind : {"intercept", "level", "binary", "slope", "smooth", "lag"}
+        ``level`` a level of a :class:`Category`; ``binary`` a 0/1
+        :class:`Slope`; ``slope`` a continuous :class:`Slope`; ``lag`` a
+        :class:`LinearFunctional`.
+    columns : np.ndarray of int, shape (k,)
+        Its design columns.
     level : tuple or None
-        ``(column, value)`` of a category: the level a :class:`Category`
-        column codes, or the level a term ``by`` a category is fitted for; None
-        otherwise.
-    drops_rows : bool
-        True for a level of a :class:`Category`: when the column is made
-        inactive in a session, the session's rows of that level are dropped
-        (not merged into the reference level), and every term ``by`` that
-        level leaves the session with them.
+        ``(column, value)``: the level a ``level`` codes, or the level a term
+        ``by`` a category is fitted for; None otherwise.
+    covariate : str or None
+        The column a slope or a smooth reads; None otherwise.
+    block : int or None
+        Its penalty block's place in :attr:`Design.blocks`; None without a
+        penalty.
+    dependents : tuple of str
+        For a level, the names of the terms fitted for it: when the level is
+        removed from a session, its rows are dropped (not merged into the
+        reference level) and these terms leave with it.
     """
 
     name: str
     term: str
-    support: Literal["level", "binary", "slope"] | None
-    level: tuple | None
-    drops_rows: bool = False
+    kind: Kind
+    columns: np.ndarray
+    level: tuple | None = None
+    covariate: str | None = None
+    block: int | None = None
+    dependents: tuple[str, ...] = ()
+
+    @property
+    def reads(self) -> tuple | None:
+        """The level whose rows the term reads; None for every row (a level
+        is judged on every row)."""
+        return None if self.kind == "level" else self.level
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class _Built:
-    """A term as built on the pooled rows: its name, its columns and how to
-    compute them at any rows."""
+    """A term as built on the pooled rows: its name, its design terms and how
+    to compute its columns at any rows."""
 
     name: str
     term: Term
-    columns: tuple[DesignColumn, ...]
+    design_terms: tuple[DesignTerm, ...]
     level: tuple | None = None  # (by column, level) for a term by a category
     basis: PSplineBasis | None = None
     constraint: np.ndarray | None = None
     penalty: np.ndarray | None = None
-    log_penalty: float | None = None
     scale: Standardization | None = None
-    centered: bool = False
 
-    def values(self, rows: pd.DataFrame) -> np.ndarray:
+    @property
+    def category(self) -> Category | None:
+        """The category the term codes or is fitted by."""
+        if isinstance(self.term, Category):
+            return self.term
+        return getattr(self.term, "by", None)
+
+    @property
+    def centered(self) -> bool:
+        """A standardized slope by a category is centered at its reference."""
+        return self.scale is not None and self.term.by is not None
+
+    @property
+    def log_penalty(self) -> float | None:
+        """The fixed log penalty; None without one."""
+        return None if self.penalty is None else float(self.term.penalty)
+
+    def values(self, rows: pd.DataFrame, levels: _Levels) -> np.ndarray:
         """The term's columns at ``rows``, shape ``(n_rows, k)``; NaN where a
         value it reads is missing."""
         term = self.term
         n = len(rows)
         if isinstance(term, Category):
-            value = _category_values(rows, term)
-            levels = [level for level in term.levels if level != term.reference]
-            out = np.column_stack([value == level for level in levels]).astype(float)
-            out[pd.isna(value)] = np.nan
+            index = levels.index(term)
+            out = np.column_stack(
+                [index == term.levels.index(level) for level in _coded(term)]
+            ).astype(float)
+            out[index < 0] = np.nan
             return out
         if isinstance(term, LinearFunctional):
             lags = rows[list(term.lag_columns)].to_numpy(dtype=float)
             return lags @ self.basis.design(np.log(np.asarray(term.lags, float)))
-        mask = np.ones(n, dtype=bool) if self.level is None else _in_level(rows, self)
+        mask = (
+            np.ones(n, dtype=bool)
+            if self.level is None
+            else levels.rows(term.by, self.level[1])
+        )
         x = rows[term.column].to_numpy(dtype=float)
         x = np.where(mask, x, 0.0)
         if isinstance(term, Smooth):
@@ -441,7 +448,7 @@ class _Built:
                 x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
             out = x[:, None]
         if self.level is not None:
-            out[pd.isna(rows[term.by.column].to_numpy())] = np.nan
+            out[levels.index(term.by) < 0] = np.nan
         return out
 
     def record(self) -> dict | None:
@@ -459,23 +466,52 @@ class _Built:
         }
 
 
-def _category_values(rows: pd.DataFrame, category: Category) -> np.ndarray:
-    """The category's column, checked to hold only its levels or a missing
-    value (None or NaN: the row is missing)."""
-    value = rows[category.column].to_numpy()
-    unknown = ~(pd.Series(value).isin(category.levels).to_numpy() | pd.isna(value))
+def _coded(category: Category) -> list:
+    """The levels with a column: every level but the reference."""
+    return [level for level in category.levels if level != category.reference]
+
+
+class _Levels:
+    """Each category's level at a set of rows, read and checked once.
+
+    ``index(category)`` is each row's place in ``category.levels``, -1 where
+    the value is missing (None or NaN: the row is missing); any other value
+    outside the levels is an error. ``rows(category, value)`` is the rows of
+    one level.
+    """
+
+    def __init__(self, rows: pd.DataFrame) -> None:
+        self._frame = rows
+        self._index: dict[Category, np.ndarray] = {}
+
+    def index(self, category: Category) -> np.ndarray:
+        """Each row's place in ``category.levels``; -1 for a missing value."""
+        if category not in self._index:
+            self._index[category] = _level_index(self._frame, category)
+        return self._index[category]
+
+    def rows(self, category: Category, value: object) -> np.ndarray:
+        """True for a row whose ``category`` is ``value``."""
+        return self.index(category) == category.levels.index(value)
+
+
+def _level_index(rows: pd.DataFrame, category: Category) -> np.ndarray:
+    """Each row's place in ``category.levels``, shape ``(n_rows,)``: -1 for a
+    missing value (None or NaN); a value outside the levels is an error."""
+    values = rows[category.column]
+    codes, uniques = pd.factorize(values)
+    place = pd.Index(uniques).get_indexer(list(category.levels))
+    lookup = np.full(len(uniques), -2)
+    lookup[place[place >= 0]] = np.flatnonzero(place >= 0)
+    index = np.full(len(codes), -1)
+    index[codes >= 0] = lookup[codes[codes >= 0]]
+    unknown = index == -2
     if unknown.any():
         raise ValueError(
             f"{category.column}: values outside the levels {category.levels}: "
-            f"{sorted(map(str, set(value[unknown])))}"
+            f"{sorted(map(str, set(values.to_numpy()[unknown])))}"
         )
-    return value
-
-
-def _in_level(rows: pd.DataFrame, built: _Built) -> np.ndarray:
-    """The rows in the level a term ``by`` a category is fitted for."""
-    column, level = built.level
-    return _category_values(rows, built.term.by) == level
+    return index
 
 
 def _level_name(term: Smooth | Slope, base: str, level: object) -> str:
@@ -483,65 +519,63 @@ def _level_name(term: Smooth | Slope, base: str, level: object) -> str:
 
 
 def _build_term(
-    term: Term, pooled: pd.DataFrame, scales: dict[str, Standardization | None]
+    term: Term,
+    pooled: pd.DataFrame,
+    scales: dict[str, Standardization | None],
+    levels: _Levels,
 ) -> list[_Built]:
-    """The built pieces of one term (one per level of a ``by``)."""
+    """The built pieces of one term (one per level of a ``by``), their design
+    terms' columns numbered from 0 within the piece."""
     if isinstance(term, Category):
-        _category_values(pooled, term)
-        columns = tuple(
-            DesignColumn(
+        levels.index(term)
+        kinds = tuple(
+            DesignTerm(
                 f"{term.column}[{level}]",
                 term.column,
                 "level",
-                (term.column, level),
-                drops_rows=True,
+                np.array([j]),
+                level=(term.column, level),
             )
-            for level in term.levels
-            if level != term.reference
+            for j, level in enumerate(_coded(term))
         )
-        return [_Built(term.column, term, columns)]
+        return [_Built(term.column, term, kinds)]
     if isinstance(term, LinearFunctional):
         name = f"lf({term.lag_columns[0]}..{term.lag_columns[-1]})"
         basis = PSplineBasis(term.lo, term.hi, term.n_basis)
-        columns = tuple(
-            DesignColumn(f"{name}.{b}", name, None, None) for b in range(term.n_basis)
-        )
-        return [
-            _Built(
-                name,
-                term,
-                columns,
-                basis=basis,
-                penalty=None if term.penalty == "none" else basis.penalty(),
-                log_penalty=None if term.penalty == "none" else float(term.penalty),
-            )
-        ]
-    levels = term.levels if term.by is not None else (None,)
+        kind = DesignTerm(name, name, "lag", np.arange(term.n_basis))
+        penalty = None if term.penalty == "none" else basis.penalty()
+        return [_Built(name, term, (kind,), basis=basis, penalty=penalty)]
+    by_levels = term.levels if term.by is not None else (None,)
     out = []
-    for level in levels:
+    for level in by_levels:
         level_key = None if level is None else (term.by.column, level)
         if isinstance(term, Smooth):
             base = f"s({term.column})"
             name = base if level is None else _level_name(term, base, level)
-            draft = _Built(name, term, (), level_key)
-            x = _pooled_values(pooled, draft, term.column)
+            x = pooled[term.column].to_numpy(dtype=float)
+            if level is not None:
+                x = x[levels.rows(term.by, level)]
+            x = _finite(x, name)
             basis = PSplineBasis(term.lo, term.hi, term.n_basis)
             smooth = basis.constrained(x)
-            columns = tuple(
-                DesignColumn(f"{name}.{b}", name, None, level_key)
-                for b in range(term.n_basis - 1)
+            kind = DesignTerm(
+                name,
+                name,
+                "smooth",
+                np.arange(term.n_basis - 1),
+                level=level_key,
+                covariate=term.column,
             )
             fixed = term.penalty != "none"
             out.append(
                 _Built(
                     name,
                     term,
-                    columns,
+                    (kind,),
                     level_key,
                     basis=basis,
                     constraint=smooth.constraint,
                     penalty=smooth.penalty if fixed else None,
-                    log_penalty=float(term.penalty) if fixed else None,
                 )
             )
         else:
@@ -549,17 +583,20 @@ def _build_term(
                 term.column if level is None else _level_name(term, term.column, level)
             )
             scale = scales[term.column]
-            rule = "binary" if scale is None else "slope"
-            columns = (DesignColumn(name, name, rule, level_key),)
-            centered = scale is not None and term.by is not None
-            out.append(
-                _Built(name, term, columns, level_key, scale=scale, centered=centered)
+            kind = DesignTerm(
+                name,
+                name,
+                "binary" if scale is None else "slope",
+                np.arange(1),
+                level=level_key,
+                covariate=term.column,
             )
+            out.append(_Built(name, term, (kind,), level_key, scale=scale))
     return out
 
 
 def _covariate_scales(
-    terms: Sequence[Term], pooled: pd.DataFrame
+    terms: Sequence[Term], pooled: pd.DataFrame, levels: _Levels
 ) -> dict[str, Standardization | None]:
     """Each slope covariate's one standardization: over the pooled rows of
     every level on which any slope of the covariate reads it."""
@@ -569,7 +606,8 @@ def _covariate_scales(
             continue
         rows = np.ones(len(pooled), dtype=bool)
         if term.by is not None:
-            rows = np.isin(_category_values(pooled, term.by), term.levels)
+            index = levels.index(term.by)
+            rows = np.isin(index, [term.by.levels.index(lv) for lv in term.levels])
         reads[term.column] = reads.get(term.column, np.zeros(len(pooled), bool)) | rows
     return {
         column: standardization(
@@ -591,12 +629,47 @@ def _finite(x: np.ndarray, name: str) -> np.ndarray:
     return x
 
 
-def _pooled_values(pooled: pd.DataFrame, draft: _Built, column: str) -> np.ndarray:
-    """The pooled values a term reads (its level's rows), checked finite."""
-    x = pooled[column].to_numpy(dtype=float)
-    if draft.level is not None:
-        x = x[_in_level(pooled, draft)]
-    return _finite(x, draft.name)
+def _small_terms(X: np.ndarray, terms: Sequence[DesignTerm]) -> dict[str, float]:
+    """The design check on the rows of ``X``: each term of a measured kind
+    whose largest absolute value is above zero and below
+    ``SMALLEST_COLUMN_SIZE``, with that value (a smooth's columns measured
+    together, as one term)."""
+    size = np.max(np.abs(X), axis=0, initial=0.0)
+    out = {}
+    for term in _check_order(terms):
+        largest = float(np.max(size[term.columns], initial=0.0))
+        if 0.0 < largest < SMALLEST_COLUMN_SIZE:
+            out[term.name] = largest
+    return out
+
+
+def _check_order(terms: Sequence[DesignTerm]) -> list[DesignTerm]:
+    """The measured terms, the smooths and lag functionals first."""
+    measured = [t for t in terms if t.kind in _MEASURED]
+    return sorted(measured, key=lambda t: t.kind == "slope")
+
+
+class SessionDesign(NamedTuple):
+    """A design built at a set of rows (:meth:`Design.build`).
+
+    Attributes
+    ----------
+    X : np.ndarray, shape (n_rows, p)
+        NaN where a value read is missing.
+    offset : np.ndarray or None, shape (n_rows,)
+        ``log`` of the exposure (NaN where it is not positive); None without
+        an :class:`Offset`.
+    missing : np.ndarray of bool, shape (n_rows,)
+        True for a row with a missing value the design reads.
+    level_rows : dict of tuple to np.ndarray of bool
+        ``(column, value)`` -> the rows of that level, for every level a
+        design term codes or is fitted for.
+    """
+
+    X: np.ndarray
+    offset: np.ndarray | None
+    missing: np.ndarray
+    level_rows: dict[tuple, np.ndarray]
 
 
 @dataclass(frozen=True)
@@ -605,61 +678,50 @@ class Design:
 
     Attributes
     ----------
-    terms : tuple
-        As given.
-    intercept : bool
-        Column 0 is the intercept.
-    columns : tuple of DesignColumn
+    terms : tuple of DesignTerm
+        One per term as a session's fit judges it, in column order: the
+        intercept, each level of a category, each slope, smooth and lag
+        functional (one per level of a ``by``).
+    coef_names : tuple of str
         One per design column, in order.
     blocks : tuple of PenaltyBlock
         One per term with a fixed penalty, in the order of the terms.
     log_penalties : np.ndarray, shape (n_blocks,)
         Each block's fixed log penalty.
-    block_terms : tuple of str
-        Each block's term name.
     offset : Offset or None
     """
 
-    terms: tuple
-    intercept: bool
-    columns: tuple[DesignColumn, ...]
+    terms: tuple[DesignTerm, ...]
+    coef_names: tuple[str, ...]
     blocks: tuple[PenaltyBlock, ...]
     log_penalties: np.ndarray
-    block_terms: tuple[str, ...]
     offset: Offset | None
     _built: tuple[_Built, ...] = field(repr=False)
 
+    @cached_property
+    def by_name(self) -> dict[str, DesignTerm]:
+        """Term name -> its :class:`DesignTerm`."""
+        return {term.name: term for term in self.terms}
+
+    @cached_property
+    def column_terms(self) -> tuple[DesignTerm, ...]:
+        """Each design column's :class:`DesignTerm`, in column order."""
+        return tuple(term for term in self.terms for _ in term.columns)
+
     @property
-    def coef_names(self) -> list[str]:
-        """The coefficient names, in column order."""
-        return [column.name for column in self.columns]
+    def intercept_column(self) -> int | None:
+        """The intercept's column (0); None without one."""
+        return 0 if self.terms and self.terms[0].kind == "intercept" else None
 
     @property
     def term_columns(self) -> dict[str, np.ndarray]:
-        """Term name -> its column indices, in term order (the intercept is
-        not a term)."""
-        out: dict[str, list[int]] = {}
-        for j, column in enumerate(self.columns):
-            if column.term != INTERCEPT:
-                out.setdefault(column.term, []).append(j)
-        return {name: np.array(index) for name, index in out.items()}
-
-    @property
-    def size_groups(self) -> list[tuple[str, np.ndarray]]:
-        """What the design check measures together: every column of a smooth
-        term (a :class:`Smooth` or :class:`LinearFunctional`) as one group,
-        named by the term; every other column alone, named by its
-        coefficient."""
-        smooth = {b.name for b in self._built if b.basis is not None}
-        groups = [
-            (name, cols) for name, cols in self.term_columns.items() if name in smooth
-        ]
-        groups += [
-            (column.name, np.array([j]))
-            for j, column in enumerate(self.columns)
-            if column.term not in smooth
-        ]
-        return groups
+        """Model term name -> its column indices, in column order (the
+        intercept is not a term)."""
+        out: dict[str, list[np.ndarray]] = {}
+        for term in self.terms:
+            if term.kind != "intercept":
+                out.setdefault(term.term, []).append(term.columns)
+        return {name: np.concatenate(parts) for name, parts in out.items()}
 
     def basis_record(self) -> dict[str, dict]:
         """Term -> its basis (C7 ``basis``), for the terms with a basis."""
@@ -680,46 +742,58 @@ class Design:
 
     def standardization_record(self) -> dict[str, dict]:
         """Covariate -> its standardization (C7 ``standardization``): its SD,
-        ``ddof``, reference and the terms centered at it, one entry per scaled
-        covariate (every term of the covariate shares it)."""
+        ``ddof`` (0), reference and the terms centered at it, one entry per
+        scaled covariate (every term of the covariate shares it)."""
         out: dict[str, dict] = {}
         for b in self._built:
             if b.scale is not None:
                 entry = out.setdefault(
-                    b.term.column, {**b.scale._asdict(), "centered": []}
+                    b.term.column,
+                    {
+                        "sd": b.scale.sd,
+                        "ddof": 0,
+                        "reference": b.scale.reference,
+                        "centered": [],
+                    },
                 )
                 if b.centered:
                     entry["centered"].append(b.name)
         return out
 
-    def _matrix(self, rows: pd.DataFrame) -> tuple[np.ndarray, np.ndarray | None]:
-        """``X`` and the offset, NaN where a value read is missing."""
-        parts = [np.ones((len(rows), 1))] if self.intercept else []
-        parts += [b.values(rows) for b in self._built]
+    def build(self, rows: pd.DataFrame) -> SessionDesign:
+        """The design at ``rows``, missing values included (as NaN).
+
+        Raises
+        ------
+        ValueError
+            If a category holds a value outside its levels.
+        """
+        levels = _Levels(rows)
+        parts = [np.ones((len(rows), 1))] if self.intercept_column is not None else []
+        parts += [b.values(rows, levels) for b in self._built]
         X = np.hstack(parts) if parts else np.empty((len(rows), 0))
+        level_rows = {
+            t.level: levels.rows(b.category, t.level[1])
+            for b in self._built
+            for t in b.design_terms
+            if t.level is not None
+        }
         offset = None
+        missing = ~np.isfinite(X).all(axis=1)
         if self.offset is not None:
             exposure = rows[self.offset.column].to_numpy(dtype=float)
             with np.errstate(divide="ignore", invalid="ignore"):
                 offset = np.where(exposure > 0, np.log(exposure), np.nan)
-        return X, offset
+            missing |= ~np.isfinite(offset)
+        return SessionDesign(X, offset, missing, level_rows)
 
     def missing_rows(self, rows: pd.DataFrame) -> np.ndarray:
         """True for a row with a missing value the design reads, shape
         ``(n_rows,)`` (an exposure that is not positive counts as missing)."""
-        X, offset = self._matrix(rows)
-        missing = ~np.isfinite(X).all(axis=1)
-        if offset is not None:
-            missing |= ~np.isfinite(offset)
-        return missing
-
-    def level_rows(self, rows: pd.DataFrame, level: tuple) -> np.ndarray:
-        """True for a row of ``level`` (``(column, value)`` of a category)."""
-        column, value = level
-        return rows[column].to_numpy() == value
+        return self.build(rows).missing
 
     def session(self, rows: pd.DataFrame) -> tuple[np.ndarray, np.ndarray | None]:
-        """One session's design and offset.
+        """One session's design and offset, at rows without missing values.
 
         Parameters
         ----------
@@ -739,19 +813,31 @@ class Design:
             its levels. A column too small in the session is not refused here
             (:meth:`small_terms`; the support rule makes it inactive).
         """
-        if self.missing_rows(rows).any():
+        built = self.build(rows)
+        if built.missing.any():
             raise ValueError(
-                f"{int(self.missing_rows(rows).sum())} rows with missing values; "
+                f"{int(built.missing.sum())} rows with missing values; "
                 "drop them first (Design.missing_rows)"
             )
-        return self._matrix(rows)
+        return built.X, built.offset
 
     def small_terms(self, X: np.ndarray) -> dict[str, float]:
-        """The design check in one session: each group of :attr:`size_groups`
-        (a smooth term, or one column, named by its coefficient) whose largest
-        absolute value over the rows of ``X`` is above zero and below
-        ``SMALLEST_COLUMN_SIZE``, with that value."""
-        return _small(X, self.size_groups)
+        """The design check in one session: each term (named as
+        :class:`DesignTerm` names it; a smooth's columns measured together)
+        whose largest absolute value over the rows of ``X`` is above zero and
+        below ``SMALLEST_COLUMN_SIZE``, with that value."""
+        return _small_terms(X, self.terms)
+
+
+def _refuse_small(small: dict[str, float]) -> None:
+    """Refuse the terms of the pooled design check, naming each."""
+    if small:
+        named = ", ".join(f"{name} ({size:.2g})" for name, size in small.items())
+        raise ValueError(
+            "columns whose largest absolute value is below SMALLEST_COLUMN_SIZE = "
+            f"{SMALLEST_COLUMN_SIZE:g}: {named}; the fit would end at the "
+            "step limit: rescale them"
+        )
 
 
 def build_design(
@@ -764,8 +850,9 @@ def build_design(
     terms : sequence of terms
         At most one :class:`Offset`.
     pooled_rows : pd.DataFrame
-        Every session's rows of the model and kind, without missing values:
-        the knots' constraints and the standardizations are computed on them.
+        Every session's rows of the model and kind: the knots' constraints
+        and the standardizations are computed on them, and the rows a slope
+        or a smooth reads must be finite there.
     intercept : bool
         Put an intercept in column 0 (not for the grouped softmax, which
         cannot see a column constant within a group).
@@ -773,41 +860,75 @@ def build_design(
     Returns
     -------
     Design
+
+    Raises
+    ------
+    ValueError
+        If a term fails the design check on the pooled rows that are not
+        missing (a units problem), naming it.
     """
     offsets = [term for term in terms if isinstance(term, Offset)]
     if len(offsets) > 1:
         raise ValueError("at most one offset")
-    scales = _covariate_scales(terms, pooled_rows)
+    levels = _Levels(pooled_rows)
+    scales = _covariate_scales(terms, pooled_rows, levels)
     built = [
         piece
         for term in terms
         if not isinstance(term, Offset)
-        for piece in _build_term(term, pooled_rows, scales)
+        for piece in _build_term(term, pooled_rows, scales, levels)
     ]
     names = [b.name for b in built]
     if len(set(names)) != len(names):
         raise ValueError(f"terms repeat: {names}")
-    columns = [DesignColumn(INTERCEPT, INTERCEPT, None, None)] * intercept
-    blocks, log_penalties, block_terms = [], [], []
+    design_terms = []
+    if intercept:
+        design_terms.append(
+            DesignTerm(INTERCEPT, INTERCEPT, "intercept", np.array([0]))
+        )
+    blocks, log_penalties = [], []
+    start = int(intercept)
+    pieces = []
     for b in built:
-        start = len(columns)
-        columns.extend(b.columns)
+        block = None
         if b.penalty is not None:
-            blocks.append(PenaltyBlock(np.arange(start, len(columns)), b.penalty))
+            block = len(blocks)
+            width = sum(t.columns.size for t in b.design_terms)
+            blocks.append(PenaltyBlock(np.arange(start, start + width), b.penalty))
             log_penalties.append(b.log_penalty)
-            block_terms.append(b.name)
+        placed = tuple(
+            replace(t, columns=t.columns + start, block=block) for t in b.design_terms
+        )
+        start += sum(t.columns.size for t in placed)
+        pieces.append(replace(b, design_terms=placed))
+        design_terms.extend(placed)
+    design_terms = [
+        replace(
+            t,
+            dependents=tuple(
+                d.name for d in design_terms if d.kind != "level" and d.level == t.level
+            ),
+        )
+        if t.kind == "level"
+        else t
+        for t in design_terms
+    ]
+    coef_names = [INTERCEPT] * intercept
+    for t in design_terms[int(intercept) :]:
+        if t.kind in ("smooth", "lag"):
+            coef_names += [f"{t.name}.{b}" for b in range(t.columns.size)]
+        else:
+            coef_names.append(t.name)
     design = Design(
-        terms=tuple(terms),
-        intercept=intercept,
-        columns=tuple(columns),
+        terms=tuple(design_terms),
+        coef_names=tuple(coef_names),
         blocks=tuple(blocks),
         log_penalties=np.array(log_penalties, dtype=float),
-        block_terms=tuple(block_terms),
         offset=offsets[0] if offsets else None,
-        _built=tuple(built),
+        _built=tuple(pieces),
     )
     # Measured on the pooled rows that are not missing: one missing value
     # would make a column's largest value NaN and hide the check.
-    X, _ = design._matrix(pooled_rows[~design.missing_rows(pooled_rows)])
-    check_column_sizes(X, design.size_groups)
+    X = design.build(pooled_rows[~design.missing_rows(pooled_rows)]).X
+    _refuse_small(_small_terms(X, design.terms))
     return design

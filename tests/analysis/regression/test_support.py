@@ -88,9 +88,10 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
     rows = next(iter(content_sessions.values())).copy()
     rows = rows[~((rows["role"] == "previous") & (rows["event_id"] >= 4))]
     rows = rows.reset_index(drop=True)
-    X, _ = design.session(rows)
+    built = design.build(rows)
     unit = rows["event_id"].to_numpy()
-    support = design_support(design, rows, X, unit, np.ones(len(rows), dtype=bool))
+    every = np.ones(len(rows), dtype=bool)
+    support = design_support(design, built.X, built.level_rows, unit, every)
     assert list(support) == [
         "role[current]",
         "role[previous]",
@@ -122,7 +123,9 @@ def test_an_inactive_role_drops_its_rows_and_its_terms(content_sessions) -> None
     )
     rows = next(iter(content_sessions.values()))
     keep, dropped, with_them = level_rows_dropped(
-        design, rows, ["role[previous]", "reward_fraction:role=current"]
+        design,
+        design.build(rows).level_rows,
+        ["role[previous]", "reward_fraction:role=current"],
     )
     previous = (rows["role"] == "previous").to_numpy()
     np.testing.assert_array_equal(keep, ~previous)

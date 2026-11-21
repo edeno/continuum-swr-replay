@@ -25,7 +25,8 @@ A column that fails is made inactive in that session. When it is a level of a
 category, the session's rows of that level are dropped from its fit and
 counted, not merged into the reference level (merging inflated the belief
 variance's false positives in simulation, to 20 % in one case), and every term
-by that level leaves the session with them (:func:`level_rows_dropped`). The
+by that level leaves the session with them (:func:`level_rows_dropped`,
+from the level's ``DesignTerm.dependents``). The
 same row rule holds for a level made inactive because the session has no
 finite maximum along it.
 
@@ -40,7 +41,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple, Protocol
 
 import numpy as np
-import pandas as pd
 
 from .constants import MAX_FAILING_SHARE
 from .newton import CONVERGED
@@ -152,33 +152,36 @@ def slope_support(
     )
 
 
+_RULES = {"level": level_support, "binary": binary_support, "slope": slope_support}
+
+
 def design_support(
     design: Design,
-    rows: pd.DataFrame,
     X: np.ndarray,
+    level_rows: Mapping[tuple, np.ndarray],
     unit: np.ndarray,
     has_event: np.ndarray,
 ) -> dict[str, Support]:
-    """Every unpenalized column's support in one session.
+    """Every unpenalized term's support in one session.
 
     Parameters
     ----------
     design : Design
-    rows : pd.DataFrame
-        The session's rows, as :meth:`.terms.Design.session` was given them.
     X : np.ndarray, shape (n_rows, p)
-        Their design.
+        The session's design.
+    level_rows : mapping of tuple to np.ndarray of bool, shape (n_rows,)
+        Each level's rows (:attr:`.terms.SessionDesign.level_rows`).
     unit : np.ndarray, shape (n_rows,)
     has_event : np.ndarray of bool, shape (n_rows,)
 
     Returns
     -------
     dict of str to Support
-        Coefficient name -> its support, for the columns with a support rule
-        (``DesignColumn.support``), in column order; then, for a smooth term
-        that fails the design check in the session
-        (:meth:`.terms.Design.small_terms`), term name -> a failing entry
-        without counts. A column that fails the design check fails, with that
+        Term name -> its support, for the terms with a support rule (a level,
+        a 0/1 slope, a continuous slope), in column order; then, for a smooth
+        or a lag functional that fails the design check in the session
+        (:meth:`.terms.Design.small_terms`), its name -> a failing entry
+        without counts. A slope that fails the design check fails, with that
         reason.
     """
     small = {
@@ -189,61 +192,60 @@ def design_support(
         for name, size in design.small_terms(X).items()
     }
     out = {}
-    for j, column in enumerate(design.columns):
-        if column.support is None:
+    for term in design.terms:
+        if term.kind not in _RULES:
             continue
-        reads = np.ones(len(rows), dtype=bool)
-        if column.level is not None and not column.drops_rows:
-            reads = design.level_rows(rows, column.level)
-        rule = {
-            "level": level_support,
-            "binary": binary_support,
-            "slope": slope_support,
-        }[column.support]
-        counted = rule(X[reads, j], unit[reads], has_event[reads])
-        if column.name in small:
-            counted = counted._replace(passes=False, reason=small.pop(column.name))
-        out[column.name] = counted
-    for name, reason in small.items():  # the smooth terms
+        reads = (
+            np.ones(X.shape[0], dtype=bool)
+            if term.reads is None
+            else level_rows[term.reads]
+        )
+        (j,) = term.columns
+        counted = _RULES[term.kind](X[reads, j], unit[reads], has_event[reads])
+        if term.name in small:
+            counted = counted._replace(passes=False, reason=small.pop(term.name))
+        out[term.name] = counted
+    for name, reason in small.items():  # the smooths and lag functionals
         out[name] = Support(None, None, False, reason)
     return out
 
 
 def level_rows_dropped(
-    design: Design, rows: pd.DataFrame, inactive: Iterable[str]
+    design: Design, level_rows: Mapping[tuple, np.ndarray], inactive: Iterable[str]
 ) -> tuple[np.ndarray, dict[str, int], dict[str, str]]:
     """The row rule for the levels of a category made inactive.
 
     Parameters
     ----------
     design : Design
-    rows : pd.DataFrame
-        The session's rows.
+    level_rows : mapping of tuple to np.ndarray of bool, shape (n_rows,)
+        Each level's rows in the session.
     inactive : iterable of str
-        Coefficient names made inactive; those that are levels of a category
-        (``DesignColumn.drops_rows``) drop their rows.
+        Term names made inactive; those that are levels of a category drop
+        their rows.
 
     Returns
     -------
     keep : np.ndarray of bool, shape (n_rows,)
         The rows kept.
     dropped : dict of str to int
-        Level coefficient name -> its rows dropped.
+        Level name -> its rows dropped.
     with_them : dict of str to str
         Coefficient name -> the level it leaves with, for every column of a
         term by a dropped level (zero on the rows kept).
     """
     inactive = set(inactive)
-    keep = np.ones(len(rows), dtype=bool)
+    n_rows = next(iter(level_rows.values())).size if level_rows else 0
+    keep = np.ones(n_rows, dtype=bool)
     dropped, with_them = {}, {}
-    for column in design.columns:
-        if column.name in inactive and column.drops_rows:
-            level = design.level_rows(rows, column.level)
-            dropped[column.name] = int((level & keep).sum())
+    for term in design.terms:
+        if term.kind == "level" and term.name in inactive:
+            level = level_rows[term.level]
+            dropped[term.name] = int((level & keep).sum())
             keep &= ~level
-            for other in design.columns:
-                if other.level == column.level and not other.drops_rows:
-                    with_them[other.name] = column.name
+            for name in term.dependents:
+                for j in design.by_name[name].columns:
+                    with_them[design.coef_names[j]] = term.name
     return keep, dropped, with_them
 
 
