@@ -447,3 +447,21 @@ def test_a_finite_maximum_far_away_is_a_step_limit_not_a_separation() -> None:
     full = penalized_newton(Poisson(), X, y, np.zeros(400), S, start, max_iter=400)
     assert full.converged
     assert full.beta[1] == pytest.approx(2e3, rel=0.1)
+
+
+def test_a_softmax_design_constant_within_groups_is_not_identified() -> None:
+    """The grouped softmax sees only variation within a group: two columns
+    whose difference is constant within every group (as with a session's
+    role columns that together mark every candidate) cannot be told apart,
+    and the fit is refused as not identified, not left to fail as an
+    information that is not positive definite."""
+    rng = np.random.default_rng(0)
+    groups = np.repeat(np.arange(50), 4)
+    x = rng.normal(size=200)
+    level = np.repeat(rng.normal(size=50), 4)
+    X = np.column_stack([x, x + level])
+    y = rng.dirichlet(np.ones(4), size=50).ravel()
+    fit = penalized_newton(
+        GroupedSoftmax(), X, y, groups, np.zeros((2, 2)), np.zeros(2)
+    )
+    assert fit.status == NOT_IDENTIFIED

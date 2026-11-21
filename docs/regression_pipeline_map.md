@@ -482,7 +482,7 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
 
-`PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `SessionFit`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+`FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `SessionFit`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 

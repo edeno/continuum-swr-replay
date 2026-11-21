@@ -65,6 +65,8 @@ class Likelihood(Protocol):
 
     def check(self, y: np.ndarray, aux: object) -> None: ...
 
+    def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray: ...
+
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float: ...
 
     def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray: ...
@@ -95,6 +97,10 @@ def _weighted_gram(X: np.ndarray, weights: np.ndarray) -> np.ndarray:
 
 class _DiagonalFamily:
     """A family whose information is ``X' diag(w(eta)) X``."""
+
+    def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray:
+        """The design whose column space the likelihood identifies: ``X``."""
+        return X
 
     def _weights(
         self, eta: np.ndarray, aux: object
@@ -288,6 +294,15 @@ class GroupedSoftmax:
                 f"{np.sum(empty)} group(s) whose responses sum to zero: drop them, "
                 "they carry no likelihood"
             )
+
+    def identifying_design(self, X: np.ndarray, aux: np.ndarray) -> np.ndarray:
+        """``X`` less each group's column means, shape ``(n_rows, p)``: the
+        likelihood sees only variation within a group, so a combination of
+        columns constant within every group is not identified."""
+        starts = group_starts(aux)
+        sizes = np.diff(starts, append=X.shape[0])
+        means = np.add.reduceat(X, starts, axis=0) / sizes[:, None]
+        return X - np.repeat(means, sizes, axis=0)
 
     @staticmethod
     def _parts(

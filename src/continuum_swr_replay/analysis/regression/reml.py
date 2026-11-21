@@ -32,14 +32,15 @@ sessions, and one session whose inner fit fails makes the pooled score
 infinite; the score records which session and the fit's status, and every
 error names them. A session may leave out unpenalized columns it cannot
 estimate (``SessionData.active``): its fit is that of its design without them.
-:func:`select_penalties` first sets aside the sessions whose fit fails at a
-reference point (the grid's center), naming them with the fit's status and,
-for a fit with no finite maximum, the columns running away, and raises when
-they are more than ``MAX_FAILING_SHARE`` of the sessions; it then starts from
-the best point of a grid over the others (the score can have two optima) and
-refines it by Newton on ``rho`` with the exact Hessian; :func:`fit_at_penalties`
-fits at given strengths without a search. A search that does not converge
-raises.
+:func:`select_penalties` first sets aside the sessions whose fit has no
+finite maximum at a reference point (the grid's center), naming the columns
+running away (any other failure there raises); it then starts from the best
+point of a grid over the others (the score can have two optima), refines it by
+Newton on ``rho`` with the exact Hessian, and fits the set-aside sessions at
+the chosen penalties, leaving out their unpenalized running-away columns; more
+than ``MAX_FAILING_SHARE`` of the sessions without a fit raises.
+:func:`fit_at_penalties` fits at given strengths without a search. A search
+that does not converge raises.
 """
 
 from __future__ import annotations
@@ -60,6 +61,7 @@ from .constants import (
     MAX_STEP_HALVINGS,
     NULL_SPACE_EDF_TOL,
     PENALTY_ROUNDING_TOL,
+    REFIT_MAX_ROUNDS,
     REML_DECREMENT_TOL,
     REML_EIGEN_FLOOR,
     REML_GRID_CENTER,
@@ -68,7 +70,14 @@ from .constants import (
     REML_MAX_STEPS,
 )
 from .likelihoods import Gaussian, Likelihood
-from .newton import FitStatus, NewtonFit, penalized_newton, running_away_columns
+from .newton import (
+    NO_FINITE_MAXIMUM,
+    NOT_IDENTIFIED,
+    FitStatus,
+    NewtonFit,
+    penalized_newton,
+    running_away_columns,
+)
 from .pspline import penalty_rank
 
 __all__ = [
@@ -359,6 +368,10 @@ class SessionFit:
         columns less the penalty's rank). The search can stop on the score's
         plateau before the bound, so ``PenaltySearch.at_boundary`` misses
         such a term.
+    in_penalty_choice : bool
+        True when the session's score was part of the pooled score that chose
+        the penalties; False for a session set aside before the search and
+        fitted afterwards at the chosen penalties (``PenaltySearch.set_aside``).
     """
 
     fit: NewtonFit
@@ -368,12 +381,18 @@ class SessionFit:
     scale: float
     score: float
     in_null_space: np.ndarray
+    in_penalty_choice: bool = True
 
 
 @dataclass(frozen=True)
 class SetAsideSession:
-    """A session left out of a penalty search: its fit failed at the search's
-    reference point (:func:`select_penalties`).
+    """A session left out of the penalty choice: its fit had no finite maximum
+    at the search's reference point (:func:`select_penalties`).
+
+    After the search it is fitted again at the chosen log penalties; while
+    that fit has no finite maximum along unpenalized design columns only,
+    those columns are made inactive and it is fitted again, at most
+    ``REFIT_MAX_ROUNDS`` times.
 
     Attributes
     ----------
@@ -381,24 +400,44 @@ class SetAsideSession:
         Its place among the sessions given.
     name : str or None
         ``SessionData.name``.
-    fit : NewtonFit
-        Its inner fit at the reference point, as it ended.
+    reference : RemlScore
+        Its score and fit at the reference point.
+    refits : tuple of RemlScore
+        Its fits at the chosen log penalties, in order: as given, then after
+        each round of columns made inactive.
+    left_out : np.ndarray of int, shape (k,)
+        The columns made inactive in its last refit, in the order they were.
+    reason : str
+        How it ended, in words.
     """
 
     index: int
     name: str | None
-    fit: NewtonFit
+    reference: RemlScore
+    refits: tuple[RemlScore, ...]
+    left_out: np.ndarray
+    reason: str
 
     @property
-    def status(self) -> FitStatus:
+    def reference_status(self) -> FitStatus:
         """How its fit at the reference point ended."""
-        return self.fit.status
+        return self.reference.fit.status
+
+    @property
+    def final_status(self) -> FitStatus:
+        """How its last fit at the chosen log penalties ended."""
+        return self.refits[-1].fit.status
+
+    @property
+    def fitted(self) -> bool:
+        """True when its last fit at the chosen log penalties converged."""
+        return self.refits[-1].fit.converged
 
     @property
     def running_away(self) -> np.ndarray:
-        """For a fit with no finite maximum, the columns running away
-        (:func:`.newton.running_away_columns`); empty otherwise."""
-        return self.fit.running_away
+        """The columns running away at the reference point
+        (:func:`.newton.running_away_columns`)."""
+        return self.reference.fit.running_away
 
 
 @dataclass(frozen=True)
@@ -414,12 +453,17 @@ class PenaltySearch:
     ----------
     reference_rho : np.ndarray, shape (m,)
         Where every session was fitted before the search: the sessions whose
-        fit failed there are set aside, and the search runs over the others.
+        fit has no finite maximum there are set aside, and the search runs
+        over the others.
+    in_choice : np.ndarray of int, shape (n_in_choice,)
+        The indices of the sessions whose scores chose the penalties (the
+        pooled score's sessions); two models are compared on the same set.
     set_aside : tuple of SetAsideSession
-        The sessions set aside, in order; at most ``MAX_FAILING_SHARE`` of the
-        sessions given.
-    share_set_aside : float
-        ``len(set_aside)`` over the number of sessions given.
+        The sessions set aside, in order, each with its refits at the chosen
+        penalties.
+    share_without_fit : float
+        The share of the sessions given that end without a fit (set aside and
+        not fitted by their refits); at most ``MAX_FAILING_SHARE``.
     start_rho : np.ndarray, shape (m,)
         Where Newton started: the best grid point, or the given start.
     start_score : float
@@ -439,8 +483,9 @@ class PenaltySearch:
     """
 
     reference_rho: np.ndarray
+    in_choice: np.ndarray
     set_aside: tuple[SetAsideSession, ...]
-    share_set_aside: float
+    share_without_fit: float
     start_rho: np.ndarray
     start_score: float
     n_grid_points: int
@@ -460,15 +505,18 @@ class PooledFit:
         Log penalty strengths (for the Gaussian, on the residual-sum-of-squares
         scale).
     score : float
-        Pooled REML score at ``rho``, over the sessions searched (not those
-        set aside).
+        Pooled REML score at ``rho`` over the sessions in the penalty choice
+        only (``search.in_choice``; every session when the strengths were
+        given), not those set aside: two models' scores are comparable only
+        on the same set.
     gradient : np.ndarray or None, shape (m,)
         Its gradient there; None when the strengths were given.
     sessions : tuple of SessionFit
         One per session given, in order. A session set aside by the search
-        (``search.set_aside``) has NaN coefficients, covariance, edf and
-        score, and ``fit.status`` says how its fit at the reference point
-        ended.
+        (``search.set_aside``) and fitted afterwards has its fit at ``rho``
+        with ``in_penalty_choice`` False (NaN at the columns its refit left
+        out); one not fitted has NaN coefficients, covariance, edf and score,
+        and ``fit.status`` says how its last fit ended.
     search : PenaltySearch or None
         None when the strengths were given (:func:`fit_at_penalties`).
     """
@@ -1146,7 +1194,6 @@ def _search(
     start: np.ndarray,
     n_grid_points: int,
     failures: Counter[tuple[str, str]],
-    screen: tuple[np.ndarray, tuple[SetAsideSession, ...], float],
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
@@ -1203,7 +1250,10 @@ def _search(
     lo, hi = LOG_PENALTY_BOUNDS
     at_boundary = (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
     search = PenaltySearch(
-        *screen,
+        np.full(rho.size, np.nan),  # the screen's fields, set by the caller
+        np.empty(0, dtype=int),
+        (),
+        0.0,
         np.array(start, dtype=float),
         start_score,
         n_grid_points,
@@ -1220,39 +1270,192 @@ def _screen(
     sessions: Sequence[SessionData],
     blocks: Sequence[PenaltyBlock],
     reference: np.ndarray,
-) -> tuple[list[int], tuple[np.ndarray, tuple[SetAsideSession, ...], float]]:
-    """Fit every session at ``reference``; set aside those whose fit fails.
+) -> tuple[list[int], list[tuple[int, RemlScore]]]:
+    """Fit every session at ``reference``.
 
-    Returns the indices of the sessions kept and the screen's record for
-    :class:`PenaltySearch` (the reference, the sessions set aside, their
-    share).
+    Returns the indices of the sessions whose fit converged, and the index and
+    score of each session whose fit has no finite maximum, in order.
 
     Raises
     ------
     ValueError
-        If more than ``MAX_FAILING_SHARE`` of the sessions are set aside; the
-        message names each, its fit's status and the columns running away.
+        If a session's design is not identified (naming its columns that are
+        zero on every row; the remedy is to mark the columns it cannot
+        estimate inactive), its fit fails otherwise (a numerical failure,
+        named with its status), or no session converges.
     """
-    kept, set_aside, failures = [], [], []
+    kept, set_aside = [], []
     for index, data in enumerate(sessions):
         _check_active(data, index, blocks)
         try:
             session = _session_score(lik, data, blocks, reference, data.beta0, False)
         except ValueError as error:
             raise ValueError(f"{_label(data, index)}: {error}") from error
+        status = session.fit.status
         if np.isfinite(session.score):
             kept.append(index)
+        elif status == NO_FINITE_MAXIMUM:
+            set_aside.append((index, session))
+        elif status == NOT_IDENTIFIED:
+            raise ValueError(
+                f"{_label(data, index)}: design not identified at the reference log "
+                f"penalties {reference} ({_zero_columns(lik, data, blocks)}); mark the "
+                "columns the session cannot estimate inactive (SessionData.active)"
+            )
         else:
-            set_aside.append(SetAsideSession(index, data.name, session.fit))
-            failures.append(_failure(data, index, session))
-    share = len(set_aside) / len(sessions)
-    if share > MAX_FAILING_SHARE:
+            raise ValueError(
+                f"{_label(data, index)}: {status} at the reference log penalties "
+                f"{reference} (a numerical failure of the fit, not a lack of support "
+                "in the data)"
+            )
+    if not kept:
         raise ValueError(
-            f"no finite REML score at the reference log penalties {reference} in "
-            f"{len(set_aside)} of {len(sessions)} sessions ({share:.0%}, more than "
-            f"MAX_FAILING_SHARE = {MAX_FAILING_SHARE:.0%}): " + "; ".join(failures)
+            f"no session has a finite maximum at the reference log penalties "
+            f"{reference}: "
+            + "; ".join(_failure(sessions[i], i, score) for i, score in set_aside)
         )
-    return kept, (reference.copy(), tuple(set_aside), share)
+    return kept, set_aside
+
+
+def _zero_columns(
+    lik: Likelihood, data: SessionData, blocks: Sequence[PenaltyBlock]
+) -> str:
+    """The active unpenalized columns the likelihood cannot see (zero on every
+    row; for the grouped softmax, constant within every group), in words: the
+    common cause of a design that is not identified."""
+    free = np.ones(data.X.shape[1], dtype=bool)
+    for block in blocks:
+        free[block.columns] = False
+    if data.active is not None:
+        free &= data.active
+    seen = lik.identifying_design(data.X, data.aux)
+    zero = np.flatnonzero(
+        free & ~np.any(np.abs(seen) > 1e-12 * np.abs(data.X).max(), axis=0)
+    )
+    if zero.size:
+        return (
+            "columns the likelihood cannot see (zero on every row; for the grouped "
+            f"softmax, constant within every group): {zero.tolist()}"
+        )
+    return "no column the likelihood cannot see alone; some columns are collinear"
+
+
+def _refit(
+    lik: Likelihood,
+    data: SessionData,
+    index: int,
+    blocks: Sequence[PenaltyBlock],
+    rho: np.ndarray,
+    reference: RemlScore,
+) -> SetAsideSession:
+    """A set-aside session fitted at the chosen ``rho``.
+
+    Fitted as given first; then, while its fit has no finite maximum along
+    unpenalized design columns only, with those columns made inactive, at most
+    ``REFIT_MAX_ROUNDS`` times (a direction spread over near-collinear columns
+    can name only part of them at a time). A direction through a penalty
+    block (a smooth's own line, or its penalized coordinates) cannot be left
+    out, and the session stays without a fit.
+    """
+    active = (
+        np.ones(data.X.shape[1], dtype=bool)
+        if data.active is None
+        else data.active.copy()
+    )
+    left_out: list[int] = []
+    refits = [_session_score(lik, data, blocks, rho, data.beta0, False)]
+    reason = ""
+    while not refits[-1].fit.converged:
+        last = refits[-1]
+        if last.fit.status != NO_FINITE_MAXIMUM:
+            reason = f"its fit at the chosen log penalties ended as {last.fit.status}"
+            break
+        along = last.running_away_directions
+        if any(d.block is not None for d in along):
+            reason = (
+                "no finite maximum along a penalty block ("
+                + ", ".join(str(d) for d in along)
+                + "), whose columns cannot be made inactive"
+            )
+            break
+        if len(refits) > REFIT_MAX_ROUNDS:
+            reason = (
+                f"no finite maximum after {REFIT_MAX_ROUNDS} rounds of columns "
+                f"made inactive (still running away: {last.fit.running_away.tolist()})"
+            )
+            break
+        new = [int(c) for c in last.fit.running_away if active[c]]
+        active[new] = False
+        left_out.extend(new)
+        refits.append(
+            _session_score(
+                lik, replace(data, active=active.copy()), blocks, rho, data.beta0, False
+            )
+        )
+    if refits[-1].fit.converged:
+        reason = "converged at the chosen log penalties" + (
+            f" with columns {left_out} inactive" if left_out else ""
+        )
+    return SetAsideSession(
+        index,
+        data.name,
+        reference,
+        tuple(refits),
+        np.array(left_out, dtype=int),
+        reason,
+    )
+
+
+def _refit_set_aside(
+    lik: Likelihood,
+    sessions: Sequence[SessionData],
+    blocks: Sequence[PenaltyBlock],
+    rho: np.ndarray,
+    set_aside: Sequence[tuple[int, RemlScore]],
+) -> tuple[tuple[SetAsideSession, ...], float]:
+    """Each set-aside session refitted at ``rho`` (:func:`_refit`), and the
+    share of the sessions given that end without a fit.
+
+    Raises
+    ------
+    ValueError
+        If that share exceeds ``MAX_FAILING_SHARE``; the message names each
+        session without a fit, its statuses and why.
+    """
+    records = tuple(
+        _refit(lik, sessions[i], i, blocks, rho, score) for i, score in set_aside
+    )
+    unfitted = [r for r in records if not r.fitted]
+    share = len(unfitted) / len(sessions)
+    if share > MAX_FAILING_SHARE:
+        detail = "; ".join(
+            f"{_failure(sessions[r.index], r.index, r.reference)} at the reference "
+            f"point, then {r.reason}"
+            for r in unfitted
+        )
+        raise ValueError(
+            f"{len(unfitted)} of {len(sessions)} sessions ({share:.0%}, more than "
+            f"MAX_FAILING_SHARE = {MAX_FAILING_SHARE:.0%}) have no fit at the log "
+            f"penalties {rho}: {detail}"
+        )
+    return records, share
+
+
+def _session_fit(
+    session: RemlScore, blocks: Sequence[PenaltyBlock], in_penalty_choice: bool
+) -> SessionFit:
+    """The :class:`SessionFit` of a converged session score."""
+    null_dim = np.array([b.columns.size - b.rank for b in blocks])
+    return SessionFit(
+        session.fit,
+        session.covariance,
+        session.edf,
+        session.edf_total,
+        session.scale,
+        session.score,
+        session.edf - null_dim <= NULL_SPACE_EDF_TOL,
+        in_penalty_choice,
+    )
 
 
 def _pooled_fit(
@@ -1265,35 +1468,57 @@ def _pooled_fit(
 
     A session's covariance is NaN in the rows and columns of its inactive
     columns; its edf counts the active ones. A session the search set aside
-    is put back in its place with NaN values.
+    is put back in its place: its refit at ``rho`` when that converged
+    (``in_penalty_choice`` False), else NaN values.
     """
-    null_dim = np.array([b.columns.size - b.rank for b in blocks])
-    sessions = [
-        SessionFit(
-            session.fit,
-            session.covariance,
-            session.edf,
-            session.edf_total,
-            session.scale,
-            session.score,
-            session.edf - null_dim <= NULL_SPACE_EDF_TOL,
-        )
-        for session in pooled.sessions
-    ]
+    sessions = [_session_fit(session, blocks, True) for session in pooled.sessions]
     for left_out in () if search is None else search.set_aside:
-        p = left_out.fit.beta.size
-        nan = np.full((p, p), np.nan)
-        placeholder = SessionFit(
-            replace(left_out.fit, beta=np.full(p, np.nan), A=nan),
-            nan,
-            np.full(len(blocks), np.nan),
-            np.nan,
-            np.nan,
-            np.nan,
-            np.zeros(len(blocks), dtype=bool),
-        )
-        sessions.insert(left_out.index, placeholder)
+        last = left_out.refits[-1]
+        if left_out.fitted:
+            entry = _session_fit(last, blocks, False)
+        else:
+            p = last.fit.beta.size
+            nan = np.full((p, p), np.nan)
+            entry = SessionFit(
+                replace(last.fit, beta=np.full(p, np.nan), A=nan),
+                nan,
+                np.full(len(blocks), np.nan),
+                np.nan,
+                np.nan,
+                np.nan,
+                np.zeros(len(blocks), dtype=bool),
+                False,
+            )
+        sessions.insert(left_out.index, entry)
     return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
+
+
+def _screened_search(
+    lik: Likelihood,
+    sessions: Sequence[SessionData],
+    blocks: Sequence[PenaltyBlock],
+    reference: np.ndarray,
+    start: np.ndarray | None,
+) -> PooledFit:
+    """Screen at ``reference``, search over the sessions kept (from the grid
+    when ``start`` is None), refit the sessions set aside at the chosen
+    penalties."""
+    kept, set_aside = _screen(lik, sessions, blocks, reference)
+    evaluate = _Evaluator(lik, [sessions[i] for i in kept], kept, blocks)
+    if start is None:
+        start, n_points, failures = _grid_start(evaluate, len(blocks))
+    else:
+        n_points, failures = 0, Counter()
+    rho, pooled, search = _search(evaluate, start, n_points, failures)
+    records, share = _refit_set_aside(lik, sessions, blocks, rho, set_aside)
+    search = replace(
+        search,
+        reference_rho=reference.copy(),
+        in_choice=np.array(kept, dtype=int),
+        set_aside=records,
+        share_without_fit=share,
+    )
+    return _pooled_fit(rho, pooled, blocks, search)
 
 
 def refine_penalties(
@@ -1312,14 +1537,10 @@ def refine_penalties(
     Raises
     ------
     ValueError
-        If more than ``MAX_FAILING_SHARE`` of the sessions fail at ``rho0``,
-        or the search does not converge.
+        As :func:`select_penalties`, with ``rho0`` the reference point.
     """
     rho0 = np.asarray(rho0, dtype=float)
-    kept, screen = _screen(lik, sessions, blocks, rho0)
-    evaluate = _Evaluator(lik, [sessions[i] for i in kept], kept, blocks)
-    rho, pooled, search = _search(evaluate, rho0, 0, Counter(), screen)
-    return _pooled_fit(rho, pooled, blocks, search)
+    return _screened_search(lik, sessions, blocks, rho0, rho0)
 
 
 def select_penalties(
@@ -1330,14 +1551,19 @@ def select_penalties(
     """One penalty strength per block, shared by the sessions, by pooled REML.
 
     First every session is fitted at the reference point, every log penalty
-    at ``REML_GRID_CENTER``: a session whose fit fails there (its unpenalized
-    columns separate the outcome, so that no penalty gives it a finite
-    maximum, or its design is not identified) is set aside, with its index,
-    name, status and the columns running away (``PenaltySearch.set_aside``).
-    The search then runs over the other sessions, the same ones throughout,
-    so that its objective does not change as it goes. More than
-    ``MAX_FAILING_SHARE`` of the sessions set aside is an error. A session
-    kept that fails at another point makes that point's score infinite.
+    at ``REML_GRID_CENTER``. A session whose fit has no finite maximum there
+    (its unpenalized columns, or a smooth's unpenalized line, separate the
+    outcome: no penalty gives it one) is set aside; a session whose design is
+    not identified, or whose fit fails for a numerical reason, is an error.
+    The search runs over the other sessions, the same ones throughout, so
+    that its objective does not change as it goes (``PenaltySearch.in_choice``);
+    a session kept that fails at another point makes that point's score
+    infinite. After the search each set-aside session is fitted at the chosen
+    log penalties (its penalty does not depend on its own data), with the
+    columns running away made inactive while they are all unpenalized design
+    columns, at most ``REFIT_MAX_ROUNDS`` times (``PenaltySearch.set_aside``
+    records every step). More than ``MAX_FAILING_SHARE`` of the sessions
+    without a fit at the end is an error.
 
     The grid start (one term: every integer of the bounds; two or three: the
     product of ``REML_GRID_POINTS``; more: one-term integer grids, two passes
@@ -1353,24 +1579,23 @@ def select_penalties(
     Returns
     -------
     PooledFit
-        One entry per session given; a session set aside has NaN values.
+        One entry per session given; a set-aside session has its refit (with
+        ``in_penalty_choice`` False), or NaN values when it has no fit. The
+        score is over ``search.in_choice`` only.
 
     Raises
     ------
     ValueError
-        If there is no block, more than ``MAX_FAILING_SHARE`` of the sessions
-        fail at the reference point, no grid point gives a finite pooled
-        score over the sessions kept, or the search does not converge (no
-        fallback: the model is not fitted).
+        If there is no block; a session's design is not identified or its fit
+        fails numerically at the reference point; no session converges there;
+        no grid point gives a finite pooled score over the sessions kept; the
+        search does not converge; or more than ``MAX_FAILING_SHARE`` of the
+        sessions end without a fit (no fallback: the model is not fitted).
     """
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")
     reference = np.full(len(blocks), REML_GRID_CENTER)
-    kept, screen = _screen(lik, sessions, blocks, reference)
-    evaluate = _Evaluator(lik, [sessions[i] for i in kept], kept, blocks)
-    start, n_points, failures = _grid_start(evaluate, len(blocks))
-    rho, pooled, search = _search(evaluate, start, n_points, failures, screen)
-    return _pooled_fit(rho, pooled, blocks, search)
+    return _screened_search(lik, sessions, blocks, reference, None)
 
 
 def fit_at_penalties(

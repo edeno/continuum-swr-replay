@@ -21,6 +21,8 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.newton import (
+    CONVERGED,
+    HALVING_FAILED,
     NO_FINITE_MAXIMUM,
     NOT_IDENTIFIED,
     STEP_LIMIT,
@@ -198,8 +200,55 @@ def test_no_finite_score_raises() -> None:
     """A column the data cannot identify fails every inner fit: no fallback."""
     lik, data, blocks = _session("poisson", 1, seed=4)
     X = np.column_stack([data.X, np.zeros(data.X.shape[0])])
-    with pytest.raises(ValueError, match="no finite REML score"):
+    with pytest.raises(ValueError, match="design not identified.*cannot see"):
         select_penalties(lik, [SessionData(X, data.y, data.aux)], blocks)
+
+
+def test_a_session_whose_design_is_not_identified_raises() -> None:
+    """Ten sessions, one with a 0/1 column that is zero on every row (a term
+    the session has no support for): the search does not set it aside but
+    raises, naming the session, the column and the remedy."""
+    rng = np.random.default_rng(0)
+    basis = PSplineBasis(0.0, 4.0, 10)
+    sessions = []
+    for seed in range(10):
+        x = rng.uniform(0.0, 4.0, 600)
+        B = basis.design(x)
+        Z = sum_to_zero_constraint(B)
+        reward = (rng.uniform(size=600) < 0.5).astype(float) * (seed != 3)
+        X = np.column_stack([np.ones(600), reward, B @ Z])
+        y = rng.poisson(np.exp(-1.0 + np.sin(x) + 0.3 * reward)).astype(float)
+        sessions.append(SessionData(X, y, np.zeros(600), name=f"s{seed}"))
+    blocks = [PenaltyBlock(np.arange(2, 11), Z.T @ basis.penalty() @ Z)]
+    message = (
+        r"session 3 \(s3\): design not identified .*cannot see .*: "
+        r"\[1\]\).*inactive \(SessionData.active\)"
+    )
+    with pytest.raises(ValueError, match=message):
+        select_penalties(Poisson(), sessions, blocks)
+
+
+def test_a_numerical_failure_at_the_reference_point_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A session whose fit at the reference point ends as "step halving
+    failed" (a numerical failure, not a lack of support) is not set aside:
+    the search raises, naming it, though it is one session of ten."""
+    sessions = []
+    for seed in range(10):
+        lik, data, blocks = _session("poisson", 1, seed=4 + seed)
+        sessions.append(data)
+    sessions[1] = replace(sessions[1], name="peanut_02")
+    newton_fit = reml.penalized_newton
+
+    def fails_for_one(*args, **kwargs):
+        fit = newton_fit(*args, **kwargs)
+        mine = args[2] is sessions[1].y
+        return replace(fit, status=HALVING_FAILED) if mine else fit
+
+    monkeypatch.setattr(reml, "penalized_newton", fails_for_one)
+    with pytest.raises(ValueError, match=r"session 1 \(peanut_02\): step halving"):
+        select_penalties(lik, sessions, blocks)
 
 
 def test_pooled_score_is_the_sum_and_a_failed_session_is_infinite() -> None:
@@ -577,7 +626,7 @@ def test_a_failing_session_is_named() -> None:
     assert pooled.failed_session == 1
     assert pooled.failed_status == NOT_IDENTIFIED
     message = r"session 1 \(j16_20210710_02\).*design not identified"
-    with pytest.raises(ValueError, match=r"1 of 2 sessions.*" + message):
+    with pytest.raises(ValueError, match=message + r".*cannot see .*: \[7\]"):
         select_penalties(lik, [first, broken], blocks)
     with pytest.raises(ValueError, match=message):
         refine_penalties(lik, [first, broken], blocks, [0.0])
@@ -763,7 +812,7 @@ def test_no_penalty_fit_at_penalties() -> None:
 
 
 def _content_session(
-    seed: int, n_events: int = 140, n_arms: int = 6
+    seed: int, n_events: int = 140, n_arms: int = 6, by_the_clock: bool = False
 ) -> tuple[SessionData, list[PenaltyBlock]]:
     """A grouped-softmax session of the content model's shape.
 
@@ -772,6 +821,8 @@ def _content_session(
     sum-to-zero constraint) with a linear truth of slope -1.2, so the fit at
     a strong penalty has null-space coefficients of several units, and two
     unpenalized 0/1 role columns (the first row of each event; one other row).
+    ``by_the_clock``: each event's response is on its row of smallest clock,
+    which the smooth's unpenalized line separates.
     """
     rng = np.random.default_rng(seed)
     n_rows = n_events * n_arms
@@ -789,6 +840,9 @@ def _content_session(
     p = weight / weight.sum(axis=1, keepdims=True)
     y = np.zeros((n_events, n_arms))
     y[np.arange(n_events), [rng.choice(n_arms, p=row) for row in p]] = 1.0
+    if by_the_clock:
+        y = np.zeros((n_events, n_arms))
+        y[np.arange(n_events), np.argmin(x.reshape(n_events, n_arms), axis=1)] = 1.0
     groups = np.repeat(np.arange(n_events), n_arms)
     blocks = [PenaltyBlock(np.arange(9), Z.T @ basis.penalty() @ Z)]
     return SessionData(X, y.ravel(), groups), blocks
@@ -898,9 +952,10 @@ def _with_arm_columns(
 def test_separated_sessions_are_set_aside_before_the_search() -> None:
     """One of ten sessions has no finite maximum (an arm column with a role
     column separates): it fails at the reference point (every log penalty at
-    the grid center) and is set aside, named, with its status and the columns
-    running away; the search over the other nine is the search without it.
-    Three of ten (30 %, above ``MAX_FAILING_SHARE``) is an error naming each."""
+    the grid center) and is set aside, so the penalty choice is the one made
+    without it. After the search it is fitted at the chosen penalties with
+    its running-away columns inactive: its fit is that of the session with
+    those columns inactive, flagged as not in the penalty choice."""
     sessions = []
     for seed in range(10):
         data, blocks = _content_session(seed)
@@ -916,45 +971,99 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
 
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
     (left_out,) = result.search.set_aside
-    assert (left_out.index, left_out.name, left_out.status) == (
-        4,
-        "s4",
-        NO_FINITE_MAXIMUM,
-    )
+    assert (left_out.index, left_out.name) == (4, "s4")
+    assert left_out.reference_status == NO_FINITE_MAXIMUM
     assert sorted(left_out.running_away.tolist()) == [arm, role]
-    assert result.search.share_set_aside == pytest.approx(0.1)
+    assert [r.fit.status for r in left_out.refits] == [NO_FINITE_MAXIMUM, CONVERGED]
+    assert sorted(left_out.left_out.tolist()) == [arm, role]
+    assert left_out.fitted and "inactive" in left_out.reason
     np.testing.assert_array_equal(result.search.reference_rho, [6.0])
-    assert len(result.sessions) == 10
-    assert np.all(np.isnan(result.sessions[4].fit.beta))
-    assert np.isnan(result.sessions[4].edf[0])
-    assert result.sessions[4].fit.status == NO_FINITE_MAXIMUM
+    np.testing.assert_array_equal(result.search.in_choice, [0, 1, 2, 3, 5, 6, 7, 8, 9])
+    assert result.search.share_without_fit == 0.0
 
     without = select_penalties(GroupedSoftmax(), sessions[:4] + sessions[5:], blocks)
     np.testing.assert_array_equal(result.rho, without.rho)
     assert result.score == without.score
-    assert without.search.set_aside == ()
     for kept, alone in zip(
         result.sessions[:4] + result.sessions[5:], without.sessions, strict=True
     ):
+        assert kept.in_penalty_choice
         np.testing.assert_array_equal(kept.fit.beta, alone.fit.beta)
 
-    # Leaving the running-away columns out of the session gives it a fit.
+    refitted = result.sessions[4]
+    assert not refitted.in_penalty_choice
     active = np.ones(sessions[4].X.shape[1], dtype=bool)
-    active[left_out.running_away] = False
-    repaired = replace(sessions[4], active=active)
-    assert np.isfinite(pooled_reml(GroupedSoftmax(), [repaired], blocks, [6.0]).score)
+    active[[arm, role]] = False
+    direct = fit_at_penalties(
+        GroupedSoftmax(), [replace(sessions[4], active=active)], blocks, result.rho
+    ).sessions[0]
+    np.testing.assert_array_equal(refitted.fit.beta, direct.fit.beta)
+    np.testing.assert_array_equal(refitted.edf, direct.edf)
+    assert np.all(np.isnan(refitted.fit.beta[[arm, role]]))
 
-    many = [
-        _with_arm_columns(_content_session(seed)[0], seed, separated=seed in (1, 4, 7))
-        for seed in range(10)
-    ]
+
+def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
+    """A content session whose responses are each event's row of smallest
+    clock is separated by the smooth's own line, which cannot be made
+    inactive: it is set aside, refitted at the chosen penalties without
+    success, and left without a fit, named, with the reason in words. Three
+    of ten such sessions (30 %, above ``MAX_FAILING_SHARE``) is an error
+    naming each."""
+    sessions = []
+    for seed in range(10):
+        data, blocks = _content_session(seed, by_the_clock=seed == 6)
+        sessions.append(replace(data, name=f"s{seed}"))
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+    (left_out,) = result.search.set_aside
+    assert left_out.index == 6 and not left_out.fitted
+    assert left_out.final_status == NO_FINITE_MAXIMUM
+    assert left_out.left_out.size == 0
+    assert "block 0's null space" in left_out.reason
+    assert result.search.share_without_fit == pytest.approx(0.1)
+    assert np.all(np.isnan(result.sessions[6].fit.beta))
+    assert not result.sessions[6].in_penalty_choice
+
+    many = []
+    for seed in range(10):
+        data, _ = _content_session(seed, by_the_clock=seed in (1, 4, 7))
+        many.append(replace(data, name=f"s{seed}"))
     message = (
-        r"3 of 10 sessions \(30%, more than MAX_FAILING_SHARE = 20%\): "
-        r"session 1 \(s1\): no finite maximum \(columns running away: \[1[12], "
-        r"1[12]\]; along [^)]*\); session 4 \(s4\).*; session 7 \(s7\)"
+        r"3 of 10 sessions \(30%, more than MAX_FAILING_SHARE = 20%\) have no fit"
+        r".*session 1 \(s1\): no finite maximum.*block 0's null space.*"
+        r"session 4 \(s4\).*session 7 \(s7\)"
     )
     with pytest.raises(ValueError, match=message):
         select_penalties(GroupedSoftmax(), many, blocks)
+
+
+def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
+    """Ten near-copies of a 0/1 column (each the indicator times a little
+    noise), all of whose rows have y = 1 in one session: the first fit names
+    only part of the separating direction, and the refit leaves out the
+    columns named, round after round, until the session has a fit."""
+    rng = np.random.default_rng(0)
+    basis = PSplineBasis(0.0, 4.0, 10)
+    sessions = []
+    for seed in range(6):
+        x = rng.uniform(0.0, 4.0, 600)
+        B = basis.design(x)
+        Z = sum_to_zero_constraint(B)
+        indicator = (rng.uniform(size=600) < 0.2).astype(float)
+        copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
+        X = np.column_stack([np.ones(600), B @ Z, *copies])
+        y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
+        if seed == 2:
+            y[indicator == 1] = 1.0
+        sessions.append(SessionData(X, y, name=f"s{seed}"))
+    blocks = [PenaltyBlock(np.arange(1, 10), Z.T @ basis.penalty() @ Z)]
+    with np.errstate(over="ignore"):
+        result = select_penalties(Bernoulli(), sessions, blocks)
+    (left_out,) = result.search.set_aside
+    assert left_out.index == 2 and left_out.fitted
+    assert len(left_out.refits) > 2  # more than one round
+    assert set(left_out.left_out.tolist()) <= set(range(10, 20))
+    assert len(set(left_out.left_out.tolist())) == left_out.left_out.size
+    assert result.search.share_without_fit == 0.0
 
 
 def _two_smooth_session(seed: int) -> tuple[SessionData, list[PenaltyBlock]]:
@@ -1038,6 +1147,8 @@ def test_a_stack_with_inactive_columns_is_the_stack_without_them() -> None:
     (left_out,) = reference.search.set_aside
     assert left_out.index == 2
     assert sorted(left_out.running_away.tolist()) == [arm, role]
+    assert left_out.fitted
+    assert sorted(left_out.left_out.tolist()) == [arm, role]
 
     active = np.ones(animals[2].X.shape[1], dtype=bool)
     active[[arm, role]] = False

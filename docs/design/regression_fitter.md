@@ -103,14 +103,35 @@ one a step and the others by about the square root of the decrement; on the simu
 content model's separated sessions the columns named moved it by 1.0 and every other by
 less than 5e-4. A separation that combines columns (an arm column at -19.6 with a role
 column, each with part of the response on its rows, which a rule on one column at a time
-cannot see) names each of them. Error texts name them too
-(`session 4 (s4): no finite maximum (columns running away: [11, 12])`), so that a caller
-can mark them inactive in that session (`SessionData.active`); the fit leaves nothing
-regularized to hide the separation. The list can hold a smooth's columns: its penalty
-leaves the straight line free, and a line can take part in a separation (on the
-simulated model with a reward-fraction smooth, 3 of the 7 sessions set aside name some
-of its columns). Those columns may not be inactive; the caller decides what to leave
-out among the unpenalized columns named with them.
+cannot see) names each of them. The list can name only part of a direction spread over
+near-collinear columns (of ten noisy copies of a 0/1 column, the first fit named 7, the
+refit 3). The REML fit also gives the direction in the coordinates the penalty
+leaves free or penalizes (`RemlScore.running_away_directions`, `FreeDirection`): an
+unpenalized design column, a block's null space (for a P-spline, its straight line) or
+a block's penalized direction. Error texts give both
+(`session 4 (s4): no finite maximum (columns running away: [11, 12]; along column 11,
+column 12)`; a separation by a smooth's own line reads `... along block 0's null space
+(direction 0), column 0`). Nothing is regularized to hide a separation.
+
+A separation can also end at the step limit: a 0/1 outcome that is a step in `x`,
+beside a P-spline of `x`, is separated by the smooth's unpenalized line; every Newton
+step is cut to the cap of 10, the progress stays linear, the decrement stays near 0.3
+and the fit ran out of its 100 steps as "step limit reached", with no columns named. A
+fit that reaches the step limit is "no finite maximum" when each of its last 10 steps
+(`NO_MAXIMUM_CAPPED_STEPS`) was cut to the cap and lowered the objective while the full
+Newton step's movement of the linear predictor did not shrink: along a direction
+without a maximum the curvature vanishes and the full step grows (from 17 to 211 on
+that example), while toward a finite maximum, however far in a column's units, the full
+step shrinks (a Poisson slope of 2,000 on a column of units 1e-3 stays "step limit
+reached" at 40 steps and converges at 400).
+
+**What the likelihood identifies.** The design check uses the design the likelihood
+sees (`Likelihood.identifying_design`): `X` for the Poisson, Bernoulli and Gaussian;
+for the grouped softmax, `X` less each group's mean, since a combination of columns
+constant within every group (a session's role columns that together mark every
+candidate) cancels in each group. Checked on `X` itself, such a design passed and its fit
+ended as "information not positive definite" (one of 242 simulated content sessions);
+it is now "design not identified".
 
 ## How the penalties are chosen
 
@@ -162,9 +183,9 @@ refused.
 A stacked design, one `SessionData` per animal holding its sessions' rows with a set of
 columns per session (zero on the other sessions' rows), is a session like any other: a
 separated per-session column gives the whole animal no finite maximum, the animal is set
-aside (below) with that session's columns named as running away, and marking them
-inactive gives the fit, score, derivatives, covariance and edf of the stack built without
-them (`test_a_stack_with_inactive_columns_is_the_stack_without_them`, five animals of
+aside (below) with that session's columns named as running away and refitted with them
+inactive, and marking them inactive gives the fit, score, derivatives, covariance and
+edf of the stack built without them (`test_a_stack_with_inactive_columns_is_the_stack_without_them`, five animals of
 three sessions). The mask already did this at ef98019d; what was missing was the names of
 the columns, and the whole five-animal search raised.
 
@@ -207,29 +228,50 @@ penalty 5 on, the search raised at ef98019d (the score's rounding at strong pena
 above, made it rise where it falls, by 3e-4 from 14 to 16, and inner fits failed from
 17); it now ends at the bound, the edf 1.000 in every session.
 
-**Sessions that fail are set aside before the search.** A session whose unpenalized
-columns separate the outcome has no finite maximum at any penalty (the penalty does not
-touch those columns), and one such session made every pooled score infinite, so the
-whole model raised. Before the grid, `select_penalties` fits every session at one
-reference point, every log strength at the grid's center (6: a fixed point, the same for
-every model and data set, where the penalty identifies the smooth without dominating
-it; `refine_penalties` uses its start). A session whose fit fails there is set aside
-(`PenaltySearch.set_aside`: its index, name, the fit's status and the columns running
-away; `share_set_aside`), and the search runs over the other sessions, the same ones
-from the grid's first point to the last step, so that the objective it minimizes does
-not change as it goes. `PooledFit.sessions` keeps one entry per session given, in
-order; a set-aside session's has NaN coefficients, covariance, edf and score, and its
-`fit.status` says why. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for
-reporting a model) of the sessions are set aside the search raises, naming each with
-its status and its running-away columns. A session that passes the reference point but
-fails at another point makes that point's score infinite, as before. On the simulated
-content model the 242 sessions of the M0 and M1 models without SWR set aside 4 sessions
-each (1.7 %, all "no finite maximum") and select log penalties 2.57 and 2.95; at
-ef98019d both raised. With two smooths (recency and reward fraction, M3) the search
-without SWR sets aside 7 sessions (2.9 %) and returns `[5.30, 19.38]`, the second term
-in its null space in every session; with SWR it sets aside 2 (one "information not
-positive definite") and returns `[19.70, 20]`, both terms lines. At ef98019d both raised,
-before and after the study's own screening.
+**Sessions without a finite maximum are set aside before the search.** A session whose
+unpenalized columns, or a smooth's unpenalized line, separate the outcome has no finite
+maximum at any penalty (the penalty does not touch those coordinates), and one such
+session made every pooled score infinite, so the whole model raised. Before the grid,
+`select_penalties` fits every session at one reference point, every log strength at the
+grid's center (6: a fixed point, the same for every model and data set, where the
+penalty identifies the smooth without dominating it; `refine_penalties` uses its
+start).
+
+- A session whose fit converges there takes part in the penalty choice
+  (`PenaltySearch.in_choice`); the search runs over these sessions only, the same ones
+  from the grid's first point to the last step, so that the objective it minimizes does
+  not change as it goes. A session that passes the reference point but fails at another
+  point makes that point's score infinite.
+- A session whose fit has no finite maximum there is set aside (`PenaltySearch.set_aside`).
+- A session whose design is not identified is an error that names the session and the
+  columns the likelihood cannot see, with the remedy: mark the columns the session
+  cannot estimate inactive (`SessionData.active`). It is the caller's design, not the
+  data's lack of a maximum.
+- A session whose fit fails otherwise ("step halving failed", "step limit reached",
+  "information not positive definite") is an error naming it: a numerical failure is not
+  a property of the data to be reported around.
+
+After the search, each set-aside session is fitted at the chosen log strengths (a
+session's penalty does not depend on its own data). While that fit has no finite
+maximum along unpenalized design columns only, those columns are made inactive and the
+session is fitted again, at most `REFIT_MAX_ROUNDS` (5) times. A direction through a
+penalty block (a smooth's own line, or its penalized coordinates) cannot be left out,
+and the session stays without a fit; so does one that still has no finite maximum
+after the rounds, or whose refit fails otherwise. Each set-aside session's record keeps
+its fit at the reference point, every refit, the columns left out, and the reason in
+words (`SetAsideSession`). `PooledFit.sessions` keeps one entry per session given, in
+order: a set-aside session that was fitted has its fit, with `in_penalty_choice` False
+(it did not take part in choosing the penalties) and NaN at the columns left out; one
+without a fit has NaN coefficients, covariance, edf and score. `PooledFit.score` is the
+pooled score over `search.in_choice` only, so two models' scores are compared only on
+the same set. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for reporting
+a model) of the sessions end without a fit (`PenaltySearch.share_without_fit`), the
+search raises, naming each with its statuses and the reason.
+
+In exact arithmetic the first refit, before any column is left out, cannot succeed:
+the direction of a session without a finite maximum lies in the coordinates the
+penalty leaves free, whatever its strength. It is kept as a check, and on the
+reproductions it never succeeded; the sessions fitted were fitted with columns left out.
 
 There is no fallback: if no grid point gives a finite score over the sessions kept,
 `select_penalties` raises, naming the sessions that failed and why, and the model is not

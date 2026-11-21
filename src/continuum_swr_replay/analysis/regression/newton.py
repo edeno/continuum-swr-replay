@@ -306,7 +306,10 @@ def penalized_newton(
     F, loglik = objective(beta)
     capped_and_fell: list[bool] = []
     eta_steps: list[float] = []
-    if not _identified(X, _free_columns(S) if free_basis is None else free_basis):
+    identifying = lik.identifying_design(X, aux)
+    if not _identified(
+        identifying, _free_columns(S) if free_basis is None else free_basis
+    ):
         nan = np.full((beta.size, beta.size), np.nan)
         return NewtonFit(beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik)
     for n_iter in range(max_iter + 1):
