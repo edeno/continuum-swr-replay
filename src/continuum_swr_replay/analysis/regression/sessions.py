@@ -26,10 +26,10 @@ session, in order:
    inactive. At the session's first fit a design not identified, or a
    numerical failure, is an error that names the session; in a refit, a
    direction through a penalty block or any other status leaves the session
-   without a fit, with the reason in words. A fit with no finite maximum along
-   a direction that includes the intercept (the reference level's rows, or the
-   baseline's, hold no event) leaves nothing out and drops nothing: the session
-   is not fitted, with that reason.
+   without a fit, with the reason in words. When the refit ends because its
+   fit has no finite maximum along the intercept
+   (:data:`.reml.ALONG_THE_INTERCEPT`), nothing is dropped or left out: the
+   session gets the not-fitted record with that reason.
 4. The collinearity of each term is measured at the fit
    (:func:`.collinearity.term_collinearity`), and the record is built.
 
@@ -54,7 +54,13 @@ from .collinearity import term_collinearity
 from .likelihoods import Bernoulli, Gaussian, GroupedSoftmax, Likelihood, Poisson
 from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
 from .record import FitRecord
-from .reml import PenaltyBlock, RemlScore, SessionData, SessionRefit, refit_session
+from .reml import (
+    ALONG_THE_INTERCEPT,
+    PenaltyBlock,
+    RemlScore,
+    SessionData,
+    refit_session,
+)
 from .support import design_support, level_rows_dropped
 from .terms import INTERCEPT, Design
 
@@ -291,14 +297,14 @@ def fit_session(
             )
             raise ValueError(f"session {name}: at its first fit {what}")
         first = False
-        if design.intercept and _along_the_intercept(refit):
+        if refit.reason == ALONG_THE_INTERCEPT:
             return _not_fitted(
                 design,
                 lik,
                 rows,
                 unit,
                 counts,
-                ALONG_THE_INTERCEPT,
+                refit.reason,
                 support=recorded_support(),
                 left_out=left_out,
                 **identity,
@@ -413,20 +419,6 @@ def _named(
         else:
             names.append(f"{block_terms[direction.block]} ({direction})")
     return ", ".join(dict.fromkeys(names))
-
-
-#: Why a session whose fit has no finite maximum along the intercept is not
-#: fitted: leaving the intercept out would fit another model.
-ALONG_THE_INTERCEPT = (
-    "no finite maximum along the intercept: the rows of the reference level, or "
-    "of the baseline, hold no event of the kind"
-)
-
-
-def _along_the_intercept(refit: SessionRefit) -> bool:
-    """True when a fit of the refit had no finite maximum along a direction
-    that includes the intercept (column 0)."""
-    return any(0 in score.fit.running_away for score in refit.refits)
 
 
 def _columns_of(design: Design, name: str) -> list[str]:

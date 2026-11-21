@@ -256,12 +256,10 @@ start).
   a property of the data to be reported around.
 
 After the search, each set-aside session is fitted at the chosen log strengths (a
-session's penalty does not depend on its own data). While that fit has no finite
-maximum along unpenalized design columns only, those columns are made inactive and the
-session is fitted again, at most `REFIT_MAX_ROUNDS` (5) times. A direction through a
-penalty block (a smooth's own line, or its penalized coordinates) cannot be left out,
-and the session stays without a fit; so does one that still has no finite maximum
-after the rounds, or whose refit fails otherwise. Each set-aside session's record keeps
+session's penalty does not depend on its own data), by the refit rule of
+`refit_session` (section "Sessions without a finite maximum" below): columns running away
+are made inactive and the session fitted again, and a session whose direction cannot be
+left out (a penalty block's, or the intercept's) stays without a fit. Each set-aside session's record keeps
 its fit at the reference point, every refit, the columns left out, and the reason in
 words (`SetAsideSession`). `PooledFit.sessions` keeps one entry per session given, in
 order (each session's `RemlScore`): a set-aside session that was fitted has its fit,
@@ -530,17 +528,20 @@ maximum along unpenalized design columns only, it makes the columns running away
 inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds. It records the round in
 which each column was left out. A direction through a penalty block (a smooth's own line,
 or its penalized coordinates) cannot be left out, and the session stays without a fit;
-so does a fit that ends with any other status. The penalty search's refit of a session it
-set aside calls this function, and so does the per-session loop, so the rule is in one
-place.
+so does a fit that ends with any other status, and one still without a finite maximum
+after the rounds. The intercept is never made inactive: a session fitted without it is a
+fit of another model. When the columns running away include the intercept (the rows of
+the reference level, or of the baseline, hold no event of the kind), no column is made
+inactive and the session stays without a fit, with the reason "no finite maximum along
+the intercept" (`ALONG_THE_INTERCEPT`). The intercept is found from the data: a design
+column with the same nonzero value on every row. A grouped-softmax design has none (such
+a column is constant within every group, which the fitter refuses as not identified).
 
-A direction that includes the intercept is different: leaving the intercept out would fit
-another model. When a session's fit in the per-session loop has no finite maximum along
-such a direction (the rows of the reference level, or of the baseline, hold no event of
-the kind), nothing is dropped and no column is made inactive: the session is not fitted,
-its record gives that reason, and the loop goes on. (`refit_session` itself does not know
-which column is the intercept; in the penalty search's path a set-aside session whose
-intercept runs away is still refitted without it.)
+The penalty search's refit of a session it set aside calls this function, and so does the
+per-session loop, so the rule is in one place. In the search such a session counts among
+the sessions without a fit (`PenaltySearch.share_without_fit` and the
+`MAX_FAILING_SHARE` gate). In the per-session loop, nothing is dropped for it: it gets
+the not-fitted record with that reason, and the loop goes on.
 
 Such a session is reported with those terms missing (the lead, sixteenth round of the
 design). It is not left out of a summary, because leaving it out would depend on the
