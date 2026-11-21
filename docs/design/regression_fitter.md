@@ -560,8 +560,12 @@ placed by its start) belongs to a trial segment: from a departure from a well to
 next departure, so the run to a well and the whole stay there are one segment. Its class
 is the destination well. A segment longer than `MAX_SEGMENT_S = 30` s is cut into equal
 pieces, so that a long stay is spread over the folds; the pieces of one segment can fall
-in different folds, so one long stay, or one event whose rows cross a cut, can span two
-folds. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
+in different folds, so one long stay can span two folds. The cap is a number of rows: 30 s
+at the median spacing of the rows. A piece of evenly spaced bins is therefore at most 30 s,
+and a piece of events, which are not evenly spaced, can span more or less time. The rows'
+times must be strictly increasing, one row per bin or per event: a model with several rows
+per event (one per candidate arm) makes the folds on the events and gives each event's
+rows its fold. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
 shuffling, the class a row's segment's and the group its piece. Every row of a piece is
 in one fold, and each class is spread over the folds as evenly as whole pieces allow.
 The folds do not depend on a seed.

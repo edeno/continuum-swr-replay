@@ -154,3 +154,29 @@ def test_a_long_stay_and_an_event_across_its_cut_span_two_folds() -> None:
     cut = time[stay][np.flatnonzero(np.diff(group[stay]))]
     crossing = [c for c in cut if np.unique(folds[np.abs(time - c) < 1.0]).size == 2]
     assert crossing
+
+
+def test_row_times_must_be_strictly_increasing() -> None:
+    """Event by arm rows share their event's time: the folds are made on one
+    row per event, and the caller maps them to the event's arm rows."""
+    time, starts, classes = _trials([10.0] * 8, [0, 1] * 4)
+    events = np.sort(np.random.default_rng(0).uniform(0.0, 80.0, 60))
+    fo.trial_folds(events, starts, classes)
+    for rows in (np.repeat(events, 9), events[::-1]):
+        with pytest.raises(ValueError, match="one row per event or per bin"):
+            fo.trial_folds(rows, starts, classes)
+        with pytest.raises(ValueError, match="one row per event or per bin"):
+            fo.capped_groups(rows, fo.trial_segments(rows, starts))
+
+
+def test_the_cap_is_a_number_of_rows_at_the_median_spacing() -> None:
+    """Rows 1 s apart then 3 s apart: the median spacing is 1 s, so a piece is
+    30 rows, which spans 29 s where the rows are 1 s apart and 87 s where
+    they are 3 s apart."""
+    time = np.r_[np.arange(0.0, 100.0), 100.0 + 3.0 * np.arange(1, 41)]
+    segment = np.zeros(time.size, dtype=np.int64)
+    group = fo.capped_groups(time, segment)
+    sizes = np.bincount(group)
+    assert sizes.max() <= 30
+    spans = [np.ptp(time[group == g]) for g in np.unique(group)]
+    assert max(spans) > 30.0
