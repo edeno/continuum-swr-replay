@@ -283,12 +283,7 @@ def penalized_newton(
     _check_inputs(lik, X, y, aux, S, beta0)
     beta = np.array(beta0, dtype=float)
     cap = np.inf if lik.quadratic else max_step
-
-    def objective(b: np.ndarray) -> tuple[float, float]:
-        loglik = lik.loglik(X @ b, y, aux)
-        return -loglik + 0.5 * b @ S @ b, loglik
-
-    F, loglik = objective(beta)
+    F, loglik = _objective(lik, X, y, aux, S, beta)
     capped_and_fell: list[bool] = []
     eta_steps: list[float] = []
     identifying = lik.identifying_design(X, aux)
@@ -298,27 +293,12 @@ def penalized_newton(
         nan = np.full((beta.size, beta.size), np.nan)
         return NewtonFit(beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik)
     for n_iter in range(max_iter + 1):
-        eta = X @ beta
-        g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
-        A = lik.information(X, eta, y, aux) + S
-        try:
-            factor = scipy.linalg.cho_factor(A, lower=True)
-        except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
+        A, step, decrement = _newton_system(lik, X, y, aux, S, beta)
+        if step is None:
             return NewtonFit(beta, A, NOT_POSITIVE_DEFINITE, np.nan, n_iter, loglik)
-        step = scipy.linalg.cho_solve(factor, g)
-        decrement = 0.5 * float(g @ step)
         if decrement < NEWTON_DECREMENT_TOL:
             if not lik.quadratic and _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
-                return NewtonFit(
-                    beta,
-                    A,
-                    NO_FINITE_MAXIMUM,
-                    decrement,
-                    n_iter,
-                    loglik,
-                    step,
-                    running_away_columns(X, step),
-                )
+                return _no_finite_maximum(X, beta, A, decrement, n_iter, loglik, step)
             return _last_step(
                 lik,
                 X,
@@ -326,6 +306,7 @@ def penalized_newton(
                 aux,
                 S,
                 NewtonFit(beta, A, CONVERGED, decrement, n_iter, loglik),
+                F,
                 step,
             )
         eta_steps.append(_eta_step(X, step))
@@ -335,7 +316,7 @@ def penalized_newton(
         capped = scale < 1.0
         for _ in range(MAX_STEP_HALVINGS):
             candidate = beta + scale * step
-            F_new, loglik_new = objective(candidate)
+            F_new, loglik_new = _objective(lik, X, y, aux, S, candidate)
             if np.isfinite(F_new) and F_new <= F:
                 break
             scale *= 0.5
@@ -344,17 +325,69 @@ def penalized_newton(
         capped_and_fell.append(capped and F_new < F)
         beta, F, loglik = candidate, F_new, loglik_new
     if not lik.quadratic and _runs_away_at_the_cap(capped_and_fell, eta_steps):
-        return NewtonFit(
-            beta,
-            A,
-            NO_FINITE_MAXIMUM,
-            decrement,
-            n_iter,
-            loglik,
-            step,
-            running_away_columns(X, step),
-        )
+        return _no_finite_maximum(X, beta, A, decrement, n_iter, loglik, step)
     return NewtonFit(beta, A, STEP_LIMIT, decrement, n_iter, loglik)
+
+
+def _objective(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    S: np.ndarray,
+    beta: np.ndarray,
+) -> tuple[float, float]:
+    """``F(beta) = -l(beta) + beta' S beta / 2``, and ``l(beta)``."""
+    loglik = lik.loglik(X @ beta, y, aux)
+    return -loglik + 0.5 * beta @ S @ beta, loglik
+
+
+def _newton_system(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    S: np.ndarray,
+    beta: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray | None, float]:
+    """``A = H + S`` at ``beta``, the Newton step ``A^-1 g`` and the decrement
+    ``g' A^-1 g / 2``, with ``g`` the gradient of ``-F``.
+
+    The step is None and the decrement NaN when ``A`` is not positive
+    definite or not finite (its Cholesky factorization fails).
+    """
+    eta = X @ beta
+    g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
+    A = lik.information(X, eta, y, aux) + S
+    try:
+        factor = scipy.linalg.cho_factor(A, lower=True)
+    except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
+        return A, None, np.nan
+    step = scipy.linalg.cho_solve(factor, g)
+    return A, step, 0.5 * float(g @ step)
+
+
+def _no_finite_maximum(
+    X: np.ndarray,
+    beta: np.ndarray,
+    A: np.ndarray,
+    decrement: float,
+    n_iter: int,
+    loglik: float,
+    step: np.ndarray,
+) -> NewtonFit:
+    """A fit with no finite maximum, with its last step and the columns
+    running away along it."""
+    return NewtonFit(
+        beta,
+        A,
+        NO_FINITE_MAXIMUM,
+        decrement,
+        n_iter,
+        loglik,
+        step,
+        running_away_columns(X, step),
+    )
 
 
 def _runs_away_at_the_cap(capped_and_fell: list[bool], eta_steps: list[float]) -> bool:
@@ -382,33 +415,26 @@ def _last_step(
     aux: object,
     S: np.ndarray,
     fit: NewtonFit,
+    F: float,
     step: np.ndarray,
 ) -> NewtonFit:
-    """The converged ``fit`` moved by its full Newton ``step``, when that is safe.
+    """The converged ``fit``, whose objective is ``F``, moved by its full
+    Newton ``step``, when that is safe.
 
     The step is taken when ``F`` does not rise by more than its rounding,
     ``8 eps max(1, |F|)``, and it lands where ``A`` is positive definite and
     the decrement is below ``NEWTON_DECREMENT_TOL``; otherwise ``fit`` (whose
-    decrement is below it) is returned unchanged. A gain below the rounding of ``F`` is still
-    taken: without it a coefficient would stay off by up to
+    decrement is below it) is returned unchanged. A gain below the rounding of
+    ``F`` is still taken: without it a coefficient would stay off by up to
     ``sqrt(2 eps |F| / lambda_min)``, about 1e-7 on a fit with ``F`` near 400,
     which the REML score inherits through ``log|A|``.
     """
     beta = fit.beta + step
-    eta = X @ beta
-    loglik = lik.loglik(eta, y, aux)
-    F_old = -fit.loglik + 0.5 * fit.beta @ S @ fit.beta
-    F_new = -loglik + 0.5 * beta @ S @ beta
-    rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(F_old))
-    if not (np.isfinite(F_new) and F_new <= F_old + rounding):
+    F_new, loglik = _objective(lik, X, y, aux, S, beta)
+    rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(F))
+    if not (np.isfinite(F_new) and F_new <= F + rounding):
         return fit
-    g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
-    A = lik.information(X, eta, y, aux) + S
-    try:
-        factor = scipy.linalg.cho_factor(A, lower=True)
-    except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
-        return fit
-    decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
-    if not decrement < NEWTON_DECREMENT_TOL:
+    A, new_step, decrement = _newton_system(lik, X, y, aux, S, beta)
+    if new_step is None or not decrement < NEWTON_DECREMENT_TOL:
         return fit
     return NewtonFit(beta, A, CONVERGED, decrement, fit.n_iter + 1, loglik)

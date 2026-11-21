@@ -363,7 +363,8 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
     decrement = 0.5 * float(g @ np.linalg.solve(A, g))
     fit = NewtonFit(beta, A, CONVERGED, decrement, 3, lik.loglik(eta, y, offset))
 
-    moved = newton._last_step(lik, X, y, offset, S, fit, np.array([to + 0.5]))
+    F = -fit.loglik  # no penalty
+    moved = newton._last_step(lik, X, y, offset, S, fit, F, np.array([to + 0.5]))
 
     assert moved is fit
 
