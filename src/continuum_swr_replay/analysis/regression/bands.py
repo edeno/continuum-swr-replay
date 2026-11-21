@@ -109,6 +109,25 @@ class Band(NamedTuple):
     seed: int
 
 
+def _psd_root(matrix: np.ndarray) -> np.ndarray:
+    """``R`` with ``R R' = matrix`` for a symmetric positive-semidefinite matrix.
+
+    ``U sqrt(lambda)`` from the eigen-decomposition; a negative eigenvalue (a
+    rounding error) is clipped to zero.
+
+    Parameters
+    ----------
+    matrix : np.ndarray, shape (n, n)
+        Symmetric.
+
+    Returns
+    -------
+    np.ndarray, shape (n, n)
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    return eigenvectors * np.sqrt(np.clip(eigenvalues, 0.0, None))
+
+
 def simultaneous_band(
     curve_matrix: np.ndarray,
     beta: np.ndarray,
@@ -150,9 +169,8 @@ def simultaneous_band(
     if not (np.isfinite(beta_used).all() and np.isfinite(V).all()):
         raise ValueError("the curve uses a coefficient left out of the fit")
     C = C[:, used]
-    eigenvalues, eigenvectors = np.linalg.eigh((V + V.T) / 2)
-    # C z with z = U sqrt(lambda) e, e standard normal: draws of N(0, C V C').
-    root = C @ (eigenvectors * np.sqrt(np.clip(eigenvalues, 0.0, None)))
+    # C z with z = R e, R R' = V and e standard normal: draws of N(0, C V C').
+    root = C @ _psd_root((V + V.T) / 2)
     se = np.sqrt(np.einsum("gr,gr->g", root, root))
     if not (se > 0).all():
         raise ValueError("the curve's standard error is zero at a grid point")
@@ -182,7 +200,7 @@ def _animal_pivot_quantile(
     Parameters
     ----------
     correlation : np.ndarray, shape (n_points, n_points)
-        The grid correlation; negative eigenvalues are clipped to zero.
+        The grid correlation (:func:`_psd_root`).
     n_animals : int
         ``A``.
     rng : np.random.Generator
@@ -191,16 +209,11 @@ def _animal_pivot_quantile(
     -------
     float
     """
-    eigenvalues, eigenvectors = np.linalg.eigh(correlation)
-    root = eigenvectors * np.sqrt(np.clip(eigenvalues, 0.0, None))
-    maxima = []
-    for start in range(0, PIVOT_DRAWS, 1000):
-        n = min(1000, PIVOT_DRAWS - start)
-        curves = rng.standard_normal((n, n_animals, root.shape[1])) @ root.T
-        mean = curves.mean(axis=1)
-        se = curves.std(axis=1, ddof=1) / np.sqrt(n_animals)
-        maxima.append(np.max(np.abs(mean) / se, axis=1))
-    return float(np.quantile(np.concatenate(maxima), BAND_LEVEL))
+    root = _psd_root(correlation)
+    curves = rng.standard_normal((PIVOT_DRAWS, n_animals, root.shape[1])) @ root.T
+    mean = curves.mean(axis=1)
+    se = curves.std(axis=1, ddof=1) / np.sqrt(n_animals)
+    return float(np.quantile(np.max(np.abs(mean) / se, axis=1), BAND_LEVEL))
 
 
 def across_session_band(
