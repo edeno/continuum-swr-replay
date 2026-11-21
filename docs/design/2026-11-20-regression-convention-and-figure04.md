@@ -195,7 +195,7 @@ events, and for the difference between the kinds.
 | Q4 | Does content follow an arm's reward history or value? | content | not answerable with pooled slopes; ask by arm role |
 | Q5 | Does content follow how long an arm has gone unvisited, and does uncertainty add to that? | content | recency strong; uncertainty beyond recency not supported |
 | Q6 | Does content relate to where the animal goes next? | content, choice | null once behavior is in the model; next arm equals previous arm in over 80 % of events |
-| Q7 | How do rate and content change as the animal gets ready to leave? | rate, content | strong first look; needs the model |
+| Q7 | How do rate and content change as the animal gets ready to leave the well, and before a small movement at the well? | rate, content | strong first look; needs the model |
 
 "SWR" and "No SWR" mean non-local events that overlap an SWR or overlap none, as in Figures 2 and 3. Each
 comparison between the kinds states whether event length is held fixed ("direct") or not ("total"); both are
@@ -205,14 +205,21 @@ reported.
 
 ### 4.1 Data
 
-- One cohort for every behavior model: well-anchored stops and the at-well events in them, as the canonical
-  tables define them. The ripple-power model joins this cohort.
-- The whole stop is modeled, not its first 4 s. Each time bin carries two clocks: time since the stop began
-  and time until the stop ends.
-- At-risk time for event starts excludes time inside an ongoing event, as now. The end of the stop is
-  handled by the model's second clock, not by cutting time (**call**; the alternative is to remove the last
-  median event duration of each stop from the at-risk time. The prototype used the second clock; it absorbed
-  the censoring.)
+- **The unit is the well visit** (lead, 2026-11-20, after the exploration of section 2.7): from the animal's
+  arrival at a well to its last nose-poke out. The immobile stretches of a visit are joined across the small
+  movements between them. Time after the last nose-poke out is run time and is not analyzed (lead: "if the
+  animal has poked out then we count it as part of the run time and don't analyze them"); an event counts
+  when it lies wholly inside the visit. The ripple-power model joins this cohort.
+- At-risk time for event starts is the immobile time of the visit, less time inside an ongoing event, as
+  now. Time in a small movement is not at risk.
+- Each time bin carries three clocks (lead): time since arrival at the well; time until the animal leaves
+  (the last nose-poke out); and time until the next movement of any size. The third is "to try": SWR starts
+  fall before every movement, small or large (section 2.7), and it is kept only if the collinearity rule of
+  section 4.7 lets it be told apart from the second.
+- The whole visit is modeled, not the first 4 s of a stop.
+- The stop table gains what the visit needs: a visit identifier, the visit's arrival and last nose-poke out,
+  and each stretch's kind of end (a small movement or the animal leaving). This is a rebuild of the canonical
+  tables as one set.
 - A row with a missing value is never dropped inside a fitter. The cohort step drops it and counts it, per
   kind.
 
@@ -233,8 +240,13 @@ reported.
 - The content response is each event's share over its candidate arms, one unit of weight per event, as the
   shipped fits use (lead, 2026-09-05: fractions stay shipped). The count response and the
   Dirichlet-multinomial are robustness estimators on the same design.
-- The candidate set is one set for every content question (**open**, decision 1 of section 9; the
-  prototypes used the six leaf arms). Arm fixed effects stay in every content model, per kind.
+- The candidate set is all nine arms, for every content question (lead, 2026-11-20: "so that we can better
+  describe the activity"). The trunk arms are their own role, with no reward, value or visit covariates, and
+  every event stays in the cohort. Arm fixed effects stay in every content model, per kind. (The prototypes
+  used the six leaf arms; the nine-arm design goes through the same simulations before it is used.)
+- Uncertainty has three measures, declared before the fit and each tested once with recency in the model
+  (lead, 2026-11-20): the belief variance as now; how variable an arm's rewards were; and how many times the
+  animal has sampled the arm.
 - One standardization: a covariate that is reported per standard deviation is scaled once by a pooled
   standard deviation computed on the cohort, with one stated definition (**call**: population form,
   ddof = 0), stored with the fit.
@@ -290,13 +302,13 @@ reported.
 
   | Question | Scalar estimand |
   |---|---|
-  | Q1 | rate 2 to 4 s after arrival over rate in the first second |
+  | Q1 | rate 2 to 4 s after arrival at the well over rate in the first second |
   | Q2 | rate ratio for a rewarded against an omitted last outcome |
   | Q3 | share on the current arm over the share on another leaf arm; the same for the previous arm |
   | Q4 | slope of the current arm's share on its reward fraction; slope of another arm's share on its value |
   | Q5 | share of an arm 20 trials since its last visit over one 3 trials since; slope on uncertainty with recency in the model |
   | Q6 | share on the next arm over the share on another arm that is neither current nor previous |
-  | Q7 | rate in the last 0.25 s before the animal leaves over rate 1 to 2 s before; the same for the current-arm share |
+  | Q7 | rate in the last 0.25 s before the last nose-poke out over rate 1 to 2 s before; the same for the current-arm share |
 
   That is ten estimands, each for two kinds and their difference: 30 tests.
 - A curve is shown with a band that is valid for the whole curve, from draws of the fitted coefficients. The
@@ -310,6 +322,30 @@ reported.
 - Every stored fit carries the same record: penalty strengths, effective degrees of freedom per term, the
   convergence measure, the support of each term, and the basis.
 - Each statistic lives in `analysis/` and the figure calls the function the summary reads, as now.
+
+### 4.7 Collinearity
+
+The lead (2026-11-20): "we should also be concerned about collinearity in this model and all the models".
+
+- Every model's design is measured before its coefficients are read, and the measure is stored with the fit:
+  for a term with one column, how well the other terms predict it (the variance inflation factor); for a
+  smooth term, the same idea for its whole curve (concurvity, as mgcv reports it).
+- The measure is taken on the quantity the likelihood sees: within the event for the content models, on
+  at-risk time for the rate models.
+- A threshold is set once for every family (**call**: a term is "separable" when the other terms explain
+  less than 80 % of it, a variance inflation of 5). A term over it is not reported by itself: it is reported
+  together with the term it cannot be told from (as recency and uncertainty are today), or one of the two
+  leaves the model by a rule written before the fit.
+- A penalty steadies a fit but adds no information. A pair of terms the design cannot separate stays
+  inseparable under any penalty, so the rule above applies with or without one.
+- Each model is also checked on simulated data laid over its real design: an effect is planted on one term,
+  and the fit must not report it on another.
+- Measured for the three clocks on the real at-risk time (a diagnostic; visits from position, 45,005 of
+  them): time since arrival is nearly independent of the other two (they predict 6 % of it). Time until the
+  animal leaves and time until the next movement predict about half of each other (43 % and 51 %), because
+  61 % of at-risk time is in a visit's last immobile stretch, where the two are equal. They can still be
+  told apart: of the at-risk time within 0.5 s of a movement, about half is before a small movement and
+  half before the animal leaves.
 
 ## 5. The shared fitter
 
@@ -378,15 +414,15 @@ values are in the summary.
 
 | Family (section 2.6) | Proposed (**call**) |
 |---|---|
-| Per-bin rate ladder | replaced by the two-clock model (stage 1.1) |
+| Per-bin rate ladder | replaced by the visit model with its clocks (stage 1.1) |
 | Per-stop rate ladder | kept, fit by the shared fitter, as the "total" reward effect per second of stop, if decision 3 asks for it |
 | SWR-contrast rate ladder | its kind contrast becomes part of the two-clock model; its other covariates on rate (prediction error, value, entropy, switch rate) are in none of the seven questions: lead decides |
 | Uncertainty rate model | in none of the seven questions: lead decides |
 | Event-history models (duration-aware, ridge cross-validated) | kept; moved to the shared fitter after Figure 4, since they already use at-risk time and a penalty |
-| Older all-bins cross-history model | nothing reports it and the two above supersede it: lead decides |
+| Older all-bins cross-history model | deleted in the first commit of the build (lead: "ok delete"); nothing reports it |
 | Content ladders (arm, patch, contrast, leaf) | replaced by the model with slopes by role (stage 1.2) |
 | Dirichlet-multinomial content | kept as the robustness estimator on the new design |
-| Within-arm comparison of uncertainty, recency, value | its question is now Q5 in the content model: lead decides |
+| Within-arm comparison of uncertainty, recency, value | deleted when the content model's Q5 values replace its values (lead: "ok delete") |
 | Choice | moved (stage 1.3) |
 | Stay or leave | 7 % of its fits converge now; refit on the convention, then lead decides whether it stays in the paper |
 | Ripple power per event | moved, onto the shared cohort (stage 1.3) |
@@ -401,7 +437,7 @@ starting point for the figure's own design pass after stage 1.
 |---|---|---|
 | a | An example stop: events of both kinds against the two clocks | orientation |
 | b | Rate against time since arrival, each kind | Q1 |
-| c | Rate against time until the animal leaves, each kind | Q7 |
+| c | Rate against time until the animal leaves, and against time until a small movement, each kind | Q7 |
 | d | Effect of the last outcome on the rate, each kind and the difference | Q2 |
 | e | Content share on the current arm, the previous arm and other arms, each kind | Q3 |
 | f | Current-arm share against time until the animal leaves, each kind | Q7 |
@@ -409,7 +445,13 @@ starting point for the figure's own design pass after stage 1.
 | h | Slopes by arm role for reward history and value, each kind | Q4 |
 | i | Content and the next choice | Q6 |
 
-## 9. Open decisions for the lead
+## 9. Decisions
+
+Settled by the lead on 2026-11-20 (the rounds below record the words): the nine-arm candidate set; the well
+visit as the unit, ending at the last nose-poke out, with three clocks; both forms of the reward effect; every
+remaining family moved to the convention, and two deleted; the mPFC models in this work; absolute recency;
+reward history asked by models A and D; two more measures of uncertainty. Nothing in this list is open now.
+The questions as first put:
 
 A second reader checked this document as a builder would (2026-11-20). Its questions that only the lead can
 answer are 1 to 5; 6 was open before.
