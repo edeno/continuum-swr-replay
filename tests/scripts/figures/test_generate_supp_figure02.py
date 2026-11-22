@@ -162,7 +162,7 @@ def test_panel_b_draws_the_timing_table():
         image.get_array(), 100 * _timing()["share"].to_numpy().reshape(3, 3)
     )
     texts = {t.get_text(): t for t in ax.texts}
-    assert texts["70%"].get_position() == pytest.approx((1, 1 - 0.13))
+    assert texts["70%"].get_position() == pytest.approx((1, 1 + figure.SHARE_DROP))
     assert texts["15%"].get_position()[0] == 2  # start together, end later
     assert "69\u201371" in texts
     assert texts["70%"].get_color() == "white"
@@ -170,6 +170,32 @@ def test_panel_b_draws_the_timing_table():
     assert [t.get_text() for t in ax.get_yticklabels()] == list(figure.TIMING_LABELS)
     assert ax.get_ylabel() == "Event starts,\nvs SWR start"
     assert ax.get_xlabel() == "Event ends, vs SWR end"
+    plt.close(fig)
+
+
+def test_panel_b_names_the_four_corner_cells():
+    """The corner cells, where the event and its SWR overlap but neither
+    bound is together, are named in small text at the top of each cell: start
+    and end earlier, the event leads; start earlier and end later, it
+    contains the SWR; start later and end earlier, it is inside the SWR;
+    start and end later, it lags. The middle row and column have no name."""
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[1]
+    named = {
+        t.get_text(): t.get_position()
+        for t in ax.texts
+        if t.get_text() in figure.TIMING_CORNERS.values()
+    }
+    assert named == {
+        "event leads": pytest.approx((0, figure.CORNER_DROP)),
+        "contains SWR": pytest.approx((2, figure.CORNER_DROP)),
+        "inside SWR": pytest.approx((0, 2 + figure.CORNER_DROP)),
+        "event lags": pytest.approx((2, 2 + figure.CORNER_DROP)),
+    }
+    assert figure.CORNER_DROP < figure.SHARE_DROP < figure.RANGE_DROP
+    for t in ax.texts:
+        if t.get_text() in named:
+            assert t.get_fontsize() >= 6
     plt.close(fig)
 
 

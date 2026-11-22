@@ -35,7 +35,11 @@ outside SWRs away from the SWRs.
         of the pairs in it, pooled over every pair as Figure 2c and d pool,
         with the lowest and highest animal's share under it in small type
         (``event_statistics.boundary_timing_statistics``; the events summary's
-        ``timing_*`` values).
+        ``timing_*`` values). The four corner cells are named, as the event
+        and its SWR overlap there with neither bound together: start and end
+        earlier, the event leads; start earlier and end later, it contains the
+        SWR; start later and end earlier, it is inside the SWR; start and end
+        later, it lags.
 
     c and d — Support Figure 2h, the events driven by several tetrodes. Each
     tetrode is left out of the decoder in turn: the other tetrodes' estimate
@@ -228,6 +232,19 @@ TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
 TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
 """Panel b's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
+TIMING_CORNERS = {
+    ("earlier", "earlier"): "event leads",
+    ("earlier", "later"): "contains SWR",
+    ("later", "earlier"): "inside SWR",
+    ("later", "later"): "event lags",
+}
+"""Panel b's names of its corner cells, by (start, end) class: the event and its
+SWR overlap there, and neither bound is within 25 ms of the SWR's."""
+CORNER_DROP = -0.3
+SHARE_DROP = 0.0
+RANGE_DROP = 0.28
+"""Where a cell's corner name, share and animals' range sit, from its center
+(cell heights, down)."""
 TIMING_CMAP = "bone_r"
 """Panel b's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
@@ -403,8 +420,8 @@ def read_no_spike_trace() -> dict:
 def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
     """Panel b: the share of SWR-overlapping events in each combination of
     start (rows) and end (columns) against the matched SWR's, as a heat map
-    with the percent in each cell and the animals' range (in percent) under
-    it, in black
+    with the percent in each cell, the animals' range (in percent) under it
+    and the corner cells' names (:data:`TIMING_CORNERS`) above it, in black
     or white, whichever reads against the cell (``timing``: :func:`read_inputs`'
     ``timing``)."""
     n = len(TIMING_CLASSES)
@@ -414,12 +431,18 @@ def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
     for (row, column), cell in zip(np.ndindex(n, n), timing.itertuples(), strict=True):
         red, green, blue, _ = cmap(cell.share)
         color = "white" if 0.299 * red + 0.587 * green + 0.114 * blue < 0.5 else "black"
+        if cell.Index in TIMING_CORNERS:
+            ax.text(
+                column, row + CORNER_DROP, TIMING_CORNERS[cell.Index],
+                ha="center", va="center", fontsize=SMALL_SIZE, color=color,
+                style="italic",
+            )  # fmt: skip
         ax.text(
-            column, row - 0.13, f"{100 * cell.share:.0f}%", ha="center",
+            column, row + SHARE_DROP, f"{100 * cell.share:.0f}%", ha="center",
             va="center", fontsize=SMALL_SIZE, color=color,
         )  # fmt: skip
         ax.text(
-            column, row + 0.2,
+            column, row + RANGE_DROP,
             f"{100 * cell.animal_min:.0f}\u2013{100 * cell.animal_max:.0f}",
             ha="center", va="center", fontsize=SMALL_SIZE, color=color,
         )  # fmt: skip
