@@ -6,6 +6,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+from pathlib import Path  # noqa: E402
+
 import matplotlib.collections  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -45,27 +47,50 @@ def _parts() -> pd.DataFrame:
     return pd.concat(tables).set_index(["subset", "threshold_s", "family", "measure"])
 
 
+NO_SPIKE_TIME = np.linspace(-0.15, 0.15, 151)
+
+
+def _no_spike_trace() -> dict:
+    """MUA at 1 z before the start, falling to -1 z after it."""
+    median = np.where(NO_SPIKE_TIME < 0, 1.0, -1.0)
+    return {
+        "time": NO_SPIKE_TIME,
+        "q25": median - 0.5,
+        "median": median,
+        "q75": median + 0.5,
+        "level": 0.2,
+        "periods": pd.Series({"a": 3, "b": 2}),
+        "median_duration": 0.018,
+    }
+
+
 def _statistics() -> dict:
     return {
         "tetrode": _gain_statistics([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7]),
         "outside": _outside_rows(),
         "parts": _parts(),
+        "no_spike": _no_spike_trace(),
     }
 
 
-def test_the_figure_draws_four_panels_in_one_row():
+def test_the_figure_draws_five_panels_in_order():
     """a, the held-out tetrode gain as before; b and c, the outside-SWR gain
-    then its parts away from SWRs and at well-sampled places; d, the shares;
-    the heading over b to d; one letter per panel at one height."""
+    then its parts away from SWRs and at well-sampled places; d, the shares,
+    in one row under the heading over b to d; e, the No-Spike MUA, under a. A
+    row's letters at one height; a's and e's at one left edge."""
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
-    ax_a, ax_b, ax_c, ax_d = fig.axes
+    ax_a, ax_b, ax_c, ax_d, ax_e = fig.axes
     assert_draws_group_gain(ax_a, statistics["tetrode"])
     assert ax_a.get_title() == "Held-out tetrode"
     assert ax_a.get_ylabel() == "Held-out gain\nover local (nats/spike)"
-    letters = [t for t in fig.texts if len(t.get_text()) == 1]
-    assert [t.get_text() for t in letters] == list("abcd")
-    assert len({t.get_position()[1] for t in letters}) == 1
+    letters = {
+        t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
+    }
+    assert sorted(letters) == list("abcde")
+    assert len({letters[k][1] for k in "abcd"}) == 1
+    assert letters["e"][1] < letters["a"][1]
+    assert letters["e"][0] == letters["a"][0]
     assert "Immobile, at wells" in [t.get_text() for t in ax_b.texts]
     figure.check_journal_limits(fig)
     plt.close(fig)
@@ -160,6 +185,75 @@ def test_panel_d_names_each_share_beside_its_dots():
     plt.close(fig)
 
 
+def test_panel_e_draws_the_mua_around_no_spike_starts():
+    """The median with its interquartile band, a dotted line at the start, a
+    dashed line at the level outside the periods, and its labels."""
+    trace = _no_spike_trace()
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[4]
+    (median,) = [line for line in ax.lines if len(line.get_xdata()) == 151]
+    np.testing.assert_allclose(median.get_xdata(), 1000 * NO_SPIKE_TIME)
+    np.testing.assert_allclose(median.get_ydata(), trace["median"])
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0.2)
+        for line in ax.lines
+    )
+    assert any(
+        line.get_linestyle() == ":" and np.allclose(line.get_xdata(), 0)
+        for line in ax.lines
+    )
+    assert len(ax.collections) == 1  # the band
+    assert ax.get_xlabel() == "Time from No-Spike start (ms)"
+    assert ax.get_ylabel() == "MUA (z)"
+    assert ax.get_title() == "No-Spike state"
+    plt.close(fig)
+
+
+def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
+    """Each analyzed epoch's frame read once: its periods (the rule, with its
+    well visits) give the windows, and its level outside them; the periods
+    are counted by animal."""
+    import xarray as xr
+
+    from tests.analysis.event_definition.test_no_spike_periods import _frame
+
+    frame, arrival, departure = _frame()
+    frame = frame.assign(animal="a", day=1, epoch=2)
+    suffix = figure.data_over_time_suffix()
+    paths = [Path(f"a1_02_r1_HPC{suffix}"), Path(f"a2_02_r1_HPC{suffix}")]
+    read, visits = [], []
+    monkeypatch.setattr(figure, "processed_data_dir", lambda: Path("."))
+    monkeypatch.setattr(
+        figure, "analyzed_decode_files", lambda folder, suffix, require_all: paths
+    )
+    monkeypatch.setattr(
+        figure, "read_dot_with_swr_source", lambda path: read.append(path) or frame
+    )
+    monkeypatch.setattr(
+        figure,
+        "well_visit_times",
+        lambda epoch_id: visits.append(epoch_id) or (arrival, departure),
+    )
+
+    def windows(data, event_times, signals, window_sec):
+        assert window_sec == figure.TRIGGER_WINDOW_S
+        values = np.tile(np.array([2.0, 0.0]), (len(event_times), 1))[..., None]
+        return xr.DataArray(
+            values,
+            dims=("event", "time", "signal"),
+            coords={"time": [-0.002, 0.0], "signal": signals},
+        )
+
+    monkeypatch.setattr(figure, "get_signal_windows", windows)
+    trace = figure.read_no_spike_trace()
+    assert read == paths
+    assert visits == ["a1_02_r1_HPC", "a2_02_r1_HPC"]
+    np.testing.assert_allclose(trace["median"], [2.0, 0.0])
+    assert trace["periods"].to_dict() == {"a": 2}  # one period per epoch
+    assert trace["level"] == pytest.approx(1.0)
+    assert trace["median_duration"] == pytest.approx(9 * 0.002)
+
+
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
     """Values tagged ``heldout_tetrode`` name this script."""
     assert FIGURES["heldout_tetrode"].script == (
@@ -202,6 +296,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "outside_swr_gain_statistics": lambda epochs: pd.DataFrame(
             {"family": ["filter"], "measure": ["gain_per_spike"]}
         ),
+        "read_no_spike_trace": lambda: "trace",
         "outside_swr_subset_statistics": lambda sums, bin_s: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
@@ -233,7 +328,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert list(seen["tetrode"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
-    assert list(inputs) == ["tetrode", "outside", "parts"]
+    assert list(inputs) == ["tetrode", "outside", "parts", "no_spike"]
 
 
 @pytest.mark.parametrize(

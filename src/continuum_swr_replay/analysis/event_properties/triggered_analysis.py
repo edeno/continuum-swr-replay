@@ -425,3 +425,25 @@ def triggering_events_in(event_types: dict, events: pd.DataFrame) -> dict:
         )
         kept[name] = frame.loc[rows.isin(keys)]
     return kept
+
+
+def window_quartiles(windows: np.ndarray) -> dict[str, np.ndarray]:
+    """The quartiles over events of event-triggered windows, at each lag, as
+    :func:`compute_triggered_average_curves` gives them for its classes.
+
+    Parameters
+    ----------
+    windows : np.ndarray, shape (n_events, n_lags)
+        One signal's windows (``get_signal_windows``), NaN where a window has
+        no value.
+
+    Returns
+    -------
+    dict
+        ``q25``, ``median`` and ``q75``, each shape (n_lags,); NaN at a lag where
+        no event has a value.
+    """
+    return {
+        label: np.nanquantile(windows, q, axis=0)
+        for label, q in (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+    }

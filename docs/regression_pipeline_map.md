@@ -142,6 +142,12 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 `EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
 
+### `src/continuum_swr_replay/analysis/event_definition/no_spike_periods.py`
+
+No-Spike periods: when the decoder holds the No-Spike state.
+
+`no_spike_periods`, `level_outside_periods`
+
 ### `src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py`
 
 The non-local event rule and the SWR-overlap classification of those events.
@@ -272,7 +278,7 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`, `window_quartiles`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 

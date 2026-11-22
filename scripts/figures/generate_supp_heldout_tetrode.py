@@ -53,6 +53,23 @@ outside SWRs.
         the events are defined, and so describe where the gain sits and do not
         test the events.
 
+    e — Multiunit activity (``MUA_zscore``, as Figure 2i draws it) around the
+        start of No-Spike periods: the median over periods with the
+        interquartile band, a dotted line at the start and a dashed line at the
+        MUA level of immobile time outside the periods
+        (``no_spike_periods.level_outside_periods``, each epoch's median, then
+        the median over epochs; Figure 2i's "between events" level is outside
+        every non-local, SWR and MUA event, which does not carry over). A
+        period is the non-local events' rule applied to the No-Spike state
+        (``no_spike_periods.no_spike_periods``: P(No-Spike) strictly above 0.8
+        for at least 7 samples, the animal immobile throughout), wholly outside
+        excluded time and starting inside a well visit, read from every
+        analyzed epoch's decode frame in one pass; the windows are panel i's
+        (0.3 s in all, ``triggered_analysis.get_signal_windows``, a window
+        that touches excluded time left out). The decoder enters the No-Spike
+        state when the decoded tetrodes fall silent, so the fall in their MUA
+        describes the state and is not a test of it.
+
 Panel a reads the held-out tetrode run over the epochs the events summary reads
 and refuses a run not held out in folds of whole trials, as the summary does.
 Panels b to d read the held-out event run
@@ -63,7 +80,9 @@ does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Their
-values are the events summary's ``restriction_outside_swr_*`` values.
+values are the events summary's ``restriction_outside_swr_*`` values. Panel e
+reads every analyzed epoch's decode frame (``Processed-Data``), which takes a
+few minutes; it has no reported value.
 
 Usage
 -----
@@ -84,11 +103,16 @@ from matplotlib.figure import Figure
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    read_dot_with_swr_source,
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_events_in,
     select_visit_context,
+)
+from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
+    level_outside_periods,
+    no_spike_periods,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
@@ -106,8 +130,17 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
-from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME
+from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+    get_signal_windows,
+    window_quartiles,
+)
+from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.data_loaders.epoch_register import (
+    analyzed_decode_files,
+    analyzed_epoch_ids,
+)
+from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME, processed_data_dir
 from continuum_swr_replay.reported.events import (
     default_inputs,
     read_heldout_restriction,
@@ -130,6 +163,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     heading_over,
     label_gain_axis,
 )
+from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
@@ -146,9 +180,9 @@ figure_utilities.set_figure_defaults(context="paper")
 set_publication_style()
 warnings.filterwarnings("ignore")
 
-# Inches: the full page width, one row of four panels.
+# Inches: the full page width; panels a to d in one row, e under a.
 WIDTH = 6.5
-HEIGHT = 2.1
+HEIGHT = 3.9
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
@@ -166,15 +200,20 @@ lines of "Outside SWRs", so that it can be wider than its columns."""
 SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
-LEFTS = (0.077, 0.31, 0.6, 0.845)
+LEFTS = (0.077, 0.31, 0.6, 0.845, 0.077)
 """Each panel's frame's left edge (figure width)."""
-FRAME_WIDTHS = (0.12, 0.18, 0.125, 0.045)
+FRAME_WIDTHS = (0.12, 0.18, 0.125, 0.045, 0.27)
 """Each panel's frame's width (figure width); d's names reach to its right."""
-BOTTOM, TOP = 0.3, 0.74
-"""The frames' bottom and top (figure height)."""
-LETTER_HEIGHT = 0.07
+ROWS = ((0.623, 0.859), (0.12, 0.37))
+"""Each row's frames' bottom and top (figure height): a to d, then e."""
+LETTER_HEIGHT = 0.038
 """A panel letter's height (figure height): the letters' tops sit this far
-above the highest drawn top, so that they stand above the heading."""
+above their row's highest drawn top, so that they stand above the heading."""
+NO_SPIKE_SIGNAL = "MUA_zscore"
+TRIGGER_WINDOW_S = 0.3
+"""Panel e's window around each start (s, in all), Figure 2i's: the periods
+last a few tens of ms."""
+NO_SPIKE_COLOR = COLORS["No-Spike"]
 REFUSED = "the held-out tetrode figure's panels b to d are not drawn"
 RERUN = {
     "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
@@ -199,7 +238,8 @@ def read_inputs() -> dict:
         ``reported.events.require_tetrode_holdout_folds``); ``outside``:
         ``outside_swr_gain_statistics`` over the held-out event run, indexed by
         family and measure; ``parts``: ``outside_swr_subset_statistics`` over
-        its time sums, indexed by subset, threshold, family and measure.
+        its time sums, indexed by subset, threshold, family and measure;
+        ``no_spike``: :func:`read_no_spike_trace`.
 
     Raises
     ------
@@ -242,6 +282,51 @@ def read_inputs() -> dict:
         "parts": outside_swr_subset_statistics(
             heldout.time_sums, heldout.bin_s
         ).set_index(["subset", "threshold_s", "family", "measure"]),
+        "no_spike": read_no_spike_trace(),
+    }
+
+
+def read_no_spike_trace() -> dict:
+    """Panel e's trace: MUA around the start of every analyzed epoch's No-Spike
+    periods, in one pass over the decode frames (the SWR source's reader).
+
+    Returns
+    -------
+    dict
+        ``time`` (s from the start), ``q25``, ``median`` and ``q75`` over the
+        periods with a window (``triggered_analysis.window_quartiles``);
+        ``level``: the median over epochs of each epoch's MUA level outside its
+        periods; ``periods``: the periods with a window, by animal;
+        ``median_duration``: their median duration (s).
+    """
+    suffix = data_over_time_suffix()
+    windows, levels, counts, durations = [], [], {}, []
+    for path in analyzed_decode_files(processed_data_dir(), suffix, require_all=True):
+        frame = read_dot_with_swr_source(path)
+        arrival, departure = well_visit_times(path.name.removesuffix(suffix))
+        periods = no_spike_periods(frame, arrival, departure)
+        levels.append(
+            level_outside_periods(frame, periods, arrival, departure, NO_SPIKE_SIGNAL)
+        )
+        if periods.empty:
+            continue
+        session = frame[["animal", "day", "epoch"]].iloc[0]
+        epoch = get_signal_windows(
+            frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
+            window_sec=TRIGGER_WINDOW_S,
+        )  # fmt: skip
+        windows.append(epoch.sel(signal=NO_SPIKE_SIGNAL).values)
+        counts[session["animal"]] = (
+            counts.get(session["animal"], 0) + epoch.sizes["event"]
+        )
+        durations.append(periods["duration"].to_numpy())
+    stacked = np.concatenate(windows)
+    return {
+        "time": epoch["time"].values,
+        **window_quartiles(stacked),
+        "level": float(np.nanmedian(levels)),
+        "periods": pd.Series(counts, name="periods"),
+        "median_duration": float(np.median(np.concatenate(durations))),
     }
 
 
@@ -293,6 +378,27 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
+def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
+    """Panel e: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
+    the median with its interquartile band as Figure 2i draws its rows, a dotted
+    line at the start and a dashed line at the level outside the periods."""
+    t_ms = 1000 * np.asarray(trace["time"])
+    ax.fill_between(
+        t_ms, trace["q25"], trace["q75"], color=NO_SPIKE_COLOR, alpha=0.4, lw=0
+    )
+    ax.plot(t_ms, trace["median"], color=readable_text_color(NO_SPIKE_COLOR), lw=1.0)
+    ax.axhline(trace["level"], color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=3)
+    ax.text(
+        t_ms[-1], trace["level"], "outside periods", ha="right", va="bottom",
+        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+    )  # fmt: skip
+    ax.axvline(0, color="k", lw=0.5, ls=":")
+    ax.set_xlim(t_ms[0], t_ms[-1])
+    ax.set_xlabel("Time from No-Spike start (ms)")
+    ax.set_ylabel("MUA (z)")
+    ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
+
+
 def shared_limits(axes: Sequence[Axes], floor: float = 0.13) -> None:
     """One y range for panels b and c, from 0 less a floor to a little above
     their highest dot or interval, with no tick label at the frames' top."""
@@ -305,11 +411,12 @@ def shared_limits(axes: Sequence[Axes], floor: float = 0.13) -> None:
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`."""
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
+    rows = [ROWS[0]] * 4 + [ROWS[1]]
     axes = [
-        fig.add_axes((left, BOTTOM, width, TOP - BOTTOM))
-        for left, width in zip(LEFTS, FRAME_WIDTHS, strict=True)
+        fig.add_axes((left, bottom, width, top - bottom))
+        for left, width, (bottom, top) in zip(LEFTS, FRAME_WIDTHS, rows, strict=True)
     ]
-    ax_a, ax_b, ax_c, ax_d = axes
+    ax_a, ax_b, ax_c, ax_d, ax_e = axes
     draw_heldout_tetrode(ax_a, statistics["tetrode"])
     draw_outside_swr_series(
         ax_b, statistics["outside"], statistics["parts"], "beyond_swr_margin",
@@ -323,18 +430,25 @@ def generate_figure(statistics: dict) -> Figure:
     )  # fmt: skip
     shared_limits([ax_b, ax_c])
     draw_outside_swr_shares(ax_d, statistics["outside"], SHARES_YLABEL)
+    draw_no_spike_mua(ax_e, statistics["no_spike"])
     fig.draw_without_rendering()
     # each panel against the others before the heading, which b draws over c
     # and d; after it, the heading against everything as one group's
-    check_placement(fig, {"a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d]})
+    panels = {"a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d], "e": [ax_e]}
+    check_placement(fig, panels)
     heading_over(fig, fig.canvas.get_renderer(), [ax_b, ax_c, ax_d], HEADING)
     fig.draw_without_rendering()
-    # the letters of the one row at one height, just above the highest panel
-    # (b's, which holds the heading), each at its panel's left edge
-    top = max(drawn_extent(fig, [ax]).y1 for ax in axes) + LETTER_HEIGHT
-    for ax, letter in zip(axes, "abcd", strict=True):
-        letter_panel(fig, letter, max(drawn_extent(fig, [ax]).x0 - 0.004, 0.0), top)
-    check_placement(fig, {"a": [ax_a], "b to d": [ax_b, ax_c, ax_d]})
+    # each row's letters at one height, just above its highest panel (b's,
+    # which holds the heading, in the first), each at its panel's left edge;
+    # a and e share a column, so their letters share the leftmost edge
+    left = {ax: drawn_extent(fig, [ax]).x0 for ax in axes}
+    left[ax_a] = left[ax_e] = min(left[ax_a], left[ax_e])
+    for row in ([ax_a, ax_b, ax_c, ax_d], [ax_e]):
+        top = max(drawn_extent(fig, [ax]).y1 for ax in row) + LETTER_HEIGHT
+        for ax in row:
+            letter = "abcde"[axes.index(ax)]
+            letter_panel(fig, letter, max(left[ax] - 0.004, 0.0), top)
+    check_placement(fig, {"a": [ax_a], "b to d": [ax_b, ax_c, ax_d], "e": [ax_e]})
     return fig
 
 

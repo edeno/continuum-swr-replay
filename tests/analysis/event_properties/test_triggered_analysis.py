@@ -491,3 +491,19 @@ def test_triggering_events_in_keeps_the_frames_rows_of_the_selected_events():
     assert kept[swr].index.tolist() == [5]
     assert kept["SWR_events"] is event_types["SWR_events"]
     assert len(event_types[no_swr]) == 4  # the input is not changed
+
+
+def test_window_quartiles_are_over_events_at_each_lag():
+    """Five events, two lags: at the first lag 1..5 (quartiles 2, 3, 4); at the
+    second one value missing, 10, 20, 30, 40 (17.5, 25, 32.5)."""
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        window_quartiles,
+    )
+
+    windows = np.array(
+        [[1.0, 10.0], [2.0, 20.0], [3.0, np.nan], [4.0, 30.0], [5.0, 40.0]]
+    )
+    quartiles = window_quartiles(windows)
+    np.testing.assert_allclose(quartiles["q25"], [2.0, 17.5])
+    np.testing.assert_allclose(quartiles["median"], [3.0, 25.0])
+    np.testing.assert_allclose(quartiles["q75"], [4.0, 32.5])
