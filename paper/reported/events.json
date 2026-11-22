@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "ba82b02086b2",
+ "commit": "ddc34cb45f81",
  "code": {
-  "head": "ba82b02086b2130448e4a89d71e44efd48d11a8d",
+  "head": "ddc34cb45f81287250031959954c979ccdcb02a4",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -231,8 +231,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_definition/analyzed_time.py": {
-    "sha256": "9d58bcfb5a737d248953992044118081114550e8287009b17d55a2dc818f60d7",
-    "code_sha256": "50144d5da1dc59d317f3d0bc44b044c1af242f4212c08dfa2d70febd49e0e75c"
+    "sha256": "250a67ab64c7145787dcb5b1b44edd80f999e27473e477e7c97cc4ae3fa413a0",
+    "code_sha256": "a080d104b737d295cf0bbf19c6cf564ba80c4c6fde3743fe67dc1b9b3225287c"
    },
    "src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py": {
     "sha256": "a66ffa26bdedf307a823a8f2591b023a36927ab2200b16b98d2f0a1d19b5e961",
@@ -283,8 +283,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_evidence/bin_facts.py": {
-    "sha256": "59ea60940de857862e2d081633ad031c21622a676b260cda098178c41757e475",
-    "code_sha256": "ad3277059c07c0bed60ce195221fdc2a80e7d93fe8e81966820f3c67c90f9ca3"
+    "sha256": "a7121b4a3d85ed724df452b306796f750079aaa786b204354fc8b02d24128c51",
+    "code_sha256": "000cdd72a033ef315a26689f459f8dd2500ad1ca4bea609caffd44068cffb1ce"
    },
    "src/continuum_swr_replay/analysis/event_evidence/heldout_events.py": {
     "sha256": "9a592253f94db913d807871e35c865607d137962dca9639a72e049fd2eea09b1",
@@ -303,8 +303,8 @@
     "code_sha256": "870e60557d17a9e49a6d9ea79a563f9c9911b9977f860e39c926013a78ade74c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
-    "sha256": "1fd253bfc69f2bab2b72ed68169cf47faa1e74aa5d7b2f26992eb76053aefb20",
-    "code_sha256": "49677c1c6097d6c8d9f912b7aa18130e2202723f2df675d11cd876fc53f91393"
+    "sha256": "fc05762092d00de1a85b468677d447fa0a7975b156840a9f308afe2b2f1173e5",
+    "code_sha256": "6123c085d0d147fbcdb6a0001110e49016c5f34b9208dc7f262d0bfd7572bfda"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
     "sha256": "8bddc2992907df5de62240b055ca876be991dd67420dbc09fd35f0a93c2ada52",
@@ -351,8 +351,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py": {
-    "sha256": "7514e5c1d5cfb413ca94e2f51465b74ca5d292dc81936c595378fd83ec000771",
-    "code_sha256": "c0429e4ae8280633ccdf123bf3a2882e2e79f6b08d2a96bbed0ba34162e9d1ee"
+    "sha256": "aa9f2bf055f9682b0cebb33bf3ec5581298b7177be8da647cc2c29bf2034ddc0",
+    "code_sha256": "9a1cf7cf7e01a8bdd60cd7edf1cfd0271dacbb6e1c369bc8fdd5152eb5b90af9"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
     "sha256": "83bc35c9b3c390372098ed012f5584d938d945afd8233f4934febcc19bb8e4f8",
@@ -363,16 +363,16 @@
     "code_sha256": "96e6230ed69c7fe4f0067e798084a767c6c97a62e7b22be5d6bb520210ee5c24"
    },
    "src/continuum_swr_replay/analysis/event_properties/nonlocal_by_signal.py": {
-    "sha256": "39d3c4bdb1c46e1a341adc90f52d0f203a69e5033956e5d619943f2778fdded2",
-    "code_sha256": "9bc47aae043346e1523dbfa4deddc411c8af2c562486f1d47e369c7b0d51fad9"
+    "sha256": "8c33eea6824f29fc9bac102fca29666e0d9703da9fbe6c0f7648db4063d539da",
+    "code_sha256": "66b7ebb1b31d7425d488569cd250d597853852571a90f85daa601cc42e0354e9"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
     "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
    },
    "src/continuum_swr_replay/analysis/event_properties/rule_sweep.py": {
-    "sha256": "e5af69b200103d31969b5368b859126742ff09bab71edfced2d40ba5fb3940fb",
-    "code_sha256": "f6459d8a2d2c8b926196664bc2c7686b66c0d7550f4f5697edfd363775ef280f"
+    "sha256": "e9cb31cba3d3d145964f58bc28809a8368cff98915b78c11c9039fc32caa3c44",
+    "code_sha256": "7cc56fe20dce6fee91d13aaaee1481b3140e294fce10d78fd9336e140addf345"
    },
    "src/continuum_swr_replay/analysis/event_tables/__init__.py": {
     "sha256": "cbb29294c811a4b945fdd3aede000b0fcb85102d8258312c41bb98e099c3630a",
@@ -459,8 +459,8 @@
     "code_sha256": "feee92da6b87e416f4cde4875511ee6f96d504590a0b1a02e27b0dbb396948b1"
    },
    "src/continuum_swr_replay/data_loaders/epoch_register.py": {
-    "sha256": "a657a0e8257a55c0089fccfc9cf5da483b2aa5ab54946f05536fb2f667a6d17e",
-    "code_sha256": "50b383856ad151befe68c59f300b99f56ff0d6328e901f631907c71fcd781ccf"
+    "sha256": "1adf5c91b1512b64814311c21610922f52ebdfa074c5bfa185fda0d2a5fdd145",
+    "code_sha256": "4524d1e8c89518fca3934f4e367351367452e0f1e13514edf169d734fb6c2682"
    },
    "src/continuum_swr_replay/data_loaders/spikes.py": {
     "sha256": "b31afcb682e50cb2e16db7b3c3a4fd7e73d506f356aeb8b38a04c3f06a7d57ad",
@@ -519,8 +519,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "acd187ecabbcc789d3e847950afbe6c7425cfea804d9ea9cafd6c2d2e3ad7641",
-    "code_sha256": "ab4ae61e4fe52def82cfb0a57fed836172209290650d9e53dd34fc2c6a91998f"
+    "sha256": "7f5c8aa5e7c52cfe8e41191a97dc814cb600017618f764630be2332a5d5eef7c",
+    "code_sha256": "269526addf5ca6db1e9aef1781090bc074ebb8bf8be0c2b3745a1aa736081cc8"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -12533,7 +12533,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12549,7 +12549,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12565,7 +12565,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12581,7 +12581,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12597,7 +12597,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12613,7 +12613,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12629,7 +12629,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12645,7 +12645,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12661,7 +12661,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12677,7 +12677,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12693,7 +12693,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12709,7 +12709,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12725,7 +12725,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12741,7 +12741,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12757,7 +12757,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12773,7 +12773,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12789,7 +12789,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12805,7 +12805,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12821,7 +12821,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12837,7 +12837,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12853,7 +12853,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12869,7 +12869,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12885,7 +12885,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12901,7 +12901,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12917,7 +12917,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12933,7 +12933,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12949,7 +12949,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12965,7 +12965,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12981,7 +12981,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12997,7 +12997,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13013,7 +13013,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13029,7 +13029,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13045,7 +13045,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13061,7 +13061,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13077,7 +13077,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13093,7 +13093,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13109,7 +13109,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13125,7 +13125,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13141,7 +13141,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13157,7 +13157,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13173,7 +13173,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13189,7 +13189,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13205,7 +13205,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13221,7 +13221,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13237,7 +13237,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13253,7 +13253,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13269,7 +13269,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13285,7 +13285,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13301,7 +13301,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13317,7 +13317,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13333,7 +13333,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13349,7 +13349,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13365,7 +13365,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2i"
+    "S2c"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
