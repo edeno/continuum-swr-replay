@@ -359,7 +359,7 @@ Sources:
 
 ### 2a.6. How does the decoder divide time among its four states while the animal moves and while it is still?
 
-Status: computed. Figures: decoder_validation. Values: 8.
+Status: computed. Figures: 2a, decoder_validation. Values: 8.
 
 *Note:* Added with the decoder-validation figure's state-fraction values; check its wording and place.
 
@@ -3546,7 +3546,7 @@ Script: `scripts/figures/generate_figure01.py`. Questions: 1.1.
 
 ### Figure 2: Non-local events and SWRs
 
-Script: `scripts/figures/generate_figure02.py`. Questions: 2b.1, 2b.2, 2b.3, 2b.4, 2b.5, 2c.3, 2d.8, 2d.9.
+Script: `scripts/figures/generate_figure02.py`. Questions: 2a.6, 2b.1, 2b.2, 2b.3, 2b.4, 2b.5, 2c.3, 2d.8, 2d.9.
 
 Unlettered: `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrBoutsInSubset`, `\EventsHeldoutNonSwrBoutsLeftOut`, `\EventsHeldoutNonSwrBoutsMatchedOutsideVisit`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrBoutsInSubset`, `\EventsHeldoutSwrBoutsLeftOut`, `\EventsHeldoutSwrBoutsMatchedOutsideVisit`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 

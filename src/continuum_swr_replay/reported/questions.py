@@ -231,7 +231,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2a.6",
         "How does the decoder divide time among its four states while the animal moves and while it is still?",
-        figures=("decoder_validation",),
+        figures=("2a", "decoder_validation"),
         note="Added with the decoder-validation figure's state-fraction values; check its wording and place.",
     ),
     Question(

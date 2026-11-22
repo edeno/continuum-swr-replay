@@ -261,6 +261,7 @@ TAGS = {
     "decoding_error": Tags(("2a.1",)),
     "calibration": Tags(("2a.1",), ("decoder_validation",)),
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
+    "state_fractions_immobile": Tags(("2a.6",), ("2a",)),
     "cohort": Tags(("2b.2",), ("2d",)),
     "visit_context": Tags(("2b.2",)),
     "left_out": Tags(("2b.2",)),
@@ -673,15 +674,12 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
-def state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2a.6: the decoder's state fractions while the animal moves and
-    while it is still (the decoder-validation figure's bars)."""
-    make = value_factory(state_fraction_values, source, TAGS["state_fractions"])
+def _state_fraction_values(
+    make: Callable[..., Value], sessions: pd.DataFrame, movement: str, where: str
+) -> list[Value]:
+    """One movement state's four state fractions (``movement`` of
+    ``quality_metrics.MOVEMENT_STATES``), made by ``make``."""
     fractions = quality_metrics.state_fraction_statistics(sessions)
-    where = {
-        "moving": "bins faster than 4 cm/s",
-        "immobile": "bins slower than 4 cm/s",
-    }
     return [
         make(
             f"state_fraction_{movement}_{_STATE_WORDS[state]}",
@@ -689,11 +687,32 @@ def state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
             "fraction",
             "pct1",
             f"median over sessions of each session's mean {state} over its "
-            f"{where[movement]} outside excluded time, sessions pooled",
+            f"{where} outside excluded time, sessions pooled",
         )
-        for movement in quality_metrics.MOVEMENT_STATES
         for state in quality_metrics.STATE_PROBABILITY_COLUMNS
     ]
+
+
+def state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.6: the decoder's state fractions while the animal moves (the
+    decoder-validation figure's bars)."""
+    make = value_factory(state_fraction_values, source, TAGS["state_fractions"])
+    return _state_fraction_values(make, sessions, "moving", "bins faster than 4 cm/s")
+
+
+def immobile_state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.6: the decoder's state fractions while the animal is still
+    inside a well visit, beside Figure 2a, where everything else is inside the
+    visits (the stored immobile fractions are over the immobile bins inside a
+    visit, ``measure_decoder_quality.py``)."""
+    make = value_factory(
+        immobile_state_fraction_values, source, TAGS["state_fractions_immobile"]
+    )
+    return _state_fraction_values(
+        make, sessions, "immobile",
+        "bins slower than 4 cm/s inside a well visit (from the first poke-in at "
+        "a well to the final poke-out)",
+    )  # fmt: skip
 
 
 # --- how common the events are, and how they sit against SWRs ----------------
@@ -4939,6 +4958,17 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*decoding_error_values(quality_sessions, quality_source))
     summary.add(*calibration_values(calibration, quality_source))
     summary.add(*state_fraction_values(quality_sessions, quality_source))
+    # the immobile fractions are over the time inside the well visits
+    summary.add(
+        *over(
+            pend(
+                immobile_state_fraction_values(quality_sessions, quality_source),
+                off_subset(folder),
+                off_visits(folder, quality_sessions["epoch_id"]),
+            ),
+            f"the immobile {TIME_SUBSET}",
+        )
+    )
     summary.inputs += [
         file_record(folder / name, ROOT_DIR)
         for name in ("sessions.parquet", "calibration.parquet", "manifest.json")

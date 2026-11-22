@@ -6,11 +6,15 @@ reads them without the decode frames. From each analyzed epoch's decode
 
 - ``sessions.parquet``, one row per epoch:
   ``quality_metrics.session_decoder_quality`` (the Local-state decoding error
-  and the decoder state fractions, moving and immobile);
+  and the decoder state fractions, moving and immobile; the immobile ones over
+  the immobile bins inside a well visit, each epoch's visits from the session
+  cache, ``event_tables.prepare_data.well_visit_times``);
 - ``calibration.parquet``, one row per epoch and Local-probability bin:
   ``quality_metrics.compute_calibration_curve``.
 
-Each row carries the epoch id and its decode's sha256. Written to
+Each row carries the epoch id and its decode's sha256. The manifest records
+the analyses' subset and the session-cache entries the visits were read from.
+Written to
 ``Processed-Data/decoder_quality/`` (or ``--out-dir``) with a
 ``manifest.json``.
 
@@ -34,6 +38,14 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     session_decoder_quality,
 )
 from continuum_swr_replay.analysis.event_definition import analyzed_time
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    ANALYZED_SUBSET,
+)
+from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    session_cache_record,
+    well_visit_times,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_decode_files
 from continuum_swr_replay.decoding.files import (
     data_over_time_suffix,
@@ -45,15 +57,16 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 
 def measure_epoch(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """One epoch's session row and calibration rows, with its id and decode hash."""
+    """One epoch's session row and calibration rows, with its id and decode hash.
+    The immobile state fractions are over the immobile bins inside a well
+    visit (the epoch's visits from the session cache)."""
     sha256 = sha256_file(path)
     dot = analyzed_time.read_verified_dot_with_swr_source(path, sha256)
-    epoch = {
-        "epoch_id": epoch_identifier_of(path, data_over_time_suffix()),
-        "decode_sha256": sha256,
-    }
+    identifier = epoch_identifier_of(path, data_over_time_suffix())
+    in_visit = in_well_visit(dot.index.to_numpy(), *well_visit_times(identifier))
+    epoch = {"epoch_id": identifier, "decode_sha256": sha256}
     return (
-        session_decoder_quality(dot).assign(**epoch),
+        session_decoder_quality(dot, in_visit=in_visit).assign(**epoch),
         compute_calibration_curve(dot).assign(**epoch),
     )
 
@@ -98,6 +111,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         {
             "produced_by": produced_by(__file__),
             "commit": described_commit(),
+            "subset": ANALYZED_SUBSET,
+            "session_cache": session_cache_record(sessions["epoch_id"]),
             "n_epochs": len(sessions),
             "decodes": dict(
                 zip(sessions["epoch_id"], sessions["decode_sha256"], strict=True)
@@ -105,7 +120,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             "local_error": "time bins with Local_prob above 0.5 outside "
             "excluded time; abs(ahead_behind_distance), cm",
             "state_fractions": "mean state probability over bins faster "
-            "(moving) or slower (immobile) than 4 cm/s, outside excluded time",
+            "(moving) or slower (immobile) than 4 cm/s, outside excluded time; "
+            "the immobile bins only those inside a well visit",
             "calibration": "median abs(ahead_behind_distance) per 0.1-wide "
             "Local_prob bin, outside excluded time",
         },

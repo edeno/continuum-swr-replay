@@ -97,6 +97,23 @@ def test_session_state_fractions_are_each_session_s_mean_probabilities():
     )
 
 
+def test_the_immobile_fractions_take_only_the_bins_inside_a_well_visit():
+    """Given the well-visit mask, the immobile bars count only the immobile
+    bins inside a visit; the moving bars do not change."""
+    frame = _three_sessions()
+    # a's last immobile bin (local 0) and b's first immobile bin (local 1)
+    # are outside every visit
+    outside = np.zeros(len(frame), dtype=bool)
+    outside[4] = True
+    outside[6] = True
+    fractions = session_state_fractions(frame, in_visit=~outside)
+    every = session_state_fractions(frame)
+    np.testing.assert_allclose(fractions["immobile_Local_prob"], [1.0, 0.0, 0.0])
+    np.testing.assert_allclose(
+        fractions["moving_Local_prob"], every["moving_Local_prob"]
+    )
+
+
 def test_a_session_with_no_moving_bin_has_no_moving_fraction():
     frame = pd.concat(
         [

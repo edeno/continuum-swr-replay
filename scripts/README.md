@@ -30,7 +30,7 @@ them importable.
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
-- `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
+- `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions (the immobile ones inside the well visits) and calibration curve, which the events summary reads.
 
 ## `detection/` — the event detectors (Part 1)
 - `run_artifact_detection.py` — the artifact mask of every epoch's CA1 data (`docs/design/2026-10-09-artifact-detection.md`).

@@ -125,7 +125,10 @@ def test_decoding_error_values_are_the_median_over_sessions_with_an_error():
 
 
 def test_state_fraction_values_name_each_movement_and_state():
-    numbers = _numbers(builder.state_fraction_values(_quality_sessions(), "s"))
+    numbers = _numbers(
+        builder.state_fraction_values(_quality_sessions(), "s")
+        + builder.immobile_state_fraction_values(_quality_sessions(), "s")
+    )
     assert numbers == {
         # the median over the four sessions: the mean of the middle two
         "state_fraction_moving_local": pytest.approx(0.85),
@@ -138,6 +141,16 @@ def test_state_fraction_values_name_each_movement_and_state():
         "state_fraction_immobile_continuous": pytest.approx(0.22),
         "state_fraction_immobile_fragmented": pytest.approx(0.12),
     }
+    values = _by_key(
+        builder.state_fraction_values(_quality_sessions(), "s")
+        + builder.immobile_state_fraction_values(_quality_sessions(), "s")
+    )
+    for key, value in values.items():
+        if "_immobile_" in key:
+            assert value.figures == builder.TAGS["state_fractions_immobile"].figures
+            assert "inside a well visit" in value.description
+        else:
+            assert value.figures == builder.TAGS["state_fractions"].figures
 
 
 def test_calibration_values_are_each_bin_s_median_over_sessions_in_order():

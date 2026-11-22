@@ -43,6 +43,12 @@ def test_an_epoch_s_rows_carry_its_id_and_its_decode_s_hash(tmp_path, monkeypatc
     path.write_bytes(raw)
     # the SWR source is tested elsewhere; the frame already has its column
     monkeypatch.setattr(script.analyzed_time, "with_swr_source", lambda dot: dot)
+    # one visit holding the first four bins (0 to 0.008 s)
+    monkeypatch.setattr(
+        script,
+        "well_visit_times",
+        lambda epoch_id: (np.array([0.0]), np.array([0.008])),
+    )
 
     sessions, calibration = script.measure_epoch(path)
 
@@ -51,8 +57,10 @@ def test_an_epoch_s_rows_carry_its_id_and_its_decode_s_hash(tmp_path, monkeypatc
     assert sessions["decode_sha256"].tolist() == [sha256]
     pd.testing.assert_frame_equal(
         sessions.drop(columns=["epoch_id", "decode_sha256"]),
-        session_decoder_quality(_frame()),
+        session_decoder_quality(_frame(), in_visit=np.arange(6) < 4),
     )
+    # immobile inside the visit: bins 2 and 3 (local 0.2 and 0.95)
+    assert sessions["immobile_Local_prob"].iloc[0] == (0.2 + 0.95) / 2
     assert set(calibration["epoch_id"]) == {IDENTIFIER}
     pd.testing.assert_frame_equal(
         calibration.drop(columns=["epoch_id", "decode_sha256"]),

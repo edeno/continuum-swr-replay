@@ -1381,6 +1381,7 @@ def session_state_fractions(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     group_cols: list[str] | None = None,
+    in_visit: np.ndarray | None = None,
 ) -> pd.DataFrame:
     """Each session's decoder state fractions, moving and immobile.
 
@@ -1388,7 +1389,8 @@ def session_state_fractions(
     session's bins outside excluded time: moving bins are those faster than
     ``speed_threshold`` (:func:`compute_state_fraction_during_movement`),
     immobile bins those slower than it (strictly, the project's immobility
-    rule; a bin at the threshold or without a speed is in neither).
+    rule; a bin at the threshold or without a speed is in neither) and, given
+    ``in_visit``, inside a well visit, as the analyses take immobile time.
 
     Parameters
     ----------
@@ -1400,6 +1402,11 @@ def session_state_fractions(
         Speed (cm/s) between moving and immobile.
     group_cols : list[str] | None, optional
         Session grouping columns, by default ``["animal", "day", "epoch"]``.
+    in_visit : np.ndarray of bool, shape (n_rows,), optional
+        Whether each row is inside a well visit
+        (``event_definition.well_visits.in_well_visit``); the immobile bins are
+        those inside one. None takes every immobile bin (the decoder-validation
+        figure, which draws from pooled frames without their visits).
 
     Returns
     -------
@@ -1421,6 +1428,8 @@ def session_state_fractions(
     moving.columns = group_cols + [f"moving_{c}" for c in prob_cols]
 
     is_immobile = immobile_analyzed_bins(data, speed_threshold)
+    if in_visit is not None:
+        is_immobile = is_immobile & np.asarray(in_visit, dtype=bool)
     immobile = (
         data.loc[is_immobile]
         .groupby(group_cols, sort=False)[prob_cols]
@@ -1461,7 +1470,9 @@ def state_fraction_statistics(session_fractions: pd.DataFrame) -> pd.DataFrame:
 
 
 def session_decoder_quality(
-    data: pd.DataFrame, group_cols: list[str] | None = None
+    data: pd.DataFrame,
+    group_cols: list[str] | None = None,
+    in_visit: np.ndarray | None = None,
 ) -> pd.DataFrame:
     """Each session's Local-state decoding error and its state fractions.
 
@@ -1475,6 +1486,9 @@ def session_decoder_quality(
         ``data_over_time`` read through the SWR source.
     group_cols : list[str] | None, optional
         Session grouping columns, by default ``["animal", "day", "epoch"]``.
+    in_visit : np.ndarray of bool, shape (n_rows,), optional
+        The well-visit mask of :func:`session_state_fractions`' immobile bins;
+        the decoding error and the moving fractions are over all time.
 
     Returns
     -------
@@ -1486,7 +1500,7 @@ def session_decoder_quality(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
     return compute_local_decoding_error(data, group_cols=group_cols).merge(
-        session_state_fractions(data, group_cols=group_cols),
+        session_state_fractions(data, group_cols=group_cols, in_visit=in_visit),
         on=group_cols,
         how="outer",
         validate="one_to_one",

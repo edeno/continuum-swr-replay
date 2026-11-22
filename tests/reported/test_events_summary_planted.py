@@ -125,6 +125,7 @@ OTHER_BUILDERS = (
     "decoding_error_values",
     "calibration_values",
     "state_fraction_values",
+    "immobile_state_fraction_values",
     "class_distribution_values",
     "nonlocal_power_values",
     "nonlocal_mua_values",
@@ -277,6 +278,7 @@ class _Run:
             NONLOCAL_BY_SIGNAL_DIR,
             EVENT_RULE_SWEEP_DIR,
             STATE_CALIBRATION_IN_VISITS_DIR,
+            DECODER_QUALITY_DIR,
             EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
@@ -322,7 +324,6 @@ class _Run:
         (
             root / "state_evidence" / f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"
         ).write_text(json.dumps(provenance))
-        (root / DECODER_QUALITY_DIR).mkdir()
         for name in ("sessions", "calibration"):
             pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
                 root / DECODER_QUALITY_DIR / f"{name}.parquet"
@@ -660,6 +661,12 @@ PENDING_CASES = [
         NONLOCAL_BY_SIGNAL_DIR,
         ("session_cache", _other_cache()),
         {"nonlocal_power", "nonlocal_mua"},
+    ),
+    (DECODER_QUALITY_DIR, ("subset", None), {"immobile_state_fraction"}),
+    (
+        DECODER_QUALITY_DIR,
+        ("session_cache", _other_cache()),
+        {"immobile_state_fraction"},
     ),
     (STATE_CALIBRATION_IN_VISITS_DIR, ("subset", None), {"state_calibration"}),
     (
