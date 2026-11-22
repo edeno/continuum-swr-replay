@@ -7,8 +7,8 @@ the order the text cites them, in four rows:
 - the count is robust (c, d): the share of events with no SWR at other
   settings of the event rule, and the timing of events against their SWRs;
 - the events are coordinated and specific (e to h): non-local time against
-  MUA, the posterior's spread, the held-out tetrode gain split by bins with
-  and without spikes, and shared content;
+  MUA, the held-out tetrode gain split by bins with and without spikes, the
+  posterior's spread, and shared content;
 - ripple power and the held-out test (i, j): the events' peak ripple power has
   one mode and the share with no SWR follows the SWR threshold, and the gain
   outside SWRs away from the SWRs.
@@ -110,30 +110,14 @@ the order the text cites them, in four rows:
         decoded non-local. The panel does not show that non-local detection is
         independent of population bursts: the decoder needs spikes, so the two
         go together. It poses the question that the held-out tetrode panels
-        (g, h) answer: whether the spikes point to the decoded place.
+        (f, h) answer: whether the spikes point to the decoded place.
 
-    f — Supports Figure 2's case that the no-SWR events are specific: how
-        concentrated the decoded position is, no-SWR against SWR events. Each
-        event's HPD coverage is the length of track (cm) that holds 95 % of
-        the decoded probability, averaged over the event's bins
-        (``hpd_coverage_cm`` of the canonical event table). Its distribution
-        on a log axis, the percent of a class's events per bin
-        (``event_statistics.HPD_BIN_EDGES_CM``), a thin line per animal and
-        their mean in bold (``event_statistics.hpd_distribution``). Each class
-        holds a tight group of events (near 20-25 cm) and a diffuse one spread
-        over most of the track, so a median falls between them and describes
-        neither; the events summary reports the share of each class below the
-        dotted cut at 50 cm (``event_statistics.hpd_tight_share_statistics``;
-        the ``hpd_tight_*`` values). The track's length is not drawn: it
-        differs by animal and is known only from each decode's environment.
-        The pooled class medians (``hpd_median_*``) are for the text.
-
-    g and h — Support Figure 2h, the events driven by several tetrodes. Each
+    f and h — Support Figure 2h, the events driven by several tetrodes. Each
     tetrode is left out of the decoder in turn: the other tetrodes' estimate
-    predicts its spikes better than local coding does (g), and in the events
+    predicts its spikes better than local coding does (f), and in the events
     where that estimate is specific, its activity is where the others point (h).
 
-    g — The held-out tetrode gain over local coding. The immobile non-local
+    f — The held-out tetrode gain over local coding. The immobile non-local
         events of the canonical event table that start inside a well visit
         (``cohort_selection.select_visit_context``), split by whether they
         overlap an SWR. Each tetrode is left out of the decoder's smoother in
@@ -164,8 +148,24 @@ the order the text cites them, in four rows:
         ``*_heldout_gain_*``, ``*_heldout_spiking_gain_*`` and
         ``*_heldout_silent_gain_*`` values).
 
+    g — Supports Figure 2's case that the no-SWR events are specific: how
+        concentrated the decoded position is, no-SWR against SWR events. Each
+        event's HPD coverage is the length of track (cm) that holds 95 % of
+        the decoded probability, averaged over the event's bins
+        (``hpd_coverage_cm`` of the canonical event table). Its distribution
+        on a log axis, the percent of a class's events per bin
+        (``event_statistics.HPD_BIN_EDGES_CM``), a thin line per animal and
+        their mean in bold (``event_statistics.hpd_distribution``). Each class
+        holds a tight group of events (near 20-25 cm) and a diffuse one spread
+        over most of the track, so a median falls between them and describes
+        neither; the events summary reports the share of each class below the
+        dotted cut at 50 cm (``event_statistics.hpd_tight_share_statistics``;
+        the ``hpd_tight_*`` values). The track's length is not drawn: it
+        differs by animal and is known only from each decode's environment.
+        The pooled class medians (``hpd_median_*``) are for the text.
+
     h — Shared content: during an event, do the tetrodes point to the same
-        remote place? The same events and run as g, each left-out tetrode
+        remote place? The same events and run as f, each left-out tetrode
         scored under the other tetrodes' position distribution against no
         place preference (the agreement; above zero only when the left-out
         tetrode's activity is where the others point), summed over tetrodes and
@@ -180,7 +180,7 @@ the order the text cites them, in four rows:
         100 cm; two separate narrow peaks give the sum of their widths, not the
         distance between them); the event's value is the mean over its scored
         bins and its left-out tetrodes. It is not the same measure as panel
-        f's (the 95 % HPD length of the all-tetrode non-local posterior). A dot
+        g's (the 95 % HPD length of the all-tetrode non-local posterior). A dot
         per animal for no-SWR and SWR events in their colors, beside them the
         animals' mean with its 95 % interval, a thin line through each group's
         means and a dashed line at zero, no place preferred
@@ -471,8 +471,8 @@ PANELS = (
     "rule_sweep",
     "boundary_timing",
     "nonlocal_mua",
-    "hpd",
     "heldout_gain",
+    "hpd",
     "shared_content",
     "ripple_modes",
     "outside_distance",
@@ -482,7 +482,7 @@ LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
     ((0.81, 0.95), ("state_calibration", "no_spike_mua")),
     ((0.56, 0.7), ("rule_sweep", "boundary_timing")),
-    ((0.31, 0.45), ("nonlocal_mua", "hpd", "heldout_gain", "shared_content")),
+    ((0.31, 0.45), ("nonlocal_mua", "heldout_gain", "hpd", "shared_content")),
     ((0.06, 0.2), ("ripple_modes", "outside_distance")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
@@ -493,8 +493,8 @@ FRAMES = {
     "rule_sweep": (0.085, 0.38),
     "boundary_timing": (0.66, 0.32),
     "nonlocal_mua": (0.075, 0.13),
-    "hpd": (0.275, 0.17),
-    "heldout_gain": (0.52, 0.2),
+    "heldout_gain": (0.305, 0.19),
+    "hpd": (0.57, 0.155),
     "shared_content": (0.8, 0.185),
     "ripple_modes": (0.085, 0.3),
     "outside_distance": (0.55, 0.36),

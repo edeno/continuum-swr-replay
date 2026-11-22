@@ -285,10 +285,10 @@ TAGS = {
     "rule_sweep_swr": Tags(("2a.5",), ("S2i",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
     "participation": Tags(("2d.9",), ("2h",)),
-    "spike_rate": Tags(("2d.9",), ("S2g",)),
+    "spike_rate": Tags(("2d.9",), ("S2f",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("S2g",)),
+    "tetrode_holdout": Tags(("2c.3",), ("S2f",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
@@ -305,7 +305,7 @@ TAGS = {
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
-    "hpd": Tags(("2d.5",), ("S2f",)),
+    "hpd": Tags(("2d.5",), ("S2g",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
 }
@@ -2072,7 +2072,7 @@ _CONTROL_AGREEMENT = (
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding and the
     agreement, per spike, of the events and their Local-rest controls. The
-    gain is drawn on Figure 2's supplement (panel S2g) and carries its tag; the
+    gain is drawn on Figure 2's supplement (panel S2f) and carries its tag; the
     agreement is drawn on no figure."""
     make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     make_text = value_factory(

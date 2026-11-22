@@ -221,7 +221,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     height, the rows' first letters at one left edge, no heading."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "hpd", "heldout_gain", "shared_content", "ripple_modes",
+        "nonlocal_mua", "heldout_gain", "hpd", "shared_content", "ripple_modes",
         "outside_distance",
     )  # fmt: skip
     statistics = _statistics()

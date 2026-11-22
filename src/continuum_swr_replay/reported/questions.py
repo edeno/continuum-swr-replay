@@ -272,8 +272,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position (against matched windows and on held-out tetrodes), and do held-out spikes favor a decoder that may be non-local outside SWRs over one that is non-local only in SWRs or never?",
-        figures=("2", "2j", "S2g", "S2h", "S2j"),
-        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of Figure 2's supplement, panel S2g, is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values; panel S2h, shared content, is the *_shared_content_* values: the held-out agreement per spike of the events by the spread of the other tetrodes' estimate, in bins fixed in advance). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2j draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; Figure 2's supplement draws that gain outside SWRs away from the SWRs (S2j); its shares in the events detected from the held-out decode and outside them and the gain at well-sampled places are for the text) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
+        figures=("2", "2j", "S2f", "S2h", "S2j"),
+        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of Figure 2's supplement, panel S2f, is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values; panel S2h, shared content, is the *_shared_content_* values: the held-out agreement per spike of the events by the spread of the other tetrodes' estimate, in bins fixed in advance). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2j draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; Figure 2's supplement draws that gain outside SWRs away from the SWRs (S2j); its shares in the events detected from the held-out decode and outside them and the gain at well-sampled places are for the text) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
         "2c.4",
@@ -309,8 +309,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.5",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
-        figures=("S2f",),
-        note="Figure 2's supplement, panel S2f, draws the distribution of the events' HPD coverage by class, with the share of events with a tight posterior (the hpd_tight_* values); the pooled class medians (hpd_median_*) are for the text.",
+        figures=("S2g",),
+        note="Figure 2's supplement, panel S2g, draws the distribution of the events' HPD coverage by class, with the share of events with a tight posterior (the hpd_tight_* values); the pooled class medians (hpd_median_*) are for the text.",
     ),
     Question(
         "2d.6",
@@ -326,7 +326,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.9",
         "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2", "2h", "S2g"),
+        figures=("2", "2h", "S2f"),
         note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
     ),
     Question(
