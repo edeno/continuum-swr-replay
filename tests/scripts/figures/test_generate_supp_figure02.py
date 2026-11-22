@@ -366,7 +366,7 @@ def test_panel_d_draws_the_agreement_by_spread():
     their intervals farther out joined by a thin line in the group's color, the
     bins' labels, a dashed zero line and which way means shared content."""
     fig = figure.generate_figure(_statistics())
-    (ax,) = figure.panel_axes(fig, "shared_content")
+    ax_share, ax = figure.panel_axes(fig, "shared_content")
     assert [t.get_text() for t in ax.get_xticklabels()] == list(
         figure.SPREAD_BIN_LABELS
     )
@@ -397,21 +397,32 @@ def test_panel_d_draws_the_agreement_by_spread():
         line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
         for line in ax.lines
     )
-    # each group's percent of its events per bin, one row per group, under the
-    # data and clear of each other
-    for group, shares in SHARE_OF_EVENTS.items():
-        row = [
-            t for t in ax.texts
-            if t.get_text() in {f"{round(100 * v)}" for v in shares}
-            and t.get_position()[1] == figure.SHARE_ROWS_Y[list(SHARE_OF_EVENTS).index(group)]
-        ]  # fmt: skip
-        assert sorted(t.get_position()[0] for t in row) == list(bins)
-    assert "% of events" in [t.get_text() for t in ax.texts]
+    # a strip above, sharing the x axis: each group's percent of its events per
+    # bin as two narrow bars side by side, in the groups' colors
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    bars = list(ax_share.patches)
+    assert len(bars) == 2 * len(bins)
+    for side, (group, color) in zip((-1, 1), panels.GROUP_COLORS.items(), strict=True):
+        mine = [b for b in bars if to_rgba(b.get_facecolor()) == to_rgba(color)]
+        np.testing.assert_allclose(
+            [b.get_x() + b.get_width() / 2 for b in mine],
+            bins + side * figure.SHARE_BAR_WIDTH / 2,
+        )
+        np.testing.assert_allclose(
+            [b.get_height() for b in mine], 100 * np.asarray(SHARE_OF_EVENTS[group])
+        )
+    assert ax_share.get_shared_x_axes().joined(ax_share, ax)
+    assert ax_share.get_ylabel() == "% of\nevents"
+    assert ax_share.get_title() == "Shared content"
+    assert not any(t.get_visible() and t.get_text() for t in ax_share.get_xticklabels())
     texts = [t.get_text() for t in ax.texts]
     assert "\u2191 shared\ncontent" in texts
     assert {"No SWR", "SWR"} <= set(texts)
     assert ax.get_ylabel() == "Held-out agreement\n(nats/spike)"
-    assert ax.get_xlabel() == "Spread of the other tetrodes'\nestimate (cm)"
+    assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
     plt.close(fig)
 
 

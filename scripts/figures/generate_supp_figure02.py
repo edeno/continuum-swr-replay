@@ -170,14 +170,25 @@ the order the text cites them, in four rows:
         place preference (the agreement; above zero only when the left-out
         tetrode's activity is where the others point), summed over tetrodes and
         bins and divided by the event's spikes, as the gain is. The events are
-        grouped by their spread, the mean over their left-out tetrodes of the
-        mean over the event's bins of the effective width of the other
-        tetrodes' distribution, in bins fixed in advance
-        (``shared_content.SPREAD_BINS_CM``). A dot per animal for no-SWR and
-        SWR events in their colors, beside them the animals' mean with its
-        95 % interval, a thin line through each group's means and a dashed line
-        at zero, no place preferred (``shared_content.agreement_by_spread_statistics``;
-        the events summary's ``*_shared_content_*`` values).
+        grouped, in bins fixed in advance (``shared_content.SPREAD_BINS_CM``),
+        by the width of the other tetrodes' position estimate. For each
+        left-out tetrode and each 2 ms bin, the other tetrodes give a
+        probability distribution over track position (Local, Continuous and
+        Fragmented together, No-Spike left out); its effective width is
+        exp(entropy) place bins times the bin size, the length of track the
+        distribution effectively covers (a flat distribution over 100 cm gives
+        100 cm; two separate narrow peaks give the sum of their widths, not the
+        distance between them); the event's value is the mean over its scored
+        bins and its left-out tetrodes. It is not the same measure as panel
+        f's (the 95 % HPD length of the all-tetrode non-local posterior). A dot
+        per animal for no-SWR and SWR events in their colors, beside them the
+        animals' mean with its 95 % interval, a thin line through each group's
+        means and a dashed line at zero, no place preferred
+        (``shared_content.agreement_by_spread_statistics``; the events
+        summary's ``*_shared_content_*`` values). Above, a thin strip sharing
+        the x axis: the percent of each group's events in each width bin, two
+        narrow bars side by side in the groups' colors (``share_of_events``;
+        the ``*_shared_content_*_share_of_events`` values).
 
     i — Supports Figure 2i, which shows no step in non-local time at the SWR
         threshold. Two axes share the ripple-power x axis (-1 to 7 z). Top
@@ -263,7 +274,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.ticker import NullLocator
+from matplotlib.ticker import MaxNLocator, NullLocator
 from matplotlib.transforms import blended_transform_factory
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -403,7 +414,7 @@ RANGE_DROP = 0.28
 TIMING_CMAP = "bone_r"
 """The timing table's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
-SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
+SHARED_XLABEL = "Width of the other tetrodes'\nposition estimate (cm)"
 RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
 """Where the ripple panel reads each animal's density of the events' peak power
 (z): past 12 z lies a thin tail."""
@@ -443,11 +454,9 @@ SHARED_OFFSET = 0.2
 """The shared-content panel: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
 SHARED_MEAN_OFFSET = 0.11
-SHARE_ROWS_ROOM = 0.35
-"""How far the shared-content panel's y axis reaches below its data, as a share
-of the data's range: room for the rows of each group's share of its events."""
-SHARE_ROWS_Y = (0.09, 0.02)
-"""The rows of the no-SWR and the SWR events' shares (axes height)."""
+SHARE_BAR_WIDTH = 0.3
+"""The width of each group's bar in the shared-content panel's strip (x units)."""
+
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
 OUTSIDE_LABEL = "Outside\nSWRs"
 PARTS_LABEL_DROP = 21
@@ -830,15 +839,15 @@ def draw_heldout_tetrode(ax: Axes, statistics: dict) -> None:
     ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
 
 
-def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
+def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> None:
     """The shared-content panel: the held-out agreement per spike by spread bin, for no-SWR and
     SWR events (``statistics``: :func:`read_inputs`' ``shared``). Each group's
     dots (one per animal) in its color on its side of the bin, the animals'
     mean with its 95 % interval in black farther out, a thin line through the
     group's means, the group's name beside its first bin, a dashed line at zero
-    and, above it at the right, which way means shared content; under the data,
-    each group's percent of its events in each bin in its color
-    (``share_of_events``), with a gray note of what the numbers are."""
+    and, above it at the right, which way means shared content. Above, a thin
+    strip sharing the x axis: each group's percent of its events in each bin
+    (``share_of_events``), two narrow bars side by side in the groups' colors."""
     bins = np.arange(len(SPREAD_BIN_LABELS))
     for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
         rows = [statistics.loc[(label, group)] for label in SPREAD_BIN_LABELS]
@@ -874,29 +883,26 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
             transform=ax.transAxes, fontsize=SMALL_SIZE,
             color=readable_text_color(color),
         )  # fmt: skip
-    # each group's share of its events in each bin, in two rows under the data
-    low, high = ax.get_ylim()
-    ticks = [t for t in ax.get_yticks() if low <= t <= high]
-    ax.set_ylim(low - SHARE_ROWS_ROOM * (high - low), high)
-    ax.set_yticks(ticks)  # none beside the rows of numbers
-    for k, (group, color) in enumerate(GROUP_COLORS.items()):
-        for x, label in zip(bins, SPREAD_BIN_LABELS, strict=True):
-            ax.text(
-                x, SHARE_ROWS_Y[k],
-                format_number(statistics.loc[(label, group), "share_of_events"], "pctnum"),
-                transform=blended_transform_factory(ax.transData, ax.transAxes),
-                ha="center", va="bottom", fontsize=SMALL_SIZE,
-                color=readable_text_color(color),
-            )  # fmt: skip
-    ax.text(
-        0.02, SHARE_ROWS_Y[0] + 0.08, "% of events", transform=ax.transAxes,
-        ha="left", va="bottom", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-    )  # fmt: skip
+    # the strip above: each group's percent of its events in each bin
+    for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
+        shares = [
+            100 * statistics.loc[(label, group), "share_of_events"]
+            for label in SPREAD_BIN_LABELS
+        ]
+        ax_share.bar(
+            bins + side * SHARE_BAR_WIDTH / 2, shares, width=SHARE_BAR_WIDTH,
+            color=color, lw=0,
+        )  # fmt: skip
+    ax_share.sharex(ax)
+    ax_share.tick_params(labelbottom=False)
+    ax_share.set_ylim(0, None)
+    ax_share.yaxis.set_major_locator(MaxNLocator(2))
+    ax_share.set_ylabel("% of\nevents")
+    ax_share.set_title("Shared content", fontsize=SMALL_SIZE, pad=3)
     ax.set_xlim(-0.6, bins[-1] + 0.6)
     ax.set_xticks(bins, SPREAD_BIN_LABELS)
     ax.set_xlabel(SHARED_XLABEL)
     ax.set_ylabel(SHARED_YLABEL)
-    ax.set_title("Shared content", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_outside_swr_series(
@@ -1150,8 +1156,15 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 2), "ripple_modes": (2, 1)}
+PANEL_GRIDS = {
+    "nonlocal_mua": (2, 1),
+    "rule_sweep": (1, 2),
+    "ripple_modes": (2, 1),
+    "shared_content": (2, 1),
+}
 """The panels drawn on several axes in their frame: rows and columns."""
+PANEL_ROW_SHARES = {"shared_content": (1, 3)}
+"""The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
 
@@ -1178,15 +1191,23 @@ def generate_figure(statistics: dict) -> Figure:
     for panel in PANELS:  # the axes in the panels' order (panel_axes)
         (bottom, top), (left, width) = spans[panel], FRAMES[panel]
         rows, columns = PANEL_GRIDS.get(panel, (1, 1))
-        height = (top - bottom) * (1 - GRID_GAP[0] * (rows - 1)) / rows
+        shares = np.asarray(PANEL_ROW_SHARES.get(panel, (1,) * rows), dtype=float)
+        heights = (
+            (top - bottom) * (1 - GRID_GAP[0] * (rows - 1)) * shares / shares.sum()
+        )
+        tops = (
+            top
+            - np.concatenate([[0.0], np.cumsum(heights[:-1])])
+            - np.arange(rows) * GRID_GAP[0] * (top - bottom)
+        )
         across = width * (1 - GRID_GAP[1] * (columns - 1)) / columns
         axes[panel] = [
             fig.add_axes(
                 (
                     left + c * (across + GRID_GAP[1] * width),
-                    top - height - r * (height + GRID_GAP[0] * (top - bottom)),
+                    tops[r] - heights[r],
                     across,
-                    height,
+                    heights[r],
                 )
             )
             for r in range(rows)
@@ -1195,7 +1216,7 @@ def generate_figure(statistics: dict) -> Figure:
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
     draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
-    draw_shared_content(axes["shared_content"][0], statistics["shared"])
+    draw_shared_content(*axes["shared_content"], statistics["shared"])
     draw_outside_swr_series(
         axes["outside_distance"][0], statistics["outside"], statistics["parts"],
         "beyond_swr_margin", OUTSIDE_SWR_MARGINS_S,
