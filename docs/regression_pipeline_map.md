@@ -194,13 +194,13 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
+`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_subset_shares`, `outside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
 The non-local restriction models summed over event windows.
 
-`outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+`outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
