@@ -32,8 +32,8 @@ holds it; :func:`outside_swr_not_observed_counts` counts those left out. The
 sums over all immobile time keep them: they are immobile time, inside an SWR
 or not.
 
-**All immobile time** (:func:`epoch_immobile_gains`, Figure 2g's first axis
-and the first column of its second):
+**All immobile time** (:func:`epoch_immobile_gains`; Figure 2g's first axis
+draws the paired difference ``full - swr`` per spike):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
 ``immobile_outside_swr``) inside a well visit, each decoder's gain over the
 local-only decoder, ``(swr - none)`` and ``(full - none)``, and their
@@ -47,7 +47,7 @@ over the ``immobile_outside_swr`` bins inside a well visit, where ``swr`` may
 not use the non-local states and ``full`` may, so ``full - swr`` is what the
 non-local states buy outside SWRs:
 
-- the gain per spike and per second (the second column of Figure 2g's second
+- the gain per spike and per second (the second column of Figure 2g's first
   axis);
 - the share in the given events with no SWR, and the share in the given events'
   time outside the SWR of those that overlap one: the events' summed
@@ -61,7 +61,7 @@ non-local states buy outside SWRs:
   numerators, as :func:`.restriction_windows.window_contrasts` leaves it out of
   the window statistics;
 - the share outside those events, the rest: 1 minus the two shares, so the three
-  add to 1 (Figure 2g's third axis draws the three). It holds the bins inside no
+  add to 1 (Figure 2g's second axis draws the three). It holds the bins inside no
   event window and the bins of the windows the two shares leave out;
 - the gain per spike and per second in the rest of that time, the bins inside
   no event window of any group (``in_event_window`` false): every event the
@@ -853,16 +853,12 @@ def _epoch_measure_statistics(
 RESTRICTION_FIGURE_FAMILY = "filter"
 """Figure 2g, the decoders compared, in one score family (the events summary's
 values of it carry the panel's tag; the other family's do not)."""
-RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
-"""Figure 2g's first axis: each decoder's gain over the local-only decoder per
-spike of the immobile time inside a well visit, by its measure
-(:data:`IMMOBILE_MEASURES`), in drawing order (SWR-only, Full)."""
 RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
-"""Figure 2g's second axis, first column: the full decoder minus the SWR-only
+"""Figure 2g's first axis, first column: the full decoder minus the SWR-only
 decoder per spike of all the immobile time inside a well visit, each epoch's
 paired difference (:data:`IMMOBILE_MEASURES`)."""
 RESTRICTION_FIGURE_OUTSIDE_SWR = "gain_per_spike"
-"""Figure 2g's second axis, second column: the full decoder minus the SWR-only
+"""Figure 2g's first axis, second column: the full decoder minus the SWR-only
 decoder per spike of the immobile time outside SWRs inside a well visit
 (:data:`MEASURES`)."""
 RESTRICTION_FIGURE_SHARES = (
@@ -870,7 +866,7 @@ RESTRICTION_FIGURE_SHARES = (
     "share_in_swr_events_outside_swr",
     "share_outside_events",
 )
-"""Figure 2g's third axis: where that gain outside SWRs sits, as shares of it
+"""Figure 2g's second axis: where that gain outside SWRs sits, as shares of it
 (:data:`MEASURES`), in drawing order: in the no-SWR events, in the time outside
 the SWR of the events partly in one (both detected from the held-out decode),
 and outside those events."""
@@ -912,13 +908,13 @@ def restriction_figure_statistics(
     -------
     decoders : pd.DataFrame
         :func:`immobile_gain_statistics` over the immobile time inside a well
-        visit, indexed by ``family`` and ``measure`` (the first axis and the
-        second axis' first column).
+        visit, indexed by ``family`` and ``measure`` (the first axis' first
+        column).
     outside : pd.DataFrame
         :func:`outside_swr_gain_statistics` over the immobile time outside SWRs
         inside a well visit, with the shares of it in the events of
-        ``windows``, indexed by ``family`` and ``measure`` (the second axis'
-        second column and the third axis).
+        ``windows``, indexed by ``family`` and ``measure`` (the first axis'
+        second column and the second axis).
     """
     decoders = immobile_gain_statistics(
         epoch_immobile_gains(time_sums, bin_s)

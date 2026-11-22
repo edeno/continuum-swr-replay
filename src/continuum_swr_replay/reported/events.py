@@ -149,7 +149,6 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE,
-    RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
@@ -2532,8 +2531,8 @@ def restriction_outside_swr_values(
     marks every held-out event, wherever it starts). The gain per spike and
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
-    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's second and third
-    axes and carry that panel's tag."""
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's two axes and
+    carry that panel's tag."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
     )
@@ -2797,9 +2796,10 @@ def restriction_immobile_values(
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
-    decoder captures. The gains per spike in :data:`RESTRICTION_FIGURE_FAMILY`
-    are drawn on Figure 2g's first axis and their paired difference on its
-    second; they carry that panel's tag."""
+    decoder captures. Of these, Figure 2g draws only the paired difference per
+    spike in :data:`RESTRICTION_FIGURE_FAMILY` (its first axis), which carries
+    that panel's tag with the epoch counts; the gains over the local-only
+    decoder are for the text."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
     )
@@ -2809,7 +2809,7 @@ def restriction_immobile_values(
     statistics = restriction_totals.immobile_gain_statistics(
         restriction_totals.epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    drawn = (*RESTRICTION_FIGURE_DECODERS, RESTRICTION_FIGURE_DIFFERENCE)
+    drawn = (RESTRICTION_FIGURE_DIFFERENCE,)
     values = []
     for family, suffix in FAMILY_SUFFIX.items():
         scored = (

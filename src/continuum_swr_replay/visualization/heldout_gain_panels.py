@@ -1,7 +1,7 @@
 """The held-out gain panels: a gain for each of two kinds of event.
 
 The held-out tetrode supplementary figure (the gain over local coding per spike)
-and Figure 2g's second and third axes (the full decoder's gain over the SWR-only
+and Figure 2g's two axes (the full decoder's gain over the SWR-only
 decoder per spike, and the shares of it outside SWRs) draw each value the same
 way: a dot per animal in the group's color and, beside them, the animals' mean
 with its 95 % interval in black, with a dashed line at zero, where neither side

@@ -1327,12 +1327,11 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # Figure 2g's first axis draws the filter family's gains per spike and
-    # their difference; per second, the share and the two-sided family carry
-    # no figure
+    # Figure 2g's first axis draws the filter family's paired difference per
+    # spike, with the epoch counts; the gains over the local-only decoder, per
+    # second, the share and the two-sided family carry no figure (the text's)
     drawn = {
-        f"restriction_immobile_{contrast}_per_spike{end}"
-        for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr")
+        f"restriction_immobile_full_minus_swr_per_spike{end}"
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     } | {
         "restriction_immobile_epochs_full_above_swr_only",
@@ -1352,13 +1351,10 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         windows, sums, bin_s
     )
     numbers = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
-    for measure in (
-        *builder.RESTRICTION_FIGURE_DECODERS,
-        builder.RESTRICTION_FIGURE_DIFFERENCE,
-    ):
-        assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
-            numbers[f"restriction_immobile_{measure}"]
-        )
+    measure = builder.RESTRICTION_FIGURE_DIFFERENCE
+    assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
+        numbers[f"restriction_immobile_{measure}"]
+    )
     groups = builder.restriction_outside_swr_values(sums, bin_s, windows, "s")
     numbers = _numbers(groups.with_events)
     key = "restriction_outside_swr_full_minus_swr"

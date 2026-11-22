@@ -1862,8 +1862,6 @@ def _measure_rows(measures: dict[str, list[float]]) -> pd.DataFrame:
     return table
 
 
-SWR_ONLY = [0.096, 0.089, 0.074, 0.128, 0.084]
-FULL = [0.118, 0.112, 0.104, 0.17, 0.109]
 PAIRED = [0.022, 0.023, 0.03, 0.042, 0.025]
 OUTSIDE = [0.029, 0.02, 0.025, 0.038, 0.022]
 SHARES = {
@@ -1877,13 +1875,7 @@ SHARES["share_outside_events"] = list(
 
 def _decoder_rows() -> pd.DataFrame:
     """``immobile_gain_statistics``' rows the panel reads."""
-    return _measure_rows(
-        {
-            "swr_minus_none_per_spike": SWR_ONLY,
-            "full_minus_none_per_spike": FULL,
-            "full_minus_swr_per_spike": PAIRED,
-        }
-    )
+    return _measure_rows({"full_minus_swr_per_spike": PAIRED})
 
 
 def _outside_rows() -> pd.DataFrame:
@@ -1916,44 +1908,11 @@ def _has_zero_line(ax) -> bool:
     )
 
 
-def test_figure02_panel_g_first_axis_draws_each_decoders_gain_unjoined(offline):
-    """Panel g's first axis: a dot per animal for the SWR-only decoder (dark
-    gray) and the full decoder (green), not joined (the paired difference is
-    the second axis), a dashed zero line labeled "local-only", and the filter
-    family only."""
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import to_rgba
-
-    figure02 = offline("scripts.figures.generate_figure02")
-    fig, ax = plt.subplots()
-    figure02.draw_decoder_gains(ax, _decoder_rows())
-    fig.canvas.draw()
-    dots = ax.collections
-    assert len(dots) == 2
-    for drawn, x, values, color in (
-        (dots[0], 0.0, SWR_ONLY, figure02.C_SWR_ONLY),
-        (dots[1], 1.0, FULL, figure02.COLORS["Non-Local"]),
-    ):
-        np.testing.assert_allclose(drawn.get_offsets()[:, 0], x)
-        np.testing.assert_allclose(drawn.get_offsets()[:, 1], values)
-        np.testing.assert_allclose(drawn.get_facecolors()[0], to_rgba(color))
-    # no line joins an animal's two dots
-    assert not [line for line in ax.lines if line.get_linestyle() == "-"]
-    assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-only", "Full"]
-    assert [t.get_text() for t in ax.texts] == ["local-only"]
-    assert ax.get_title() == ""
-    assert ax.get_ylabel() == "Gain over local-only\ndecoder (nats/spike)"
-    low, high = ax.get_ylim()
-    assert low < 0 < max(FULL) < high
-    plt.close(fig)
-
-
-def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
-    """Panel g's second axis: the full minus the SWR-only decoder over all
-    immobile time (the paired difference) and outside SWRs, each a dot per
-    animal in green and the mean with its interval beside them, and a dashed
-    zero line."""
+def test_figure02_panel_g_first_axis_draws_full_minus_swr_only(offline):
+    """Panel g's first axis: the full minus the SWR-only decoder over all
+    immobile time (the paired difference, gray dots) and outside SWRs (the main
+    result: green dots, its label in bold), each a dot per animal and the mean
+    with its interval beside them, and a dashed zero line."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
@@ -1961,31 +1920,32 @@ def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
     fig, ax = plt.subplots()
     figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
     fig.canvas.draw()
-    for x, values in ((0.0, PAIRED), (1.0, OUTSIDE)):
+    for x, values, color in (
+        (0.0, PAIRED, figure02.C_REFERENCE),
+        (1.0, OUTSIDE, figure02.COLORS["Non-Local"]),
+    ):
         dots = _dots_at(ax, x)
         np.testing.assert_allclose(dots.get_offsets()[:, 1], values)
-        np.testing.assert_allclose(
-            dots.get_facecolors()[0], to_rgba(figure02.COLORS["Non-Local"])
-        )
+        np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["All", "Outside\nSWRs"]
+    labels = ax.get_xticklabels()
+    assert [t.get_text() for t in labels] == ["All", "Outside\nSWRs"]
+    assert [t.get_fontweight() for t in labels] == ["normal", "bold"]
     # horizontal, so that they do not hang below panel h's labels
-    assert {t.get_rotation() for t in ax.get_xticklabels()} == {0.0}
-    # the unit is in the title, in place of a y label
-    assert ax.get_title() == "Full minus\nSWR-only\n(nats/spike)"
-    assert ax.get_ylabel() == ""
-    # no tick label at the frame's top, where it would meet the title
+    assert {t.get_rotation() for t in labels} == {0.0}
+    assert ax.get_title() == ""
+    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/spike)"
+    # no tick label at the frame's top, where it would meet the heading's rule
     assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
     plt.close(fig)
 
 
-def test_figure02_panel_g_third_axis_names_each_share_beside_its_dots(offline):
-    """Panel g's third axis: the three shares of the gain outside SWRs in
+def test_figure02_panel_g_second_axis_names_each_share_beside_its_dots(offline):
+    """Panel g's second axis: the three shares of the gain outside SWRs in
     percent, in one column, in panel d's colors and a gray for the rest, each
     a dot per animal, the mean with its interval beside them and its name
-    beside that in its color; no x tick labels; a dashed zero line; the title
-    a text above the frame, returned for the figure to place."""
+    beside that in its color; no x tick labels; a dashed zero line."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
@@ -1993,7 +1953,7 @@ def test_figure02_panel_g_third_axis_names_each_share_beside_its_dots(offline):
 
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    title = figure02.draw_outside_swr_shares(ax, _outside_rows())
+    figure02.draw_outside_swr_shares(ax, _outside_rows())
     fig.canvas.draw()
     colors = (
         figure02.COLORS["No SWR"],
@@ -2007,7 +1967,7 @@ def test_figure02_panel_g_third_axis_names_each_share_beside_its_dots(offline):
     ]
     assert len(dots) == 3
     means = _means_at(ax, 0.0)
-    names = [t for t in ax.texts if t is not title]
+    names = list(ax.texts)
     for drawn, mean, name, (measure, values), color in zip(
         dots, means, names, SHARES.items(), colors, strict=True
     ):
@@ -2029,8 +1989,7 @@ def test_figure02_panel_g_third_axis_names_each_share_beside_its_dots(offline):
     assert _has_zero_line(ax)
     # the rest is below zero here, and inside the axis
     assert ax.get_ylim()[0] < 100 * min(SHARES["share_outside_events"])
-    assert title.get_text() == "Share of gain\noutside SWRs (%)"
-    assert ax.get_ylabel() == ""
+    assert ax.get_ylabel() == "Share of gain\noutside SWRs (%)"
     plt.close(fig)
 
 
@@ -2049,7 +2008,6 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
         is restriction_totals.restriction_figure_statistics
     )
     for name in (
-        "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
         "RESTRICTION_FIGURE_FAMILY",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
@@ -2058,14 +2016,12 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
         assert getattr(figure02, name) is getattr(restriction_totals, name), name
     for name in (
         "RESTRICTION_FIGURE",
-        "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
         "RESTRICTION_FIGURE_FAMILY",
         "RESTRICTION_FIGURE_GROUPS",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name
-    assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)
     assert list(figure02.SHARE_LABELS) == list(
         restriction_totals.RESTRICTION_FIGURE_SHARES
     )
