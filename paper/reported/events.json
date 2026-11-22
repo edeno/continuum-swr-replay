@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "d9d721da686a",
+ "commit": "16e7afccc3e9",
  "code": {
-  "head": "d9d721da686af610899ef212c78e0c72e6819724",
+  "head": "16e7afccc3e978fb2f20173fe085b58a7521ea13",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -283,7 +283,7 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_evidence/heldout_events.py": {
-    "sha256": "7786ee68cd3603b6ba5a6097b347e97ba8783c5981e75d38151cc5176550b5f7",
+    "sha256": "9a592253f94db913d807871e35c865607d137962dca9639a72e049fd2eea09b1",
     "code_sha256": "e6089aa015a19090e27f21373091f476d2a760a2bd68aebde4f8ec586ee0c623"
    },
    "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
@@ -291,8 +291,8 @@
     "code_sha256": "5614fe932b5e718f9523f7ef02f2bdc54f2cc029835f648d38d20a3f22fb918c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py": {
-    "sha256": "8151eed80d63bf3bef722b80426e5442721b8451de1408945bb44aa2cfbc137e",
-    "code_sha256": "7a15e36c5099566c40dcf3684f1dafd7e4c768883fa1aad43b20a37618bfb146"
+    "sha256": "9f241973dacb84338a415d366fb18df06dff9c89c19903c7a9125872b92a81f6",
+    "code_sha256": "fa2a01339340f1f1c8e4d81cedea6f48b8f5fb77e7b11274083d26d175267f8c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
     "sha256": "f38b55578e657527fd62904f201de5ce673b480026e7793fef1981217511968f",
@@ -335,8 +335,8 @@
     "code_sha256": "5287a678cd0925a5783ccfabc8650caadd3423e7f338781acb8ea144f7006e42"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
-    "sha256": "32f7a51987a1476476d4dd77a67227264bf281fc5ec07987a9cfc638bebd9efe",
-    "code_sha256": "aba8dd7009a8eb19b7aeddbcddc19578ce0fa1867ff918b10de39fd9656b0a74"
+    "sha256": "fb51944dc60ec36110034d4308d6c2cdf0100eb5a18d9888c39bd016c4a60a3b",
+    "code_sha256": "9472bba65557329ab44485556d0fe40683cd7dd432a927843e69e4c1ee006fa0"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
@@ -414,9 +414,17 @@
     "sha256": "ebaf8dec141bd22ad5b56f895d71fa51be302a06811323871e734acb6df1bc7f",
     "code_sha256": "10a0d890b4532049a71b7ce1c86828a69132cc59dc3f3a4657e7e0cf24871046"
    },
+   "src/continuum_swr_replay/analysis/regression/__init__.py": {
+    "sha256": "cdefdcd4b070c8772d9bcdce6f96d6fc8e204b90506327fefec77e5c777cf6c0",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/analysis/regression/folds.py": {
+    "sha256": "19b85eef7e9f022ea4e7aa0ab718e44cceaa2a2e705c6ea2be47c05dc9b4a35d",
+    "code_sha256": "b6edc2b2642ff0a733debb4b7a660234a2d1ff125d07a8638caec0515b182a71"
+   },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "64f9274b3a85ae1b5b1f493e438fd85f2a9aafa0f002ff6d96ec2dc97d4b5d73",
-    "code_sha256": "03f6c51afd81e1df4d30d7927b121e056e9bf82b124185afb290a5f867d0f5dc"
+    "sha256": "95ff286d20363d5c5e58521edc29e8768c99fcf9f29254ee7a370297d590bb07",
+    "code_sha256": "05888953cb0b8c2ec1d7a96109b8685d70cefd6af66062ce20f39d7838030a5c"
    },
    "src/continuum_swr_replay/columns.py": {
     "sha256": "ce2b6258d178bf3faf8a65a7fcb140a40ccbb39206df076afe186d5e21b00ae8",
@@ -495,8 +503,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "a96de5df127eed4dadeb39c0ae9e346649c69cfeb2602ef2f7085bf01c7e1420",
-    "code_sha256": "157a8bf73a759f1f6fb16d946b23fe8825401d0e6d26661a2f3cdc9694929afa"
+    "sha256": "30cdd04513ed765d6f6340e277c00ee73f1da1d0882a21b8d98ec8a33e75a213",
+    "code_sha256": "e4c95342305a157b619a714fc121d0cf22d916a12636e9e8537f32d894f4b6f4"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
