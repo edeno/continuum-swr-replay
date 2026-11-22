@@ -3,8 +3,8 @@
 Figure 2j (each decoder's gain over the local-only decoder, and the full
 decoder's over the SWR-only decoder) and Figure 2's supplement
 (``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
-local coding per spike; the full decoder's gain outside SWRs, by distance from
-the SWRs and by place sampling; and where that gain sits) draw each value the
+local coding per spike; the full decoder's gain outside SWRs by distance from
+the SWRs) draw each value the
 same way: a dot per animal and, beside them, the animals' mean with its 95 %
 interval in black, with a dashed line at zero, where neither side predicts the
 spikes better.
@@ -17,14 +17,10 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.transforms import blended_transform_factory
 
-from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
-    OUTSIDE_SWR_SHARES,
-    RESTRICTION_FIGURE_FAMILY,
-)
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
-from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
 
 GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["SWR"]}
@@ -150,73 +146,3 @@ def full_better_cue(ax: Axes) -> None:
         transform=blended_transform_factory(ax.transAxes, ax.transData),
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
-
-
-SHARE_LABELS = dict(
-    zip(OUTSIDE_SWR_SHARES, ("No SWR", "Partly in SWR", "Outside events"), strict=True)
-)
-"""Each share of the gain outside SWRs, named as panel d of Figure 2 names the
-event classes, and the rest outside the events."""
-SHARE_COLORS = dict(
-    zip(
-        OUTSIDE_SWR_SHARES,
-        (COLORS["No SWR"], COLORS["SWR partial"], "#999999"),
-        strict=True,
-    )
-)
-"""Panel d's colors of the no-SWR events and of the events partly in an SWR,
-and a neutral gray for the time outside events."""
-
-
-def percent(row: pd.Series) -> pd.Series:
-    """A statistics row with its values (``animals``, ``estimate``, ``ci_low``,
-    ``ci_high``) in percent."""
-    scaled = row.copy()
-    for column in ("animals", "estimate", "ci_low", "ci_high"):
-        scaled[column] = 100 * np.asarray(row[column])
-    return scaled
-
-
-def draw_outside_swr_shares(ax: Axes, outside: pd.DataFrame, ylabel: str) -> None:
-    """Where the full decoder's gain over the SWR-only decoder outside SWRs
-    sits, in percent of that gain: in the no-SWR events, in the time outside
-    the SWR of the events partly in an SWR, and outside the events (the rest;
-    per epoch the three add to 100 %).
-
-    The three lie at very different heights, so they share one column: for
-    each, a dot per animal (the median over its epochs, spread sideways), the
-    animals' mean with its 95 % interval, and its name beside them in its color
-    (text no lighter than the reference gray); a dashed line at zero; no x tick
-    labels (``restriction_totals.outside_swr_gain_statistics``'
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.OUTSIDE_SWR_SHARES`).
-
-    Parameters
-    ----------
-    ax : Axes
-    outside : pd.DataFrame
-        ``outside_swr_gain_statistics``' rows, indexed by ``family`` and
-        ``measure``.
-    ylabel : str
-    """
-    rows = {
-        measure: percent(outside.loc[(RESTRICTION_FIGURE_FAMILY, measure)])
-        for measure in OUTSIDE_SWR_SHARES
-    }
-    for measure, row in rows.items():
-        color = SHARE_COLORS[measure]
-        draw_animal_gain(ax, 0.0, row, color, spread=True)
-        text_color = readable_text_color(color)
-        if text_color == color and color == SHARE_COLORS[OUTSIDE_SWR_SHARES[-1]]:
-            text_color = REFERENCE_COLOR  # the gray dots' name, no lighter than it
-        ax.annotate(
-            SHARE_LABELS[measure], (MEAN_OFFSET, row["estimate"]),
-            xytext=(4, 0), textcoords="offset points", ha="left", va="center",
-            fontsize=SMALL_SIZE, color=text_color, annotation_clip=False,
-        )  # fmt: skip
-    ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-    ax.set_xlim(-0.4, 0.4)
-    ax.set_xticks([])
-    low = min(min(float(r["animals"].min()), r["ci_low"]) for r in rows.values())
-    high = max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values())
-    ax.set_ylim(min(low, 0) - 0.06 * (high - low), high + 0.06 * (high - low))
-    ax.set_ylabel(ylabel)

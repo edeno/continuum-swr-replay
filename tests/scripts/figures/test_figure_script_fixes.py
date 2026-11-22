@@ -1866,13 +1866,6 @@ SWR_ONLY = [0.099, 0.103, 0.081, 0.138, 0.093]
 FULL = [0.119, 0.117, 0.107, 0.172, 0.115]
 PAIRED = [0.022, 0.023, 0.03, 0.042, 0.025]
 OUTSIDE = [0.029, 0.02, 0.025, 0.038, 0.022]
-SHARES = {
-    "share_in_no_swr_events": [0.98, 0.95, 0.92, 0.91, 0.86],
-    "share_in_swr_events_outside_swr": [0.22, 0.24, 0.12, 0.11, 0.17],
-}
-SHARES["share_outside_events"] = list(
-    1 - np.add(*SHARES.values())
-)  # the rest: the three add to 1
 
 
 def _decoder_rows() -> pd.DataFrame:
@@ -1887,8 +1880,8 @@ def _decoder_rows() -> pd.DataFrame:
 
 
 def _outside_rows() -> pd.DataFrame:
-    """``outside_swr_gain_statistics``' rows the panels read."""
-    return _measure_rows({"gain_per_spike": OUTSIDE, **SHARES})
+    """``outside_swr_gain_statistics``' row the panels read."""
+    return _measure_rows({"gain_per_spike": OUTSIDE})
 
 
 def _dots_at(ax, x: float):
@@ -2026,7 +2019,6 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     assert events.TAGS["tetrode_holdout"].figures == ("S2c",)
     assert events.TAGS["shared_content"].figures == ("S2d",)
     assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2e",)
-    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2f",)
     assert events.TAGS["participation"].figures == ("2h",)
 
 

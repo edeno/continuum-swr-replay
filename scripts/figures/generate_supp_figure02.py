@@ -2,7 +2,7 @@
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
 the order the text cites them: MUA in the No-Spike state, the timing of events
 against their SWRs, the held-out tetrode gain, shared content, and the gain
-outside SWRs.
+outside SWRs away from the SWRs.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -74,16 +74,16 @@ outside SWRs.
         at zero, no place preferred (``shared_content.agreement_by_spread_statistics``;
         the events summary's ``*_shared_content_*`` values).
 
-    e and f — Support Figure 2j: its main result, the full decoder's gain over the
-    SWR-only decoder outside SWRs, looked at more closely. Every value is over
-    the immobile bins inside a well visit, which runs from the animal's first
-    nose-poke at a reward well to its last poke-out there. Each is per epoch,
-    summed over its bins and divided by the spikes in them (held-out log score, the whole decoder fit
-    on folds of whole trials and each fold scored under the fit that did not
-    see it); a dot per animal is the median over its epochs, beside the
-    animals' mean with its 95 % interval.
-
-    e — That gain over every immobile bin outside SWRs ("Outside SWRs",
+    e — Supports Figure 2j: its main result, the full decoder's gain over the
+        SWR-only decoder outside SWRs, looked at more closely. Every value is
+        over the immobile bins inside a well visit, which runs from the
+        animal's first nose-poke at a reward well to its last poke-out there.
+        Each is per epoch, summed over its bins and divided by the spikes in
+        them (held-out log score, the whole decoder fit on folds of whole
+        trials and each fold scored under the fit that did not see it); a dot
+        per animal is the median over its epochs, beside the animals' mean
+        with its 95 % interval. That gain over every immobile bin outside
+        SWRs ("Outside SWRs",
         ``restriction_totals.outside_swr_gain_statistics``), then over only
         the bins farther than 100, 250 and 500 ms from every SWR
         (``restriction_totals.outside_swr_subset_statistics``, the
@@ -91,23 +91,16 @@ outside SWRs.
         is not SWR edges. The same gain over only the bins whose place has at
         least 10 and at least 60 s of training data (the ``place_sampling``
         parts) is a reported value for the text, not drawn
-        (``restriction_outside_swr_sampled_*``).
-    f — Where that gain outside SWRs sits, as a share of it per epoch: in the
-        events with no SWR, in the time outside the SWR of the events partly in
-        one, and outside those events (1 minus the other two, so the three add
-        to 100 %; below zero, as the full decoder does slightly worse there),
-        each named beside its dots in panel d's colors of Figure 2
-        (``outside_swr_gain_statistics``' shares). The events are those
-        detected from the held-out decode that start inside a well visit, the
-        full decoder's own events. Outside SWRs the SWR-only decoder is the
-        local-only decoder, so the full decoder can gain only where it goes
-        non-local, which is where its events are: the shares follow from how
-        the events are defined, and so describe where the gain sits and do not
-        test the events.
+        (``restriction_outside_swr_sampled_*``). Where that gain sits, its
+        shares in the events detected from the held-out decode and outside
+        them, is also for the text, not drawn
+        (``restriction_outside_swr_full_minus_swr_share_*``): the shares follow
+        from how the events are defined, so they describe where the gain sits
+        and do not test the events.
 
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
-Panels e and f read the held-out event run
+Panel e reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
 (``reported.events.read_heldout_restriction``), and refuse it, as Figure 2j
@@ -206,7 +199,6 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     REFERENCE_COLOR,
     draw_animal_gain,
     draw_group_gain,
-    draw_outside_swr_shares,
     full_better_cue,
     label_gain_axis,
     spread_offsets,
@@ -228,7 +220,7 @@ figure_utilities.set_figure_defaults(context="paper")
 set_publication_style()
 warnings.filterwarnings("ignore")
 
-# Inches: the full page width, two rows: a and b, then c, d and e.
+# Inches: the full page width, two rows: a, b and c, then d and e.
 WIDTH = 6.5
 HEIGHT = 4.2
 
@@ -244,8 +236,6 @@ SHARED_OFFSET = 0.2
 """Panel d: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
 SHARED_MEAN_OFFSET = 0.11
-SHARES_YLABEL = "Share of the\noutside-SWR gain (%)"
-"""Panel f's y label: a description of where the gain sits, not a test."""
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
 OUTSIDE_LABEL = "Outside\nSWRs"
 PARTS_LABEL_DROP = 21
@@ -260,13 +250,12 @@ PANELS = (
     "heldout_gain",
     "shared_content",
     "outside_distance",
-    "outside_shares",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
     ((0.6, 0.9), ("no_spike_mua", "boundary_timing", "heldout_gain")),
-    ((0.155, 0.41), ("shared_content", "outside_distance", "outside_shares")),
+    ((0.155, 0.41), ("shared_content", "outside_distance")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
@@ -275,11 +264,9 @@ FRAMES = {
     "boundary_timing": (0.4, 0.18),
     "heldout_gain": (0.73, 0.1),
     "shared_content": (0.075, 0.36),
-    "outside_distance": (0.53, 0.2),
-    "outside_shares": (0.82, 0.045),
+    "outside_distance": (0.6, 0.3),
 }
-"""Each panel's frame's left edge and width (figure width); the shares' names
-reach to the frame's right."""
+"""Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
@@ -288,10 +275,7 @@ TRIGGER_WINDOW_S = 0.3
 """Panel a's window around each start (s, in all), Figure 2g's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
-REFUSED = (
-    f"Figure 2's supplement: panels {LETTERS['outside_distance']} and "
-    f"{LETTERS['outside_shares']} are not drawn"
-)
+REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
 RERUN = {
     "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
     "and the runs made from it",
@@ -300,8 +284,8 @@ RERUN = {
     "session_cache": "scripts/event_evidence/measure_bin_facts.py, then "
     "scripts/event_evidence/detect_heldout_events.py",
 }
-"""The runners to make again when the panels of the gain outside SWRs refuse
-their inputs."""
+"""The runners to make again when the panel of the gain outside SWRs refuses
+its inputs."""
 
 
 def read_inputs() -> dict:
@@ -584,9 +568,6 @@ def generate_figure(statistics: dict) -> Figure:
         "beyond_swr_margin", OUTSIDE_SWR_MARGINS_S,
         [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
     )  # fmt: skip
-    draw_outside_swr_shares(
-        axes["outside_shares"], statistics["outside"], SHARES_YLABEL
-    )
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge

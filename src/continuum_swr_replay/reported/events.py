@@ -279,7 +279,6 @@ TAGS = {
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
     "shared_content": Tags(("2c.3",), ("S2d",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2e",)),
-    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2f",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -2707,19 +2706,13 @@ def restriction_outside_swr_values(
     marks every held-out event, wherever it starts). The gain per spike and
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
-    :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2j, the
-    shares on Figure 2's supplement (panel S2f); each carries its panel's
-    tag."""
+    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2j and carries its
+    tag; the shares are for the text."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
     )
     make_figure = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
-    )
-    make_shares = value_factory(
-        restriction_outside_swr_values,
-        source,
-        TAGS["nonlocal_restriction_shares"],
     )
     statistics = restriction_totals.outside_swr_gain_statistics(
         restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -2787,7 +2780,7 @@ def restriction_outside_swr_values(
             ),
         ):
             values += _share_interval(
-                make_shares if figure else make_text,
+                make_text,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
                 f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
@@ -2801,10 +2794,9 @@ def restriction_outside_swr_values(
             )
         # a share that is below 0 where the full decoder does worse: a
         # unitless quantity, as a fraction must lie in [0, 1]
-        make = make_shares if figure else make_text
         row = statistics.loc[(family, "share_outside_events")]
         values += [
-            make(
+            make_text(
                 f"{key}_share_outside_heldout_events",
                 row["estimate"],
                 "quantity",
@@ -2819,14 +2811,14 @@ def restriction_outside_swr_values(
                 "1, below 0 when the full decoder does worse than the SWR-only "
                 f"decoder there. Over the cohort: {_EPOCH_REDUCTION}",
             ),
-            make(
+            make_text(
                 f"{key}_share_outside_heldout_events_ci_low",
                 row["ci_low"],
                 "quantity",
                 "dec2",
                 "lower bound of its 95 % interval",
             ),
-            make(
+            make_text(
                 f"{key}_share_outside_heldout_events_ci_high",
                 row["ci_high"],
                 "quantity",

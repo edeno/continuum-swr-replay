@@ -1272,23 +1272,13 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     # per family: per spike and per second, the gain and the rest (four each),
     # the epochs (two), and three shares (three each)
     assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 3 * 3)
-    # Figure 2j draws the filter family's gain per spike; the held-out tetrode
-    # supplementary figure its three shares
+    # Figure 2j draws the filter family's gain per spike; the shares are for
+    # the text, with no figure
     drawn = {f"{key}_per_spike{end}" for end in ("", "_ci_low", "_ci_high")} | {
         f"{key}_per_spike_animals_positive"
     }
-    supplement = {
-        f"{key}_{share}{end}"
-        for share in (
-            "share_in_heldout_non_swr_events",
-            "share_in_heldout_swr_events_outside_swr",
-            "share_outside_heldout_events",
-        )
-        for end in ("", "_ci_low", "_ci_high")
-    }
     assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
-    assert {k for k, v in values.items() if v.figures == ("S2f",)} == supplement
-    assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
 def _immobile_time_sums() -> pd.DataFrame:
@@ -1389,11 +1379,6 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         np.testing.assert_allclose(
             outside.loc[("filter", measure), "estimate"], numbers[f"{key}_{name}"]
         )
-    assert set(builder.restriction_totals.OUTSIDE_SWR_SHARES) == {
-        "share_in_no_swr_events",
-        "share_in_swr_events_outside_swr",
-        "share_outside_events",
-    }
 
 
 def _part_time_sums() -> pd.DataFrame:
