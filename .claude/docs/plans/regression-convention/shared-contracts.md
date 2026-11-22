@@ -205,22 +205,26 @@ written by one function (new, `analysis/regression/record.py`, Phase 2):
 | `model`, `kind`, `animal`, `session_date`, `epoch` | identity |
 | `likelihood` | `poisson`, `grouped_softmax`, `bernoulli`, `gaussian` |
 | `n_rows`, `n_units`, `n_events` | what the likelihood saw (units: visits, events or units) |
-| `cohort_counts` | JSON: `count_visit_context` output and the rows dropped for missing values, per kind |
+| `cohort_counts` | JSON: `count_visit_context` output (added by the caller) and the rows removed from the session's fit, by cause (a missing value; a level's rows dropped; an event with no response; an event emptied by dropped rows) |
 | `coef`, `vcov` | JSON arrays with `coef_names`; `vcov` is the Bayesian covariance `(H + S)^-1` |
 | `log_penalty` | JSON: term -> log lambda (repeated per row) and how it was set; WAITS FOR THE LEAD (smooth-term rule): a value selected by REML with `at_boundary`, a fixed declared value, or none |
 | `edf` | JSON: term -> effective degrees of freedom |
-| `status`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3: the fit's `NewtonFit.status` (one of the six statuses of `newton.FitStatus`; only "converged" is a fit) |
-| `left_out` | JSON: coefficient name -> why it is inactive in this session (`support`, or `no finite maximum` with the refit round); its `coef` and `vcov` entries are NaN |
-| `support` | JSON: coefficient name (a column of an unpenalized term; a smooth term's name when the term is too small in the session) -> {`n_low`, `n_high`, `passes`, `reason`} from the support rule, counted on the rows the fit used |
+| `status`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3: the fit's `NewtonFit.status` (one of the six statuses of `newton.FitStatus`; only "converged" is a fit), or `not fitted` when no fit was tried |
+| `left_out` | JSON: coefficient name -> why it is inactive in this session, a code of `support.Removed` (`support`, `too_small`, `with_level`, `no_finite_maximum`); its `coef` and `vcov` entries are NaN |
+| `left_out_round` | JSON: coefficient name -> the refit round in which it left, for `no_finite_maximum` |
+| `support` | JSON: coefficient name (a column of an unpenalized term; a smooth term's name when the term is too small in the session) -> {`n_low`, `n_high`, `passes`, `reason` (a `Removed` code, or empty), `size`} from the support rule, counted on the rows the fit used |
 | `collinearity` | JSON: term -> {`r2`, `vif`} or {`observed`, `worst`, `estimate`} |
 | `basis` | JSON: term -> {`kind`, `knots`, `degree`, `range`, `constraint`, `clamp`} |
 | `standardization` | JSON: covariate -> {`sd`, `ddof`: 0, `reference`} |
 | `table_sha256` | the canonical tables the fit read (`reported.values.file_record` hashes) |
+| `no_fit` | empty when a fit is kept; otherwise a code of `record.NoFit`: `no_rows` or `no_events` (no fit was tried; `status` is `not fitted`), or `along_the_intercept`, `along_a_penalty`, `too_many_rounds`, `other_status` (a fit was tried and not kept: `status` and the counts are the last fit's, the coefficients are NaN, and `left_out` holds what the refit had left out before it ended) |
 
 A record whose `status` is not "converged", a failing support entry for a declared term, or a declared term
 over the collinearity threshold is kept and flagged; the summary reads only passing rows and states the count
 left out. A session with a term in `left_out` is kept for its other terms and reported with that term
-missing (lead, 2026-11-21); Phase 2's handling of sessions without a finite maximum builds it.
+missing (lead, 2026-11-21). A term with several columns and no penalty leaves a session whole. The
+causes are closed sets of codes, so that a summary counts sessions by cause; `record.describe` gives the
+words.
 
 ## C8. The declared family of tests
 

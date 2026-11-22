@@ -275,6 +275,28 @@ reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
   fits; score a halving candidate before computing its derivatives; cache `X'X` and
   `X'y` for the Gaussian.
   *When:* with the trace terms above.
+- [ ] **Rescale columns inside the fitter.** A second way to remove the step cap's dependence on
+  column units, not tried: the fitter scales every column to unit size before the Newton
+  steps and maps the coefficients, the penalty and the covariance back. It would remove the
+  design's small-column check. It changes the paths of the fits, so it needs the saved
+  failure cases and the mgcv comparison again.
+  *When:* only if the small-column check gets in the way.
+- [ ] **Contrasts built from the design.** `range_mean_contrast` is given its term's range and
+  curve rows by the caller, and `SDChangeContrast` is given a pooled mean and SD, although the
+  design holds all of them. Note that "per pooled SD" has two meanings in the declared
+  list: for a smooth's SD change it is the SD on one role's rows; for a slope it is the SD
+  over every level on which a slope of that covariate is fitted.
+  *When:* with the first model's design (rate or content).
+- [ ] **The across-session band on a curve's coefficients.** Every session shares one design,
+  so a curve is `C beta` with one `C`; a band built on the term's coefficients needs no
+  grid correlation and has no refusal at a reference point. With five animals it does not
+  remove the weak case (more independent directions than animals).
+  *When:* with the band's check on the models' own curves.
+- [ ] **Collinearity from the Gram matrix.** The measures take one QR of the weighted
+  design per session (about 0.18 s at 50,000 rows by 60 columns, a reviewer's timing). A
+  factor of the p by p Gram matrix is about ten times cheaper, but it must tolerate a
+  column that is zero in a session and it squares the condition number.
+  *When:* if the per-session loop's time matters.
 - [ ] **The Gaussian in the Newton loop.** The Gaussian goes through the loop and is
   exempted from its step rules at three places. One exact step does not replace the
   loop: the loop's second step refines the first. A reviewer measured, on a design with
