@@ -187,7 +187,15 @@ def test_an_inactive_role_drops_its_rows() -> None:
     alone = fit_at_penalties(
         GroupedSoftmax(), [data], design.blocks, design.log_penalties
     )
-    np.testing.assert_array_equal(record.coef, alone.sessions[0].fit.beta)
+    # Not bit for bit: the loop builds the design on every row and then drops
+    # rows, and here it is built on the rows kept. A row of the smooth is a row
+    # of a matrix product, whose last digit depends, on some machines (the AVX2
+    # kernels of the linear-algebra library), on where the row lies in the
+    # matrix. A fit on other rows or columns differs in the first digits.
+    # NaN (an inactive column) must be at the same places.
+    np.testing.assert_allclose(
+        record.coef, alone.sessions[0].fit.beta, rtol=1e-10, atol=1e-12
+    )
 
 
 def test_a_role_without_a_finite_maximum_drops_its_rows() -> None:

@@ -173,6 +173,24 @@ tests upstream of the plotting layer.
 - **Multi-assertion tests are fine.** "One assertion per test" gets in the
   way of pinning related properties of the same call (e.g. shape *and* value
   *and* dtype). Group naturally; split when the assertions diverge.
+- **Bit-for-bit equality only for the same computation.** Two runs of the
+  same operations on the same arrays are equal bit for bit. Two routes to the
+  same numbers are not, on every machine: the linear-algebra library (OpenBLAS)
+  picks its kernel from the CPU, and under its AVX2 kernels a row of a matrix
+  product can differ in the last digit with the row's place in the matrix, so a
+  design built on every row and then cut differs from one built on the rows
+  kept. Compare such routes with a tolerance a wrong result cannot pass
+  (`assert_allclose(..., rtol=1e-10)`), and do not let an output's order rest
+  on which of two values equal but for rounding is larger. To run a test as an
+  AVX2-only CI runner does, from a machine with AVX-512:
+
+  ```bash
+  OPENBLAS_CORETYPE=Haswell \
+  NPY_DISABLE_CPU_FEATURES="AVX512F AVX512CD AVX512_SKX AVX512_CLX AVX512_CNL AVX512_ICL" \
+  uv run --frozen pytest tests/analysis/regression
+  ```
+
+  This moves NumPy and SciPy only; JAX compiles for the CPU it runs on.
 
 ## Useful patterns
 

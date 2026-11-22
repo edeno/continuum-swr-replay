@@ -57,6 +57,7 @@ from .constants import (
     NEWTON_MAX_STEPS,
     NO_MAXIMUM_CAPPED_STEPS,
     NO_MAXIMUM_ETA_STEP,
+    RUNNING_AWAY_TIE_DECIMALS,
 )
 from .likelihoods import Likelihood
 
@@ -229,11 +230,14 @@ def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
     Returns
     -------
     np.ndarray of int, shape (k,)
-        Column indices, the largest part first.
+        Column indices, the largest part first; parts equal but for rounding
+        (``RUNNING_AWAY_TIE_DECIMALS``) in column order, so that the order
+        does not depend on the machine.
     """
     part = np.max(np.abs(X * step), axis=0)
     columns = np.flatnonzero(part > NO_MAXIMUM_ETA_STEP)
-    return columns[np.argsort(-part[columns], kind="stable")]
+    size = np.round(np.log10(part[columns]), RUNNING_AWAY_TIE_DECIMALS)
+    return columns[np.argsort(-size, kind="stable")]
 
 
 def penalized_newton(

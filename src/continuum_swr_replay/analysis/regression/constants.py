@@ -28,6 +28,13 @@ MAX_STEP_LENGTH = 10.0
 # likelihood (the Gaussian), whose maximum is finite when A is positive definite
 # and whose eta is on the outcome's scale.
 NO_MAXIMUM_ETA_STEP = 0.1
+# The columns running away are listed by their part of the step, the largest
+# first. The columns of one direction (an arm column with a role column) have
+# parts that differ in the last digit only, and which comes out larger depends
+# on the machine's linear-algebra kernel. Parts whose base-10 logarithms agree
+# to this many decimals (a relative difference below about 2e-9) are a tie, in
+# column order.
+RUNNING_AWAY_TIE_DECIMALS = 9
 # A fit that reaches NEWTON_MAX_STEPS has no finite maximum, too, when each of
 # its last NO_MAXIMUM_CAPPED_STEPS steps was cut to MAX_STEP_LENGTH and lowered
 # the objective while the full Newton step's movement of eta did not shrink: a
