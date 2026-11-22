@@ -69,6 +69,10 @@ SHARED = {
 """Panel c's animals in the narrowest spread bin; each wider bin is 0.1 lower."""
 
 
+SHARE_OF_EVENTS = {"no SWR": [0.12, 0.2, 0.43, 0.25], "SWR": [0.1, 0.3, 0.4, 0.2]}
+"""Each group's share of its events in each spread bin."""
+
+
 def _shared_statistics() -> pd.DataFrame:
     """``agreement_by_spread_statistics``' rows: each bin and group's animals,
     their mean and an interval of 0.05 either side."""
@@ -82,6 +86,7 @@ def _shared_statistics() -> pd.DataFrame:
                     "spread_bin": label, "group": group, "animals": animals,
                     "animal_names": np.array(list("abcde")), "estimate": mean,
                     "ci_low": mean - 0.05, "ci_high": mean + 0.05,
+                    "share_of_events": SHARE_OF_EVENTS[group][k],
                 }
             )  # fmt: skip
     return pd.DataFrame(rows).set_index(["spread_bin", "group"])
@@ -391,6 +396,16 @@ def test_panel_d_draws_the_agreement_by_spread():
         line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
         for line in ax.lines
     )
+    # each group's percent of its events per bin, one row per group, under the
+    # data and clear of each other
+    for group, shares in SHARE_OF_EVENTS.items():
+        row = [
+            t for t in ax.texts
+            if t.get_text() in {f"{round(100 * v)}" for v in shares}
+            and t.get_position()[1] == figure.SHARE_ROWS_Y[list(SHARE_OF_EVENTS).index(group)]
+        ]  # fmt: skip
+        assert sorted(t.get_position()[0] for t in row) == list(bins)
+    assert "% of events" in [t.get_text() for t in ax.texts]
     texts = [t.get_text() for t in ax.texts]
     assert "\u2191 shared content" in texts
     assert {"No SWR", "SWR"} <= set(texts)

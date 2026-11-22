@@ -414,6 +414,11 @@ SHARED_OFFSET = 0.2
 """The shared-content panel: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
 SHARED_MEAN_OFFSET = 0.11
+SHARE_ROWS_ROOM = 0.35
+"""How far the shared-content panel's y axis reaches below its data, as a share
+of the data's range: room for the rows of each group's share of its events."""
+SHARE_ROWS_Y = (0.09, 0.02)
+"""The rows of the no-SWR and the SWR events' shares (axes height)."""
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
 OUTSIDE_LABEL = "Outside\nSWRs"
 PARTS_LABEL_DROP = 21
@@ -802,7 +807,9 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
     dots (one per animal) in its color on its side of the bin, the animals'
     mean with its 95 % interval in black farther out, a thin line through the
     group's means, the group's name beside its first bin, a dashed line at zero
-    and, under it at the left, which way means shared content."""
+    and, under it at the left, which way means shared content; under the data,
+    each group's percent of its events in each bin in its color
+    (``share_of_events``), with a gray note of what the numbers are."""
     bins = np.arange(len(SPREAD_BIN_LABELS))
     for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
         rows = [statistics.loc[(label, group)] for label in SPREAD_BIN_LABELS]
@@ -837,6 +844,24 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
             transform=ax.transAxes, fontsize=SMALL_SIZE,
             color=readable_text_color(color),
         )  # fmt: skip
+    # each group's share of its events in each bin, in two rows under the data
+    low, high = ax.get_ylim()
+    ticks = [t for t in ax.get_yticks() if low <= t <= high]
+    ax.set_ylim(low - SHARE_ROWS_ROOM * (high - low), high)
+    ax.set_yticks(ticks)  # none beside the rows of numbers
+    for k, (group, color) in enumerate(GROUP_COLORS.items()):
+        for x, label in zip(bins, SPREAD_BIN_LABELS, strict=True):
+            ax.text(
+                x, SHARE_ROWS_Y[k],
+                format_number(statistics.loc[(label, group), "share_of_events"], "pctnum"),
+                transform=blended_transform_factory(ax.transData, ax.transAxes),
+                ha="center", va="bottom", fontsize=SMALL_SIZE,
+                color=readable_text_color(color),
+            )  # fmt: skip
+    ax.text(
+        0.02, SHARE_ROWS_Y[0] + 0.08, "% of events", transform=ax.transAxes,
+        ha="left", va="bottom", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+    )  # fmt: skip
     ax.set_xlim(-0.6, bins[-1] + 0.6)
     ax.set_xticks(bins, SPREAD_BIN_LABELS)
     ax.set_xlabel(SHARED_XLABEL)
