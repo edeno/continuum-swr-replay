@@ -94,7 +94,7 @@ the order the text cites them, in four rows:
         SWR; start later and end earlier, it is inside the SWR; start and end
         later, it lags.
 
-    e — Supports Figure 2g and h, the events driven by population activity:
+    e — Supports Figure 2g and h, on population activity and the events:
         where the non-local time sits in MUA (the z-scored multiunit rate of
         the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
         animal's immobile time bins decoded non-local spread over MUA (percent
@@ -107,7 +107,12 @@ the order the text cites them, in four rows:
         ``signal_share_panels.draw_share_by_signal``;
         ``Processed-Data/nonlocal_by_signal``; the events summary's
         ``nonlocal_share_mua_above_level*`` and
-        ``nonlocal_time_below_mua_level_fraction*`` values).
+        ``nonlocal_time_below_mua_level_fraction*`` values). Most non-local
+        time is below the MUA level, and nearly all time above the MUA level is
+        decoded non-local. The panel does not show that non-local detection is
+        independent of population bursts: the decoder needs spikes, so the two
+        go together. It poses the question that the held-out tetrode panels
+        (g, h) answer: whether the spikes point to the decoded place.
 
     f — Supports Figure 2's case that the no-SWR events are specific: how
         concentrated the decoded position is, no-SWR against SWR events. Each

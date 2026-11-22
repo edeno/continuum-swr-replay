@@ -179,7 +179,13 @@ The review of the restriction and held-out tetrode runs before the
   `restriction_outside_swr_sampled_minute_full_minus_swr_per_spike`). The gain
   outside SWRs away from the SWRs is in Figure 2's supplement
   (`scripts/figures/generate_supp_figure02.py`, panel j); its shares in and
-  outside those events are reported values for the text.
+  outside those events are reported values for the text. The supplement's MUA
+  panel (e): most non-local time is below the MUA level
+  (`nonlocal_time_below_mua_level_fraction`), and nearly all time above the MUA
+  level is decoded non-local (`nonlocal_share_mua_above_level`). The caption
+  must not say that this shows non-local detection is independent of
+  population bursts: it poses the question the held-out tetrode panels (g, h)
+  answer.
   *When:* when the caption of Figure 2 is written.
 - [ ] **The library does not repeat itself on one kind of CI machine.** On
   GitHub's runners with an AMD EPYC 7763 (no AVX-512), the fold fit of the
