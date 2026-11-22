@@ -421,7 +421,7 @@ def test_panel_d_draws_the_agreement_by_spread():
     texts = [t.get_text() for t in ax.texts]
     assert "\u2191 shared\ncontent" in texts
     assert {"No SWR", "SWR"} <= set(texts)
-    assert ax.get_ylabel() == "Held-out agreement\n(nats/spike)"
+    assert ax.get_ylabel() == "Agreement\n(nats/spike)"
     assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
     plt.close(fig)
 

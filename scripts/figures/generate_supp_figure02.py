@@ -413,7 +413,7 @@ RANGE_DROP = 0.28
 (cell heights, down)."""
 TIMING_CMAP = "bone_r"
 """The timing table's colormap: sequential, the posteriors' (prints in gray)."""
-SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
+SHARED_YLABEL = "Agreement\n(nats/spike)"
 SHARED_XLABEL = "Width of the other tetrodes'\nposition estimate (cm)"
 RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
 """Where the ripple panel reads each animal's density of the events' peak power
@@ -495,7 +495,7 @@ FRAMES = {
     "nonlocal_mua": (0.075, 0.13),
     "heldout_gain": (0.305, 0.19),
     "hpd": (0.56, 0.16),
-    "shared_content": (0.815, 0.175),
+    "shared_content": (0.805, 0.185),
     "ripple_modes": (0.085, 0.3),
     "outside_distance": (0.55, 0.36),
 }
@@ -879,7 +879,7 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
         zip(("No SWR", "SWR"), GROUP_COLORS.values(), strict=True)
     ):
         ax.text(
-            0.99, 0.97 - 0.1 * k, name, ha="right", va="top",
+            0.99, 0.97 - 0.14 * k, name, ha="right", va="top",
             transform=ax.transAxes, fontsize=SMALL_SIZE,
             color=readable_text_color(color),
         )  # fmt: skip
