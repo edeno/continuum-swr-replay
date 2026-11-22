@@ -606,7 +606,7 @@ Sources:
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 2g, 2i. Values: 18.
+Status: computed. Figures: 2g, 2i, S2g. Values: 18.
 
 Sources:
 
@@ -3460,7 +3460,7 @@ Unlettered: `\DetectionPilotCallsDecidedByOutsideWindowPassing`, `\DetectionPilo
 
 ### Figure S2: MUA in the No-Spike state, the timing of events against their SWRs, the held-out tetrode gain over local coding, shared content by the spread of the other tetrodes' estimate, and the gain outside SWRs away from the SWRs
 
-Script: `scripts/figures/generate_supp_figure02.py`. Questions: 2b.4, 2c.3, 2d.5, 2d.9.
+Script: `scripts/figures/generate_supp_figure02.py`. Questions: 2b.4, 2b.5, 2c.3, 2d.5, 2d.9.
 
 Panel b: `\EventsTimingStartEarlierEndEarlierShareAnimalMax`, `\EventsTimingStartEarlierEndEarlierShareAnimalMin`, `\EventsTimingStartEarlierEndEarlierShare`, `\EventsTimingStartEarlierEndLaterShareAnimalMax`, `\EventsTimingStartEarlierEndLaterShareAnimalMin`, `\EventsTimingStartEarlierEndLaterShare`, `\EventsTimingStartEarlierEndTogetherShareAnimalMax`, `\EventsTimingStartEarlierEndTogetherShareAnimalMin`, `\EventsTimingStartEarlierEndTogetherShare`, `\EventsTimingStartLaterEndEarlierShareAnimalMax`, `\EventsTimingStartLaterEndEarlierShareAnimalMin`, `\EventsTimingStartLaterEndEarlierShare`, `\EventsTimingStartLaterEndLaterShareAnimalMax`, `\EventsTimingStartLaterEndLaterShareAnimalMin`, `\EventsTimingStartLaterEndLaterShare`, `\EventsTimingStartLaterEndTogetherShareAnimalMax`, `\EventsTimingStartLaterEndTogetherShareAnimalMin`, `\EventsTimingStartLaterEndTogetherShare`, `\EventsTimingStartTogetherEndEarlierShareAnimalMax`, `\EventsTimingStartTogetherEndEarlierShareAnimalMin`, `\EventsTimingStartTogetherEndEarlierShare`, `\EventsTimingStartTogetherEndLaterShareAnimalMax`, `\EventsTimingStartTogetherEndLaterShareAnimalMin`, `\EventsTimingStartTogetherEndLaterShare`, `\EventsTimingStartTogetherEndTogetherShareAnimalMax`, `\EventsTimingStartTogetherEndTogetherShareAnimalMin`, `\EventsTimingStartTogetherEndTogetherShare`
 

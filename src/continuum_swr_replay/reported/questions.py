@@ -124,7 +124,7 @@ FIGURES: dict[str, Figure] = {
         "held-out tetrode gain over local coding, shared content by the spread of "
         "the other tetrodes' estimate, and the gain outside SWRs away from the SWRs",
         "scripts/figures/generate_supp_figure02.py",
-        "abcdef",
+        "abcdefg",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -264,7 +264,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
-        figures=("2g", "2i"),
+        figures=("2g", "2i", "S2g"),
     ),
     Question(
         "2c.3",

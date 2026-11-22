@@ -266,7 +266,7 @@ TAGS = {
     "theta": Tags(("2d.8",), ("2g",)),
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
-    "class_distribution": Tags(("2b.5",)),
+    "class_distribution": Tags(("2b.5",), ("S2g",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),

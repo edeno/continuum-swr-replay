@@ -249,6 +249,11 @@ def rest_power_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.Data
     return counts[["power_low", "power_high", "n_bins", "n_nonlocal"]]
 
 
+def _kde(x: NDArray) -> stats.gaussian_kde:
+    """The Gaussian KDE of test 1 (Silverman's bandwidth)."""
+    return stats.gaussian_kde(np.asarray(x, dtype=np.float64), bw_method="silverman")
+
+
 def kde_modes(
     x: NDArray,
     *,
@@ -278,7 +283,7 @@ def kde_modes(
     x = np.asarray(x, dtype=np.float64)
     lo, hi = np.quantile(x, [trim, 1.0 - trim])
     grid = np.linspace(lo, hi, n_grid)
-    density = stats.gaussian_kde(x, bw_method="silverman")(grid)
+    density = _kde(x)(grid)
     # pad with zeros so a maximum at a grid edge can count
     padded = np.concatenate([[0.0], density, [0.0]])
     peaks, _ = find_peaks(padded, prominence=prominence * density.max())
@@ -888,6 +893,37 @@ def event_ripple_power(
 def _by_animal_and_pooled(events: pd.DataFrame):
     yield from events.groupby("animal")
     yield "pooled", events
+
+
+def peak_power_densities(events: pd.DataFrame, grid: NDArray) -> pd.DataFrame:
+    """Each animal's density of the events' peak ripple power: the KDE whose
+    main mode :func:`distribution_table` reports (:func:`kde_modes`), read on
+    one grid.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal`` and ``ripple_z_max`` (an event whose
+        power is not finite is left out).
+    grid : NDArray, shape (n_grid,)
+        z.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_grid, n_animals)
+        Indexed by ``grid``, a column per animal (sorted): the density, per z.
+    """
+    column = RIPPLE_POWERS["peak"]
+    return pd.DataFrame(
+        {
+            animal: _kde(x[np.isfinite(x)])(grid)
+            for animal, x in (
+                (animal, frame[column].to_numpy(dtype=np.float64))
+                for animal, frame in events.groupby("animal")
+            )
+        },
+        index=pd.Index(np.asarray(grid, dtype=np.float64), name="power_z"),
+    )
 
 
 def robust_sd(x: NDArray) -> float:

@@ -2,7 +2,8 @@
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
 the order the text cites them: MUA in the No-Spike state, the timing of events
 against their SWRs, the held-out tetrode gain, shared content, the gain
-outside SWRs away from the SWRs, and the posterior's spread.
+outside SWRs away from the SWRs, the posterior's spread, and the events' peak
+ripple power.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -128,6 +129,20 @@ outside SWRs away from the SWRs, and the posterior's spread.
         ``hpd_*`` values). The pooled median and the animals' medians differ,
         as the animals hold different numbers of events.
 
+    g — Supports Figure 2i, which shows no step in non-local time at the SWR
+        threshold: the events' peak ripple power (the maximum of the z-scored
+        Kay consensus over the event's rows) has one mode. Each animal's
+        density of it, a thin line per animal and their mean in bold (as
+        Figure 2i draws its animals), is the Gaussian KDE (Silverman's
+        bandwidth) whose main mode the one-class-or-two analysis reports
+        (``class_or_continuum.peak_power_densities``), read from -2 to 12 z
+        (a thin tail lies beyond); a dashed line at the SWR threshold; and the
+        dip test's result (``event_statistics.peak_ripple_mode_statistics``;
+        ``Processed-Data/ripple_class_structure``, its per-event ``criterion``
+        files and ``distribution.csv``; the events summary's ``ripple_peak_*``
+        values). The distribution is not split by SWR label: the label is set
+        from this power, so a split would show the threshold, not two kinds.
+
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
 Panel e reads the held-out event run
@@ -195,11 +210,16 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
 )
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+    KAY_ZSCORE_THRESHOLD,
+    peak_power_densities,
+)
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TIMING_CLASSES,
     boundary_offsets,
     boundary_timing_statistics,
     class_median_rows,
+    peak_ripple_mode_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
@@ -207,6 +227,7 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
 from continuum_swr_replay.data_loaders.epoch_register import (
+    analyzed_animals,
     analyzed_decode_files,
     analyzed_epoch_ids,
 )
@@ -257,7 +278,7 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width, two rows: a, b and c, then d and e.
 WIDTH = 6.5
-HEIGHT = 4.2
+HEIGHT = 6.0
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
@@ -280,6 +301,9 @@ TIMING_CMAP = "bone_r"
 """Panel b's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
 SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
+RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
+"""Where the ripple panel reads each animal's density of the events' peak power
+(z): past 12 z lies a thin tail."""
 HPD_YLABEL = "95 % HPD region\n(cm, event mean)"
 """The HPD panel's y label: each event's mean over its bins of the length of
 track the 95 % highest-posterior-density region covers."""
@@ -302,22 +326,25 @@ PANELS = (
     "shared_content",
     "outside_distance",
     "hpd",
+    "ripple_modes",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
-    ((0.6, 0.9), ("no_spike_mua", "boundary_timing", "heldout_gain")),
-    ((0.155, 0.41), ("shared_content", "outside_distance", "hpd")),
+    ((0.73, 0.94), ("no_spike_mua", "boundary_timing", "heldout_gain")),
+    ((0.41, 0.6), ("shared_content", "outside_distance")),
+    ((0.1, 0.28), ("hpd", "ripple_modes")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
 FRAMES = {
     "no_spike_mua": (0.075, 0.155),
-    "boundary_timing": (0.4, 0.18),
-    "heldout_gain": (0.73, 0.25),
+    "boundary_timing": (0.38, 0.22),
+    "heldout_gain": (0.7, 0.28),
     "shared_content": (0.075, 0.36),
-    "outside_distance": (0.53, 0.25),
-    "hpd": (0.9, 0.09),
+    "outside_distance": (0.6, 0.3),
+    "hpd": (0.075, 0.09),
+    "ripple_modes": (0.3, 0.25),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -394,6 +421,9 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "ripple_modes": read_ripple_modes(
+            events, inputs.class_structure, inputs.event_table
+        ),
         "hpd": read_hpd(events, inputs.property_bootstrap, inputs.event_table),
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
@@ -425,18 +455,71 @@ def read_hpd(events: pd.DataFrame, bootstrap: Path, event_table: Path) -> pd.Dat
         If the bootstrap was not made from the current event table over the
         analyses' subset (the summary marks its values pending).
     """
-    manifest = read_output_manifest(bootstrap)
+    _refuse_stale(
+        bootstrap, event_table, "hpd",
+        "scripts/event_properties/bootstrap_event_properties.py",
+    )  # fmt: skip
+    intervals = pd.read_csv(bootstrap / "intervals.csv", index_col=0)
+    return class_median_rows(events, "hpd_coverage_cm", intervals.loc["hpd"])
+
+
+def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> None:
+    """Refuse an output not made from the current event table over the
+    analyses' subset, as the events summary marks its values pending."""
+    manifest = read_output_manifest(folder)
     for reason in (
-        event_table_staleness(manifest, sha256_file(event_table), rel(bootstrap)),
-        subset_staleness(manifest, rel(bootstrap)),
+        event_table_staleness(manifest, sha256_file(event_table), rel(folder)),
+        subset_staleness(manifest, rel(folder)),
     ):
         if reason is not None:
             raise ValueError(
-                f"Figure 2's supplement: panel {LETTERS['hpd']} is not drawn: "
-                f"{reason}. Rerun scripts/event_properties/bootstrap_event_properties.py."
+                f"Figure 2's supplement: panel {LETTERS[panel]} is not drawn: "
+                f"{reason}. Rerun {rerun}."
             )
-    intervals = pd.read_csv(bootstrap / "intervals.csv", index_col=0)
-    return class_median_rows(events, "hpd_coverage_cm", intervals.loc["hpd"])
+
+
+def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> dict:
+    """The ripple panel's statistics from the one-class-or-two output: each
+    animal's density of the selected events' peak ripple power
+    (``class_or_continuum.peak_power_densities``, the KDE whose modes the
+    output's ``distribution.csv`` reports) and the one-mode statistic of the
+    events summary (``event_statistics.peak_ripple_mode_statistics``).
+
+    Returns
+    -------
+    dict
+        ``densities`` (indexed by :data:`RIPPLE_GRID_Z`, a column per animal),
+        ``modes`` and ``n_animals``.
+
+    Raises
+    ------
+    ValueError
+        If the output is not current, or a selected event has no peak power.
+    """
+    _refuse_stale(
+        folder, event_table, "ripple_modes",
+        "scripts/event_properties/measure_ripple_class_structure.py analyze",
+    )  # fmt: skip
+    peaks = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "ripple_z_max"])
+        for path in sorted((folder / "criterion").glob("*.parquet"))
+    )
+    events = events[["event_id", "animal"]].merge(
+        peaks, on="event_id", how="left", validate="1:1"
+    )
+    if events["ripple_z_max"].isna().any():
+        raise ValueError(
+            f"Figure 2's supplement: {int(events['ripple_z_max'].isna().sum())} "
+            f"selected events have no peak ripple power in {rel(folder)}/criterion"
+        )
+    n_animals = len(analyzed_animals())
+    return {
+        "densities": peak_power_densities(events, RIPPLE_GRID_Z),
+        "modes": peak_ripple_mode_statistics(
+            pd.read_csv(folder / "distribution.csv"), n_animals
+        ),
+        "n_animals": n_animals,
+    }
 
 
 def read_no_spike_trace() -> dict:
@@ -623,6 +706,36 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
+def draw_ripple_modes(ax: Axes, statistics: dict) -> None:
+    """The ripple panel: each animal's density of the events' peak ripple power
+    as a thin line, their mean in bold (as Figure 2i draws its animals), a
+    dashed line at the SWR threshold and the one-mode result. Not split by SWR
+    label: the label is set from this power (``statistics``:
+    :func:`read_ripple_modes`)."""
+    densities = statistics["densities"]
+    grid = densities.index.to_numpy()
+    ax.plot(grid, densities.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax.plot(grid, densities.mean(axis=1).to_numpy(), color="k", lw=1.0)
+    ax.axvline(KAY_ZSCORE_THRESHOLD, color=COLORS["SWR"], lw=0.8, ls="--")
+    ax.text(
+        KAY_ZSCORE_THRESHOLD + 0.3, 0.97, "SWR\nthreshold", transform=ax.get_xaxis_transform(),
+        ha="left", va="top", fontsize=SMALL_SIZE, color=readable_text_color(COLORS["SWR"]),
+    )  # fmt: skip
+    modes = statistics["modes"]
+    ax.text(
+        0.98, 0.72,
+        f"one mode in {modes['n_animals_unimodal']} of {statistics['n_animals']}\n"
+        "animals (dip test)",
+        transform=ax.transAxes, ha="right", va="top", fontsize=SMALL_SIZE,
+    )  # fmt: skip
+    ax.set_xlim(grid[0], grid[-1])
+    ax.set_ylim(0, 1.4 * float(densities.to_numpy().max()))  # room for the notes
+    ax.set_xticks([0, 5, 10])
+    ax.set_xlabel("Event peak ripple power (z)")
+    ax.set_ylabel("Density (per z)")
+    ax.set_title("One mode", fontsize=SMALL_SIZE, pad=3)
+
+
 def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
     """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
     (its median) and, beside them, the pooled median with its 95 % interval in
@@ -675,6 +788,7 @@ def generate_figure(statistics: dict) -> Figure:
         [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
     )  # fmt: skip
     draw_hpd(axes["hpd"], statistics["hpd"])
+    draw_ripple_modes(axes["ripple_modes"], statistics["ripple_modes"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge

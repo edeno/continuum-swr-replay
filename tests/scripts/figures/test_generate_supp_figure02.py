@@ -142,8 +142,30 @@ def _split_statistics() -> dict:
     return {column: _gain_statistics(*groups) for column, groups in SPLIT.items()}
 
 
+RIPPLE_GRID = np.linspace(-2.0, 12.0, 141)
+
+
+def _ripple_modes() -> dict:
+    """Two animals' peak-power densities (normal, modes 1 and 2 z) and the one
+    mode statistic: one mode in 5 of 5 animals."""
+    densities = pd.DataFrame(
+        {
+            animal: np.exp(-0.5 * (RIPPLE_GRID - mode) ** 2) / np.sqrt(2 * np.pi)
+            for animal, mode in (("a", 1.0), ("b", 2.0))
+        },
+        index=RIPPLE_GRID,
+    )
+    return {
+        "densities": densities,
+        "modes": {"n_animals_unimodal": 5, "mode_animal_min": 1.0,
+                  "mode_animal_max": 2.0},
+        "n_animals": 5,
+    }  # fmt: skip
+
+
 def _statistics() -> dict:
     return {
+        "ripple_modes": _ripple_modes(),
         "hpd": _hpd(),
         "timing": _timing(),
         "tetrode": _split_statistics(),
@@ -160,7 +182,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters at one left edge, no heading."""
     assert figure.PANELS == (
         "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
-        "outside_distance", "hpd",
+        "outside_distance", "hpd", "ripple_modes",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
@@ -173,9 +195,10 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdef")
+    assert sorted(letters) == list("abcdefg")
     assert len({letters[k][1] for k in "abc"}) == 1
-    assert len({letters[k][1] for k in "def"}) == 1
+    assert len({letters[k][1] for k in "de"}) == 1
+    assert len({letters[k][1] for k in "fg"}) == 1
     assert letters["a"][1] > letters["d"][1]
     assert letters["a"][0] == letters["d"][0]
     assert "Immobile, at wells" not in [
@@ -202,7 +225,7 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
         if isinstance(c, matplotlib.collections.PathCollection)
     ]  # fmt: skip
     assert len(dots) == 6
-    for k, (group, color) in enumerate(panels.GROUP_COLORS.items()):
+    for k, (_group, color) in enumerate(panels.GROUP_COLORS.items()):
         for j, (column, groups) in enumerate(SPLIT.items()):
             x = panels.split_x(k, j)
             (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
@@ -369,6 +392,28 @@ def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
     plt.close(fig)
 
 
+def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
+    """Each animal's density of the events' peak ripple power as a thin line,
+    their mean in bold, a dashed line at the SWR threshold, the one-mode
+    result read from the statistics, and no split by SWR label."""
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[figure.PANELS.index("ripple_modes")]
+    densities = _ripple_modes()["densities"]
+    curves = [line for line in ax.lines if len(line.get_xdata()) == RIPPLE_GRID.size]
+    assert len(curves) == 3  # two animals and their mean
+    np.testing.assert_allclose(
+        curves[-1].get_ydata(), densities.mean(axis=1).to_numpy()
+    )
+    assert curves[-1].get_linewidth() > curves[0].get_linewidth()
+    (threshold,) = [line for line in ax.lines if line.get_linestyle() == "--"]
+    np.testing.assert_allclose(threshold.get_xdata(), figure.KAY_ZSCORE_THRESHOLD)
+    texts = [t.get_text() for t in ax.texts]
+    assert "one mode in 5 of 5\nanimals (dip test)" in texts
+    assert not ax.collections  # no band, no stacked label
+    assert ax.get_xlabel() == "Event peak ripple power (z)"
+    plt.close(fig)
+
+
 def test_panel_a_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
@@ -439,8 +484,8 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
-    """Values tagged ``S2`` (by panel, ``S2b`` to ``S2f``) name this script."""
-    assert FIGURES["S2"].panels == "abcdef"
+    """Values tagged ``S2`` (by panel) name this script."""
+    assert FIGURES["S2"].panels == "abcdefg"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -482,6 +527,9 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         ),
         "read_no_spike_trace": lambda: "trace",
         "read_hpd": lambda events, bootstrap, table: seen.setdefault("hpd", events),
+        "read_ripple_modes": lambda events, folder, table: seen.setdefault(
+            "ripple", events
+        ),
         "outside_swr_subset_statistics": lambda sums, bin_s: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
@@ -516,7 +564,9 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
+    assert seen["ripple"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
+        "ripple_modes",
         "hpd",
         "timing",
         "tetrode",
