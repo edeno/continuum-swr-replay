@@ -3583,7 +3583,8 @@ def state_calibration_values(
             "count",
             "count",
             "random 10-bin immobile calibration windows that start inside a well "
-            "visit, over the analyzed epochs",
+            "visit and have a finite held-out score for Local, over the analyzed "
+            "epochs",
         )
     )
     return values
