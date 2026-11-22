@@ -58,6 +58,9 @@ non-local states buy outside SWRs:
   not positive. A window with a bin in excluded time is left out of the
   numerators, as :func:`.restriction_windows.window_contrasts` leaves it out of
   the window statistics;
+- the share outside those events, the rest: 1 minus the two shares, so the three
+  add to 1 (Figure 2g's third axis draws the three). It holds the bins inside no
+  event window and the bins of the windows the two shares leave out;
 - the gain per spike and per second in the rest of that time, the bins inside
   no event window of any group (``in_event_window`` false): every event the
   time sums were given counts, whichever events the shares are given.
@@ -150,6 +153,7 @@ MEASURES = (
     "gain_per_s",
     "share_in_no_swr_events",
     "share_in_swr_events_outside_swr",
+    "share_outside_events",
     "outside_events_gain_per_spike",
     "outside_events_gain_per_s",
 )
@@ -427,7 +431,8 @@ def epoch_outside_swr_gains(
         ``full_minus_swr`` (nats), ``gain_per_spike``, ``gain_per_s``,
         ``no_swr_events_full_minus_swr``, ``share_in_no_swr_events``,
         ``swr_events_outside_swr_full_minus_swr``,
-        ``share_in_swr_events_outside_swr``, ``outside_events_full_minus_swr``,
+        ``share_in_swr_events_outside_swr``, ``share_outside_events`` (1 minus
+        the two shares), ``outside_events_full_minus_swr``,
         ``outside_events_gain_per_spike`` and ``outside_events_gain_per_s``
         (NaN without spikes, bins or a positive total, as each divides).
 
@@ -483,6 +488,11 @@ def epoch_outside_swr_gains(
         out[f"swr_events_outside_swr_full_minus_swr{suffix}"] = flanks
         out[f"share_in_swr_events_outside_swr{suffix}"] = list(
             map(ratio_or_nan, flanks, gain)
+        )
+        out[f"share_outside_events{suffix}"] = (
+            1.0
+            - out[f"share_in_no_swr_events{suffix}"]
+            - out[f"share_in_swr_events_outside_swr{suffix}"]
         )
         out[f"outside_events_full_minus_swr{suffix}"] = rest_gain
         out[f"outside_events_gain_per_spike{suffix}"] = list(

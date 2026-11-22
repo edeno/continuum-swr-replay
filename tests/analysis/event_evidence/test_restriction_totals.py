@@ -137,6 +137,11 @@ def test_outside_swr_shares_are_on_the_bins_inside_a_visit():
     np.testing.assert_allclose(
         epochs["share_in_no_swr_events_two_sided"], [0.3, 0.1, np.nan]
     )
+    # the rest, elsewhere: 1 - 0.3 - 0.2 and 1 - 0.1 - 0.0; none without a total
+    np.testing.assert_allclose(epochs["share_outside_events"], [0.5, 0.9, np.nan])
+    np.testing.assert_allclose(
+        epochs["share_outside_events_two_sided"], [0.5, 0.9, np.nan]
+    )
 
 
 def test_immobile_gains_inside_a_visit_per_spike_and_per_second():
@@ -186,6 +191,9 @@ def test_outside_swr_statistics_are_the_mean_over_animals_of_their_epoch_medians
     assert gain["n_epochs"] == 3 and gain["n_epochs_positive"] == 2
     share = key.loc[("filter", "share_in_no_swr_events")]
     assert share["estimate"] == pytest.approx(0.2) and share["n_animals"] == 1
+    # the share elsewhere: a's median of 0.5 and 0.9; b has none
+    rest = key.loc[("filter", "share_outside_events")]
+    assert rest["estimate"] == pytest.approx(0.7) and rest["n_epochs"] == 2
 
 
 def test_time_sums_with_a_row_twice_or_an_epoch_without_a_time_step_raise():
