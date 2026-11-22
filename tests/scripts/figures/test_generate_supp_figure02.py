@@ -560,29 +560,35 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
 
 
 def test_the_calibration_panel_draws_each_states_evidence_by_its_probability():
-    """Local, Continuous and Fragmented on three axes sharing the x axis, each
-    the animals' mean with its interval at the probability bins' centers in
-    the state's color, a dashed zero line; No-Spike is not drawn."""
+    """Local, Continuous and Fragmented on one axis, each the animals' mean
+    with its interval near the probability bins' centers in the state's color,
+    named at its line's end; a dashed zero line; a y label that says what the
+    evidence is against; No-Spike is not drawn."""
     from matplotlib.colors import to_rgba
 
     fig = figure.generate_figure(_statistics())
-    axes = figure.panel_axes(fig, "state_calibration")
-    assert [ax.get_title() for ax in axes] == ["Local", "Continuous", "Fragmented"]
-    centers = [0.1, 0.3, 0.5, 0.7, 0.9]
-    for k, (ax, state) in enumerate(zip(axes, figure.CALIBRATION_COLORS, strict=True)):
-        (curve,) = [line for line in ax.lines if len(line.get_xdata()) == 5]
-        np.testing.assert_allclose(curve.get_xdata(), centers)
+    (ax,) = figure.panel_axes(fig, "state_calibration")
+    centers = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
+    curves = [line for line in ax.lines if len(line.get_xdata()) == 5]
+    assert len(curves) == 3
+    for k, (curve, state) in enumerate(
+        zip(curves, figure.CALIBRATION_COLORS, strict=True)
+    ):
+        np.testing.assert_allclose(
+            curve.get_xdata(), centers + (k - 1) * figure.CALIBRATION_DODGE
+        )
         np.testing.assert_allclose(curve.get_ydata(), k + np.arange(5))
         np.testing.assert_allclose(
             to_rgba(curve.get_color()), to_rgba(figure.CALIBRATION_COLORS[state])
         )
-        assert any(
-            line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-            for line in ax.lines
-        )
-        assert ax.get_shared_x_axes().joined(ax, axes[0])
-    assert axes[0].get_ylabel() == "Held-out evidence\n(nats/window)"
-    assert axes[1].get_xlabel() == "State probability"
+    assert [t.get_text() for t in ax.texts] == ["Local", "Continuous", "Fragmented"]
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    assert ax.get_ylabel() == figure.CALIBRATION_YLABEL
+    assert "mismatched place" in ax.get_ylabel() and "nats/spike" in ax.get_ylabel()
+    assert ax.get_xlabel() == "State probability"
     plt.close(fig)
 
 

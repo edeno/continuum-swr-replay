@@ -17,7 +17,8 @@ Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes to
 - ``manifest.json``: the run read (its folder and the sha256 of its manifest),
   the subset (``cohort_selection.ANALYZED_SUBSET``), the session-cache entries
   the visits were read from (``prepare_data.session_cache_record``) and each
-  epoch's immobile calibration windows kept and left out.
+  epoch's immobile calibration windows kept and left out, and the kept ones
+  with no scored spike for each metric (per spike, those have no value).
 
 Usage::
 
@@ -73,8 +74,9 @@ COLUMNS = [
 
 
 def epoch_windows(run_dir: Path, epoch_id: str) -> tuple[pd.DataFrame, dict[str, int]]:
-    """One epoch's immobile calibration windows inside the well visits, and how
-    many were kept and left out."""
+    """One epoch's immobile calibration windows inside the well visits, how many
+    were kept and left out, and how many of the kept ones have no scored spike
+    for each metric (they enter no statistic)."""
     windows = pd.read_parquet(
         run_dir / "per_epoch" / f"{epoch_id}_windows.parquet", columns=COLUMNS
     )
@@ -82,7 +84,10 @@ def epoch_windows(run_dir: Path, epoch_id: str) -> tuple[pd.DataFrame, dict[str,
     n_immobile = int(
         ((windows["kind"] == "calib") & (windows["regime"] == "immobile")).sum()
     )
-    return kept, {"n_kept": len(kept), "n_left_out": n_immobile - len(kept)}
+    counts = {"n_kept": len(kept), "n_left_out": n_immobile - len(kept)}
+    for metric in sorted({m for v in IN_VISIT_CALIBRATION_METRICS.values() for m in v}):
+        counts[f"n_without_scored_spike_{metric}"] = int(kept[metric].isna().sum())
+    return kept, counts
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -134,9 +139,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         indent=1,
         final_newline=True,
     )
-    kept = sum(c["n_kept"] for c in counts)
-    left = sum(c["n_left_out"] for c in counts)
-    print(f"{len(epochs)} epochs, {kept} windows kept, {left} left out -> {out_dir}")
+    totals = pd.DataFrame(counts).sum()
+    print(f"{len(epochs)} epochs -> {out_dir}")
+    print(totals.to_string())
 
 
 if __name__ == "__main__":

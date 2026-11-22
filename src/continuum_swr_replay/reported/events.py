@@ -3550,42 +3550,45 @@ def state_calibration_values(
             row = mine.loc[label]
             values.append(
                 make(
-                    f"{key}_{end}",
+                    f"{key}_{end}_per_spike",
                     row["animal_estimate"],
                     "quantity",
                     "sig2",
                     f"held-out evidence for {state} over the random 10-bin "
                     f"immobile windows whose {state} probability is in {place} bin "
-                    f"({label}): {what}, the spike-mark log likelihood ratio summed "
-                    f"over the window; {reduction}. Caveats: {_CALIBRATION_CAVEATS}",
-                    "nats per window",
+                    f"({label}): {what}, the spike-mark log likelihood ratio per "
+                    f"spike of the scored tetrodes (each run's ratio over the scored "
+                    f"half's spikes, averaged over the runs in which that half "
+                    f"spiked; a window in which it never spiked has no value); "
+                    f"{reduction}. Caveats: {_CALIBRATION_CAVEATS}",
+                    "nats per spike",
                 )
             )
             if end == "top_bin":
                 values += [
-                    make(f"{key}_top_bin_ci_low", row["animal_ci_lo"], "quantity",
-                         "sig2", "lower bound of its 95 % interval", "nats per window"),
-                    make(f"{key}_top_bin_ci_high", row["animal_ci_hi"], "quantity",
-                         "sig2", "upper bound of that interval", "nats per window"),
+                    make(f"{key}_top_bin_per_spike_ci_low", row["animal_ci_lo"], "quantity",
+                         "sig2", "lower bound of its 95 % interval", "nats per spike"),
+                    make(f"{key}_top_bin_per_spike_ci_high", row["animal_ci_hi"], "quantity",
+                         "sig2", "upper bound of that interval", "nats per spike"),
                 ]  # fmt: skip
         values += [
             make(
-                f"{key}_slope",
+                f"{key}_slope_per_spike",
                 trend["slope_animal_estimate"],
                 "quantity",
                 "sig2",
                 f"rise of that held-out evidence for {state} with the state's "
                 "probability: each epoch's least-squares slope over its windows "
-                "(nats per window per unit of probability), then the mean over "
+                "(nats per spike per unit of probability), then the mean over "
                 "animals of each animal's mean epoch slope",
-                "nats per window per unit probability",
+                "nats per spike per unit probability",
             ),
-            make(f"{key}_slope_ci_low", trend["slope_animal_ci_lo"], "quantity",
+            make(f"{key}_slope_per_spike_ci_low", trend["slope_animal_ci_lo"], "quantity",
                  "sig2", "lower bound of its 95 % interval (nested bootstrap)",
-                 "nats per window per unit probability"),
-            make(f"{key}_slope_ci_high", trend["slope_animal_ci_hi"], "quantity",
+                 "nats per spike per unit probability"),
+            make(f"{key}_slope_per_spike_ci_high", trend["slope_animal_ci_hi"], "quantity",
                  "sig2", "upper bound of that interval",
-                 "nats per window per unit probability"),
+                 "nats per spike per unit probability"),
         ]  # fmt: skip
     first = bins[bins["state"] == next(iter(_CALIBRATED_STATES))]
     values.append(
@@ -3595,7 +3598,8 @@ def state_calibration_values(
             "count",
             "count",
             "random 10-bin immobile calibration windows that start inside a well "
-            "visit and have a finite held-out score for Local, over the analyzed "
+            "visit and have a held-out score for Local (a scored spike), over the "
+            "analyzed "
             "epochs",
         )
     )

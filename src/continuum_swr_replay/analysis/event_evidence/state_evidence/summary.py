@@ -1428,16 +1428,19 @@ def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFra
 
 
 IN_VISIT_CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
-    "Local": ("runcv_loc_mark",),
-    "Non-Local Continuous": ("runcv_nl_null_mark",),
-    "Non-Local Fragmented": ("runcv_nl_null_mark",),
+    "Local": ("runcv_loc_mark_ps",),
+    "Non-Local Continuous": ("runcv_nl_null_mark_ps",),
+    "Non-Local Fragmented": ("runcv_nl_null_mark_ps",),
 }
 """The calibration Figure 2's supplement draws, over the immobile calibration
-windows that start inside a well visit, under the primary encoding: for Local,
-the animal's place against a mismatched place; for the non-local states, the
-place one half of the tetrodes decodes against a mismatched place, scored on
-the other half. No-Spike is not drawn: a confident No-Spike label forces both
-halves silent (the module's caveats)."""
+windows that start inside a well visit, under the primary encoding, per spike
+of the scored tetrodes (``_ps``: each run's score over the scored half's
+spikes, averaged over the runs in which that half spiked; a window in which it
+never spiked has no value): for Local, the animal's place against a
+mismatched place; for the non-local states, the place one half of the
+tetrodes decodes against a mismatched place, scored on the other half.
+No-Spike is not drawn: a confident No-Spike label forces both halves silent
+(the module's caveats)."""
 
 
 def calibration_windows_in_well_visits(

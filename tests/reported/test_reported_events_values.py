@@ -685,14 +685,18 @@ def test_state_calibration_values_name_each_state_and_state_the_caveats():
     bins, trends = _state_calibration()
     values = _by_key(builder.state_calibration_values(bins, trends, "s"))
     numbers = {k: v.value for k, v in values.items()}
-    assert numbers["state_calibration_local_top_bin"] == 4
-    assert numbers["state_calibration_continuous_top_bin_ci_low"] == pytest.approx(4.5)
-    assert numbers["state_calibration_fragmented_bottom_bin"] == 2
-    assert numbers["state_calibration_fragmented_slope"] == 3.0
-    assert numbers["state_calibration_local_slope_ci_high"] == pytest.approx(1.4)
+    assert numbers["state_calibration_local_top_bin_per_spike"] == 4
+    assert numbers[
+        "state_calibration_continuous_top_bin_per_spike_ci_low"
+    ] == pytest.approx(4.5)
+    assert numbers["state_calibration_fragmented_bottom_bin_per_spike"] == 2
+    assert numbers["state_calibration_fragmented_slope_per_spike"] == 3.0
+    assert numbers["state_calibration_local_slope_per_spike_ci_high"] == pytest.approx(
+        1.4
+    )
     assert numbers["state_calibration_windows"] == 500
     assert not any(c.isdigit() for k in values for c in k)
-    description = values["state_calibration_continuous_top_bin"].description
+    description = values["state_calibration_continuous_top_bin_per_spike"].description
     for caveat in ("every tetrode", "only the remote place", "other time blocks"):
         assert caveat in description
     for value in values.values():

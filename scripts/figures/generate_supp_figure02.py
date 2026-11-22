@@ -16,17 +16,20 @@ the order the text cites them, in four rows:
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
         well visit, grouped by a state's probability (five bins), and the
-        held-out evidence for what the state claims, one axis per state: for
-        Local, the held-out tetrodes' spikes at the animal's place against at
-        mismatched places; for Continuous and Fragmented, the place decoded
-        from one half of the tetrodes scored on the other half against
-        mismatched places (nats per window, the spike-mark log likelihood
-        ratio). The animals' mean with its 95 % interval, in the state's
-        color, and a dashed line at zero. No-Spike is not drawn: a confident
-        No-Spike label forces both halves silent, so it is no test (panel b
-        covers that state). Caveats: the probability bins come from the decode
-        with every tetrode; only the remote place is held out by the tetrode
-        split; the encodings are fit on running time in other time blocks
+        held-out evidence for what the state claims, per spike of the scored
+        tetrodes, on one axis: for Local, the held-out tetrodes' spikes at the
+        animal's place over at mismatched places; for Continuous and
+        Fragmented, the place decoded from one half of the tetrodes scored on
+        the other half over mismatched places (nats per spike, the spike-mark
+        log likelihood ratio over the scored half's spikes, averaged over the
+        runs in which that half spiked; a window in which it never spiked has
+        no value and is left out). The animals' mean with its 95 % interval, in
+        the state's color, each state named at its line's end, and a dashed
+        line at zero. No-Spike is not drawn: a confident No-Spike label forces
+        both halves silent, so it is no test (panel b covers that state).
+        Caveats: the probability bins come from the decode with every tetrode;
+        only the remote place is held out by the tetrode split; the encodings
+        are fit on running time in other time blocks
         (``state_evidence.calibration_statistics`` over
         ``IN_VISIT_CALIBRATION_METRICS``, re-summarized from the stored
         windows of the held-out tetrode run by
@@ -403,6 +406,12 @@ CALIBRATION_COLORS = {
 }
 """The calibration panel's states (``state_evidence.IN_VISIT_CALIBRATION_METRICS``),
 in the decoder figures' state colors."""
+CALIBRATION_YLABEL = (
+    "Evidence for the state's place\nover a mismatched place\n(nats/spike)"
+)
+"""The calibration panel's y label."""
+CALIBRATION_DODGE = 0.025
+"""How far apart the states' points sit at each probability bin (x units)."""
 SWEEP_XLABELS = {
     "probability_threshold": "Non-local\nprobability",
     "minimum_samples": "Minimum\nsamples",
@@ -460,7 +469,7 @@ ROWS = (
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
 FRAMES = {
-    "state_calibration": (0.085, 0.47),
+    "state_calibration": (0.12, 0.4),
     "no_spike_mua": (0.71, 0.27),
     "rule_sweep": (0.085, 0.47),
     "boundary_timing": (0.71, 0.27),
@@ -969,29 +978,37 @@ def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> 
     )  # fmt: skip
 
 
-def draw_state_calibration(axes: Sequence[Axes], bins: pd.DataFrame) -> None:
-    """The calibration panel: for Local, Continuous and Fragmented (one axis
-    each, sharing the x axis), the held-out evidence for what the state claims
-    against its probability, the animals' mean with its 95 % interval at each
-    probability bin's center in the state's color, and a dashed line at zero
-    (``bins``: :func:`read_inputs`' ``calibration``)."""
+def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
+    """The calibration panel: for Local, Continuous and Fragmented, on one
+    axis, the held-out evidence per spike for the state's place over a
+    mismatched place against the state's probability, the animals' mean with
+    its 95 % interval at each probability bin's center (the states a little
+    apart so that the intervals show), each state named at its line's end in
+    its color, and a dashed line at zero (``bins``: :func:`read_inputs`'
+    ``calibration``)."""
     centers = np.arange(0.1, 1.0, 0.2)
-    for ax, (state, color) in zip(axes, CALIBRATION_COLORS.items(), strict=True):
+    for k, (state, color) in enumerate(CALIBRATION_COLORS.items()):
         mine = bins[bins["state"] == state]
         estimate = mine["animal_estimate"].to_numpy()
+        x = centers + (k - 1) * CALIBRATION_DODGE
         ax.errorbar(
-            centers, estimate,
+            x, estimate,
             yerr=[estimate - mine["animal_ci_lo"], mine["animal_ci_hi"] - estimate],
             color=color, marker="o", ms=2.5, lw=1.0, capsize=0,
         )  # fmt: skip
-        ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-        ax.set_title(state.removeprefix("Non-Local "), fontsize=SMALL_SIZE, pad=3)
-        if ax is not axes[0]:
-            ax.sharex(axes[0])
-    axes[0].set_xlim(0, 1)
-    axes[0].set_xticks([0, 0.5, 1])
-    axes[0].set_ylabel("Held-out evidence\n(nats/window)")
-    axes[1].set_xlabel("State probability")
+        ax.annotate(
+            state.removeprefix("Non-Local "), (1.0, estimate[-1]),
+            xytext=(2, 0), textcoords="offset points", ha="left", va="center",
+            fontsize=SMALL_SIZE, color=readable_text_color(color),
+            annotation_clip=False,
+        )  # fmt: skip
+    ax.plot([0, 1], [0, 0], color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+    ax.set_xlim(0, 1.3)  # room for the states' names inside the axis
+    ax.spines["bottom"].set_bounds(0, 1)
+    ax.set_xticks([0, 0.5, 1])
+    ax.set_xlabel("State probability")
+    ax.set_ylabel(CALIBRATION_YLABEL)
+    ax.set_title("Decoder states, held out", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
@@ -1094,11 +1111,7 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {
-    "nonlocal_mua": (2, 1),
-    "rule_sweep": (1, 3),
-    "state_calibration": (1, 3),
-}
+PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3)}
 """The panels drawn on several axes in their frame: rows and columns."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
@@ -1153,7 +1166,7 @@ def generate_figure(statistics: dict) -> Figure:
     draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
-    draw_state_calibration(axes["state_calibration"], statistics["calibration"])
+    draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge
