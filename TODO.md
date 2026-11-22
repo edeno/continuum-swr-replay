@@ -175,10 +175,13 @@ The review of the restriction and held-out tetrode runs before the
   and an A100), every repeat was bit for bit; there a one-step float change of
   the inputs moves the transitions by 4e-10 and a planted leak by 1.4e-2. So
   the cause is below this repository, in JAX's CPU execution or in how the
-  library uses it, and it is not found. The three tests that compare two
-  computations bit for bit (`tests/integration/test_nonlocal_restriction_simulated.py`)
-  skip, with that reason, on a machine that does not repeat the computation,
-  and are exact everywhere else. Not done: a reproducer that needs only the
+  library uses it, and it is not found. The two tests that compare two
+  computations of the fold fit bit for bit
+  (`tests/integration/test_nonlocal_restriction_simulated.py`, marked
+  `bit_for_bit`) are not run on GitHub's runners, where a job cannot choose
+  its machine, and are exact everywhere else. A repeat made inside the test
+  did not tell the machines apart: on such a runner two calls in a row agreed
+  after an earlier one had differed (master d6cce684's slow job). Not done: a reproducer that needs only the
   library, and an issue on `non_local_detector` or JAX. The script and the
   runners' reports are in `.claude/research/ci_float_reproducibility/`.
 - [ ] **Old session-cache files hold other trials.** Both GPU runners make their

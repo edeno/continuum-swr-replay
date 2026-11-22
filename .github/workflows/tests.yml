@@ -51,7 +51,8 @@ jobs:
         run: uv run --frozen --python ${{ matrix.python-version }} ruff check src scripts tests
 
       # -rs lists each skipped test with its reason: the bit-for-bit fold-fit
-      # tests skip on a runner that does not repeat the library's computation.
+      # tests are not run here, because one runner type does not repeat the
+      # library's computation and a job cannot choose its machine.
       - name: Run tests
         run: uv run --frozen --python ${{ matrix.python-version }} pytest -q -rs -m "${{ matrix.tests }}"
 
