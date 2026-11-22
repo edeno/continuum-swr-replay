@@ -3774,8 +3774,8 @@ without being called, is not listed.
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
 | `events.nonlocal_found_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.nonlocal_events_overlapped` |  |
-| `events.nonlocal_mua_values` | `reported/events.py` | `analysis.event_properties.event_statistics.animal_signal_counts`, `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics`, `analysis.event_properties.event_statistics.nonlocal_share_above_statistics`, `analysis.event_properties.nonlocal_by_signal.nonlocal_counts` |  |
-| `events.nonlocal_power_values` | `reported/events.py` | `analysis.event_properties.event_statistics.animal_signal_counts`, `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics`, `analysis.event_properties.nonlocal_by_signal.nonlocal_counts` |  |
+| `events.nonlocal_mua_values` | `reported/events.py` | `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics`, `analysis.event_properties.event_statistics.nonlocal_share_above_statistics`, `analysis.event_properties.nonlocal_by_signal.animal_nonlocal_counts` |  |
+| `events.nonlocal_power_values` | `reported/events.py` | `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics`, `analysis.event_properties.nonlocal_by_signal.animal_nonlocal_counts` |  |
 | `events.other_detector_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.other_detector_statistics` |  |
 | `events.participation_values` | `reported/events.py` | `analysis.event_evidence.participation.participation_differences`, `analysis.event_evidence.participation.participation_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |
@@ -3786,7 +3786,7 @@ without being called, is not listed.
 | `events.restriction_immobile_values` | `reported/events.py` | `analysis.event_evidence.restriction_totals.epoch_immobile_gains`, `analysis.event_evidence.restriction_totals.immobile_gain_statistics` |  |
 | `events.restriction_inside_swr_values` | `reported/events.py` | `analysis.event_evidence.restriction_totals.epoch_inside_swr_gains`, `analysis.event_evidence.restriction_totals.inside_swr_gain_statistics` |  |
 | `events.restriction_outside_swr_part_values` | `reported/events.py` | `analysis.event_evidence.restriction_totals.outside_swr_not_observed_counts`, `analysis.event_evidence.restriction_totals.outside_swr_subset_shares`, `analysis.event_evidence.restriction_totals.outside_swr_subset_statistics` |  |
-| `events.restriction_outside_swr_values` | `reported/events.py` | `analysis.event_evidence.restriction_totals.epoch_outside_swr_gains`, `analysis.event_evidence.restriction_totals.outside_swr_gain_statistics` |  |
+| `events.restriction_outside_swr_values` | `reported/events.py` | `analysis.event_evidence.restriction_totals.outside_swr_statistics` |  |
 | `events.restriction_window_values` | `reported/events.py` | `analysis.event_evidence.restriction_windows.outside_swr_window_counts`, `analysis.event_evidence.restriction_windows.restriction_window_statistics` |  |
 | `events.rule_sweep_values` | `reported/events.py` | `analysis.event_properties.rule_sweep.criterion_agreement`, `analysis.event_properties.rule_sweep.sweep_statistics` |  |
 | `events.shared_content_values` | `reported/events.py` | `analysis.event_evidence.shared_content.agreement_by_spread_statistics` |  |

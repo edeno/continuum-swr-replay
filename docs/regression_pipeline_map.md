@@ -86,7 +86,7 @@ The simulated run of Figure 1, decoded by the switching state-space model.
 
 The analyzed-time read point: a decode frame held to the one analyzed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py`
 
@@ -200,7 +200,7 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `epoch_inside_swr_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_subset_shares`, `outside_swr_gain_statistics`, `inside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
+`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `epoch_inside_swr_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_subset_shares`, `outside_swr_gain_statistics`, `outside_swr_statistics`, `inside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
@@ -272,7 +272,7 @@ Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and it
 
 Where the non-local time sits in ripple power and in MUA, per time bin.
 
-`count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`
+`count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
@@ -284,7 +284,7 @@ Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
 How the count of non-local events and the share with no SWR depend on the event rule's settings: a sensitivity check, not a change to the events.
 
-`detect_classified_events`, `epoch_sweep_counts`, `sweep_statistics`, `criterion_agreement`
+`detect_classified_events`, `epoch_sweep_counts`, `rule_rows`, `sweep_statistics`, `criterion_agreement`
 
 ### `src/continuum_swr_replay/analysis/event_properties/start_and_rest_theta.py`
 

@@ -26,6 +26,28 @@ Work that is deferred on purpose. Each item says when it should be done.
   `generate_supp_pipeline_data_flow.py`.
   *When:* before any of them enters the paper.
 
+- [ ] **The No-Spike trace is computed in the figure script.** Panel b of Figure 2's
+  supplement reads every analyzed epoch's decode frame on each render
+  (`generate_supp_figure02.read_no_spike_trace`, about 5 minutes with one process): a
+  per-epoch statistic with no stored output, so the panel has no staleness check and
+  its numbers no summary key. Make it an analysis function with a runner and a stored
+  output that the figure reads.
+  *When:* before the caption of panel b quotes a number from it, or when the render
+  time gets in the way.
+- [ ] **Panel letters are written in four places.** The supplement's letters follow
+  from its layout (`LAYOUT`), but they are also written in the question list
+  (`FIGURES["S2"].panels`), in the events summary's tags (`TAGS`, `"S2a"` and so on)
+  and in the docstrings and headers that cite a panel, so a reordering changes all
+  four by hand; `test_each_panels_values_carry_its_letter` catches a tag that
+  disagrees, the prose has no check.
+  *When:* the next time a figure's panels are reordered.
+- [ ] **Convention 10's letter placement is implemented three times.** Figure 2's
+  `place_letters`, Figure 3's letter table and the supplement's loop in
+  `generate_supp_figure02.generate_figure` each place a row's letters at one height
+  and a column's at one left edge. One helper in `visualization/` would keep the rule
+  in one place.
+  *When:* when a fourth figure needs it, or the convention changes.
+
 ## Reproduction
 
 - [ ] **Public reproduction from archived tables (Tier 1).** Archive the
@@ -160,6 +182,19 @@ Work that is deferred on purpose. Each item says when it should be done.
     coupling continuously; value-gating of with-SWR rate.
 
   *When:* before the Results are drafted.
+
+- [ ] **Staleness reasons are prose that callers split apart.** A staleness note ends
+  with its advice ("; rerun ... before citing"), and the figures that refuse on it cut
+  that off (`reported.events.heldout_restriction_refusal`'s `split("; rerun ")`) to
+  name their own runners. A reason that is a value (what is not current, and what to
+  rerun) would need no splitting and could not drift from the text.
+  *When:* when another figure refuses on a staleness reason.
+- [ ] **Readers and staleness helpers live in the events builder.** The figures import
+  `read_heldout_restriction`, `checked_reference`, `restriction_inputs_note`,
+  `heldout_restriction_refusal` and `event_table_staleness` from
+  `reported/events.py`, a builder whose job is to name and describe values. Move the
+  readers and their checks into a module the builder and the figures both import.
+  *When:* when a third figure reads them, or at the next reorganization of `reported/`.
 
 ## Event evidence
 
@@ -301,6 +336,19 @@ The review of the restriction and held-out tetrode runs before the
   *When:* after the `figure02g-review` branch is merged.
 - [ ] **Is an event's decoded place where silence alone would put it?** Not done and not planned unless a reviewer asks: compare each event's decoded place with the lowest-rate place bins of the saved encoding model (`decoding/encoding_model.py`), where the ground process alone would put it. The split of the held-out tetrode gain into bins with a spike and silent bins (Figure 2's supplement, panel f) and the events' spike rate against matched Local rest (`non_swr_event_spike_rate_hz`, `non_swr_control_spike_rate_hz`) already speak against a silence-driven estimate; events with a wide estimate (a quarter of no-SWR events, `non_swr_shared_content_hundred_cm_or_more_share_of_events`) are where it could still hold.
   *When:* only if a reviewer asks.
+
+- [ ] **`likelihood_advantage._replicates` loops over epochs in Python.** Each
+  bootstrap replicate takes each drawn epoch's median in a Python loop over epochs.
+  Vectorize it (the copies' counts, as `nested_bootstrap_draws` does) and check that
+  the replicates are the same.
+  *When:* if the events summary's build time matters.
+- [ ] **The rule sweep detects the events again for each minimum duration.**
+  `rule_sweep.epoch_sweep_counts` runs the rule and the classification once per
+  minimum run length, although at one probability threshold the longer minimums keep
+  a subset of the shortest one's runs. Detect once at the shortest and keep the runs
+  long enough, checking that the counts are the same.
+  *When:* if the sweep is rerun often (it takes about 2 minutes over 242 epochs with
+  several workers).
 
 ## Run infrastructure
 
