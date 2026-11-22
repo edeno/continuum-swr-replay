@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Each decode bin's spikes over every tetrode and whether it is inside a well visit.
+"""Each decode bin's spikes over every tetrode, whether it is inside a well visit,
+and whether SWR detection was observed there.
 
 For every epoch of the non-local restriction run (``score_nonlocal_restriction.py``,
 its ``ok`` records): load the epoch's spikes (``state_evidence.terms.load_marks_and_training_mask``,
@@ -8,7 +9,8 @@ loader's time axis is the decode frame's, and read the epoch's well visits from
 the session cache of the table builders only (``event_tables.prepare_data.well_visit_times``;
 an epoch without a current cache entry fails instead of being fetched). Then
 write the per-bin facts (``event_evidence.bin_facts.bin_facts``: spikes binned
-as the decoder bins them, and ``in_well_visit``). The restriction run's record
+as the decoder bins them, ``in_well_visit``, and ``swr_observed``, the decode
+frame's read through the SWR source). The restriction run's record
 counts no spikes (the fold fit's likelihood is the library's, which returns no
 count), so nothing here ties the spikes to that run; the window run
 (``sum_nonlocal_restriction_windows.py``) ties them to the held-out tetrode
@@ -19,9 +21,10 @@ over a subset, so the run records none. CPU only.
 Writes, under ``processed_data_dir() / EVENT_BIN_FACTS_DIR``:
 
 - ``{epoch_id}_bin_facts.parquet``: one row per decode bin, ``time`` (s),
-  ``n_spikes`` (int32) and ``in_well_visit`` (bool);
+  ``n_spikes`` (int32), ``in_well_visit`` and ``swr_observed`` (bool);
 - ``{epoch_id}_bin_facts.json``: the epoch's record (bins, spikes, well visits,
-  bins and spikes inside them, the digests of the decode frame and the
+  bins and spikes inside them, bins where SWR detection was not observed, the
+  digests of the decode frame and the
   restriction run's record; provenance);
 
 and ``manifest.json`` gathered from the records. The inputs record the
@@ -44,6 +47,10 @@ import sys
 import time as clock
 from pathlib import Path
 
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    SWR_OBSERVED_COLUMN,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
 from continuum_swr_replay.analysis.event_evidence.bin_facts import bin_facts
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
@@ -96,7 +103,12 @@ def run_epoch(
     started = clock.time()
     epoch = epoch_inputs(epoch_id, data_dir, detector=False)
     visits = well_visit_times(epoch_id)
-    table = bin_facts(epoch.time, epoch.loaded["spike_times"], visits)
+    table = bin_facts(
+        epoch.time,
+        epoch.loaded["spike_times"],
+        visits,
+        epoch.frame[SWR_OBSERVED_COLUMN].to_numpy(dtype=bool),
+    )
     n_spikes = int(table["n_spikes"].sum())
     restriction_record = record_path(
         restriction_dir, epoch_id, NONLOCAL_RESTRICTION_NAME
@@ -111,6 +123,7 @@ def run_epoch(
             "n_well_visits": len(visits[0]),
             "n_bins_in_well_visit": int(inside.sum()),
             "n_spikes_in_well_visit": int(table.loc[inside, "n_spikes"].sum()),
+            "n_bins_swr_not_observed": int((~table["swr_observed"]).sum()),
             "epoch_inputs": {
                 "data_over_time": file_input(epoch.paths.data_over_time),
                 "restriction_record": file_input(restriction_record),
@@ -135,7 +148,12 @@ def main(argv: list[str] | None = None) -> None:
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]"},
+        "settings": {
+            "binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]",
+            "swr_observed": "the decode frame's swr_observed, read through the "
+            "SWR source",
+            "swr_source": swr_source_name(),
+        },
         "inputs": {"session_cache": session_cache_record(every_epoch)},
     }
     if args.gather:

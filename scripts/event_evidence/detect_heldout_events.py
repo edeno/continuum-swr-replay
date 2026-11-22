@@ -17,7 +17,8 @@ still scored under a fit that did not see it. Then sum the restriction scores ov
 (``restriction_windows.window_table``),
 say which held-out and which canonical events share a bin
 (``heldout_events.shared_bin_events``), and sum the epoch's bins by category,
-well visit and held-out event window (``restriction_totals.restriction_time_sums``).
+well visit, held-out event window, SWR detection observed, margin from the
+scoring mask and place sampling (``restriction_totals.restriction_time_sums``).
 CPU only: pandas and numpy, nothing is decoded or refit.
 
 The epoch fails (status ``failed``, with the reason) unless the same rule
@@ -27,8 +28,9 @@ those labels are the event table's events of the epoch, and unless, for each of
 those events, the rule's SWR group is the table's ``is_swr`` and its start
 inside a well visit is what ``cohort_selection.select_visit_context`` gives.
 
-``--restriction-dir`` reads another restriction run and ``--output-dir`` writes
-elsewhere; by default the canonical restriction run and
+``--restriction-dir`` reads another restriction run, ``--bin-facts-dir``
+another per-bin facts run, and ``--output-dir`` writes elsewhere; by default
+the canonical restriction and per-bin facts runs and
 ``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``.
 
 Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``:
@@ -49,12 +51,14 @@ Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS
   ``label``, ``group`` (the table's ``is_swr``) and ``shares_bin_with_heldout``
   (a held-out event, of any well-visit start, holds one of its bins);
 - ``{epoch_id}_heldout_time_sums.parquet``: the epoch's bins, spikes and six
-  summed scores by ``category``, ``in_well_visit`` and ``in_event_window``
-  (inside a held-out event of either group, wherever it starts;
-  ``restriction_totals.restriction_time_sums``), with ``epoch_id`` and
-  ``animal``;
+  summed scores by ``category``, ``in_well_visit``, ``in_event_window``
+  (inside a held-out event of either group, wherever it starts),
+  ``swr_observed``, ``beyond_swr_margin_s`` and ``place_sampling_at_least_s``
+  (``restriction_totals.TIME_SUM_KEYS``, ``restriction_totals.restriction_time_sums``),
+  with ``epoch_id`` and ``animal``;
 - ``{epoch_id}_heldout_events.json``: the epoch's record (events by group and
-  well visit, events found again, the time step, the digests of the per-bin
+  well visit, events found again, the immobile bins outside every SWR where
+  SWR detection was not observed, the time step, the digests of the per-bin
   table, the per-bin facts and the decode frame, provenance);
 
 and ``manifest.json`` gathered from the records. The header records the digests
@@ -94,6 +98,7 @@ from continuum_swr_replay.analysis.event_evidence import heldout_events as he
 from continuum_swr_replay.analysis.event_evidence import restriction_totals as rt
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    IMMOBILE_OUTSIDE_SWR,
     STATE_PROBABILITY_COLUMNS,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
@@ -128,9 +133,11 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_bin_facts_dir_argument,
     add_cpu_arguments,
     add_restriction_dir_argument,
     add_run_arguments,
+    bin_facts_run_dir,
     cpu_pool,
     event_table_path,
     file_input,
@@ -144,9 +151,9 @@ PRODUCED_BY = produced_by(__file__)
 HELDOUT_PROBABILITIES = tuple(STATE_PROBABILITY_COLUMNS[s] for s in NON_LOCAL_STATES)
 """The per-bin table's held-out P(Non-Local Continuous) and P(Non-Local
 Fragmented) of the ``full`` model."""
-BIN_COLUMNS = [*rw.WINDOW_BIN_COLUMNS, *HELDOUT_PROBABILITIES]
-"""The per-bin table's columns the epoch reads: the window sums' (which hold
-the time sums'), and the held-out probabilities."""
+BIN_COLUMNS = [*rt.TIME_SUM_BIN_COLUMNS, *HELDOUT_PROBABILITIES]
+"""The per-bin table's columns the epoch reads: the time sums' (which hold the
+window sums'), and the held-out probabilities."""
 EVENT_COLUMNS = [
     "animal",
     "session_date",
@@ -173,11 +180,13 @@ def run_epoch(
     data_dir: Path,
     output: Path,
     restriction_dir: Path | None = None,
+    facts_dir: Path | None = None,
 ) -> dict:
     """Detect one epoch's held-out events, write its tables and return its record.
 
     ``restriction_dir`` is the restriction run read, by default
-    ``data_dir / EVENT_NONLOCAL_RESTRICTION_DIR``.
+    ``data_dir / EVENT_NONLOCAL_RESTRICTION_DIR``, and ``facts_dir`` the
+    per-bin facts run, by default ``data_dir / EVENT_BIN_FACTS_DIR``.
 
     Raises
     ------
@@ -191,8 +200,9 @@ def run_epoch(
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    facts_dir = facts_dir or data_dir / EVENT_BIN_FACTS_DIR
     bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
-    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME)
+    facts_path = output_path(epoch_id, facts_dir, BIN_FACTS_NAME)
     decode_path = decode_paths(epoch_id, data_dir).data_over_time
     bins = pd.read_parquet(bins_path, columns=BIN_COLUMNS)
     facts = pd.read_parquet(facts_path)
@@ -311,6 +321,10 @@ def run_epoch(
     time_sums.insert(0, "animal", animal)
     time_sums.insert(0, "epoch_id", epoch_id)
     write_table(time_sums, output_path(epoch_id, output, HELDOUT_TIME_SUMS_NAME))
+    not_observed = rt.outside_swr_not_observed_counts(time_sums)
+    left_out = (time_sums["category"] == IMMOBILE_OUTSIDE_SWR) & ~time_sums[
+        "swr_observed"
+    ].astype(bool)
 
     return json_ready(
         {
@@ -334,6 +348,10 @@ def run_epoch(
             "n_events_without_bins_outside_swr": int(
                 (rows["n_bins_outside_swr"] == 0).sum()
             ),
+            "n_bins_outside_swr_not_observed": int(
+                time_sums.loc[left_out, "n_bins"].sum()
+            ),
+            "n_bins_outside_swr_not_observed_in_well_visit": not_observed["n_bins"],
             "bin_s": sample_step(time),
             "epoch_inputs": {
                 "bins": file_input(bins_path),
@@ -352,23 +370,28 @@ def main(argv: list[str] | None = None) -> None:
     add_run_arguments(parser)
     add_cpu_arguments(parser, workers=8)
     add_restriction_dir_argument(parser)
+    add_bin_facts_dir_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
     event_table = event_table_path(data_dir)
     restriction = restriction_run_dir(args, data_dir)
+    facts_dir = bin_facts_run_dir(args, data_dir)
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
         "settings": {
             "probabilities": list(HELDOUT_PROBABILITIES),
             "nonlocal_threshold": DEFAULT_NON_LOCAL_THRESHOLD,
+            "time_sum_keys": list(rt.TIME_SUM_KEYS),
+            "outside_swr_margins_s": list(rt.OUTSIDE_SWR_MARGINS_S),
+            "place_sampling_thresholds_s": list(rt.PLACE_SAMPLING_THRESHOLDS_S),
         },
         "inputs": {
             "event_table": file_input(event_table),
             "nonlocal_restriction": run_input(restriction),
-            "bin_facts": run_input(data_dir / EVENT_BIN_FACTS_DIR),
+            "bin_facts": run_input(facts_dir),
         },
     }
     if args.gather:
@@ -382,7 +405,7 @@ def main(argv: list[str] | None = None) -> None:
             args.n_shards,
         ),
         task=run_epoch,
-        task_args=(event_table, data_dir, output, restriction),
+        task_args=(event_table, data_dir, output, restriction, facts_dir),
         output=output,
         name=HELDOUT_EVENTS_NAME,
         header=header,

@@ -11,9 +11,9 @@ spike count over every tetrode from the epoch's held-out tetrode table
 (``restriction_windows.window_spike_counts``, which fails when the two runs'
 windows differ by id, event, kind, group or length, or a window lacks a
 tetrode's row). From the epoch's per-bin facts (``measure_bin_facts.py``: each
-bin's spikes and well-visit flag, on the per-bin table's time) add each
-window's spikes over its bins outside SWRs and its sums over those inside a
-well visit (``restriction_windows.window_bin_fact_sums``; the facts' spikes over
+bin's spikes, well-visit flag and SWR-observed flag, on the per-bin table's
+time) add each window's spikes over its bins outside SWRs and its sums over
+those inside a well visit (``restriction_windows.window_bin_fact_sums``; the facts' spikes over
 the whole window must be the held-out tetrode run's ``n_spikes``, which ties
 the facts' spikes to that run's loader: the restriction run's record counts no
 spikes). An epoch that is ``ok`` in only one of the two runs is left out and
@@ -23,17 +23,21 @@ The epoch's bins summed by category, well visit and event window, and Figure
 held-out data.
 
 ``--restriction-dir`` reads another restriction run (a second scoring of the
-same bins) and ``--output-dir`` writes elsewhere; by default the canonical
-restriction run and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
+same bins), ``--bin-facts-dir`` another per-bin facts run, and ``--output-dir``
+writes elsewhere; by default the canonical restriction and per-bin facts runs
+and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
 
 Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 
 - ``{epoch_id}_nonlocal_restriction_windows.parquet``: one row per window,
   ``epoch_id``, ``animal``, ``window_id``, ``event_id``, ``kind``, ``group``,
   ``s``, ``e``, ``n_bins``, ``n_bins_in_swr``, ``n_bins_immobile``,
-  ``n_bins_excluded``, ``n_bins_not_finite``, ``duration_s``, the six summed
-  scores (float64 nats), the same over the window's ``immobile_outside_swr``
-  bins only (``n_bins_outside_swr``, ``duration_outside_swr_s`` and the six
+  ``n_bins_excluded``, ``n_bins_not_finite``, ``n_bins_outside_swr_not_observed``
+  (bins in the category ``immobile_outside_swr`` where SWR detection was not
+  observed, left out of the bins outside SWRs), ``duration_s``, the six summed
+  scores (float64 nats), the same over the window's bins outside SWRs
+  (``restriction_windows.outside_swr_bins``: ``immobile_outside_swr`` where SWR
+  detection was observed) only (``n_bins_outside_swr``, ``duration_outside_swr_s`` and the six
   ``<score>_outside_swr``; ``restriction_windows.OUTSIDE_SWR_COLUMNS``),
   ``n_spikes``, and the columns from the per-bin facts
   (``restriction_windows.BIN_FACT_COLUMNS``: ``n_spikes_outside_swr``, and the
@@ -41,8 +45,9 @@ Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 - ``{epoch_id}_nonlocal_restriction_windows.json``: the epoch's record (the
   windows by kind and group, the windows with a bin in excluded time, outside
   the immobile categories, with a score that is not finite, without spikes, the
-  "no SWR" events with a bin inside an SWR the ``swr`` model used, and the
-  events with no bin outside SWRs; the time
+  "no SWR" events with a bin inside an SWR the ``swr`` model used, the
+  events with no bin outside SWRs, and the windows' bins left out of them
+  where SWR detection was not observed; the time
   step; the digests of the per-bin table, the held-out tetrode table and the
   participation table; provenance);
 
@@ -120,9 +125,11 @@ from continuum_swr_replay.tables.io import write_table
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
     WINDOW_EVENT_COLUMNS,
+    add_bin_facts_dir_argument,
     add_cpu_arguments,
     add_restriction_dir_argument,
     add_run_arguments,
+    bin_facts_run_dir,
     cpu_pool,
     decode_time,
     event_table_path,
@@ -144,11 +151,13 @@ def run_epoch(
     data_dir: Path,
     output: Path,
     restriction_dir: Path | None = None,
+    facts_dir: Path | None = None,
 ) -> dict:
     """Sum one epoch's windows, write its table and return its record.
 
     ``restriction_dir`` is the restriction run read, by default
-    ``data_dir / EVENT_NONLOCAL_RESTRICTION_DIR``.
+    ``data_dir / EVENT_NONLOCAL_RESTRICTION_DIR``, and ``facts_dir`` the
+    per-bin facts run, by default ``data_dir / EVENT_BIN_FACTS_DIR``.
 
     Raises
     ------
@@ -160,8 +169,9 @@ def run_epoch(
     """
     started = clock.time()
     restriction_dir = restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    facts_dir = facts_dir or data_dir / EVENT_BIN_FACTS_DIR
     bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
-    facts_path = output_path(epoch_id, data_dir / EVENT_BIN_FACTS_DIR, BIN_FACTS_NAME)
+    facts_path = output_path(epoch_id, facts_dir, BIN_FACTS_NAME)
     holdout_path = output_path(
         epoch_id, data_dir / EVENT_TETRODE_HOLDOUT_DIR, TETRODE_HOLDOUT_NAME
     )
@@ -223,6 +233,9 @@ def run_epoch(
                     & (table["n_bins_outside_swr"] > 0)
                     & (table["n_spikes_outside_swr"] == 0)
                 ).sum()
+            ),
+            "n_bins_outside_swr_not_observed": int(
+                table["n_bins_outside_swr_not_observed"].sum()
             ),
             "n_spikes": int(facts["n_spikes"].sum()),
             "bin_s": sample_step(time),
@@ -286,6 +299,7 @@ def main(argv: list[str] | None = None) -> None:
     add_run_arguments(parser)
     add_cpu_arguments(parser, workers=8)
     add_restriction_dir_argument(parser)
+    add_bin_facts_dir_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -293,7 +307,7 @@ def main(argv: list[str] | None = None) -> None:
     event_table = event_table_path(data_dir)
     restriction = restriction_run_dir(args, data_dir)
     holdout_dir = data_dir / EVENT_TETRODE_HOLDOUT_DIR
-    facts_dir = data_dir / EVENT_BIN_FACTS_DIR
+    facts_dir = bin_facts_run_dir(args, data_dir)
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
@@ -338,7 +352,7 @@ def main(argv: list[str] | None = None) -> None:
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
-        task_args=(event_table, data_dir, output, restriction),
+        task_args=(event_table, data_dir, output, restriction, facts_dir),
         output=output,
         name=NONLOCAL_RESTRICTION_WINDOWS_NAME,
         header=header,

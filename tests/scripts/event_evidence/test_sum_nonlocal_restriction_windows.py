@@ -164,6 +164,30 @@ def test_run_epoch_sums_each_window_and_adds_its_spikes(data_dir, tmp_path):
     ]
 
 
+def test_bins_where_swr_detection_was_not_observed_are_counted_and_left_out(
+    data_dir, tmp_path
+):
+    """Bin 3 of x is outside SWRs but SWR detection was not observed there; a
+    facts run elsewhere is read with ``facts_dir``."""
+    facts_dir = tmp_path / "other_facts"
+    facts_dir.mkdir()
+    facts = _facts()
+    facts.loc[3, "swr_observed"] = False
+    facts.to_parquet(output_path(EPOCH, facts_dir, BIN_FACTS_NAME))
+    output = tmp_path / "out"
+    output.mkdir()
+    record = runner.run_epoch(
+        EPOCH, tmp_path / "e.parquet", data_dir, output, facts_dir=facts_dir
+    )
+    table = pd.read_parquet(
+        output_path(EPOCH, output, NONLOCAL_RESTRICTION_WINDOWS_NAME)
+    )
+    assert table["n_bins_outside_swr"].tolist() == [2, 1, 2]
+    assert table["n_bins_outside_swr_not_observed"].tolist() == [1, 0, 0]
+    assert table["n_spikes_outside_swr"].tolist() == [1, 0, 5]
+    assert record["n_bins_outside_swr_not_observed"] == 1
+
+
 def test_per_bin_facts_whose_window_spikes_are_not_the_holdout_runs_raise(
     data_dir, tmp_path
 ):

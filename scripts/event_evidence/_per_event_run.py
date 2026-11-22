@@ -26,6 +26,7 @@ import pandas as pd
 
 from continuum_swr_replay.decoding.files import DecodePaths, decode_paths
 from continuum_swr_replay.paths import (
+    EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_PARTICIPATION_DIR,
     PARTICIPATION_NAME,
@@ -176,6 +177,24 @@ def restriction_run_dir(args: argparse.Namespace, data_dir: Path) -> Path:
     """``--restriction-dir``, or by default the canonical restriction run under
     ``data_dir``."""
     return args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+
+
+def add_bin_facts_dir_argument(parser: argparse.ArgumentParser) -> None:
+    """``--bin-facts-dir``, the per-bin facts run a runner reads
+    (:func:`bin_facts_run_dir`)."""
+    parser.add_argument(
+        "--bin-facts-dir",
+        type=Path,
+        default=None,
+        help="the per-bin facts run to read; default the canonical one under "
+        "--data-dir",
+    )
+
+
+def bin_facts_run_dir(args: argparse.Namespace, data_dir: Path) -> Path:
+    """``--bin-facts-dir``, or by default the canonical per-bin facts run under
+    ``data_dir``."""
+    return args.bin_facts_dir or data_dir / EVENT_BIN_FACTS_DIR
 
 
 def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:

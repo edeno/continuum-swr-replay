@@ -28,6 +28,8 @@ EPOCH = "wilbur20210329_02_r1_HPC"
 TIME = 50.0 + 0.002 * np.arange(6)
 SPIKES = [np.array([50.0, 50.0031]), np.array([50.005, 50.0099, 60.0])]
 VISITS = (np.array([50.002]), np.array([50.006]))
+OBSERVED = np.array([True, True, False, False, True, True])
+"""The decode frame's swr_observed."""
 
 
 @pytest.fixture
@@ -43,7 +45,7 @@ def folders(tmp_path, monkeypatch):
         assert detector is False
         return EpochInputs(
             types.SimpleNamespace(data_over_time=tmp_path / "cache.pkl"),
-            None,
+            pd.DataFrame({"swr_observed": OBSERVED}, index=TIME),
             TIME,
             {"time": TIME, "spike_times": SPIKES},
             None,
@@ -75,7 +77,8 @@ def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
     assert record["n_bins_in_well_visit"] == 2
     assert record["n_spikes_in_well_visit"] == 2
     assert record["n_well_visits"] == 1
-    # the record the earlier runs wrote, less the restriction run's spike count
+    np.testing.assert_array_equal(table["swr_observed"], OBSERVED)
+    assert record["n_bins_swr_not_observed"] == 2
     assert list(record) == [
         "status",
         "n_bins",
@@ -83,6 +86,7 @@ def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
         "n_well_visits",
         "n_bins_in_well_visit",
         "n_spikes_in_well_visit",
+        "n_bins_swr_not_observed",
         "epoch_inputs",
         "seconds",
     ]
@@ -115,10 +119,12 @@ def test_the_header_records_the_session_cache_of_every_epoch_of_the_restriction_
     runner.main(["--gather"])
     runner.main(["--epochs", EPOCH])
     assert headers[0] == headers[1]
-    # the header the run finishing under the earlier code wrote, key for key
     assert list(headers[0]) == ["produced_by", "provenance", "settings", "inputs"]
+    # the swr_observed setting makes the facts of the earlier design rerun
     assert headers[0]["settings"] == {
-        "binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]"
+        "binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]",
+        "swr_observed": "the decode frame's swr_observed, read through the SWR source",
+        "swr_source": runner.swr_source_name(),
     }
     assert headers[0]["inputs"] == {"session_cache": session_cache_record(epochs)}
     assert "subset" not in headers[0] and "subset" not in headers[0]["settings"]

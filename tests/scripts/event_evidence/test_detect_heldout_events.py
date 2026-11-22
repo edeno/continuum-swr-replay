@@ -74,7 +74,8 @@ def _raw(labels: dict[int, tuple[int, int]] = CANONICAL) -> pd.DataFrame:
 def _bins() -> pd.DataFrame:
     """The fold-fit table: ``none`` 0, ``swr`` 1 and ``full`` 3 nats at every
     bin, the two-sided scores twice those, the SWR's bins in the category
-    ``immobile_in_swr``, and the held-out trace (half continuous)."""
+    ``immobile_in_swr``, the held-out trace (half continuous), and
+    ``place_sampling_s`` a tenth of the bin's index (s)."""
     one = np.ones(N, dtype=np.float32)
     in_swr = (np.arange(N) >= 110) & (np.arange(N) <= 120)
     prob = _trace(HELDOUT).astype(np.float32)
@@ -94,12 +95,21 @@ def _bins() -> pd.DataFrame:
         in_swr,
         np.where(in_swr, "immobile_in_swr", "immobile_outside_swr"),
         **states,
+        place_sampling_s=(np.arange(N) / 10).astype(np.float32),
     )
 
 
+NOT_OBSERVED = [105, 106, 700]
+"""Bins where SWR detection was not observed: two in the first held-out event
+(outside the SWR, inside the visit), one outside the visit."""
+
+
 def _facts() -> pd.DataFrame:
-    """One spike per bin; bins 0-499 inside a well visit."""
-    return bin_facts_table(TIME, np.ones(N), np.arange(N) < 500)
+    """One spike per bin; bins 0-499 inside a well visit; SWR detection
+    observed everywhere but :data:`NOT_OBSERVED`."""
+    return bin_facts_table(
+        TIME, np.ones(N), np.arange(N) < 500, ~np.isin(np.arange(N), NOT_OBSERVED)
+    )
 
 
 TABLE = pd.DataFrame(
@@ -150,15 +160,17 @@ def test_run_epoch_writes_the_heldout_events_the_canonical_found_and_the_time(
     assert events["starts_in_well_visit"].tolist() == [True, False]
     assert events["shares_bin_with_canonical"].tolist() == [True, False]
     assert set(events["kind"]) == {"event"} and set(events["animal"]) == {"j16"}
-    # the window sums: 10 bins each, the first with 9 inside the SWR
+    # the window sums: 10 bins each, the first with 5 inside the SWR and 2
+    # outside it where SWR detection was not observed
     assert events["n_bins"].tolist() == [10, 10]
-    assert events["n_bins_outside_swr"].tolist() == [5, 10]
+    assert events["n_bins_outside_swr"].tolist() == [3, 10]
+    assert events["n_bins_outside_swr_not_observed"].tolist() == [2, 0]
     assert events["n_spikes"].tolist() == [10, 10]
     np.testing.assert_allclose(events["full"] - events["swr"], [20, 20])
     np.testing.assert_allclose(
-        events["full_outside_swr"] - events["swr_outside_swr"], [10, 20]
+        events["full_outside_swr"] - events["swr_outside_swr"], [6, 20]
     )
-    assert events["n_bins_outside_swr_in_visit"].tolist() == [5, 0]
+    assert events["n_bins_outside_swr_in_visit"].tolist() == [3, 0]
     # the canonical events: 1 shares bins with a held-out event, 2 does not
     found = tables[CANONICAL_EVENTS_FOUND_NAME]
     assert found["event_id"].tolist() == [11, 22]
@@ -169,7 +181,16 @@ def test_run_epoch_writes_the_heldout_events_the_canonical_found_and_the_time(
     assert sums["n_bins"].sum() == N
     assert sums.loc[sums["in_event_window"], "n_bins"].sum() == 20
     assert set(sums["epoch_id"]) == {EPOCH}
+    assert len(sums) == 384
+    outside = sums["category"] == "immobile_outside_swr"
+    assert sums.loc[outside & ~sums["swr_observed"], "n_bins"].sum() == 3
+    # place sampling at least 60 s: bins 600-999; farther than 0.5 s (250
+    # bins) from the SWR's bins 110-120: bins 371-999
+    assert sums.loc[sums["place_sampling_at_least_s"] == 60.0, "n_bins"].sum() == 400
+    assert sums.loc[sums["beyond_swr_margin_s"] == 0.5, "n_bins"].sum() == 629
     assert record["status"] == "ok"
+    assert record["n_bins_outside_swr_not_observed"] == 3
+    assert record["n_bins_outside_swr_not_observed_in_well_visit"] == 2
     assert record["n_heldout_events"] == 2
     assert record["n_canonical_events_sharing_a_bin"] == 1
     assert record["bin_s"] == pytest.approx(0.002)
