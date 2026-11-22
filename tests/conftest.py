@@ -33,15 +33,18 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 # for every new number of spikes: the simulated decoder tests
 # (``tests/integration/test_*_simulated.py``) compile about 6,000 small programs
 # per file, three quarters of one file's time and a third of the other's on a
-# cold run. A program is found only by a key
-# made of the program itself, its compile options and the JAX, jaxlib and XLA
-# versions, so an entry left by other code or another version is never read,
-# and a damaged entry is compiled again (with a warning). The default folder
-# follows the XDG convention; a caller's ``JAX_COMPILATION_CACHE_DIR`` wins, and
-# ``JAX_ENABLE_COMPILATION_CACHE=false`` turns the cache off. Every program is
-# kept, however fast it compiled (JAX's default keeps only those taking a
-# second or more). The folder is not pruned (JAX's size limit rescans the whole
-# folder on every write): delete it to reclaim the space.
+# cold run. A program is found only by a key made of the program itself, its
+# compile options, the jaxlib version, ``XLA_FLAGS`` and the host CPU's feature
+# list, so an entry left by other code, another version or another kind of
+# machine is never read. Writes are neither atomic nor locked: two runs at
+# once can leave a damaged entry, which costs a warning and a fresh compile on
+# every later run (JAX does not replace it) until the folder is deleted. The
+# default folder follows the XDG convention; a caller's
+# ``JAX_COMPILATION_CACHE_DIR`` wins, and ``JAX_ENABLE_COMPILATION_CACHE=false``
+# turns the cache off. Every program is kept, however fast it compiled (JAX's
+# default keeps only those taking a second or more). The folder is not pruned
+# (JAX's size limit rescans the whole folder on every write): delete it to
+# reclaim the space.
 # Set before any test imports JAX, which reads these when it is imported.
 os.environ.setdefault(
     "JAX_COMPILATION_CACHE_DIR",

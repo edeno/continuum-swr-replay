@@ -26,7 +26,9 @@ second run compiles little (set in [`conftest.py`](conftest.py)). It helps
 most in the simulated decoder tests (`integration/test_*_simulated.py`), which
 spend much of a first run compiling. Set `JAX_COMPILATION_CACHE_DIR` to use
 another folder, or `JAX_ENABLE_COMPILATION_CACHE=false` to turn it off. JAX
-never prunes the folder; delete it to reclaim the space.
+never prunes the folder; delete it to reclaim the space, or when runs warn
+that a cache entry cannot be read (two runs at once can damage one, and JAX
+does not replace it).
 
 ## Markers
 

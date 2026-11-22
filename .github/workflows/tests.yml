@@ -50,8 +50,10 @@ jobs:
       - name: Lint
         run: uv run --frozen --python ${{ matrix.python-version }} ruff check src scripts tests
 
+      # -rs lists each skipped test with its reason: the bit-for-bit fold-fit
+      # tests skip on a runner that does not repeat the library's computation.
       - name: Run tests
-        run: uv run --frozen --python ${{ matrix.python-version }} pytest -q -m "${{ matrix.tests }}"
+        run: uv run --frozen --python ${{ matrix.python-version }} pytest -q -rs -m "${{ matrix.tests }}"
 
   manuscript:
     # Builds paper/main.pdf from the committed sources, figures and macros, as
