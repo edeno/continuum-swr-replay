@@ -80,8 +80,8 @@ events summary uses (``event_statistics.overlap_class_statistics``,
 features run the summary reads; g's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; i from
 the stored counts by the functions the events summary uses
-(``nonlocal_by_signal.nonlocal_counts``, ``event_statistics.animal_signal_counts``,
-``nonlocal_below_threshold_statistics``); j from the held-out event run's
+(``nonlocal_by_signal.animal_nonlocal_counts``,
+``event_statistics.nonlocal_below_threshold_statistics``); j from the held-out event run's
 events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
 held-out decode that start inside a well visit, and the time inside a well
@@ -181,7 +181,6 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    animal_signal_counts,
     boundary_offsets,
     nonlocal_below_threshold_statistics,
     overlap_class_animal_shares,
@@ -189,7 +188,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     reference_medians,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
-    nonlocal_counts,
+    animal_nonlocal_counts,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
@@ -1611,15 +1610,13 @@ def generate_figure(
         ),
         ["ripple", "mua", "theta"],
     )
-    power_counts = animal_signal_counts(
-        nonlocal_counts(
-            checked_reference(
-                pd.read_parquet(data_dir / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"),
-                data_dir / NONLOCAL_BY_SIGNAL_DIR,
-                "counts by signal",
-            ),
-            "ripple_power",
-        )
+    power_counts = animal_nonlocal_counts(
+        checked_reference(
+            pd.read_parquet(data_dir / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"),
+            data_dir / NONLOCAL_BY_SIGNAL_DIR,
+            "counts by signal",
+        ),
+        "ripple_power",
     )
     # every analyzed epoch with an event: an epoch with none has no table
     event_epochs = event_table_epochs(table, analyzed_epoch_ids())

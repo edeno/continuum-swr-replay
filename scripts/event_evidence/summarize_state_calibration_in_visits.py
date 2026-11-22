@@ -61,6 +61,10 @@ from continuum_swr_replay.runs.io import (
 )
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
+METRICS = sorted(
+    {metric for metrics in IN_VISIT_CALIBRATION_METRICS.values() for metric in metrics}
+)
+"""Every state's calibration metrics, once each, sorted."""
 COLUMNS = [
     "epoch_id",
     "animal",
@@ -68,7 +72,7 @@ COLUMNS = [
     "regime",
     "start_time",
     *(f"p_{state}" for state in IN_VISIT_CALIBRATION_METRICS),
-    *sorted({m for metrics in IN_VISIT_CALIBRATION_METRICS.values() for m in metrics}),
+    *METRICS,
 ]
 """The stored windows' columns read."""
 
@@ -85,7 +89,7 @@ def epoch_windows(run_dir: Path, epoch_id: str) -> tuple[pd.DataFrame, dict[str,
         ((windows["kind"] == "calib") & (windows["regime"] == "immobile")).sum()
     )
     counts = {"n_kept": len(kept), "n_left_out": n_immobile - len(kept)}
-    for metric in sorted({m for v in IN_VISIT_CALIBRATION_METRICS.values() for m in v}):
+    for metric in METRICS:
         counts[f"n_without_scored_spike_{metric}"] = int(kept[metric].isna().sum())
     return kept, counts
 

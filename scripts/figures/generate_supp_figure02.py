@@ -107,8 +107,8 @@ the order the text cites them, in four rows:
         immobile bins decoded non-local at each MUA level; a line per animal,
         their mean in bold, a dashed line at 2 z, the MUA event detector's
         threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
-        inside the well visits (``nonlocal_by_signal.nonlocal_counts`` of the
-        stored counts, the same table Figure 2i reads, by
+        inside the well visits (``nonlocal_by_signal.animal_nonlocal_counts`` of
+        the stored counts, the same table Figure 2i reads, by
         ``signal_share_panels.draw_share_by_signal``;
         ``Processed-Data/nonlocal_by_signal``; the events summary's
         ``nonlocal_share_mua_above_level*`` and
@@ -313,7 +313,6 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     HPD_BIN_EDGES_CM,
     HPD_TIGHT_CM,
     TIMING_CLASSES,
-    animal_signal_counts,
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
@@ -322,7 +321,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     MUA_LEVEL_Z,
-    nonlocal_counts,
+    animal_nonlocal_counts,
 )
 from continuum_swr_replay.analysis.event_properties.rule_sweep import (
     RULE,
@@ -366,6 +365,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
     SPLIT_LABELS,
+    animal_values,
     draw_animal_gain,
     draw_split_gain,
     full_better_cue,
@@ -507,6 +507,8 @@ TRIGGER_WINDOW_S = 0.3
 """The No-Spike panel's window around each start (s, in all), Figure 2g's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
+GROUP_NAMES = ("No SWR", "SWR")
+"""The groups' names on the panels, in ``GROUP_COLORS``' order."""
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
 
 
@@ -662,9 +664,8 @@ def read_rule_sweep(folder: Path, event_table: Path) -> pd.DataFrame:
 
 def read_mua_counts(folder: Path) -> pd.DataFrame:
     """The MUA panel's counts: each animal's immobile time bins inside the well
-    visits, and its non-local ones, by MUA (``nonlocal_by_signal.nonlocal_counts``
-    of the stored counts, ``event_statistics.animal_signal_counts``), as the
-    events summary reads them.
+    visits, and its non-local ones, by MUA (``nonlocal_by_signal.animal_nonlocal_counts``
+    of the stored counts), as the events summary reads them.
 
     Raises
     ------
@@ -681,7 +682,7 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
             f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
             f"{error}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
         ) from error
-    return animal_signal_counts(nonlocal_counts(counts, "mua"))
+    return animal_nonlocal_counts(counts, "mua")
 
 
 def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> dict:
@@ -861,7 +862,7 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR, linespacing=0.95,
     )  # fmt: skip
     for k, (name, color) in enumerate(
-        zip(("No SWR", "SWR"), GROUP_COLORS.values(), strict=True)
+        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
     ):
         ax.text(
             0.99, 0.97 - 0.14 * k, name, ha="right", va="top",
@@ -1022,7 +1023,7 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
         mine = sweep[sweep["setting"] == setting]
         x = mine["value"].to_numpy()
         animals = pd.DataFrame(
-            [pd.Series(r.animals, index=r.animal_names) for r in mine.itertuples()]
+            [animal_values(row, "animals") for _, row in mine.iterrows()]
         )
         ax.plot(x, 100 * animals.to_numpy(), color="k", lw=0.5, alpha=0.5)
         ax.plot(x, 100 * mine["no_swr_fraction"].to_numpy(), color="k", lw=1.0,
@@ -1073,7 +1074,7 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
     for k, (name, color) in enumerate(
-        zip(("No SWR", "SWR"), GROUP_COLORS.values(), strict=True)
+        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
     ):
         ax.text(
             0.98, 0.98 - 0.1 * k, name, transform=ax.transAxes, ha="right",

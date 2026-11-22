@@ -21,12 +21,15 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
+)
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     detect_nonlocal_events,
 )
 from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
+from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.tables.columns import require_columns
@@ -113,16 +116,10 @@ def level_outside_periods(
         NaN when no sample qualifies.
     """
     time = frame.index.to_numpy(dtype=float)
-    inside = np.zeros(time.size, dtype=bool)
-    starts = np.searchsorted(time, periods["start_time"].to_numpy(), side="left")
-    ends = np.searchsorted(time, periods["end_time"].to_numpy(), side="right")
-    for start, end in zip(starts, ends, strict=True):
-        inside[start:end] = True
     chosen = (
-        (frame["head_speed"].to_numpy() < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
-        & ~frame["in_excluded_time"].to_numpy(dtype=bool)
+        immobile_analyzed_bins(frame)
         & in_well_visit(time, arrival_times, departure_times)
-        & ~inside
+        & ~interval_mask(time, periods)
     )
     values = frame[column].to_numpy(dtype=float)[chosen]
     return float(np.nanmedian(values)) if np.isfinite(values).any() else np.nan

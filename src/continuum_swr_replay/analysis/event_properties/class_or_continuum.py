@@ -782,16 +782,12 @@ def peak_power_densities(events: pd.DataFrame, grid: NDArray) -> pd.DataFrame:
     pd.DataFrame, shape (n_grid, n_animals)
         Indexed by ``grid``, a column per animal (sorted): the density, per z.
     """
-    column = RIPPLE_POWERS["peak"]
+    densities = {}
+    for animal, frame in events.groupby("animal"):
+        x = frame[RIPPLE_POWERS["peak"]].to_numpy(dtype=np.float64)
+        densities[animal] = _kde(x[np.isfinite(x)])(grid)
     return pd.DataFrame(
-        {
-            animal: _kde(x[np.isfinite(x)])(grid)
-            for animal, x in (
-                (animal, frame[column].to_numpy(dtype=np.float64))
-                for animal, frame in events.groupby("animal")
-            )
-        },
-        index=pd.Index(np.asarray(grid, dtype=np.float64), name="power_z"),
+        densities, index=pd.Index(np.asarray(grid, dtype=np.float64), name="power_z")
     )
 
 

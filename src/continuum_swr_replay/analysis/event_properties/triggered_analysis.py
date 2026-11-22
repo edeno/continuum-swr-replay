@@ -343,11 +343,11 @@ def compute_triggered_average_curves(
     for signal_type in signal_types:
         no_mean = no_mean_all.sel(signal=signal_type)
         quartiles = {
-            f"{name}_{label}": np.nanquantile(
-                windows.sel(signal=signal_type).values, q, axis=0
-            )
+            f"{name}_{label}": values
             for name, windows in (("no_overlap", windows_no), ("overlap", windows_ov))
-            for label, q in (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+            for label, values in window_quartiles(
+                windows.sel(signal=signal_type).values
+            ).items()
         }
         curves[signal_type] = {
             **quartiles,

@@ -115,10 +115,11 @@ def detect_classified_events(
         probability_threshold,
         minimum_samples * DECODE_SAMPLE_S,
     )
-    frame = with_swr_source(
-        raw.assign(non_local_event=labels.to_numpy()),
-        non_local_threshold=probability_threshold,
-    )
+    # a shallow copy: the new column leaves ``raw``, whose other columns it shares,
+    # as it was
+    labeled = raw.copy(deep=False)
+    labeled["non_local_event"] = labels.to_numpy()
+    frame = with_swr_source(labeled, non_local_threshold=probability_threshold)
     return build_classified_nonlocal_event_table(
         frame, nonlocal_threshold=probability_threshold
     )
@@ -145,22 +146,29 @@ def epoch_sweep_counts(
         events whose criterion label at 2 z is their canonical label; the same
         on each of those rows, NaN on the others).
     """
+
+    def events_in_visits(
+        probability_threshold: float, minimum_samples: int
+    ) -> pd.DataFrame:
+        events = detect_classified_events(raw, probability_threshold, minimum_samples)
+        return events[
+            in_well_visit(events["event_start"].to_numpy(), arrival, departure)
+        ]
+
+    rule_events = events_in_visits(
+        RULE["probability_threshold"], RULE["minimum_samples"]
+    )
     rows = []
-    rule_events = None
     for setting in ("probability_threshold", "minimum_samples"):
         for value in SETTINGS[setting]:
             settings = {**RULE, setting: value}
-            if rule_events is not None and settings == RULE:
-                events = rule_events
-            else:
-                events = detect_classified_events(
-                    raw, settings["probability_threshold"], settings["minimum_samples"]
+            events = (
+                rule_events
+                if settings == RULE
+                else events_in_visits(
+                    settings["probability_threshold"], settings["minimum_samples"]
                 )
-                events = events[
-                    in_well_visit(events["event_start"].to_numpy(), arrival, departure)
-                ]
-            if settings == RULE:
-                rule_events = events
+            )
             rows.append(
                 {
                     "setting": setting,
@@ -191,6 +199,15 @@ def epoch_sweep_counts(
     return pd.DataFrame(rows)
 
 
+def rule_rows(counts: pd.DataFrame, setting: str) -> pd.DataFrame:
+    """The rows of :func:`epoch_sweep_counts`' counts at the rule's value of
+    ``setting`` (a key of :data:`RULE`): every epoch's events at the rule's
+    settings."""
+    return counts[
+        (counts["setting"] == setting) & np.isclose(counts["value"], RULE[setting])
+    ]
+
+
 def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
     """The share of events with no SWR, and the events, at each setting.
 
@@ -213,13 +230,7 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
         ``animal_min`` and ``animal_max``.
     """
     rows = []
-    rule_events = int(
-        counts.loc[
-            (counts["setting"] == "probability_threshold")
-            & np.isclose(counts["value"], RULE["probability_threshold"]),
-            "n_events",
-        ].sum()
-    )
+    rule_events = int(rule_rows(counts, "probability_threshold")["n_events"].sum())
     for setting, values in SETTINGS.items():
         for value in values:
             mine = counts[
@@ -253,8 +264,5 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
 def criterion_agreement(counts: pd.DataFrame) -> float:
     """The share of the rule's events whose Kay criterion label at 2 z is their
     canonical SWR label (:func:`epoch_sweep_counts`' ``n_criterion_agrees``)."""
-    rule = counts[
-        (counts["setting"] == "swr_threshold_z")
-        & np.isclose(counts["value"], RULE["swr_threshold_z"])
-    ]
+    rule = rule_rows(counts, "swr_threshold_z")
     return float(rule["n_criterion_agrees"].sum() / rule["n_events"].sum())

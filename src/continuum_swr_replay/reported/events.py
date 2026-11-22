@@ -154,11 +154,11 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FIT,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
     OUTSIDE_SWR_EVENT_WINDOWS,
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_FAMILY,
-    OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
@@ -952,29 +952,16 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             f"SWR-overlapping events that start {words[start]} the matched SWR's "
             f"start and end {words[end]} its end"
         )
-        values += [
-            make(
-                f"{key}_share",
-                row["share"],
-                "fraction",
-                "pct",
+        values += _animal_range_values(
+            make,
+            f"{key}_share",
+            (row["share"], row["animal_min"], row["animal_max"]),
+            (
                 f"share of the {what}, pooled over every SWR-overlapping event",
-            ),
-            make(
-                f"{key}_share_animal_min",
-                row["animal_min"],
-                "fraction",
-                "pctnum",
                 f"lowest animal's share of the {what}, over its own events",
-            ),
-            make(
-                f"{key}_share_animal_max",
-                row["animal_max"],
-                "fraction",
-                "pct",
                 f"highest animal's share of the {what}, over its own events",
             ),
-        ]
+        )
     return values
 
 
@@ -1147,34 +1134,25 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
     values = []
     for detector, row in overlap.iterrows():
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
-        values += [
-            make(
-                key,
+        values += _animal_range_values(
+            make,
+            key,
+            (
                 row["pooled"],
-                "fraction",
-                "pct",
+                float(np.min(row["animals"])),
+                float(np.max(row["animals"])),
+            ),
+            (
                 f"share of the non-local events that a {detector} event overlaps "
                 "(of those whose overlap is known, inside the two detectors' "
                 "shared exposure), pooled over events",
-            ),
-            make(
-                f"{key}_animal_min",
-                float(np.min(row["animals"])),
-                "fraction",
-                "pctnum",
                 f"lowest per-animal share of the non-local events that a {detector} "
                 "event overlaps (an animal's share is the mean over its epochs of "
                 "the epoch's share)",
-            ),
-            make(
-                f"{key}_animal_max",
-                float(np.max(row["animals"])),
-                "fraction",
-                "pct",
                 f"highest per-animal share of the non-local events that a {detector} "
                 "event overlaps (the mean over the animal's epochs)",
             ),
-        ]
+        )
     return values
 
 
@@ -2286,6 +2264,10 @@ _EPOCH_REDUCTION = (
 )
 #: Each SWR group's word in a key (the inverse of ``_RUN_GROUPS``).
 _GROUP_WORDS = {group: word for word, group in _RUN_GROUPS.items()}
+#: The full decoder's score minus the SWR-only decoder's, in words.
+_FULL_MINUS_SWR = (
+    f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
+)
 
 
 def _interval_and_animals_positive(
@@ -2306,6 +2288,71 @@ def _interval_and_animals_positive(
             "count",
             "animals whose value is above zero",
         ),
+    ]
+
+
+def _full_minus_swr_values(
+    make: Callable[..., Value],
+    key: str,
+    row: pd.Series,
+    unit: tuple[str, str, str],
+    scored: str,
+    time: str,
+    epochs: str,
+    positive: str = "epochs whose gain per second is above zero",
+) -> list[Value]:
+    """The full minus the SWR-only decoder over ``time``, per ``unit`` (an entry
+    of ``_RESTRICTION_UNITS``): :func:`_interval_and_animals_positive`, and per
+    second also the epochs whose value is above zero (``positive``) and the
+    epochs with a value (``epochs``, what they have)."""
+    name, divided, words = unit
+    values = _interval_and_animals_positive(
+        make,
+        f"{key}_{name}",
+        row,
+        f"{scored}, {_FULL_MINUS_SWR}, summed over {time} and divided by "
+        f"{divided}: {_EPOCH_REDUCTION}",
+        unit=words,
+    )
+    if name == "per_s":
+        values += [
+            make(
+                f"{key}_epochs_positive",
+                row["n_epochs_positive"],
+                "count",
+                "count",
+                positive,
+            ),
+            make(
+                f"{key}_epochs",
+                row["n_epochs"],
+                "count",
+                "count",
+                f"epochs with {epochs}",
+            ),
+        ]
+    return values
+
+
+def _animal_range_values(
+    make: Callable[..., Value],
+    key: str,
+    shares: tuple[float, float, float],
+    descriptions: tuple[str, str, str],
+    lowest_style: str = "pctnum",
+) -> list[Value]:
+    """A share, then the lowest and the highest animal's (``{key}_animal_min``,
+    ``{key}_animal_max``): ``shares`` and ``descriptions`` in that order, each
+    printed as a percent (the lowest in ``lowest_style``)."""
+    return [
+        make(key_, share, "fraction", style, description)
+        for key_, share, style, description in zip(
+            (key, f"{key}_animal_min", f"{key}_animal_max"),
+            shares,
+            ("pct", lowest_style, "pct"),
+            descriptions,
+            strict=True,
+        )
     ]
 
 
@@ -2924,50 +2971,31 @@ def restriction_outside_swr_values(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
     )
     statistics = restriction_totals.outside_swr_statistics(time_sums, bin_s, windows)
-    full_minus_swr = (
-        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
-    )
     time = f"every one of the epoch's {_OUTSIDE_SWR_BINS}"
     values, outside_events = [], []
     for family, suffix in FAMILY_SUFFIX.items():
         key = f"restriction_outside_swr_full_minus_swr{suffix}"
         scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
         figure = family == RESTRICTION_FIGURE_FAMILY
-        for unit, divided, words in _RESTRICTION_UNITS:
-            row = statistics.loc[(family, f"gain_{unit}")]
-            values += _interval_and_animals_positive(
+        for unit in _RESTRICTION_UNITS:
+            name, divided, words = unit
+            values += _full_minus_swr_values(
                 make_figure
-                if figure and f"gain_{unit}" == RESTRICTION_FIGURE_OUTSIDE_SWR
+                if figure and f"gain_{name}" == RESTRICTION_FIGURE_OUTSIDE_SWR
                 else make_text,
-                f"{key}_{unit}",
-                row,
-                f"{scored}, {full_minus_swr}, summed over {time} and divided by "
-                f"{divided}: {_EPOCH_REDUCTION}",
-                unit=words,
+                key,
+                statistics.loc[(family, f"gain_{name}")],
+                unit,
+                scored,
+                time,
+                _OUTSIDE_SWR_BINS,
             )
-            if unit == "per_s":
-                values += [
-                    make_text(
-                        f"{key}_epochs_positive",
-                        row["n_epochs_positive"],
-                        "count",
-                        "count",
-                        "epochs whose gain per second is above zero",
-                    ),
-                    make_text(
-                        f"{key}_epochs",
-                        row["n_epochs"],
-                        "count",
-                        "count",
-                        f"epochs with {_OUTSIDE_SWR_BINS}",
-                    ),
-                ]
-            row = statistics.loc[(family, f"outside_events_gain_{unit}")]
+            row = statistics.loc[(family, f"outside_events_gain_{name}")]
             outside_events += _interval_and_animals_positive(
                 make_text,
-                f"{key}_outside_heldout_events_{unit}",
+                f"{key}_outside_heldout_events_{name}",
                 row,
-                f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
+                f"{scored}, {_FULL_MINUS_SWR}, summed over the epoch's immobile bins "
                 "outside SWRs that no event detected from the held-out decode "
                 f"holds (wherever it starts) and divided by {divided}: "
                 f"{_EPOCH_REDUCTION}",
@@ -2990,7 +3018,7 @@ def restriction_outside_swr_values(
                 make_text,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
-                f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
+                f"{scored}; the gain is the score {_FULL_MINUS_SWR}. Per epoch, "
                 f"the gain summed over {part} (their {_OUTSIDE_SWR_BINS} "
                 "inside a well visit; an event that runs past the final poke-out "
                 "adds its bins before it only), divided by the gain summed over "
@@ -3008,7 +3036,7 @@ def restriction_outside_swr_values(
                 row["estimate"],
                 "quantity",
                 "dec2",
-                f"{scored}; the gain is the score {full_minus_swr}. Per epoch, 1 "
+                f"{scored}; the gain is the score {_FULL_MINUS_SWR}. Per epoch, 1 "
                 "minus the share of the gain in the events detected from the "
                 "held-out decode with no SWR and minus its share in the time "
                 "outside the SWR of those that overlap an SWR, so the three shares "
@@ -3116,47 +3144,27 @@ def restriction_outside_swr_part_values(
         time_sums, bin_s
     ).set_index(["subset", "threshold_s", "family", "measure"])
     shares = restriction_totals.outside_swr_subset_shares(time_sums, bin_s)
-    full_minus_swr = (
-        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
-    )
     for subset, parts in _OUTSIDE_SWR_PARTS.items():
         for threshold, (word, kept) in parts.items():
             time = f"the epoch's {_OUTSIDE_SWR_BINS} {kept}"
             for family, suffix in FAMILY_SUFFIX.items():
                 key = f"restriction_outside_swr_{word}_full_minus_swr{suffix}"
                 scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
-                for unit, divided, words in _RESTRICTION_UNITS:
-                    row = statistics.loc[(subset, threshold, family, f"gain_{unit}")]
+                for unit in _RESTRICTION_UNITS:
                     drawn = (
                         subset == "beyond_swr_margin"
                         and family == RESTRICTION_FIGURE_FAMILY
-                        and unit == "per_spike"
+                        and unit[0] == "per_spike"
                     )
-                    values += _interval_and_animals_positive(
+                    values += _full_minus_swr_values(
                         make_distance if drawn else make,
-                        f"{key}_{unit}",
-                        row,
-                        f"{scored}, {full_minus_swr}, summed over {time} and "
-                        f"divided by {divided}: {_EPOCH_REDUCTION}",
-                        unit=words,
+                        key,
+                        statistics.loc[(subset, threshold, family, f"gain_{unit[0]}")],
+                        unit,
+                        scored,
+                        time,
+                        f"{_OUTSIDE_SWR_BINS} {kept}",
                     )
-                    if unit == "per_s":
-                        values += [
-                            make(
-                                f"{key}_epochs_positive",
-                                row["n_epochs_positive"],
-                                "count",
-                                "count",
-                                "epochs whose gain per second is above zero",
-                            ),
-                            make(
-                                f"{key}_epochs",
-                                row["n_epochs"],
-                                "count",
-                                "count",
-                                f"epochs with {_OUTSIDE_SWR_BINS} {kept}",
-                            ),
-                        ]
             row = shares.loc[(subset, threshold)]
             where = f"that lie {kept}" if subset == "beyond_swr_margin" else kept
             share = f"share of the epoch's {_OUTSIDE_SWR_BINS} {where}"
@@ -3201,41 +3209,21 @@ def restriction_inside_swr_values(
     statistics = restriction_totals.inside_swr_gain_statistics(
         restriction_totals.epoch_inside_swr_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    full_minus_swr = (
-        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
-    )
     values = []
     for family, suffix in FAMILY_SUFFIX.items():
         key = f"restriction_inside_swr_full_minus_swr{suffix}"
         scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
-        for unit, divided, words in _RESTRICTION_UNITS:
-            row = statistics.loc[(family, f"gain_{unit}")]
-            values += _interval_and_animals_positive(
+        for unit in _RESTRICTION_UNITS:
+            values += _full_minus_swr_values(
                 make,
-                f"{key}_{unit}",
-                row,
-                f"{scored}, {full_minus_swr}, summed over every one of the "
-                f"epoch's {_INSIDE_SWR_BINS} inside a well visit and divided by "
-                f"{divided}: {_EPOCH_REDUCTION}",
-                unit=words,
+                key,
+                statistics.loc[(family, f"gain_{unit[0]}")],
+                unit,
+                scored,
+                f"every one of the epoch's {_INSIDE_SWR_BINS} inside a well visit",
+                f"{_INSIDE_SWR_BINS} inside a well visit",
+                "epochs whose gain per second inside SWRs is above zero",
             )
-            if unit == "per_s":
-                values += [
-                    make(
-                        f"{key}_epochs_positive",
-                        row["n_epochs_positive"],
-                        "count",
-                        "count",
-                        "epochs whose gain per second inside SWRs is above zero",
-                    ),
-                    make(
-                        f"{key}_epochs",
-                        row["n_epochs"],
-                        "count",
-                        "count",
-                        f"epochs with {_INSIDE_SWR_BINS} inside a well visit",
-                    ),
-                ]
     return values
 
 
@@ -3385,9 +3373,7 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        event_statistics.animal_signal_counts(
-            nonlocal_by_signal.nonlocal_counts(counts, "ripple_power")
-        ),
+        nonlocal_by_signal.animal_nonlocal_counts(counts, "ripple_power"),
         KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
@@ -3431,9 +3417,7 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     detection is independent of population bursts (the held-out tetrode values
     address whether the spikes point to the decoded place)."""
     make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
-    animals = event_statistics.animal_signal_counts(
-        nonlocal_by_signal.nonlocal_counts(counts, "mua")
-    )
+    animals = nonlocal_by_signal.animal_nonlocal_counts(counts, "mua")
     level = nonlocal_by_signal.MUA_LEVEL_Z
     above = event_statistics.nonlocal_share_above_statistics(animals, level)
     below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
@@ -3454,54 +3438,42 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             f"the MUA level of the values below: {level_words}",
             "z",
         ),
-        make(
+        *_animal_range_values(
+            make,
             key_above,
-            above["share_animal_mean"],
-            "fraction",
-            "pct",
-            f"share of the immobile time bins with MUA at or above {level_words} "
-            f"that are decoded non-local ({nonlocal_}): mean over animals of each "
-            "animal's share of its bins. Nearly all time above the MUA level is "
-            "decoded non-local: the decoder needs spikes, so this does not show "
-            "that non-local detection is independent of population bursts",
+            (
+                above["share_animal_mean"],
+                above["share_animal_min"],
+                above["share_animal_max"],
+            ),
+            (
+                f"share of the immobile time bins with MUA at or above {level_words} "
+                f"that are decoded non-local ({nonlocal_}): mean over animals of each "
+                "animal's share of its bins. Nearly all time above the MUA level is "
+                "decoded non-local: the decoder needs spikes, so this does not show "
+                "that non-local detection is independent of population bursts",
+                f"lowest per-animal share of the bins with MUA at or above {level:g} z "
+                "that are decoded non-local",
+                "highest per-animal share",
+            ),
+            lowest_style="pct",
         ),
-        make(
-            f"{key_above}_animal_min",
-            above["share_animal_min"],
-            "fraction",
-            "pct",
-            f"lowest per-animal share of the bins with MUA at or above {level:g} z "
-            "that are decoded non-local",
-        ),
-        make(
-            f"{key_above}_animal_max",
-            above["share_animal_max"],
-            "fraction",
-            "pct",
-            "highest per-animal share",
-        ),
-        make(
+        *_animal_range_values(
+            make,
             key_below,
-            below["fraction_animal_mean"],
-            "fraction",
-            "pct",
-            f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
-            f"MUA is below {level_words}: mean over animals of each animal's share "
-            "of its bins. Most non-local time is below the MUA level",
-        ),
-        make(
-            f"{key_below}_animal_min",
-            below["fraction_animal_min"],
-            "fraction",
-            "pct",
-            f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
-        ),
-        make(
-            f"{key_below}_animal_max",
-            below["fraction_animal_max"],
-            "fraction",
-            "pct",
-            "highest per-animal share",
+            (
+                below["fraction_animal_mean"],
+                below["fraction_animal_min"],
+                below["fraction_animal_max"],
+            ),
+            (
+                f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
+                f"MUA is below {level_words}: mean over animals of each animal's share "
+                "of its bins. Most non-local time is below the MUA level",
+                f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+                "highest per-animal share",
+            ),
+            lowest_style="pct",
         ),
     ]
 
@@ -3574,28 +3546,17 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
             " (the value the paper uses)" if row.is_rule else ""
         )
         values += [
-            make(
+            *_animal_range_values(
+                make,
                 f"{key}_no_swr_fraction",
-                row.no_swr_fraction,
-                "fraction",
-                "pct",
-                f"share of the events detected again {at} that overlap no SWR, "
-                "pooled over events",
-            ),
-            make(
-                f"{key}_no_swr_fraction_animal_min",
-                row.animal_min,
-                "fraction",
-                "pctnum",
-                f"lowest per-animal share with no SWR {at} (an animal's share is the "
-                "mean over its epochs of the epoch's share)",
-            ),
-            make(
-                f"{key}_no_swr_fraction_animal_max",
-                row.animal_max,
-                "fraction",
-                "pct",
-                "highest per-animal share",
+                (row.no_swr_fraction, row.animal_min, row.animal_max),
+                (
+                    f"share of the events detected again {at} that overlap no SWR, "
+                    "pooled over events",
+                    f"lowest per-animal share with no SWR {at} (an animal's share is the "
+                    "mean over its epochs of the epoch's share)",
+                    "highest per-animal share",
+                ),
             ),
             make(
                 f"{key}_events_vs_rule",
@@ -4780,11 +4741,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             EVENTS_SUBSET,
         )
     )
+    holdout_windows = tetrode_holdout.window_scores(holdout_table)
     summary.add(
         *over(
             pend(
                 tetrode_holdout_values(
-                    tetrode_holdout.window_scores(holdout_table),
+                    holdout_windows,
                     f"{rel(inputs.tetrode_holdout)} "
                     "(scripts/event_evidence/score_tetrode_holdout.py)",
                 ),
@@ -4800,7 +4762,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         *over(
             pend(
                 shared_content_values(
-                    tetrode_holdout.window_scores(holdout_table),
+                    holdout_windows,
                     f"{rel(inputs.tetrode_holdout)} "
                     "(scripts/event_evidence/score_tetrode_holdout.py)",
                 ),

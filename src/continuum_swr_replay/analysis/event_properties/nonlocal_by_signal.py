@@ -27,6 +27,9 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    animal_signal_counts,
+)
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     HSE_ZSCORE_THRESHOLD,
@@ -217,3 +220,25 @@ def nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
         .groupby(keys, sort=False, as_index=False)[["n_bins", "n_nonlocal"]]
         .sum()
     )
+
+
+def animal_nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
+    """Each animal's immobile time bins, and its non-local ones, by the level of
+    ``signal``: ``event_statistics.animal_signal_counts`` of
+    :func:`nonlocal_counts`, the counts Figure 2i, its supplement and the events
+    summary read.
+
+    Parameters
+    ----------
+    counts : pd.DataFrame
+        The stored per-epoch counts (:func:`rest_signal_counts`' rows of every
+        epoch).
+    signal : str
+        One of :data:`SIGNALS`.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``event_statistics.animal_signal_counts``' rows.
+    """
+    return animal_signal_counts(nonlocal_counts(counts, signal))
