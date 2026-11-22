@@ -1969,48 +1969,68 @@ def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
         )
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["All", "Outside SWR"]
-    assert ax.get_title() == "Full minus SWR-only"
-    assert ax.get_ylabel() == "nats/spike"
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["All", "Outside\nSWRs"]
+    # horizontal, so that they do not hang below panel h's labels
+    assert {t.get_rotation() for t in ax.get_xticklabels()} == {0.0}
+    # the unit is in the title, in place of a y label
+    assert ax.get_title() == "Full minus\nSWR-only\n(nats/spike)"
+    assert ax.get_ylabel() == ""
     # no tick label at the frame's top, where it would meet the title
     assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
     plt.close(fig)
 
 
-def test_figure02_panel_g_third_axis_draws_the_shares_in_percent(offline):
+def test_figure02_panel_g_third_axis_names_each_share_beside_its_dots(offline):
     """Panel g's third axis: the three shares of the gain outside SWRs in
-    percent, in panel d's colors and a gray for the rest, each a dot per animal
-    and the mean with its interval beside them, and a dashed zero line."""
+    percent, in one column, in panel d's colors and a gray for the rest, each
+    a dot per animal, the mean with its interval beside them and its name
+    beside that in its color; no x tick labels; a dashed zero line; the title
+    a text above the frame, returned for the figure to place."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
+    from continuum_swr_replay.visualization.palettes import readable_text_color
+
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    figure02.draw_outside_swr_shares(ax, _outside_rows())
+    title = figure02.draw_outside_swr_shares(ax, _outside_rows())
     fig.canvas.draw()
-    for x, (measure, values), color in zip(
-        (0.0, 1.0, 2.0),
-        SHARES.items(),
-        (
-            figure02.COLORS["No SWR"],
-            figure02.COLORS["SWR partial"],
-            figure02.C_OUTSIDE_EVENTS,
-        ),
-        strict=True,
-    ):
-        dots = _dots_at(ax, x)
-        np.testing.assert_allclose(dots.get_offsets()[:, 1], 100 * np.asarray(values))
-        np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
-        assert np.allclose(_means_at(ax, x), 100 * np.mean(values)), measure
-    assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == [
-        "No SWR",
-        "Partly in SWR",
-        "Elsewhere",
+    colors = (
+        figure02.COLORS["No SWR"],
+        figure02.COLORS["SWR partial"],
+        figure02.C_OUTSIDE_EVENTS,
+    )
+    dots = [
+        c
+        for c in ax.collections
+        if isinstance(c, matplotlib.collections.PathCollection)
     ]
+    assert len(dots) == 3
+    means = _means_at(ax, 0.0)
+    names = [t for t in ax.texts if t is not title]
+    for drawn, mean, name, (measure, values), color in zip(
+        dots, means, names, SHARES.items(), colors, strict=True
+    ):
+        np.testing.assert_allclose(drawn.get_offsets()[:, 0], 0.0)
+        np.testing.assert_allclose(drawn.get_offsets()[:, 1], 100 * np.asarray(values))
+        np.testing.assert_allclose(drawn.get_facecolors()[0], to_rgba(color))
+        assert np.allclose(mean, 100 * np.mean(values)), measure
+        # the name, at the mean's height, right of it, in the share's color
+        assert name.get_text() == figure02.SHARE_LABELS[measure]
+        assert name.xy[1] == pytest.approx(100 * np.mean(values))
+        assert name.get_ha() == "left"
+        assert name.get_color() == readable_text_color(color)
+    assert [n.get_text() for n in names] == [
+        "No-SWR\nevents",
+        "Partly in\nan SWR",
+        "Outside\nevents",
+    ]
+    assert list(ax.get_xticks()) == []
+    assert _has_zero_line(ax)
     # the rest is below zero here, and inside the axis
     assert ax.get_ylim()[0] < 100 * min(SHARES["share_outside_events"])
-    assert ax.get_ylabel() == "Share of gain\noutside SWRs (%)"
+    assert title.get_text() == "Share of gain\noutside SWRs (%)"
+    assert ax.get_ylabel() == ""
     plt.close(fig)
 
 
@@ -2046,7 +2066,9 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name
     assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)
-    assert list(figure02.SHARE_X) == list(restriction_totals.RESTRICTION_FIGURE_SHARES)
+    assert list(figure02.SHARE_LABELS) == list(
+        restriction_totals.RESTRICTION_FIGURE_SHARES
+    )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
     assert events.TAGS["participation"].figures == ("2h",)
     assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)

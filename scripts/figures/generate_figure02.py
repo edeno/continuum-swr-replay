@@ -38,15 +38,16 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         (``restriction_totals.immobile_gain_statistics``). Second axis, "Full
         minus SWR-only" (nats per spike, its own scale): over every immobile
         bin ("All", each epoch's paired difference, the same statistic) and
-        over the immobile bins outside SWRs ("Outside SWR",
+        over the immobile bins outside SWRs ("Outside SWRs",
         ``restriction_totals.outside_swr_gain_statistics``), a dot per animal,
         the animals' mean with its 95 % interval and a dashed line at zero.
-        Third axis: where that gain outside SWRs lies, as a share of it per
-        epoch, in the events with no SWR, in the time outside the SWR of the
-        events partly in one, and elsewhere (1 minus the other two, so the
-        three add to 100 %; below zero, as the full decoder does slightly worse
-        there), a dot per animal and the mean with its interval (the same
-        statistic). The events are those detected from the held-out decode
+        Third axis, "Share of gain outside SWRs (%)": where that gain lies, as
+        a share of it per epoch, in the events with no SWR ("No-SWR events"),
+        in the time outside the SWR of the events partly in one ("Partly in an
+        SWR") and outside those events ("Outside events": 1 minus the other
+        two, so the three add to 100 %; below zero, as the full decoder does
+        slightly worse there), a dot per animal and the mean with its interval
+        (the same statistic), each named beside its dots. The events are those detected from the held-out decode
         (the canonical event rule on each fold's held-out state probabilities)
         that start inside a well visit: the full decoder's own events, so the
         shares say where its gain sits and do not test it; the second axis'
@@ -134,6 +135,7 @@ from matplotlib.axes import Axes
 from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.text import Text
 from matplotlib.ticker import NullLocator
 from matplotlib.transforms import Bbox, offset_copy
 from non_local_detector.environment import Environment
@@ -243,6 +245,7 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
+    MEAN_OFFSET,
     REFERENCE_COLOR,
     animal_values,
     draw_animal_gain,
@@ -961,30 +964,29 @@ def fit_axes_in_row(
     proportion to ``weights``.
 
     Each axes' y axis (its label and tick labels) and the texts it writes
-    past its frame's right edge (a reference's name) take what they need,
+    beside its frame, past the right edge (a reference's name, direct labels),
+    take what they need,
     measured on the drawn figure, and the frames share the rest, so no label
     runs into the next axes. The x tick labels, rotated to hang down and left
     below the frames, do not count: parallel labels do not cross, and the
     first axes' hang into the figure's margin as panel c's labels do. Nor do
-    the titles, which may reach over the gaps; whether they meet is checked
-    on the image. Measured again after each move, as the extents change with
-    the frames.
+    the titles and texts above the frames, which may reach over the gaps;
+    whether they meet is checked on the image. Measured again after each move
+    (:data:`FIT_PASSES`), as the extents change with the frames.
     """
-    for _ in range(3):
+    for _ in range(FIT_PASSES):
         fig.canvas.draw()
         to_figure = fig.transFigure.inverted()
         pads = []
         for ax in axes:
             y_axis = ax.yaxis.get_tightbbox(renderer).transformed(to_figure)
             box = ax.get_position()
-            right = max(
-                [box.x1]
-                + [
-                    text.get_window_extent(renderer).transformed(to_figure).x1
-                    for text in ax.texts
-                ]
-            )
-            pads.append((box.x0 - y_axis.x0, right - box.x1))
+            beside = [
+                text.get_window_extent(renderer).transformed(to_figure)
+                for text in ax.texts
+            ]
+            ink_right = max([box.x1] + [b.x1 for b in beside if b.y0 < box.y1])
+            pads.append((box.x0 - y_axis.x0, ink_right - box.x1))
         free = (
             right
             - left
@@ -999,6 +1001,16 @@ def fit_axes_in_row(
             x += before + width + after + PANEL_G_GAP
 
 
+def align_title_to_y_axis(fig: Figure, renderer: Any, ax: Axes, title: Text) -> None:
+    """Put ``title`` (a text of ``ax``) 2 points above the frame, starting at
+    the left edge of the y axis' tick labels, as a left-aligned title over the
+    axis and what it writes beside it."""
+    to_figure = fig.transFigure.inverted()
+    left = ax.yaxis.get_tightbbox(renderer).transformed(to_figure).x0
+    title.set_transform(offset_copy(fig.transFigure, fig=fig, y=2, units="points"))
+    title.set_position((left, ax.get_position().y1))
+
+
 def title_over(fig: Figure, renderer: Any, axes: Sequence[Axes], title: str) -> None:
     """One title centered over several axes (``axes``, left to right), just
     above the highest of their tops and their own titles, with a thin line
@@ -1011,19 +1023,19 @@ def title_over(fig: Figure, renderer: Any, axes: Sequence[Axes], title: str) -> 
     top = max(
         [box.y1 for box in boxes]
         + [
-            ax.title.get_window_extent(renderer).transformed(to_figure).y1
+            text.get_window_extent(renderer).transformed(to_figure).y1
             for ax in axes
-            if ax.get_title()
+            for text in ([ax.title] if ax.get_title() else []) + list(ax.texts)
         ]
     )
-    above = offset_copy(fig.transFigure, fig=fig, y=1.5, units="points")
+    above = offset_copy(fig.transFigure, fig=fig, y=2, units="points")
     axes[0].plot(
         (boxes[0].x0, boxes[-1].x1), (top, top), transform=above,
         color="black", lw=0.5, clip_on=False,
     )  # fmt: skip
     axes[0].text(
         (boxes[0].x0 + boxes[-1].x1) / 2, top, title,
-        transform=offset_copy(fig.transFigure, fig=fig, y=2.5, units="points"),
+        transform=offset_copy(fig.transFigure, fig=fig, y=3, units="points"),
         ha="center", va="bottom", fontsize=SMALL_SIZE,
     )  # fmt: skip
 
@@ -1188,19 +1200,22 @@ PANEL_G_REFERENCE = "local-only"
 DIFFERENCE_X = {"all": 0.0, "outside_swr": 1.0}
 """Panel g, second axis: the full minus the SWR-only decoder over all the
 immobile time, then over the immobile time outside SWRs."""
-DIFFERENCE_LABELS = {"all": "All", "outside_swr": "Outside SWR"}
-"""Rotated, on one line: "Outside SWRs" would end below the figure's bottom."""
-PANEL_G_DIFFERENCE_TITLE = "Full minus SWR-only"
-PANEL_G_DIFFERENCE_YLABEL = "nats/spike"
-SHARE_X = dict(zip(RESTRICTION_FIGURE_SHARES, (0.0, 1.0, 2.0), strict=True))
-"""Panel g, third axis: each share of the gain outside SWRs and its position."""
+DIFFERENCE_LABELS = {"all": "All", "outside_swr": "Outside\nSWRs"}
+"""Horizontal: rotated, "Outside SWRs" would hang below panel h's labels."""
+PANEL_G_DIFFERENCE_TITLE = "Full minus\nSWR-only\n(nats/spike)"
+"""On three lines, so it sits over its own axis, not between its neighbors,
+and carries the unit in place of a y label, which would take the width the
+frames need."""
 SHARE_LABELS = dict(
     zip(
         RESTRICTION_FIGURE_SHARES,
-        (CLASS_LABELS["non_swr"], CLASS_LABELS["swr_partial"], "Elsewhere"),
+        ("No-SWR\nevents", "Partly in\nan SWR", "Outside\nevents"),
         strict=True,
     )
 )
+"""Panel g, third axis: each share's name, written beside its dots (the three
+lie at very different heights, so they share one column and need no x tick
+labels)."""
 C_OUTSIDE_EVENTS = C_PAIR
 """The share of the gain outside events: a neutral gray, no class's color."""
 SHARE_COLORS = dict(
@@ -1212,7 +1227,9 @@ SHARE_COLORS = dict(
 )
 """Panel d's colors of the no-SWR events and of the events partly in an SWR,
 and a gray for the time outside events."""
-PANEL_G_SHARE_YLABEL = "Share of gain\noutside SWRs (%)"
+PANEL_G_SHARE_TITLE = "Share of gain\noutside SWRs (%)"
+"""The third axis' title, in place of a y label, which would take the width
+the frames need."""
 GAIN_FLOOR = 0.13
 """Panel g: each axis' floor below zero, as a share of its top."""
 PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
@@ -1250,17 +1267,24 @@ axes; g, h and i share the first three (:data:`ROW4_WIDTHS`)."""
 ROW4_WIDTHS = (2.55, 0.8, 1.2)
 """The widths of g (its three axes), h and i within row 4's first three cells."""
 ROW4_WSPACE = 0.42
-PANEL_G_WIDTHS = (0.55, 0.55, 0.8)
+PANEL_G_WIDTHS = (0.6, 0.9, 0.25)
 """Panel g's three axes' frame widths, in proportion: the decoders, their
 difference, the shares (:func:`fit_axes_in_row`)."""
 PANEL_G_WSPACE = 1.0
 """The grid's first guess; :func:`fit_axes_in_row` then places the axes."""
+FIT_PASSES = 10
+"""The passes of :func:`fit_axes_in_row`: what overhangs a frame shrinks as the
+frame grows, so the widths settle over a few passes."""
 PANEL_G_GAP = 0.012
 """Panel g: the space between one axes' drawing and the next (figure width)."""
 PANEL_G_TICK_PAD = 1.0
-"""Panel g's x tick labels' distance from their ticks (points), less than the
-default so that its rotated labels end above the figure's bottom."""
-PANEL_GAP = 0.025
+"""Panel g's rotated x tick labels' distance from their ticks (points), less
+than the default so that they end no lower than panel h's."""
+PANEL_G_TOP_DROP = 2 * SMALL_SIZE * 1.2 / 72 / HEIGHT
+"""What panel g's frames give up at their tops (figure height): two lines of
+its titles' text, as its axis titles take three lines under the panel's
+title where the earlier design's took one."""
+PANEL_GAP = 0.012
 """The space between panel g's drawing and panel h's (figure width)."""
 LETTER_COLUMNS = ("abcg", "d", "e", "h", "i", "fj")
 """The panel letters that share a left edge (convention 10). Row 4's g holds
@@ -1384,18 +1408,13 @@ def draw_full_minus_swr(
         draw_animal_gain(ax, DIFFERENCE_X[name], row, C_NL)
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
     ax.set_xlim(-0.45, 1.5)
-    ax.set_xticks(
-        list(DIFFERENCE_X.values()), list(DIFFERENCE_LABELS.values()), rotation=45,
-        ha="right", rotation_mode="anchor",
-    )  # fmt: skip
-    ax.tick_params(axis="x", pad=PANEL_G_TICK_PAD)
+    ax.set_xticks(list(DIFFERENCE_X.values()), list(DIFFERENCE_LABELS.values()))
     top = (
         max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
     )
     ax.set_ylim(-GAIN_FLOOR * top, top)
     # no tick label at the frame's top, where it would meet the title
     ax.set_yticks([t for t in ax.get_yticks() if 0 <= t <= 0.9 * top])
-    ax.set_ylabel(PANEL_G_DIFFERENCE_YLABEL)
     ax.set_title(PANEL_G_DIFFERENCE_TITLE, fontsize=SMALL_SIZE, pad=2)
 
 
@@ -1408,7 +1427,7 @@ def percent(row: pd.Series) -> pd.Series:
     return scaled
 
 
-def draw_outside_swr_shares(ax: Axes, outside: pd.DataFrame) -> None:
+def draw_outside_swr_shares(ax: Axes, outside: pd.DataFrame) -> Text:
     """Panel g, third axis: where the full decoder's gain over the SWR-only
     decoder outside SWRs sits, in percent of that gain: in the no-SWR events,
     in the time outside the SWR of the events partly in an SWR, and outside
@@ -1428,24 +1447,38 @@ def draw_outside_swr_shares(ax: Axes, outside: pd.DataFrame) -> None:
     outside : pd.DataFrame
         ``outside_swr_gain_statistics``' rows, indexed by ``family`` and
         ``measure``.
+
+    Returns
+    -------
+    Text
+        The axis' title, for :func:`align_title_to_y_axis` to place.
     """
     rows = {
         measure: percent(outside.loc[(RESTRICTION_FIGURE_FAMILY, measure)])
         for measure in RESTRICTION_FIGURE_SHARES
     }
     for measure, row in rows.items():
-        draw_animal_gain(ax, SHARE_X[measure], row, SHARE_COLORS[measure])
+        color = SHARE_COLORS[measure]
+        draw_animal_gain(ax, 0.0, row, color)
+        ax.annotate(
+            SHARE_LABELS[measure], (MEAN_OFFSET, row["estimate"]),
+            xytext=(4, 0), textcoords="offset points", ha="left", va="center",
+            fontsize=SMALL_SIZE, color=readable_text_color(color),
+            annotation_clip=False,
+        )  # fmt: skip
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    ax.set_xlim(-0.45, 2.5)
-    ax.set_xticks(
-        list(SHARE_X.values()), list(SHARE_LABELS.values()), rotation=45,
-        ha="right", rotation_mode="anchor",
-    )  # fmt: skip
-    ax.tick_params(axis="x", pad=PANEL_G_TICK_PAD)
+    ax.set_xlim(-0.4, 0.4)
+    ax.set_xticks([])
     low = min(min(float(r["animals"].min()), r["ci_low"]) for r in rows.values())
     high = max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values())
     ax.set_ylim(min(low, 0) - 0.06 * (high - low), high + 0.06 * (high - low))
-    ax.set_ylabel(PANEL_G_SHARE_YLABEL)
+    # above the frame from the start (``fit_axes_in_row`` counts only what is
+    # beside it), and placed once the axes are (``align_title_to_y_axis``): it
+    # starts at the tick labels' left and reaches over the names beside the dots
+    return ax.text(
+        0, 1, PANEL_G_SHARE_TITLE, ha="left", va="bottom", fontsize=SMALL_SIZE,
+        transform=offset_copy(ax.transAxes, fig=ax.figure, y=2, units="points"),
+    )  # fmt: skip
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1886,7 +1919,7 @@ def generate_figure(
     ax_g, ax_g2, ax_g3 = (fig.add_subplot(decoders[k]) for k in range(3))
     draw_decoder_gains(ax_g, restriction_decoders)
     draw_full_minus_swr(ax_g2, restriction_decoders, restriction_outside)
-    draw_outside_swr_shares(ax_g3, restriction_outside)
+    share_title = draw_outside_swr_shares(ax_g3, restriction_outside)
     ax_h = fig.add_subplot(row4_left[1])
     draw_participation(ax_h, participation)
     triggered = row4_left[2].subgridspec(4, 1, hspace=0.2)
@@ -1913,6 +1946,11 @@ def generate_figure(
     # g's y axis starts where c's drawing does (c's bar labels reach further
     # left than g's y-label) and g ends a gap before h's drawing
     to_figure = fig.transFigure.inverted()
+    # g's axis titles take two lines under the panel's title: its frames give
+    # up one line at their tops, so the row's letters stay where they were
+    for ax in (ax_g, ax_g2, ax_g3):
+        box = ax.get_position()
+        ax.set_position((box.x0, box.y0, box.width, box.height - PANEL_G_TOP_DROP))
     fit_axes_in_row(
         fig,
         renderer,
@@ -1923,6 +1961,7 @@ def generate_figure(
     )
     fit_track_to_height(fig, ax_a, x_left)
     fig.canvas.draw()
+    align_title_to_y_axis(fig, renderer, ax_g3, share_title)
     title_over(fig, renderer, [ax_g, ax_g2, ax_g3], PANEL_G_TITLE)
     fig.canvas.draw()
     positions = place_letters(
