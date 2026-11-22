@@ -68,6 +68,11 @@ non-local states buy outside SWRs:
   no event window of any group (``in_event_window`` false): every event the
   time sums were given counts, whichever events the shares are given.
 
+**Immobile time inside SWRs** (:func:`epoch_inside_swr_gains`,
+:func:`inside_swr_gain_statistics`): the same ``full - swr`` per spike and per
+second over the ``immobile_in_swr`` bins inside a well visit, where both
+decoders may use the non-local states, a reported value for the text.
+
 **Parts of the time outside SWRs** (:func:`epoch_outside_swr_subset_gains`,
 :func:`outside_swr_subset_statistics`): the same gain, per spike and per
 second, over only the bins outside SWRs inside a well visit that are farther
@@ -569,6 +574,54 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
     return out
 
 
+def epoch_inside_swr_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFrame:
+    """Each epoch's ``full - swr`` over its immobile bins inside SWRs inside a
+    well visit (``immobile_in_swr``), per spike and per second, both score
+    families: the other side of :func:`epoch_outside_swr_gains`, where both
+    decoders may use the non-local states.
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per epoch of ``time_sums``, sorted by ``epoch_id``:
+        ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds`` of
+        the chosen bins, and for each family (suffix ``""`` for the filter
+        score, ``"_two_sided"``): ``full_minus_swr`` (nats), ``gain_per_spike``
+        and ``gain_per_s`` (NaN without spikes or bins).
+
+    Raises
+    ------
+    ValueError
+        If an epoch has a row of the time sums twice or no time step.
+    """
+    _check_time_sums(time_sums, bin_s)
+    total = _chosen_time(time_sums, time_sums["category"] == IMMOBILE_IN_SWR)
+    animals = time_sums.groupby("epoch_id")["animal"].first()
+    out = pd.DataFrame(
+        {
+            "epoch_id": total.index,
+            "animal": animals.reindex(total.index).to_numpy(),
+            "n_bins": total["n_bins"].to_numpy(),
+            "n_spikes": total["n_spikes"].to_numpy(),
+            "seconds": total["n_bins"].to_numpy()
+            * bin_s.reindex(total.index).to_numpy(float),
+        }
+    )
+    for suffix in FAMILY_SUFFIX.values():
+        gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
+        out[f"full_minus_swr{suffix}"] = gain
+        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
+        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
+    return out
+
+
 def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
     """The immobile bins outside every SWR of the source, inside a well visit,
     where SWR detection was not observed: left out of every sum outside SWRs
@@ -782,6 +835,23 @@ def outside_swr_gain_statistics(
         above zero).
     """
     return _epoch_measure_statistics(epochs, MEASURES, n_boot=n_boot, seed=seed)
+
+
+def inside_swr_gain_statistics(
+    epochs: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+) -> pd.DataFrame:
+    """The gain inside SWRs per spike and per second (:data:`SUBSET_MEASURES`),
+    reduced over epochs and animals as :func:`outside_swr_gain_statistics`
+    reduces the gain outside SWRs, with the same columns.
+
+    Parameters
+    ----------
+    epochs : pd.DataFrame
+        :func:`epoch_inside_swr_gains`' rows.
+    n_boot, seed : int, optional
+        The bootstrap's replicates and seed, the same for every row.
+    """
+    return _epoch_measure_statistics(epochs, SUBSET_MEASURES, n_boot=n_boot, seed=seed)
 
 
 def immobile_gain_statistics(

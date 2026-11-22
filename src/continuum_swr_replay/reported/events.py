@@ -257,6 +257,7 @@ TAGS = {
     "left_out": Tags(("2b.2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
     "other_detectors": Tags(("2b.3",)),
+    "nonlocal_found": Tags(("2b.3",), ("2e",)),
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
     "boundary_timing": Tags(("2b.4",), ("S2b",)),
@@ -1082,6 +1083,60 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                     "event (the mean over the animal's epochs)",
                 ),
             ]
+    return values
+
+
+def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.3 and Figure 2e's right bars: for each detector the panel
+    draws (``nonlocal_comparison.FIGURE_DETECTORS``), the share of the
+    selected non-local events that overlap one of its events, pooled over
+    events, and the lowest and highest animal's share
+    (``nonlocal_comparison.nonlocal_events_overlapped``, which the figure
+    draws).
+
+    Parameters
+    ----------
+    memberships : pd.DataFrame
+        ``nonlocal_comparison.nonlocal_event_memberships`` of the selected
+        non-local events.
+    source : str
+    """
+    make = value_factory(nonlocal_found_values, source, TAGS["nonlocal_found"])
+    words = {detector: word for word, detector in DETECTORS.items()}
+    overlap = nonlocal_comparison.nonlocal_events_overlapped(
+        memberships, nonlocal_comparison.FIGURE_DETECTORS
+    )
+    values = []
+    for detector, row in overlap.iterrows():
+        key = f"nonlocal_events_found_by_{words[detector]}_fraction"
+        values += [
+            make(
+                key,
+                row["pooled"],
+                "fraction",
+                "pct",
+                f"share of the non-local events that a {detector} event overlaps "
+                "(of those whose overlap is known, inside the two detectors' "
+                "shared exposure), pooled over events",
+            ),
+            make(
+                f"{key}_animal_min",
+                float(np.min(row["animals"])),
+                "fraction",
+                "pctnum",
+                f"lowest per-animal share of the non-local events that a {detector} "
+                "event overlaps (an animal's share is the mean over its epochs of "
+                "the epoch's share)",
+            ),
+            make(
+                f"{key}_animal_max",
+                float(np.max(row["animals"])),
+                "fraction",
+                "pct",
+                f"highest per-animal share of the non-local events that a {detector} "
+                "event overlaps (the mean over the animal's epochs)",
+            ),
+        ]
     return values
 
 
@@ -2975,6 +3030,63 @@ def restriction_outside_swr_part_values(
     return values
 
 
+_INSIDE_SWR_BINS = (
+    "immobile bins inside SWRs (inside an SWR of the source, where both decoders "
+    "may use the non-local states)"
+)
+
+
+def restriction_inside_swr_values(
+    time_sums: pd.DataFrame, bin_s: pd.Series, source: str
+) -> list[Value]:
+    """Question 2c.3: the full decoder against the SWR-only decoder over the
+    immobile time inside SWRs inside a well visit, per spike and per second,
+    with the statistic, interval and epoch counts of the gain outside SWRs
+    (``restriction_totals.inside_swr_gain_statistics``); for the text."""
+    make = value_factory(
+        restriction_inside_swr_values, source, TAGS["nonlocal_restriction"]
+    )
+    statistics = restriction_totals.inside_swr_gain_statistics(
+        restriction_totals.epoch_inside_swr_gains(time_sums, bin_s)
+    ).set_index(["family", "measure"])
+    full_minus_swr = (
+        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
+    )
+    values = []
+    for family, suffix in FAMILY_SUFFIX.items():
+        key = f"restriction_inside_swr_full_minus_swr{suffix}"
+        scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
+        for unit, divided, words in _RESTRICTION_UNITS:
+            row = statistics.loc[(family, f"gain_{unit}")]
+            values += _interval_and_animals_positive(
+                make,
+                f"{key}_{unit}",
+                row,
+                f"{scored}, {full_minus_swr}, summed over every one of the "
+                f"epoch's {_INSIDE_SWR_BINS} inside a well visit and divided by "
+                f"{divided}: {_EPOCH_REDUCTION}",
+                unit=words,
+            )
+            if unit == "per_s":
+                values += [
+                    make(
+                        f"{key}_epochs_positive",
+                        row["n_epochs_positive"],
+                        "count",
+                        "count",
+                        "epochs whose gain per second inside SWRs is above zero",
+                    ),
+                    make(
+                        f"{key}_epochs",
+                        row["n_epochs"],
+                        "count",
+                        "count",
+                        f"epochs with {_INSIDE_SWR_BINS} inside a well visit",
+                    ),
+                ]
+    return values
+
+
 def restriction_immobile_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, source: str
 ) -> list[Value]:
@@ -3915,6 +4027,17 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         "epoch's well visits (the session cache's port experiences)"
     )
     summary.add(*over(other_detector_values(others, detector_source), DETECTOR_SUBSET))
+    summary.add(
+        *over(
+            nonlocal_found_values(
+                nonlocal_comparison.nonlocal_event_memberships(
+                    run, comparison.directional, events["event_id"]
+                ),
+                detector_source,
+            ),
+            DETECTOR_SUBSET,
+        )
+    )
     summary.add(*detector_visit_values(comparison.visit_counts, detector_source))
     summary.inputs.append(
         files_record(
@@ -4329,6 +4452,21 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         *over(
             pend(
                 restriction_outside_swr_part_values(
+                    restriction_time_sums,
+                    restriction_bin_s,
+                    f"{heldout_source} (its time sums)",
+                ),
+                *heldout_runs_stale,
+                heldout.session_cache,
+            ),
+            TIME_SUBSET,
+        )
+    )
+    # inside SWRs, from the time sums alone: no event enters
+    summary.add(
+        *over(
+            pend(
+                restriction_inside_swr_values(
                     restriction_time_sums,
                     restriction_bin_s,
                     f"{heldout_source} (its time sums)",

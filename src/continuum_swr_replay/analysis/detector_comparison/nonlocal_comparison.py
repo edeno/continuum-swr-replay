@@ -325,6 +325,12 @@ def read_comparison(run_dir: Path, visits: Mapping[str, Visits]) -> Comparison:
     )
 
 
+FIGURE_DETECTORS = ("kay", "karlsson", "yu", "zugaro", "carey", "mua", "memoryless")
+"""The other detectors Figure 2e compares with the non-local detector, top to
+bottom: the SWR definitions (Kay's, the SWR source, first), MUA and the
+Widloski detector."""
+
+
 def _matched_shares(
     events: pd.DataFrame, by: str, detectors: tuple[str, ...]
 ) -> pd.DataFrame:

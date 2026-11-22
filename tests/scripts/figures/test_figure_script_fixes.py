@@ -2020,6 +2020,12 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     assert events.TAGS["shared_content"].figures == ("S2d",)
     assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2e",)
     assert events.TAGS["participation"].figures == ("2h",)
+    # panel e's detectors are the analysis layer's, whose found shares the
+    # summary tags with the panel
+    from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
+
+    assert list(figure02.DETECTOR_LABELS) == list(nonlocal_comparison.FIGURE_DETECTORS)
+    assert events.TAGS["nonlocal_found"].figures == ("2e",)
 
 
 @pytest.mark.parametrize(

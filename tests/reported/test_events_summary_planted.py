@@ -93,6 +93,7 @@ RESTRICTION_BUILDERS = {
     "restriction_outside_swr_values": None,
     "restriction_immobile_values": None,
     "restriction_outside_swr_part_values": None,
+    "restriction_inside_swr_values": None,
 }
 #: The builders given the held-out events, by the argument holding them.
 HELDOUT_BUILDERS = {
@@ -112,6 +113,7 @@ OTHER_BUILDERS = (
     "property_interval_values",
     "gamma_db_values",
     "other_detector_values",
+    "nonlocal_found_values",
     "detector_visit_values",
     "spike_evidence_values",
     "spike_evidence_visit_values",
@@ -465,6 +467,14 @@ class _Run:
         }.items():
             monkeypatch.setattr(builder, name, value)
         monkeypatch.setattr(builder.nonlocal_comparison, "read_comparison", comparison)
+
+        def memberships(run, directional, event_ids):
+            seen["nonlocal_event_memberships"] = (list(event_ids),)
+            return pd.DataFrame({"planted": [PLANTED]})
+
+        monkeypatch.setattr(
+            builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
+        )
         monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
 
     def summarize(self) -> dict:
@@ -510,12 +520,16 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "restriction_outside_swr_values",
         "restriction_immobile_values",
         "restriction_outside_swr_part_values",
+        "restriction_inside_swr_values",
     ):
         assert seen[name][0]["epoch_id"].tolist() == EPOCHS
         assert seen[name][1].to_dict() == dict.fromkeys(EPOCHS, BIN_S)
     # the other detectors' events are selected by the comparison, given the visits
     assert _same_visits(seen["read_comparison"][0])
     assert seen["other_detector_values"][0]["planted"].tolist() == [PLANTED]
+    # the non-local events each detector finds: the selected ones only
+    (found_ids,) = seen["nonlocal_event_memberships"]
+    assert PLANTED not in found_ids and len(found_ids) == 13
     # the spike evidence: the event inside a visit and the quiet window inside
     evidence = seen["spike_evidence_values"][0]
     assert evidence["start_time"].tolist() == [10.0, 5.0]
@@ -547,7 +561,12 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "so its partner may start outside a visit"
     )
     # the time no event holds is outside every event, selected or not
-    for key in ("restriction_immobile", "restriction_outside_swr_part", OUTSIDE_EVENTS):
+    for key in (
+        "restriction_immobile",
+        "restriction_outside_swr_part",
+        "restriction_inside_swr",
+        OUTSIDE_EVENTS,
+    ):
         assert values[key].description.endswith(f"; over {builder.TIME_SUBSET}")
 
 
@@ -576,6 +595,7 @@ HELDOUT_EVENT_VALUES = {
 HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {
     "restriction_immobile",
     "restriction_outside_swr_part",
+    "restriction_inside_swr",
 }
 RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES) - {"restriction_window"}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}

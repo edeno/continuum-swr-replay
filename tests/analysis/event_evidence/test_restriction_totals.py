@@ -196,6 +196,29 @@ def test_outside_swr_statistics_are_the_mean_over_animals_of_their_epoch_medians
     assert rest["estimate"] == pytest.approx(0.7) and rest["n_epochs"] == 2
 
 
+def test_inside_swr_gains_are_on_the_immobile_bins_in_swrs_inside_a_visit():
+    """In SWRs inside a visit: a1 2 bins, 2 spikes, full - swr = 7 - 6 = 1; a2
+    none; b1 2, 2, 2 - 3 = -1. a1's bins in SWRs outside a visit and its moving
+    bins never count."""
+    epochs = rt.epoch_inside_swr_gains(_time_sums(), _bin_s())
+    assert list(epochs["epoch_id"]) == ["a1", "a2", "b1"]
+    assert list(epochs["animal"]) == ["a", "a", "b"]
+    np.testing.assert_array_equal(epochs["n_spikes"], [2, 0, 2])
+    np.testing.assert_allclose(epochs["seconds"], [1.0, 0.0, 1.0])
+    np.testing.assert_allclose(epochs["full_minus_swr"], [1.0, 0.0, -1.0])
+    np.testing.assert_allclose(epochs["gain_per_spike"], [0.5, np.nan, -0.5])
+    np.testing.assert_allclose(epochs["gain_per_s"], [1.0, np.nan, -1.0])
+    np.testing.assert_allclose(epochs["gain_per_spike_two_sided"], [1.0, np.nan, -1.0])
+    stats = rt.inside_swr_gain_statistics(epochs, n_boot=200, seed=1)
+    assert len(stats) == 2 * len(rt.SUBSET_MEASURES)
+    gain = stats.set_index(["family", "measure"]).loc[("filter", "gain_per_spike")]
+    # a: its one epoch with SWR bins; b: -0.5
+    np.testing.assert_allclose(gain["animals"], [0.5, -0.5])
+    assert gain["estimate"] == pytest.approx(0.0)
+    assert gain["n_epochs"] == 2 and gain["n_epochs_positive"] == 1
+    assert gain["n_animals_positive"] == 1
+
+
 def test_time_sums_with_a_row_twice_or_an_epoch_without_a_time_step_raise():
     with pytest.raises(ValueError, match="no time step"):
         rt.epoch_immobile_gains(_time_sums(), _bin_s().drop("a2"))

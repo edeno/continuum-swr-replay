@@ -230,6 +230,42 @@ def _other_detector_events() -> pd.DataFrame:
     ).assign(day="d1", epoch="e1")
 
 
+def test_nonlocal_found_values_are_figure_2es_right_bars():
+    """For every detector Figure 2e draws, the share of the selected non-local
+    events its events overlap, pooled over events, with the lowest and highest
+    animal (an animal's share the mean over its epochs), from the function the
+    figure draws with; tagged with question 2b.3 and panel 2e."""
+    from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
+
+    detectors = nonlocal_comparison.FIGURE_DETECTORS
+    rows = []
+    for k, detector in enumerate(detectors):
+        # animal a: 1 of 2 events matched in epoch 1, 1 of 1 in epoch 2 (0.75);
+        # animal b: k % 2 of 1
+        rows += [
+            ("a", 1, detector, True), ("a", 1, detector, False),
+            ("a", 2, detector, True), ("b", 1, detector, bool(k % 2)),
+        ]  # fmt: skip
+    memberships = pd.DataFrame(
+        rows, columns=["animal", "day", "other_detector", "matched"]
+    ).assign(epoch="02_r1")
+    values = _by_key(builder.nonlocal_found_values(memberships, "s"))
+    words = {detector: word for word, detector in builder.DETECTORS.items()}
+    expected = {}
+    for k, detector in enumerate(detectors):
+        key = f"nonlocal_events_found_by_{words[detector]}_fraction"
+        expected[key] = (2 + k % 2) / 4
+        expected[f"{key}_animal_min"] = min(0.75, k % 2)
+        expected[f"{key}_animal_max"] = max(0.75, k % 2)
+    assert {k: v.value for k, v in values.items()} == pytest.approx(expected)
+    assert "nonlocal_events_found_by_widloski_fraction" in values
+    for value in values.values():
+        assert value.questions == ("2b.3",)
+        assert value.figures == ("2e",)
+        assert value.kind == "fraction"
+        assert value.function == "nonlocal_found_values"
+
+
 def test_other_detector_values_name_each_detector_and_each_state():
     values = _by_key(builder.other_detector_values(_other_detector_events(), "s"))
     numbers = {key: value.value for key, value in values.items()}
@@ -1379,6 +1415,33 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         np.testing.assert_allclose(
             outside.loc[("filter", measure), "estimate"], numbers[f"{key}_{name}"]
         )
+
+
+def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
+    """In SWRs: full - swr is 5, 3 and 4 nats over 10 spikes and 5 s per
+    epoch; per spike 0.5, 0.3, 0.4 and per second twice that. The same
+    statistic, interval and epoch counts as the gain outside SWRs, both score
+    families, question 2c.3 and no figure."""
+    bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
+    values = _by_key(
+        builder.restriction_inside_swr_values(_immobile_time_sums(), bin_s, "s")
+    )
+    numbers = {key: value.value for key, value in values.items()}
+    key = "restriction_inside_swr_full_minus_swr"
+    assert numbers[f"{key}_per_spike"] == pytest.approx(0.4)
+    assert numbers[f"{key}_per_s"] == pytest.approx(0.8)
+    assert numbers[f"{key}_two_sided_per_spike"] == pytest.approx(0.8)
+    assert numbers[f"{key}_per_spike_animals_positive"] == 3
+    assert numbers[f"{key}_epochs_positive"] == 3
+    assert numbers[f"{key}_epochs"] == 3
+    assert values[f"{key}_per_spike"].unit == "nats per spike"
+    assert values[f"{key}_per_s"].unit == "nats per s"
+    assert numbers[f"{key}_per_spike_ci_low"] <= 0.4
+    # per family: two units x four, and the epochs (two)
+    assert len(numbers) == 2 * (2 * 4 + 2)
+    for value in values.values():
+        assert value.questions == ("2c.3",) and value.figures == ()
+    assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 
 def _part_time_sums() -> pd.DataFrame:

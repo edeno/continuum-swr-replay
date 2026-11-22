@@ -368,15 +368,15 @@ TRIGGERED_WINDOW_S = 0.3
 TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed"]
 # Panel i: ripple-power bins, z.
 # Panel e: the detectors, in the order drawn, and their labels.
-DETECTOR_LABELS = {
-    "kay": "Kay (SWR)",
-    "karlsson": "Karlsson",
-    "yu": "Yu",
-    "zugaro": "Zugaro",
-    "carey": "Carey",
-    "mua": "MUA",
-    "memoryless": "Widloski",
-}
+DETECTOR_LABELS = dict(
+    zip(
+        nonlocal_comparison.FIGURE_DETECTORS,
+        ("Kay (SWR)", "Karlsson", "Yu", "Zugaro", "Carey", "MUA", "Widloski"),
+        strict=True,
+    )
+)
+"""Panel e's name of each detector it draws
+(``nonlocal_comparison.FIGURE_DETECTORS``, in its order)."""
 
 
 # ---------------------------------------------------------------------------
@@ -695,7 +695,8 @@ def detector_comparison(events: pd.DataFrame) -> dict:
     dict
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
         Kay's SWRs (c); ``overlap``: the share of non-local events each of
-        :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
+        ``nonlocal_comparison.FIGURE_DETECTORS`` overlaps (the events
+        summary's ``nonlocal_events_found_by_*`` values) and ``with_nonlocal``, the share of
         each one's events that overlap a non-local event (e); and
         ``kay_content_animals``, each animal's share of Kay's SWRs in each
         content class (c).
@@ -713,10 +714,10 @@ def detector_comparison(events: pd.DataFrame) -> dict:
             nonlocal_comparison.nonlocal_event_memberships(
                 run, directional, events["event_id"]
             ),
-            tuple(DETECTOR_LABELS),
+            nonlocal_comparison.FIGURE_DETECTORS,
         ),
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
-            others, tuple(DETECTOR_LABELS)
+            others, nonlocal_comparison.FIGURE_DETECTORS
         ),
     }
 
