@@ -1953,7 +1953,6 @@ def test_figure02_panel_g_first_axis_draws_each_decoders_gain(offline):
     assert (
         ax.get_ylabel() == "Held-out log score\nover local-only\ndecoder (nats/spike)"
     )
-    assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
     plt.close(fig)
 
 
@@ -1961,14 +1960,13 @@ def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
     """Panel g's second axis: the full minus the SWR-only decoder over all
     immobility (the paired difference) and outside SWRs (the main result, its
     label in bold), dark gray dots spread about each column, the mean with its
-    interval beside them, the dashed zero line with "full better", and the
-    outside-SWR row returned for the count note."""
+    interval beside them, and the dashed zero line with "full better"."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    counted = figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
+    figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
     fig.canvas.draw()
     for x, values in ((0.0, PAIRED), (1.0, OUTSIDE)):
         dots = _dots_at(ax, x)
@@ -1986,27 +1984,6 @@ def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
     assert {t.get_rotation() for t in labels} == {0.0}
     assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert [t.get_text() for t in ax.texts] == ["↑ full better"]
-    # no tick label at the frame's top, where it would meet the heading's rule
-    assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
-    np.testing.assert_allclose(counted["animals"], OUTSIDE)
-    plt.close(fig)
-
-
-def test_figure02_panel_g_count_note_reads_the_counts_from_the_statistics(offline):
-    """The note under panel g's second axis gives the outside-SWR row's
-    animals and the epochs above zero of all its epochs, in the reference
-    gray, ending at the frame's right edge."""
-    import matplotlib.pyplot as plt
-
-    figure02 = offline("scripts.figures.generate_figure02")
-    fig, ax = plt.subplots()
-    row = pd.Series({"n_animals": 5, "n_epochs_positive": 240, "n_epochs": 242})
-    fig.canvas.draw()
-    figure02.count_note(fig, fig.canvas.get_renderer(), ax, row)
-    (note,) = ax.texts
-    assert note.get_text() == "5 animals; 240 of 242 epochs > 0"
-    assert note.get_color() == figure02.C_REFERENCE
-    assert note.get_ha() == "right"
     plt.close(fig)
 
 
@@ -2047,8 +2024,7 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
     # Figure 2's supplement, panel by panel
     assert events.TAGS["tetrode_holdout"].figures == ("S2a",)
     assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2b",)
-    assert events.TAGS["nonlocal_restriction_sampling"].figures == ("S2c",)
-    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2d",)
+    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2c",)
     assert events.TAGS["participation"].figures == ("2h",)
 
 

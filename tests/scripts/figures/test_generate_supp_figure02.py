@@ -73,52 +73,37 @@ def _statistics() -> dict:
     }
 
 
-def test_the_figure_draws_five_panels_in_order():
-    """a, the held-out tetrode gain as before; b and c, the outside-SWR gain
-    then its parts away from SWRs and at well-sampled places; d, the shares,
-    in one row under the heading over b to d; e, the No-Spike MUA, under a. A
-    row's letters at one height; a's and e's at one left edge."""
+def test_the_figure_draws_four_panels_in_one_row():
+    """a, the held-out tetrode gain as before; b, the outside-SWR gain then
+    only away from SWRs; c, the shares; d, the No-Spike MUA; one letter per
+    panel at one height, no heading."""
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
-    ax_a, ax_b, ax_c, ax_d, ax_e = fig.axes
+    ax_a, ax_b, ax_c, ax_d = fig.axes
     assert_draws_group_gain(ax_a, statistics["tetrode"])
     assert ax_a.get_title() == "Held-out tetrode"
     assert ax_a.get_ylabel() == "Held-out gain\nover local (nats/spike)"
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcde")
-    assert len({letters[k][1] for k in "abcd"}) == 1
-    assert letters["e"][1] < letters["a"][1]
-    assert letters["e"][0] == letters["a"][0]
-    assert "Immobile, at wells" in [t.get_text() for t in ax_b.texts]
+    assert sorted(letters) == list("abcd")
+    assert len({position[1] for position in letters.values()}) == 1
+    assert "Immobile, at wells" not in [
+        t.get_text() for ax in fig.axes for t in ax.texts
+    ]
     figure.check_journal_limits(fig)
     plt.close(fig)
 
 
-@pytest.mark.parametrize(
-    ("panel", "parts", "names", "label"),
-    [
-        (1, MARGINS, ["100", "250", "500"], "at least this far from\nany SWR (ms)"),
-        (
-            2,
-            SAMPLED,
-            ["10", "60"],
-            "training data at the\nanimal's place (s, at least)",
-        ),
-    ],
-    ids=["away from SWRs", "well-sampled places"],
-)
-def test_panels_b_and_c_draw_the_outside_swr_gain_then_its_parts(
-    panel, parts, names, label
-):
-    """Outside SWRs, then each part: dots spread about each column, the mean
-    with its interval, a thin line through the means, the parts' label, the
-    difference's y label, the zero line and "full better"."""
+def test_panel_b_draws_the_outside_swr_gain_then_away_from_swrs():
+    """Outside SWRs, then only farther than each margin from every SWR: dots
+    spread about each column, the mean with its interval, a thin line through
+    the means, the margins' label, the difference's y label, the zero line and
+    "full better". The gain at well-sampled places is not drawn."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[panel]
-    xs = [0.0, *(figure.SERIES_START + k for k in range(len(parts)))]
-    for x, values in zip(xs, [OUTSIDE, *parts.values()], strict=True):
+    ax = fig.axes[1]
+    xs = [0.0, *(figure.SERIES_START + k for k in range(len(MARGINS)))]
+    for x, values in zip(xs, [OUTSIDE, *MARGINS.values()], strict=True):
         (dots,) = [
             c
             for c in ax.collections
@@ -130,18 +115,20 @@ def test_panels_b_and_c_draw_the_outside_swr_gain_then_its_parts(
         assert np.allclose(_means_at(ax, x), np.mean(values))
     (series,) = [line for line in ax.lines if len(line.get_xdata()) == len(xs)]
     np.testing.assert_allclose(
-        series.get_ydata(), [np.mean(v) for v in [OUTSIDE, *parts.values()]]
+        series.get_ydata(), [np.mean(v) for v in [OUTSIDE, *MARGINS.values()]]
     )
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["Outside\nSWRs", *names]
+    assert [t.get_text() for t in ax.get_xticklabels()] == [
+        "Outside\nSWRs", "100", "250", "500",
+    ]  # fmt: skip
     texts = [t.get_text() for t in ax.texts]
-    assert label in texts and "↑ full better" in texts
+    assert "at least this far from\nany SWR (ms)" in texts
+    assert "↑ full better" in texts
     assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
-    # b and c share one y range
-    assert fig.axes[1].get_ylim() == fig.axes[2].get_ylim()
+    assert ax.get_ylim()[0] < 0
     plt.close(fig)
 
 
-def test_panel_d_names_each_share_beside_its_dots():
+def test_panel_c_names_each_share_beside_its_dots():
     """The three shares in percent in one column, in panel d's colors and a
     gray for the rest, each a dot per animal (spread), the mean with its
     interval and its name beside them, no lighter than the reference gray; no x
@@ -151,7 +138,7 @@ def test_panel_d_names_each_share_beside_its_dots():
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[3]
+    ax = fig.axes[2]
     dots = [
         c
         for c in ax.collections
@@ -185,12 +172,12 @@ def test_panel_d_names_each_share_beside_its_dots():
     plt.close(fig)
 
 
-def test_panel_e_draws_the_mua_around_no_spike_starts():
+def test_panel_d_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
     trace = _no_spike_trace()
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[4]
+    ax = fig.axes[3]
     (median,) = [line for line in ax.lines if len(line.get_xdata()) == 151]
     np.testing.assert_allclose(median.get_xdata(), 1000 * NO_SPIKE_TIME)
     np.testing.assert_allclose(median.get_ydata(), trace["median"])
@@ -203,7 +190,7 @@ def test_panel_e_draws_the_mua_around_no_spike_starts():
         for line in ax.lines
     )
     assert len(ax.collections) == 1  # the band
-    assert ax.get_xlabel() == "Time from No-Spike start (ms)"
+    assert ax.get_xlabel() == "Time from No-Spike\nstart (ms)"
     assert ax.get_ylabel() == "MUA (z)"
     assert ax.get_title() == "No-Spike state"
     plt.close(fig)
@@ -255,8 +242,8 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
-    """Values tagged ``S2`` (by panel, ``S2a`` to ``S2e``) name this script."""
-    assert FIGURES["S2"].panels == "abcde"
+    """Values tagged ``S2`` (by panel, ``S2a`` to ``S2d``) name this script."""
+    assert FIGURES["S2"].panels == "abcd"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -343,7 +330,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
 def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     monkeypatch, notes, inputs_note, rerun
 ):
-    """Panels b to d are refused as Figure 2g is: from a restriction run off
+    """Panels b and c are refused as Figure 2g is: from a restriction run off
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {
@@ -358,7 +345,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "epoch_outside_swr_gains", refuse)
-    with pytest.raises(ValueError, match="panels b to d are not drawn") as refused:
+    with pytest.raises(ValueError, match="panels b and c are not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 

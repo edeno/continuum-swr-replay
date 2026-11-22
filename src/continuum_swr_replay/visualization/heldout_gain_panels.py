@@ -12,14 +12,10 @@ spikes better.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
-
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
-from matplotlib.transforms import blended_transform_factory, offset_copy
+from matplotlib.transforms import blended_transform_factory
 
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_SHARES,
@@ -138,6 +134,10 @@ def label_gain_axis(
     ax.set_ylabel(ylabel)
 
 
+GAIN_FLOOR = 0.13
+"""A gain axis' floor below zero, as a share of its top (Figure 2g, Figure 2's
+supplement, panel b)."""
+
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""
 
@@ -149,35 +149,6 @@ def full_better_cue(ax: Axes) -> None:
         0.03, 0.0, "\u2191 full better", ha="left", va="bottom",
         transform=blended_transform_factory(ax.transAxes, ax.transData),
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-    )  # fmt: skip
-
-
-def heading_over(fig: Figure, renderer: Any, axes: Sequence[Axes], title: str) -> None:
-    """One heading centered over several axes (``axes``, left to right), just
-    above the highest of their tops and their own titles and texts, with a thin
-    line under it from the first frame's left edge to the last one's right
-    edge, so it reads as the heading of them all. Both are drawn by the first
-    axes, so that axes' drawn extent, and a panel letter placed from it,
-    include them."""
-    to_figure = fig.transFigure.inverted()
-    boxes = [ax.get_position() for ax in axes]
-    top = max(
-        [box.y1 for box in boxes]
-        + [
-            text.get_window_extent(renderer).transformed(to_figure).y1
-            for ax in axes
-            for text in ([ax.title] if ax.get_title() else []) + list(ax.texts)
-        ]
-    )
-    above = offset_copy(fig.transFigure, fig=fig, y=2, units="points")
-    axes[0].plot(
-        (boxes[0].x0, boxes[-1].x1), (top, top), transform=above,
-        color="black", lw=0.5, clip_on=False,
-    )  # fmt: skip
-    axes[0].text(
-        (boxes[0].x0 + boxes[-1].x1) / 2, top, title,
-        transform=offset_copy(fig.transFigure, fig=fig, y=3, units="points"),
-        ha="center", va="bottom", fontsize=SMALL_SIZE,
     )  # fmt: skip
 
 

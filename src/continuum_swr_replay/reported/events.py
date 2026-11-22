@@ -276,8 +276,7 @@ TAGS = {
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2b",)),
-    "nonlocal_restriction_sampling": Tags(("2c.3",), ("S2c",)),
-    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2d",)),
+    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2c",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -2551,7 +2550,7 @@ def restriction_outside_swr_values(
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
     :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2g, the
-    shares on Figure 2's supplement (panel S2d); each carries its panel's
+    shares on Figure 2's supplement (panel S2c); each carries its panel's
     tag."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
@@ -2724,24 +2723,17 @@ def restriction_outside_swr_part_values(
     the immobile bins outside every SWR where SWR detection was not observed,
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
-    spike in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2's
-    supplement and carry its panel's tag: away from the SWRs S2b, at
-    well-sampled places S2c."""
+    spike in :data:`RESTRICTION_FIGURE_FAMILY` away from the SWRs are drawn on
+    Figure 2's supplement and carry its panel's tag (S2b); the gain at
+    well-sampled places is for the text."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
     )
-    make_panel = {
-        "beyond_swr_margin": value_factory(
-            restriction_outside_swr_part_values,
-            source,
-            TAGS["nonlocal_restriction_distance"],
-        ),
-        "place_sampling": value_factory(
-            restriction_outside_swr_part_values,
-            source,
-            TAGS["nonlocal_restriction_sampling"],
-        ),
-    }
+    make_distance = value_factory(
+        restriction_outside_swr_part_values,
+        source,
+        TAGS["nonlocal_restriction_distance"],
+    )
     counts = restriction_totals.outside_swr_not_observed_counts(time_sums)
     values = [
         make(
@@ -2778,9 +2770,13 @@ def restriction_outside_swr_part_values(
                 scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
                 for unit, divided, words in _RESTRICTION_UNITS:
                     row = statistics.loc[(subset, threshold, family, f"gain_{unit}")]
-                    drawn = family == RESTRICTION_FIGURE_FAMILY and unit == "per_spike"
+                    drawn = (
+                        subset == "beyond_swr_margin"
+                        and family == RESTRICTION_FIGURE_FAMILY
+                        and unit == "per_spike"
+                    )
                     values += _interval_and_animals_positive(
-                        make_panel[subset] if drawn else make,
+                        make_distance if drawn else make,
                         f"{key}_{unit}",
                         row,
                         f"{scored}, {full_minus_swr}, summed over {time} and "

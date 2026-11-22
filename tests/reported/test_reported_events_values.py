@@ -1265,7 +1265,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for end in ("", "_ci_low", "_ci_high")
     }
     assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
-    assert {k for k, v in values.items() if v.figures == ("S2d",)} == supplement
+    assert {k for k, v in values.items() if v.figures == ("S2c",)} == supplement
     assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
 
@@ -1454,18 +1454,17 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     # per part: two families x (two units x four + two epoch counts), and the
     # share with the animals' lowest; and the two counts left out
     assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
-    # Figure 2's supplement draws each part's gain per spike in the filter
-    # family: away from the SWRs in panel S2b, at well-sampled places in S2c
+    # Figure 2's supplement draws the gain per spike away from the SWRs in the
+    # filter family (panel S2b); the gain at well-sampled places is for the text
     drawn = {
-        k for k in values if "_full_minus_swr_per_spike" in k and "_two_sided" not in k
+        k
+        for k in values
+        if "_beyond_" in k
+        and "_full_minus_swr_per_spike" in k
+        and "_two_sided" not in k
     }
-    assert len(drawn) == 5 * 4
-    assert {k for k, v in values.items() if v.figures == ("S2b",)} == {
-        k for k in drawn if "_beyond_" in k
-    }
-    assert {k for k, v in values.items() if v.figures == ("S2c",)} == {
-        k for k in drawn if "_sampled_" in k
-    }
+    assert len(drawn) == 3 * 4
+    assert {k for k, v in values.items() if v.figures == ("S2b",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 

@@ -27,8 +27,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         conditions) fit on folds of whole trials and each fold scored under the
         fit that did not see it: the local-only decoder (Local and No-Spike
         states only), the SWR-only decoder (non-local states only inside SWRs)
-        and the full decoder. Every value is over "Immobile, at wells" (the
-        panel's title): the immobile bins inside a well visit, which runs from
+        and the full decoder. Every value is over the immobile bins inside a
+        well visit, which runs from
         the animal's first nose-poke at a reward well to its last poke-out
         there. Each value is per epoch, summed over its bins and divided by
         the spikes in them; a dot per animal is the median over its epochs.
@@ -42,9 +42,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         over the immobile bins outside SWRs ("Outside SWRs", the main result,
         its label in bold; ``restriction_totals.outside_swr_gain_statistics``),
         a dot per animal in dark gray, the mean with its interval, a dashed
-        line at zero with which way the full decoder is better, and under the
-        axis the animals and the epochs whose gain outside SWRs is above
-        zero. The bins outside SWRs are chosen by speed, ripple detection and
+        line at zero with which way the full decoder is better. The bins outside SWRs are chosen by speed, ripple detection and
         the well visits alone, not by the decoder: the test. An animal's dots
         are spread sideways so that each shows. The held-out tetrode
         supplementary figure (``generate_supp_figure02.py``) looks at
@@ -130,7 +128,7 @@ from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
 from matplotlib.ticker import NullLocator
-from matplotlib.transforms import Bbox, offset_copy
+from matplotlib.transforms import Bbox
 from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -238,12 +236,12 @@ from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_YLABEL,
+    GAIN_FLOOR,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
     animal_values,
     draw_animal_gain,
     full_better_cue,
-    heading_over,
     label_gain_axis,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
@@ -1139,9 +1137,6 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
 """Panel h: each group's Local-rest and event positions on the x axis."""
 
-PANEL_G_TITLE = "Immobile, at wells"
-"""Panel g's heading, over its two axes: every value is over the immobile time
-inside a well visit."""
 DECODER_X = dict(zip(RESTRICTION_FIGURE_DECODERS, (0.0, 1.0), strict=True))
 """Panel g, first axis: each decoder's measure and its position on the x axis."""
 DECODER_LABELS = dict(
@@ -1160,8 +1155,6 @@ immobile time, then over the immobile time outside SWRs."""
 DIFFERENCE_LABELS = {"all": "All\nimmobility", "outside_swr": "Outside\nSWRs"}
 """Horizontal, on two lines; the main result, outside SWRs, in bold (as panels
 c and d mark their key class)."""
-GAIN_FLOOR = 0.13
-"""Panel g: each axis' floor below zero, as a share of its top."""
 PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
 BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
 RESTRICTION_RERUN = "scripts/event_evidence/score_nonlocal_restriction.py"
@@ -1274,13 +1267,11 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
         ax, PANEL_G_DECODERS_YLABEL, PANEL_G_REFERENCE, floor=-GAIN_FLOOR * top
     )
     ax.set_ylim(top=top)
-    # no tick label at the frame's top, where it would meet the heading's rule
-    ax.set_yticks([t for t in ax.get_yticks() if 0 <= t <= 0.9 * top])
 
 
 def draw_full_minus_swr(
     ax: Axes, decoders: pd.DataFrame, outside: pd.DataFrame
-) -> pd.Series:
+) -> None:
     """Panel g, second axis: the full decoder minus the SWR-only decoder per
     spike, over all the immobile time inside a well visit (the paired
     difference, ``restriction_totals.immobile_gain_statistics``'
@@ -1304,12 +1295,6 @@ def draw_full_minus_swr(
     outside : pd.DataFrame
         ``outside_swr_gain_statistics``' rows, indexed by ``family`` and
         ``measure``.
-
-    Returns
-    -------
-    pd.Series
-        The outside-SWR row, whose animal and epoch counts the panel's note
-        gives (:func:`count_note`).
     """
     rows = {
         "all": decoders.loc[(RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_DIFFERENCE)],
@@ -1327,26 +1312,8 @@ def draw_full_minus_swr(
         max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
     )
     ax.set_ylim(-GAIN_FLOOR * top, top)
-    # no tick label at the frame's top, where it would meet the heading's rule
-    ax.set_yticks([t for t in ax.get_yticks() if 0 <= t <= 0.9 * top])
     ax.set_ylabel(DIFFERENCE_YLABEL)
     full_better_cue(ax)
-    return rows["outside_swr"]
-
-
-def count_note(fig: Figure, renderer: Any, ax: Axes, row: pd.Series) -> None:
-    """ "N animals; n of N epochs > 0" (the row's ``n_animals``,
-    ``n_epochs_positive`` and ``n_epochs``) on the line under ``ax``'s tick
-    labels, ending at its frame's right edge, in the reference gray."""
-    to_figure = fig.transFigure.inverted()
-    labels = ax.xaxis.get_tightbbox(renderer).transformed(to_figure)
-    ax.text(
-        ax.get_position().x1, labels.y0,
-        f"{int(row['n_animals'])} animals; {int(row['n_epochs_positive'])} of "
-        f"{int(row['n_epochs'])} epochs > 0",
-        transform=offset_copy(fig.transFigure, fig=fig, y=-1, units="points"),
-        ha="right", va="top", fontsize=SMALL_SIZE, color=C_REFERENCE,
-    )  # fmt: skip
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1786,7 +1753,7 @@ def generate_figure(
     )
     ax_g, ax_g2 = (fig.add_subplot(panel_g[k]) for k in range(2))
     draw_decoder_gains(ax_g, restriction_decoders)
-    counted = draw_full_minus_swr(ax_g2, restriction_decoders, restriction_outside)
+    draw_full_minus_swr(ax_g2, restriction_decoders, restriction_outside)
     ax_h = fig.add_subplot(row4_left[1])
     draw_participation(ax_h, participation)
     triggered = row4_left[2].subgridspec(4, 1, hspace=0.2)
@@ -1822,9 +1789,6 @@ def generate_figure(
         PANEL_G_WIDTHS,
     )
     fit_track_to_height(fig, ax_a, x_left)
-    fig.canvas.draw()
-    heading_over(fig, renderer, [ax_g, ax_g2], PANEL_G_TITLE)
-    count_note(fig, renderer, ax_g2, counted)
     fig.canvas.draw()
     positions = place_letters(
         fig,

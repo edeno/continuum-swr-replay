@@ -173,10 +173,13 @@ The review of the restriction and held-out tetrode runs before the
   (`restriction_immobile_share_captured_by_swr_only`), and the full minus the
   SWR-only decoder per spike inside the events detected from the held-out decode
   (`restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike`,
-  `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`). The
-  gain outside SWRs away from the SWRs, at well-sampled places, and its shares
-  in and outside those events are in Figure 2's supplement
-  (`scripts/figures/generate_supp_figure02.py`, panels b to d).
+  `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`), and the
+  gain outside SWRs over only the bins whose place has at least 10 and at least
+  60 s of training data (`restriction_outside_swr_sampled_ten_s_full_minus_swr_per_spike`,
+  `restriction_outside_swr_sampled_minute_full_minus_swr_per_spike`). The gain
+  outside SWRs away from the SWRs, and its shares in and outside those events,
+  are in Figure 2's supplement (`scripts/figures/generate_supp_figure02.py`,
+  panels b and c).
   *When:* when the caption of Figure 2 is written.
 - [ ] **The library does not repeat itself on one kind of CI machine.** On
   GitHub's runners with an AMD EPYC 7763 (no AVX-512), the fold fit of the
