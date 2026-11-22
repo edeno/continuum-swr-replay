@@ -222,6 +222,16 @@ The review of the restriction and held-out tetrode runs before the
   left. The all-immobile values keep those bins (they are immobile time either way).
   *When:* at the next rerun of `score_nonlocal_restriction.py`; give `bin_categories`
   the observed mask then, and keep `outside_swr_bins` as the one rule.
+- [ ] **The margin from the SWRs ignores gaps in the ripple band.** The parts of the
+  time outside SWRs farther than a margin from them
+  (`restriction_totals.swr_margin_bands`) measure the distance to the scoring mask
+  only, so a bin beside a stretch where SWR detection was not observed counts as far
+  from an SWR.
+  *When:* if the margin values are quoted as "far from any SWR".
+- [ ] **No reader checks the per-bin facts' SWR source.** `measure_bin_facts.py` records
+  the SWR source in its header's settings (`swr_source`), but neither the CPU runners
+  nor the events summary compare it with the current source.
+  *When:* at the next change to the per-bin facts' readers.
 - [ ] **`n_folds` beside `folds`.** `tetrode_holdout.heldout_terms`, `holdout_scores` and
   `nonlocal_restriction.fold_fit_scores` take `n_folds` beside the `folds` array, which
   implies it.
