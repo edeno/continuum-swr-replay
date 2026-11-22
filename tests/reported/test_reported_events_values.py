@@ -897,7 +897,20 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     assert numbers["swr_heldout_control_agreement_per_spike"] == pytest.approx(0.0)
     description = by_key["non_swr_heldout_agreement_per_spike"].description
     assert "no place preference" in description
-    assert "not held out" in description
+    assert "not a zero reference" not in description
+    # every held-out tetrode value says the windows' time is not held out
+    assert all(
+        "choice of time is not held out" in v.description
+        for k, v in by_key.items()
+        if k.endswith("_per_spike")
+    )
+    # the controls share the animal's own place: no zero reference for the
+    # agreement, one for the gain
+    control = by_key["swr_heldout_control_agreement_per_spike"].description
+    assert "animal's own place" in control and "not a zero reference" in control
+    assert "not a zero reference" not in (
+        by_key["swr_heldout_control_gain_per_spike"].description
+    )
     # five estimates, three values each, two groups; two counts
     assert len(numbers) == 5 * 3 * 2 + 2
 
@@ -1390,7 +1403,12 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     assert values[f"{key}_per_spike"].unit == "nats per spike"
     assert values[f"{stem}_beyond_hundred_ms_share_of_bins"].kind == "fraction"
     assert "100 ms" in values[f"{key}_per_spike"].description
-    assert "60 s" in values[f"{stem}_sampled_minute_share_of_bins"].description
+    share = values[f"{stem}_sampled_minute_share_of_bins"].description
+    assert "60 s" in share and "no interval is given" in share
+    assert "lowest animal's value" in share
+    lowest = values[f"{stem}_sampled_minute_share_of_bins_animal_min"].description
+    assert "lowest of the animals' values of the share" in lowest and "60 s" in lowest
+    assert "SWR detection was observed" in values[f"{key}_per_spike"].description
     assert numbers[f"{stem}_beyond_hundred_ms_share_of_bins_animal_min"] == (
         pytest.approx(0.6)
     )
@@ -1411,3 +1429,7 @@ def test_the_gain_outside_swrs_leaves_out_the_bins_without_ripple_signal():
     assert numbers["restriction_outside_swr_full_minus_swr_per_spike"] == (
         pytest.approx(22 / 10)
     )
+    headline = _by_key(groups.with_events)[
+        "restriction_outside_swr_full_minus_swr_per_spike"
+    ]
+    assert "where SWR detection was observed" in headline.description
