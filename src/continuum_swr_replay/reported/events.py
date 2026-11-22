@@ -193,6 +193,7 @@ from continuum_swr_replay.analysis.regression.folds import MAX_SEGMENT_S, N_FOLD
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_epoch_ids,
+    require_analyzed_epochs,
 )
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
@@ -2372,19 +2373,78 @@ class HeldoutRestriction:
     """The run was not made from the current event table."""
 
 
-def restriction_inputs_note(restriction_dir: Path, epochs: Iterable[str]) -> str | None:
+def restriction_inputs_note(
+    restriction_dir: Path,
+    epochs: Iterable[str],
+    label: str | None = None,
+    features_manifest: dict | None = None,
+) -> str | None:
     """Why the restriction run in ``restriction_dir`` was not made from the
     current decode frames and SWR source, or None: :func:`restriction_input_staleness`
-    with the decode frames the event features run records for each epoch. The
-    figures that draw the restriction run refuse it then (Figure 2j, and Figure
-    2's supplement, ``scripts/figures/generate_supp_figure02.py``)."""
-    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)["epochs"]
+    with the decode frames the event features run records for each epoch
+    (``features_manifest``, read from the canonical run when None). ``label``
+    names the run in the note (by default ``the restriction run (<folder>)``).
+    The figures that draw the restriction run refuse it then
+    (:func:`heldout_restriction_refusal`)."""
+    if features_manifest is None:
+        features_manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     return restriction_input_staleness(
         read_output_manifest(restriction_dir),
-        {e: record.get("decode", {}).get("sha256") for e, record in features.items()},
+        {
+            epoch_id: record.get("decode", {}).get("sha256")
+            for epoch_id, record in features_manifest["epochs"].items()
+        },
         epochs,
-        f"the restriction run ({restriction_dir})",
+        f"the restriction run ({restriction_dir})" if label is None else label,
     )
+
+
+def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
+    """A per-epoch measurement (the brain-state reference, the counts by signal
+    of Figure 2i and its supplement), if it was made over the time inside the well visits, from the
+    current session cache's visits and from the decodes the event features run
+    records for every analyzed epoch.
+
+    Parameters
+    ----------
+    reference : pd.DataFrame
+        The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
+    folder : Path
+        Its folder, whose ``manifest.json`` records the subset it is over and
+        the session-cache entries it read the visits from.
+    name : str
+        What it is, for the error.
+
+    Raises
+    ------
+    ValueError
+        If it was not made over the analyses' subset or from the current
+        session cache (``prepare_data.time_mask_staleness``), an analyzed epoch
+        is missing or extra, or its decode hash differs.
+    """
+    note = time_mask_staleness(
+        read_output_manifest(folder), reference["epoch_id"], f"the {name} ({folder})"
+    )
+    if note is not None:
+        raise ValueError(note)
+    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    expected = {
+        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
+        for epoch_id in analyzed_epoch_ids()
+    }
+    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
+    if recorded != expected:
+        differ = sorted(
+            epoch_id
+            for epoch_id in expected.keys() | recorded.keys()
+            if expected.get(epoch_id) != recorded.get(epoch_id)
+        )
+        raise ValueError(
+            f"the {name} was not made from the decodes of event "
+            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
+            f"e.g. {differ[:3]}"
+        )
+    return reference
 
 
 def restriction_input_staleness(
@@ -2401,8 +2461,7 @@ def restriction_input_staleness(
     the SHA-256 of the decode frame it read (``epoch_inputs.data_over_time``).
     The current source is ``swr_source.swr_source_name()``. The current decode
     frames are the ones the event features run records (``decode_sha256``),
-    which the figures also take as the decodes (``generate_figure02.py``'s
-    ``checked_reference``); no decode frame is hashed here, so a decode remade
+    which the figures also take as the decodes (:func:`checked_reference`); no decode frame is hashed here, so a decode remade
     without a new event features run is not seen.
 
     Parameters
@@ -2450,6 +2509,51 @@ def restriction_input_staleness(
         f"({'; '.join(notes)}); rerun scripts/event_evidence/"
         "score_nonlocal_restriction.py and the runs made from it before citing"
     )
+
+
+HELDOUT_EVENTS_RERUN = "scripts/event_evidence/detect_heldout_events.py"
+HELDOUT_RESTRICTION_RERUN = {
+    "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
+    "and the runs made from it",
+    "restriction_run": HELDOUT_EVENTS_RERUN,
+    "bin_facts_run": HELDOUT_EVENTS_RERUN,
+    "session_cache": "scripts/event_evidence/measure_bin_facts.py, then "
+    + HELDOUT_EVENTS_RERUN,
+}
+"""The runners to make again when a figure refuses the held-out event run, by
+what is not current (:func:`heldout_restriction_refusal`)."""
+
+
+def heldout_restriction_refusal(
+    heldout: HeldoutRestriction, restriction_inputs: str | None
+) -> tuple[str, str] | None:
+    """Why a figure drawing the held-out event run refuses it, or None.
+
+    Parameters
+    ----------
+    heldout : HeldoutRestriction
+        The run's inputs and reasons (:func:`read_heldout_restriction`); its
+        event-table reason is the summary's alone.
+    restriction_inputs : str or None
+        Why the restriction run was not made from the current decodes and SWR
+        source (:func:`restriction_inputs_note`).
+
+    Returns
+    -------
+    tuple of (str, str) or None
+        The first reason that is not None, without its closing advice to rerun
+        before citing, and the runners to make again
+        (:data:`HELDOUT_RESTRICTION_RERUN`).
+    """
+    for name, reason in (
+        ("restriction_inputs", restriction_inputs),
+        ("restriction_run", heldout.restriction_run),
+        ("bin_facts_run", heldout.bin_facts_run),
+        ("session_cache", heldout.session_cache),
+    ):
+        if reason is not None:
+            return reason.split("; rerun ")[0], HELDOUT_RESTRICTION_RERUN[name]
+    return None
 
 
 def read_heldout_restriction(
@@ -2819,9 +2923,7 @@ def restriction_outside_swr_values(
     make_figure = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
     )
-    statistics = restriction_totals.outside_swr_gain_statistics(
-        restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
-    ).set_index(["family", "measure"])
+    statistics = restriction_totals.outside_swr_statistics(time_sums, bin_s, windows)
     full_minus_swr = (
         f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
     )
@@ -4311,6 +4413,10 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             read_output_manifest(folder), epoch_ids, rel(folder)
         )
 
+    def off_time_mask(folder: Path, epoch_ids: Iterable[str]) -> str | None:
+        """Why a time-masked output is not over the subset and the current visits."""
+        return time_mask_staleness(read_output_manifest(folder), epoch_ids, rel(folder))
+
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*visit_context_values(table, source))
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
@@ -4344,8 +4450,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             pend(
                 rest_theta_values(events_with_extras, extras_source),
                 extras_stale,
-                off_subset(inputs.event_start_rest_theta),
-                off_visits(
+                off_time_mask(
                     inputs.event_start_rest_theta, (path.stem for path in extra_paths)
                 ),
             ),
@@ -4389,8 +4494,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         *over(
             pend(
                 brain_state_values(events_with_gamma, reference, signal_source),
-                off_subset(inputs.brain_state_reference.parent),
-                off_visits(inputs.brain_state_reference.parent, reference["epoch_id"]),
+                off_time_mask(
+                    inputs.brain_state_reference.parent, reference["epoch_id"]
+                ),
             ),
             against_rest,
         )
@@ -4421,8 +4527,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "(scripts/event_properties/measure_event_gamma.py)",
                 ),
                 stale(inputs.event_gamma),
-                off_subset(inputs.event_gamma),
-                off_visits(inputs.event_gamma, gamma_reference["epoch_id"]),
+                off_time_mask(inputs.event_gamma, gamma_reference["epoch_id"]),
             ),
             against_rest,
         )
@@ -4488,8 +4593,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "detector_comparison/measure_exposure_in_well_visits.py: the "
                     "non-local detector's exposure inside the well visits)",
                 ),
-                off_subset(folder),
-                off_visits(folder, exposure["epoch_id"]),
+                off_time_mask(folder, exposure["epoch_id"]),
             ),
             LEFT_OUT_SUBSET,
         )
@@ -4742,14 +4846,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # every restriction value reads the restriction run: pending when it was not
     # made from the current decode frames (as the event features run records
     # them) and SWR source
-    restriction_inputs = restriction_input_staleness(
-        read_output_manifest(restriction_dir),
-        {
-            epoch_id: record.get("decode", {}).get("sha256")
-            for epoch_id, record in features_manifest["epochs"].items()
-        },
-        analyzed,
-        rel(restriction_dir),
+    restriction_inputs = restriction_inputs_note(
+        restriction_dir, analyzed, rel(restriction_dir), features_manifest
     )
     # the run holds the windows of every event: those of the selected events
     # (and their controls, under their event's id) are read
@@ -4942,11 +5040,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ("sessions.parquet", quality_sessions),
         ("calibration.parquet", calibration),
     ):
-        if set(quality_table["epoch_id"]) != set(analyzed_epoch_ids()):
-            raise ValueError(
-                f"{folder / name} holds {quality_table['epoch_id'].nunique()} "
-                f"epochs, not the {n_epochs} analyzed ones"
-            )
+        require_analyzed_epochs(quality_table["epoch_id"], str(folder / name))
     quality_source = (
         f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analyzed "
         "epoch's decode)"
@@ -4959,8 +5053,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         *over(
             pend(
                 immobile_state_fraction_values(quality_sessions, quality_source),
-                off_subset(folder),
-                off_visits(folder, quality_sessions["epoch_id"]),
+                off_time_mask(folder, quality_sessions["epoch_id"]),
             ),
             f"the immobile {TIME_SUBSET}",
         )
@@ -5008,11 +5101,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     folder = inputs.nonlocal_by_signal
     signal_counts = pd.read_parquet(folder / "counts.parquet")
-    if set(signal_counts["epoch_id"]) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"{folder / 'counts.parquet'} holds {signal_counts['epoch_id'].nunique()} "
-            f"epochs, not the {n_epochs} analyzed ones"
-        )
+    require_analyzed_epochs(signal_counts["epoch_id"], str(folder / "counts.parquet"))
     counts_source = (
         f"{rel(folder)} (scripts/event_properties/measure_nonlocal_by_signal.py: "
         "each analyzed epoch's decode)"
@@ -5022,8 +5111,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             *over(
                 pend(
                     builder_values(signal_counts, counts_source),
-                    off_subset(folder),
-                    off_visits(folder, signal_counts["epoch_id"]),
+                    off_time_mask(folder, signal_counts["epoch_id"]),
                 ),
                 f"the immobile {TIME_SUBSET}",
             )
@@ -5035,11 +5123,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     folder = inputs.event_rule_sweep
     sweep_counts = pd.read_parquet(folder / "counts.parquet")
-    if set(sweep_counts["epoch_id"]) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"{folder / 'counts.parquet'} holds {sweep_counts['epoch_id'].nunique()} "
-            f"epochs, not the {n_epochs} analyzed ones"
-        )
+    require_analyzed_epochs(sweep_counts["epoch_id"], str(folder / "counts.parquet"))
     summary.add(
         *over(
             pend(
@@ -5049,8 +5133,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "each analyzed epoch's decode, detected again at each setting)",
                 ),
                 stale(folder),
-                off_subset(folder),
-                off_visits(folder, sweep_counts["epoch_id"].unique()),
+                off_time_mask(folder, sweep_counts["epoch_id"].unique()),
             ),
             EVENTS_SUBSET,
         )
@@ -5062,11 +5145,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     folder = inputs.state_calibration_in_visits
     calibration_epochs = list(read_output_manifest(folder)["epochs"])
-    if set(calibration_epochs) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"{folder} holds {len(calibration_epochs)} epochs, not the {n_epochs} "
-            "analyzed ones"
-        )
+    require_analyzed_epochs(calibration_epochs, str(folder))
     names = ("calibration_bins.csv", "calibration_trends.csv", "manifest.json")
     summary.add(
         *over(
@@ -5078,8 +5157,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "summarize_state_calibration_in_visits.py, from the held-out "
                     f"tetrode run {STATE_EVIDENCE_RUN}/{STATE_EVIDENCE_DIR})",
                 ),
-                off_subset(folder),
-                off_visits(folder, calibration_epochs),
+                off_time_mask(folder, calibration_epochs),
             ),
             f"the immobile {TIME_SUBSET}",
         )

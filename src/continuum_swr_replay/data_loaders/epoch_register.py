@@ -57,7 +57,7 @@ holds analyzed epochs' decodes, which the audit checks (``decode_folder``).
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
@@ -479,6 +479,29 @@ def analyzed_epoch_ids(register: pd.DataFrame | None = None) -> list[str]:
     return sorted(
         format_epoch_identifier(name, epoch, "HPC") for name, epoch in analyzed
     )
+
+
+def require_analyzed_epochs(epoch_ids: Iterable[str], source: str) -> None:
+    """Refuse an input that does not hold the analyzed epochs, no more and no fewer.
+
+    Parameters
+    ----------
+    epoch_ids : iterable of str
+        The epochs the input holds (``{stem}_{epoch}_HPC``), repeats allowed.
+    source : str
+        The input, for the message.
+
+    Raises
+    ------
+    ValueError
+        If the epochs are not :func:`analyzed_epoch_ids`' ones.
+    """
+    held = set(epoch_ids)
+    analyzed = analyzed_epoch_ids()
+    if held != set(analyzed):
+        raise ValueError(
+            f"{source} holds {len(held)} epochs, not the {len(analyzed)} analyzed ones"
+        )
 
 
 def analyzed_animals(register: pd.DataFrame | None = None) -> tuple[str, ...]:

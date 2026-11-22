@@ -260,7 +260,7 @@ import argparse
 import logging
 import string
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -292,8 +292,7 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_MARGINS_S,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
-    epoch_outside_swr_gains,
-    outside_swr_gain_statistics,
+    outside_swr_statistics,
     outside_swr_subset_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.shared_content import (
@@ -331,17 +330,23 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
     window_quartiles,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import well_visit_times
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    time_mask_staleness,
+    well_visit_times,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_decode_files,
     analyzed_epoch_ids,
+    require_analyzed_epochs,
 )
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME, processed_data_dir
 from continuum_swr_replay.reported.events import (
+    checked_reference,
     default_inputs,
     event_table_staleness,
+    heldout_restriction_refusal,
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
@@ -501,16 +506,6 @@ TRIGGER_WINDOW_S = 0.3
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
-RERUN = {
-    "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
-    "and the runs made from it",
-    "restriction_run": "scripts/event_evidence/detect_heldout_events.py",
-    "bin_facts_run": "scripts/event_evidence/detect_heldout_events.py",
-    "session_cache": "scripts/event_evidence/measure_bin_facts.py, then "
-    "scripts/event_evidence/detect_heldout_events.py",
-}
-"""The runners to make again when the panel of the gain outside SWRs refuses
-its inputs."""
 
 
 def read_inputs() -> dict:
@@ -525,7 +520,7 @@ def read_inputs() -> dict:
         ``reported.events.require_tetrode_holdout_folds``); ``timing``: the
         selected events' ``boundary_timing_statistics``; ``shared``: their
         agreement by spread bin (``agreement_by_spread_statistics``); ``outside``:
-        ``outside_swr_gain_statistics`` over the held-out event run, indexed by
+        ``outside_swr_statistics`` over the held-out event run, indexed by
         family and measure; ``parts``: ``outside_swr_subset_statistics`` over
         its time sums, indexed by subset, threshold, family and measure;
         ``no_spike``: :func:`read_no_spike_trace`.
@@ -534,7 +529,7 @@ def read_inputs() -> dict:
     ------
     ValueError
         If the held-out event run, or what it was made from, is not current
-        (:data:`RERUN` names what to make again).
+        (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
     require_tetrode_holdout_folds(
@@ -552,18 +547,12 @@ def read_inputs() -> dict:
         epochs,
         sha256_file(inputs.event_table),
     )
-    for name, reason in (
-        (
-            "restriction_inputs",
-            restriction_inputs_note(inputs.nonlocal_restriction, epochs),
-        ),
-        ("restriction_run", heldout.restriction_run),
-        ("bin_facts_run", heldout.bin_facts_run),
-        ("session_cache", heldout.session_cache),
-    ):
-        if reason is not None:
-            cause = reason.split("; rerun ")[0]
-            raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
+    refusal = heldout_restriction_refusal(
+        heldout, restriction_inputs_note(inputs.nonlocal_restriction, epochs)
+    )
+    if refusal is not None:
+        cause, rerun = refusal
+        raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
     windows = window_scores(selected)
     return {
         "calibration": read_state_calibration(inputs.state_calibration_in_visits),
@@ -581,9 +570,9 @@ def read_inputs() -> dict:
             for column in SPLIT_LABELS
         },
         "shared": agreement_by_spread_statistics(windows[windows["kind"] == "event"]),
-        "outside": outside_swr_gain_statistics(
-            epoch_outside_swr_gains(heldout.time_sums, heldout.bin_s, heldout.events)
-        ).set_index(["family", "measure"]),
+        "outside": outside_swr_statistics(
+            heldout.time_sums, heldout.bin_s, heldout.events
+        ),
         "parts": outside_swr_subset_statistics(
             heldout.time_sums, heldout.bin_s
         ).set_index(["subset", "threshold_s", "family", "measure"]),
@@ -599,13 +588,27 @@ def read_hpd(events: pd.DataFrame) -> pd.DataFrame:
     return hpd_distribution(events)
 
 
-def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> None:
-    """Refuse an output not made from the current event table over the
-    analyses' subset, as the events summary marks its values pending."""
+def _refuse_stale(
+    folder: Path,
+    panel: str,
+    rerun: str,
+    *,
+    event_table: Path | None = None,
+    epoch_ids: Iterable[str] | None = None,
+) -> None:
+    """Refuse an output the events summary marks pending: one not made from the
+    current event table (when ``event_table`` is given), not over the analyses'
+    subset, or, for a time-masked output (``epoch_ids`` given), not from the
+    current well visits (``prepare_data.time_mask_staleness``)."""
     manifest = read_output_manifest(folder)
+    what = rel(folder)
     for reason in (
-        event_table_staleness(manifest, sha256_file(event_table), rel(folder)),
-        subset_staleness(manifest, rel(folder)),
+        None
+        if event_table is None
+        else event_table_staleness(manifest, sha256_file(event_table), what),
+        subset_staleness(manifest, what)
+        if epoch_ids is None
+        else time_mask_staleness(manifest, epoch_ids, what),
     ):
         if reason is not None:
             raise ValueError(
@@ -623,21 +626,16 @@ def read_state_calibration(folder: Path) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        If the summary was not made over the analyses' subset, or not over the
-        analyzed epochs.
+        If the summary was not made over the analyses' subset from the current
+        well visits, or not over the analyzed epochs.
     """
-    manifest = read_output_manifest(folder)
-    if (reason := subset_staleness(manifest, rel(folder))) is not None:
-        raise ValueError(
-            f"Figure 2's supplement: panel {LETTERS['state_calibration']} is not "
-            f"drawn: {reason}. Rerun "
-            "scripts/event_evidence/summarize_state_calibration_in_visits.py."
-        )
-    if set(manifest["epochs"]) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"Figure 2's supplement: {rel(folder)} holds {len(manifest['epochs'])} "
-            "epochs, not the analyzed ones"
-        )
+    epochs = list(read_output_manifest(folder)["epochs"])
+    _refuse_stale(
+        folder, "state_calibration",
+        "scripts/event_evidence/summarize_state_calibration_in_visits.py",
+        epoch_ids=epochs,
+    )  # fmt: skip
+    require_analyzed_epochs(epochs, f"Figure 2's supplement: {rel(folder)}")
     return pd.read_csv(folder / "calibration_bins.csv")
 
 
@@ -649,18 +647,17 @@ def read_rule_sweep(folder: Path, event_table: Path) -> pd.DataFrame:
     ------
     ValueError
         If the counts were not made from the current event table over the
-        analyses' subset, or do not hold the analyzed epochs.
+        analyses' subset and the current well visits, or do not hold the
+        analyzed epochs.
     """
-    _refuse_stale(
-        folder, event_table, "rule_sweep",
-        "scripts/event_properties/sweep_event_rule.py",
-    )  # fmt: skip
     counts = pd.read_parquet(folder / "counts.parquet")
-    if set(counts["epoch_id"]) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"Figure 2's supplement: {rel(folder)}/counts.parquet holds "
-            f"{counts['epoch_id'].nunique()} epochs, not the analyzed ones"
-        )
+    _refuse_stale(
+        folder, "rule_sweep", "scripts/event_properties/sweep_event_rule.py",
+        event_table=event_table, epoch_ids=counts["epoch_id"].unique(),
+    )  # fmt: skip
+    require_analyzed_epochs(
+        counts["epoch_id"], f"Figure 2's supplement: {rel(folder)}/counts.parquet"
+    )
     return sweep_statistics(counts)
 
 
@@ -673,22 +670,18 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        If the counts were not made over the analyses' subset, or do not hold
-        the analyzed epochs.
+        If the counts were not made over the analyses' subset from the current
+        well visits and the decodes the event features run records, for the
+        analyzed epochs (``reported.events.checked_reference``, as Figure 2i).
     """
-    if (
-        reason := subset_staleness(read_output_manifest(folder), rel(folder))
-    ) is not None:
+    counts = pd.read_parquet(folder / "counts.parquet")
+    try:
+        checked_reference(counts, folder, "counts by signal")
+    except ValueError as error:
         raise ValueError(
             f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
-            f"{reason}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
-        )
-    counts = pd.read_parquet(folder / "counts.parquet")
-    if set(counts["epoch_id"]) != set(analyzed_epoch_ids()):
-        raise ValueError(
-            f"Figure 2's supplement: {rel(folder)}/counts.parquet holds "
-            f"{counts['epoch_id'].nunique()} epochs, not the analyzed ones"
-        )
+            f"{error}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
+        ) from error
     return animal_signal_counts(nonlocal_counts(counts, "mua"))
 
 
@@ -711,8 +704,9 @@ def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> 
         If the output is not current, or a selected event has no peak power.
     """
     _refuse_stale(
-        folder, event_table, "ripple_modes",
+        folder, "ripple_modes",
         "scripts/event_properties/measure_ripple_class_structure.py analyze",
+        event_table=event_table,
     )  # fmt: skip
     peaks = pd.concat(
         pd.read_parquet(path, columns=["event_id", "ripple_z_max"])

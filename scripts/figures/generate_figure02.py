@@ -230,6 +230,8 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.events import (
+    checked_reference,
+    heldout_restriction_refusal,
     read_heldout_restriction,
     restriction_inputs_note,
 )
@@ -511,54 +513,6 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
         f"_features{EVENT_FEATURES_RUN}_comparison{comparison[:12]}"
         f"_settings{_settings_fingerprint()[:12]}_cache.joblib"
     )
-
-
-def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
-    """A per-epoch measurement (the brain-state reference, the counts by ripple
-    power), if it was made over the time inside the well visits, from the
-    current session cache's visits and from the decodes the event features run
-    records for every analyzed epoch.
-
-    Parameters
-    ----------
-    reference : pd.DataFrame
-        The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
-    folder : Path
-        Its folder, whose ``manifest.json`` records the subset it is over and
-        the session-cache entries it read the visits from.
-    name : str
-        What it is, for the error.
-
-    Raises
-    ------
-    ValueError
-        If it was not made over the analyses' subset or from the current
-        session cache (``prepare_data.time_mask_staleness``), an analyzed epoch
-        is missing or extra, or its decode hash differs.
-    """
-    note = time_mask_staleness(
-        read_output_manifest(folder), reference["epoch_id"], f"the {name} ({folder})"
-    )
-    if note is not None:
-        raise ValueError(note)
-    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    expected = {
-        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
-        for epoch_id in analyzed_epoch_ids()
-    }
-    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
-    if recorded != expected:
-        differ = sorted(
-            epoch_id
-            for epoch_id in expected.keys() | recorded.keys()
-            if expected.get(epoch_id) != recorded.get(epoch_id)
-        )
-        raise ValueError(
-            f"the {name} was not made from the decodes of event "
-            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
-            f"e.g. {differ[:3]}"
-        )
-    return reference
 
 
 def _compute_figure_inputs(
@@ -1167,17 +1121,12 @@ immobile time, then over the immobile time outside SWRs."""
 DIFFERENCE_LABELS = {"all": "All\nimmobility", "outside_swr": "Outside\nSWRs"}
 """Horizontal, on two lines; the main result, outside SWRs, in bold (as panels
 c and d mark their key class)."""
-HELDOUT_EVENTS_RERUN = "scripts/event_evidence/detect_heldout_events.py"
-BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
-RESTRICTION_RERUN = "scripts/event_evidence/score_nonlocal_restriction.py"
-"""The runners to make again when the decoder comparison refuses its inputs."""
 
 
-def restriction_refusal(reason: str, rerun: str) -> str:
-    """Why the decoder comparison is not drawn: what is not current
-    (the events summary's ``reason``, without its closing advice to rerun
-    before citing) and the runners to make again (``rerun``)."""
-    cause = reason.split("; rerun ")[0]
+def restriction_refusal(cause: str, rerun: str) -> str:
+    """Why the decoder comparison is not drawn: what is not current (``cause``)
+    and the runners to make again (``rerun``), from
+    ``reported.events.heldout_restriction_refusal``."""
     letter = ROW4_LETTERS["decoder_comparison"]
     return (
         f"the decoder comparison (panel {letter}) is not drawn: {cause}. Rerun {rerun}."
@@ -1709,17 +1658,14 @@ def generate_figure(
         event_epochs,
         sha256_file(_event_table_path(data_dir)),
     )
-    restriction_inputs = restriction_inputs_note(
-        data_dir / EVENT_NONLOCAL_RESTRICTION_DIR, event_epochs
+    refusal = heldout_restriction_refusal(
+        heldout,
+        restriction_inputs_note(
+            data_dir / EVENT_NONLOCAL_RESTRICTION_DIR, event_epochs
+        ),
     )
-    for reason, rerun in (
-        (restriction_inputs, f"{RESTRICTION_RERUN} and the runs made from it"),
-        (heldout.restriction_run, HELDOUT_EVENTS_RERUN),
-        (heldout.bin_facts_run, HELDOUT_EVENTS_RERUN),
-        (heldout.session_cache, f"{BIN_FACTS_RERUN}, then {HELDOUT_EVENTS_RERUN}"),
-    ):
-        if reason is not None:
-            raise ValueError(restriction_refusal(reason, rerun))
+    if refusal is not None:
+        raise ValueError(restriction_refusal(*refusal))
     restriction_decoders, restriction_outside = restriction_figure_statistics(
         heldout.events, heldout.time_sums, heldout.bin_s
     )

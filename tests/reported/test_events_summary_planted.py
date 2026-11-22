@@ -36,6 +36,7 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
 )
+from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
@@ -483,6 +484,8 @@ class _Run:
         }.items():
             monkeypatch.setattr(builder, name, value)
         monkeypatch.setattr(builder.nonlocal_comparison, "read_comparison", comparison)
+        # the inputs' epoch check reads the register where it is defined
+        monkeypatch.setattr(epoch_register, "analyzed_epoch_ids", lambda: EPOCHS)
 
         def memberships(run, directional, event_ids):
             seen["nonlocal_event_memberships"] = (list(event_ids),)

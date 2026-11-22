@@ -837,6 +837,17 @@ def outside_swr_gain_statistics(
     return _epoch_measure_statistics(epochs, MEASURES, n_boot=n_boot, seed=seed)
 
 
+def outside_swr_statistics(
+    time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame
+) -> pd.DataFrame:
+    """:func:`outside_swr_gain_statistics` over :func:`epoch_outside_swr_gains`,
+    indexed by ``family`` and ``measure``: the statistics Figure 2j, Figure 2's
+    supplement and the events summary read of the immobile time outside SWRs."""
+    return outside_swr_gain_statistics(
+        epoch_outside_swr_gains(time_sums, bin_s, windows)
+    ).set_index(["family", "measure"])
+
+
 def inside_swr_gain_statistics(
     epochs: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
 ) -> pd.DataFrame:
@@ -977,16 +988,11 @@ def restriction_figure_statistics(
         visit, indexed by ``family`` and ``measure`` (the first axis and the
         second axis' first column).
     outside : pd.DataFrame
-        :func:`outside_swr_gain_statistics` over the immobile time outside SWRs
+        :func:`outside_swr_statistics` over the immobile time outside SWRs
         inside a well visit, with the shares of it in the events of
-        ``windows``, indexed by ``family`` and ``measure`` (the second axis'
-        second column; Figure 2's supplement draws its
-        shares).
+        ``windows`` (the second axis' second column).
     """
     decoders = immobile_gain_statistics(
         epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    outside = outside_swr_gain_statistics(
-        epoch_outside_swr_gains(time_sums, bin_s, windows)
-    ).set_index(["family", "measure"])
-    return decoders, outside
+    return decoders, outside_swr_statistics(time_sums, bin_s, windows)

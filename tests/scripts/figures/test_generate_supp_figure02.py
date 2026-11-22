@@ -708,11 +708,8 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "sha256_file": lambda path: "0" * 64,
         "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),
         "restriction_inputs_note": lambda folder, epochs: note,
-        "epoch_outside_swr_gains": lambda sums, bin_s, events: seen.setdefault(
+        "outside_swr_statistics": lambda sums, bin_s, events: seen.setdefault(
             "restriction", (sums, bin_s, events)
-        ),
-        "outside_swr_gain_statistics": lambda epochs: pd.DataFrame(
-            {"family": ["filter"], "measure": ["gain_per_spike"]}
         ),
         "read_no_spike_trace": lambda: "trace",
         "read_hpd": lambda events: seen.setdefault("hpd", events),
@@ -799,7 +796,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     _patch_reading(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
-    monkeypatch.setattr(figure, "epoch_outside_swr_gains", refuse)
+    monkeypatch.setattr(figure, "outside_swr_statistics", refuse)
     with pytest.raises(ValueError, match="panel j is not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
