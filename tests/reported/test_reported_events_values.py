@@ -1391,9 +1391,12 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     assert values[f"{stem}_beyond_hundred_ms_share_of_bins"].kind == "fraction"
     assert "100 ms" in values[f"{key}_per_spike"].description
     assert "60 s" in values[f"{stem}_sampled_minute_share_of_bins"].description
+    assert numbers[f"{stem}_beyond_hundred_ms_share_of_bins_animal_min"] == (
+        pytest.approx(0.6)
+    )
     # per part: two families x (two units x four + two epoch counts), and the
-    # share with its bounds; and the two counts left out
-    assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 3) + 2
+    # share with the animals' lowest; and the two counts left out
+    assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
     assert {v.figures for v in values.values()} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 

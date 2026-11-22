@@ -2711,18 +2711,30 @@ def restriction_outside_swr_part_values(
                                 f"epochs with immobile bins outside SWRs {kept}",
                             ),
                         ]
-            values += _share_interval(
-                make,
-                f"restriction_outside_swr_{word}_share_of_bins",
-                statistics.loc[
-                    (subset, threshold, RESTRICTION_FIGURE_FAMILY, "share_of_bins")
-                ],
-                f"share of the epoch's immobile bins outside SWRs that lie {kept}"
-                f" (both families): {_EPOCH_REDUCTION}"
-                if subset == "beyond_swr_margin"
-                else f"share of the epoch's immobile bins outside SWRs {kept} (both "
-                f"families): {_EPOCH_REDUCTION}",
-            )
+            # a share of the bins kept, near 1 for some parts: its t interval
+            # can pass 1, so the animals' lowest value is given instead
+            row = statistics.loc[
+                (subset, threshold, RESTRICTION_FIGURE_FAMILY, "share_of_bins")
+            ]
+            where = f"that lie {kept}" if subset == "beyond_swr_margin" else kept
+            values += [
+                make(
+                    f"restriction_outside_swr_{word}_share_of_bins",
+                    row["estimate"],
+                    "fraction",
+                    "pct",
+                    f"share of the epoch's immobile bins outside SWRs {where}: "
+                    "mean over animals of each animal's median over its epochs",
+                ),
+                make(
+                    f"restriction_outside_swr_{word}_share_of_bins_animal_min",
+                    float(np.min(row["animals"])),
+                    "fraction",
+                    "pct",
+                    "lowest of the animals' values (each the median over the "
+                    "animal's epochs)",
+                ),
+            ]
     return values
 
 
