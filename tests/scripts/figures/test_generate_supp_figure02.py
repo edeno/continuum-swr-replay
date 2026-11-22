@@ -298,7 +298,6 @@ def test_each_panels_values_carry_its_letter():
     panels = {
         "state_calibration": "state_calibration",
         "rule_sweep": "rule_sweep",
-        "rule_sweep_swr": "ripple_modes",
         "boundary_timing": "boundary_timing",
         "nonlocal_mua": "nonlocal_mua",
         "hpd": "hpd",
@@ -494,52 +493,25 @@ def test_the_hpd_panel_draws_the_distribution_of_each_class():
     plt.close(fig)
 
 
-def test_the_ripple_panel_draws_the_peak_power_and_the_share_at_each_threshold():
-    """Two axes sharing the ripple-power x axis. Top: each animal's density of
-    the events' peak ripple power as a thin line, their mean in bold, the
-    one-mode result in its title, no split by SWR label. Bottom: the percent of events with
-    no SWR at each SWR threshold, a thin line per animal and the cohort's
-    line. One dashed line at the threshold used on both, labeled once; each
-    axis names what its x is."""
-    from continuum_swr_replay.analysis.event_properties.rule_sweep import (
-        SWR_THRESHOLDS_Z,
-    )
-
+def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
+    """Each animal's density of the events' peak ripple power as a thin line,
+    their mean in bold, a dashed line at the SWR threshold, the one-mode
+    result read from the statistics, and no split by SWR label."""
     fig = figure.generate_figure(_statistics())
-    ax_peak, ax_share = figure.panel_axes(fig, "ripple_modes")
+    (ax,) = figure.panel_axes(fig, "ripple_modes")
     densities = _ripple_modes()["densities"]
-    curves = [
-        line for line in ax_peak.lines if len(line.get_xdata()) == RIPPLE_GRID.size
-    ]
+    curves = [line for line in ax.lines if len(line.get_xdata()) == RIPPLE_GRID.size]
     assert len(curves) == 3  # two animals and their mean
     np.testing.assert_allclose(
         curves[-1].get_ydata(), densities.mean(axis=1).to_numpy()
     )
     assert curves[-1].get_linewidth() > curves[0].get_linewidth()
-    assert ax_peak.get_title() == "One mode in 5 of 5 animals (dip test)"
-    assert not ax_peak.collections  # no band, no stacked label
-    sweep = _sweep()
-    mine = sweep[sweep["setting"] == "swr_threshold_z"]
-    shares = [
-        line
-        for line in ax_share.lines
-        if len(line.get_xdata()) == len(SWR_THRESHOLDS_Z)
-    ]
-    assert len(shares) == 2 + 1
-    np.testing.assert_allclose(shares[-1].get_xdata(), SWR_THRESHOLDS_Z)
-    np.testing.assert_allclose(
-        shares[-1].get_ydata(), 100 * mine["no_swr_fraction"].to_numpy()
-    )
-    for ax in (ax_peak, ax_share):
-        (threshold,) = [line for line in ax.lines if line.get_linestyle() == "--"]
-        np.testing.assert_allclose(threshold.get_xdata(), figure.KAY_ZSCORE_THRESHOLD)
-    labels = [t.get_text() for ax in (ax_peak, ax_share) for t in ax.texts]
-    assert labels.count("SWR threshold used") == 1
-    assert "Event peak" in [t.get_text() for t in ax_peak.texts]
-    assert "No SWR at this threshold" in [t.get_text() for t in ax_share.texts]
-    assert ax_share.get_shared_x_axes().joined(ax_share, ax_peak)
-    assert ax_share.get_xlabel() == "Ripple power (z)"
-    assert ax_peak.get_xlim() == figure.RIPPLE_X_LIMITS_Z
+    (threshold,) = [line for line in ax.lines if line.get_linestyle() == "--"]
+    np.testing.assert_allclose(threshold.get_xdata(), figure.KAY_ZSCORE_THRESHOLD)
+    texts = [t.get_text() for t in ax.texts]
+    assert "one mode in 5 of 5\nanimals (dip test)" in texts
+    assert not ax.collections  # no band, no stacked label
+    assert ax.get_xlabel() == "Event peak ripple power (z)"
     plt.close(fig)
 
 
@@ -564,10 +536,9 @@ def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua():
 
 
 def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
-    """Two small axes sharing the y axis, one per setting of the event rule: a
-    thin line per animal and the pooled share in bold, in percent, the value
-    used dotted and marked, and the title "Event rule" over both (the SWR
-    detector's threshold is in the ripple panel)."""
+    """Three small axes sharing the y axis, one per swept setting: a thin line
+    per animal and the pooled share in bold, in percent, the rule's value
+    marked by a dotted line."""
     from continuum_swr_replay.analysis.event_properties.rule_sweep import (
         RULE,
         SETTINGS,
@@ -576,9 +547,8 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
     sweep = _sweep()
     fig = figure.generate_figure(_statistics())
     axes = figure.panel_axes(fig, "rule_sweep")
-    assert len(axes) == 2
-    for ax, setting in zip(axes, figure.SWEEP_XLABELS, strict=True):
-        values = SETTINGS[setting]
+    assert len(axes) == 3
+    for ax, (setting, values) in zip(axes, SETTINGS.items(), strict=True):
         mine = sweep[sweep["setting"] == setting]
         lines = [line for line in ax.lines if len(line.get_xdata()) == len(values)]
         assert len(lines) == 2 + 1  # two animals and the pooled share
@@ -589,10 +559,13 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
         (rule,) = [line for line in ax.lines if line.get_linestyle() == ":"]
         np.testing.assert_allclose(rule.get_xdata(), RULE[setting])
         assert ax.get_shared_y_axes().joined(ax, axes[0])
-        assert " used" in [t.get_text() for t in ax.texts]
     assert axes[0].get_ylabel() == "Events with\nno SWR (%)"
+    # one heading over the event rule's two axes, one over the detector's; the
+    # value used marked on all three
     assert "Event rule" in [t.get_text() for t in axes[0].texts]
-    assert list(figure.SWEEP_XLABELS) == ["probability_threshold", "minimum_samples"]
+    assert "SWR detector" in [t.get_text() for t in axes[2].texts]
+    for ax in axes:
+        assert " used" in [t.get_text() for t in ax.texts]
     assert [ax.get_xlabel() for ax in axes] == list(figure.SWEEP_XLABELS.values())
     plt.close(fig)
 

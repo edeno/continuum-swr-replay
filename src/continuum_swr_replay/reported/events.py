@@ -282,7 +282,6 @@ TAGS = {
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
     "rule_sweep": Tags(("2a.5",), ("S2c",)),
-    "rule_sweep_swr": Tags(("2a.5",), ("S2i",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
     "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",), ("S2f",)),
@@ -3460,15 +3459,12 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
     (``rule_sweep.criterion_agreement``). A sensitivity check: the canonical
     events and every other value are the rule's. The share with no SWR changes
     little with the event rule's two settings and strongly with the SWR
-    detector's threshold, as a threshold on one distribution must; about a
-    third of the events have no SWR even at 1 z. The event rule's settings
-    carry the sweep panel's tag; the SWR detector's threshold and the
-    criterion's agreement carry the ripple panel's, where they are drawn."""
-    make_rule = value_factory(rule_sweep_values, source, TAGS["rule_sweep"])
-    make_swr = value_factory(rule_sweep_values, source, TAGS["rule_sweep_swr"])
+    detector's threshold, as a threshold on one distribution must (the text
+    cites the threshold axis with the ripple-power panels); about a third of
+    the events have no SWR even at 1 z."""
+    make = value_factory(rule_sweep_values, source, TAGS["rule_sweep"])
     values = []
     for row in rule_sweep.sweep_statistics(counts).itertuples():
-        make = make_swr if row.setting == "swr_threshold_z" else make_rule
         setting_word, words, value_words = _SWEEP_SETTINGS[row.setting]
         value = int(row.value) if row.setting == "minimum_samples" else row.value
         key = f"rule_sweep_{setting_word}_{value_words[value]}"
@@ -3508,7 +3504,7 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
         ]
     values.append(
-        make_swr(
+        make(
             "rule_sweep_swr_criterion_agreement",
             rule_sweep.criterion_agreement(counts),
             "fraction",

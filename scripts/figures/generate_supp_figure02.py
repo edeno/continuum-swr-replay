@@ -5,13 +5,13 @@ the order the text cites them, in four rows:
 - the decoder on these recordings (a, b): its states calibrated by held-out
   spikes, and MUA in the No-Spike state;
 - the count is robust (c, d): the share of events with no SWR at other
-  settings of the event rule, and the timing of events against their SWRs;
+  settings of the event rule and of the SWR detector, and the timing of events
+  against their SWRs;
 - the events are coordinated and specific (e to h): non-local time against
   MUA, the held-out tetrode gain split by bins with and without spikes, the
   posterior's spread, and shared content;
 - ripple power and the held-out test (i, j): the events' peak ripple power has
-  one mode and the share with no SWR follows the SWR threshold, and the gain
-  outside SWRs away from the SWRs.
+  one mode, and the gain outside SWRs away from the SWRs.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -55,23 +55,30 @@ the order the text cites them, in four rows:
         state when the decoded tetrodes fall silent, so the fall in their MUA
         describes the state and is not a test of it.
 
-    c — Supports Figure 2d, the share of events with no SWR: it changes little
-        with the event rule's settings. The share of the immobile non-local
-        events that start inside a well visit with no SWR, at each value of
-        the event rule's two settings swept one at a time (the other at the
-        value the paper uses): the non-local probability an event stays
+    c — Supports Figure 2d, the share of events with no SWR. The text cites
+        this panel twice: its event-rule axes with the count of events (the
+        share changes little with the rule), and its SWR-threshold axis with
+        the ripple-power panels (Figure 2i, panel i), because the share follows
+        the threshold, as a threshold on one distribution must. The share of
+        the immobile non-local events that start inside a well visit with no
+        SWR, at each value of three settings swept one at a time (the others
+        at the values the paper uses). Two are settings of the event rule
+        (heading "Event rule"): the non-local probability an event stays
         strictly above (0.5 to 0.95) and the minimum run length (7, the rule's
-        15 ms, to 25 samples of 2 ms). A thin line per animal (the mean over
-        its epochs of each epoch's share) and the share pooled over events in
-        bold; the value the paper uses is dotted and marked "used". The events
-        are detected again from the stored decode by the rule itself and
-        labeled as the canonical table labels them; at the rule's settings
-        they are the canonical events (``rule_sweep.sweep_statistics``;
-        ``Processed-Data/event_rule_sweep``,
+        15 ms, to 25 samples of 2 ms). The third is the SWR detector's
+        threshold (heading "SWR detector", 0 to 6 z). A thin line per animal
+        (the mean over its epochs of each epoch's share) and the share pooled
+        over events in bold; the value the paper uses is dotted and marked
+        "used" on every axis. About a third of the events have no SWR even at
+        1 z. The events are detected again from the stored decode by the rule
+        itself and labeled as the canonical table labels them; at the rule's
+        settings they are the canonical events. The SWRs are not detected
+        again: an event counts as overlapping an SWR at a threshold when its
+        Kay criterion on the decode grid reaches it, a label that agrees with
+        the canonical one for 99 % of the events at 2 z
+        (``rule_sweep.sweep_statistics``; ``Processed-Data/event_rule_sweep``,
         ``scripts/event_properties/sweep_event_rule.py``; the events summary's
-        ``rule_sweep_probability_threshold_*`` and
-        ``rule_sweep_minimum_samples_*`` values). The SWR detector's threshold,
-        swept by the same runner, is drawn in panel i.
+        ``rule_sweep_*`` values).
 
     d — Supports Figure 2f, which shows that a good share of the events start
         or end more than 25 ms from their SWR without saying which way. Each
@@ -191,31 +198,18 @@ the order the text cites them, in four rows:
         the ``*_shared_content_*_share_of_events`` values).
 
     i — Supports Figure 2i, which shows no step in non-local time at the SWR
-        threshold. Two axes share the ripple-power x axis (-1 to 7 z). Top
-        ("Event peak"): the events' peak ripple power (the maximum of the
-        z-scored Kay consensus over the event's rows) has one mode. Each
-        animal's density of it, a thin line per animal and their mean in bold
-        (as Figure 2i draws its animals), is the Gaussian KDE (Silverman's
+        threshold: the events' peak ripple power (the maximum of the z-scored
+        Kay consensus over the event's rows) has one mode. Each animal's
+        density of it, a thin line per animal and their mean in bold (as
+        Figure 2i draws its animals), is the Gaussian KDE (Silverman's
         bandwidth) whose main mode the one-class-or-two analysis reports
-        (``class_or_continuum.peak_power_densities``), with the dip test's
-        result in the title (``event_statistics.peak_ripple_mode_statistics``;
-        ``Processed-Data/ripple_class_structure``; the events summary's
-        ``ripple_peak_*`` values). The distribution is not split by SWR label:
-        the label is set from this power, so a split would show the
-        threshold, not two kinds. Bottom ("No SWR at this threshold"): the
-        percent of events with no SWR if the SWR detector's threshold were at
-        each value from 0 to 6 z, a thin line per animal and the cohort's line
-        with its points (the SWR-threshold rows of
-        ``rule_sweep.sweep_statistics``; the events summary's
-        ``rule_sweep_swr_threshold_*`` values). The SWRs are not detected
-        again: an event counts as overlapping an SWR at a threshold when its
-        Kay criterion on the decode grid reaches it, a label that agrees with
-        the canonical one for 99 % of the events at 2 z
-        (``rule_sweep_swr_criterion_agreement``), so the bottom's x is that
-        threshold, close to but not the same quantity as the top's peak. The
-        share follows the threshold, as a threshold on one distribution must,
-        and about a third of the events have no SWR even at 1 z. One dashed
-        line at the threshold the paper uses (2 z) runs through both axes.
+        (``class_or_continuum.peak_power_densities``), read from -2 to 12 z
+        (a thin tail lies beyond); a dashed line at the SWR threshold; and the
+        dip test's result (``event_statistics.peak_ripple_mode_statistics``;
+        ``Processed-Data/ripple_class_structure``, its per-event ``criterion``
+        files and ``distribution.csv``; the events summary's ``ripple_peak_*``
+        values). The distribution is not split by SWR label: the label is set
+        from this power, so a split would show the threshold, not two kinds.
 
     j — Supports Figure 2j: its main result, the full decoder's gain over the
         SWR-only decoder outside SWRs, looked at more closely. Every value is
@@ -434,17 +428,15 @@ CALIBRATION_DODGE = 0.025
 SWEEP_XLABELS = {
     "probability_threshold": "Non-local\nprobability",
     "minimum_samples": "Minimum\nsamples",
+    "swr_threshold_z": "SWR\nthreshold (z)",
 }
-"""The sweep panel's x label of each of the event rule's two settings (the SWR
-detector's threshold is drawn in the ripple panel)."""
+"""The sweep panel's x label of each swept setting."""
 SWEEP_TICKS = {
     "probability_threshold": (0.5, 0.8, 0.95),
     "minimum_samples": (7, 15, 25),
+    "swr_threshold_z": (0, 2, 4, 6),
 }
-"""The sweep panel's x ticks: the rule's value and the ends."""
-RIPPLE_X_LIMITS_Z = (-1.0, 7.0)
-"""The ripple panel's shared x range (z): where the events' peak ripple power
-and the share with no SWR at each SWR threshold both have something to show."""
+"""The sweep panel's x ticks: the value used and the ends."""
 HPD_XLABEL = "95 % HPD length (cm),\nmean over the event's bins"
 """The posterior-spread panel's x label: each event's mean over its bins of the
 length of track that holds 95 % of the decoded probability."""
@@ -490,8 +482,8 @@ right."""
 FRAMES = {
     "state_calibration": (0.12, 0.4),
     "no_spike_mua": (0.71, 0.27),
-    "rule_sweep": (0.085, 0.38),
-    "boundary_timing": (0.66, 0.32),
+    "rule_sweep": (0.085, 0.47),
+    "boundary_timing": (0.71, 0.27),
     "nonlocal_mua": (0.075, 0.13),
     "heldout_gain": (0.305, 0.19),
     "hpd": (0.56, 0.16),
@@ -948,65 +940,34 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
-def draw_ripple_modes(
-    ax_peak: Axes, ax_share: Axes, statistics: dict, sweep: pd.DataFrame
-) -> None:
-    """The ripple panel, two axes sharing the ripple-power x axis. Top, each
-    animal's density of the events' peak ripple power as a thin line, their
-    mean in bold (as Figure 2i draws its animals), the one-mode result in its
-    title; not
-    split by SWR label, which is set from this power (``statistics``:
-    :func:`read_ripple_modes`). Bottom, the percent of events with no SWR if
-    the SWR threshold were at each value, applied to each event's Kay
-    criterion on the decode grid: a thin line per animal and the cohort's line
-    with its points (``sweep``: the SWR-threshold rows of :func:`read_inputs`'
-    ``sweep``). One dashed line at the threshold the paper uses through both,
-    labeled once; each axis names what its x is."""
+def draw_ripple_modes(ax: Axes, statistics: dict) -> None:
+    """The ripple panel: each animal's density of the events' peak ripple power
+    as a thin line, their mean in bold (as Figure 2i draws its animals), a
+    dashed line at the SWR threshold and the one-mode result. Not split by SWR
+    label: the label is set from this power (``statistics``:
+    :func:`read_ripple_modes`)."""
     densities = statistics["densities"]
     grid = densities.index.to_numpy()
-    ax_peak.plot(grid, densities.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax_peak.plot(grid, densities.mean(axis=1).to_numpy(), color="k", lw=1.0)
+    ax.plot(grid, densities.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax.plot(grid, densities.mean(axis=1).to_numpy(), color="k", lw=1.0)
+    ax.axvline(KAY_ZSCORE_THRESHOLD, color=COLORS["SWR"], lw=0.8, ls="--")
+    ax.text(
+        KAY_ZSCORE_THRESHOLD + 0.3, 0.97, "SWR\nthreshold", transform=ax.get_xaxis_transform(),
+        ha="left", va="top", fontsize=SMALL_SIZE, color=readable_text_color(COLORS["SWR"]),
+    )  # fmt: skip
     modes = statistics["modes"]
-    ax_peak.set_ylim(0, 1.45 * float(densities.to_numpy().max()))  # room for labels
-    ax_peak.set_ylabel("Density\n(per z)")
-    ax_peak.set_title(
-        f"One mode in {modes['n_animals_unimodal']} of {statistics['n_animals']} "
+    ax.text(
+        0.98, 0.72,
+        f"one mode in {modes['n_animals_unimodal']} of {statistics['n_animals']}\n"
         "animals (dip test)",
-        fontsize=SMALL_SIZE, pad=3,
+        transform=ax.transAxes, ha="right", va="top", fontsize=SMALL_SIZE,
     )  # fmt: skip
-    ax_peak.tick_params(labelbottom=False)
-
-    mine = sweep[sweep["setting"] == "swr_threshold_z"]
-    x = mine["value"].to_numpy()
-    animals = pd.DataFrame(
-        [pd.Series(r.animals, index=r.animal_names) for r in mine.itertuples()]
-    )
-    ax_share.plot(x, 100 * animals.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax_share.plot(x, 100 * mine["no_swr_fraction"].to_numpy(), color="k", lw=1.0,
-                  marker="o", ms=2)  # fmt: skip
-    ax_share.sharex(ax_peak)
-    ax_share.set_ylim(0, 100)
-    ax_share.set_yticks([0, 50, 100])
-    ax_share.set_ylabel("Events with\nno SWR (%)")
-    ax_share.set_xlabel("Ripple power (z)")
-    # each axis names its x: the top's at its upper left, the bottom's at its
-    # lower right, where the curves leave room
-    for ax, heading, (x, y, ha, va) in (
-        (ax_peak, "Event peak", (0.02, 0.95, "left", "top")),
-        (ax_share, "No SWR at this threshold", (0.98, 0.05, "right", "bottom")),
-    ):
-        ax.axvline(KAY_ZSCORE_THRESHOLD, color=COLORS["SWR"], lw=0.8, ls="--")
-        ax.text(
-            x, y, heading, transform=ax.transAxes, ha=ha, va=va,
-            fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-        )  # fmt: skip
-    ax_peak.text(
-        KAY_ZSCORE_THRESHOLD + 0.15, 0.95, "SWR threshold used",
-        transform=ax_peak.get_xaxis_transform(), ha="left", va="top",
-        fontsize=SMALL_SIZE, color=readable_text_color(COLORS["SWR"]),
-    )  # fmt: skip
-    ax_peak.set_xlim(*RIPPLE_X_LIMITS_Z)
-    ax_peak.set_xticks([0, 2, 4, 6])
+    ax.set_xlim(grid[0], grid[-1])
+    ax.set_ylim(0, 1.4 * float(densities.to_numpy().max()))  # room for the notes
+    ax.set_xticks([0, 5, 10])
+    ax.set_xlabel("Event peak ripple power (z)")
+    ax.set_ylabel("Density (per z)")
+    ax.set_title("One mode", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
@@ -1061,11 +1022,11 @@ def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
 
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     """The sweep panel: the share of events with no SWR at each value of each
-    of the event rule's two settings (one axis each, sharing the y axis), a
-    thin line per animal and the pooled share in bold with its dots, the value
-    the paper uses dotted and marked "used", and the title "Event rule" over
-    both (``sweep``: :func:`read_inputs`' ``sweep``; its SWR-threshold rows
-    are drawn in the ripple panel)."""
+    swept setting (one axis each, sharing the y axis), a thin line per animal
+    and the pooled share in bold with its dots, and on every axis the value the
+    paper uses dotted and marked "used". The first two axes are settings of
+    the event rule, under one heading; the third is the SWR detector's
+    threshold (``sweep``: :func:`read_inputs`' ``sweep``)."""
     for ax, (setting, xlabel) in zip(axes, SWEEP_XLABELS.items(), strict=True):
         mine = sweep[sweep["setting"] == setting]
         x = mine["value"].to_numpy()
@@ -1089,13 +1050,16 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
             RULE[setting], 3, " used", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
             ha="left", va="bottom",
         )  # fmt: skip
-    # the panel's title, centered over its two axes
+    # one heading over the event rule's two axes, another over the detector's
     first, second = axes[0].get_position(), axes[1].get_position()
-    axes[0].annotate(
-        "Event rule", (((first.x0 + second.x1) / 2 - first.x0) / first.width, 1.0),
-        xycoords="axes fraction", xytext=(0, 3), textcoords="offset points",
-        ha="center", va="bottom", fontsize=SMALL_SIZE,
-    )  # fmt: skip
+    for ax, heading, x in (
+        (axes[0], "Event rule", ((first.x0 + second.x1) / 2 - first.x0) / first.width),
+        (axes[2], "SWR detector", 0.5),
+    ):
+        ax.annotate(
+            heading, (x, 1.0), xycoords="axes fraction", xytext=(0, 3),
+            textcoords="offset points", ha="center", va="bottom", fontsize=SMALL_SIZE,
+        )  # fmt: skip
 
 
 def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
@@ -1156,12 +1120,7 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {
-    "nonlocal_mua": (2, 1),
-    "rule_sweep": (1, 2),
-    "ripple_modes": (2, 1),
-    "shared_content": (2, 1),
-}
+PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3), "shared_content": (2, 1)}
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"shared_content": (1, 3)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
@@ -1223,9 +1182,7 @@ def generate_figure(statistics: dict) -> Figure:
         [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
     )  # fmt: skip
     draw_hpd(axes["hpd"][0], statistics["hpd"])
-    draw_ripple_modes(
-        *axes["ripple_modes"], statistics["ripple_modes"], statistics["sweep"]
-    )
+    draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
