@@ -324,7 +324,13 @@ arm, patch and `is_stay` (`visit_context.assign_visit_current_arm`), in every ta
 A quantity summed over time (seconds, SWRs, per-bin scores) is restricted to the
 visits with `analysis/event_definition/well_visits.py:in_well_visit` on its own time
 grid: a time is inside a visit from the first poke-in (included) to the final poke-out
-(not included), the per-sample rule the labels summarize. An epoch's visits are read
+(not included), the per-sample rule the labels summarize. The decoder-validation values
+and figure (the Local-state decoding error, the calibration of error against Local
+probability, the moving state fractions; `scripts/decoding/measure_decoder_quality.py`,
+`scripts/figures/generate_supp_decoder_validation.py`) are over all analyzed time on
+purpose, because they test the place-field fit, not the events at the wells (the lead's
+decision, 2026-11-22); only the immobile state fractions cited beside Figure 2a are inside
+the visits. An epoch's visits are read
 from the session cache only, by `analysis/event_tables/prepare_data.py:well_visit_times`
 (a missing or off-contract entry is refused: nothing is fetched from Spyglass or
 written; a script loads the visits and passes the arrays or the mask down), and where
