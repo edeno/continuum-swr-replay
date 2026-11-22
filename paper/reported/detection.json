@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "db7a3ab02e60",
+ "commit": "5cfc25f66ed8",
  "code": {
-  "head": "db7a3ab02e60ac1ffedc63b02192dd98f7142ffd",
+  "head": "5cfc25f66ed8ecf795d8343dd4f5d5be793c8f94",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
