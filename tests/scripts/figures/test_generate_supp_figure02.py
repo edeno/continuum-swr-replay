@@ -89,8 +89,29 @@ def _shared_statistics() -> pd.DataFrame:
     return pd.DataFrame(rows).set_index(["spread_bin", "group"])
 
 
+def _timing() -> pd.DataFrame:
+    """``boundary_timing_statistics``' nine cells: shares 0.05 to 0.7 (the
+    middle cell the largest), each animal range 0.01 either side."""
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        TIMING_CLASSES,
+    )
+
+    shares = np.array([0.05, 0.05, 0.05, 0.05, 0.7, 0.15, 0.05, 0.1, 0.05])
+    cells = pd.MultiIndex.from_product(
+        [TIMING_CLASSES, TIMING_CLASSES], names=["start", "end"]
+    )
+    return pd.DataFrame(
+        {
+            "share": shares, "animal_min": shares - 0.01,
+            "animal_max": shares + 0.01, "n_events": (1000 * shares).astype(int),
+        },
+        index=cells,
+    )  # fmt: skip
+
+
 def _statistics() -> dict:
     return {
+        "timing": _timing(),
         "tetrode": _gain_statistics([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7]),
         "shared": _shared_statistics(),
         "outside": _outside_rows(),
@@ -100,28 +121,29 @@ def _statistics() -> dict:
 
 
 def test_the_figure_draws_its_panels_in_the_cited_order():
-    """a, the No-Spike MUA; b, the held-out tetrode gain; c, shared content; d,
-    the outside-SWR gain then away from SWRs; e, the shares: in two rows, each
-    row's letters at one height, the rows' first letters at one left edge, no
-    heading."""
+    """a, the No-Spike MUA; b, the timing table; c, the held-out tetrode gain;
+    d, shared content; e, the outside-SWR gain then away from SWRs; f, the
+    shares: in two rows, each row's letters at one height, the rows' first
+    letters at one left edge, no heading."""
     assert figure.PANELS == (
-        "no_spike_mua", "heldout_gain", "shared_content", "outside_distance",
-        "outside_shares",
+        "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
+        "outside_distance", "outside_shares",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
-    ax_gain = fig.axes[1]
+    ax_gain = fig.axes[2]
     assert_draws_group_gain(ax_gain, statistics["tetrode"])
     assert ax_gain.get_title() == "Held-out tetrode"
     assert ax_gain.get_ylabel() == "Held-out gain\nover local (nats/spike)"
     assert fig.axes[0].get_title() == "No-Spike state"
-    assert fig.axes[2].get_title() == "Shared content"
+    assert fig.axes[1].get_title() == "Timing against the SWR"
+    assert fig.axes[3].get_title() == "Shared content"
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcde")
+    assert sorted(letters) == list("abcdef")
     assert len({letters[k][1] for k in "abc"}) == 1
-    assert len({letters[k][1] for k in "de"}) == 1
+    assert len({letters[k][1] for k in "def"}) == 1
     assert letters["a"][1] > letters["d"][1]
     assert letters["a"][0] == letters["d"][0]
     assert "Immobile, at wells" not in [
@@ -131,12 +153,34 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     plt.close(fig)
 
 
-def test_panel_c_draws_the_agreement_by_spread():
+def test_panel_b_draws_the_timing_table():
+    """The nine shares as a 3 by 3 heat map (rows the start, columns the end),
+    each cell's percent and its animals' range, white on the dark cell and
+    black on the pale ones, and the labels."""
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[1]
+    (image,) = ax.images
+    np.testing.assert_allclose(
+        image.get_array(), 100 * _timing()["share"].to_numpy().reshape(3, 3)
+    )
+    texts = {t.get_text(): t for t in ax.texts}
+    assert texts["70%"].get_position() == pytest.approx((1, 1 - 0.13))
+    assert texts["15%"].get_position()[0] == 2  # start together, end later
+    assert "69\u201371" in texts
+    assert texts["70%"].get_color() == "white"
+    assert texts["5%"].get_color() == "black"
+    assert [t.get_text() for t in ax.get_yticklabels()] == list(figure.TIMING_LABELS)
+    assert ax.get_ylabel() == "Event starts,\nvs SWR start"
+    assert ax.get_xlabel() == "Event ends, vs SWR end"
+    plt.close(fig)
+
+
+def test_panel_d_draws_the_agreement_by_spread():
     """Each group's dots per spread bin on its side of the bin, its means with
     their intervals farther out joined by a thin line in the group's color, the
     bins' labels, a dashed zero line and which way means shared content."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[2]
+    ax = fig.axes[3]
     assert [t.get_text() for t in ax.get_xticklabels()] == list(
         figure.SPREAD_BIN_LABELS
     )
@@ -175,13 +219,13 @@ def test_panel_c_draws_the_agreement_by_spread():
     plt.close(fig)
 
 
-def test_panel_d_draws_the_outside_swr_gain_then_away_from_swrs():
+def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
     """Outside SWRs, then only farther than each margin from every SWR: dots
     spread about each column, the mean with its interval, a thin line through
     the means, the margins' label, the difference's y label, the zero line and
     "full better". The gain at well-sampled places is not drawn."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[3]
+    ax = fig.axes[4]
     xs = [0.0, *(figure.SERIES_START + k for k in range(len(MARGINS)))]
     for x, values in zip(xs, [OUTSIDE, *MARGINS.values()], strict=True):
         (dots,) = [
@@ -208,7 +252,7 @@ def test_panel_d_draws_the_outside_swr_gain_then_away_from_swrs():
     plt.close(fig)
 
 
-def test_panel_e_names_each_share_beside_its_dots():
+def test_panel_f_names_each_share_beside_its_dots():
     """The three shares in percent in one column, in panel d's colors and a
     gray for the rest, each a dot per animal (spread), the mean with its
     interval and its name beside them, no lighter than the reference gray; no x
@@ -218,7 +262,7 @@ def test_panel_e_names_each_share_beside_its_dots():
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[4]
+    ax = fig.axes[5]
     dots = [
         c
         for c in ax.collections
@@ -322,8 +366,8 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
-    """Values tagged ``S2`` (by panel, ``S2b`` to ``S2e``) name this script."""
-    assert FIGURES["S2"].panels == "abcde"
+    """Values tagged ``S2`` (by panel, ``S2b`` to ``S2f``) name this script."""
+    assert FIGURES["S2"].panels == "abcdef"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -397,7 +441,14 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert list(seen["tetrode"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
-    assert list(inputs) == ["tetrode", "shared", "outside", "parts", "no_spike"]
+    assert list(inputs) == [
+        "timing",
+        "tetrode",
+        "shared",
+        "outside",
+        "parts",
+        "no_spike",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -428,7 +479,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "epoch_outside_swr_gains", refuse)
-    with pytest.raises(ValueError, match="panels d and e are not drawn") as refused:
+    with pytest.raises(ValueError, match="panels e and f are not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 

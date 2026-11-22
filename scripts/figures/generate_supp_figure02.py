@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them: MUA in the No-Spike state, the held-out tetrode
-gain, shared content, and the gain outside SWRs.
+the order the text cites them: MUA in the No-Spike state, the timing of events
+against their SWRs, the held-out tetrode gain, shared content, and the gain
+outside SWRs.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -21,12 +22,27 @@ gain, shared content, and the gain outside SWRs.
         state when the decoded tetrodes fall silent, so the fall in their MUA
         describes the state and is not a test of it.
 
-    b and c — Support Figure 2h, the events driven by several tetrodes. Each
-    tetrode is left out of the decoder in turn: the other tetrodes' estimate
-    predicts its spikes better than local coding does (b), and in the events
-    where that estimate is specific, its activity is where the others point (c).
+    b — Supports Figure 2f, which shows that a good share of the events start
+        or end more than 25 ms from their SWR without saying which way. Each
+        SWR-overlapping event of the canonical event table that starts inside
+        a well visit, against its matched SWR (the pairs and offsets of Figure
+        2f, ``event_statistics.boundary_offsets``: event minus SWR, so a
+        positive start offset is an event that starts later than its SWR, a
+        positive end offset one that ends later), classed by its start
+        (earlier, within 25 ms, later) and its end (the same), 25 ms being the
+        tolerance of the events summary's ``*_beyond_twenty_five_ms_fraction``
+        values (``event_statistics.TIMING_TOLERANCE``). Each cell is the share
+        of the pairs in it, pooled over every pair as Figure 2c and d pool,
+        with the lowest and highest animal's share under it in small type
+        (``event_statistics.boundary_timing_statistics``; the events summary's
+        ``timing_*`` values).
 
-    b — The held-out tetrode gain over local coding. The immobile non-local
+    c and d — Support Figure 2h, the events driven by several tetrodes. Each
+    tetrode is left out of the decoder in turn: the other tetrodes' estimate
+    predicts its spikes better than local coding does (c), and in the events
+    where that estimate is specific, its activity is where the others point (d).
+
+    c — The held-out tetrode gain over local coding. The immobile non-local
         events of the canonical event table that start inside a well visit
         (``cohort_selection.select_visit_context``), split by whether they
         overlap an SWR. Each tetrode is left out of the decoder's smoother in
@@ -43,8 +59,8 @@ gain, shared content, and the gain outside SWRs.
         ``scripts/event_evidence/score_tetrode_holdout.py``;
         ``Processed-Data/event_tetrode_holdout``; the events summary's
         ``*_heldout_*`` values).
-    c — Shared content: during an event, do the tetrodes point to the same
-        remote place? The same events and run as b, each left-out tetrode
+    d — Shared content: during an event, do the tetrodes point to the same
+        remote place? The same events and run as c, each left-out tetrode
         scored under the other tetrodes' position distribution against no
         place preference (the agreement; above zero only when the left-out
         tetrode's activity is where the others point), summed over tetrodes and
@@ -58,7 +74,7 @@ gain, shared content, and the gain outside SWRs.
         at zero, no place preferred (``shared_content.agreement_by_spread_statistics``;
         the events summary's ``*_shared_content_*`` values).
 
-    d and e — Support Figure 2j: its main result, the full decoder's gain over the
+    e and f — Support Figure 2j: its main result, the full decoder's gain over the
     SWR-only decoder outside SWRs, looked at more closely. Every value is over
     the immobile bins inside a well visit, which runs from the animal's first
     nose-poke at a reward well to its last poke-out there. Each is per epoch,
@@ -67,7 +83,7 @@ gain, shared content, and the gain outside SWRs.
     see it); a dot per animal is the median over its epochs, beside the
     animals' mean with its 95 % interval.
 
-    d — That gain over every immobile bin outside SWRs ("Outside SWRs",
+    e — That gain over every immobile bin outside SWRs ("Outside SWRs",
         ``restriction_totals.outside_swr_gain_statistics``), then over only
         the bins farther than 100, 250 and 500 ms from every SWR
         (``restriction_totals.outside_swr_subset_statistics``, the
@@ -76,7 +92,7 @@ gain, shared content, and the gain outside SWRs.
         least 10 and at least 60 s of training data (the ``place_sampling``
         parts) is a reported value for the text, not drawn
         (``restriction_outside_swr_sampled_*``).
-    e — Where that gain outside SWRs sits, as a share of it per epoch: in the
+    f — Where that gain outside SWRs sits, as a share of it per epoch: in the
         events with no SWR, in the time outside the SWR of the events partly in
         one, and outside those events (1 minus the other two, so the three add
         to 100 %; below zero, as the full decoder does slightly worse there),
@@ -89,9 +105,9 @@ gain, shared content, and the gain outside SWRs.
         the events are defined, and so describe where the gain sits and do not
         test the events.
 
-Panels b and c read the held-out tetrode run over the epochs the events
+Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
-Panels d and e read the held-out event run
+Panels e and f read the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
 (``reported.events.read_heldout_restriction``), and refuse it, as Figure 2j
@@ -99,8 +115,9 @@ does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Their
-values are the events summary's ``restriction_outside_swr_*`` values. Panel a
-reads every analyzed epoch's decode frame (``Processed-Data``), which takes a
+values are the events summary's ``restriction_outside_swr_*`` values. Panel b
+reads the canonical event table. Panel a reads every analyzed epoch's decode
+frame (``Processed-Data``), which takes a
 few minutes; it has no reported value.
 
 Usage
@@ -153,6 +170,11 @@ from continuum_swr_replay.analysis.event_evidence.shared_content import (
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    TIMING_CLASSES,
+    boundary_offsets,
+    boundary_timing_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
@@ -212,14 +234,18 @@ HEIGHT = 4.2
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
+TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
+"""Panel b's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
+TIMING_CMAP = "bone_r"
+"""Panel b's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
 SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
 SHARED_OFFSET = 0.2
-"""Panel c: each group's dots sit this far either side of its spread bin; the
+"""Panel d: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
 SHARED_MEAN_OFFSET = 0.11
 SHARES_YLABEL = "Share of the\noutside-SWR gain (%)"
-"""Panel e's y label: a description of where the gain sits, not a test."""
+"""Panel f's y label: a description of where the gain sits, not a test."""
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
 OUTSIDE_LABEL = "Outside\nSWRs"
 PARTS_LABEL_DROP = 21
@@ -230,6 +256,7 @@ SERIES_START = 1.3
 the parts are 1 apart."""
 PANELS = (
     "no_spike_mua",
+    "boundary_timing",
     "heldout_gain",
     "shared_content",
     "outside_distance",
@@ -238,17 +265,18 @@ PANELS = (
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
-    ((0.6, 0.9), ("no_spike_mua", "heldout_gain", "shared_content")),
-    ((0.155, 0.41), ("outside_distance", "outside_shares")),
+    ((0.6, 0.9), ("no_spike_mua", "boundary_timing", "heldout_gain")),
+    ((0.155, 0.41), ("shared_content", "outside_distance", "outside_shares")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
 FRAMES = {
     "no_spike_mua": (0.075, 0.155),
-    "heldout_gain": (0.34, 0.1),
-    "shared_content": (0.56, 0.42),
-    "outside_distance": (0.075, 0.2),
-    "outside_shares": (0.41, 0.045),
+    "boundary_timing": (0.4, 0.18),
+    "heldout_gain": (0.73, 0.1),
+    "shared_content": (0.075, 0.36),
+    "outside_distance": (0.53, 0.2),
+    "outside_shares": (0.82, 0.045),
 }
 """Each panel's frame's left edge and width (figure width); the shares' names
 reach to the frame's right."""
@@ -285,7 +313,8 @@ def read_inputs() -> dict:
         ``tetrode``: the held-out tetrode statistics of the events that start
         inside a well visit, indexed by group (a held-out tetrode run not held
         out in folds of whole trials is refused,
-        ``reported.events.require_tetrode_holdout_folds``); ``shared``: their
+        ``reported.events.require_tetrode_holdout_folds``); ``timing``: the
+        selected events' ``boundary_timing_statistics``; ``shared``: their
         agreement by spread bin (``agreement_by_spread_statistics``); ``outside``:
         ``outside_swr_gain_statistics`` over the held-out event run, indexed by
         family and measure; ``parts``: ``outside_swr_subset_statistics`` over
@@ -305,7 +334,8 @@ def read_inputs() -> dict:
     table = read_swr_table(inputs.event_table)
     epochs = event_table_epochs(table, analyzed_epoch_ids())
     scores = read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, epochs)
-    selected = select_events_in(scores, select_visit_context(table)["event_id"])
+    events = select_visit_context(table)
+    selected = select_events_in(scores, events["event_id"])
     heldout = read_heldout_restriction(
         inputs.nonlocal_restriction_heldout_events,
         inputs.nonlocal_restriction,
@@ -327,6 +357,9 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "timing": boundary_timing_statistics(
+            boundary_offsets(events), events["animal"]
+        ),
         "tetrode": holdout_statistics(windows, "event"),
         "shared": agreement_by_spread_statistics(windows[windows["kind"] == "event"]),
         "outside": outside_swr_gain_statistics(
@@ -383,15 +416,48 @@ def read_no_spike_trace() -> dict:
     }
 
 
+def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
+    """Panel b: the share of SWR-overlapping events in each combination of
+    start (rows) and end (columns) against the matched SWR's, as a heat map
+    with the percent in each cell and the animals' range (in percent) under
+    it, in black
+    or white, whichever reads against the cell (``timing``: :func:`read_inputs`'
+    ``timing``)."""
+    n = len(TIMING_CLASSES)
+    shares = timing["share"].to_numpy().reshape(n, n)
+    cmap = plt.get_cmap(TIMING_CMAP)
+    ax.imshow(100 * shares, cmap=cmap, vmin=0, vmax=100, aspect="auto")
+    for (row, column), cell in zip(np.ndindex(n, n), timing.itertuples(), strict=True):
+        red, green, blue, _ = cmap(cell.share)
+        color = "white" if 0.299 * red + 0.587 * green + 0.114 * blue < 0.5 else "black"
+        ax.text(
+            column, row - 0.13, f"{100 * cell.share:.0f}%", ha="center",
+            va="center", fontsize=SMALL_SIZE, color=color,
+        )  # fmt: skip
+        ax.text(
+            column, row + 0.2,
+            f"{100 * cell.animal_min:.0f}\u2013{100 * cell.animal_max:.0f}",
+            ha="center", va="center", fontsize=SMALL_SIZE, color=color,
+        )  # fmt: skip
+    ax.set_xticks(range(n), TIMING_LABELS)
+    ax.set_yticks(range(n), TIMING_LABELS)
+    ax.tick_params(length=0)
+    for side in ax.spines.values():
+        side.set_visible(False)
+    ax.set_xlabel("Event ends, vs SWR end")
+    ax.set_ylabel("Event starts,\nvs SWR start")
+    ax.set_title("Timing against the SWR", fontsize=SMALL_SIZE, pad=3)
+
+
 def draw_heldout_tetrode(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel b: the held-out tetrode gain over local coding per spike, by group
+    """Panel c: the held-out tetrode gain over local coding per spike, by group
     (``statistics``: :func:`read_inputs`' ``tetrode``)."""
     draw_group_gain(ax, statistics, TITLE)
     label_gain_axis(ax, YLABEL)
 
 
 def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel c: the held-out agreement per spike by spread bin, for no-SWR and
+    """Panel d: the held-out agreement per spike by spread bin, for no-SWR and
     SWR events (``statistics``: :func:`read_inputs`' ``shared``). Each group's
     dots (one per animal) in its color on its side of the bin, the animals'
     mean with its 95 % interval in black farther out, a thin line through the
@@ -445,7 +511,7 @@ def draw_outside_swr_series(
     names: Sequence[str],
     xlabel: str,
 ) -> None:
-    """Panel d: the full decoder minus the SWR-only decoder per spike
+    """Panel e: the full decoder minus the SWR-only decoder per spike
     over every immobile bin outside SWRs, then over each part of them
     (``subset``, at each of ``thresholds``), a dot per animal and the mean
     with its interval, a thin line through the means, the parts' label under
@@ -510,6 +576,7 @@ def generate_figure(statistics: dict) -> Figure:
         for (bottom, top), row in ROWS for panel in row
     }  # fmt: skip
     draw_no_spike_mua(axes["no_spike_mua"], statistics["no_spike"])
+    draw_boundary_timing(axes["boundary_timing"], statistics["timing"])
     draw_heldout_tetrode(axes["heldout_gain"], statistics["tetrode"])
     draw_shared_content(axes["shared_content"], statistics["shared"])
     draw_outside_swr_series(
