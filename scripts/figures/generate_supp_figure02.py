@@ -263,6 +263,7 @@ import logging
 import string
 import warnings
 from collections.abc import Iterable, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -358,17 +359,12 @@ from continuum_swr_replay.runs.io import read_complete_run, sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    DIFFERENCE_YLABEL,
-    GAIN_FLOOR,
     GROUP_COLORS,
-    MEAN_OFFSET,
-    NEUTRAL_DOTS,
     REFERENCE_COLOR,
     SPLIT_LABELS,
     animal_values,
-    draw_animal_gain,
+    draw_full_minus_swr_axis,
     draw_split_gain,
-    full_better_cue,
     label_gain_axis,
     spread_offsets,
 )
@@ -464,40 +460,30 @@ lines of "Outside SWRs", so that it can be wider than its columns."""
 SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
-PANELS = (
-    "state_calibration",
-    "no_spike_mua",
-    "rule_sweep",
-    "boundary_timing",
-    "nonlocal_mua",
-    "heldout_gain",
-    "hpd",
-    "shared_content",
-    "ripple_modes",
-    "outside_distance",
+LAYOUT = (
+    ((0.81, 0.95), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
+    ((0.56, 0.7), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
+    (
+        (0.31, 0.45),
+        (
+            ("nonlocal_mua", 0.075, 0.13),
+            ("heldout_gain", 0.305, 0.19),
+            ("hpd", 0.56, 0.16),
+            ("shared_content", 0.805, 0.185),
+        ),
+    ),
+    ((0.06, 0.2), (("ripple_modes", 0.085, 0.3), ("outside_distance", 0.55, 0.36))),
 )
-"""The panels in the order the text cites them; their letters follow from it."""
+"""The figure's rows, top to bottom: each row's frames' bottom and top (figure
+height), then its panels left to right, each with its frame's left edge and
+width (figure width). Read in this order the panels are in the order the text
+cites them, so their letters follow from it."""
+PANELS = tuple(panel for _, row in LAYOUT for panel, _, _ in row)
+"""The panels in the order the text cites them."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
-ROWS = (
-    ((0.81, 0.95), ("state_calibration", "no_spike_mua")),
-    ((0.56, 0.7), ("rule_sweep", "boundary_timing")),
-    ((0.31, 0.45), ("nonlocal_mua", "heldout_gain", "hpd", "shared_content")),
-    ((0.06, 0.2), ("ripple_modes", "outside_distance")),
-)
-"""Each row's frames' bottom and top (figure height) and its panels, left to
-right."""
-FRAMES = {
-    "state_calibration": (0.12, 0.4),
-    "no_spike_mua": (0.71, 0.27),
-    "rule_sweep": (0.085, 0.47),
-    "boundary_timing": (0.71, 0.27),
-    "nonlocal_mua": (0.075, 0.13),
-    "heldout_gain": (0.305, 0.19),
-    "hpd": (0.56, 0.16),
-    "shared_content": (0.805, 0.185),
-    "ripple_modes": (0.085, 0.3),
-    "outside_distance": (0.55, 0.36),
-}
+ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT)
+"""Each row's frames' bottom and top and its panels, left to right."""
+FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
 """A panel letter's height (figure height): the letters' tops sit this far
@@ -507,13 +493,17 @@ TRIGGER_WINDOW_S = 0.3
 """The No-Spike panel's window around each start (s, in all), Figure 2g's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
+NO_SPIKE_WORKERS = 4
+"""The processes that read the decode frames for the No-Spike panel by
+default: each holds one frame at a time."""
 GROUP_NAMES = ("No SWR", "SWR")
 """The groups' names on the panels, in ``GROUP_COLORS``' order."""
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
 
 
-def read_inputs() -> dict:
-    """The figure's statistics, as the events summary reads them.
+def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
+    """The figure's statistics, as the events summary reads them (the No-Spike
+    trace's decode frames read by ``workers`` processes).
 
     Returns
     -------
@@ -585,7 +575,7 @@ def read_inputs() -> dict:
         "parts": outside_swr_subset_statistics(
             heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
         ).set_index(["subset", "threshold_s", "family", "measure"]),
-        "no_spike": read_no_spike_trace(),
+        "no_spike": read_no_spike_trace(workers),
     }
 
 
@@ -730,9 +720,40 @@ def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> 
     }
 
 
-def read_no_spike_trace() -> dict:
+def _no_spike_epoch(path: Path) -> dict:
+    """One epoch's part of :func:`read_no_spike_trace`: its MUA level outside
+    its No-Spike periods, and, when it has periods, its windows
+    ``(n_periods, n_lags)``, their lags, its animal and the periods' durations."""
+    frame = read_dot_with_swr_source(path)
+    arrival, departure = well_visit_times(
+        path.name.removesuffix(data_over_time_suffix())
+    )
+    periods = no_spike_periods(frame, arrival, departure)
+    epoch = {
+        "level": level_outside_periods(
+            frame, periods, arrival, departure, NO_SPIKE_SIGNAL
+        )
+    }
+    if periods.empty:
+        return epoch
+    session = frame[["animal", "day", "epoch"]].iloc[0]
+    windows = get_signal_windows(
+        frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
+        window_sec=TRIGGER_WINDOW_S,
+    )  # fmt: skip
+    return {
+        **epoch,
+        "windows": windows.sel(signal=NO_SPIKE_SIGNAL).values,
+        "time": windows["time"].values,
+        "animal": session["animal"],
+        "durations": periods["duration"].to_numpy(),
+    }
+
+
+def read_no_spike_trace(workers: int = NO_SPIKE_WORKERS) -> dict:
     """The No-Spike panel's trace: MUA around the start of every analyzed epoch's No-Spike
-    periods, in one pass over the decode frames (the SWR source's reader).
+    periods, in one pass over the decode frames (the SWR source's reader), read
+    by ``workers`` processes (1 reads them in this one), in the epochs' order.
 
     Returns
     -------
@@ -743,34 +764,26 @@ def read_no_spike_trace() -> dict:
         periods; ``periods``: the periods with a window, by animal;
         ``median_duration``: their median duration (s).
     """
-    suffix = data_over_time_suffix()
-    windows, levels, counts, durations = [], [], {}, []
-    for path in analyzed_decode_files(processed_data_dir(), suffix, require_all=True):
-        frame = read_dot_with_swr_source(path)
-        arrival, departure = well_visit_times(path.name.removesuffix(suffix))
-        periods = no_spike_periods(frame, arrival, departure)
-        levels.append(
-            level_outside_periods(frame, periods, arrival, departure, NO_SPIKE_SIGNAL)
-        )
-        if periods.empty:
-            continue
-        session = frame[["animal", "day", "epoch"]].iloc[0]
-        epoch = get_signal_windows(
-            frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
-            window_sec=TRIGGER_WINDOW_S,
-        )  # fmt: skip
-        windows.append(epoch.sel(signal=NO_SPIKE_SIGNAL).values)
-        counts[session["animal"]] = (
-            counts.get(session["animal"], 0) + epoch.sizes["event"]
-        )
-        durations.append(periods["duration"].to_numpy())
-    stacked = np.concatenate(windows)
+    paths = analyzed_decode_files(
+        processed_data_dir(), data_over_time_suffix(), require_all=True
+    )
+    if workers == 1:
+        epochs = list(map(_no_spike_epoch, paths))
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            epochs = list(pool.map(_no_spike_epoch, paths))
+    with_periods = [epoch for epoch in epochs if "windows" in epoch]
+    counts: dict = {}
+    for epoch in with_periods:
+        counts[epoch["animal"]] = counts.get(epoch["animal"], 0) + len(epoch["windows"])
     return {
-        "time": epoch["time"].values,
-        **window_quartiles(stacked),
-        "level": float(np.nanmedian(levels)),
+        "time": with_periods[-1]["time"],
+        **window_quartiles(np.concatenate([e["windows"] for e in with_periods])),
+        "level": float(np.nanmedian([epoch["level"] for epoch in epochs])),
         "periods": pd.Series(counts, name="periods"),
-        "median_duration": float(np.median(np.concatenate(durations))),
+        "median_duration": float(
+            np.median(np.concatenate([e["durations"] for e in with_periods]))
+        ),
     }
 
 
@@ -910,19 +923,9 @@ def draw_outside_swr_series(
     ]
     names = [f"{margin * 1000:g}" for margin in OUTSIDE_SWR_MARGINS_S]
     xs = [0.0, *(SERIES_START + k for k in range(len(OUTSIDE_SWR_MARGINS_S)))]
-    for x, row in zip(xs, rows, strict=True):
-        draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True)
-    ax.plot(
-        [x + MEAN_OFFSET for x in xs], [row["estimate"] for row in rows],
-        color=REFERENCE_COLOR, lw=0.5, zorder=1,
-    )  # fmt: skip
-    ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+    draw_full_minus_swr_axis(ax, xs, rows, 1.05, through_means=True)
     ax.set_xlim(-0.45, xs[-1] + 0.6)
     ax.set_xticks(xs, [OUTSIDE_LABEL, *names])
-    top = 1.05 * max(max(float(r["animals"].max()), r["ci_high"]) for r in rows)
-    ax.set_ylim(-GAIN_FLOOR * top, top)
-    ax.set_ylabel(DIFFERENCE_YLABEL)
-    full_better_cue(ax)
     # the parts' label, centered under their tick labels
     ax.annotate(
         DISTANCE_LABEL, (float(np.mean(xs[1:])), 0), xycoords=("data", "axes fraction"),
@@ -1134,9 +1137,8 @@ def panel_axes(fig: Figure, panel: str) -> list[Axes]:
 
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
-    order and laid out by :data:`ROWS` and :data:`FRAMES`."""
+    order and laid out by :data:`LAYOUT`."""
     spans = {panel: span for span, row in ROWS for panel in row}
-    assert sorted(spans) == sorted(PANELS)
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     axes = {}
     for panel in PANELS:  # the axes in the panels' order (panel_axes)
@@ -1200,9 +1202,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/supp_figure02")
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=NO_SPIKE_WORKERS,
+        help="processes that read the decode frames for the No-Spike panel "
+        f"(default {NO_SPIKE_WORKERS}; 1 reads them in this process)",
+    )
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    fig = generate_figure(read_inputs())
+    fig = generate_figure(read_inputs(args.workers))
     check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
     save_figure(fig, "supp_figure02", base_dir=args.output_dir)

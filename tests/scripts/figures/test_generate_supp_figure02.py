@@ -211,7 +211,16 @@ def _statistics() -> dict:
     }
 
 
-def test_the_figure_draws_its_panels_in_the_cited_order():
+@pytest.fixture(scope="module")
+def drawn():
+    """The figure drawn once from :func:`_statistics`, for the tests that only
+    read it."""
+    fig = figure.generate_figure(_statistics())
+    yield fig
+    plt.close(fig)
+
+
+def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     """In four rows, each a group the text cites in turn: the decoder (a, b),
     the count is robust (c, d), the events are coordinated and specific (e to
     h), ripple power and the held-out test (i, j); each row's letters at one
@@ -221,8 +230,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
         "nonlocal_mua", "heldout_gain", "hpd", "shared_content", "ripple_modes",
         "outside_distance",
     )  # fmt: skip
-    statistics = _statistics()
-    fig = figure.generate_figure(statistics)
+    fig = drawn
     ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
     assert ax_gain.get_title() == "Held-out tetrode"
     assert ax_gain.get_ylabel() == "Held-out gain\nover local (nats/spike)"
@@ -246,10 +254,9 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
     figure.check_journal_limits(fig)
-    plt.close(fig)
 
 
-def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes():
+def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes(drawn):
     """For no-SWR then SWR events, three positions in the group's color (all
     bins, the bins where the scored tetrode spiked, the silent bins): a dot per
     animal, the mean with its interval beside them; the parts named so that a
@@ -259,7 +266,7 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
 
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "heldout_gain")
     dots = [
         c for c in ax.collections
@@ -284,7 +291,6 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
         line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
         for line in ax.lines
     )
-    plt.close(fig)
 
 
 def test_each_panels_values_carry_its_letter():
@@ -309,11 +315,11 @@ def test_each_panels_values_carry_its_letter():
     assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua"}
 
 
-def test_the_timing_panel_draws_the_timing_table():
+def test_the_timing_panel_draws_the_timing_table(drawn):
     """The nine shares as a 3 by 3 heat map (rows the start, columns the end),
     each cell's percent and its animals' range, white on the dark cell and
     black on the pale ones, and the labels."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "boundary_timing")
     (image,) = ax.images
     np.testing.assert_allclose(
@@ -328,16 +334,15 @@ def test_the_timing_panel_draws_the_timing_table():
     assert [t.get_text() for t in ax.get_yticklabels()] == list(figure.TIMING_LABELS)
     assert ax.get_ylabel() == "Event starts,\nvs SWR start"
     assert ax.get_xlabel() == "Event ends, vs SWR end"
-    plt.close(fig)
 
 
-def test_the_timing_panel_names_the_four_corner_cells():
+def test_the_timing_panel_names_the_four_corner_cells(drawn):
     """The corner cells, where the event and its SWR overlap but neither
     bound is together, are named in small text at the top of each cell: start
     and end earlier, the event leads; start earlier and end later, it
     contains the SWR; start later and end earlier, it is inside the SWR;
     start and end later, it lags. The middle row and column have no name."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "boundary_timing")
     named = {
         t.get_text(): t.get_position()
@@ -354,14 +359,13 @@ def test_the_timing_panel_names_the_four_corner_cells():
     for t in ax.texts:
         if t.get_text() in named:
             assert t.get_fontsize() >= 6
-    plt.close(fig)
 
 
-def test_the_shared_content_panel_draws_the_agreement_by_spread():
+def test_the_shared_content_panel_draws_the_agreement_by_spread(drawn):
     """Each group's dots per spread bin on its side of the bin, its means with
     their intervals farther out joined by a thin line in the group's color, the
     bins' labels, a dashed zero line and which way means shared content."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     ax_share, ax = figure.panel_axes(fig, "shared_content")
     assert [t.get_text() for t in ax.get_xticklabels()] == list(
         figure.SPREAD_BIN_LABELS
@@ -419,15 +423,14 @@ def test_the_shared_content_panel_draws_the_agreement_by_spread():
     assert {"No SWR", "SWR"} <= set(texts)
     assert ax.get_ylabel() == "Agreement\n(nats/spike)"
     assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
-    plt.close(fig)
 
 
-def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs():
+def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn):
     """Outside SWRs, then only farther than each margin from every SWR: dots
     spread about each column, the mean with its interval, a thin line through
     the means, the margins' label, the difference's y label, the zero line and
     "full better". The gain at well-sampled places is not drawn."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "outside_distance")
     xs = [0.0, *(figure.SERIES_START + k for k in range(len(MARGINS)))]
     for x, values in zip(xs, [OUTSIDE, *MARGINS.values()], strict=True):
@@ -452,10 +455,9 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs():
     assert "↑ full better" in texts
     assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert ax.get_ylim()[0] < 0
-    plt.close(fig)
 
 
-def test_the_hpd_panel_draws_the_distribution_of_each_class():
+def test_the_hpd_panel_draws_the_distribution_of_each_class(drawn):
     """For each class, a thin line per animal and their mean in bold, in the
     class's color, on a log x axis with the named ticks; a dotted line at the
     tight cut; the classes named in their colors; a y axis from 0."""
@@ -464,7 +466,7 @@ def test_the_hpd_panel_draws_the_distribution_of_each_class():
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
     distribution = _hpd()
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "hpd")
     n_bins = len(figure.HPD_BIN_EDGES_CM) - 1
     curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
@@ -487,14 +489,13 @@ def test_the_hpd_panel_draws_the_distribution_of_each_class():
     assert {"No SWR", "SWR", "50 cm"} <= {t.get_text() for t in ax.texts}
     assert ax.get_ylim()[0] == 0
     assert ax.get_title() == "Posterior spread"
-    plt.close(fig)
 
 
-def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
+def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note(drawn):
     """Each animal's density of the events' peak ripple power as a thin line,
     their mean in bold, a dashed line at the SWR threshold, the one-mode
     result read from the statistics, and no split by SWR label."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "ripple_modes")
     densities = _ripple_modes()["densities"]
     curves = [line for line in ax.lines if len(line.get_xdata()) == RIPPLE_GRID.size]
@@ -509,15 +510,14 @@ def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
     assert "one mode in 5 of 5\nanimals (dip test)" in texts
     assert not ax.collections  # no band, no stacked label
     assert ax.get_xlabel() == "Event peak ripple power (z)"
-    plt.close(fig)
 
 
-def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua():
+def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
     """As Figure 2i draws ripple power: top, each animal's non-local time
     spread over MUA with the share below the MUA level written; bottom, the
     share of bins decoded non-local at each level; a dashed line at the level
     on both."""
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     ax_spread, ax_share = figure.panel_axes(fig, "nonlocal_mua")
     for ax in (ax_spread, ax_share):
         assert len(ax.lines) == 2 + 2  # two animals, their mean, the level
@@ -529,10 +529,9 @@ def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua():
     assert ax_spread.texts[0].get_text() == f"{round(100 * below)}% below\n2 z"
     assert ax_share.get_xlabel() == "MUA (z)"
     assert ax_spread.get_title() == "Non-local time"
-    plt.close(fig)
 
 
-def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
+def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
     """Three small axes sharing the y axis, one per swept setting: a thin line
     per animal and the pooled share in bold, in percent, the rule's value
     marked by a dotted line."""
@@ -542,7 +541,7 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
     )
 
     sweep = _sweep()
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     axes = figure.panel_axes(fig, "rule_sweep")
     assert len(axes) == 3
     for ax, (setting, values) in zip(axes, SETTINGS.items(), strict=True):
@@ -564,17 +563,16 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
     for ax in axes:
         assert " used" in [t.get_text() for t in ax.texts]
     assert [ax.get_xlabel() for ax in axes] == list(figure.SWEEP_XLABELS.values())
-    plt.close(fig)
 
 
-def test_the_calibration_panel_draws_each_states_evidence_by_its_probability():
+def test_the_calibration_panel_draws_each_states_evidence_by_its_probability(drawn):
     """Local, Continuous and Fragmented on one axis, each the animals' mean
     with its interval near the probability bins' centers in the state's color,
     named at its line's end; a dashed zero line; a y label that says what the
     evidence is against; No-Spike is not drawn."""
     from matplotlib.colors import to_rgba
 
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "state_calibration")
     centers = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
     curves = [line for line in ax.lines if len(line.get_xdata()) == 5]
@@ -597,14 +595,13 @@ def test_the_calibration_panel_draws_each_states_evidence_by_its_probability():
     assert ax.get_ylabel() == figure.CALIBRATION_YLABEL
     assert "mismatched place" in ax.get_ylabel() and "nats/spike" in ax.get_ylabel()
     assert ax.get_xlabel() == "State probability"
-    plt.close(fig)
 
 
-def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts():
+def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts(drawn):
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
     trace = _no_spike_trace()
-    fig = figure.generate_figure(_statistics())
+    fig = drawn
     (ax,) = figure.panel_axes(fig, "no_spike_mua")
     (median,) = [line for line in ax.lines if len(line.get_xdata()) == 151]
     np.testing.assert_allclose(median.get_xdata(), 1000 * NO_SPIKE_TIME)
@@ -621,7 +618,6 @@ def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts():
     assert ax.get_xlabel() == "Time from No-Spike\nstart (ms)"
     assert ax.get_ylabel() == "MUA (z)"
     assert ax.get_title() == "No-Spike state"
-    plt.close(fig)
 
 
 def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
@@ -660,7 +656,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
         )
 
     monkeypatch.setattr(figure, "get_signal_windows", windows)
-    trace = figure.read_no_spike_trace()
+    trace = figure.read_no_spike_trace(workers=1)
     assert read == paths
     assert visits == ["a1_02_r1_HPC", "a2_02_r1_HPC"]
     np.testing.assert_allclose(trace["median"], [2.0, 0.0])
@@ -708,7 +704,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "outside_swr_statistics": lambda sums, bin_s, events: seen.setdefault(
             "restriction", (sums, bin_s, events)
         ),
-        "read_no_spike_trace": lambda: "trace",
+        "read_no_spike_trace": lambda workers: "trace",
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",

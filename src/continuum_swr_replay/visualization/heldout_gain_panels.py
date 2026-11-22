@@ -12,6 +12,8 @@ spikes better.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -172,3 +174,32 @@ def full_better_cue(ax: Axes) -> None:
         transform=blended_transform_factory(ax.transAxes, ax.transData),
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
+
+
+def draw_full_minus_swr_axis(
+    ax: Axes,
+    xs: Sequence[float],
+    rows: Sequence[pd.Series],
+    top_scale: float,
+    *,
+    through_means: bool = False,
+) -> None:
+    """An axis of the full decoder minus the SWR-only decoder: at each of ``xs``
+    a dot per animal (spread sideways, :data:`NEUTRAL_DOTS`) and the animals'
+    mean with its interval (``rows``, statistics rows), a thin line through the
+    means when ``through_means``, a dashed line at zero, the y axis from
+    :data:`GAIN_FLOOR` below zero to ``top_scale`` times the highest dot or
+    bound, :data:`DIFFERENCE_YLABEL` and :func:`full_better_cue`. The x axis is
+    the caller's (Figure 2j's second axis, Figure 2's supplement, panel j)."""
+    for x, row in zip(xs, rows, strict=True):
+        draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True)
+    if through_means:
+        ax.plot(
+            [x + MEAN_OFFSET for x in xs], [row["estimate"] for row in rows],
+            color=REFERENCE_COLOR, lw=0.5, zorder=1,
+        )  # fmt: skip
+    ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+    top = top_scale * max(max(float(r["animals"].max()), r["ci_high"]) for r in rows)
+    ax.set_ylim(-GAIN_FLOOR * top, top)
+    ax.set_ylabel(DIFFERENCE_YLABEL)
+    full_better_cue(ax)

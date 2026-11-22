@@ -245,13 +245,12 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    DIFFERENCE_YLABEL,
     GAIN_FLOOR,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
     animal_values,
     draw_animal_gain,
-    full_better_cue,
+    draw_full_minus_swr_axis,
     label_gain_axis,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
@@ -926,8 +925,9 @@ def fit_axes_in_row(
     below the frames, do not count: parallel labels do not cross, and the
     first axes' hang into the figure's margin as panel c's labels do. Nor do
     the titles and texts above the frames, which may reach over the gaps;
-    whether they meet is checked on the image. Measured again after each move
-    (:data:`FIT_PASSES`), as the extents change with the frames.
+    whether they meet is checked on the image. Measured again after each move,
+    as the extents change with the frames, until the frames stop moving (at
+    most :data:`FIT_PASSES` times).
     """
     for _ in range(FIT_PASSES):
         fig.canvas.draw()
@@ -949,11 +949,17 @@ def fit_axes_in_row(
             - sum(before + after for before, after in pads)
         )
         x = left
+        moved = False
         for ax, (before, after), weight in zip(axes, pads, weights, strict=True):
             width = free * weight / sum(weights)
             box = ax.get_position()
-            ax.set_position((x + before, box.y0, width, box.height))
+            # set_position stores the extents x0 and x0 + width
+            if (box.x0, box.x1) != (x + before, x + before + width):
+                ax.set_position((x + before, box.y0, width, box.height))
+                moved = True
             x += before + width + after + DECODER_AXES_GAP
+        if not moved:
+            break
 
 
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
@@ -1285,18 +1291,12 @@ def draw_full_minus_swr(
             (RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_OUTSIDE_SWR)
         ],
     }
-    for name, row in rows.items():
-        draw_animal_gain(ax, DIFFERENCE_X[name], row, NEUTRAL_DOTS, spread=True)
-    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
+    draw_full_minus_swr_axis(
+        ax, [DIFFERENCE_X[name] for name in rows], list(rows.values()), 1.08
+    )
     ax.set_xlim(-0.45, 1.5)
     ax.set_xticks(list(DIFFERENCE_X.values()), list(DIFFERENCE_LABELS.values()))
     ax.get_xticklabels()[list(DIFFERENCE_X).index("outside_swr")].set_fontweight("bold")
-    top = (
-        max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
-    )
-    ax.set_ylim(-GAIN_FLOOR * top, top)
-    ax.set_ylabel(DIFFERENCE_YLABEL)
-    full_better_cue(ax)
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:

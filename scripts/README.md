@@ -123,7 +123,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.
 - `generate_supp_figure01.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
-- `generate_supp_figure02.py` — Figure 2's supplement (S2), ten panels in four rows: the decoder's states calibrated by held-out spikes and MUA in No-Spike; the event rule's sensitivity and the timing table; non-local time against MUA, the HPD coverage, the held-out tetrode gain split by bins with and without spikes, and shared content; the events' peak ripple power and the gain outside SWRs away from the SWRs (reads every analyzed epoch's decode frame, a few minutes).
+- `generate_supp_figure02.py` — Figure 2's supplement (S2), ten panels in four rows: the decoder's states calibrated by held-out spikes and MUA in No-Spike; the event rule's sensitivity and the timing table; non-local time against MUA, the HPD coverage, the held-out tetrode gain split by bins with and without spikes, and shared content; the events' peak ripple power and the gain outside SWRs away from the SWRs (reads every analyzed epoch's decode frame with `--workers` processes, 4 by default).
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
 
