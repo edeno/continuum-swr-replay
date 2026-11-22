@@ -207,11 +207,12 @@ def detect_nonlocal_events(
     speed: np.ndarray,
     time: pd.Index | np.ndarray,
     prob_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+    minimum_duration: float = NON_LOCAL_MINIMUM_DURATION_S,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """The non-local events of a decode: the whole rule, in one place.
 
     An event is a run of non-local probability above ``prob_threshold`` that
-    lasts ``NON_LOCAL_MINIMUM_DURATION_S`` (:func:`get_confident_times`) during
+    lasts ``minimum_duration`` (:func:`get_confident_times`) during
     which the animal is immobile throughout: every sampled speed finite and below
     the immobility threshold (``immobility.build_speed_eligible_event_cohort``).
     A run is kept or dropped whole, never clipped.
@@ -230,6 +231,11 @@ def detect_nonlocal_events(
     prob_threshold : float, optional
         The probability an event stays strictly above, by default
         ``DEFAULT_NON_LOCAL_THRESHOLD``.
+    minimum_duration : float, optional
+        How long a run must last (s, converted to a sample count as
+        :func:`get_confident_times` does), by default
+        ``NON_LOCAL_MINIMUM_DURATION_S``. Only the event rule's sensitivity
+        check (``event_properties.rule_sweep``) gives another.
 
     Returns
     -------
@@ -246,6 +252,7 @@ def detect_nonlocal_events(
         speed,
         time_s,
         prob_threshold,
+        minimum_duration,
     )
     return build_speed_eligible_event_cohort(
         detected,

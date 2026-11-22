@@ -62,3 +62,19 @@ def test_a_higher_threshold_drops_the_event():
 
     assert len(events) == 0
     assert (labels == 0).all()
+
+
+def test_a_shorter_minimum_keeps_the_short_run_and_a_longer_one_drops_the_event():
+    """The 4-sample run is an event at a 4-sample minimum; the 26-sample event
+    is not at a 27-sample minimum."""
+    probability, speed, time = _decode()
+
+    short, _ = detect_nonlocal_events(probability, speed, time, minimum_duration=4 * DT)
+    long, _ = detect_nonlocal_events(probability, speed, time, minimum_duration=27 * DT)
+
+    np.testing.assert_allclose(
+        short[["start_time", "end_time"]].to_numpy(),
+        [[0.100, 0.150], [0.300, 0.306]],
+        atol=1e-9,
+    )
+    assert len(long) == 0

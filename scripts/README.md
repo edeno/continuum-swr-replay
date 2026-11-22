@@ -71,6 +71,7 @@ and the `measure` stage of `measure_ripple_class_structure.py` measure every eve
 and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
+- `sweep_event_rule.py` — each epoch's non-local events, and those with no SWR, at other settings of the event rule (the sensitivity check of Figure 2's supplement; the canonical events are not changed).
 - `measure_nonlocal_by_signal.py` — each epoch's immobile time bins by ripple power, by MUA and by non-local probability (Figure 2i and the MUA panel of Figure 2's supplement).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 

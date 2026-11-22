@@ -3,7 +3,7 @@
 the order the text cites them: MUA in the No-Spike state, the timing of events
 against their SWRs, the held-out tetrode gain, shared content, the gain
 outside SWRs away from the SWRs, the posterior's spread, the events' peak
-ripple power, and non-local time against MUA.
+ripple power, non-local time against MUA, and the event rule's sensitivity.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -158,6 +158,25 @@ ripple power, and non-local time against MUA.
         ``nonlocal_share_mua_above_level*`` and
         ``nonlocal_time_below_mua_level_fraction*`` values).
 
+    i — Supports Figure 2d, the share of events with no SWR: it is not a
+        product of the event rule's settings. The share of the immobile
+        non-local events that start inside a well visit with no SWR, at each
+        value of three settings swept one at a time (the others at the rule's):
+        the non-local probability an event stays strictly above (0.5 to 0.95),
+        the minimum run length (7, the rule's 15 ms, to 25 samples of 2 ms) and
+        the SWR threshold (1 to 4 z). A thin line per animal (the mean over
+        its epochs of each epoch's share) and the share pooled over events in
+        bold, the rule's value dotted. The events are detected again from the
+        stored decode by the rule itself and labeled as the canonical table
+        labels them; at the rule's settings they are the canonical events. The
+        SWRs are not detected again: an event counts as overlapping an SWR at
+        a threshold when its Kay criterion on the decode grid reaches it, a
+        label that agrees with the canonical one for 99 % of the events at
+        2 z (``rule_sweep.sweep_statistics``;
+        ``Processed-Data/event_rule_sweep``,
+        ``scripts/event_properties/sweep_event_rule.py``; the events summary's
+        ``rule_sweep_*`` values).
+
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
 Panel e reads the held-out event run
@@ -242,6 +261,10 @@ from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     MUA_LEVEL_Z,
     nonlocal_counts,
 )
+from continuum_swr_replay.analysis.event_properties.rule_sweep import (
+    RULE,
+    sweep_statistics,
+)
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
     window_quartiles,
@@ -301,7 +324,7 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width, two rows: a, b and c, then d and e.
 WIDTH = 6.5
-HEIGHT = 6.0
+HEIGHT = 7.8
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
@@ -327,6 +350,18 @@ SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
 RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
 """Where the ripple panel reads each animal's density of the events' peak power
 (z): past 12 z lies a thin tail."""
+SWEEP_XLABELS = {
+    "probability_threshold": "Non-local\nprobability",
+    "minimum_samples": "Minimum\nsamples",
+    "swr_threshold_z": "SWR\nthreshold (z)",
+}
+"""The sweep panel's x label of each swept setting."""
+SWEEP_TICKS = {
+    "probability_threshold": (0.5, 0.8, 0.95),
+    "minimum_samples": (7, 15, 25),
+    "swr_threshold_z": (1, 2, 3, 4),
+}
+"""The sweep panel's x ticks: the rule's value and the ends."""
 HPD_YLABEL = "95 % HPD region\n(cm, event mean)"
 """The HPD panel's y label: each event's mean over its bins of the length of
 track the 95 % highest-posterior-density region covers."""
@@ -351,13 +386,15 @@ PANELS = (
     "hpd",
     "ripple_modes",
     "nonlocal_mua",
+    "rule_sweep",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
-    ((0.73, 0.94), ("no_spike_mua", "boundary_timing", "heldout_gain")),
-    ((0.41, 0.6), ("shared_content", "outside_distance")),
-    ((0.1, 0.28), ("hpd", "ripple_modes", "nonlocal_mua")),
+    ((0.8, 0.95), ("no_spike_mua", "boundary_timing", "heldout_gain")),
+    ((0.56, 0.69), ("shared_content", "outside_distance")),
+    ((0.31, 0.45), ("hpd", "ripple_modes", "nonlocal_mua")),
+    ((0.07, 0.2), ("rule_sweep",)),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
@@ -370,6 +407,7 @@ FRAMES = {
     "hpd": (0.075, 0.09),
     "ripple_modes": (0.3, 0.25),
     "nonlocal_mua": (0.7, 0.25),
+    "rule_sweep": (0.075, 0.5),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -446,6 +484,7 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "ripple_modes": read_ripple_modes(
             events, inputs.class_structure, inputs.event_table
@@ -502,6 +541,29 @@ def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> No
                 f"Figure 2's supplement: panel {LETTERS[panel]} is not drawn: "
                 f"{reason}. Rerun {rerun}."
             )
+
+
+def read_rule_sweep(folder: Path, event_table: Path) -> pd.DataFrame:
+    """The sweep panel's statistics (``rule_sweep.sweep_statistics`` of the
+    stored per-epoch counts), as the events summary reads them.
+
+    Raises
+    ------
+    ValueError
+        If the counts were not made from the current event table over the
+        analyses' subset, or do not hold the analyzed epochs.
+    """
+    _refuse_stale(
+        folder, event_table, "rule_sweep",
+        "scripts/event_properties/sweep_event_rule.py",
+    )  # fmt: skip
+    counts = pd.read_parquet(folder / "counts.parquet")
+    if set(counts["epoch_id"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"Figure 2's supplement: {rel(folder)}/counts.parquet holds "
+            f"{counts['epoch_id'].nunique()} epochs, not the analyzed ones"
+        )
+    return sweep_statistics(counts)
 
 
 def read_mua_counts(folder: Path) -> pd.DataFrame:
@@ -807,6 +869,36 @@ def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> 
     )  # fmt: skip
 
 
+def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
+    """The sweep panel: the share of events with no SWR at each value of each
+    swept setting (one axis each, sharing the y axis), a thin line per animal
+    and the pooled share in bold with its dots, the rule's value marked by a
+    dotted line (``sweep``: :func:`read_inputs`' ``sweep``)."""
+    for ax, (setting, xlabel) in zip(axes, SWEEP_XLABELS.items(), strict=True):
+        mine = sweep[sweep["setting"] == setting]
+        x = mine["value"].to_numpy()
+        animals = pd.DataFrame(
+            [pd.Series(r.animals, index=r.animal_names) for r in mine.itertuples()]
+        )
+        ax.plot(x, 100 * animals.to_numpy(), color="k", lw=0.5, alpha=0.5)
+        ax.plot(x, 100 * mine["no_swr_fraction"].to_numpy(), color="k", lw=1.0,
+                marker="o", ms=2)  # fmt: skip
+        ax.axvline(RULE[setting], color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+        ax.set_xticks(SWEEP_TICKS[setting])
+        ax.set_xlabel(xlabel)
+        if ax is not axes[0]:
+            ax.sharey(axes[0])
+            ax.tick_params(labelleft=False)
+    axes[0].set_ylim(0, 100)
+    axes[0].set_yticks([0, 50, 100])
+    axes[0].set_ylabel("Events with\nno SWR (%)")
+    axes[1].set_title("The event rule's settings", fontsize=SMALL_SIZE, pad=3)
+    axes[0].text(
+        RULE["probability_threshold"], 3, " rule", fontsize=SMALL_SIZE,
+        color=REFERENCE_COLOR, ha="left", va="bottom",
+    )  # fmt: skip
+
+
 def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
     """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
     (its median) and, beside them, the pooled median with its 95 % interval in
@@ -840,36 +932,48 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-STACKED = ("nonlocal_mua",)
-"""The panels drawn on two axes, one above the other, in their frame."""
-STACK_GAP = 0.1
-"""The gap between a stacked panel's two axes, as a share of its frame's height."""
+PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3)}
+"""The panels drawn on several axes in their frame: rows and columns."""
+GRID_GAP = (0.1, 0.1)
+"""The gap between a panel's axes, as a share of its frame's height and width."""
+
+
+def _n_axes(panel: str) -> int:
+    rows, columns = PANEL_GRIDS.get(panel, (1, 1))
+    return rows * columns
 
 
 def panel_axes(fig: Figure, panel: str) -> list[Axes]:
-    """A panel's axes of a figure :func:`generate_figure` made (two for a panel
-    of :data:`STACKED`, top first)."""
-    start = sum(1 + (p in STACKED) for p in PANELS[: PANELS.index(panel)])
-    return fig.axes[start : start + 1 + (panel in STACKED)]
+    """A panel's axes of a figure :func:`generate_figure` made, row by row
+    (several for a panel of :data:`PANEL_GRIDS`)."""
+    start = sum(_n_axes(p) for p in PANELS[: PANELS.index(panel)])
+    return fig.axes[start : start + _n_axes(panel)]
 
 
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
     order and laid out by :data:`ROWS` and :data:`FRAMES`."""
-    rows = {panel: span for span, row in ROWS for panel in row}
-    assert sorted(rows) == sorted(PANELS)
+    spans = {panel: span for span, row in ROWS for panel in row}
+    assert sorted(spans) == sorted(PANELS)
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     axes = {}
     for panel in PANELS:  # the axes in the panels' order (panel_axes)
-        (bottom, top), (left, width) = rows[panel], FRAMES[panel]
-        if panel in STACKED:
-            half = (top - bottom) * (1 - STACK_GAP) / 2
-            axes[panel] = [
-                fig.add_axes((left, top - half, width, half)),
-                fig.add_axes((left, bottom, width, half)),
-            ]
-        else:
-            axes[panel] = [fig.add_axes((left, bottom, width, top - bottom))]
+        (bottom, top), (left, width) = spans[panel], FRAMES[panel]
+        rows, columns = PANEL_GRIDS.get(panel, (1, 1))
+        height = (top - bottom) * (1 - GRID_GAP[0] * (rows - 1)) / rows
+        across = width * (1 - GRID_GAP[1] * (columns - 1)) / columns
+        axes[panel] = [
+            fig.add_axes(
+                (
+                    left + c * (across + GRID_GAP[1] * width),
+                    top - height - r * (height + GRID_GAP[0] * (top - bottom)),
+                    across,
+                    height,
+                )
+            )
+            for r in range(rows)
+            for c in range(columns)
+        ]
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
     draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
@@ -882,6 +986,7 @@ def generate_figure(statistics: dict) -> Figure:
     draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
+    draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge

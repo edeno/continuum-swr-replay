@@ -48,6 +48,7 @@ from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EXPOSURE_IN_VISITS_DIR,
@@ -126,6 +127,7 @@ OTHER_BUILDERS = (
     "class_distribution_values",
     "nonlocal_power_values",
     "nonlocal_mua_values",
+    "rule_sweep_values",
 )
 
 
@@ -271,6 +273,7 @@ class _Run:
             EVENT_GAMMA_DIR,
             RIPPLE_CLASS_STRUCTURE_DIR,
             NONLOCAL_BY_SIGNAL_DIR,
+            EVENT_RULE_SWEEP_DIR,
             EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
@@ -325,9 +328,10 @@ class _Run:
             pd.DataFrame({"a": [1]}).to_csv(
                 root / RIPPLE_CLASS_STRUCTURE_DIR / f"{name}.csv", index=False
             )
-        pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
-            root / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"
-        )
+        for folder in (NONLOCAL_BY_SIGNAL_DIR, EVENT_RULE_SWEEP_DIR):
+            pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
+                root / folder / "counts.parquet"
+            )
         pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
             root / EXPOSURE_IN_VISITS_DIR / "exposure.parquet"
         )
@@ -348,6 +352,7 @@ class _Run:
             event_gamma=root / EVENT_GAMMA_DIR,
             class_structure=root / RIPPLE_CLASS_STRUCTURE_DIR,
             nonlocal_by_signal=root / NONLOCAL_BY_SIGNAL_DIR,
+            event_rule_sweep=root / EVENT_RULE_SWEEP_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
             property_bootstrap=root / EVENT_PROPERTY_BOOTSTRAP_DIR,
             decoder_quality=root / DECODER_QUALITY_DIR,
@@ -648,6 +653,9 @@ PENDING_CASES = [
         ("session_cache", _other_cache()),
         {"nonlocal_power", "nonlocal_mua"},
     ),
+    (EVENT_RULE_SWEEP_DIR, ("subset", None), {"rule_sweep"}),
+    (EVENT_RULE_SWEEP_DIR, ("event_table", {"sha256": "old"}), {"rule_sweep"}),
+    (EVENT_RULE_SWEEP_DIR, ("session_cache", _other_cache()), {"rule_sweep"}),
     (EXPOSURE_IN_VISITS_DIR, ("subset", None), {"left_out"}),
     (EXPOSURE_IN_VISITS_DIR, ("session_cache", _other_cache()), {"left_out"}),
     (

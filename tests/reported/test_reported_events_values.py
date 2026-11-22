@@ -618,6 +618,36 @@ def test_nonlocal_mua_values_give_the_share_above_the_level_and_below_it():
     assert "2 z" in values["nonlocal_share_mua_above_level"].description
 
 
+def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check():
+    """Every swept value's share with no SWR (pooled, lowest and highest animal)
+    and events against the rule's, from ``rule_sweep.sweep_statistics``; the
+    rule's own share; the criterion's agreement. Question 2a.5, the sweep
+    panel."""
+    from continuum_swr_replay.analysis.event_properties import rule_sweep
+    from tests.analysis.event_properties.test_rule_sweep import _counts
+
+    values = _by_key(builder.rule_sweep_values(_counts(), "s"))
+    stats = rule_sweep.sweep_statistics(_counts()).set_index(["setting", "value"])
+    key = "rule_sweep_probability_threshold_point_nine"
+    assert values[f"{key}_no_swr_fraction"].value == pytest.approx(
+        stats.loc[("probability_threshold", 0.9), "no_swr_fraction"]
+    )
+    assert values[f"{key}_events_vs_rule"].value == pytest.approx(30 / 40)
+    assert values[
+        "rule_sweep_minimum_samples_twenty_five_no_swr_fraction_animal_max"
+    ].value == (pytest.approx(10 / 16))
+    assert values[
+        "rule_sweep_swr_threshold_two_no_swr_fraction"
+    ].value == pytest.approx(0.5)
+    assert values["rule_sweep_swr_criterion_agreement"].value == pytest.approx(37 / 40)
+    n_values = sum(len(v) for v in rule_sweep.SETTINGS.values())
+    assert len(values) == 4 * n_values + 1
+    assert not any(c.isdigit() for k in values for c in k)
+    for value in values.values():
+        assert value.questions == ("2a.5",)
+        assert value.figures == builder.TAGS["rule_sweep"].figures
+
+
 def step_fits() -> pd.DataFrame:
     """Step fits of every analyzed animal at the main settings: 1 animal with a
     step in duration, 3 in spatial extent and in replay speed, 2 in spike

@@ -43,6 +43,8 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - each epoch's immobile time bins by ripple power, by MUA and by non-local
   probability (``Processed-Data/nonlocal_by_signal``, from
   ``scripts/event_properties/measure_nonlocal_by_signal.py``);
+- the event rule's sensitivity check (``Processed-Data/event_rule_sweep``, from
+  ``scripts/event_properties/sweep_event_rule.py``);
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
@@ -170,6 +172,7 @@ from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
     nonlocal_by_signal,
+    rule_sweep,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
@@ -202,6 +205,7 @@ from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EXPOSURE_IN_VISITS_DIR,
@@ -272,6 +276,7 @@ TAGS = {
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2h",)),
+    "rule_sweep": Tags(("2a.5",), ("S2i",)),
     "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",), ("S2c",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
@@ -393,6 +398,7 @@ class EventsInputs:
     event_gamma: Path
     class_structure: Path
     nonlocal_by_signal: Path
+    event_rule_sweep: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
@@ -422,6 +428,7 @@ def default_inputs() -> EventsInputs:
         event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
         nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
+        event_rule_sweep=processed_data_dir() / EVENT_RULE_SWEEP_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
@@ -3311,7 +3318,7 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "mua_level_z",
             level,
             "quantity",
-            "dec1",
+            "int",
             f"the MUA level of the values below: {level_words}",
             "z",
         ),
@@ -3363,6 +3370,109 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "highest per-animal share",
         ),
     ]
+
+
+#: Each swept setting's word in a key and in a description, and each value's
+#: word in a key (which holds no digit).
+_SWEEP_SETTINGS = {
+    "probability_threshold": (
+        "probability_threshold",
+        "the non-local probability an event stays strictly above",
+        dict(
+            zip(
+                rule_sweep.PROBABILITY_THRESHOLDS,
+                ("half", "point_six", "point_seven", "point_eight", "point_nine",
+                 "point_nine_five"),
+                strict=True,
+            )
+        ),
+    ),
+    "minimum_samples": (
+        "minimum_samples",
+        "the minimum run length (2 ms decode samples)",
+        dict(
+            zip(
+                rule_sweep.MINIMUM_SAMPLES,
+                ("seven", "ten", "fifteen", "twenty_five"),
+                strict=True,
+            )
+        ),
+    ),
+    "swr_threshold_z": (
+        "swr_threshold",
+        "the SWR threshold (z of the Kay consensus ripple power; an event is "
+        "counted as overlapping an SWR when its Kay criterion on the decode grid "
+        "is at or above it)",
+        dict(
+            zip(
+                rule_sweep.SWR_THRESHOLDS_Z,
+                ("one", "one_and_half", "two", "two_and_half", "three", "four"),
+                strict=True,
+            )
+        ),
+    ),
+}  # fmt: skip
+
+
+def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.5 and the sweep panel of Figure 2's supplement: the share of
+    the immobile non-local events that start inside a well visit with no SWR,
+    and the events against the rule's, at each setting of the event rule
+    (``rule_sweep.sweep_statistics``, which the panel draws), and how often the
+    Kay criterion's label at 2 z is the canonical one
+    (``rule_sweep.criterion_agreement``). A sensitivity check: the canonical
+    events and every other value are the rule's."""
+    make = value_factory(rule_sweep_values, source, TAGS["rule_sweep"])
+    values = []
+    for row in rule_sweep.sweep_statistics(counts).itertuples():
+        setting_word, words, value_words = _SWEEP_SETTINGS[row.setting]
+        value = int(row.value) if row.setting == "minimum_samples" else row.value
+        key = f"rule_sweep_{setting_word}_{value_words[value]}"
+        at = f"with {words} at {value:g}" + (" (the rule's)" if row.is_rule else "")
+        values += [
+            make(
+                f"{key}_no_swr_fraction",
+                row.no_swr_fraction,
+                "fraction",
+                "pct",
+                f"share of the events detected again {at} that overlap no SWR, "
+                "pooled over events",
+            ),
+            make(
+                f"{key}_no_swr_fraction_animal_min",
+                row.animal_min,
+                "fraction",
+                "pctnum",
+                f"lowest per-animal share with no SWR {at} (an animal's share is the "
+                "mean over its epochs of the epoch's share)",
+            ),
+            make(
+                f"{key}_no_swr_fraction_animal_max",
+                row.animal_max,
+                "fraction",
+                "pct",
+                "highest per-animal share",
+            ),
+            make(
+                f"{key}_events_vs_rule",
+                row.events_vs_rule,
+                "quantity",
+                "dec2",
+                f"the events detected again {at}, as a multiple of the rule's",
+            ),
+        ]
+    values.append(
+        make(
+            "rule_sweep_swr_criterion_agreement",
+            rule_sweep.criterion_agreement(counts),
+            "fraction",
+            "pct",
+            "share of the events whose Kay criterion on the decode grid gives their "
+            "canonical SWR label at the detector's 2 z (the stand-in by which the "
+            "SWR threshold is swept, since the SWRs are not detected again)",
+        )
+    )
+    return values
 
 
 def _step_statistics(steps: pd.DataFrame) -> pd.DataFrame:
@@ -4753,6 +4863,33 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 f"the immobile {TIME_SUBSET}",
             )
         )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("counts.parquet", "manifest.json")
+    ]
+
+    folder = inputs.event_rule_sweep
+    sweep_counts = pd.read_parquet(folder / "counts.parquet")
+    if set(sweep_counts["epoch_id"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"{folder / 'counts.parquet'} holds {sweep_counts['epoch_id'].nunique()} "
+            f"epochs, not the {n_epochs} analyzed ones"
+        )
+    summary.add(
+        *over(
+            pend(
+                rule_sweep_values(
+                    sweep_counts,
+                    f"{rel(folder)} (scripts/event_properties/sweep_event_rule.py: "
+                    "each analyzed epoch's decode, detected again at each setting)",
+                ),
+                stale(folder),
+                off_subset(folder),
+                off_visits(folder, sweep_counts["epoch_id"].unique()),
+            ),
+            EVENTS_SUBSET,
+        )
+    )
     summary.inputs += [
         file_record(folder / name, ROOT_DIR)
         for name in ("counts.parquet", "manifest.json")

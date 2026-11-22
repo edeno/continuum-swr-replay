@@ -280,6 +280,12 @@ Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
 `duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
 
+### `src/continuum_swr_replay/analysis/event_properties/rule_sweep.py`
+
+How the count of non-local events and the share with no SWR depend on the event rule's settings: a sensitivity check, not a change to the events.
+
+`detect_classified_events`, `epoch_sweep_counts`, `sweep_statistics`, `criterion_agreement`
+
 ### `src/continuum_swr_replay/analysis/event_properties/start_and_rest_theta.py`
 
 Each non-local event's start distance, and the theta of duration-matched quiet rest.
@@ -1113,6 +1119,12 @@ Count each epoch's immobile time bins by ripple power, by MUA and by non-local p
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
 `out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
+
+### `scripts/event_properties/sweep_event_rule.py`
+
+Count the non-local events, and those with no SWR, at other settings of the event rule.
+
+`check_rule_counts`, `main`
 
 ### `scripts/pfc/calibrate_pfc_kernel_timing.py`
 

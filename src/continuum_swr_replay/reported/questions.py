@@ -124,7 +124,7 @@ FIGURES: dict[str, Figure] = {
         "held-out tetrode gain over local coding, shared content by the spread of "
         "the other tetrodes' estimate, and the gain outside SWRs away from the SWRs",
         "scripts/figures/generate_supp_figure02.py",
-        "abcdefgh",
+        "abcdefghi",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -223,8 +223,9 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2a.5",
         "How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?",
-        status="not computed",
-        reason="no script (the threshold sweep)",
+        status="partly computed",
+        reason="the non-SWR fraction is swept over the non-local threshold, the minimum duration and the SWR threshold; the close/remote split is not",
+        figures=("S2i",),
     ),
     Question(
         "2a.6",

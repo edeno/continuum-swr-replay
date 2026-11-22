@@ -149,6 +149,9 @@ RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 NONLOCAL_BY_SIGNAL_DIR = "nonlocal_by_signal"
 """Each epoch's immobile time bins by ripple power, by MUA and by non-local
 probability (``scripts/event_properties/measure_nonlocal_by_signal.py``)."""
+EVENT_RULE_SWEEP_DIR = "event_rule_sweep"
+"""Each epoch's events, and those with no SWR, at other settings of the event
+rule (``scripts/event_properties/sweep_event_rule.py``)."""
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
 (``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""
