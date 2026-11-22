@@ -259,6 +259,7 @@ TAGS = {
     "other_detectors": Tags(("2b.3",)),
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
+    "boundary_timing": Tags(("2b.4",), ("S2b",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
     "mua": Tags(("2d.8",), ("2g",)),
     "theta": Tags(("2d.8",), ("2g",)),
@@ -272,13 +273,13 @@ TAGS = {
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("S2b",)),
+    "tetrode_holdout": Tags(("2c.3",), ("S2c",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
-    "shared_content": Tags(("2c.3",), ("S2c",)),
-    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2d",)),
-    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2e",)),
+    "shared_content": Tags(("2c.3",), ("S2d",)),
+    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2e",)),
+    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2f",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -886,6 +887,57 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             for name, tail_s in event_statistics.OFFSET_TAILS_S.items()
         ),
     ]
+
+
+def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.4 and Figure 2's supplement, panel S2b: the share of
+    SWR-overlapping events in each of the nine combinations of their start and
+    end against their matched SWR's (earlier, together within 25 ms, later;
+    ``event_statistics.boundary_timing_statistics``), pooled over events, with
+    the lowest and highest animal."""
+    make = value_factory(boundary_timing_values, source, TAGS["boundary_timing"])
+    table = event_statistics.boundary_timing_statistics(
+        event_statistics.boundary_offsets(events), events["animal"]
+    )
+    tolerance_ms = (
+        1000 * event_statistics.OFFSET_TAILS_S[event_statistics.TIMING_TOLERANCE]
+    )
+    words = {
+        "earlier": f"more than {tolerance_ms:g} ms earlier than",
+        "together": f"within {tolerance_ms:g} ms of",
+        "later": f"more than {tolerance_ms:g} ms later than",
+    }
+    values = []
+    for (start, end), row in table.iterrows():
+        key = f"timing_start_{start}_end_{end}"
+        what = (
+            f"SWR-overlapping events that start {words[start]} the matched SWR's "
+            f"start and end {words[end]} its end"
+        )
+        values += [
+            make(
+                f"{key}_share",
+                row["share"],
+                "fraction",
+                "pct",
+                f"share of the {what}, pooled over every SWR-overlapping event",
+            ),
+            make(
+                f"{key}_share_animal_min",
+                row["animal_min"],
+                "fraction",
+                "pctnum",
+                f"lowest animal's share of the {what}, over its own events",
+            ),
+            make(
+                f"{key}_share_animal_max",
+                row["animal_max"],
+                "fraction",
+                "pct",
+                f"highest animal's share of the {what}, over its own events",
+            ),
+        ]
+    return values
 
 
 def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
@@ -1916,7 +1968,7 @@ _CONTROL_AGREEMENT = (
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding and the
     agreement, per spike, of the events and their Local-rest controls. The
-    gain is drawn on Figure 2's supplement (panel S2b) and carries its tag; the
+    gain is drawn on Figure 2's supplement (panel S2c) and carries its tag; the
     agreement is drawn on no figure."""
     make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     make_text = value_factory(
@@ -1985,7 +2037,7 @@ _SPREAD_WORDS = (
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2's supplement, panel S2c: during an event, do
+    """Question 2c.3 and Figure 2's supplement, panel S2d: during an event, do
     the tetrodes point to the same remote place? The held-out tetrode agreement
     per spike of the events of each SWR group, by the spread of the other
     tetrodes' position distribution in fixed bins
@@ -2656,7 +2708,7 @@ def restriction_outside_swr_values(
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
     :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2j, the
-    shares on Figure 2's supplement (panel S2e); each carries its panel's
+    shares on Figure 2's supplement (panel S2f); each carries its panel's
     tag."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
@@ -2830,7 +2882,7 @@ def restriction_outside_swr_part_values(
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
     spike in :data:`RESTRICTION_FIGURE_FAMILY` away from the SWRs are drawn on
-    Figure 2's supplement and carry its panel's tag (S2d); the gain at
+    Figure 2's supplement and carry its panel's tag (S2e); the gain at
     well-sampled places is for the text."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
@@ -3739,6 +3791,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*visit_context_values(table, source))
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_offset_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(boundary_timing_values(events, source), EVENTS_SUBSET))
     summary.add(*over(state_composition_values(events, source), EVENTS_SUBSET))
     summary.inputs.append(event_table_record)
     events_with_extras, extra_paths = with_start_and_rest_theta(

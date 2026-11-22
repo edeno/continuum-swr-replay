@@ -136,7 +136,7 @@ def label_gain_axis(
 
 GAIN_FLOOR = 0.13
 """A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
-supplement, panel d)."""
+supplement, panel e)."""
 
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""

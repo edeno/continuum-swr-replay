@@ -238,7 +238,7 @@ The review of the restriction and held-out tetrode runs before the
   (`restriction_inputs_note`), but not when only the event table changed (the held-out
   event run's canonical check), while the events summary marks the values pending.
   *When:* when Figure 2's checks are next changed.
-- [ ] **Figure 2's supplement, panels b and c, check no staleness.**
+- [ ] **Figure 2's supplement, panels c and d, check no staleness.**
   `scripts/figures/generate_supp_figure02.py` refuses a held-out tetrode run not on
   folds of whole trials, but draws a run made from another event table or
   participation run.

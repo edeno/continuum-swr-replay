@@ -184,6 +184,28 @@ def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
     assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
 
 
+def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
+    """The six SWR-overlapping events: a (together, together); b (together,
+    together), (later, earlier) twice; c (later, earlier), (later, later)."""
+    values = _by_key(builder.boundary_timing_values(_events(), "s"))
+    assert len(values) == 9 * 3
+    shares = {k: v.value for k, v in values.items() if k.endswith("_share")}
+    assert sum(shares.values()) == pytest.approx(1.0)
+    assert values["timing_start_together_end_together_share"].value == 2 / 6
+    assert values["timing_start_later_end_earlier_share"].value == 3 / 6
+    assert values["timing_start_later_end_later_share"].value == 1 / 6
+    # later-earlier: a 0, b 2/3, c 1/2
+    assert values["timing_start_later_end_earlier_share_animal_min"].value == 0.0
+    assert values[
+        "timing_start_later_end_earlier_share_animal_max"
+    ].value == pytest.approx(2 / 3)
+    assert {v.figures for v in values.values()} == {("S2b",)}
+    assert {v.questions for v in values.values()} == {("2b.4",)}
+    assert "more than 25 ms later than the matched SWR's start" in (
+        values["timing_start_later_end_earlier_share"].description
+    )
+
+
 def _other_detector_events() -> pd.DataFrame:
     """Kay: three events of animal a overlap no non-local event (two mostly
     Local, one mostly No-Spike) and one of animal b overlaps one. The Widloski
@@ -879,11 +901,11 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
     by_key = _by_key(values)
-    # Figure 2's supplement draws the gains (panel S2b); Figure 2 does not, and
+    # Figure 2's supplement draws the gains (panel S2c); Figure 2 does not, and
     # no figure draws the agreement
     agreement = {k for k in by_key if "agreement" in k}
     assert {by_key[k].figures for k in agreement} == {()}
-    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2b",)}
+    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2c",)}
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
@@ -1265,7 +1287,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for end in ("", "_ci_low", "_ci_high")
     }
     assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
-    assert {k for k, v in values.items() if v.figures == ("S2e",)} == supplement
+    assert {k for k, v in values.items() if v.figures == ("S2f",)} == supplement
     assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
 
@@ -1455,7 +1477,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     # share with the animals' lowest; and the two counts left out
     assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
     # Figure 2's supplement draws the gain per spike away from the SWRs in the
-    # filter family (panel S2d); the gain at well-sampled places is for the text
+    # filter family (panel S2e); the gain at well-sampled places is for the text
     drawn = {
         k
         for k in values
@@ -1464,7 +1486,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
         and "_two_sided" not in k
     }
     assert len(drawn) == 3 * 4
-    assert {k for k, v in values.items() if v.figures == ("S2d",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("S2e",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 
