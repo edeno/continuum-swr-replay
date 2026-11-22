@@ -198,8 +198,16 @@ def _sweep() -> pd.DataFrame:
     return sweep_statistics(_counts())
 
 
+def _calibration() -> pd.DataFrame:
+    """The in-visit calibration's bins (the builder test's)."""
+    from tests.reported.test_reported_events_values import _state_calibration
+
+    return _state_calibration()[0]
+
+
 def _statistics() -> dict:
     return {
+        "calibration": _calibration(),
         "sweep": _sweep(),
         "mua": _mua_counts(),
         "ripple_modes": _ripple_modes(),
@@ -220,6 +228,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     assert figure.PANELS == (
         "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
         "outside_distance", "hpd", "ripple_modes", "nonlocal_mua", "rule_sweep",
+        "state_calibration",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
@@ -235,7 +244,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghi")
+    assert sorted(letters) == list("abcdefghij")
     assert len({letters[k][1] for k in "abc"}) == 1
     assert len({letters[k][1] for k in "de"}) == 1
     assert len({letters[k][1] for k in "fgh"}) == 1
@@ -503,6 +512,33 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
     plt.close(fig)
 
 
+def test_the_calibration_panel_draws_each_states_evidence_by_its_probability():
+    """Local, Continuous and Fragmented on three axes sharing the x axis, each
+    the animals' mean with its interval at the probability bins' centers in
+    the state's color, a dashed zero line; No-Spike is not drawn."""
+    from matplotlib.colors import to_rgba
+
+    fig = figure.generate_figure(_statistics())
+    axes = figure.panel_axes(fig, "state_calibration")
+    assert [ax.get_title() for ax in axes] == ["Local", "Continuous", "Fragmented"]
+    centers = [0.1, 0.3, 0.5, 0.7, 0.9]
+    for k, (ax, state) in enumerate(zip(axes, figure.CALIBRATION_COLORS, strict=True)):
+        (curve,) = [line for line in ax.lines if len(line.get_xdata()) == 5]
+        np.testing.assert_allclose(curve.get_xdata(), centers)
+        np.testing.assert_allclose(curve.get_ydata(), k + np.arange(5))
+        np.testing.assert_allclose(
+            to_rgba(curve.get_color()), to_rgba(figure.CALIBRATION_COLORS[state])
+        )
+        assert any(
+            line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+            for line in ax.lines
+        )
+        assert ax.get_shared_x_axes().joined(ax, axes[0])
+    assert axes[0].get_ylabel() == "Held-out evidence\n(nats/window)"
+    assert axes[1].get_xlabel() == "State probability"
+    plt.close(fig)
+
+
 def test_panel_a_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
@@ -574,7 +610,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghi"
+    assert FIGURES["S2"].panels == "abcdefghij"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -618,6 +654,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_hpd": lambda events, bootstrap, table: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
+        "read_state_calibration": lambda folder: "calibration",
         "read_ripple_modes": lambda events, folder, table: seen.setdefault(
             "ripple", events
         ),
@@ -657,6 +694,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
     assert seen["ripple"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
+        "calibration",
         "sweep",
         "mua",
         "ripple_modes",

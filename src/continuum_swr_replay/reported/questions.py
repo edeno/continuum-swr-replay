@@ -124,7 +124,7 @@ FIGURES: dict[str, Figure] = {
         "held-out tetrode gain over local coding, shared content by the spread of "
         "the other tetrodes' estimate, and the gain outside SWRs away from the SWRs",
         "scripts/figures/generate_supp_figure02.py",
-        "abcdefghi",
+        "abcdefghij",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -236,6 +236,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2a.7",
         "Do held-out spikes support what each decoder state claims: the animal's position in Local, a remote position in the Non-Local states, silence in No-Spike?",
+        figures=("S2j",),
         note="The held-out tetrode test on confident state bouts. It validates the model's states; whether the events are supported is question 2c.3.",
     ),
     Question(

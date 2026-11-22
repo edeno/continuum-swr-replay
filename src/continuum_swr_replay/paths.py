@@ -170,6 +170,10 @@ STATE_EVIDENCE_DIR = "state_evidence"
 STATE_EVIDENCE_RUN = "_refresh_20261016"
 """The held-out tetrode run, under the processed-data root, that the detection
 and events summaries read (242 epochs, all ``ok``)."""
+STATE_CALIBRATION_IN_VISITS_DIR = "state_calibration_in_visits"
+"""The held-out state calibration over the immobile windows inside the well
+visits, summarized from the held-out tetrode run's stored windows
+(``scripts/event_evidence/summarize_state_calibration_in_visits.py``)."""
 NL_BOUTS_BY_SWR_STEM = "nl_bouts_by_swr"
 """The stem of the files the SWR split of a held-out tetrode run writes in the
 run's folder (``scripts/event_evidence/split_state_evidence_by_swr.py``); the events

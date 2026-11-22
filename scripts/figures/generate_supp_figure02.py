@@ -3,7 +3,8 @@
 the order the text cites them: MUA in the No-Spike state, the timing of events
 against their SWRs, the held-out tetrode gain, shared content, the gain
 outside SWRs away from the SWRs, the posterior's spread, the events' peak
-ripple power, non-local time against MUA, and the event rule's sensitivity.
+ripple power, non-local time against MUA, the event rule's sensitivity, and
+the decoder's states calibrated by held-out spikes.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -177,6 +178,27 @@ ripple power, non-local time against MUA, and the event rule's sensitivity.
         ``scripts/event_properties/sweep_event_rule.py``; the events summary's
         ``rule_sweep_*`` values).
 
+    j — Supports Figure 2a: on these recordings the decoder's states mean
+        what they claim. Random 10-bin immobile windows that start inside a
+        well visit, grouped by a state's probability (five bins), and the
+        held-out evidence for what the state claims, one axis per state: for
+        Local, the held-out tetrodes' spikes at the animal's place against at
+        mismatched places; for Continuous and Fragmented, the place decoded
+        from one half of the tetrodes scored on the other half against
+        mismatched places (nats per window, the spike-mark log likelihood
+        ratio). The animals' mean with its 95 % interval, in the state's
+        color, and a dashed line at zero. No-Spike is not drawn: a confident
+        No-Spike label forces both halves silent, so it is no test (panel a
+        covers that state). Caveats: the probability bins come from the decode
+        with every tetrode; only the remote place is held out by the tetrode
+        split; the encodings are fit on running time in other time blocks
+        (``state_evidence.calibration_statistics`` over
+        ``IN_VISIT_CALIBRATION_METRICS``, re-summarized from the stored
+        windows of the held-out tetrode run by
+        ``scripts/event_evidence/summarize_state_calibration_in_visits.py``;
+        ``Processed-Data/state_calibration_in_visits``; the events summary's
+        ``state_calibration_*`` values).
+
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
 Panel e reads the held-out event run
@@ -308,6 +330,7 @@ from continuum_swr_replay.visualization.palettes import COLORS, readable_text_co
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
+    STATE_COLORS,
     check_journal_limits,
     check_placement,
     drawn_extent,
@@ -350,6 +373,13 @@ SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
 RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
 """Where the ripple panel reads each animal's density of the events' peak power
 (z): past 12 z lies a thin tail."""
+CALIBRATION_COLORS = {
+    "Local": STATE_COLORS["Local"],
+    "Non-Local Continuous": STATE_COLORS["Continuous"],
+    "Non-Local Fragmented": STATE_COLORS["Fragmented"],
+}
+"""The calibration panel's states (``state_evidence.IN_VISIT_CALIBRATION_METRICS``),
+in the decoder figures' state colors."""
 SWEEP_XLABELS = {
     "probability_threshold": "Non-local\nprobability",
     "minimum_samples": "Minimum\nsamples",
@@ -387,6 +417,7 @@ PANELS = (
     "ripple_modes",
     "nonlocal_mua",
     "rule_sweep",
+    "state_calibration",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
@@ -394,7 +425,7 @@ ROWS = (
     ((0.8, 0.95), ("no_spike_mua", "boundary_timing", "heldout_gain")),
     ((0.56, 0.69), ("shared_content", "outside_distance")),
     ((0.31, 0.45), ("hpd", "ripple_modes", "nonlocal_mua")),
-    ((0.07, 0.2), ("rule_sweep",)),
+    ((0.07, 0.2), ("rule_sweep", "state_calibration")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
@@ -407,7 +438,8 @@ FRAMES = {
     "hpd": (0.075, 0.09),
     "ripple_modes": (0.3, 0.25),
     "nonlocal_mua": (0.7, 0.25),
-    "rule_sweep": (0.075, 0.5),
+    "rule_sweep": (0.075, 0.4),
+    "state_calibration": (0.56, 0.4),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -484,6 +516,7 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "calibration": read_state_calibration(inputs.state_calibration_in_visits),
         "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "ripple_modes": read_ripple_modes(
@@ -541,6 +574,33 @@ def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> No
                 f"Figure 2's supplement: panel {LETTERS[panel]} is not drawn: "
                 f"{reason}. Rerun {rerun}."
             )
+
+
+def read_state_calibration(folder: Path) -> pd.DataFrame:
+    """The calibration panel's bins: the held-out state calibration over the
+    immobile windows inside the well visits, as the events summary reads it
+    (``state_evidence.calibration_statistics``' bins, written by
+    ``scripts/event_evidence/summarize_state_calibration_in_visits.py``).
+
+    Raises
+    ------
+    ValueError
+        If the summary was not made over the analyses' subset, or not over the
+        analyzed epochs.
+    """
+    manifest = read_output_manifest(folder)
+    if (reason := subset_staleness(manifest, rel(folder))) is not None:
+        raise ValueError(
+            f"Figure 2's supplement: panel {LETTERS['state_calibration']} is not "
+            f"drawn: {reason}. Rerun "
+            "scripts/event_evidence/summarize_state_calibration_in_visits.py."
+        )
+    if set(manifest["epochs"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"Figure 2's supplement: {rel(folder)} holds {len(manifest['epochs'])} "
+            "epochs, not the analyzed ones"
+        )
+    return pd.read_csv(folder / "calibration_bins.csv")
 
 
 def read_rule_sweep(folder: Path, event_table: Path) -> pd.DataFrame:
@@ -869,6 +929,31 @@ def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> 
     )  # fmt: skip
 
 
+def draw_state_calibration(axes: Sequence[Axes], bins: pd.DataFrame) -> None:
+    """The calibration panel: for Local, Continuous and Fragmented (one axis
+    each, sharing the x axis), the held-out evidence for what the state claims
+    against its probability, the animals' mean with its 95 % interval at each
+    probability bin's center in the state's color, and a dashed line at zero
+    (``bins``: :func:`read_inputs`' ``calibration``)."""
+    centers = np.arange(0.1, 1.0, 0.2)
+    for ax, (state, color) in zip(axes, CALIBRATION_COLORS.items(), strict=True):
+        mine = bins[bins["state"] == state]
+        estimate = mine["animal_estimate"].to_numpy()
+        ax.errorbar(
+            centers, estimate,
+            yerr=[estimate - mine["animal_ci_lo"], mine["animal_ci_hi"] - estimate],
+            color=color, marker="o", ms=2.5, lw=1.0, capsize=0,
+        )  # fmt: skip
+        ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+        ax.set_title(state.removeprefix("Non-Local "), fontsize=SMALL_SIZE, pad=3)
+        if ax is not axes[0]:
+            ax.sharex(axes[0])
+    axes[0].set_xlim(0, 1)
+    axes[0].set_xticks([0, 0.5, 1])
+    axes[0].set_ylabel("Held-out evidence\n(nats/window)")
+    axes[1].set_xlabel("State probability")
+
+
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     """The sweep panel: the share of events with no SWR at each value of each
     swept setting (one axis each, sharing the y axis), a thin line per animal
@@ -932,7 +1017,11 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3)}
+PANEL_GRIDS = {
+    "nonlocal_mua": (2, 1),
+    "rule_sweep": (1, 3),
+    "state_calibration": (1, 3),
+}
 """The panels drawn on several axes in their frame: rows and columns."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
@@ -987,6 +1076,7 @@ def generate_figure(statistics: dict) -> Figure:
     draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
+    draw_state_calibration(axes["state_calibration"], statistics["calibration"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge

@@ -974,6 +974,7 @@ def calibration_statistics(
     n_flips: int = 10_000,
     seed: Seed = SUMMARY_SEED,
     window_level: bool = False,
+    regimes: Sequence[str] = REGIMES,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Calibration curves: evidence against each state's probability.
 
@@ -1023,6 +1024,8 @@ def calibration_statistics(
         Resamples of the nested and of the window-level bootstraps.
     window_level : bool, optional
         Add the window-level columns (default False).
+    regimes : sequence of str, optional
+        The regimes summarized (default :data:`REGIMES`).
 
     Returns
     -------
@@ -1032,7 +1035,7 @@ def calibration_statistics(
         metrics = CALIBRATION_METRICS
     calibration = windows[windows.kind == "calib"]
     bins, trends = [], []
-    for regime in REGIMES:
+    for regime in regimes:
         cell = calibration[calibration.regime == regime]
         epochs, animals = cell.epoch_id.to_numpy(), cell.animal.to_numpy()
         for state, state_metrics in metrics.items():
@@ -1422,6 +1425,49 @@ def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFra
         raise ValueError("a matched window has no bout")
     w["state"] = w["state"] + " | " + w["swr"]
     return w
+
+
+IN_VISIT_CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
+    "Local": ("runcv_loc_mark",),
+    "Non-Local Continuous": ("runcv_nl_null_mark",),
+    "Non-Local Fragmented": ("runcv_nl_null_mark",),
+}
+"""The calibration Figure 2's supplement draws, over the immobile calibration
+windows that start inside a well visit, under the primary encoding: for Local,
+the animal's place against a mismatched place; for the non-local states, the
+place one half of the tetrodes decodes against a mismatched place, scored on
+the other half. No-Spike is not drawn: a confident No-Spike label forces both
+halves silent (the module's caveats)."""
+
+
+def calibration_windows_in_well_visits(
+    windows: pd.DataFrame,
+    arrival_times: np.ndarray,
+    departure_times: np.ndarray,
+) -> pd.DataFrame:
+    """One epoch's immobile calibration windows that start inside a well visit.
+
+    A window counts when its first sample (``start_time``) is inside a visit
+    (``event_definition.well_visits.in_well_visit``), as an immobile bout does
+    (:func:`mark_bouts_in_well_visits`).
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        One epoch's windows: ``kind``, ``regime`` and ``start_time`` (s).
+    arrival_times, departure_times : np.ndarray, shape (n_visits,)
+        The epoch's well visits (``event_tables.prepare_data.well_visit_times``).
+
+    Returns
+    -------
+    pd.DataFrame
+        The rows of ``windows`` kept.
+    """
+    calibration = (windows["kind"] == "calib") & (windows["regime"] == "immobile")
+    inside = in_well_visit(
+        windows["start_time"].to_numpy(dtype=float), arrival_times, departure_times
+    )
+    return windows[calibration.to_numpy() & inside]
 
 
 def mark_bouts_in_well_visits(

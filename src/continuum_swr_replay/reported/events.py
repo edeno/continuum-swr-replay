@@ -43,6 +43,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - each epoch's immobile time bins by ripple power, by MUA and by non-local
   probability (``Processed-Data/nonlocal_by_signal``, from
   ``scripts/event_properties/measure_nonlocal_by_signal.py``);
+- the held-out state calibration over the immobile time inside the well visits
+  (``Processed-Data/state_calibration_in_visits``, from
+  ``scripts/event_evidence/summarize_state_calibration_in_visits.py``);
 - the event rule's sensitivity check (``Processed-Data/event_rule_sweep``, from
   ``scripts/event_properties/sweep_event_rule.py``);
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
@@ -217,6 +220,7 @@ from continuum_swr_replay.paths import (
     PARTICIPATION_NAME,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
+    STATE_CALIBRATION_IN_VISITS_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
     TETRODE_HOLDOUT_NAME,
@@ -277,6 +281,7 @@ TAGS = {
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2h",)),
     "rule_sweep": Tags(("2a.5",), ("S2i",)),
+    "state_calibration": Tags(("2a.7",), ("S2j",)),
     "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",), ("S2c",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
@@ -399,6 +404,7 @@ class EventsInputs:
     class_structure: Path
     nonlocal_by_signal: Path
     event_rule_sweep: Path
+    state_calibration_in_visits: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
@@ -429,6 +435,8 @@ def default_inputs() -> EventsInputs:
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
         nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
         event_rule_sweep=processed_data_dir() / EVENT_RULE_SWEEP_DIR,
+        state_calibration_in_visits=processed_data_dir()
+        / STATE_CALIBRATION_IN_VISITS_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
@@ -3475,6 +3483,112 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+#: Each calibrated state's word in a key, and what its evidence compares.
+_CALIBRATED_STATES = {
+    "Local": (
+        "local",
+        "the held-out tetrodes' spikes scored at the animal's place against at "
+        "mismatched places (other windows' animal positions at least 20 cm away)",
+    ),
+    "Non-Local Continuous": (
+        "continuous",
+        "the place decoded from one half of the tetrodes scored on the other half "
+        "against mismatched places (other windows' decoded places)",
+    ),
+    "Non-Local Fragmented": (
+        "fragmented",
+        "the place decoded from one half of the tetrodes scored on the other half "
+        "against mismatched places (other windows' decoded places)",
+    ),
+}
+_CALIBRATION_CAVEATS = (
+    "the probability bins come from the decode with every tetrode, so the "
+    "scored half's spikes helped make the state probability; only the remote "
+    "place is held out by the tetrode split (one half chooses it, the other "
+    "scores it); the place-field encodings are fit on running time in other "
+    "time blocks (alternating 30 s blocks), so a window's own spikes are not in "
+    "its encoding"
+)
+
+
+def state_calibration_values(
+    bins: pd.DataFrame, trends: pd.DataFrame, source: str
+) -> list[Value]:
+    """Question 2a.7 and the state calibration panel of Figure 2's supplement:
+    over the immobile calibration windows inside a well visit, binned by a
+    state's probability, the held-out evidence for what the state claims, in
+    the top and the bottom bins, and the rise over the bins (each epoch's
+    slope), as ``state_evidence.calibration_statistics`` wrote them (the
+    animal-level estimate and its nested bootstrap interval)."""
+    make = value_factory(state_calibration_values, source, TAGS["state_calibration"])
+    reduction = (
+        "per epoch the median over its windows, then the mean over animals of "
+        "each animal's mean epoch value; 95 % interval from the nested bootstrap "
+        "of the animals and their epochs, small-sample t correction"
+    )
+    values = []
+    for state, (word, what) in _CALIBRATED_STATES.items():
+        mine = bins[bins["state"] == state].set_index("pbin")
+        trend = trends[trends["state"] == state].iloc[0]
+        key = f"state_calibration_{word}"
+        for end, label, place in (
+            ("top_bin", mine.index[-1], "the top"),
+            ("bottom_bin", mine.index[0], "the bottom"),
+        ):
+            row = mine.loc[label]
+            values.append(
+                make(
+                    f"{key}_{end}",
+                    row["animal_estimate"],
+                    "quantity",
+                    "sig2",
+                    f"held-out evidence for {state} over the random 10-bin "
+                    f"immobile windows whose {state} probability is in {place} bin "
+                    f"({label}): {what}, the spike-mark log likelihood ratio summed "
+                    f"over the window; {reduction}. Caveats: {_CALIBRATION_CAVEATS}",
+                    "nats per window",
+                )
+            )
+            if end == "top_bin":
+                values += [
+                    make(f"{key}_top_bin_ci_low", row["animal_ci_lo"], "quantity",
+                         "sig2", "lower bound of its 95 % interval", "nats per window"),
+                    make(f"{key}_top_bin_ci_high", row["animal_ci_hi"], "quantity",
+                         "sig2", "upper bound of that interval", "nats per window"),
+                ]  # fmt: skip
+        values += [
+            make(
+                f"{key}_slope",
+                trend["slope_animal_estimate"],
+                "quantity",
+                "sig2",
+                f"rise of that held-out evidence for {state} with the state's "
+                "probability: each epoch's least-squares slope over its windows "
+                "(nats per window per unit of probability), then the mean over "
+                "animals of each animal's mean epoch slope",
+                "nats per window per unit probability",
+            ),
+            make(f"{key}_slope_ci_low", trend["slope_animal_ci_lo"], "quantity",
+                 "sig2", "lower bound of its 95 % interval (nested bootstrap)",
+                 "nats per window per unit probability"),
+            make(f"{key}_slope_ci_high", trend["slope_animal_ci_hi"], "quantity",
+                 "sig2", "upper bound of that interval",
+                 "nats per window per unit probability"),
+        ]  # fmt: skip
+    first = bins[bins["state"] == next(iter(_CALIBRATED_STATES))]
+    values.append(
+        make(
+            "state_calibration_windows",
+            int(first["n"].sum()),
+            "count",
+            "count",
+            "random 10-bin immobile calibration windows that start inside a well "
+            "visit, over the analyzed epochs",
+        )
+    )
+    return values
+
+
 def _step_statistics(steps: pd.DataFrame) -> pd.DataFrame:
     """The step test's statistics per property, at the main settings."""
     return event_statistics.threshold_step_statistics(
@@ -4894,4 +5008,30 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(folder / name, ROOT_DIR)
         for name in ("counts.parquet", "manifest.json")
     ]
+
+    folder = inputs.state_calibration_in_visits
+    calibration_epochs = list(read_output_manifest(folder)["epochs"])
+    if set(calibration_epochs) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"{folder} holds {len(calibration_epochs)} epochs, not the {n_epochs} "
+            "analyzed ones"
+        )
+    names = ("calibration_bins.csv", "calibration_trends.csv", "manifest.json")
+    summary.add(
+        *over(
+            pend(
+                state_calibration_values(
+                    pd.read_csv(folder / names[0]),
+                    pd.read_csv(folder / names[1]),
+                    f"{rel(folder)} (scripts/event_evidence/"
+                    "summarize_state_calibration_in_visits.py, from the held-out "
+                    f"tetrode run {STATE_EVIDENCE_RUN}/{STATE_EVIDENCE_DIR})",
+                ),
+                off_subset(folder),
+                off_visits(folder, calibration_epochs),
+            ),
+            f"the immobile {TIME_SUBSET}",
+        )
+    )
+    summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
     return summary

@@ -55,6 +55,7 @@ from continuum_swr_replay.paths import (
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
+    STATE_CALIBRATION_IN_VISITS_DIR,
 )
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Tags, pend, value_factory
@@ -128,6 +129,7 @@ OTHER_BUILDERS = (
     "nonlocal_power_values",
     "nonlocal_mua_values",
     "rule_sweep_values",
+    "state_calibration_values",
 )
 
 
@@ -274,6 +276,7 @@ class _Run:
             RIPPLE_CLASS_STRUCTURE_DIR,
             NONLOCAL_BY_SIGNAL_DIR,
             EVENT_RULE_SWEEP_DIR,
+            STATE_CALIBRATION_IN_VISITS_DIR,
             EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
@@ -328,6 +331,10 @@ class _Run:
             pd.DataFrame({"a": [1]}).to_csv(
                 root / RIPPLE_CLASS_STRUCTURE_DIR / f"{name}.csv", index=False
             )
+        for name in ("calibration_bins", "calibration_trends"):
+            pd.DataFrame({"a": [1]}).to_csv(
+                root / STATE_CALIBRATION_IN_VISITS_DIR / f"{name}.csv", index=False
+            )
         for folder in (NONLOCAL_BY_SIGNAL_DIR, EVENT_RULE_SWEEP_DIR):
             pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
                 root / folder / "counts.parquet"
@@ -353,6 +360,7 @@ class _Run:
             class_structure=root / RIPPLE_CLASS_STRUCTURE_DIR,
             nonlocal_by_signal=root / NONLOCAL_BY_SIGNAL_DIR,
             event_rule_sweep=root / EVENT_RULE_SWEEP_DIR,
+            state_calibration_in_visits=root / STATE_CALIBRATION_IN_VISITS_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
             property_bootstrap=root / EVENT_PROPERTY_BOOTSTRAP_DIR,
             decoder_quality=root / DECODER_QUALITY_DIR,
@@ -652,6 +660,12 @@ PENDING_CASES = [
         NONLOCAL_BY_SIGNAL_DIR,
         ("session_cache", _other_cache()),
         {"nonlocal_power", "nonlocal_mua"},
+    ),
+    (STATE_CALIBRATION_IN_VISITS_DIR, ("subset", None), {"state_calibration"}),
+    (
+        STATE_CALIBRATION_IN_VISITS_DIR,
+        ("session_cache", _other_cache()),
+        {"state_calibration"},
     ),
     (EVENT_RULE_SWEEP_DIR, ("subset", None), {"rule_sweep"}),
     (EVENT_RULE_SWEEP_DIR, ("event_table", {"sha256": "old"}), {"rule_sweep"}),

@@ -648,6 +648,56 @@ def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check()
         assert value.figures == builder.TAGS["rule_sweep"].figures
 
 
+def _state_calibration() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The in-visit calibration's bins and trends: each state's estimate k + bin
+    index (k = 0, 1, 2 for Local, Continuous, Fragmented), intervals 0.5 either
+    side, 100 windows a bin over 242 epochs; slopes 1, 2, 3 with intervals 0.4
+    either side."""
+    from continuum_swr_replay.analysis.event_evidence.state_evidence import (
+        IN_VISIT_CALIBRATION_METRICS,
+        PROBABILITY_BIN_LABELS,
+    )
+
+    bins, trends = [], []
+    for k, (state, (metric,)) in enumerate(IN_VISIT_CALIBRATION_METRICS.items()):
+        for j, label in enumerate(PROBABILITY_BIN_LABELS):
+            bins.append(
+                {
+                    "regime": "immobile", "state": state, "metric": metric,
+                    "pbin": label, "n": 100, "n_epochs": 242,
+                    "animal_estimate": k + j, "animal_ci_lo": k + j - 0.5,
+                    "animal_ci_hi": k + j + 0.5,
+                }
+            )  # fmt: skip
+        trends.append(
+            {
+                "regime": "immobile", "state": state, "metric": metric,
+                "slope_animal_estimate": k + 1.0,
+                "slope_animal_ci_lo": k + 0.6, "slope_animal_ci_hi": k + 1.4,
+            }
+        )  # fmt: skip
+    return pd.DataFrame(bins), pd.DataFrame(trends)
+
+
+def test_state_calibration_values_name_each_state_and_state_the_caveats():
+    bins, trends = _state_calibration()
+    values = _by_key(builder.state_calibration_values(bins, trends, "s"))
+    numbers = {k: v.value for k, v in values.items()}
+    assert numbers["state_calibration_local_top_bin"] == 4
+    assert numbers["state_calibration_continuous_top_bin_ci_low"] == pytest.approx(4.5)
+    assert numbers["state_calibration_fragmented_bottom_bin"] == 2
+    assert numbers["state_calibration_fragmented_slope"] == 3.0
+    assert numbers["state_calibration_local_slope_ci_high"] == pytest.approx(1.4)
+    assert numbers["state_calibration_windows"] == 500
+    assert not any(c.isdigit() for k in values for c in k)
+    description = values["state_calibration_continuous_top_bin"].description
+    for caveat in ("every tetrode", "only the remote place", "other time blocks"):
+        assert caveat in description
+    for value in values.values():
+        assert value.questions == ("2a.7",)
+        assert value.figures == builder.TAGS["state_calibration"].figures
+
+
 def step_fits() -> pd.DataFrame:
     """Step fits of every analyzed animal at the main settings: 1 animal with a
     step in duration, 3 in spatial extent and in replay speed, 2 in spike

@@ -35,6 +35,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     build_windows,
     calibration_statistics,
     calibration_windows,
+    calibration_windows_in_well_visits,
     coordinated_silence,
     epoch_summaries,
     epoch_summary_kind,
@@ -1396,6 +1397,37 @@ def test_calibration_statistics_bin_by_probability_and_call_the_trend():
     _, flat_trends = calibration_statistics(flat, metrics={"Local": ["run_loc_mark"]})
     assert (
         flat_trends.rises.iloc[0] == "no" and flat_trends.top_positive.iloc[0] == "no"
+    )
+
+
+def test_calibration_windows_in_well_visits_keep_the_immobile_ones_that_start_inside():
+    """Immobile calibration windows starting at 1, 5 and 9 s, a running one at
+    5 s and an immobile bout at 5 s; one visit, 4 to 9 s (9 s outside): only
+    the immobile calibration window at 5 s is kept."""
+    windows = pd.DataFrame(
+        {
+            "kind": ["calib", "calib", "calib", "calib", "bout"],
+            "regime": ["immobile", "immobile", "immobile", "running", "immobile"],
+            "start_time": [1.0, 5.0, 9.0, 5.0, 5.0],
+        }
+    )
+    kept = calibration_windows_in_well_visits(windows, np.array([4.0]), np.array([9.0]))
+    assert kept.index.tolist() == [1]
+
+
+def test_calibration_statistics_over_the_immobile_regime_alone():
+    """With ``regimes`` the running regime is not summarized; the immobile rows
+    are those of the full call."""
+    table = evidence_table()
+    full, _ = calibration_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    immobile, trends = calibration_statistics(
+        table, metrics={"Local": ["run_loc_mark"]}, regimes=("immobile",)
+    )
+    assert set(immobile["regime"]) == {"immobile"} and len(immobile) == 5
+    assert list(trends["regime"]) == ["immobile"]
+    pd.testing.assert_frame_equal(
+        immobile.reset_index(drop=True),
+        full[full["regime"] == "immobile"].reset_index(drop=True),
     )
 
 

@@ -52,6 +52,7 @@ them importable.
 
 ## `event_evidence/` — are the events real (Part 2)
 - `run_state_evidence.py` — held-out spike evidence for each decoder state on every canonical HPC decode.
+- `summarize_state_calibration_in_visits.py` — the held-out state calibration re-summarized over the immobile windows that start inside a well visit, from the stored windows of `run_state_evidence.py` (Figure 2's supplement; nothing decoded again).
 - `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling, over the bouts that start inside a well visit (it records `cohort_selection.ANALYZED_SUBSET` and the bouts kept and left out in its provenance).
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux). It scores every event; the summary reads the events that start inside a well visit and the quiet windows whose first sample is inside one.
