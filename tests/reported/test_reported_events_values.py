@@ -565,29 +565,57 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
         builder.class_distribution_values(distribution.iloc[1:], "s")
 
 
-def test_nonlocal_power_values_give_the_share_of_nonlocal_time_below_the_threshold():
-    # each animal's non-local bins below 2 z are 1, 2, ... 5 of its 10
-    rows = [
-        (animal, f"{animal}_e", low, high, 100, n)
-        for i, animal in enumerate(analyzed_animals())
-        for low, high, n in ((-np.inf, 2.0, i + 1), (2.0, np.inf, 9 - i))
-    ]
-    counts = pd.DataFrame(
+def _signal_counts() -> pd.DataFrame:
+    """Each analyzed animal (i = 0 to 4), one epoch: by ripple power, 100 bins
+    below 2 z of which i + 1 non-local and 100 above of which 9 - i; by MUA,
+    100 bins below 2 z of which 2 non-local and 10 above of which i + 1."""
+    rows = []
+    for i, animal in enumerate(analyzed_animals()):
+        for signal, cells in (
+            ("ripple_power", ((-np.inf, 2.0, 100, i + 1), (2.0, np.inf, 100, 9 - i))),
+            ("mua", ((-np.inf, 2.0, 100, 2), (2.0, np.inf, 10, i + 1))),
+        ):
+            for low, high, n_bins, n_nonlocal in cells:
+                rows += [
+                    (f"{animal}_e", animal, signal, low, high, 0.0, 0.2, n_bins - n_nonlocal),
+                    (f"{animal}_e", animal, signal, low, high, 0.8, 1.0, n_nonlocal),
+                ]  # fmt: skip
+    return pd.DataFrame(
         rows,
         columns=[
-            "animal",
-            "epoch_id",
-            "power_low",
-            "power_high",
-            "n_bins",
-            "n_nonlocal",
+            "epoch_id", "animal", "signal", "signal_low", "signal_high",
+            "probability_low", "probability_high", "n_bins",
         ],
-    )
-    assert _numbers(builder.nonlocal_power_values(counts, "s")) == {
+    )  # fmt: skip
+
+
+def test_nonlocal_power_values_give_the_share_of_nonlocal_time_below_the_threshold():
+    assert _numbers(builder.nonlocal_power_values(_signal_counts(), "s")) == {
         "nonlocal_time_below_swr_threshold_fraction": pytest.approx(0.3),
         "nonlocal_time_below_swr_threshold_fraction_animal_min": pytest.approx(0.1),
         "nonlocal_time_below_swr_threshold_fraction_animal_max": pytest.approx(0.5),
     }
+
+
+def test_nonlocal_mua_values_give_the_share_above_the_level_and_below_it():
+    """Above 2 z of MUA, (i + 1) / 10 of the bins are non-local; of the
+    non-local bins, 2 / (2 + i + 1) have MUA below 2 z. Tagged with the MUA
+    panel of Figure 2's supplement."""
+    values = _by_key(builder.nonlocal_mua_values(_signal_counts(), "s"))
+    below = [2 / (3 + i) for i in range(5)]
+    assert {k: v.value for k, v in values.items()} == {
+        "nonlocal_share_mua_above_level": pytest.approx(0.3),
+        "nonlocal_share_mua_above_level_animal_min": pytest.approx(0.1),
+        "nonlocal_share_mua_above_level_animal_max": pytest.approx(0.5),
+        "nonlocal_time_below_mua_level_fraction": pytest.approx(np.mean(below)),
+        "nonlocal_time_below_mua_level_fraction_animal_min": pytest.approx(min(below)),
+        "nonlocal_time_below_mua_level_fraction_animal_max": pytest.approx(max(below)),
+        "mua_level_z": 2.0,
+    }
+    assert {v.figures for v in values.values()} == {
+        builder.TAGS["nonlocal_mua"].figures
+    }
+    assert "2 z" in values["nonlocal_share_mua_above_level"].description
 
 
 def step_fits() -> pd.DataFrame:

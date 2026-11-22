@@ -606,7 +606,7 @@ Sources:
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 2g, 2i, S2g. Values: 18.
+Status: computed. Figures: 2g, 2i, S2g, S2h. Values: 18.
 
 Sources:
 
@@ -3529,7 +3529,7 @@ without being called, is not listed.
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
-| `events.nonlocal_power_values` | `reported/events.py` | `analysis.event_properties.event_statistics.animal_power_counts`, `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics` |  |
+| `events.nonlocal_power_values` | `reported/events.py` | `analysis.event_properties.event_statistics.animal_signal_counts`, `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics`, `analysis.event_properties.nonlocal_by_signal.nonlocal_counts` |  |
 | `events.other_detector_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.other_detector_statistics` |  |
 | `events.participation_values` | `reported/events.py` | `analysis.event_evidence.participation.participation_differences`, `analysis.event_evidence.participation.participation_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |

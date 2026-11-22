@@ -812,3 +812,16 @@ it (`docs/development.md`, convention 11); its id in `reported/questions.py` is 
 | `scripts/figures/generate_supp_event_gamma.py`, `paper/figures/supp_event_gamma/`, figure id `event_gamma` | `scripts/figures/generate_supp_figure03.py`, `paper/figures/supp_figure03/`, figure id `S3` (the supplement to Figure 3) |
 | `tests/scripts/figures/test_generate_supp_memoryless_comparison.py`, `test_generate_supp_heldout_tetrode.py` | `test_generate_supp_figure01.py`, `test_generate_supp_figure02.py` |
 
+## The per-time-bin counts by signal, 2026-11-22
+
+The counts behind Figure 2i were extended to MUA, counted in the same pass and by
+non-local probability, so that every count is a sum over one table.
+
+| Old place | New place |
+|---|---|
+| `scripts/event_properties/measure_nonlocal_by_ripple_power.py`, `Processed-Data/nonlocal_by_ripple_power/` (`paths.NONLOCAL_BY_RIPPLE_POWER_DIR`) | `scripts/event_properties/measure_nonlocal_by_signal.py`, `Processed-Data/nonlocal_by_signal/` (`paths.NONLOCAL_BY_SIGNAL_DIR`): per epoch, signal (`ripple_power`, `mua`), signal bin and probability bin |
+| `analysis.event_properties.class_or_continuum.rest_power_counts`, `nonlocal_share_by_power`, `RIPPLE_POWER_EDGES` | `analysis.event_properties.nonlocal_by_signal.rest_signal_counts`, `count_by_signal_and_probability`, `RIPPLE_POWER_EDGES` (with `MUA_EDGES`, `PROBABILITY_EDGES`, `nonlocal_counts`) |
+| `analysis.event_properties.event_statistics.animal_power_counts` (columns `power_low`, `power_high`) | `event_statistics.animal_signal_counts` (columns `signal_low`, `signal_high`) |
+| `draw_share_by_power` in `scripts/figures/generate_figure02.py` | `visualization.signal_share_panels.draw_share_by_signal`, which Figure 2's supplement draws MUA with |
+| `reported.events.EventsInputs.nonlocal_by_ripple_power` | `EventsInputs.nonlocal_by_signal` |
+| `scripts/exploratory/_trunk_zscore_timebin.py` (marked temporary) | removed |

@@ -37,8 +37,10 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         the share of them below the SWR threshold (top), and the share of
         immobile time bins decoded non-local at each power, which has no step
         at the threshold (bottom)
-        (``class_or_continuum.rest_power_counts``;
-        ``Processed-Data/nonlocal_by_ripple_power``).
+        (``nonlocal_by_signal.rest_signal_counts``;
+        ``Processed-Data/nonlocal_by_signal``; drawn by
+        ``visualization.signal_share_panels.draw_share_by_signal``, which
+        Figure 2's supplement draws MUA with).
     j — Three decoders that differ only in when the non-local states may be
         occupied, scored by every tetrode's one-step-ahead predictive score of
         each bin, the whole decoder (place fields, state transitions, initial
@@ -78,7 +80,7 @@ events summary uses (``event_statistics.overlap_class_statistics``,
 features run the summary reads; g's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; i from
 the stored counts by the functions the events summary uses
-(``event_statistics.animal_power_counts``,
+(``nonlocal_by_signal.nonlocal_counts``, ``event_statistics.animal_signal_counts``,
 ``nonlocal_below_threshold_statistics``); j from the held-out event run's
 events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
@@ -178,12 +180,15 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    animal_power_counts,
+    animal_signal_counts,
     boundary_offsets,
     nonlocal_below_threshold_statistics,
     overlap_class_animal_shares,
     overlap_class_statistics,
     reference_medians,
+)
+from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+    nonlocal_counts,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
@@ -217,7 +222,7 @@ from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
-    NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_BY_SIGNAL_DIR,
     PARTICIPATION_NAME,
     event_features_root,
     processed_data_dir,
@@ -255,6 +260,9 @@ from continuum_swr_replay.visualization.plots import (
     plot_spike_times,
     plot_track_graph_2d,
 )
+from continuum_swr_replay.visualization.signal_share_panels import (
+    draw_share_by_signal,
+)
 from continuum_swr_replay.visualization.simulated_run_panels import (
     ANIMAL_POS_COLOR,
     LABEL_SIZE,
@@ -271,7 +279,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 # cache by itself. Bump this whenever the cached values could change for any
 # other reason; git history holds what each earlier bump was for.
 # 14: j's share by ripple power left the bundle; it is drawn from the stored
-#     counts (``Processed-Data/nonlocal_by_ripple_power``).
+#     counts (then ``Processed-Data/nonlocal_by_ripple_power``).
 # 15: i's averages and c and e's comparison are over the events that start
 #     inside a well visit.
 FIGURE02_CACHE_VERSION = 15
@@ -1478,55 +1486,25 @@ def draw_detector_overlap(
 
 
 def draw_share_by_power(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
-    """Panel i: where the non-local time sits in ripple power.
-
-    Top, each animal's non-local time bins spread over ripple power (the
-    percent of them in each power bin), the part below the SWR threshold shaded
-    under the animals' mean and its share written
-    (``nonlocal_below_threshold_statistics``, which counts the bins beyond the
-    axis too). Bottom, the share of immobile bins decoded non-local at each
-    power. One thin line per animal, their mean in bold.
+    """Panel i: where the non-local time sits in ripple power, drawn by
+    ``signal_share_panels.draw_share_by_signal`` with the share of non-local
+    time below the SWR threshold written (``nonlocal_below_threshold_statistics``,
+    the events summary's value).
 
     Parameters
     ----------
     ax_spread, ax_share : Axes
     counts : pd.DataFrame
-        ``animal_power_counts`` of the stored per-epoch counts.
+        ``animal_signal_counts`` of the stored counts' ripple power.
     """
-    drawn = counts[np.isfinite(counts["power_low"]) & np.isfinite(counts["power_high"])]
-    width = (drawn["power_high"] - drawn["power_low"]).iloc[0]
-    for ax, column in ((ax_spread, "nonlocal_fraction"), (ax_share, "share")):
-        by_animal = 100 * drawn.pivot(
-            index="power_low", columns="animal", values=column
-        )
-        center = by_animal.index + width / 2
-        mean = by_animal.mean(axis=1)
-        ax.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-        ax.plot(center, mean, color="k", lw=1.0)
-        ax.axvline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.8, ls="--")
-        ax.set_xlim(drawn["power_low"].min(), drawn["power_high"].max())
-        if ax is ax_spread:
-            ax.fill_between(
-                center, mean, where=center < KAY_ZSCORE_THRESHOLD, color=C_QUIET, lw=0
-            )
     below = nonlocal_below_threshold_statistics(counts, KAY_ZSCORE_THRESHOLD)
-    ax_spread.text(
-        0.98, 0.95,
-        f"{format_number(below['fraction_animal_mean'], 'pctnum')}% below\nthreshold",
-        transform=ax_spread.transAxes, ha="right", va="top", fontsize=SMALL_SIZE,
+    draw_share_by_signal(
+        ax_spread, ax_share, counts, threshold=KAY_ZSCORE_THRESHOLD,
+        threshold_label="SWR\nthreshold", threshold_color=C_SWR, shade_color=C_QUIET,
+        xlabel="Ripple power (z)",
+        below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
+        "below\nthreshold",
     )  # fmt: skip
-    ax_spread.set_ylim(0, None)
-    ax_spread.set_ylabel(f"% per\n{width:g} z")
-    ax_spread.set_title("Non-local time", fontsize=SMALL_SIZE, pad=3)
-    ax_spread.tick_params(labelbottom=False)
-    ax_share.text(
-        KAY_ZSCORE_THRESHOLD + 0.3, 5, "SWR\nthreshold", fontsize=SMALL_SIZE,
-        color=C_SWR, va="bottom",
-    )  # fmt: skip
-    ax_share.set_ylim(0, 102)
-    ax_share.set_yticks([0, 50, 100])
-    ax_share.set_xlabel("Ripple power (z)")
-    ax_share.set_ylabel("% of bins\nnon-local")
 
 
 OFFSET_BINS_MS = np.arange(-100, 101, 5)
@@ -1684,11 +1662,14 @@ def generate_figure(
         ),
         ["ripple", "mua", "theta"],
     )
-    power_counts = animal_power_counts(
-        checked_reference(
-            pd.read_parquet(data_dir / NONLOCAL_BY_RIPPLE_POWER_DIR / "counts.parquet"),
-            data_dir / NONLOCAL_BY_RIPPLE_POWER_DIR,
-            "counts by ripple power",
+    power_counts = animal_signal_counts(
+        nonlocal_counts(
+            checked_reference(
+                pd.read_parquet(data_dir / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"),
+                data_dir / NONLOCAL_BY_SIGNAL_DIR,
+                "counts by signal",
+            ),
+            "ripple_power",
         )
     )
     # every analyzed epoch with an event: an epoch with none has no table

@@ -163,8 +163,34 @@ def _ripple_modes() -> dict:
     }  # fmt: skip
 
 
+def _mua_counts() -> pd.DataFrame:
+    """``animal_signal_counts`` of two animals over the MUA bins: 20 bins in each,
+    non-local in 2 below 2 z and 10 at or above."""
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_signal_counts,
+    )
+    from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+        MUA_EDGES,
+    )
+
+    low, high = MUA_EDGES[:-1], MUA_EDGES[1:]
+    return animal_signal_counts(
+        pd.concat(
+            pd.DataFrame(
+                {
+                    "animal": animal, "epoch_id": f"{animal}_e", "signal_low": low,
+                    "signal_high": high, "n_bins": 20,
+                    "n_nonlocal": np.where(low >= 2.0, 10, 2),
+                }
+            )
+            for animal in ("a", "b")
+        )
+    )  # fmt: skip
+
+
 def _statistics() -> dict:
     return {
+        "mua": _mua_counts(),
         "ripple_modes": _ripple_modes(),
         "hpd": _hpd(),
         "timing": _timing(),
@@ -182,23 +208,26 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters at one left edge, no heading."""
     assert figure.PANELS == (
         "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
-        "outside_distance", "hpd", "ripple_modes",
+        "outside_distance", "hpd", "ripple_modes", "nonlocal_mua",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
-    ax_gain = fig.axes[2]
+    ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
     assert ax_gain.get_title() == "Held-out tetrode"
     assert ax_gain.get_ylabel() == "Held-out gain\nover local (nats/spike)"
-    assert fig.axes[0].get_title() == "No-Spike state"
-    assert fig.axes[1].get_title() == "Timing against the SWR"
-    assert fig.axes[3].get_title() == "Shared content"
+    assert figure.panel_axes(fig, "no_spike_mua")[0].get_title() == "No-Spike state"
+    assert (
+        figure.panel_axes(fig, "boundary_timing")[0].get_title()
+        == "Timing against the SWR"
+    )
+    assert figure.panel_axes(fig, "shared_content")[0].get_title() == "Shared content"
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefg")
+    assert sorted(letters) == list("abcdefgh")
     assert len({letters[k][1] for k in "abc"}) == 1
     assert len({letters[k][1] for k in "de"}) == 1
-    assert len({letters[k][1] for k in "fg"}) == 1
+    assert len({letters[k][1] for k in "fgh"}) == 1
     assert letters["a"][1] > letters["d"][1]
     assert letters["a"][0] == letters["d"][0]
     assert "Immobile, at wells" not in [
@@ -219,7 +248,7 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[figure.PANELS.index("heldout_gain")]
+    (ax,) = figure.panel_axes(fig, "heldout_gain")
     dots = [
         c for c in ax.collections
         if isinstance(c, matplotlib.collections.PathCollection)
@@ -251,7 +280,7 @@ def test_panel_b_draws_the_timing_table():
     each cell's percent and its animals' range, white on the dark cell and
     black on the pale ones, and the labels."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[1]
+    (ax,) = figure.panel_axes(fig, "boundary_timing")
     (image,) = ax.images
     np.testing.assert_allclose(
         image.get_array(), 100 * _timing()["share"].to_numpy().reshape(3, 3)
@@ -275,7 +304,7 @@ def test_panel_b_names_the_four_corner_cells():
     contains the SWR; start later and end earlier, it is inside the SWR;
     start and end later, it lags. The middle row and column have no name."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[1]
+    (ax,) = figure.panel_axes(fig, "boundary_timing")
     named = {
         t.get_text(): t.get_position()
         for t in ax.texts
@@ -299,7 +328,7 @@ def test_panel_d_draws_the_agreement_by_spread():
     their intervals farther out joined by a thin line in the group's color, the
     bins' labels, a dashed zero line and which way means shared content."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[3]
+    (ax,) = figure.panel_axes(fig, "shared_content")
     assert [t.get_text() for t in ax.get_xticklabels()] == list(
         figure.SPREAD_BIN_LABELS
     )
@@ -344,7 +373,7 @@ def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
     the means, the margins' label, the difference's y label, the zero line and
     "full better". The gain at well-sampled places is not drawn."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[4]
+    (ax,) = figure.panel_axes(fig, "outside_distance")
     xs = [0.0, *(figure.SERIES_START + k for k in range(len(MARGINS)))]
     for x, values in zip(xs, [OUTSIDE, *MARGINS.values()], strict=True):
         (dots,) = [
@@ -376,7 +405,7 @@ def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
     with its interval in black beside them, a y label in cm that says what the
     length is, and no zero line (a length, not a gain)."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[figure.PANELS.index("hpd")]
+    (ax,) = figure.panel_axes(fig, "hpd")
     for x, group in enumerate(("no SWR", "SWR")):
         (dots,) = [
             c for c in ax.collections
@@ -397,7 +426,7 @@ def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
     their mean in bold, a dashed line at the SWR threshold, the one-mode
     result read from the statistics, and no split by SWR label."""
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[figure.PANELS.index("ripple_modes")]
+    (ax,) = figure.panel_axes(fig, "ripple_modes")
     densities = _ripple_modes()["densities"]
     curves = [line for line in ax.lines if len(line.get_xdata()) == RIPPLE_GRID.size]
     assert len(curves) == 3  # two animals and their mean
@@ -414,12 +443,32 @@ def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note():
     plt.close(fig)
 
 
+def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua():
+    """As Figure 2i draws ripple power: top, each animal's non-local time
+    spread over MUA with the share below the MUA level written; bottom, the
+    share of bins decoded non-local at each level; a dashed line at the level
+    on both."""
+    fig = figure.generate_figure(_statistics())
+    ax_spread, ax_share = figure.panel_axes(fig, "nonlocal_mua")
+    for ax in (ax_spread, ax_share):
+        assert len(ax.lines) == 2 + 2  # two animals, their mean, the level
+        (level,) = [line for line in ax.lines if line.get_linestyle() == "--"]
+        np.testing.assert_allclose(level.get_xdata(), figure.MUA_LEVEL_Z)
+    # non-local bins below 2 z: 2 in each of the 17 bins below (the open one
+    # too) against 10 in each of the 33 at or above
+    below = 17 * 2 / (17 * 2 + 33 * 10)
+    assert ax_spread.texts[0].get_text() == f"{round(100 * below)}% below\n2 z"
+    assert ax_share.get_xlabel() == "MUA (z)"
+    assert ax_spread.get_title() == "Non-local time"
+    plt.close(fig)
+
+
 def test_panel_a_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
     trace = _no_spike_trace()
     fig = figure.generate_figure(_statistics())
-    ax = fig.axes[0]
+    (ax,) = figure.panel_axes(fig, "no_spike_mua")
     (median,) = [line for line in ax.lines if len(line.get_xdata()) == 151]
     np.testing.assert_allclose(median.get_xdata(), 1000 * NO_SPIKE_TIME)
     np.testing.assert_allclose(median.get_ydata(), trace["median"])
@@ -485,7 +534,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefg"
+    assert FIGURES["S2"].panels == "abcdefgh"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -527,6 +576,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         ),
         "read_no_spike_trace": lambda: "trace",
         "read_hpd": lambda events, bootstrap, table: seen.setdefault("hpd", events),
+        "read_mua_counts": lambda folder: "mua",
         "read_ripple_modes": lambda events, folder, table: seen.setdefault(
             "ripple", events
         ),
@@ -566,6 +616,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
     assert seen["ripple"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
+        "mua",
         "ripple_modes",
         "hpd",
         "timing",

@@ -1240,11 +1240,12 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
     axis, with the animals' mean."""
     import matplotlib.pyplot as plt
 
-    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
-        RIPPLE_POWER_EDGES,
-    )
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        animal_power_counts,
+        animal_signal_counts,
+    )
+    from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+        RIPPLE_POWER_EDGES,
+        nonlocal_counts,
     )
     from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
     from continuum_swr_replay.reported.events import nonlocal_power_values
@@ -1260,21 +1261,30 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
         n_nonlocal = np.zeros(len(low), dtype=int)
         n_nonlocal[0], n_nonlocal[-1] = 8, 4
         n_nonlocal[np.flatnonzero(low == 2.0)[0]] = 4 * i
-        epochs.append(
-            pd.DataFrame(
-                {
-                    "animal": animal,
-                    "epoch_id": f"{animal}_e",
-                    "power_low": low,
-                    "power_high": high,
-                    "n_bins": 20,
-                    "n_nonlocal": n_nonlocal,
-                }
+        # the stored table: each signal bin's non-local bins in the last
+        # probability bin, the rest in the first
+        for probability_low, n in ((0.0, 20 - n_nonlocal), (0.8, n_nonlocal)):
+            epochs.append(
+                pd.DataFrame(
+                    {
+                        "epoch_id": f"{animal}_e",
+                        "animal": animal,
+                        "signal": "ripple_power",
+                        "signal_low": low,
+                        "signal_high": high,
+                        "probability_low": probability_low,
+                        "probability_high": probability_low + 0.2,
+                        "n_bins": n,
+                    }
+                )
             )
-        )
     counts = pd.concat(epochs, ignore_index=True)
     fig, (ax_spread, ax_share) = plt.subplots(2, 1, sharex=True)
-    figure02.draw_share_by_power(ax_spread, ax_share, animal_power_counts(counts))
+    figure02.draw_share_by_power(
+        ax_spread,
+        ax_share,
+        animal_signal_counts(nonlocal_counts(counts, "ripple_power")),
+    )
     value = {v.key: v for v in nonlocal_power_values(counts, "s")}[
         "nonlocal_time_below_swr_threshold_fraction"
     ]
@@ -2103,7 +2113,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         BRAIN_STATE_REFERENCE_DIR,
         EVENT_BIN_FACTS_DIR,
         EVENT_PARTICIPATION_DIR,
-        NONLOCAL_BY_RIPPLE_POWER_DIR,
+        NONLOCAL_BY_SIGNAL_DIR,
         processed_data_dir,
         replay_content_dir,
         table_path,
@@ -2125,7 +2135,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     joblib.dump({"frame_event_counts": frames, "data": data, "results": None}, cache)
     for folder, name in (
         (BRAIN_STATE_REFERENCE_DIR, "reference.parquet"),
-        (NONLOCAL_BY_RIPPLE_POWER_DIR, "counts.parquet"),
+        (NONLOCAL_BY_SIGNAL_DIR, "counts.parquet"),
     ):
         (tmp_path / folder).mkdir()
         pd.DataFrame({"epoch_id": ["e"]}).to_parquet(tmp_path / folder / name)
@@ -2162,7 +2172,8 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "example_windows": lambda *args: {},
         "checked_reference": lambda reference, folder, name: reference,
         "reference_medians": lambda *args: None,
-        "animal_power_counts": lambda *args: None,
+        "animal_signal_counts": lambda *args: None,
+        "nonlocal_counts": lambda *args: None,
         "event_table_epochs": lambda *args: ["e"],
         "read_complete_run": lambda *args: rows,
         "participation_statistics": lambda table: None,

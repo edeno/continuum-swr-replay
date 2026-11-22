@@ -64,17 +64,8 @@ from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import SplineTransformer
 
 from continuum_swr_replay.analysis.detection.swr_detectors import DETECTOR_SETTINGS
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    immobile_analyzed_bins,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    nonlocal_probability,
-)
 from continuum_swr_replay.intervals import contiguous_true_runs
-from continuum_swr_replay.parameters import (
-    DECODE_SAMPLE_S,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 
 KAY_ZSCORE_THRESHOLD = float(DETECTOR_SETTINGS["kay"]["zscore_threshold"])
 """The z-score the Kay detector's SWRs must reach (2.0)."""
@@ -84,12 +75,6 @@ KAY_MINIMUM_DURATION_S = float(DETECTOR_SETTINGS["kay"]["minimum_duration"])
 
 SARLE_CUTOFF = 5.0 / 9.0
 """Sarle's coefficient of a uniform law; above it a sample is often called bimodal."""
-
-RIPPLE_POWER_EDGES = np.concatenate([[-np.inf], np.arange(-2.0, 10.01, 0.25), [np.inf]])
-"""The ripple-power bins of :func:`rest_power_counts`, z: 0.25 z wide from -2 to
-10 with an open bin at each end, so every time bin is counted.
-:data:`KAY_ZSCORE_THRESHOLD` is an edge."""
-
 
 # --- test 1: one mode or two -------------------------------------------------
 
@@ -131,122 +116,6 @@ def dip_test(x: NDArray) -> tuple[float, float]:
     """
     dip, p_value = diptest.diptest(np.asarray(x, dtype=np.float64))
     return float(dip), float(p_value)
-
-
-def nonlocal_share_by_power(
-    power: NDArray,
-    nonlocal_probability: NDArray,
-    group: NDArray,
-    edges: NDArray,
-    threshold: float,
-) -> pd.DataFrame:
-    """The share of time bins decoded non-local, by ripple power, in each group.
-
-    A view of test 1 that needs no SWR label: if the SWR threshold marked a
-    natural boundary, the share of non-local bins would step there; on a
-    continuum it rises smoothly through it.
-
-    Parameters
-    ----------
-    power : ndarray, shape (n_bins,)
-        Each time bin's z-scored ripple power.
-    nonlocal_probability : ndarray, shape (n_bins,)
-        Each bin's non-local probability (Continuous plus Fragmented).
-    group : ndarray, shape (n_bins,)
-        Each bin's group (an animal).
-    edges : ndarray, shape (n_edges,)
-        Ascending ripple-power bin edges; a bin outside them is left out, as is
-        one whose power or probability is not finite.
-    threshold : float
-        A bin counts as non-local when its probability is above this.
-
-    Returns
-    -------
-    shares : pd.DataFrame, shape (n_groups * (n_edges - 1), 6)
-        One row per group and power bin: ``group``, ``power_low``,
-        ``power_high``, ``n_bins``, ``n_nonlocal`` (the non-local ones) and
-        ``share`` (their share of ``n_bins``, NaN where ``n_bins`` is 0).
-    """
-    power = np.asarray(power, dtype=float)
-    probability = np.asarray(nonlocal_probability, dtype=float)
-    edges = np.asarray(edges, dtype=float)
-    keep = (
-        np.isfinite(power)
-        & np.isfinite(probability)
-        & (power >= edges[0])
-        & (power <= edges[-1])
-    )
-    n_power = edges.size - 1
-    which = np.clip(
-        np.searchsorted(edges, power[keep], side="right") - 1, 0, n_power - 1
-    )
-    codes, names = pd.factorize(np.asarray(group)[keep])
-    cell = codes * n_power + which
-    size = len(names) * n_power
-    n_bins = np.bincount(cell, minlength=size)
-    n_nonlocal = np.bincount(cell[probability[keep] > threshold], minlength=size)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        share = np.where(n_bins > 0, n_nonlocal / n_bins, np.nan)
-    return pd.DataFrame(
-        {
-            "group": np.repeat(names, n_power),
-            "power_low": np.tile(edges[:-1], len(names)),
-            "power_high": np.tile(edges[1:], len(names)),
-            "n_bins": n_bins,
-            "n_nonlocal": n_nonlocal,
-            "share": share,
-        }
-    )
-
-
-def rest_power_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.DataFrame:
-    """One epoch's immobile time bins inside the well visits, and those decoded
-    non-local, by ripple power.
-
-    The bins are the immobile ones outside excluded time
-    (``analyzed_time.immobile_analyzed_bins``) that lie inside a well visit
-    (from the first poke-in at a well to the final poke-out), the time the
-    analyzed events start in; one is non-local when its non-local probability
-    is above ``DEFAULT_NON_LOCAL_THRESHOLD``.
-
-    Parameters
-    ----------
-    dot : pd.DataFrame
-        One epoch's decode frame read through the SWR source
-        (``analyzed_time.with_swr_source``), with ``head_speed``,
-        ``in_excluded_time``, ``SWR_zscore`` and the two non-local state
-        probabilities.
-    in_visit : NDArray of bool, shape (n_time,)
-        Whether each bin is inside a well visit
-        (``event_definition.well_visits.in_well_visit`` on the frame's times).
-
-    Returns
-    -------
-    counts : pd.DataFrame, shape (n_power_bins, 4)
-        One row per bin of :data:`RIPPLE_POWER_EDGES`: ``power_low``,
-        ``power_high``, ``n_bins`` and ``n_nonlocal``. A bin without a finite
-        power or probability is in no row.
-
-    Raises
-    ------
-    ValueError
-        If ``in_visit`` is not one bool per bin.
-    """
-    in_visit = np.asarray(in_visit)
-    if in_visit.dtype != bool or in_visit.shape != (len(dot),):
-        raise ValueError(
-            f"in_visit must be one bool per bin, shape ({len(dot)},); got "
-            f"{in_visit.dtype} of shape {in_visit.shape}"
-        )
-    rest = immobile_analyzed_bins(dot) & in_visit
-    counts = nonlocal_share_by_power(
-        dot["SWR_zscore"].to_numpy()[rest],
-        nonlocal_probability(dot).to_numpy()[rest],
-        np.zeros(int(rest.sum()), dtype=np.int64),
-        edges=RIPPLE_POWER_EDGES,
-        threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-    )
-    return counts[["power_low", "power_high", "n_bins", "n_nonlocal"]]
 
 
 def _kde(x: NDArray) -> stats.gaussian_kde:

@@ -146,9 +146,9 @@ EVENT_GAMMA_DIR = "event_gamma"
 RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 """The one-class-or-two tests
 (``scripts/event_properties/measure_ripple_class_structure.py``)."""
-NONLOCAL_BY_RIPPLE_POWER_DIR = "nonlocal_by_ripple_power"
-"""Each epoch's immobile time bins, and its non-local ones, by ripple power
-(``scripts/event_properties/measure_nonlocal_by_ripple_power.py``)."""
+NONLOCAL_BY_SIGNAL_DIR = "nonlocal_by_signal"
+"""Each epoch's immobile time bins by ripple power, by MUA and by non-local
+probability (``scripts/event_properties/measure_nonlocal_by_signal.py``)."""
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
 (``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""

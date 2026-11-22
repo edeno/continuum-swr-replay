@@ -22,7 +22,7 @@ A runner that computes on the CPU says so first thing in its `main`
 
 The exploratory scripts that unit tests pin (`_verify_harmonization_parity.py`,
 `_statescript_contingency.py`, `_augment_data_over_time.py`,
-`_trunk_zscore_extract.py`, `_trunk_zscore_timebin.py`) stay in `exploratory/` as
+`_trunk_zscore_extract.py`) stay in `exploratory/` as
 documented exceptions to "unsupported one-off": their leading underscore already makes
 them importable.
 
@@ -71,7 +71,7 @@ and the `measure` stage of `measure_ripple_class_structure.py` measure every eve
 and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
-- `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2i).
+- `measure_nonlocal_by_signal.py` — each epoch's immobile time bins by ripple power, by MUA and by non-local probability (Figure 2i and the MUA panel of Figure 2's supplement).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 
 ## `tables/` — the event, stop and time-bin tables

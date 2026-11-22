@@ -21,7 +21,7 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
-    NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_BY_SIGNAL_DIR,
     event_features_root,
     replay_content_dir,
     table_path,
@@ -30,7 +30,7 @@ from continuum_swr_replay.runs.io import files_sha256, sha256_file
 from scripts.event_properties import bootstrap_event_properties as bootstrap
 from scripts.event_properties import measure_brain_state_reference as brain_state
 from scripts.event_properties import measure_event_gamma as gamma
-from scripts.event_properties import measure_nonlocal_by_ripple_power as power
+from scripts.event_properties import measure_nonlocal_by_signal as power
 from scripts.event_properties import measure_ripple_class_structure as structure
 from tests.support._session_cache_fixtures import write_session_cache_entries
 
@@ -114,7 +114,7 @@ def test_the_brain_state_reference_is_over_the_rest_inside_the_visits(
     assert pd.read_parquet(folder / "reference.parquet")["epoch_id"].tolist() == [EPOCH]
 
 
-def test_the_counts_by_ripple_power_are_over_the_immobile_time_inside_the_visits(
+def test_the_counts_by_signal_are_over_the_immobile_time_inside_the_visits(
     decoded, monkeypatch
 ):
     _features_run("run1")
@@ -124,11 +124,11 @@ def test_the_counts_by_ripple_power_are_over_the_immobile_time_inside_the_visits
         seen.append(in_visit)
         return pd.DataFrame({"n_bins": [int(in_visit.sum())]})
 
-    monkeypatch.setattr(power, "rest_power_counts", counts)
+    monkeypatch.setattr(power, "rest_signal_counts", counts)
     monkeypatch.setattr(power, "immobile_analyzed_bins", lambda dot: TIME < 0.3)
     power.main(["--event-features-run", "run1"])
     np.testing.assert_array_equal(seen[0], (TIME >= 0.1) & (TIME < 0.5))
-    folder = power.processed_data_dir() / NONLOCAL_BY_RIPPLE_POWER_DIR
+    folder = power.processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR
     manifest = json.loads((folder / "manifest.json").read_text())
     assert manifest["subset"] == ANALYZED_SUBSET
     assert manifest["session_cache"]["sha256"] == files_sha256(decoded)

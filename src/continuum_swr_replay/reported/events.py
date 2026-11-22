@@ -40,9 +40,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``scripts/event_properties/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
   the z-scored gamma per event and epoch, and the band power's change against
   quiet rest in dB (its ``reference.parquet``);
-- each epoch's immobile time bins, and its non-local ones, by ripple power
-  (``Processed-Data/nonlocal_by_ripple_power``, from
-  ``scripts/event_properties/measure_nonlocal_by_ripple_power.py``);
+- each epoch's immobile time bins by ripple power, by MUA and by non-local
+  probability (``Processed-Data/nonlocal_by_signal``, from
+  ``scripts/event_properties/measure_nonlocal_by_signal.py``);
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
@@ -169,6 +169,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import TRIAL_D
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
+    nonlocal_by_signal,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
@@ -207,7 +208,7 @@ from continuum_swr_replay.paths import (
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
-    NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_BY_SIGNAL_DIR,
     NONLOCAL_RESTRICTION_WINDOWS_NAME,
     PARTICIPATION_NAME,
     RIPPLE_CLASS_STRUCTURE_DIR,
@@ -270,6 +271,7 @@ TAGS = {
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
+    "nonlocal_mua": Tags(("2b.5",), ("S2h",)),
     "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",), ("S2c",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
@@ -390,7 +392,7 @@ class EventsInputs:
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
-    nonlocal_by_ripple_power: Path
+    nonlocal_by_signal: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
@@ -419,7 +421,7 @@ def default_inputs() -> EventsInputs:
         / "reference.parquet",
         event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
-        nonlocal_by_ripple_power=processed_data_dir() / NONLOCAL_BY_RIPPLE_POWER_DIR,
+        nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
@@ -3242,11 +3244,15 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     Kay threshold (Figure 2i)?
 
     Over the immobile time bins decoded non-local, each animal's bins pooled
-    over its epochs.
+    over its epochs (``counts``: the stored per-epoch counts by signal and
+    non-local probability, ``nonlocal_by_signal.rest_signal_counts``).
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        event_statistics.animal_power_counts(counts), KAY_ZSCORE_THRESHOLD
+        event_statistics.animal_signal_counts(
+            nonlocal_by_signal.nonlocal_counts(counts, "ripple_power")
+        ),
+        KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
     return [
@@ -3270,6 +3276,88 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
         make(
             f"{key}_animal_max",
             stats["fraction_animal_max"],
+            "fraction",
+            "pct",
+            "highest per-animal share",
+        ),
+    ]
+
+
+def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
+    """Non-local time against MUA, the MUA panel of Figure 2's supplement: the
+    share of the immobile time bins with MUA at or above
+    ``nonlocal_by_signal.MUA_LEVEL_Z`` that are decoded non-local, and the
+    share of the bins decoded non-local whose MUA is below it
+    (``event_statistics.nonlocal_share_above_statistics`` and
+    ``nonlocal_below_threshold_statistics`` of the stored counts, as the panel
+    reads them)."""
+    make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
+    animals = event_statistics.animal_signal_counts(
+        nonlocal_by_signal.nonlocal_counts(counts, "mua")
+    )
+    level = nonlocal_by_signal.MUA_LEVEL_Z
+    above = event_statistics.nonlocal_share_above_statistics(animals, level)
+    below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
+    nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
+    level_words = (
+        f"{level:g} z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded "
+        "tetrodes; the value of the MUA event detector's threshold, which z-scores "
+        "its own smoothed rate)"
+    )
+    key_above = "nonlocal_share_mua_above_level"
+    key_below = "nonlocal_time_below_mua_level_fraction"
+    return [
+        make(
+            "mua_level_z",
+            level,
+            "quantity",
+            "dec1",
+            f"the MUA level of the values below: {level_words}",
+            "z",
+        ),
+        make(
+            key_above,
+            above["share_animal_mean"],
+            "fraction",
+            "pct",
+            f"share of the immobile time bins with MUA at or above {level_words} "
+            f"that are decoded non-local ({nonlocal_}): mean over animals of each "
+            "animal's share of its bins",
+        ),
+        make(
+            f"{key_above}_animal_min",
+            above["share_animal_min"],
+            "fraction",
+            "pct",
+            f"lowest per-animal share of the bins with MUA at or above {level:g} z "
+            "that are decoded non-local",
+        ),
+        make(
+            f"{key_above}_animal_max",
+            above["share_animal_max"],
+            "fraction",
+            "pct",
+            "highest per-animal share",
+        ),
+        make(
+            key_below,
+            below["fraction_animal_mean"],
+            "fraction",
+            "pct",
+            f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
+            f"MUA is below {level_words}: mean over animals of each animal's share "
+            "of its bins",
+        ),
+        make(
+            f"{key_below}_animal_min",
+            below["fraction_animal_min"],
+            "fraction",
+            "pct",
+            f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+        ),
+        make(
+            f"{key_below}_animal_max",
+            below["fraction_animal_max"],
             "fraction",
             "pct",
             "highest per-animal share",
@@ -4643,27 +4731,28 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
 
-    folder = inputs.nonlocal_by_ripple_power
-    power_counts = pd.read_parquet(folder / "counts.parquet")
-    if set(power_counts["epoch_id"]) != set(analyzed_epoch_ids()):
+    folder = inputs.nonlocal_by_signal
+    signal_counts = pd.read_parquet(folder / "counts.parquet")
+    if set(signal_counts["epoch_id"]) != set(analyzed_epoch_ids()):
         raise ValueError(
-            f"{folder / 'counts.parquet'} holds {power_counts['epoch_id'].nunique()} "
+            f"{folder / 'counts.parquet'} holds {signal_counts['epoch_id'].nunique()} "
             f"epochs, not the {n_epochs} analyzed ones"
         )
-    summary.add(
-        *over(
-            pend(
-                nonlocal_power_values(
-                    power_counts,
-                    f"{rel(folder)} (scripts/event_properties/"
-                    "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
-                ),
-                off_subset(folder),
-                off_visits(folder, power_counts["epoch_id"]),
-            ),
-            f"the immobile {TIME_SUBSET}",
-        )
+    counts_source = (
+        f"{rel(folder)} (scripts/event_properties/measure_nonlocal_by_signal.py: "
+        "each analyzed epoch's decode)"
     )
+    for builder_values in (nonlocal_power_values, nonlocal_mua_values):
+        summary.add(
+            *over(
+                pend(
+                    builder_values(signal_counts, counts_source),
+                    off_subset(folder),
+                    off_visits(folder, signal_counts["epoch_id"]),
+                ),
+                f"the immobile {TIME_SUBSET}",
+            )
+        )
     summary.inputs += [
         file_record(folder / name, ROOT_DIR)
         for name in ("counts.parquet", "manifest.json")

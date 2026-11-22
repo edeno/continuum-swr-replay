@@ -2,8 +2,8 @@
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
 the order the text cites them: MUA in the No-Spike state, the timing of events
 against their SWRs, the held-out tetrode gain, shared content, the gain
-outside SWRs away from the SWRs, the posterior's spread, and the events' peak
-ripple power.
+outside SWRs away from the SWRs, the posterior's spread, the events' peak
+ripple power, and non-local time against MUA.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -143,6 +143,21 @@ ripple power.
         values). The distribution is not split by SWR label: the label is set
         from this power, so a split would show the threshold, not two kinds.
 
+    h — Supports Figure 2g and h, the events driven by population activity:
+        where the non-local time sits in MUA (the z-scored multiunit rate of
+        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
+        animal's immobile time bins decoded non-local spread over MUA (percent
+        per 0.25 z), the share below 2 z written; bottom, the percent of
+        immobile bins decoded non-local at each MUA level; a line per animal,
+        their mean in bold, a dashed line at 2 z, the MUA event detector's
+        threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
+        inside the well visits (``nonlocal_by_signal.nonlocal_counts`` of the
+        stored counts, the same table Figure 2i reads, by
+        ``signal_share_panels.draw_share_by_signal``;
+        ``Processed-Data/nonlocal_by_signal``; the events summary's
+        ``nonlocal_share_mua_above_level*`` and
+        ``nonlocal_time_below_mua_level_fraction*`` values).
+
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
 Panel e reads the held-out event run
@@ -216,10 +231,16 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TIMING_CLASSES,
+    animal_signal_counts,
     boundary_offsets,
     boundary_timing_statistics,
     class_median_rows,
+    nonlocal_below_threshold_statistics,
     peak_ripple_mode_statistics,
+)
+from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+    MUA_LEVEL_Z,
+    nonlocal_counts,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
@@ -240,6 +261,7 @@ from continuum_swr_replay.reported.events import (
     require_tetrode_holdout_folds,
     restriction_inputs_note,
 )
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import rel
 from continuum_swr_replay.runs.io import read_complete_run, sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
@@ -260,6 +282,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     spread_offsets,
 )
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
@@ -327,13 +350,14 @@ PANELS = (
     "outside_distance",
     "hpd",
     "ripple_modes",
+    "nonlocal_mua",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
     ((0.73, 0.94), ("no_spike_mua", "boundary_timing", "heldout_gain")),
     ((0.41, 0.6), ("shared_content", "outside_distance")),
-    ((0.1, 0.28), ("hpd", "ripple_modes")),
+    ((0.1, 0.28), ("hpd", "ripple_modes", "nonlocal_mua")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
@@ -345,6 +369,7 @@ FRAMES = {
     "outside_distance": (0.6, 0.3),
     "hpd": (0.075, 0.09),
     "ripple_modes": (0.3, 0.25),
+    "nonlocal_mua": (0.7, 0.25),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -421,6 +446,7 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "ripple_modes": read_ripple_modes(
             events, inputs.class_structure, inputs.event_table
         ),
@@ -476,6 +502,34 @@ def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> No
                 f"Figure 2's supplement: panel {LETTERS[panel]} is not drawn: "
                 f"{reason}. Rerun {rerun}."
             )
+
+
+def read_mua_counts(folder: Path) -> pd.DataFrame:
+    """The MUA panel's counts: each animal's immobile time bins inside the well
+    visits, and its non-local ones, by MUA (``nonlocal_by_signal.nonlocal_counts``
+    of the stored counts, ``event_statistics.animal_signal_counts``), as the
+    events summary reads them.
+
+    Raises
+    ------
+    ValueError
+        If the counts were not made over the analyses' subset, or do not hold
+        the analyzed epochs.
+    """
+    if (
+        reason := subset_staleness(read_output_manifest(folder), rel(folder))
+    ) is not None:
+        raise ValueError(
+            f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
+            f"{reason}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
+        )
+    counts = pd.read_parquet(folder / "counts.parquet")
+    if set(counts["epoch_id"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"Figure 2's supplement: {rel(folder)}/counts.parquet holds "
+            f"{counts['epoch_id'].nunique()} epochs, not the analyzed ones"
+        )
+    return animal_signal_counts(nonlocal_counts(counts, "mua"))
 
 
 def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> dict:
@@ -736,6 +790,23 @@ def draw_ripple_modes(ax: Axes, statistics: dict) -> None:
     ax.set_title("One mode", fontsize=SMALL_SIZE, pad=3)
 
 
+def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
+    """The MUA panel, drawn as Figure 2i draws ripple power
+    (``signal_share_panels.draw_share_by_signal``): where the non-local time
+    sits in MUA (top) and the share of immobile bins decoded non-local at each
+    MUA level (bottom), with the MUA level of the reported values and the
+    share of non-local time below it (``nonlocal_below_threshold_statistics``,
+    the events summary's value; ``counts``: :func:`read_inputs`' ``mua``)."""
+    below = nonlocal_below_threshold_statistics(counts, MUA_LEVEL_Z)
+    draw_share_by_signal(
+        ax_spread, ax_share, counts, threshold=MUA_LEVEL_Z,
+        threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
+        shade_color=COLORS["All Events"], xlabel="MUA (z)",
+        below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
+        f"below\n{MUA_LEVEL_Z:g} z",
+    )  # fmt: skip
+
+
 def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
     """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
     (its median) and, beside them, the pooled median with its 95 % interval in
@@ -769,30 +840,54 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
+STACKED = ("nonlocal_mua",)
+"""The panels drawn on two axes, one above the other, in their frame."""
+STACK_GAP = 0.1
+"""The gap between a stacked panel's two axes, as a share of its frame's height."""
+
+
+def panel_axes(fig: Figure, panel: str) -> list[Axes]:
+    """A panel's axes of a figure :func:`generate_figure` made (two for a panel
+    of :data:`STACKED`, top first)."""
+    start = sum(1 + (p in STACKED) for p in PANELS[: PANELS.index(panel)])
+    return fig.axes[start : start + 1 + (panel in STACKED)]
+
+
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
     order and laid out by :data:`ROWS` and :data:`FRAMES`."""
-    assert sorted(p for _, row in ROWS for p in row) == sorted(PANELS)
+    rows = {panel: span for span, row in ROWS for panel in row}
+    assert sorted(rows) == sorted(PANELS)
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
-    axes = {
-        panel: fig.add_axes((FRAMES[panel][0], bottom, FRAMES[panel][1], top - bottom))
-        for (bottom, top), row in ROWS for panel in row
-    }  # fmt: skip
-    draw_no_spike_mua(axes["no_spike_mua"], statistics["no_spike"])
-    draw_boundary_timing(axes["boundary_timing"], statistics["timing"])
-    draw_heldout_tetrode(axes["heldout_gain"], statistics["tetrode"])
-    draw_shared_content(axes["shared_content"], statistics["shared"])
+    axes = {}
+    for panel in PANELS:  # the axes in the panels' order (panel_axes)
+        (bottom, top), (left, width) = rows[panel], FRAMES[panel]
+        if panel in STACKED:
+            half = (top - bottom) * (1 - STACK_GAP) / 2
+            axes[panel] = [
+                fig.add_axes((left, top - half, width, half)),
+                fig.add_axes((left, bottom, width, half)),
+            ]
+        else:
+            axes[panel] = [fig.add_axes((left, bottom, width, top - bottom))]
+    draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
+    draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
+    draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
+    draw_shared_content(axes["shared_content"][0], statistics["shared"])
     draw_outside_swr_series(
-        axes["outside_distance"], statistics["outside"], statistics["parts"],
+        axes["outside_distance"][0], statistics["outside"], statistics["parts"],
         "beyond_swr_margin", OUTSIDE_SWR_MARGINS_S,
         [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
     )  # fmt: skip
-    draw_hpd(axes["hpd"], statistics["hpd"])
-    draw_ripple_modes(axes["ripple_modes"], statistics["ripple_modes"])
+    draw_hpd(axes["hpd"][0], statistics["hpd"])
+    draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
+    draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge
-    extent = {panel: drawn_extent(fig, [ax]) for panel, ax in axes.items()}
+    extent = {
+        panel: drawn_extent(fig, panel_list) for panel, panel_list in axes.items()
+    }
     left = {panel: max(e.x0 - 0.004, 0.0) for panel, e in extent.items()}
     column = min(left[row[0]] for _, row in ROWS)
     for _, row in ROWS:
@@ -800,7 +895,7 @@ def generate_figure(statistics: dict) -> Figure:
         top = max(extent[panel].y1 for panel in row) + LETTER_HEIGHT
         for panel in row:
             letter_panel(fig, LETTERS[panel], left[panel], top)
-    check_placement(fig, {LETTERS[p]: [ax] for p, ax in axes.items()})
+    check_placement(fig, {LETTERS[p]: panel_list for p, panel_list in axes.items()})
     return fig
 
 

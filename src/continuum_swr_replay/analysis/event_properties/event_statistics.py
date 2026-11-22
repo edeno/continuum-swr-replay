@@ -921,27 +921,28 @@ def peak_ripple_mode_statistics(
     }
 
 
-def animal_power_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
-    """Each animal's time bins, and its non-local ones, by ripple power.
+def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's time bins, and its non-local ones, by the level of a signal
+    (ripple power or MUA).
 
     Parameters
     ----------
-    epoch_counts : pd.DataFrame, shape (n_epochs * n_power_bins, n_columns)
-        One row per epoch and ripple-power bin
-        (``class_or_continuum.rest_power_counts``), with ``animal``,
-        ``power_low``, ``power_high``, ``n_bins`` and ``n_nonlocal``.
+    epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
+        One row per epoch and signal bin (``nonlocal_by_signal.nonlocal_counts``),
+        with ``animal``, ``signal_low``, ``signal_high``, ``n_bins`` and
+        ``n_nonlocal``.
 
     Returns
     -------
-    counts : pd.DataFrame, shape (n_animals * n_power_bins, 7)
-        One row per animal and power bin, in that order: ``animal``,
-        ``power_low``, ``power_high``, ``n_bins`` and ``n_nonlocal`` summed
+    counts : pd.DataFrame, shape (n_animals * n_signal_bins, 7)
+        One row per animal and signal bin, in that order: ``animal``,
+        ``signal_low``, ``signal_high``, ``n_bins`` and ``n_nonlocal`` summed
         over the animal's epochs, ``share`` (the non-local share of the bin's
         time bins, NaN where the animal has none) and ``nonlocal_fraction``
         (the bin's share of the animal's non-local bins).
     """
     counts = epoch_counts.groupby(
-        ["animal", "power_low", "power_high"], as_index=False
+        ["animal", "signal_low", "signal_high"], as_index=False
     )[["n_bins", "n_nonlocal"]].sum()
     counts["share"] = counts["n_nonlocal"] / counts["n_bins"].where(
         counts["n_bins"] > 0
@@ -952,23 +953,28 @@ def animal_power_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
     return counts
 
 
+def _require_edge(counts: pd.DataFrame, threshold: float) -> None:
+    if not (counts["signal_low"] == threshold).any():
+        raise ValueError(f"{threshold} is not an edge of the signal's bins")
+
+
 def nonlocal_below_threshold_statistics(
     counts: pd.DataFrame, threshold: float
 ) -> dict[str, float]:
-    """How much of the non-local time has ripple power below a threshold.
+    """How much of the non-local time has a signal below a threshold.
 
     Parameters
     ----------
-    counts : pd.DataFrame, shape (n_animals * n_power_bins, n_columns)
-        :func:`animal_power_counts`.
+    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
+        :func:`animal_signal_counts`.
     threshold : float
-        The ripple power, z; an edge of the power bins.
+        The signal's level, z; an edge of its bins.
 
     Returns
     -------
     statistics : dict
         - ``fraction_animal_mean``: the mean over animals of each animal's
-          share of its non-local time bins whose power is below ``threshold``.
+          share of its non-local time bins whose signal is below ``threshold``.
         - ``fraction_animal_min``, ``fraction_animal_max``: the lowest and
           highest of the animals' shares.
         - ``n_animals``: the animals.
@@ -976,12 +982,11 @@ def nonlocal_below_threshold_statistics(
     Raises
     ------
     ValueError
-        If ``threshold`` is not an edge of the power bins.
+        If ``threshold`` is not an edge of the signal's bins.
     """
-    if not (counts["power_low"] == threshold).any():
-        raise ValueError(f"{threshold} is not an edge of the ripple-power bins")
+    _require_edge(counts, threshold)
     below = (
-        counts[counts["power_high"] <= threshold]
+        counts[counts["signal_high"] <= threshold]
         .groupby("animal")["nonlocal_fraction"]
         .sum()
     )
@@ -990,6 +995,48 @@ def nonlocal_below_threshold_statistics(
         "fraction_animal_min": float(below.min()),
         "fraction_animal_max": float(below.max()),
         "n_animals": int(below.size),
+    }
+
+
+def nonlocal_share_above_statistics(
+    counts: pd.DataFrame, threshold: float
+) -> dict[str, float]:
+    """The share of the time bins with a signal at or above a level that are
+    decoded non-local.
+
+    Parameters
+    ----------
+    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
+        :func:`animal_signal_counts`.
+    threshold : float
+        The level, z; an edge of the signal's bins.
+
+    Returns
+    -------
+    statistics : dict
+        - ``share_animal_mean``: the mean over animals of each animal's
+          non-local bins at or above ``threshold`` over its bins there.
+        - ``share_animal_min``, ``share_animal_max``: the lowest and highest
+          animal.
+        - ``n_animals``: the animals.
+
+    Raises
+    ------
+    ValueError
+        If ``threshold`` is not an edge of the signal's bins.
+    """
+    _require_edge(counts, threshold)
+    above = (
+        counts[counts["signal_low"] >= threshold]
+        .groupby("animal")[["n_nonlocal", "n_bins"]]
+        .sum()
+    )
+    share = above["n_nonlocal"] / above["n_bins"]
+    return {
+        "share_animal_mean": float(share.mean()),
+        "share_animal_min": float(share.min()),
+        "share_animal_max": float(share.max()),
+        "n_animals": int(share.size),
     }
 
 

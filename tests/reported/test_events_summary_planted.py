@@ -52,7 +52,7 @@ from continuum_swr_replay.paths import (
     EVENT_TETRODE_HOLDOUT_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
-    NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_BY_SIGNAL_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
 )
 from continuum_swr_replay.reported import events as builder
@@ -125,6 +125,7 @@ OTHER_BUILDERS = (
     "state_fraction_values",
     "class_distribution_values",
     "nonlocal_power_values",
+    "nonlocal_mua_values",
 )
 
 
@@ -269,7 +270,7 @@ class _Run:
             BRAIN_STATE_REFERENCE_DIR,
             EVENT_GAMMA_DIR,
             RIPPLE_CLASS_STRUCTURE_DIR,
-            NONLOCAL_BY_RIPPLE_POWER_DIR,
+            NONLOCAL_BY_SIGNAL_DIR,
             EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
@@ -325,7 +326,7 @@ class _Run:
                 root / RIPPLE_CLASS_STRUCTURE_DIR / f"{name}.csv", index=False
             )
         pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
-            root / NONLOCAL_BY_RIPPLE_POWER_DIR / "counts.parquet"
+            root / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"
         )
         pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
             root / EXPOSURE_IN_VISITS_DIR / "exposure.parquet"
@@ -346,7 +347,7 @@ class _Run:
             / "reference.parquet",
             event_gamma=root / EVENT_GAMMA_DIR,
             class_structure=root / RIPPLE_CLASS_STRUCTURE_DIR,
-            nonlocal_by_ripple_power=root / NONLOCAL_BY_RIPPLE_POWER_DIR,
+            nonlocal_by_signal=root / NONLOCAL_BY_SIGNAL_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
             property_bootstrap=root / EVENT_PROPERTY_BOOTSTRAP_DIR,
             decoder_quality=root / DECODER_QUALITY_DIR,
@@ -641,11 +642,11 @@ PENDING_CASES = [
         ("event_table", {"sha256": "old"}),
         {"class_distribution", "class_step"},
     ),
-    (NONLOCAL_BY_RIPPLE_POWER_DIR, ("subset", None), {"nonlocal_power"}),
+    (NONLOCAL_BY_SIGNAL_DIR, ("subset", None), {"nonlocal_power", "nonlocal_mua"}),
     (
-        NONLOCAL_BY_RIPPLE_POWER_DIR,
+        NONLOCAL_BY_SIGNAL_DIR,
         ("session_cache", _other_cache()),
-        {"nonlocal_power"},
+        {"nonlocal_power", "nonlocal_mua"},
     ),
     (EXPOSURE_IN_VISITS_DIR, ("subset", None), {"left_out"}),
     (EXPOSURE_IN_VISITS_DIR, ("session_cache", _other_cache()), {"left_out"}),
