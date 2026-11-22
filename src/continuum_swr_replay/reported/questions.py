@@ -310,7 +310,7 @@ QUESTIONS: tuple[Question, ...] = (
         "2d.5",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
         figures=("S2f",),
-        note="Figure 2's supplement, panel S2f, draws the HPD coverage (the hpd_* values): each animal's median of each class, and the pooled median with the property bootstrap's interval.",
+        note="Figure 2's supplement, panel S2f, draws the HPD coverage at the animal level (the hpd_coverage_* values: each animal's median, the mean over animals with its interval); the pooled class medians (hpd_median_*) are for the text.",
     ),
     Question(
         "2d.6",

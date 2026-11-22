@@ -3742,7 +3742,7 @@ _PROPERTIES = (
         "higher",
         TAGS["certainty"],
     ),
-    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", TAGS["hpd"]),
+    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", TAGS["certainty"]),
     (
         "pause",
         "pause_fraction",
@@ -3880,42 +3880,53 @@ def _class_median_values(
     ]
 
 
-def hpd_interval_values(
-    events: pd.DataFrame, intervals: pd.DataFrame, source: str
-) -> list[Value]:
-    """Question 2d.5 and the HPD panel of Figure 2's supplement: the 95 %
-    interval of each class's median HPD coverage, the property bootstrap's
-    (``event_statistics.class_median_rows``, which the panel draws; the
-    medians themselves are :func:`property_values`'; ``intervals``: the
-    bootstrap's ``intervals.csv``, indexed by property)."""
-    make = value_factory(hpd_interval_values, source, TAGS["hpd"])
-    rows = event_statistics.class_median_rows(
-        events, "hpd_coverage_cm", intervals.loc["hpd"]
+def hpd_animal_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.5 and the HPD panel of Figure 2's supplement: each class's
+    HPD coverage at the animal level, as the panel draws it
+    (``event_statistics.hpd_animal_statistics``, the held-out panels'
+    statistic), and the animals whose no-SWR value is below their SWR value.
+    The pooled class medians (``hpd_median_*``, :func:`property_values`) are
+    another statistic and carry no figure tag."""
+    make = value_factory(hpd_animal_values, source, TAGS["hpd"])
+    rows = event_statistics.hpd_animal_statistics(events)
+    what = (
+        "HPD coverage, the length of track that holds 95 % of the decoded "
+        "probability averaged over the event's bins (hpd_coverage_cm)"
+    )
+    reduction = (
+        "an epoch's median over its events, an animal's median over its epochs, "
+        "the mean over animals; 95 % interval from the nested bootstrap of the "
+        "animals, their epochs and their events, small-sample t correction"
     )
     values = []
-    for group, word in (("no SWR", "non_swr"), ("SWR", "swr")):
-        events_name = "non-SWR" if word == "non_swr" else "SWR-overlapping"
+    for group, word, name in (
+        ("no SWR", "non_swr", "non-SWR"),
+        ("SWR", "swr", "SWR-overlapping"),
+    ):
+        row = rows.loc[group]
+        key = f"hpd_coverage_animal_mean_{word}"
         values += [
-            make(
-                f"hpd_median_{word}_ci_low",
-                rows.loc[group, "ci_low"],
-                "quantity",
-                "sig2",
-                f"lower bound of the 95 % interval of the median "
-                f"{_PROPERTY_NAMES['hpd']} of immobile {events_name} non-local "
-                "events (nested bootstrap of the animals, their epochs and their "
-                "events, small-sample t correction over the animals)",
-                "cm",
-            ),
-            make(
-                f"hpd_median_{word}_ci_high",
-                rows.loc[group, "ci_high"],
-                "quantity",
-                "sig2",
-                "upper bound of that interval",
-                "cm",
-            ),
-        ]
+            make(key, row["estimate"], "quantity", "sig2",
+                 f"{what} of immobile {name} non-local events: {reduction}", "cm"),
+            make(f"{key}_ci_low", row["ci_low"], "quantity", "sig2",
+                 "lower bound of its 95 % interval", "cm"),
+            make(f"{key}_ci_high", row["ci_high"], "quantity", "sig2",
+                 "upper bound of that interval", "cm"),
+        ]  # fmt: skip
+    no_swr = pd.Series(
+        rows.loc["no SWR", "animals"], rows.loc["no SWR", "animal_names"]
+    )
+    swr = pd.Series(rows.loc["SWR", "animals"], rows.loc["SWR", "animal_names"])
+    values.append(
+        make(
+            "hpd_coverage_animals_non_swr_lower",
+            int((no_swr < swr.reindex(no_swr.index)).sum()),
+            "count",
+            "count",
+            f"animals whose non-SWR {what}, the median over its epochs of each "
+            "epoch's median, is below their SWR one",
+        )
+    )
     return values
 
 
@@ -4262,6 +4273,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_offset_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_timing_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(hpd_animal_values(events, source), EVENTS_SUBSET))
     summary.add(*over(state_composition_values(events, source), EVENTS_SUBSET))
     summary.inputs.append(event_table_record)
     events_with_extras, extra_paths = with_start_and_rest_theta(
@@ -4309,22 +4321,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     intervals,
                     f"{rel(inputs.property_bootstrap)} "
                     "(scripts/event_properties/bootstrap_event_properties.py)",
-                ),
-                stale(inputs.property_bootstrap),
-                off_subset(inputs.property_bootstrap),
-            ),
-            EVENTS_SUBSET,
-        )
-    )
-    summary.add(
-        *over(
-            pend(
-                hpd_interval_values(
-                    events,
-                    intervals,
-                    f"{rel(inputs.property_bootstrap)} "
-                    "(scripts/event_properties/bootstrap_event_properties.py) and "
-                    f"{rel(inputs.event_table)} (canonical event table)",
                 ),
                 stale(inputs.property_bootstrap),
                 off_subset(inputs.property_bootstrap),

@@ -114,7 +114,7 @@ HPD = {
 
 
 def _hpd() -> pd.DataFrame:
-    """``class_median_rows``' two rows: pooled medians 47 and 82, intervals
+    """``hpd_animal_statistics``' two rows: estimates 47 and 82, intervals
     20 either side, the animals of :data:`HPD`."""
     return pd.DataFrame.from_dict(
         {
@@ -445,9 +445,9 @@ def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
 
 
 def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
-    """No SWR and SWR in their colors: a dot per animal, the pooled median
+    """No SWR and SWR in their colors: a dot per animal, the mean over animals
     with its interval in black beside them, a y label in cm that says what the
-    length is, and no zero line (a length, not a gain)."""
+    length is, a y axis from 0 and no zero line (a length, not a gain)."""
     fig = figure.generate_figure(_statistics())
     (ax,) = figure.panel_axes(fig, "hpd")
     for x, group in enumerate(("no SWR", "SWR")):
@@ -461,6 +461,7 @@ def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
     assert ax.get_ylabel() == figure.HPD_YLABEL
     assert "95 % HPD" in ax.get_ylabel() and "cm" in ax.get_ylabel()
     assert not any(np.allclose(line.get_ydata(), 0) for line in ax.lines)
+    assert ax.get_ylim()[0] == 0
     assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
     plt.close(fig)
 
@@ -675,7 +676,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             {"family": ["filter"], "measure": ["gain_per_spike"]}
         ),
         "read_no_spike_trace": lambda: "trace",
-        "read_hpd": lambda events, bootstrap, table: seen.setdefault("hpd", events),
+        "read_hpd": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
@@ -791,18 +792,3 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     monkeypatch.setattr(figure, "read_swr_table", read_swr_table)
     with pytest.raises(ValueError, match=message):
         figure.read_inputs()
-
-
-def test_the_hpd_panel_refuses_a_bootstrap_off_the_subset(monkeypatch, tmp_path):
-    """A property bootstrap not over the analyses' subset is refused, as the
-    events summary marks its values pending."""
-    monkeypatch.setattr(figure, "read_output_manifest", lambda folder: {})
-    monkeypatch.setattr(figure, "sha256_file", lambda path: "0" * 64)
-    monkeypatch.setattr(figure, "event_table_staleness", lambda m, sha, what: None)
-    monkeypatch.setattr(
-        figure, "subset_staleness", lambda manifest, what: "made over other events"
-    )
-    with pytest.raises(
-        ValueError, match=f"panel {figure.LETTERS['hpd']} is not drawn: made over other"
-    ):
-        figure.read_hpd(pd.DataFrame(), tmp_path, tmp_path / "table.parquet")

@@ -106,16 +106,15 @@ the order the text cites them, in four rows:
 
     f — Supports Figure 2's case that the no-SWR events are specific: how
         concentrated the decoded position is, no-SWR against SWR events. Each
-        event's HPD coverage is the mean over its bins of the length of track
-        (cm) covered by the 95 % highest-posterior-density region of the
-        position posterior (``hpd_coverage_cm`` of the canonical event table,
-        the per-bin ``hpd`` of the decode frames). A dot per animal (its
-        median, event -> epoch -> animal) and, beside them, the pooled median
-        with its 95 % interval from the property bootstrap
-        (``event_statistics.class_median_rows``;
-        ``Processed-Data/event_property_bootstrap``; the events summary's
-        ``hpd_*`` values). The pooled median and the animals' medians differ,
-        as the animals hold different numbers of events.
+        event's HPD coverage is the length of track (cm) that holds 95 % of
+        the decoded probability, averaged over the event's bins
+        (``hpd_coverage_cm`` of the canonical event table, the per-bin ``hpd``
+        of the decode frames). A dot per animal (the median over its epochs
+        of each epoch's median) and, beside them, the mean over animals with
+        its 95 % nested bootstrap interval, the statistic of the held-out
+        panels (``event_statistics.hpd_animal_statistics``; the events
+        summary's ``hpd_coverage_*`` values). The y axis starts at 0. The
+        pooled class medians (``hpd_median_*``) are for the text.
 
     g and h — Support Figure 2h, the events driven by several tetrodes. Each
     tetrode is left out of the decoder in turn: the other tetrodes' estimate
@@ -217,8 +216,7 @@ was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Their
 values are the events summary's ``restriction_outside_swr_*`` values. Panels d,
-f and i read the canonical event table (f and i with the stored outputs they
-name), refused, as their values are marked pending, when an output was not
+f and i read the canonical event table (i with the stored output it names), refused, as their values are marked pending, when an output was not
 made from the current event table over the analyses' subset; c, e and a their
 stored outputs likewise. Panel b reads every analyzed epoch's decode frame
 (``Processed-Data``), which takes a few minutes; it has no reported value.
@@ -284,7 +282,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_signal_counts,
     boundary_offsets,
     boundary_timing_statistics,
-    class_median_rows,
+    hpd_animal_statistics,
     nonlocal_below_threshold_statistics,
     peak_ripple_mode_statistics,
 )
@@ -531,7 +529,7 @@ def read_inputs() -> dict:
         "ripple_modes": read_ripple_modes(
             events, inputs.class_structure, inputs.event_table
         ),
-        "hpd": read_hpd(events, inputs.property_bootstrap, inputs.event_table),
+        "hpd": read_hpd(events),
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
         ),
@@ -550,24 +548,11 @@ def read_inputs() -> dict:
     }
 
 
-def read_hpd(events: pd.DataFrame, bootstrap: Path, event_table: Path) -> pd.DataFrame:
-    """The HPD panel's rows (``event_statistics.class_median_rows``): each
-    animal's median HPD coverage of the selected events by class, the pooled
-    medians and the property bootstrap's intervals of them, as the events
-    summary reads them.
-
-    Raises
-    ------
-    ValueError
-        If the bootstrap was not made from the current event table over the
-        analyses' subset (the summary marks its values pending).
-    """
-    _refuse_stale(
-        bootstrap, event_table, "hpd",
-        "scripts/event_properties/bootstrap_event_properties.py",
-    )  # fmt: skip
-    intervals = pd.read_csv(bootstrap / "intervals.csv", index_col=0)
-    return class_median_rows(events, "hpd_coverage_cm", intervals.loc["hpd"])
+def read_hpd(events: pd.DataFrame) -> pd.DataFrame:
+    """The HPD panel's statistics: each class's HPD coverage at the animal level
+    (``event_statistics.hpd_animal_statistics``, the held-out panels'
+    statistic), as the events summary reads it."""
+    return hpd_animal_statistics(events)
 
 
 def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> None:
@@ -997,12 +982,14 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
 
 def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
     """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
-    (its median) and, beside them, the pooled median with its 95 % interval in
-    black (``rows``: :func:`read_hpd`)."""
+    (the median over its epochs of each epoch's median) and, beside them, the
+    mean over animals with its 95 % interval in black, on a y axis from 0 (a
+    length; ``rows``: :func:`read_hpd`)."""
     for group, color in GROUP_COLORS.items():
         draw_animal_gain(ax, HELDOUT_X[group], rows.loc[group], color)
     ax.set_xlim(-0.6, 1.6)
     ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
+    ax.set_ylim(0, None)
     ax.set_ylabel(HPD_YLABEL)
     ax.set_title("Posterior spread", fontsize=SMALL_SIZE, pad=3)
 

@@ -1336,7 +1336,7 @@ Sources:
 
 Status: computed. Figures: S2f. Values: 25.
 
-*Note:* Figure 2's supplement, panel S2f, draws the HPD coverage (the hpd_* values): each animal's median of each class, and the pooled median with the property bootstrap's interval.
+*Note:* Figure 2's supplement, panel S2f, draws the HPD coverage at the animal level (the hpd_coverage_* values: each animal's median, the mean over animals with its interval); the pooled class medians (hpd_median_*) are for the text.
 
 Sources:
 

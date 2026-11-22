@@ -30,6 +30,9 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
+    likelihood_advantage_statistics,
+)
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_session_values,
     session_median_statistics,
@@ -1163,45 +1166,41 @@ def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
     )
 
 
-def class_median_rows(
-    events: pd.DataFrame, column: str, intervals: pd.Series
+def hpd_animal_statistics(
+    events: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
 ) -> pd.DataFrame:
-    """A per-event property by class, as a figure draws it: the pooled median
-    (:func:`class_medians`), its 95 % interval from the property bootstrap
-    (``scripts/event_properties/bootstrap_event_properties.py``, its
-    ``intervals.csv`` row of the property) and each animal's median
-    (:func:`animal_class_medians`).
+    """Each event's HPD coverage (``hpd_coverage_cm``: the length of track that
+    holds 95 % of the decoded probability, averaged over the event's bins) for
+    no-SWR and SWR events, reduced as the held-out panels reduce their scores
+    (``likelihood_advantage.likelihood_advantage_statistics``): an epoch's
+    median over its events, an animal's median over its epochs, the mean over
+    animals with its 95 % nested bootstrap interval.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        As :func:`animal_class_medians` takes them.
-    column : str
-        The property.
-    intervals : pd.Series
-        The bootstrap's row of the property: ``median_non_swr_low``,
-        ``median_non_swr_high``, ``median_swr_low`` and ``median_swr_high``.
+        One row per event, with ``animal``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`),
+        ``is_swr`` and ``hpd_coverage_cm``.
+    n_boot, seed : int, optional
 
     Returns
     -------
-    rows : pd.DataFrame, shape (2, 5)
-        Indexed by group (``"no SWR"``, ``"SWR"``): ``estimate``, ``ci_low``,
-        ``ci_high``, ``animals`` (the animals with the class, sorted) and
-        ``animal_names``.
+    pd.DataFrame
+        Indexed by group (``"no SWR"``, ``"SWR"``), with
+        ``likelihood_advantage_statistics``' columns.
     """
-    medians = class_medians(events, column)
-    animals = animal_class_medians(events, column)
-    rows = {}
-    for group, word in (("no SWR", "non_swr"), ("SWR", "swr")):
-        known = animals[word].dropna()
-        rows[group] = {
-            "estimate": medians[f"median_{word}"],
-            "ci_low": float(intervals[f"median_{word}_low"]),
-            "ci_high": float(intervals[f"median_{word}_high"]),
-            "animals": known.to_numpy(),
-            "animal_names": known.index.to_numpy(),
+    table = pd.DataFrame(
+        {
+            "animal": events["animal"].to_numpy(),
+            "epoch_id": events[list(SESSION_COLUMNS)].astype(str).agg("_".join, axis=1),
+            "group": np.where(events["is_swr"].astype(bool), "SWR", "no SWR"),
+            "hpd_coverage_cm": events["hpd_coverage_cm"].to_numpy(dtype=float),
         }
-    return pd.DataFrame.from_dict(rows, orient="index")
+    )
+    return likelihood_advantage_statistics(
+        table, column="hpd_coverage_cm", n_boot=n_boot, seed=seed
+    ).loc[["no SWR", "SWR"]]
 
 
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:

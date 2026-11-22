@@ -686,30 +686,42 @@ def test_animal_class_medians_give_each_animal_s_median_of_each_class():
     assert np.isnan(stats.animal_class_medians(no_swr, "extent").loc["c", "swr"])
 
 
-def test_class_median_rows_hold_the_medians_their_interval_and_the_animals():
-    """Per class: the pooled median, the stored bootstrap interval of it, and
-    each animal's median (an animal without the class left out)."""
-    intervals = pd.Series(
+def test_hpd_animal_statistics_are_the_held_out_panels_statistic():
+    """Each class's HPD coverage as the held-out panels reduce their scores:
+    an epoch's median over its events, an animal's median over its epochs,
+    the mean over animals with its nested bootstrap interval
+    (``likelihood_advantage_statistics``)."""
+    events = pd.DataFrame(
         {
-            "median_non_swr_low": 1.0,
-            "median_non_swr_high": 5.0,
-            "median_swr_low": 4.5,
-            "median_swr_high": 8.0,
+            "animal": ["a"] * 6 + ["b"] * 4,
+            "session_date": [1, 1, 1, 2, 2, 2, 1, 1, 1, 1],
+            "epoch": "02_r1",
+            "is_swr": [False, False, True, False, True, True, False, False, True, True],
+            "hpd_coverage_cm": [
+                10.0,
+                30.0,
+                50.0,
+                40.0,
+                60.0,
+                80.0,
+                20.0,
+                20.0,
+                70.0,
+                np.nan,
+            ],
         }
     )
-    events = _property_events()
-    events = events[~((events.animal == "c") & events.is_swr)]
-    rows = stats.class_median_rows(events, "extent", intervals)
+    rows = stats.hpd_animal_statistics(events, n_boot=200)
     assert list(rows.index) == ["no SWR", "SWR"]
-    # non-SWR: 1, 1, 3, 7, 8; SWR (no c): 4, 5, 7
-    assert rows.loc["no SWR", "estimate"] == 3.0
-    assert rows.loc["SWR", "estimate"] == 5.0
-    assert (rows.loc["no SWR", "ci_low"], rows.loc["no SWR", "ci_high"]) == (1.0, 5.0)
-    assert (rows.loc["SWR", "ci_low"], rows.loc["SWR", "ci_high"]) == (4.5, 8.0)
-    np.testing.assert_array_equal(rows.loc["no SWR", "animals"], [2.0, 8.0, 1.0, 7.0])
-    assert list(rows.loc["no SWR", "animal_names"]) == ["a", "b", "c", "d"]
-    np.testing.assert_array_equal(rows.loc["SWR", "animals"], [5.0, 4.0, 7.0])
-    assert list(rows.loc["SWR", "animal_names"]) == ["a", "b", "d"]
+    # a: epoch 1 median 20, epoch 2 40 -> 30; b: 20; mean 25
+    np.testing.assert_allclose(rows.loc["no SWR", "animals"], [30.0, 20.0])
+    assert rows.loc["no SWR", "estimate"] == pytest.approx(25.0)
+    # SWR: a: 50 and 70 -> 60; b: 70 (its other SWR event has no value)
+    np.testing.assert_allclose(rows.loc["SWR", "animals"], [60.0, 70.0])
+    assert list(rows.loc["SWR", "animal_names"]) == ["a", "b"]
+    for group in rows.index:
+        row = rows.loc[group]
+        assert row["ci_low"] <= row["estimate"] <= row["ci_high"]
 
 
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():

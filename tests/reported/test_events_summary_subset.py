@@ -74,8 +74,9 @@ def test_summary_reads_the_selected_events(monkeypatch):
     # (the label check against the visits is tested in cohort_selection)
     monkeypatch.setattr(builder, "read_manifest", lambda run: {"epochs": {}})
     monkeypatch.setattr(builder, "check_visit_context_starts", lambda t, v: None)
-    # (the state shares are not columns of these events)
+    # (the state shares and the HPD coverage are not columns of these events)
     monkeypatch.setattr(builder, "state_composition_values", lambda events, s: [])
+    monkeypatch.setattr(builder, "hpd_animal_values", lambda events, s: [])
     added = []
     monkeypatch.setattr(
         builder.Summary, "add", lambda self, *values: added.extend(values)
