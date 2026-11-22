@@ -74,7 +74,7 @@ EVENT_BUILDERS = (
     "event_cohort_values",
     "boundary_offset_values",
     "boundary_timing_values",
-    "hpd_animal_values",
+    "hpd_tight_values",
     "state_composition_values",
     "property_values",
     "start_distance_values",

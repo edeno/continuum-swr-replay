@@ -3880,51 +3880,56 @@ def _class_median_values(
     ]
 
 
-def hpd_animal_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.5 and the HPD panel of Figure 2's supplement: each class's
-    HPD coverage at the animal level, as the panel draws it
-    (``event_statistics.hpd_animal_statistics``, the held-out panels'
-    statistic), and the animals whose no-SWR value is below their SWR value.
-    The pooled class medians (``hpd_median_*``, :func:`property_values`) are
-    another statistic and carry no figure tag."""
-    make = value_factory(hpd_animal_values, source, TAGS["hpd"])
-    rows = event_statistics.hpd_animal_statistics(events)
+def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.5 and the posterior-spread panel of Figure 2's supplement:
+    the share of each class's events with a tight posterior, HPD coverage below
+    ``event_statistics.HPD_TIGHT_CM``
+    (``event_statistics.hpd_tight_share_statistics``), the animals in which the
+    no-SWR share is the higher, and the cut. Each class holds a tight group of
+    events and a diffuse one, so a median falls between them; the pooled class
+    medians (``hpd_median_*``, :func:`property_values`) carry no figure tag."""
+    make = value_factory(hpd_tight_values, source, TAGS["hpd"])
+    result = event_statistics.hpd_tight_share_statistics(events)
+    rows = result["rows"]
+    cut = event_statistics.HPD_TIGHT_CM
     what = (
-        "HPD coverage, the length of track that holds 95 % of the decoded "
-        "probability averaged over the event's bins (hpd_coverage_cm)"
+        f"share of the events whose HPD coverage, the length of track that holds "
+        f"95 % of the decoded probability averaged over the event's bins, is below "
+        f"{cut:g} cm"
     )
     reduction = (
-        "an epoch's median over its events, an animal's median over its epochs, "
-        "the mean over animals; 95 % interval from the nested bootstrap of the "
-        "animals, their epochs and their events, small-sample t correction"
+        "each epoch's share, each animal's median over its epochs, the mean over "
+        "animals; 95 % interval from the nested bootstrap of the animals and "
+        "their epochs, small-sample t correction"
     )
-    values = []
+    values = [
+        make(
+            "hpd_tight_cut_cm",
+            cut,
+            "quantity",
+            "int",
+            "the HPD coverage below which an event's posterior counts as tight, "
+            "between the tight and the diffuse group of events",
+            "cm",
+        )
+    ]
     for group, word, name in (
         ("no SWR", "non_swr", "non-SWR"),
         ("SWR", "swr", "SWR-overlapping"),
     ):
         row = rows.loc[group]
-        key = f"hpd_coverage_animal_mean_{word}"
-        values += [
-            make(key, row["estimate"], "quantity", "sig2",
-                 f"{what} of immobile {name} non-local events: {reduction}", "cm"),
-            make(f"{key}_ci_low", row["ci_low"], "quantity", "sig2",
-                 "lower bound of its 95 % interval", "cm"),
-            make(f"{key}_ci_high", row["ci_high"], "quantity", "sig2",
-                 "upper bound of that interval", "cm"),
-        ]  # fmt: skip
-    no_swr = pd.Series(
-        rows.loc["no SWR", "animals"], rows.loc["no SWR", "animal_names"]
-    )
-    swr = pd.Series(rows.loc["SWR", "animals"], rows.loc["SWR", "animal_names"])
+        key = f"hpd_tight_share_{word}"
+        values += _share_interval(
+            make, key, row, f"{what}, of immobile {name} non-local events: {reduction}"
+        )
     values.append(
         make(
-            "hpd_coverage_animals_non_swr_lower",
-            int((no_swr < swr.reindex(no_swr.index)).sum()),
+            "hpd_tight_share_animals_non_swr_higher",
+            result["n_animals_non_swr_higher"],
             "count",
             "count",
-            f"animals whose non-SWR {what}, the median over its epochs of each "
-            "epoch's median, is below their SWR one",
+            "animals whose share of non-SWR events with a tight posterior (the "
+            "median over its epochs) is above their share of SWR events",
         )
     )
     return values
@@ -4273,7 +4278,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_offset_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_timing_values(events, source), EVENTS_SUBSET))
-    summary.add(*over(hpd_animal_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(hpd_tight_values(events, source), EVENTS_SUBSET))
     summary.add(*over(state_composition_values(events, source), EVENTS_SUBSET))
     summary.inputs.append(event_table_record)
     events_with_extras, extra_paths = with_start_and_rest_theta(

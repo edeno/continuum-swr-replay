@@ -108,13 +108,17 @@ the order the text cites them, in four rows:
         concentrated the decoded position is, no-SWR against SWR events. Each
         event's HPD coverage is the length of track (cm) that holds 95 % of
         the decoded probability, averaged over the event's bins
-        (``hpd_coverage_cm`` of the canonical event table, the per-bin ``hpd``
-        of the decode frames). A dot per animal (the median over its epochs
-        of each epoch's median) and, beside them, the mean over animals with
-        its 95 % nested bootstrap interval, the statistic of the held-out
-        panels (``event_statistics.hpd_animal_statistics``; the events
-        summary's ``hpd_coverage_*`` values). The y axis starts at 0. The
-        pooled class medians (``hpd_median_*``) are for the text.
+        (``hpd_coverage_cm`` of the canonical event table). Its distribution
+        on a log axis, the percent of a class's events per bin
+        (``event_statistics.HPD_BIN_EDGES_CM``), a thin line per animal and
+        their mean in bold (``event_statistics.hpd_distribution``). Each class
+        holds a tight group of events (near 20-25 cm) and a diffuse one spread
+        over most of the track, so a median falls between them and describes
+        neither; the events summary reports the share of each class below the
+        dotted cut at 50 cm (``event_statistics.hpd_tight_share_statistics``;
+        the ``hpd_tight_*`` values). The track's length is not drawn: it
+        differs by animal and is known only from each decode's environment.
+        The pooled class medians (``hpd_median_*``) are for the text.
 
     g and h — Support Figure 2h, the events driven by several tetrodes. Each
     tetrode is left out of the decoder in turn: the other tetrodes' estimate
@@ -238,6 +242,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.ticker import NullLocator
 from matplotlib.transforms import blended_transform_factory
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -278,11 +283,13 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     peak_power_densities,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    HPD_BIN_EDGES_CM,
+    HPD_TIGHT_CM,
     TIMING_CLASSES,
     animal_signal_counts,
     boundary_offsets,
     boundary_timing_statistics,
-    hpd_animal_statistics,
+    hpd_distribution,
     nonlocal_below_threshold_statistics,
     peak_ripple_mode_statistics,
 )
@@ -322,7 +329,6 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_YLABEL,
     GAIN_FLOOR,
     GROUP_COLORS,
-    HELDOUT_X,
     MEAN_OFFSET,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
@@ -399,9 +405,11 @@ SWEEP_TICKS = {
     "swr_threshold_z": (1, 2, 3, 4),
 }
 """The sweep panel's x ticks: the rule's value and the ends."""
-HPD_YLABEL = "95 % HPD region\n(cm, event mean)"
-"""The HPD panel's y label: each event's mean over its bins of the length of
-track the 95 % highest-posterior-density region covers."""
+HPD_XLABEL = "95 % HPD length (cm),\nmean over the event's bins"
+"""The posterior-spread panel's x label: each event's mean over its bins of the
+length of track that holds 95 % of the decoded probability."""
+HPD_YLABEL = "% of events"
+HPD_TICKS_CM = (10, 25, 50, 100, 200, 400)
 SHARED_OFFSET = 0.2
 """The shared-content panel: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
@@ -441,10 +449,10 @@ FRAMES = {
     "no_spike_mua": (0.71, 0.27),
     "rule_sweep": (0.085, 0.47),
     "boundary_timing": (0.71, 0.27),
-    "nonlocal_mua": (0.085, 0.15),
-    "hpd": (0.32, 0.06),
-    "heldout_gain": (0.47, 0.22),
-    "shared_content": (0.77, 0.21),
+    "nonlocal_mua": (0.075, 0.13),
+    "hpd": (0.28, 0.18),
+    "heldout_gain": (0.535, 0.2),
+    "shared_content": (0.815, 0.17),
     "ripple_modes": (0.085, 0.3),
     "outside_distance": (0.55, 0.36),
 }
@@ -549,10 +557,11 @@ def read_inputs() -> dict:
 
 
 def read_hpd(events: pd.DataFrame) -> pd.DataFrame:
-    """The HPD panel's statistics: each class's HPD coverage at the animal level
-    (``event_statistics.hpd_animal_statistics``, the held-out panels'
-    statistic), as the events summary reads it."""
-    return hpd_animal_statistics(events)
+    """The posterior-spread panel's distribution: each animal's percent of its
+    events of each class per HPD coverage bin
+    (``event_statistics.hpd_distribution``); the share below the tight cut is
+    the events summary's (``hpd_tight_share_*``)."""
+    return hpd_distribution(events)
 
 
 def _refuse_stale(folder: Path, event_table: Path, panel: str, rerun: str) -> None:
@@ -980,16 +989,39 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     )  # fmt: skip
 
 
-def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
-    """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
-    (the median over its epochs of each epoch's median) and, beside them, the
-    mean over animals with its 95 % interval in black, on a y axis from 0 (a
-    length; ``rows``: :func:`read_hpd`)."""
+def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
+    """The posterior-spread panel: for no-SWR and SWR events, the percent of
+    the class's events in each HPD coverage bin on a log axis, a thin line per
+    animal and their mean in bold in the class's color, the classes named in
+    their colors, and a dotted line at the tight cut
+    (``distribution``: :func:`read_inputs`' ``hpd``)."""
     for group, color in GROUP_COLORS.items():
-        draw_animal_gain(ax, HELDOUT_X[group], rows.loc[group], color)
-    ax.set_xlim(-0.6, 1.6)
-    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
-    ax.set_ylim(0, None)
+        mine = distribution[distribution["group"] == group]
+        by_animal = mine.pivot(index="bin_low", columns="animal", values="percent")
+        high = mine.groupby("bin_low")["bin_high"].first()
+        center = np.sqrt(by_animal.index.to_numpy() * high.to_numpy())
+        ax.plot(center, by_animal.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(center, by_animal.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    ax.axvline(HPD_TIGHT_CM, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+    ax.text(
+        HPD_TIGHT_CM / 1.08, 0.98, f"{HPD_TIGHT_CM:g} cm",
+        transform=ax.get_xaxis_transform(), ha="right", va="top",
+        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+    )  # fmt: skip
+    for k, (name, color) in enumerate(
+        zip(("No SWR", "SWR"), GROUP_COLORS.values(), strict=True)
+    ):
+        ax.text(
+            0.98, 0.98 - 0.1 * k, name, transform=ax.transAxes, ha="right",
+            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
+        )  # fmt: skip
+    ax.set_xscale("log")
+    ax.set_xlim(HPD_BIN_EDGES_CM[0], HPD_BIN_EDGES_CM[-1])
+    ax.set_xticks(HPD_TICKS_CM, [f"{t:g}" for t in HPD_TICKS_CM])
+    ax.xaxis.set_minor_locator(NullLocator())
+    top = distribution.groupby(["group", "bin_low"])["percent"].max().max()
+    ax.set_ylim(0, 1.35 * top)  # room for the names above the lines
+    ax.set_xlabel(HPD_XLABEL)
     ax.set_ylabel(HPD_YLABEL)
     ax.set_title("Posterior spread", fontsize=SMALL_SIZE, pad=3)
 

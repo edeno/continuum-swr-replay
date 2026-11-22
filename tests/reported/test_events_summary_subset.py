@@ -76,7 +76,7 @@ def test_summary_reads_the_selected_events(monkeypatch):
     monkeypatch.setattr(builder, "check_visit_context_starts", lambda t, v: None)
     # (the state shares and the HPD coverage are not columns of these events)
     monkeypatch.setattr(builder, "state_composition_values", lambda events, s: [])
-    monkeypatch.setattr(builder, "hpd_animal_values", lambda events, s: [])
+    monkeypatch.setattr(builder, "hpd_tight_values", lambda events, s: [])
     added = []
     monkeypatch.setattr(
         builder.Summary, "add", lambda self, *values: added.extend(values)

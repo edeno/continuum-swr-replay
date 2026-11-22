@@ -783,31 +783,35 @@ def test_property_values_name_each_property_class_and_direction():
     assert values["extent_animals_in_direction"].value == 1
 
 
-def test_hpd_animal_values_are_the_hpd_panels_statistic():
-    """The panel's animal-level HPD coverage of each class with its interval,
-    and the animals whose no-SWR value is lower; tagged to the panel, while
-    the pooled hpd_median_* values carry no figure tag."""
+def test_hpd_tight_values_are_the_share_below_the_cut():
+    """The share of each class's events below the cut with its interval, the
+    animals whose no-SWR share is higher and the cut, from the panel's
+    function; tagged to the panel, while the pooled hpd_median_* values carry
+    no figure tag."""
+    # three animals of one epoch each, alike: no-SWR 10 and 300 cm (half
+    # tight), SWR 10, 300, 400, 400 (a quarter)
     events = pd.DataFrame(
         {
-            "animal": ["a", "a", "b", "b"],
-            "session_date": "d1",
-            "epoch": "e1",
-            "is_swr": [False, True, False, True],
-            "hpd_coverage_cm": [10.0, 30.0, 40.0, 20.0],
+            "animal": np.repeat(["a", "b", "c"], 6),
+            "session_date": 1,
+            "epoch": "02_r1",
+            "is_swr": np.tile([False, False, True, True, True, True], 3),
+            "hpd_coverage_cm": np.tile([10.0, 300.0, 10.0, 300.0, 400.0, 400.0], 3),
         }
     )
-    values = _by_key(builder.hpd_animal_values(events, "s"))
+    values = _by_key(builder.hpd_tight_values(events, "s"))
     numbers = {k: v.value for k, v in values.items()}
-    assert numbers["hpd_coverage_animal_mean_non_swr"] == pytest.approx(25.0)
-    assert numbers["hpd_coverage_animal_mean_swr"] == pytest.approx(25.0)
-    assert numbers["hpd_coverage_animals_non_swr_lower"] == 1
+    assert numbers["hpd_tight_share_non_swr"] == pytest.approx(0.5)
+    assert numbers["hpd_tight_share_swr"] == pytest.approx(0.25)
+    assert numbers["hpd_tight_share_animals_non_swr_higher"] == 3
+    assert numbers["hpd_tight_cut_cm"] == 50.0
     assert set(numbers) == {
-        f"hpd_coverage_animal_mean_{w}{end}"
+        f"hpd_tight_share_{w}{end}"
         for w in ("non_swr", "swr")
         for end in ("", "_ci_low", "_ci_high")
-    } | {"hpd_coverage_animals_non_swr_lower"}
+    } | {"hpd_tight_share_animals_non_swr_higher", "hpd_tight_cut_cm"}
     assert "95 % of the decoded probability" in (
-        values["hpd_coverage_animal_mean_swr"].description
+        values["hpd_tight_share_swr"].description
     )
     for value in values.values():
         assert value.questions == ("2d.5",)

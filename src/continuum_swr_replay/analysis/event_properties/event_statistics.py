@@ -1166,41 +1166,119 @@ def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
     )
 
 
-def hpd_animal_statistics(
-    events: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+HPD_TIGHT_CM = 50.0
+"""The HPD coverage below which an event's posterior counts as tight (cm): it
+lies between the two groups of events, a tight one near 20-25 cm and a diffuse
+one spread over most of the track."""
+
+HPD_BIN_EDGES_CM = np.geomspace(5.0, 500.0, 25)
+"""The HPD coverage bins of the posterior-spread panel (cm), log-spaced: every
+event's coverage lies inside them."""
+
+
+def _hpd_table(events: pd.DataFrame) -> pd.DataFrame:
+    """The events with a coverage: ``animal``, ``epoch_id`` (one label per
+    session), ``group`` (``"no SWR"`` or ``"SWR"``) and ``hpd_coverage_cm``."""
+    known = events.dropna(subset=["hpd_coverage_cm"])
+    return pd.DataFrame(
+        {
+            "animal": known["animal"].to_numpy(),
+            "epoch_id": known[list(SESSION_COLUMNS)]
+            .astype(str)
+            .agg("_".join, axis=1)
+            .to_numpy(),
+            "group": np.where(known["is_swr"].astype(bool), "SWR", "no SWR"),
+            "hpd_coverage_cm": known["hpd_coverage_cm"].to_numpy(dtype=float),
+        }
+    )
+
+
+def hpd_distribution(
+    events: pd.DataFrame, edges: np.ndarray = HPD_BIN_EDGES_CM
 ) -> pd.DataFrame:
-    """Each event's HPD coverage (``hpd_coverage_cm``: the length of track that
-    holds 95 % of the decoded probability, averaged over the event's bins) for
-    no-SWR and SWR events, reduced as the held-out panels reduce their scores
-    (``likelihood_advantage.likelihood_advantage_statistics``): an epoch's
-    median over its events, an animal's median over its epochs, the mean over
-    animals with its 95 % nested bootstrap interval.
+    """Each animal's distribution of the events' HPD coverage (the length of
+    track that holds 95 % of the decoded probability, averaged over the
+    event's bins), by class.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``animal``, the session columns
-        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`),
-        ``is_swr`` and ``hpd_coverage_cm``.
-    n_boot, seed : int, optional
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        ``hpd_coverage_cm`` (an event without one is left out).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (cm); a bin holds its low edge and not its high one.
 
     Returns
     -------
     pd.DataFrame
-        Indexed by group (``"no SWR"``, ``"SWR"``), with
-        ``likelihood_advantage_statistics``' columns.
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent`` (the percent of the animal's events of the
+        class in the bin).
     """
-    table = pd.DataFrame(
-        {
-            "animal": events["animal"].to_numpy(),
-            "epoch_id": events[list(SESSION_COLUMNS)].astype(str).agg("_".join, axis=1),
-            "group": np.where(events["is_swr"].astype(bool), "SWR", "no SWR"),
-            "hpd_coverage_cm": events["hpd_coverage_cm"].to_numpy(dtype=float),
-        }
+    table = _hpd_table(events)
+    rows = []
+    for (animal, group), mine in table.groupby(["animal", "group"]):
+        counts, _ = np.histogram(mine["hpd_coverage_cm"], bins=edges)
+        rows.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "group": group,
+                    "bin_low": edges[:-1],
+                    "bin_high": edges[1:],
+                    "percent": 100 * counts / len(mine),
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True)
+
+
+def hpd_tight_share_statistics(
+    events: pd.DataFrame,
+    *,
+    cut_cm: float = HPD_TIGHT_CM,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> dict:
+    """The share of each class's events whose HPD coverage is below a cut.
+
+    Each epoch's share of its events of the class below ``cut_cm`` is reduced
+    as the project reduces a per-epoch share
+    (``likelihood_advantage.likelihood_advantage_statistics`` over one row per
+    epoch, as ``restriction_totals.outside_swr_gain_statistics`` reduces its
+    shares): each animal's median over its epochs, the mean over animals and
+    its 95 % nested bootstrap interval.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        As :func:`hpd_distribution` takes them.
+    cut_cm : float, optional
+    n_boot, seed : int, optional
+
+    Returns
+    -------
+    dict
+        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``), with
+        ``likelihood_advantage_statistics``' columns; and
+        ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
+        their SWR share.
+    """
+    table = _hpd_table(events)
+    shares = (
+        table.assign(tight=table["hpd_coverage_cm"] < cut_cm)
+        .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
+        .mean()
     )
-    return likelihood_advantage_statistics(
-        table, column="hpd_coverage_cm", n_boot=n_boot, seed=seed
+    rows = likelihood_advantage_statistics(
+        shares, column="tight", n_boot=n_boot, seed=seed
     ).loc[["no SWR", "SWR"]]
+    by_group = {
+        group: pd.Series(rows.loc[group, "animals"], rows.loc[group, "animal_names"])
+        for group in rows.index
+    }
+    higher = by_group["no SWR"] > by_group["SWR"].reindex(by_group["no SWR"].index)
+    return {"rows": rows, "n_animals_non_swr_higher": int(higher.sum())}
 
 
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:

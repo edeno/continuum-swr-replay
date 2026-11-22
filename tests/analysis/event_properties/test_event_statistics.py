@@ -686,42 +686,54 @@ def test_animal_class_medians_give_each_animal_s_median_of_each_class():
     assert np.isnan(stats.animal_class_medians(no_swr, "extent").loc["c", "swr"])
 
 
-def test_hpd_animal_statistics_are_the_held_out_panels_statistic():
-    """Each class's HPD coverage as the held-out panels reduce their scores:
-    an epoch's median over its events, an animal's median over its epochs,
-    the mean over animals with its nested bootstrap interval
-    (``likelihood_advantage_statistics``)."""
-    events = pd.DataFrame(
+def _hpd_events() -> pd.DataFrame:
+    """Animal a: epoch 1 no-SWR 10, 20, 300 cm and SWR 400; epoch 2 no-SWR 30
+    and SWR 20, 300. Animal b: one epoch, no-SWR 300, 400 and SWR 10, NaN."""
+    return pd.DataFrame(
         {
-            "animal": ["a"] * 6 + ["b"] * 4,
-            "session_date": [1, 1, 1, 2, 2, 2, 1, 1, 1, 1],
+            "animal": ["a"] * 7 + ["b"] * 4,
+            "session_date": [1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1],
             "epoch": "02_r1",
-            "is_swr": [False, False, True, False, True, True, False, False, True, True],
-            "hpd_coverage_cm": [
-                10.0,
-                30.0,
-                50.0,
-                40.0,
-                60.0,
-                80.0,
-                20.0,
-                20.0,
-                70.0,
-                np.nan,
-            ],
+            "is_swr": [False, False, False, True, False, True, True,
+                       False, False, True, True],
+            "hpd_coverage_cm": [10.0, 20.0, 300.0, 400.0, 30.0, 20.0, 300.0,
+                                300.0, 400.0, 10.0, np.nan],
         }
-    )
-    rows = stats.hpd_animal_statistics(events, n_boot=200)
-    assert list(rows.index) == ["no SWR", "SWR"]
-    # a: epoch 1 median 20, epoch 2 40 -> 30; b: 20; mean 25
-    np.testing.assert_allclose(rows.loc["no SWR", "animals"], [30.0, 20.0])
-    assert rows.loc["no SWR", "estimate"] == pytest.approx(25.0)
-    # SWR: a: 50 and 70 -> 60; b: 70 (its other SWR event has no value)
-    np.testing.assert_allclose(rows.loc["SWR", "animals"], [60.0, 70.0])
-    assert list(rows.loc["SWR", "animal_names"]) == ["a", "b"]
+    )  # fmt: skip
+
+
+def test_hpd_distribution_gives_each_animals_percent_per_bin():
+    """Per animal and class, the percent of its events (with a value) in each
+    bin of the edges."""
+    edges = np.array([5.0, 50.0, 500.0])
+    table = stats.hpd_distribution(_hpd_events(), edges).set_index(
+        ["animal", "group", "bin_low"]
+    )["percent"]
+    # a, no SWR: 10, 20, 30 below 50 and 300 above
+    assert table[("a", "no SWR", 5.0)] == pytest.approx(75.0)
+    assert table[("a", "no SWR", 50.0)] == pytest.approx(25.0)
+    assert table[("a", "SWR", 5.0)] == pytest.approx(100 / 3)
+    assert table[("b", "no SWR", 5.0)] == 0.0
+    assert table[("b", "SWR", 5.0)] == pytest.approx(100.0)
+    assert len(table) == 2 * 2 * 2
+
+
+def test_hpd_tight_share_statistics_reduce_each_epochs_share():
+    """Each epoch's share of a class below the cut, each animal's median over
+    its epochs, the mean over animals with its interval
+    (``likelihood_advantage_statistics`` over one row per epoch), and the
+    animals whose no-SWR share is the higher."""
+    result = stats.hpd_tight_share_statistics(_hpd_events(), cut_cm=50.0, n_boot=200)
+    rows = result["rows"]
+    # no SWR: a's epochs 2/3 and 1 -> median 5/6; b 0
+    np.testing.assert_allclose(rows.loc["no SWR", "animals"], [5 / 6, 0.0])
+    assert rows.loc["no SWR", "estimate"] == pytest.approx(5 / 12)
+    # SWR: a's epochs 0 and 1/2 -> 1/4; b 1
+    np.testing.assert_allclose(rows.loc["SWR", "animals"], [0.25, 1.0])
+    assert result["n_animals_non_swr_higher"] == 1
     for group in rows.index:
-        row = rows.loc[group]
-        assert row["ci_low"] <= row["estimate"] <= row["ci_high"]
+        assert rows.loc[group, "ci_low"] <= rows.loc[group, "estimate"]
+        assert rows.loc[group, "estimate"] <= rows.loc[group, "ci_high"]
 
 
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():

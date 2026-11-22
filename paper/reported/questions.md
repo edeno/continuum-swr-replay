@@ -1485,7 +1485,7 @@ Sources:
 
 Status: computed. Figures: S2f. Values: 32.
 
-*Note:* Figure 2's supplement, panel S2f, draws the HPD coverage at the animal level (the hpd_coverage_* values: each animal's median, the mean over animals with its interval); the pooled class medians (hpd_median_*) are for the text.
+*Note:* Figure 2's supplement, panel S2f, draws the distribution of the events' HPD coverage by class, with the share of events with a tight posterior (the hpd_tight_* values); the pooled class medians (hpd_median_*) are for the text.
 
 Sources:
 
@@ -3676,7 +3676,7 @@ without being called, is not listed.
 | `events.gamma_z_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.matched_reference_medians` |  |
 | `events.heldout_bout_values` | `reported/events.py` | none |  |
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
-| `events.hpd_animal_values` | `reported/events.py` | `analysis.event_properties.event_statistics.hpd_animal_statistics` |  |
+| `events.hpd_animal_values` | not in the builder's source |  |  |
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
 | `events.nonlocal_found_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.nonlocal_events_overlapped` |  |

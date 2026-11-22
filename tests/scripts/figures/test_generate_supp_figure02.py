@@ -107,26 +107,14 @@ def _timing() -> pd.DataFrame:
     )  # fmt: skip
 
 
-HPD = {
-    "no SWR": [33.0, 67.0, 94.0, 44.0, 89.0],
-    "SWR": [123.0, 119.0, 82.0, 90.0, 124.0],
-}
-
-
 def _hpd() -> pd.DataFrame:
-    """``hpd_animal_statistics``' two rows: estimates 47 and 82, intervals
-    20 either side, the animals of :data:`HPD`."""
-    return pd.DataFrame.from_dict(
-        {
-            group: {
-                "estimate": estimate, "ci_low": estimate - 20.0,
-                "ci_high": estimate + 20.0, "animals": np.array(HPD[group]),
-                "animal_names": np.array(list("abcde")),
-            }
-            for group, estimate in (("no SWR", 47.0), ("SWR", 82.0))
-        },
-        orient="index",
-    )  # fmt: skip
+    """``hpd_distribution`` of the HPD test's events."""
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        hpd_distribution,
+    )
+    from tests.analysis.event_properties.test_event_statistics import _hpd_events
+
+    return hpd_distribution(_hpd_events())
 
 
 SPLIT = {
@@ -444,25 +432,38 @@ def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
     plt.close(fig)
 
 
-def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
-    """No SWR and SWR in their colors: a dot per animal, the mean over animals
-    with its interval in black beside them, a y label in cm that says what the
-    length is, a y axis from 0 and no zero line (a length, not a gain)."""
+def test_the_hpd_panel_draws_the_distribution_of_each_class():
+    """For each class, a thin line per animal and their mean in bold, in the
+    class's color, on a log x axis with the named ticks; a dotted line at the
+    tight cut; the classes named in their colors; a y axis from 0."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    distribution = _hpd()
     fig = figure.generate_figure(_statistics())
     (ax,) = figure.panel_axes(fig, "hpd")
-    for x, group in enumerate(("no SWR", "SWR")):
-        (dots,) = [
-            c for c in ax.collections
-            if isinstance(c, matplotlib.collections.PathCollection)
-            and np.allclose(c.get_offsets()[:, 0], x)
-        ]  # fmt: skip
-        np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(HPD[group]))
-        assert np.allclose(_means_at(ax, x), _hpd().loc[group, "estimate"])
-    assert ax.get_ylabel() == figure.HPD_YLABEL
-    assert "95 % HPD" in ax.get_ylabel() and "cm" in ax.get_ylabel()
-    assert not any(np.allclose(line.get_ydata(), 0) for line in ax.lines)
+    n_bins = len(figure.HPD_BIN_EDGES_CM) - 1
+    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
+    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
+    for group, color in panels.GROUP_COLORS.items():
+        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
+        mean = max(mine, key=lambda c: c.get_linewidth())
+        expected = (
+            distribution[distribution["group"] == group]
+            .pivot(index="bin_low", columns="animal", values="percent")
+            .mean(axis=1)
+        )
+        np.testing.assert_allclose(mean.get_ydata(), expected.to_numpy())
+    assert ax.get_xscale() == "log"
+    assert [t.get_text() for t in ax.get_xticklabels()] == [
+        "10", "25", "50", "100", "200", "400",
+    ]  # fmt: skip
+    (cut,) = [line for line in ax.lines if line.get_linestyle() == ":"]
+    np.testing.assert_allclose(cut.get_xdata(), figure.HPD_TIGHT_CM)
+    assert {"No SWR", "SWR", "50 cm"} <= {t.get_text() for t in ax.texts}
     assert ax.get_ylim()[0] == 0
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    assert ax.get_title() == "Posterior spread"
     plt.close(fig)
 
 
