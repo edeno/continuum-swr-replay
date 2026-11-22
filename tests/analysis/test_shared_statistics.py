@@ -735,3 +735,112 @@ def test_the_draws_follow_the_sorted_order_of_the_animal_labels():
     two = stats.animal_balanced_bootstrap(t.value, relabeled, t.day, n_draws=20, seed=3)
     assert one.estimate == pytest.approx(two.estimate)
     assert not np.allclose(one.draws, two.draws)
+
+
+# --- ranks and signs blind to the order of a sum -----------------------------------
+
+# Eight days of two animals whose day means are, in exact arithmetic,
+# 0.1, 0.1, -0.1, 0.2, 0.3, -0.2, 0.1, 0.4: ties among |d|. Each day's sessions
+# are written two ways, so that the floating means differ in the last bit.
+EXACT_DAY_MEANS = [0.1, 0.1, -0.1, 0.2, 0.3, -0.2, 0.1, 0.4]
+SESSIONS_ONE = [
+    [0.1, 0.1, 0.1],
+    [0.1],
+    [-0.1, -0.1, -0.1],
+    [0.2],
+    [0.3],
+    [-0.2],
+    [0.1],
+    [0.4],
+]
+SESSIONS_TWO = [
+    [0.1],
+    [0.3, -0.1],
+    [-0.1],
+    [0.1, 0.3],
+    [0.3, 0.3, 0.3],
+    [-0.1, -0.3],
+    [0.1, 0.1, 0.1],
+    [0.7, 0.1],
+]
+
+
+def _day_table(sessions: list[list[float]]) -> pd.DataFrame:
+    rows = []
+    for d, values in enumerate(sessions):
+        for s, v in enumerate(values):
+            rows.append(
+                {
+                    "value": v,
+                    "animal": "a" if d < 4 else "b",
+                    "day": f"d{d}",
+                    "session": f"s{s}",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_the_day_p_does_not_depend_on_the_last_bit_of_a_tie():
+    one, two = _day_table(SESSIONS_ONE), _day_table(SESSIONS_TWO)
+    expected = stats.signed_rank_p(np.array(EXACT_DAY_MEANS))
+    for t in (one, two):
+        assert stats.day_level_test(t.value, t.animal, t.day) == expected
+        summary = stats.estimand_summary(
+            t.value, t.animal, t.day, t.session, n_draws=20, seed=0
+        )
+        assert summary["day_p"] == expected
+
+
+def test_an_animal_at_zero_does_not_have_the_estimates_sign():
+    """Animal b's sessions average to zero in exact arithmetic; in floating
+    point the sum can leave a residue of either sign, in any order."""
+    rng = np.random.default_rng(0)
+    b_values = np.array([0.1, 0.2, -0.3, 0.7, -0.7, 0.3, -0.1, -0.2])
+    for _ in range(20):
+        shuffled = rng.permutation(b_values)
+        t = pd.DataFrame(
+            {
+                "value": np.r_[[1.0, 2.0], shuffled],
+                "animal": ["a", "a"] + ["b"] * 8,
+                "day": ["d1", "d2"] + ["d1"] * 8,
+                "session": ["s1", "s1"] + [f"s{i}" for i in range(8)],
+            }
+        )
+        summary = stats.estimand_summary(
+            t.value, t.animal, t.day, t.session, n_draws=10, seed=0
+        )
+        assert summary["estimate"] > 0
+        assert summary["n_animals_same_sign"] == 1
+
+
+def test_on_continuous_values_the_snap_changes_nothing():
+    for seed in range(20):
+        t = _days_table().assign(value=np.random.default_rng(seed).normal(0.2, 1.0, 16))
+        summary = stats.estimand_summary(
+            t.value, t.animal, t.day, t.session, n_draws=10, seed=0
+        )
+        day_means = t.groupby(["animal", "day"]).value.mean().to_numpy()
+        assert summary["day_p"] == stats.signed_rank_p(day_means)
+        own = stats.animal_day_session_values(t.value, t.animal, t.day, t.session)
+        assert summary["n_animals_same_sign"] == int(
+            (np.sign(own) == np.sign(summary["estimate"])).sum()
+        )
+
+
+@pytest.mark.parametrize("column", ["animal", "day", "session"])
+def test_a_missing_label_is_refused_by_name(column):
+    t = THREE_LEVEL.copy()
+    t[column] = t[column].astype(object)
+    t.loc[[1, 4], column] = None
+    message = f"the {column} labels have 2 missing values"
+    with pytest.raises(ValueError, match=message):
+        stats.estimand_summary(t.value, t.animal, t.day, t.session, n_draws=10, seed=0)
+    with pytest.raises(ValueError, match=message):
+        stats.animal_day_session_values(t.value, t.animal, t.day, t.session)
+    if column != "session":
+        with pytest.raises(ValueError, match=message):
+            stats.day_level_test(t.value, t.animal, t.day)
+        with pytest.raises(ValueError, match=message):
+            stats.animal_balanced_bootstrap(
+                t.value, t.animal, t.day, n_draws=10, seed=0
+            )
