@@ -226,7 +226,7 @@ QUESTIONS: tuple[Question, ...] = (
         "How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?",
         status="partly computed",
         reason="the non-SWR fraction is swept over the non-local threshold, the minimum duration and the SWR threshold; the close/remote split is not",
-        figures=("S2c",),
+        figures=("S2c", "S2i"),
     ),
     Question(
         "2a.6",

@@ -15,6 +15,10 @@ def test_the_rule_is_among_the_swept_values():
     }
     for name, values in sweep.SETTINGS.items():
         assert sweep.RULE[name] in values
+    # 0 to 6 z by 0.5, the earlier 1, 1.5, 2, 2.5, 3 and 4 among them
+    assert sweep.SWR_THRESHOLDS_Z[0] == 0.0 and sweep.SWR_THRESHOLDS_Z[-1] == 6.0
+    assert {1.0, 1.5, 2.0, 2.5, 3.0, 4.0} <= set(sweep.SWR_THRESHOLDS_Z)
+    assert len(sweep.SWR_THRESHOLDS_Z) == 13
 
 
 def _events(starts, is_swr) -> pd.DataFrame:
@@ -55,6 +59,8 @@ def test_epoch_counts_detect_again_at_each_setting_and_count_those_in_a_visit(
     assert by_value.loc[("swr_threshold_z", 1.0), "n_no_swr"] == 2
     assert by_value.loc[("swr_threshold_z", 2.0), "n_no_swr"] == 4
     assert by_value.loc[("swr_threshold_z", 4.0), "n_no_swr"] == 8
+    assert by_value.loc[("swr_threshold_z", 0.0), "n_no_swr"] == 0
+    assert by_value.loc[("swr_threshold_z", 6.0), "n_no_swr"] == 8
     # at 2 z the criterion calls events 4-7 SWR; the table calls 0, 2, 4, 6
     assert (by_value.xs("swr_threshold_z")["n_criterion_agrees"] == 4).all()
 

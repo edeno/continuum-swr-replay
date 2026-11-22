@@ -645,9 +645,13 @@ def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check()
     n_values = sum(len(v) for v in rule_sweep.SETTINGS.values())
     assert len(values) == 4 * n_values + 1
     assert not any(c.isdigit() for k in values for c in k)
-    for value in values.values():
+    for key, value in values.items():
         assert value.questions == ("2a.5",)
-        assert value.figures == builder.TAGS["rule_sweep"].figures
+        drawn_with_ripple = key.startswith(
+            ("rule_sweep_swr_threshold", "rule_sweep_swr_criterion")
+        )
+        tag = "rule_sweep_swr" if drawn_with_ripple else "rule_sweep"
+        assert value.figures == builder.TAGS[tag].figures, key
 
 
 def _state_calibration() -> tuple[pd.DataFrame, pd.DataFrame]:

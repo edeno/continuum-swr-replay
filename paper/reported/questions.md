@@ -283,7 +283,7 @@ Sources:
 
 ### 2a.5. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
 
-Status: partly computed; the non-SWR fraction is swept over the non-local threshold, the minimum duration and the SWR threshold; the close/remote split is not. Figures: S2c. Values: 65.
+Status: partly computed; the non-SWR fraction is swept over the non-local threshold, the minimum duration and the SWR threshold; the close/remote split is not. Figures: S2c, S2i. Values: 65.
 
 Sources:
 

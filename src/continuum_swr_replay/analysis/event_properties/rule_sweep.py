@@ -7,7 +7,7 @@ Three settings are swept, one at a time, the others at the rule's values:
   (:data:`PROBABILITY_THRESHOLDS`, the rule's 0.8 among them);
 - the minimum run length in decode samples (:data:`MINIMUM_SAMPLES`, the
   rule's 7 among them: its 15 ms rounds to 7 samples on the 2 ms grid);
-- the SWR threshold (:data:`SWR_THRESHOLDS_Z`, the Kay detector's 2 z among
+- the SWR detector's threshold (:data:`SWR_THRESHOLDS_Z`, the Kay detector's 2 z among
   them).
 
 For the first two, :func:`epoch_sweep_counts` detects the events again from a
@@ -62,8 +62,10 @@ PROBABILITY_THRESHOLDS = (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
 """The non-local probabilities an event stays strictly above."""
 MINIMUM_SAMPLES = (7, 10, 15, 25)
 """The minimum run lengths, in 2 ms decode samples (7 is the rule's 15 ms)."""
-SWR_THRESHOLDS_Z = (1.0, 1.5, 2.0, 2.5, 3.0, 4.0)
-"""The SWR thresholds, z of the Kay consensus ripple power."""
+SWR_THRESHOLDS_Z = tuple(float(z) for z in np.arange(0.0, 6.01, 0.5))
+"""The SWR thresholds, z of the Kay consensus ripple power: 0 to 6 z in steps
+of 0.5, so that the series spans the events' peak ripple power it is drawn
+beside."""
 RULE_MINIMUM_SAMPLES = 7
 """The rule's minimum, ``NON_LOCAL_MINIMUM_DURATION_S`` (15 ms) in samples."""
 RULE = {
