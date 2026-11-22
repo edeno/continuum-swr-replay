@@ -209,6 +209,19 @@ The review of the restriction and held-out tetrode runs before the
   `scripts/figures/generate_supp_heldout_tetrode.py` refuses a run not on folds of whole
   trials, but draws a run made from another event table or participation run.
   *When:* before the figure is final.
+- [ ] **The restriction run's categories still count bins without ripple signal as
+  outside an SWR.** `nonlocal_restriction.bin_categories` puts an immobile analyzed bin
+  outside every SWR of the source in `immobile_outside_swr` whether or not SWR detection
+  was observed there (2,013 of the 64.3 million such bins inside a well visit, in 19
+  epochs, in the run of 2026-11). The CPU steps correct it: the per-bin facts record
+  `swr_observed`, and every sum outside SWRs uses
+  `restriction_windows.outside_swr_bins`. Correcting `bin_categories` itself needs a new
+  category (the bins are analyzed and immobile, so neither `excluded` nor
+  `immobile_in_swr` is right), which changes the finished run's `category` values and
+  its records' `n_bins_by_category` keys, so the run would not gather or resume; it is
+  left. The all-immobile values keep those bins (they are immobile time either way).
+  *When:* at the next rerun of `score_nonlocal_restriction.py`; give `bin_categories`
+  the observed mask then, and keep `outside_swr_bins` as the one rule.
 - [ ] **`n_folds` beside `folds`.** `tetrode_holdout.heldout_terms`, `holdout_scores` and
   `nonlocal_restriction.fold_fit_scores` take `n_folds` beside the `folds` array, which
   implies it.

@@ -70,10 +70,11 @@ after a change to fitting code only, start at step 6.
    named otherwise; the two GPU runners need `--gpus`):
    1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on
       the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR source);
-   2. `measure_bin_facts.py`: each bin's spikes and well-visit flag (reads run 1's records, the decodes and
-      the session cache);
-   3. `detect_heldout_events.py`: the events detected from the held-out decode and the time sums (needs 1
-      and 2; reads the event table);
+   2. `measure_bin_facts.py`: each bin's spikes, well-visit flag and SWR-observed flag (reads run 1's
+      records, the decodes, the SWR source and the session cache);
+   3. `detect_heldout_events.py`: the events detected from the held-out decode and the time sums, by
+      category, well visit, event window, SWR-observed flag, margin from the SWRs and place sampling
+      (needs 1 and 2; reads the event table);
    4. `measure_event_participation.py`: the Local-rest controls (reads the event table, the decodes and the
       session cache);
    5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score (needs 4; reads the event table,
@@ -95,6 +96,8 @@ after a change to fitting code only, start at step 6.
 
    With two workers on a card (`--workers-per-gpu 2`), the largest epochs can run out of GPU memory; run the
    same command again with `--workers-per-gpu 1`. Each runner reruns only the epochs whose record is not `ok`.
+   Steps 3 and 6 read another per-bin facts run with `--bin-facts-dir` (and another restriction run with
+   `--restriction-dir`); with `--output-dir`, a trial of the CPU steps writes nothing under the data root.
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
    `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.
