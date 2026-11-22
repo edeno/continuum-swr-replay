@@ -503,7 +503,9 @@ the build).
 `record.FitRecord` is one row per (model, kind, session); its docstring lists every field.
 A session with no rows, or no events of the kind, left is not fitted: no fit is tried,
 and its record has the status "not fitted" and NaN coefficients. A fit tried and not
-kept keeps the last fit's status and the true counts, with NaN coefficients. A record
+kept keeps the last fit's status and the true counts, with NaN coefficients, and lists
+what the refit had left out before it ended, as a record of what was tried (the rule is
+in `sessions.py`'s docstring). A record
 whose status is not "converged" is kept; its readers flag it. Every cause is a code of a
 closed set, so that sessions can be counted by cause: `support.Removed` for a term left
 out (`left_out`, with the refit's round in `left_out_round`), `record.NoFit` for a

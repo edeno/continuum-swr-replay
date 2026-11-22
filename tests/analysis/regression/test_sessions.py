@@ -535,12 +535,9 @@ def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
             assert column in record.left_out
 
 
-def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
-    """The reference level has 10 visits and no event, two other levels have
-    events: the fit has no finite maximum along the intercept. Nothing is
-    dropped or made inactive. A fit was tried, so the session is not "not
-    fitted": its record keeps the last fit's status, its true counts and NaN
-    coefficients, with the cause; the loop goes on."""
+def _empty_reference_rows() -> pd.DataFrame:
+    """40 visits of 30 bins with a category: the reference level A (10 visits)
+    holds no event, B and C do; a slope x per visit."""
     rng = np.random.default_rng(1)
     rows = []
     for visit in range(40):
@@ -551,7 +548,16 @@ def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
             rows.append(
                 {"visit": visit, "cat": level, "x": x, "exposure": 0.1, "count": count}
             )
-    frame = pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
+def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
+    """The reference level has 10 visits and no event, two other levels have
+    events: the fit has no finite maximum along the intercept. Nothing is
+    dropped or made inactive. A fit was tried, so the session is not "not
+    fitted": its record keeps the last fit's status, its true counts and NaN
+    coefficients, with the cause; the loop goes on."""
+    frame = _empty_reference_rows()
     other = frame.assign(count=np.random.default_rng(2).poisson(0.2, len(frame)) * 1.0)
     design = build_design(
         [
@@ -699,3 +705,40 @@ def test_a_missing_unit_id_is_refused(family, rate_sessions, content_sessions) -
         ValueError, match=rf"session {name}: 3 rows with a missing {unit}"
     ):
         _fit(design, sessions, lik, response=response, unit=unit)
+
+
+def test_a_fit_not_kept_records_what_the_refit_left_out(monkeypatch) -> None:
+    """A refit (scripted) that leaves x out in round 1 and then runs away
+    along the intercept: the session has no kept fit, and its record lists
+    what the refit had left out before it ended, with the round, as a record
+    of what was tried; no rows are dropped for it."""
+    from dataclasses import replace
+
+    from continuum_swr_replay.analysis.regression import sessions as loop
+
+    real = loop.refit_session
+
+    def scripted(lik, data, blocks, rho, **kw):
+        return replace(
+            real(lik, data, blocks, rho, **kw),
+            left_out=np.array([3]),
+            rounds=np.array([1]),
+        )
+
+    monkeypatch.setattr(loop, "refit_session", scripted)
+    frame = _empty_reference_rows()
+    design = _rate_design(frame, Category("cat", ("A", "B", "C"), reference="A"))
+    assert design.coef_names[3] == "x"
+    (record,) = _fit(
+        design,
+        {("sim", "1", "02_r1"): frame},
+        Poisson(),
+        response="count",
+        unit="visit",
+    )
+    assert record.status == "no finite maximum"
+    assert record.no_fit == NoFit.ALONG_THE_INTERCEPT
+    assert record.left_out == {"x": Removed.NO_FINITE_MAXIMUM}
+    assert record.left_out_round == {"x": 1}
+    assert record.cohort_counts["rows_dropped"] == {}
+    assert record.n_rows == len(frame) and np.isnan(record.coef).all()

@@ -37,7 +37,9 @@ fit was tried); its record says why and the loop goes on. A fit that was tried
 and not kept, because the refit ends along the intercept (nothing is dropped or
 left out for it), along a penalty direction, after too many rounds or with any
 other status, keeps the last fit's status and the true counts, with NaN
-coefficients and its cause. Every cause is a code of a closed set
+coefficients and its cause. Its ``left_out`` and ``left_out_round`` hold what
+the refit had left out before it ended, as a record of what was tried; no rows
+are dropped for it. Every cause is a code of a closed set
 (:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term;
 :func:`.record.describe` gives their words).
 
