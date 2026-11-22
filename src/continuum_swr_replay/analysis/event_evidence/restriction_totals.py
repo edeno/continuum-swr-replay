@@ -10,10 +10,27 @@ Figures 2 to 5.
 
 **The time sums.** Per epoch, :func:`restriction_time_sums` sums the per-bin
 scores, bins and spikes (the per-bin facts, :mod:`.bin_facts`) of each
-combination of ``category``, ``in_well_visit`` and ``in_event_window`` (the bin
-lies in the window of a given event of either group: the events detected from
-the held-out decode, ``scripts/event_evidence/detect_heldout_events.py``): every
-bin is in exactly one row, so any union of rows is summed by adding them.
+combination of :data:`TIME_SUM_KEYS`: ``category``, ``in_well_visit``,
+``in_event_window`` (the bin lies in the window of a given event of either
+group: the events detected from the held-out decode,
+``scripts/event_evidence/detect_heldout_events.py``), ``swr_observed`` (SWR
+detection was observed at the bin, the per-bin facts'), ``beyond_swr_margin_s``
+(the largest margin of :data:`OUTSIDE_SWR_MARGINS_S` that the bin is farther
+than from every bin of the scoring mask ``in_swr``, 0 when it is within the
+smallest; :func:`swr_margin_bands`) and ``place_sampling_at_least_s`` (the
+largest of :data:`PLACE_SAMPLING_THRESHOLDS_S` that the bin's
+``place_sampling_s`` reaches, 0 below the smallest or where the place is
+unknown; :func:`place_sampling_bands`). Every bin is in exactly one row, so
+any union of rows is summed by adding them, and the sums over the first three
+keys alone are the sums over every value of the other three.
+
+**Outside SWRs** is :func:`.restriction_windows.outside_swr_bins`: the category
+``immobile_outside_swr`` where SWR detection was observed. An immobile bin
+outside every SWR of the source where detection was not observed (a gap in the
+stored ripple band) is not known to be outside an SWR, so no sum outside SWRs
+holds it; :func:`outside_swr_not_observed_counts` counts those left out. The
+sums over all immobile time keep them: they are immobile time, inside an SWR
+or not.
 
 **All immobile time** (:func:`epoch_immobile_gains`, Figure 2g's first axis):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
@@ -45,6 +62,17 @@ non-local states buy outside SWRs:
   no event window of any group (``in_event_window`` false): every event the
   time sums were given counts, whichever events the shares are given.
 
+**Parts of the time outside SWRs** (:func:`epoch_outside_swr_subset_gains`,
+:func:`outside_swr_subset_statistics`): the same gain, per spike and per
+second, over only the bins outside SWRs inside a well visit that are farther
+than a margin of :data:`OUTSIDE_SWR_MARGINS_S` from every bin of the scoring
+mask (on each side), or whose ``place_sampling_s`` is at least a threshold of
+:data:`PLACE_SAMPLING_THRESHOLDS_S`: the seconds of training data at the
+animal's place under the bin's own fold (``tetrode_holdout.place_sampling``:
+the decode's training bins outside the fold and its margin whose place bin is
+the bin's own, times the bin width). With each, the share of the epoch's bins
+outside SWRs inside a well visit that the part keeps.
+
 Over the cohort (:func:`outside_swr_gain_statistics`,
 :func:`immobile_gain_statistics`) each measure is reduced
 as the window statistics are
@@ -62,6 +90,9 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_evidence.bin_facts import (
+    require_swr_observed,
+)
 from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
@@ -76,18 +107,41 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     IN_VISIT_SUFFIX,
+    WINDOW_BIN_COLUMNS,
     _check_facts_time,
     _window_bounds,
+    outside_swr_bins,
     restriction_window_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_rows
+from continuum_swr_replay.intervals import sample_step
 
-TIME_SUM_KEYS = ("category", "in_well_visit", "in_event_window")
+OUTSIDE_SWR_MARGINS_S = (0.1, 0.25, 0.5)
+"""The margins (s, on each side) of the parts of the time outside SWRs that lie
+farther than the margin from every bin of the scoring mask
+(:func:`epoch_outside_swr_subset_gains`)."""
+
+PLACE_SAMPLING_THRESHOLDS_S = (10.0, 60.0)
+"""The thresholds (s) of the parts of the time outside SWRs whose
+``place_sampling_s`` is at least the threshold
+(:func:`epoch_outside_swr_subset_gains`)."""
+
+TIME_SUM_KEYS = (
+    "category",
+    "in_well_visit",
+    "in_event_window",
+    "swr_observed",
+    "beyond_swr_margin_s",
+    "place_sampling_at_least_s",
+)
 """The columns that name a row of an epoch's time sums
 (:func:`restriction_time_sums`)."""
+
+TIME_SUM_BIN_COLUMNS = (*WINDOW_BIN_COLUMNS, "place_sampling_s")
+"""The per-bin table's columns :func:`restriction_time_sums` reads."""
 
 MEASURES = (
     "gain_per_spike",
@@ -99,6 +153,17 @@ MEASURES = (
 )
 """The per-epoch measures of each family over the immobile time outside SWRs,
 by their column stem (:func:`epoch_outside_swr_gains`)."""
+
+SUBSET_MEASURES = ("gain_per_spike", "gain_per_s", "share_of_bins")
+"""The per-epoch measures of each family over a part of the time outside SWRs,
+by their column stem (:func:`epoch_outside_swr_subset_gains`)."""
+
+SUBSETS = {
+    "beyond_swr_margin": ("beyond_swr_margin_s", OUTSIDE_SWR_MARGINS_S),
+    "place_sampling": ("place_sampling_at_least_s", PLACE_SAMPLING_THRESHOLDS_S),
+}
+"""Each kind of part of the time outside SWRs: the time sums' key it is chosen
+by and its thresholds (s)."""
 
 IMMOBILE_MEASURES = (
     *(
@@ -114,21 +179,90 @@ column stem (:func:`epoch_immobile_gains`): ``full_minus_swr``,
 share the SWR-only decoder captures."""
 
 
+def swr_margin_bands(in_swr: np.ndarray, bin_s: float) -> np.ndarray:
+    """Each bin's largest margin of :data:`OUTSIDE_SWR_MARGINS_S` that it is
+    farther than from every bin of the scoring mask.
+
+    The distance is counted in bins: a margin of ``m`` s is
+    ``round(m / bin_s)`` bins, and a bin is farther than it when the nearest
+    bin of the mask, on either side, is more than that many bins away.
+
+    Parameters
+    ----------
+    in_swr : np.ndarray of bool, shape (n_time,)
+        The scoring mask (the per-bin table's ``in_swr``).
+    bin_s : float
+        The time step (s).
+
+    Returns
+    -------
+    np.ndarray of float64, shape (n_time,)
+        The largest margin (s) the bin is farther than, or 0.0 when it is
+        within the smallest (every bin of the mask is). With no bin in the
+        mask, every bin is farther than every margin.
+    """
+    in_swr = np.asarray(in_swr, dtype=bool)
+    position = np.arange(in_swr.size)
+    mask = np.flatnonzero(in_swr)
+    if mask.size == 0:
+        distance = np.full(in_swr.size, np.inf)
+    else:
+        after = np.searchsorted(mask, position)
+        to_next = np.where(
+            after < mask.size, mask[np.minimum(after, mask.size - 1)] - position, np.inf
+        )
+        to_previous = np.where(
+            after > 0, position - mask[np.maximum(after - 1, 0)], np.inf
+        )
+        distance = np.minimum(to_next, to_previous)
+    out = np.zeros(in_swr.size)
+    for margin in OUTSIDE_SWR_MARGINS_S:
+        out[distance > round(margin / bin_s)] = margin
+    return out
+
+
+def place_sampling_bands(place_sampling_s: np.ndarray) -> np.ndarray:
+    """Each bin's largest threshold of :data:`PLACE_SAMPLING_THRESHOLDS_S` that
+    its ``place_sampling_s`` reaches.
+
+    Parameters
+    ----------
+    place_sampling_s : np.ndarray, shape (n_time,)
+        The seconds of training data at the animal's place under the bin's
+        fold (the per-bin table's ``place_sampling_s``), NaN where the place is
+        unknown.
+
+    Returns
+    -------
+    np.ndarray of float64, shape (n_time,)
+        The largest threshold (s) the value is at least, or 0.0 below the
+        smallest or where it is NaN.
+    """
+    sampling = np.asarray(place_sampling_s, dtype=np.float64)
+    out = np.zeros(sampling.size)
+    for threshold in PLACE_SAMPLING_THRESHOLDS_S:
+        out[sampling >= threshold] = threshold
+    return out
+
+
 def restriction_time_sums(
     bins: pd.DataFrame, facts: pd.DataFrame, windows: pd.DataFrame
 ) -> pd.DataFrame:
-    """One epoch's bins, spikes and summed scores by category, well visit and
-    event window.
+    """One epoch's bins, spikes and summed scores by category, well visit,
+    event window, SWR detection observed, margin from the scoring mask and
+    place sampling.
 
     Parameters
     ----------
     bins : pd.DataFrame
         The epoch's per-bin table of the restriction run, one row per decode
-        bin in time order: ``time`` (s), ``category`` and the six score columns
-        (:data:`.nonlocal_restriction.SCORE_COLUMNS`).
+        bin in time order: :data:`TIME_SUM_BIN_COLUMNS`, of which ``time``
+        (s), ``category``, the six score columns
+        (:data:`.nonlocal_restriction.SCORE_COLUMNS`), ``in_swr`` and
+        ``place_sampling_s`` are read.
     facts : pd.DataFrame
         The epoch's per-bin facts (``bin_facts.bin_facts``) on the same grid:
-        ``time``, ``n_spikes`` and ``in_well_visit``.
+        ``time``, ``n_spikes``, ``in_well_visit`` and ``swr_observed``.
     windows : pd.DataFrame
         The epoch's windows: ``kind`` and the first and last bin ``s`` and
         ``e`` (inclusive). Only the ``"event"`` windows mark
@@ -139,16 +273,21 @@ def restriction_time_sums(
     pd.DataFrame
         One row for each combination of :data:`TIME_SUM_KEYS`
         (:data:`.nonlocal_restriction.CATEGORIES` by ``in_well_visit`` by
-        ``in_event_window``, 16 rows, those without bins included): ``n_bins``,
-        ``n_spikes`` (int64) and each score's float64 sum (0 without bins).
+        ``in_event_window`` by ``swr_observed`` by ``beyond_swr_margin_s``
+        (0 and :data:`OUTSIDE_SWR_MARGINS_S`) by ``place_sampling_at_least_s``
+        (0 and :data:`PLACE_SAMPLING_THRESHOLDS_S`), 384 rows, those without
+        bins included): ``n_bins``, ``n_spikes`` (int64) and each score's
+        float64 sum (0 without bins).
 
     Raises
     ------
     ValueError
-        If the facts' time is not the per-bin table's, a bin's category is not
-        one of the categories, or a window reaches outside ``bins``.
+        If the facts' time is not the per-bin table's, the facts have no
+        ``swr_observed``, a bin's category is not one of the categories, or a
+        window reaches outside ``bins``.
     """
     _check_facts_time(bins, facts)
+    require_swr_observed(facts)
     category = bins["category"].astype(str).to_numpy()
     if unknown := sorted(set(category) - set(CATEGORIES)):
         raise ValueError(f"bins in unknown categories: {unknown}")
@@ -158,14 +297,33 @@ def restriction_time_sums(
     frame = bins[list(SCORE_COLUMNS)].astype(np.float64)
     frame.insert(0, "n_spikes", facts["n_spikes"].to_numpy(dtype=np.int64))
     frame.insert(0, "n_bins", np.int64(1))
+    bin_s = sample_step(bins["time"].to_numpy(dtype=float))
     keys = [
         pd.Series(category, name="category"),
         pd.Series(facts["in_well_visit"].to_numpy(dtype=bool), name="in_well_visit"),
         pd.Series(in_event, name="in_event_window"),
+        pd.Series(facts["swr_observed"].to_numpy(dtype=bool), name="swr_observed"),
+        pd.Series(
+            swr_margin_bands(bins["in_swr"].to_numpy(dtype=bool), bin_s),
+            name="beyond_swr_margin_s",
+        ),
+        pd.Series(
+            place_sampling_bands(bins["place_sampling_s"].to_numpy()),
+            name="place_sampling_at_least_s",
+        ),
     ]
     summed = frame.reset_index(drop=True).groupby(keys).sum()
     every = pd.MultiIndex.from_tuples(
-        list(itertools.product(CATEGORIES, (False, True), (False, True))),
+        list(
+            itertools.product(
+                CATEGORIES,
+                (False, True),
+                (False, True),
+                (False, True),
+                (0.0, *OUTSIDE_SWR_MARGINS_S),
+                (0.0, *PLACE_SAMPLING_THRESHOLDS_S),
+            )
+        ),
         names=list(TIME_SUM_KEYS),
     )
     out = summed.reindex(every, fill_value=0).reset_index()
@@ -173,20 +331,11 @@ def restriction_time_sums(
     return out
 
 
-def _chosen_time(
-    time_sums: pd.DataFrame,
-    categories: tuple[str, ...],
-    *,
-    outside_events: bool = False,
-) -> pd.DataFrame:
-    """Each epoch's sums over the rows of ``categories`` inside a well visit
-    (and outside every event window only, when asked): ``n_bins``,
-    ``n_spikes`` and the scores, indexed by ``epoch_id``, every epoch of
-    ``time_sums`` included."""
-    rows = time_sums["category"].isin(categories)
-    rows &= time_sums["in_well_visit"].astype(bool)
-    if outside_events:
-        rows &= ~time_sums["in_event_window"].astype(bool)
+def _chosen_time(time_sums: pd.DataFrame, rows: np.ndarray) -> pd.DataFrame:
+    """Each epoch's sums over ``rows`` of the time sums that are inside a well
+    visit: ``n_bins``, ``n_spikes`` and the scores, indexed by ``epoch_id``,
+    every epoch of ``time_sums`` included."""
+    rows = np.asarray(rows, dtype=bool) & time_sums["in_well_visit"].to_numpy(bool)
     columns = ["n_bins", "n_spikes", *SCORE_COLUMNS]
     epochs = sorted(time_sums["epoch_id"].unique())
     return (
@@ -194,11 +343,48 @@ def _chosen_time(
     )
 
 
-def _check_time_sums(time_sums: pd.DataFrame, bin_s: pd.Series) -> None:
-    """Refuse time sums with an epoch's row of :data:`TIME_SUM_KEYS` twice, or
-    an epoch without a time step."""
+def _outside_swr_rows(
+    time_sums: pd.DataFrame,
+    *,
+    outside_events: bool = False,
+    beyond_swr_margin_s: float = 0.0,
+    place_sampling_at_least_s: float = 0.0,
+) -> np.ndarray:
+    """The rows of the time sums outside SWRs
+    (:func:`.restriction_windows.outside_swr_bins`), outside every event window
+    only when asked, and only those farther than a margin from the scoring
+    mask or at least a place sampling, when given (0 keeps every row)."""
+    rows = outside_swr_bins(time_sums["category"], time_sums["swr_observed"])
+    if outside_events:
+        rows &= ~time_sums["in_event_window"].to_numpy(bool)
+    for key, at_least, known in (
+        ("beyond_swr_margin_s", beyond_swr_margin_s, OUTSIDE_SWR_MARGINS_S),
+        (
+            "place_sampling_at_least_s",
+            place_sampling_at_least_s,
+            PLACE_SAMPLING_THRESHOLDS_S,
+        ),
+    ):
+        if at_least not in (0.0, *known):
+            raise ValueError(f"{key} {at_least} is not 0 or one of {known}")
+        rows &= time_sums[key].to_numpy(float) >= at_least
+    return rows
+
+
+def _check_time_sums(time_sums: pd.DataFrame, bin_s: pd.Series | None) -> None:
+    """Refuse time sums of an earlier design (without every key of
+    :data:`TIME_SUM_KEYS`), with an epoch's row twice, or (unless ``bin_s`` is
+    None) an epoch without a time step."""
+    if missing := [key for key in TIME_SUM_KEYS if key not in time_sums.columns]:
+        raise ValueError(
+            f"the time sums have no {missing}: they were made before those keys. "
+            "Rerun scripts/event_evidence/measure_bin_facts.py and "
+            "scripts/event_evidence/detect_heldout_events.py"
+        )
     if time_sums.duplicated(["epoch_id", *TIME_SUM_KEYS]).any():
         raise ValueError("an epoch has a row of the time sums twice")
+    if bin_s is None:
+        return
     epochs = set(time_sums["epoch_id"])
     if missing := sorted(epochs - set(bin_s.index)):
         raise ValueError(f"{len(missing)} epochs have no time step: {missing[:3]}")
@@ -249,8 +435,8 @@ def epoch_outside_swr_gains(
         If an epoch has a row of the time sums twice or no time step.
     """
     _check_time_sums(time_sums, bin_s)
-    total = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,))
-    rest = _chosen_time(time_sums, (IMMOBILE_OUTSIDE_SWR,), outside_events=True)
+    total = _chosen_time(time_sums, _outside_swr_rows(time_sums))
+    rest = _chosen_time(time_sums, _outside_swr_rows(time_sums, outside_events=True))
     models = [
         f"{model}{suffix}{IN_VISIT_SUFFIX}"
         for suffix in FAMILY_SUFFIX.values()
@@ -337,7 +523,9 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
         If an epoch has a row of the time sums twice or no time step.
     """
     _check_time_sums(time_sums, bin_s)
-    total = _chosen_time(time_sums, (IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR))
+    total = _chosen_time(
+        time_sums, time_sums["category"].isin([IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR])
+    )
     animals = time_sums.groupby("epoch_id")["animal"].first()
     seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
     spikes = total["n_spikes"].to_numpy()
@@ -365,6 +553,153 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
         )
         out[f"full_above_swr_only{suffix}"] = gains["full_minus_swr"] > 0
     return out
+
+
+def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
+    """The immobile bins outside every SWR of the source, inside a well visit,
+    where SWR detection was not observed: left out of every sum outside SWRs.
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums (:func:`restriction_time_sums`' rows with
+        ``epoch_id``).
+
+    Returns
+    -------
+    dict
+        ``n_bins`` (those bins over the cohort), ``n_epochs`` (epochs with at
+        least one), ``n_bins_outside_swr`` (the bins outside SWRs inside a well
+        visit, which the sums keep) and ``n_epochs_total``.
+
+    Raises
+    ------
+    ValueError
+        If the time sums are of an earlier design (:data:`TIME_SUM_KEYS`).
+    """
+    _check_time_sums(time_sums, None)
+    left_out = (time_sums["category"] == IMMOBILE_OUTSIDE_SWR).to_numpy() & ~time_sums[
+        "swr_observed"
+    ].to_numpy(bool)
+    by_epoch = _chosen_time(time_sums, left_out)["n_bins"]
+    kept = _chosen_time(time_sums, _outside_swr_rows(time_sums))["n_bins"]
+    return {
+        "n_bins": int(by_epoch.sum()),
+        "n_epochs": int((by_epoch > 0).sum()),
+        "n_bins_outside_swr": int(kept.sum()),
+        "n_epochs_total": len(by_epoch),
+    }
+
+
+def epoch_outside_swr_subset_gains(
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    *,
+    beyond_swr_margin_s: float = 0.0,
+    place_sampling_at_least_s: float = 0.0,
+) -> pd.DataFrame:
+    """Each epoch's ``full - swr`` over a part of its immobile bins outside
+    SWRs inside a well visit, per spike and per second, and the share of those
+    bins the part keeps, both score families.
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+    beyond_swr_margin_s : float, optional
+        Only the bins farther than this margin (s, one of
+        :data:`OUTSIDE_SWR_MARGINS_S`) from every bin of the scoring mask; 0
+        (the default) keeps every bin.
+    place_sampling_at_least_s : float, optional
+        Only the bins whose ``place_sampling_s`` is at least this (s, one of
+        :data:`PLACE_SAMPLING_THRESHOLDS_S`); 0 (the default) keeps every bin.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per epoch of ``time_sums``, sorted by ``epoch_id``:
+        ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds`` of
+        the kept bins, and for each family (suffix ``""`` for the filter score,
+        ``"_two_sided"``): ``full_minus_swr`` (nats), ``gain_per_spike``,
+        ``gain_per_s`` (NaN without spikes or bins) and ``share_of_bins``
+        (kept bins over every bin outside SWRs inside a well visit, NaN
+        without such bins; the same in both families).
+
+    Raises
+    ------
+    ValueError
+        If an epoch has a row of the time sums twice or no time step, or a
+        threshold is not 0 or one of the named ones.
+    """
+    _check_time_sums(time_sums, bin_s)
+    every = _chosen_time(time_sums, _outside_swr_rows(time_sums))
+    kept = _chosen_time(
+        time_sums,
+        _outside_swr_rows(
+            time_sums,
+            beyond_swr_margin_s=beyond_swr_margin_s,
+            place_sampling_at_least_s=place_sampling_at_least_s,
+        ),
+    )
+    animals = time_sums.groupby("epoch_id")["animal"].first()
+    step = bin_s.reindex(kept.index).to_numpy(dtype=float)
+    out = pd.DataFrame(
+        {
+            "epoch_id": kept.index,
+            "animal": animals.reindex(kept.index).to_numpy(),
+            "n_bins": kept["n_bins"].to_numpy(),
+            "n_spikes": kept["n_spikes"].to_numpy(),
+            "seconds": kept["n_bins"].to_numpy() * step,
+        }
+    )
+    share = list(map(ratio_or_nan, kept["n_bins"], every["n_bins"]))
+    for suffix in FAMILY_SUFFIX.values():
+        gain = (kept[f"full{suffix}"] - kept[f"swr{suffix}"]).to_numpy()
+        out[f"full_minus_swr{suffix}"] = gain
+        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
+        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
+        out[f"share_of_bins{suffix}"] = share
+    return out
+
+
+def outside_swr_subset_statistics(
+    time_sums: pd.DataFrame, bin_s: pd.Series, *, n_boot: int = 1000, seed: int = 0
+) -> pd.DataFrame:
+    """Each part of the time outside SWRs (:data:`SUBSETS`): each measure's
+    per-animal values, their mean and its interval, by score family.
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+    n_boot, seed : int, optional
+        The bootstrap's replicates and seed, the same for every row.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per part (``subset``, a key of :data:`SUBSETS`, and its
+        ``threshold_s``), family and measure (:data:`SUBSET_MEASURES`), with
+        the columns of :func:`outside_swr_gain_statistics`, over
+        :func:`epoch_outside_swr_subset_gains`' rows.
+    """
+    parts = []
+    for subset, (key, thresholds) in SUBSETS.items():
+        for threshold in thresholds:
+            epochs = epoch_outside_swr_subset_gains(
+                time_sums, bin_s, **{key: threshold}
+            )
+            table = _epoch_measure_statistics(
+                epochs, SUBSET_MEASURES, n_boot=n_boot, seed=seed
+            )
+            table.insert(0, "threshold_s", threshold)
+            table.insert(0, "subset", subset)
+            parts.append(table)
+    return pd.concat(parts, ignore_index=True)
 
 
 def outside_swr_gain_statistics(

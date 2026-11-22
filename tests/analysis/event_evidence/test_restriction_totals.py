@@ -80,14 +80,21 @@ def test_time_sums_partition_the_bins_by_category_visit_and_event_window():
     nothing); bins 0-2 inside a visit."""
     category = ["immobile_outside_swr"] * 3 + ["immobile_in_swr", "moving", "excluded"]
     bins = restriction_bins(
-        np.arange(6.0), dict.fromkeys(SCORE_COLUMNS, np.arange(6)), None, category
+        np.arange(6.0),
+        dict.fromkeys(SCORE_COLUMNS, np.arange(6)),
+        np.arange(6) == 3,
+        category,
+        place_sampling_s=np.zeros(6, dtype=np.float32),
     )
     facts = bin_facts_table(np.arange(6.0), [1, 2, 3, 4, 5, 6], np.arange(6) < 3)
     windows = pd.DataFrame({"kind": ["event", "control"], "s": [1, 4], "e": [2, 5]})
     sums = rt.restriction_time_sums(bins, facts, windows)
-    assert list(sums.columns[:5]) == [*rt.TIME_SUM_KEYS, "n_bins", "n_spikes"]
-    assert len(sums) == 16 and sums["n_bins"].sum() == 6
-    key = sums.set_index(list(rt.TIME_SUM_KEYS))
+    assert list(sums.columns[:8]) == [*rt.TIME_SUM_KEYS, "n_bins", "n_spikes"]
+    assert len(sums) == 384 and sums["n_bins"].sum() == 6
+    # summed over the newer keys, the rows of the first three
+    key = sums.groupby(["category", "in_well_visit", "in_event_window"]).sum(
+        numeric_only=True
+    )
     inside = key.loc[("immobile_outside_swr", True, True)]
     assert inside["n_bins"] == 2 and inside["n_spikes"] == 5
     assert inside["full"] == pytest.approx(3.0)
@@ -188,3 +195,150 @@ def test_time_sums_with_a_row_twice_or_an_epoch_without_a_time_step_raise():
     twice = pd.concat([sums, sums.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="twice"):
         rt.epoch_outside_swr_gains(twice, _bin_s(), _windows())
+
+
+def _keyed_bins():
+    """Eight bins 0.1 s apart, all immobile outside SWRs and inside a visit but
+    bin 0, inside an SWR; ``full`` = bin index, ``swr`` 0, one spike a bin.
+    Bin 7 is where SWR detection was not observed. Place sampling: NaN, 5,
+    10, 59, 60, 61, 100, 100 s."""
+    n = 8
+    category = ["immobile_in_swr"] + ["immobile_outside_swr"] * (n - 1)
+    scores = dict.fromkeys(SCORE_COLUMNS, np.zeros(n))
+    scores = {**scores, "full": np.arange(n), "full_two_sided": 2 * np.arange(n)}
+    bins = restriction_bins(
+        0.1 * np.arange(n),
+        scores,
+        np.arange(n) == 0,
+        category,
+        place_sampling_s=np.array(
+            [np.nan, 5, 10, 59, 60, 61, 100, 100], dtype=np.float32
+        ),
+    )
+    facts = bin_facts_table(
+        0.1 * np.arange(n), np.ones(n), np.ones(n, bool), np.arange(n) != 7
+    )
+    windows = pd.DataFrame({"kind": [], "s": [], "e": []})
+    return bins, facts, windows
+
+
+def test_margin_bands_count_bins_to_the_nearest_bin_of_the_mask():
+    """At 0.1 s a bin, the margins 0.1, 0.25 and 0.5 s are 1, 2 (0.25/0.1
+    rounds to 2) and 5 bins: a bin is beyond a margin when the nearest mask bin
+    is more bins away than that."""
+    in_swr = np.zeros(12, dtype=bool)
+    in_swr[[0, 11]] = True
+    np.testing.assert_allclose(
+        rt.swr_margin_bands(in_swr, 0.1),
+        [0, 0, 0.1, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.1, 0, 0],
+    )
+    np.testing.assert_allclose(rt.swr_margin_bands(np.zeros(3, bool), 0.1), 0.5)
+
+
+def test_place_sampling_bands_take_the_largest_threshold_reached():
+    np.testing.assert_allclose(
+        rt.place_sampling_bands(np.array([np.nan, 0, 9.9, 10, 59.9, 60, 1e3])),
+        [0, 0, 0, 10, 10, 60, 60],
+    )
+
+
+def test_time_sums_key_the_observed_flag_margin_and_place_sampling():
+    sums = rt.restriction_time_sums(*_keyed_bins())
+    kept = sums[sums["n_bins"] > 0].set_index(list(rt.TIME_SUM_KEYS))
+    # bin 7: not observed, 7 bins (0.7 s) from bin 0, sampled 100 s
+    row = kept.loc[("immobile_outside_swr", True, False, False, 0.5, 60.0)]
+    assert row["n_bins"] == 1 and row["full"] == 7.0
+    # bin 1 is 1 bin from the mask (within 0.1 s); bin 2 is 2 bins (beyond
+    # 0.1 s, not beyond 0.25 s = 2 bins)
+    assert kept.loc[("immobile_outside_swr", True, False, True, 0.0, 0.0), "full"] == 1
+    assert kept.loc[("immobile_outside_swr", True, False, True, 0.1, 10.0), "full"] == 2
+    with pytest.raises(ValueError, match="swr_observed"):
+        bins, facts, windows = _keyed_bins()
+        rt.restriction_time_sums(bins, facts.drop(columns="swr_observed"), windows)
+
+
+def _keyed_sums() -> pd.DataFrame:
+    bins, facts, windows = _keyed_bins()
+    sums = rt.restriction_time_sums(bins, facts, windows)
+    return sums.assign(epoch_id="a1", animal="a")
+
+
+def test_the_gain_outside_swrs_leaves_out_bins_where_detection_was_not_observed():
+    """Bins 1-6 (bin 7 not observed): full - swr 21 over 6 spikes, 0.6 s."""
+    sums = _keyed_sums()
+    epochs = rt.epoch_outside_swr_gains(
+        sums, pd.Series({"a1": 0.1}), _windows().iloc[:0]
+    )
+    assert epochs.loc[0, "n_bins"] == 6
+    assert epochs.loc[0, "gain_per_spike"] == pytest.approx(21 / 6)
+    assert epochs.loc[0, "gain_per_s"] == pytest.approx(21 / 0.6)
+    counts = rt.outside_swr_not_observed_counts(sums)
+    assert counts == {
+        "n_bins": 1,
+        "n_epochs": 1,
+        "n_bins_outside_swr": 6,
+        "n_epochs_total": 1,
+    }
+    # all immobile time keeps it: bins 0-7, 28 nats
+    immobile = rt.epoch_immobile_gains(sums, pd.Series({"a1": 0.1}))
+    assert immobile.loc[0, "n_bins"] == 8
+
+
+@pytest.mark.parametrize(
+    ("keyword", "threshold", "kept_bins"),
+    [
+        # margins: bins 2-6 (more than 1 bin), 3-6 (2), 6 (5)
+        ("beyond_swr_margin_s", 0.1, [2, 3, 4, 5, 6]),
+        ("beyond_swr_margin_s", 0.25, [3, 4, 5, 6]),
+        ("beyond_swr_margin_s", 0.5, [6]),
+        # place sampling: bins 2-6 (at least 10 s), 4-6 (at least 60 s)
+        ("place_sampling_at_least_s", 10.0, [2, 3, 4, 5, 6]),
+        ("place_sampling_at_least_s", 60.0, [4, 5, 6]),
+    ],
+)
+def test_subset_gains_keep_the_bins_of_the_part(keyword, threshold, kept_bins):
+    epochs = rt.epoch_outside_swr_subset_gains(
+        _keyed_sums(), pd.Series({"a1": 0.1}), **{keyword: threshold}
+    )
+    row = epochs.iloc[0]
+    assert row["n_bins"] == len(kept_bins) and row["n_spikes"] == len(kept_bins)
+    assert row["gain_per_spike"] == pytest.approx(np.mean(kept_bins))
+    assert row["gain_per_s"] == pytest.approx(sum(kept_bins) / (0.1 * len(kept_bins)))
+    assert row["gain_per_spike_two_sided"] == pytest.approx(2 * np.mean(kept_bins))
+    assert row["share_of_bins"] == pytest.approx(len(kept_bins) / 6)
+
+
+def test_subset_gains_refuse_an_unnamed_threshold():
+    with pytest.raises(ValueError, match="one of"):
+        rt.epoch_outside_swr_subset_gains(
+            _keyed_sums(), pd.Series({"a1": 0.1}), beyond_swr_margin_s=0.2
+        )
+
+
+def test_subset_statistics_have_a_row_per_part_family_and_measure():
+    sums = pd.concat(
+        [
+            _keyed_sums(),
+            _keyed_sums().assign(epoch_id="b1", animal="b", full=lambda t: -t["full"]),
+        ],
+        ignore_index=True,
+    )
+    stats = rt.outside_swr_subset_statistics(
+        sums, pd.Series({"a1": 0.1, "b1": 0.1}), n_boot=50, seed=1
+    )
+    n_parts = len(rt.OUTSIDE_SWR_MARGINS_S) + len(rt.PLACE_SAMPLING_THRESHOLDS_S)
+    assert len(stats) == n_parts * 2 * len(rt.SUBSET_MEASURES)
+    key = stats.set_index(["subset", "threshold_s", "family", "measure"])
+    row = key.loc[("beyond_swr_margin", 0.25, "filter", "gain_per_spike")]
+    # a: mean of bins 3-6 = 4.5; b: -4.5
+    np.testing.assert_allclose(row["animals"], [4.5, -4.5])
+    assert row["estimate"] == pytest.approx(0.0)
+    assert row["n_epochs"] == 2 and row["n_epochs_positive"] == 1
+    share = key.loc[("place_sampling", 60.0, "filter", "share_of_bins")]
+    assert share["estimate"] == pytest.approx(0.5)
+
+
+def test_time_sums_of_the_earlier_design_are_refused():
+    earlier = _time_sums().drop(columns=["swr_observed"])
+    with pytest.raises(ValueError, match="made before"):
+        rt.epoch_outside_swr_gains(earlier, _bin_s(), _windows())

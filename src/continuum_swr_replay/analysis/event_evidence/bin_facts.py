@@ -1,10 +1,11 @@
-"""Per-bin facts of a decode: the spikes of each bin and whether it is inside a
-well visit.
+"""Per-bin facts of a decode: the spikes of each bin, whether it is inside a
+well visit, and whether SWR detection was observed there.
 
 The restriction scores (:mod:`.nonlocal_restriction`) are per decode bin; to read
-them per spike, or only inside a well visit, each bin needs its spike count over
-every tetrode and its well-visit flag. :func:`bin_facts` makes that table, one
-row per bin of the decode's time grid:
+them per spike, only inside a well visit, or only where an SWR could have been
+seen, each bin needs its spike count over every tetrode, its well-visit flag
+and its SWR-observed flag. :func:`bin_facts` makes that table, one row per bin
+of the decode's time grid:
 
 - ``n_spikes``: the spikes of every tetrode the decoder puts in the bin. A
   spike at ``st`` with ``time[0] <= st <= time[-1]`` goes to bin
@@ -15,6 +16,12 @@ row per bin of the decode's time grid:
 - ``in_well_visit``: the bin's time is inside a well visit
   (``event_definition.well_visits.in_well_visit``: first poke-in at a well <= t
   < final poke-out there, one port experience).
+- ``swr_observed``: SWR detection was observed at the bin's time (the decode
+  frame's ``swr_observed``, read through the SWR source:
+  ``analyzed_time.swr_observed_mask``, the closed stretches of
+  ``swr_source.epoch_source(epoch_id).observed``). Where it was not (a gap in
+  the stored ripple band), a bin outside every SWR of the source is not known
+  to be outside an SWR: ``restriction_windows.outside_swr_bins`` leaves it out.
 
 Nothing here reads an event table: the facts are the same for every event
 cohort.
@@ -31,8 +38,26 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.intervals import decoder_time_bin
 
-BIN_FACTS_COLUMNS = ("time", "n_spikes", "in_well_visit")
+BIN_FACTS_COLUMNS = ("time", "n_spikes", "in_well_visit", "swr_observed")
 """The columns of a per-bin facts table, in order."""
+
+
+def require_swr_observed(facts: pd.DataFrame, what: str = "the per-bin facts") -> None:
+    """Refuse per-bin facts (or sums made from them) without ``swr_observed``:
+    they were made before the flag was measured.
+
+    Raises
+    ------
+    ValueError
+        If ``facts`` has no ``swr_observed`` column.
+    """
+    if "swr_observed" not in facts.columns:
+        raise ValueError(
+            f"{what} have no swr_observed column: they were made before SWR "
+            "detection's coverage was recorded per bin. Rerun "
+            "scripts/event_evidence/measure_bin_facts.py and the runs made from "
+            "it (docs/reproduce.md, Parts 1 and 2)"
+        )
 
 
 def decoder_bin_spike_counts(
@@ -73,9 +98,13 @@ def decoder_bin_spike_counts(
 
 
 def bin_facts(
-    time: NDArray, spike_times: Sequence[NDArray], visits: tuple[NDArray, NDArray]
+    time: NDArray,
+    spike_times: Sequence[NDArray],
+    visits: tuple[NDArray, NDArray],
+    swr_observed: NDArray,
 ) -> pd.DataFrame:
-    """One epoch's per-bin facts: each decode bin's spikes and well-visit flag.
+    """One epoch's per-bin facts: each decode bin's spikes, well-visit flag and
+    SWR-observed flag.
 
     Parameters
     ----------
@@ -87,19 +116,32 @@ def bin_facts(
         The epoch's well visits, ``(arrival_times, departure_times)`` (s,
         ``arrival_times`` ascending), as ``prepare_data.well_visit_times``
         gives them.
+    swr_observed : np.ndarray of bool, shape (n_time,)
+        Whether SWR detection was observed at each bin (the decode frame's
+        ``swr_observed``, read through the SWR source).
 
     Returns
     -------
     pd.DataFrame
         One row per bin, in time order: :data:`BIN_FACTS_COLUMNS`, ``time``
-        (float64 s), ``n_spikes`` (int32) and ``in_well_visit`` (bool).
+        (float64 s), ``n_spikes`` (int32), ``in_well_visit`` and
+        ``swr_observed`` (bool).
+
+    Raises
+    ------
+    ValueError
+        If ``swr_observed`` is not one value per bin.
     """
     time = np.asarray(time, dtype=float)
+    swr_observed = np.asarray(swr_observed, dtype=bool)
+    if swr_observed.shape != time.shape:
+        raise ValueError("swr_observed is not one value per bin of the time grid")
     counts = decoder_bin_spike_counts(spike_times, time)
     return pd.DataFrame(
         {
             "time": time,
             "n_spikes": counts.astype(np.int32),
             "in_well_visit": in_well_visit(time, *visits),
+            "swr_observed": swr_observed,
         }
     )

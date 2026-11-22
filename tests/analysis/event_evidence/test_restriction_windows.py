@@ -13,6 +13,8 @@ from tests.support._restriction_tables import bin_facts_table, restriction_bins
 
 N = 10
 STEP = 0.002
+OBSERVED = np.ones(N, dtype=bool)
+"""SWR detection observed at every bin."""
 
 
 def _bins() -> pd.DataFrame:
@@ -55,7 +57,7 @@ def _windows() -> pd.DataFrame:
 
 
 def test_window_sums_count_and_sum_each_windows_bins():
-    sums = rw.restriction_window_sums(_bins(), _windows())
+    sums = rw.restriction_window_sums(_bins(), _windows(), swr_observed=OBSERVED)
     np.testing.assert_array_equal(sums["n_bins"], [2, 3, 2, 2])
     np.testing.assert_array_equal(sums["n_bins_in_swr"], [0, 2, 0, 0])
     np.testing.assert_array_equal(sums["n_bins_immobile"], [2, 3, 1, 1])
@@ -79,7 +81,7 @@ def test_window_sums_over_the_bins_outside_swrs():
         [_windows(), pd.DataFrame([[4, "c", "event", "SWR", 2, 3]], columns=["window_id", "event_id", "kind", "group", "s", "e"])],
         ignore_index=True,
     )  # fmt: skip
-    sums = rw.restriction_window_sums(_bins(), windows)
+    sums = rw.restriction_window_sums(_bins(), windows, swr_observed=OBSERVED)
     np.testing.assert_array_equal(sums["n_bins_outside_swr"], [2, 1, 1, 1, 0])
     np.testing.assert_allclose(
         sums["duration_outside_swr_s"], np.array([2, 1, 1, 1, 0]) * STEP
@@ -92,16 +94,62 @@ def test_window_sums_over_the_bins_outside_swrs():
     # the whole window's columns come first, unchanged by the new ones
     whole = [
         *rw.WINDOW_KEYS, "s", "e", "n_bins", "n_bins_in_swr", "n_bins_immobile",
-        "n_bins_excluded", "n_bins_not_finite", "duration_s", *SCORE_COLUMNS,
+        "n_bins_excluded", "n_bins_not_finite", "n_bins_outside_swr_not_observed",
+        "duration_s", *SCORE_COLUMNS,
     ]  # fmt: skip
     assert list(sums.columns) == [*whole, *rw.OUTSIDE_SWR_COLUMNS]
+
+
+def test_bins_where_swr_detection_was_not_observed_are_not_outside_swrs():
+    """Bins 0 and 5 are ``immobile_outside_swr`` but SWR detection was not
+    observed there: they leave the sums outside SWRs (window 0 keeps bin 1,
+    window 2 none) and are counted; the whole window's sums keep them."""
+    observed = OBSERVED.copy()
+    observed[[0, 5, 6]] = False  # bin 6 moves: not counted
+    sums = rw.restriction_window_sums(_bins(), _windows(), swr_observed=observed)
+    np.testing.assert_array_equal(sums["n_bins_outside_swr_not_observed"], [1, 0, 1, 0])
+    np.testing.assert_array_equal(sums["n_bins_outside_swr"], [1, 1, 0, 1])
+    np.testing.assert_allclose(sums["swr_outside_swr"], [1, 1, 0, 8])
+    np.testing.assert_allclose(sums["swr"], [1, 6, 11, 17])
+    facts = _facts().assign(swr_observed=observed)
+    from_facts = rw.window_bin_fact_sums(_bins(), facts, _windows())
+    # the facts' spikes: bin 1 has none, bin 8 one (bins 0 and 5, with 3 and
+    # 2, are left out)
+    np.testing.assert_array_equal(from_facts["n_spikes_outside_swr"], [0, 0, 0, 1])
+    np.testing.assert_array_equal(
+        from_facts["n_bins_outside_swr_in_visit"], [1, 1, 0, 0]
+    )
+    table = rw.window_table(_bins(), facts, _windows())
+    np.testing.assert_array_equal(table["n_bins_outside_swr"], [1, 1, 0, 1])
+
+
+def test_the_outside_swr_rule_is_the_category_where_detection_was_observed():
+    category = [
+        "immobile_outside_swr",
+        "immobile_outside_swr",
+        "immobile_in_swr",
+        "moving",
+    ]
+    np.testing.assert_array_equal(
+        rw.outside_swr_bins(category, [True, False, True, True]),
+        [True, False, False, False],
+    )
+    with pytest.raises(ValueError, match="one value per bin"):
+        rw.outside_swr_bins(category, [True])
+
+
+def test_facts_without_the_observed_flag_are_refused():
+    with pytest.raises(ValueError, match="swr_observed"):
+        rw.window_bin_fact_sums(
+            _bins(), _facts().drop(columns="swr_observed"), _windows()
+        )
 
 
 def test_a_score_not_finite_outside_swrs_makes_only_that_sum_nan():
     bins = _bins()
     bins.loc[2, "full"] = np.nan  # inside the SWR: the outside sums keep it out
     bins.loc[5, "swr"] = np.nan  # outside: window 2's outside sum is NaN too
-    sums = rw.restriction_window_sums(bins, _windows())
+    sums = rw.restriction_window_sums(bins, _windows(), swr_observed=OBSERVED)
     assert sums["full"].isna().tolist() == [False, True, False, False]
     np.testing.assert_allclose(sums["full_outside_swr"], [2, 2, 10, 16])
     assert sums["swr_outside_swr"].isna().tolist() == [False, False, True, False]
@@ -110,7 +158,7 @@ def test_a_score_not_finite_outside_swrs_makes_only_that_sum_nan():
 def test_a_score_that_is_not_finite_makes_its_windows_sum_nan_and_is_counted():
     bins = _bins()
     bins.loc[1, "full"] = np.nan
-    sums = rw.restriction_window_sums(bins, _windows())
+    sums = rw.restriction_window_sums(bins, _windows(), swr_observed=OBSERVED)
     np.testing.assert_array_equal(sums["n_bins_not_finite"], [1, 1, 0, 0])
     assert sums["full"].isna().tolist() == [True, True, False, False]
     # the other columns of those windows are kept
@@ -122,7 +170,7 @@ def test_a_window_outside_the_bins_raises():
     windows = _windows()
     windows.loc[3, "e"] = N
     with pytest.raises(ValueError, match="outside"):
-        rw.restriction_window_sums(_bins(), windows)
+        rw.restriction_window_sums(_bins(), windows, swr_observed=OBSERVED)
 
 
 def _holdout(windows: pd.DataFrame) -> pd.DataFrame:
@@ -194,7 +242,7 @@ def test_bin_fact_sums_count_spikes_outside_swrs_and_inside_a_visit():
 
 def test_the_window_table_joins_the_sums_the_spikes_and_the_bin_fact_sums():
     table = rw.window_table(_bins(), _facts(), _windows())
-    sums = rw.restriction_window_sums(_bins(), _windows())
+    sums = rw.restriction_window_sums(_bins(), _windows(), swr_observed=OBSERVED)
     facts = rw.window_bin_fact_sums(_bins(), _facts(), _windows())
     assert list(table.columns) == [*sums.columns, "n_spikes", *rw.BIN_FACT_COLUMNS]
     pd.testing.assert_frame_equal(table[list(sums.columns)], sums)
@@ -211,7 +259,7 @@ def test_bin_facts_on_another_time_grid_raise():
 
 
 def _scored() -> pd.DataFrame:
-    sums = rw.restriction_window_sums(_bins(), _windows())
+    sums = rw.restriction_window_sums(_bins(), _windows(), swr_observed=OBSERVED)
     facts = rw.window_bin_fact_sums(_bins(), _facts(), _windows())
     return pd.concat(
         [sums.assign(n_spikes=[3, 0, 3, 2]), facts[list(rw.BIN_FACT_COLUMNS)]],

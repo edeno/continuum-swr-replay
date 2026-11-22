@@ -25,7 +25,10 @@ family (:data:`.nonlocal_restriction.FAMILY_SUFFIX`). It is read two ways:
   time step (``intervals.sample_step`` of the per-bin table's time).
 
 A contrast is also read over a part of the window (:data:`PARTS`): its bins
-in the category ``immobile_outside_swr`` only, per spike in them (the spikes of
+outside SWRs only (:func:`outside_swr_bins`: the category
+``immobile_outside_swr`` where SWR detection was observed, the per-bin facts'
+``swr_observed``; a bin where it was not is not known to be outside an SWR and
+is counted apart, ``n_bins_outside_swr_not_observed``), per spike in them (the spikes of
 every tetrode the decoder put in those bins, from the per-bin facts,
 :mod:`.bin_facts`; NaN without spikes) and per second of them (the window
 table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
@@ -36,8 +39,8 @@ windows of the events detected from the held-out decode
 (``scripts/event_evidence/detect_heldout_events.py`` sums them with the same
 functions).
 
-The per-bin facts also give each window's sums over its ``immobile_outside_swr``
-bins inside a well visit (:func:`window_bin_fact_sums`,
+The per-bin facts also give each window's sums over its bins outside SWRs
+inside a well visit (:func:`window_bin_fact_sums`,
 :data:`BIN_FACT_COLUMNS`): the numerators of the shares of
 ``restriction_totals.epoch_outside_swr_gains``, on the same bins as their
 denominator.
@@ -75,8 +78,11 @@ from collections.abc import Collection, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
+from continuum_swr_replay.analysis.event_evidence.bin_facts import (
+    require_swr_observed,
+)
 from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
@@ -97,8 +103,8 @@ UNITS = {"per_spike": "n_spikes", "per_s": "duration_s"}
 """Each unit of a contrast and the window's column it is divided by."""
 
 OUTSIDE_SWR_SUFFIX = "_outside_swr"
-"""The suffix of a window's columns over its bins in the category
-``immobile_outside_swr`` only (:func:`restriction_window_sums`)."""
+"""The suffix of a window's columns over its bins outside SWRs only
+(:func:`outside_swr_bins`, :func:`restriction_window_sums`)."""
 
 OUTSIDE_SWR_COLUMNS = (
     "n_bins_outside_swr",
@@ -109,12 +115,12 @@ OUTSIDE_SWR_COLUMNS = (
 
 PARTS = ("whole", "outside_swr")
 """Each part of a window a contrast is read over, in both units: the whole
-window, or only its bins in the category ``immobile_outside_swr``, per spike in
+window, or only its bins outside SWRs (:func:`outside_swr_bins`), per spike in
 them (``n_spikes_outside_swr``) and per second of them."""
 
 IN_VISIT_SUFFIX = "_outside_swr_in_visit"
-"""The suffix of a window's columns over its bins in the category
-``immobile_outside_swr`` that are inside a well visit
+"""The suffix of a window's columns over its bins outside SWRs
+(:func:`outside_swr_bins`) that are inside a well visit
 (:func:`window_bin_fact_sums`)."""
 
 BIN_FACT_COLUMNS = (
@@ -141,7 +147,39 @@ run's). The windows are still matched to the held-out tetrode run's
 from a run with the note pending."""
 
 
-def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.DataFrame:
+def outside_swr_bins(category: ArrayLike, swr_observed: ArrayLike) -> NDArray[np.bool_]:
+    """Which bins (or rows of sums keyed by both) are outside an SWR: in the
+    category ``immobile_outside_swr`` where SWR detection was observed.
+
+    The restriction run's category (``nonlocal_restriction.bin_categories``)
+    puts an immobile analyzed bin outside every SWR of the source in
+    ``immobile_outside_swr`` whether or not detection was observed there; a bin
+    where it was not is not known to be outside an SWR. This is the one rule
+    every sum "outside SWRs" uses: the window sums
+    (``restriction_windows``) and the time sums (``restriction_totals``).
+
+    Parameters
+    ----------
+    category : array_like of str, shape (n,)
+        Each bin's (or row's) category.
+    swr_observed : array_like of bool, shape (n,)
+        Whether SWR detection was observed there (the per-bin facts'
+        ``swr_observed``).
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n,)
+    """
+    category = np.asarray(category).astype(str)
+    swr_observed = np.asarray(swr_observed, dtype=bool)
+    if swr_observed.shape != category.shape:
+        raise ValueError("swr_observed is not one value per bin of the category")
+    return (category == IMMOBILE_OUTSIDE_SWR) & swr_observed
+
+
+def restriction_window_sums(
+    bins: pd.DataFrame, windows: pd.DataFrame, *, swr_observed: ArrayLike
+) -> pd.DataFrame:
     """Each window's bins and summed scores of the three models.
 
     Parameters
@@ -154,6 +192,9 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     windows : pd.DataFrame
         The epoch's windows (``epoch_windows``): :data:`WINDOW_KEYS` and the
         first and last bin ``s`` and ``e`` (inclusive), positions in ``bins``.
+    swr_observed : array_like of bool, shape (n_bins,)
+        Whether SWR detection was observed at each bin of ``bins`` (the
+        per-bin facts' ``swr_observed``).
 
     Returns
     -------
@@ -162,11 +203,13 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
         ``e``, ``n_bins``, ``n_bins_in_swr`` (bins with ``in_swr``),
         ``n_bins_immobile`` (bins in an immobile category), ``n_bins_excluded``
         (bins in excluded time), ``n_bins_not_finite`` (bins with any score
-        that is not finite), ``duration_s`` (``n_bins`` times the time grid's
-        step) and the float64 sum of each score column (NaN where a bin of the
-        window has that score not finite); then the same over the window's
-        bins in the category ``immobile_outside_swr`` only
-        (:data:`OUTSIDE_SWR_COLUMNS`): ``n_bins_outside_swr``,
+        that is not finite), ``n_bins_outside_swr_not_observed`` (bins in the
+        category ``immobile_outside_swr`` where SWR detection was not observed:
+        left out of the bins outside SWRs), ``duration_s`` (``n_bins`` times
+        the time grid's step) and the float64 sum of each score column (NaN
+        where a bin of the window has that score not finite); then the same
+        over the window's bins outside SWRs only (:func:`outside_swr_bins`,
+        :data:`OUTSIDE_SWR_COLUMNS`): ``n_bins_outside_swr``,
         ``duration_outside_swr_s`` and each score's float64 sum over them,
         ``<score>_outside_swr`` (0 without such bins, NaN where one of them has
         that score not finite).
@@ -174,19 +217,23 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     Raises
     ------
     ValueError
-        If a window is empty or reaches outside ``bins``.
+        If a window is empty or reaches outside ``bins``, or ``swr_observed``
+        is not one value per bin.
     """
     s, e = _window_bounds(windows, len(bins))
     rows = window_rows(s, e)
     scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
     finite = np.isfinite(scores)
-    category = bins["category"].iloc[rows].astype(str).to_numpy()
-    outside = category == IMMOBILE_OUTSIDE_SWR
+    every_category = bins["category"].astype(str).to_numpy()
+    outside = outside_swr_bins(every_category, swr_observed)[rows]
+    category = every_category[rows]
     counts = {
         "n_bins_in_swr": bins["in_swr"].to_numpy(dtype=bool)[rows],
         "n_bins_immobile": np.isin(category, [IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR]),
         "n_bins_excluded": category == "excluded",
         "n_bins_not_finite": ~finite.all(axis=1),
+        "n_bins_outside_swr_not_observed": (category == IMMOBILE_OUTSIDE_SWR)
+        & ~outside,
         "n_bins_outside_swr": outside,
     }
     # every bin, then the bins outside SWRs only: the bins with a score not
@@ -220,6 +267,7 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
         "n_bins_immobile",
         "n_bins_excluded",
         "n_bins_not_finite",
+        "n_bins_outside_swr_not_observed",
     ):
         out[name] = counted[name]
     out["duration_s"] = n_bins * step
@@ -245,7 +293,8 @@ def window_bin_fact_sums(
         :func:`restriction_window_sums` takes it.
     facts : pd.DataFrame
         The epoch's per-bin facts (``bin_facts.bin_facts``), one row per bin of
-        the same time grid: ``time``, ``n_spikes`` and ``in_well_visit``.
+        the same time grid: ``time``, ``n_spikes``, ``in_well_visit`` and
+        ``swr_observed``.
     windows : pd.DataFrame
         The epoch's windows, as :func:`restriction_window_sums` takes them.
 
@@ -256,8 +305,8 @@ def window_bin_fact_sums(
         window's spikes over all its bins; the window runner checks them
         against the held-out tetrode run's ``n_spikes``) and
         :data:`BIN_FACT_COLUMNS`:
-        ``n_spikes_outside_swr`` (spikes in its ``immobile_outside_swr``
-        bins), ``n_bins_outside_swr_in_visit`` and
+        ``n_spikes_outside_swr`` (spikes in its bins outside SWRs,
+        :func:`outside_swr_bins`), ``n_bins_outside_swr_in_visit`` and
         ``n_spikes_outside_swr_in_visit`` (bins and spikes of those inside a
         well visit) and each score's float64 sum over the latter,
         ``<score>_outside_swr_in_visit`` (0 without such bins; the restriction
@@ -266,15 +315,17 @@ def window_bin_fact_sums(
     Raises
     ------
     ValueError
-        If the facts' time is not the per-bin table's, or a window is empty or
-        reaches outside ``bins``.
+        If the facts' time is not the per-bin table's, the facts have no
+        ``swr_observed``, or a window is empty or reaches outside ``bins``.
     """
     _check_facts_time(bins, facts)
+    require_swr_observed(facts)
     s, e = _window_bounds(windows, len(bins))
     rows = window_rows(s, e)
     spikes = facts["n_spikes"].to_numpy(dtype=np.float64)[rows]
-    category = bins["category"].iloc[rows].astype(str).to_numpy()
-    outside = category == IMMOBILE_OUTSIDE_SWR
+    outside = outside_swr_bins(
+        bins["category"].astype(str).to_numpy(), facts["swr_observed"].to_numpy()
+    )[rows]
     in_visit = outside & facts["in_well_visit"].to_numpy(dtype=bool)[rows]
     scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
     counts = {
@@ -323,8 +374,10 @@ def window_table(
     ValueError
         As :func:`restriction_window_sums` and :func:`window_bin_fact_sums`.
     """
-    table = restriction_window_sums(bins, windows)
     from_facts = window_bin_fact_sums(bins, facts, windows)
+    table = restriction_window_sums(
+        bins, windows, swr_observed=facts["swr_observed"].to_numpy()
+    )
     table["n_spikes"] = from_facts["n_spikes_bins"].to_numpy()
     for column in BIN_FACT_COLUMNS:
         table[column] = from_facts[column].to_numpy()
@@ -509,7 +562,8 @@ def window_contrasts(
         ``duration_s``. So the two units do not cover the same windows: a
         window without spikes has a value per second and none per spike (the
         statistics' ``n_scored`` counts the windows with a value). Outside SWRs: the contrast summed over the
-        window's ``immobile_outside_swr`` bins divided by their spikes,
+        window's bins outside SWRs (:func:`outside_swr_bins`) divided by their
+        spikes,
         ``n_spikes_outside_swr`` (NaN without a spike there), or by their
         duration, ``duration_outside_swr_s``; NaN for a window with no such bin
         (an event wholly inside its SWR). Every contrast of a window with a bin
@@ -582,8 +636,8 @@ def restriction_window_statistics(
         on its own, so a row is the same whichever others are computed.
     parts : sequence of str, optional
         The parts of the window (:data:`PARTS`): ``"whole"`` (the
-        default) and ``"outside_swr"``, the window's bins in the category
-        ``immobile_outside_swr``, read per spike in them and per second. A
+        default) and ``"outside_swr"``, the window's bins outside SWRs
+        (:func:`outside_swr_bins`), read per spike in them and per second. A
         window with no such bin, or (per spike) no spike in them, has no value
         there and is counted in ``n_events`` but not in ``n_scored``
         (:func:`outside_swr_window_counts` counts the two apart).

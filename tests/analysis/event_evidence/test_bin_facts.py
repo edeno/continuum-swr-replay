@@ -46,7 +46,7 @@ def test_bin_facts_flags_bins_inside_a_visit():
     not (departure exclusive)."""
     time = np.array([0.0, 1.0, 2.0, 2.5, 3.0])
     visits = (np.array([0.5, 2.5]), np.array([2.0, 3.0]))
-    table = bf.bin_facts(time, [np.array([0.2, 1.5, 2.6])], visits)
+    table = bf.bin_facts(time, [np.array([0.2, 1.5, 2.6])], visits, np.ones(5, bool))
     assert list(table.columns) == list(bf.BIN_FACTS_COLUMNS)
     np.testing.assert_array_equal(table["n_spikes"], [1, 1, 0, 1, 0])
     np.testing.assert_array_equal(
@@ -56,5 +56,23 @@ def test_bin_facts_flags_bins_inside_a_visit():
 
 
 def test_bin_facts_without_visits():
-    table = bf.bin_facts(TIME, [np.array([0.5])], (np.array([]), np.array([])))
+    table = bf.bin_facts(
+        TIME, [np.array([0.5])], (np.array([]), np.array([])), np.ones(4, bool)
+    )
     assert not table["in_well_visit"].any()
+
+
+def test_bin_facts_keep_where_swr_detection_was_observed():
+    observed = np.array([True, False, False, True])
+    table = bf.bin_facts(TIME, [], (np.array([]), np.array([])), observed)
+    np.testing.assert_array_equal(table["swr_observed"], observed)
+    assert table["swr_observed"].dtype == bool
+    with pytest.raises(ValueError, match="one value per bin"):
+        bf.bin_facts(TIME, [], (np.array([]), np.array([])), observed[:3])
+
+
+def test_facts_without_the_observed_flag_are_refused():
+    table = bf.bin_facts(TIME, [], (np.array([]), np.array([])), np.ones(4, bool))
+    bf.require_swr_observed(table)
+    with pytest.raises(ValueError, match="measure_bin_facts"):
+        bf.require_swr_observed(table.drop(columns="swr_observed"))

@@ -96,24 +96,34 @@ def restriction_bins(
 
 
 def bin_facts_table(
-    time: NDArray, n_spikes: NDArray, in_well_visit: NDArray
+    time: NDArray,
+    n_spikes: NDArray,
+    in_well_visit: NDArray,
+    swr_observed: NDArray | None = None,
 ) -> pd.DataFrame:
     """A per-bin facts table (``bin_facts.bin_facts``): ``time``, ``n_spikes``
-    (int32) and ``in_well_visit`` (bool)."""
+    (int32), ``in_well_visit`` and ``swr_observed`` (bool; by default SWR
+    detection observed at every bin)."""
+    if swr_observed is None:
+        swr_observed = np.ones(len(time), dtype=bool)
     return pd.DataFrame(
         {
             "time": time,
             "n_spikes": np.asarray(n_spikes, dtype=np.int32),
             "in_well_visit": np.asarray(in_well_visit, dtype=bool),
+            "swr_observed": np.asarray(swr_observed, dtype=bool),
         }
     )
 
 
-def time_sums(rows: Sequence[tuple]) -> pd.DataFrame:
+def time_sums(rows: Sequence[tuple], **keys: Sequence) -> pd.DataFrame:
     """Time sums (``restriction_totals.restriction_time_sums``' rows of a
     cohort) from ``(epoch_id, category, in_well_visit, in_event_window,
     n_bins, n_spikes, swr, full)`` rows: ``animal`` is the epoch id's first
-    letter, ``none`` 0, and the two-sided scores twice the filter scores."""
+    letter, ``none`` 0, and the two-sided scores twice the filter scores. The
+    other keys are ``swr_observed`` True, ``beyond_swr_margin_s`` and
+    ``place_sampling_at_least_s`` 0 unless given in ``keys``, one value per
+    row."""
     table = pd.DataFrame(
         rows,
         columns=[
@@ -121,6 +131,15 @@ def time_sums(rows: Sequence[tuple]) -> pd.DataFrame:
             "n_spikes", "swr", "full",
         ],
     )  # fmt: skip
+    defaults = {
+        "swr_observed": True,
+        "beyond_swr_margin_s": 0.0,
+        "place_sampling_at_least_s": 0.0,
+    }
+    for key, default in defaults.items():
+        table[key] = keys.pop(key, [default] * len(table))
+    if keys:
+        raise TypeError(f"unknown keys: {sorted(keys)}")
     return table.assign(
         animal=table["epoch_id"].str[0],
         none=0.0,
