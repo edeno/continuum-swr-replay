@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "16e7afccc3e9",
+ "commit": "155175b236f5",
  "code": {
-  "head": "16e7afccc3e978fb2f20173fe085b58a7521ea13",
+  "head": "155175b236f51cfaf43f25306ccbe5fa33528517",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -287,8 +287,8 @@
     "code_sha256": "e6089aa015a19090e27f21373091f476d2a760a2bd68aebde4f8ec586ee0c623"
    },
    "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
-    "sha256": "2954482100df7f5ba699a11621080512a8902a72f74a8af1074c764d63db404f",
-    "code_sha256": "5614fe932b5e718f9523f7ef02f2bdc54f2cc029835f648d38d20a3f22fb918c"
+    "sha256": "12db3b827b8a74b1a64d7af86c14c2cc859c00b2d7348a95c8466b0814817f01",
+    "code_sha256": "fad85f174bf9a0090f14f63f627c2a4da1fa027c822a13a97d3ea4da3ed7862f"
    },
    "src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py": {
     "sha256": "9f241973dacb84338a415d366fb18df06dff9c89c19903c7a9125872b92a81f6",
@@ -299,7 +299,7 @@
     "code_sha256": "870e60557d17a9e49a6d9ea79a563f9c9911b9977f860e39c926013a78ade74c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
-    "sha256": "56f5931652aa40a2222d47c56911e1e6de4db9e39fd9c66fab7421a0cc59a032",
+    "sha256": "d353eb95cdfa3920e86090b2585c0b8d49cbbf19f46dcb80fac97dcfe1ee5756",
     "code_sha256": "b82af0f9bca44e1032d7003559b7473d0c858ab790a4c448d72a169a8f5eee4b"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
@@ -423,8 +423,8 @@
     "code_sha256": "b6edc2b2642ff0a733debb4b7a660234a2d1ff125d07a8638caec0515b182a71"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "95ff286d20363d5c5e58521edc29e8768c99fcf9f29254ee7a370297d590bb07",
-    "code_sha256": "05888953cb0b8c2ec1d7a96109b8685d70cefd6af66062ce20f39d7838030a5c"
+    "sha256": "20de20718ad8cf2c5297d31f9fb2a8422de96d1a3b5d812ae4dec22499c4ca4f",
+    "code_sha256": "e7fec9377bddbefb9ee8c4bc80b751fea924cabc72b06ce74a157fa8c1fda444"
    },
    "src/continuum_swr_replay/columns.py": {
     "sha256": "ce2b6258d178bf3faf8a65a7fcb140a40ccbb39206df076afe186d5e21b00ae8",
@@ -3946,7 +3946,7 @@
    "pending": null
   },
   "non_swr_heldout_control_gain_per_spike_ci_high": {
-   "value": 0.0014137578681029384,
+   "value": 0.00139898229339887,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -3962,7 +3962,7 @@
    "pending": null
   },
   "non_swr_heldout_control_gain_per_spike_ci_low": {
-   "value": 7.642739138825287e-05,
+   "value": 9.120296609232102e-05,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -4010,7 +4010,7 @@
    "pending": null
   },
   "non_swr_heldout_gain_per_spike_ci_high": {
-   "value": 0.5601256567370279,
+   "value": 0.5625583089741937,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4026,7 +4026,7 @@
    "pending": null
   },
   "non_swr_heldout_gain_per_spike_ci_low": {
-   "value": 0.34595209940468624,
+   "value": 0.34351944716752053,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4058,7 +4058,7 @@
    "pending": null
   },
   "non_swr_heldout_spiking_gain_per_spike_ci_high": {
-   "value": 0.8018694387798431,
+   "value": 0.8045038303573397,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4074,7 +4074,7 @@
    "pending": null
   },
   "non_swr_heldout_spiking_gain_per_spike_ci_low": {
-   "value": 0.5993838308239072,
+   "value": 0.5967494392464106,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4132,7 +4132,7 @@
    "pending": null
   },
   "non_swr_likelihood_advantage_per_spike_ci_high": {
-   "value": 0.8898492553420289,
+   "value": 0.8948203213601448,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4146,7 +4146,7 @@
    "pending": null
   },
   "non_swr_likelihood_advantage_per_spike_ci_low": {
-   "value": 0.5172303359076292,
+   "value": 0.5122592698895133,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5078,7 +5078,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_controls_full_minus_swr_per_spike_ci_high": {
-   "value": -0.0021793260876103197,
+   "value": -0.002195661621557944,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5092,7 +5092,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_controls_full_minus_swr_per_spike_ci_low": {
-   "value": -0.0029947142707454043,
+   "value": -0.00297837873679778,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5134,7 +5134,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_controls_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": -8.166505972521093e-05,
+   "value": -7.793054519268182e-05,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5148,7 +5148,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_controls_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": -0.00024813132766544595,
+   "value": -0.00025186584219797503,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5260,7 +5260,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_full_minus_swr_per_spike_ci_high": {
-   "value": 0.5244037966357525,
+   "value": 0.525801712943259,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5274,7 +5274,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_full_minus_swr_per_spike_ci_low": {
-   "value": 0.30289938407355543,
+   "value": 0.301501467766049,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5316,7 +5316,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.7127528264899514,
+   "value": 0.718923575849971,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5330,7 +5330,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": 0.40090922178769867,
+   "value": 0.39473847242767895,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5386,7 +5386,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_per_s_ci_high": {
-   "value": 369.53885196852207,
+   "value": 369.08130961527064,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -5400,7 +5400,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_per_s_ci_low": {
-   "value": 222.55134156747113,
+   "value": 223.00888392072255,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -5442,7 +5442,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_per_spike_ci_high": {
-   "value": 0.5246718648810503,
+   "value": 0.5257033650732318,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5456,7 +5456,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_per_spike_ci_low": {
-   "value": 0.30263131582825764,
+   "value": 0.3015998156360762,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5498,7 +5498,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_two_sided_per_s_ci_high": {
-   "value": 483.5493778981327,
+   "value": 482.83784464595385,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -5512,7 +5512,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_two_sided_per_s_ci_low": {
-   "value": 307.7266449758966,
+   "value": 308.43817822807546,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -5554,7 +5554,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.7137577517860617,
+   "value": 0.7181448629288278,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5568,7 +5568,7 @@
    "pending": null
   },
   "restriction_canonical_non_swr_events_outside_swr_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": 0.3999042964915883,
+   "value": 0.3955171853488222,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5680,7 +5680,7 @@
    "pending": null
   },
   "restriction_canonical_swr_controls_full_minus_swr_per_spike_ci_high": {
-   "value": -0.0021470557633213733,
+   "value": -0.0021546426338745752,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5694,7 +5694,7 @@
    "pending": null
   },
   "restriction_canonical_swr_controls_full_minus_swr_per_spike_ci_low": {
-   "value": -0.0028478692444642417,
+   "value": -0.0028402823739110397,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5736,7 +5736,7 @@
    "pending": null
   },
   "restriction_canonical_swr_controls_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": -7.82949154580786e-05,
+   "value": -7.263086516886739e-05,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5750,7 +5750,7 @@
    "pending": null
   },
   "restriction_canonical_swr_controls_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": -0.000253626474381905,
+   "value": -0.0002592905246711162,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5862,7 +5862,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_none_per_spike_ci_high": {
-   "value": 0.9094361697417872,
+   "value": 0.9168728800929331,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5876,7 +5876,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_none_per_spike_ci_low": {
-   "value": 0.5636230784669822,
+   "value": 0.5561863681158363,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5918,7 +5918,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_none_two_sided_per_spike_ci_high": {
-   "value": 0.995984873141344,
+   "value": 1.0059901713717379,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5932,7 +5932,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_none_two_sided_per_spike_ci_low": {
-   "value": 0.620544470224012,
+   "value": 0.6105391719936183,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5974,7 +5974,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_swr_per_spike_ci_high": {
-   "value": -0.018483006114439347,
+   "value": -0.018734354276865373,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -5988,7 +5988,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_swr_per_spike_ci_low": {
-   "value": -0.03906218077379424,
+   "value": -0.038810832611368216,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6030,7 +6030,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.007325601816929536,
+   "value": 0.007094707891265258,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6044,7 +6044,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": -0.00401922373361321,
+   "value": -0.0037883298079489317,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6100,7 +6100,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_per_s_ci_high": {
-   "value": 207.19090882495357,
+   "value": 205.44640393142618,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6114,7 +6114,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_per_s_ci_low": {
-   "value": 100.0433965302738,
+   "value": 101.78790142380122,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6156,7 +6156,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_per_spike_ci_high": {
-   "value": 0.4096087775617439,
+   "value": 0.40691971578805586,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6170,7 +6170,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_per_spike_ci_low": {
-   "value": 0.24622820825860953,
+   "value": 0.24891727003229758,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6212,7 +6212,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_two_sided_per_s_ci_high": {
-   "value": 337.61572262631773,
+   "value": 336.0030357489662,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6226,7 +6226,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_two_sided_per_s_ci_low": {
-   "value": 200.42951763442423,
+   "value": 202.04220451177574,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6268,7 +6268,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.6877158767177665,
+   "value": 0.6890285111554703,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6282,7 +6282,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_outside_swr_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": 0.3810186155240161,
+   "value": 0.37970598108631226,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6380,7 +6380,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_swr_minus_none_per_spike_ci_high": {
-   "value": 0.9131815108532156,
+   "value": 0.9216795604156328,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6394,7 +6394,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_swr_minus_none_per_spike_ci_low": {
-   "value": 0.5708055278839358,
+   "value": 0.5623074783215186,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6436,7 +6436,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_swr_minus_none_two_sided_per_spike_ci_high": {
-   "value": 0.9406038612354656,
+   "value": 0.9493867241091132,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6450,7 +6450,7 @@
    "pending": null
   },
   "restriction_canonical_swr_events_swr_minus_none_two_sided_per_spike_ci_low": {
-   "value": 0.5908711779316694,
+   "value": 0.5820883150580218,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6568,7 +6568,7 @@
    "pending": null
   },
   "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike_ci_high": {
-   "value": 0.4576684266667853,
+   "value": 0.4611146272101967,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6584,7 +6584,7 @@
    "pending": null
   },
   "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike_ci_low": {
-   "value": 0.2690510258469727,
+   "value": 0.26560482530356133,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6722,7 +6722,7 @@
    "pending": null
   },
   "restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike_ci_high": {
-   "value": 0.3986899977585731,
+   "value": 0.39670215541640863,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6738,7 +6738,7 @@
    "pending": null
   },
   "restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike_ci_low": {
-   "value": 0.23890126082499868,
+   "value": 0.24088910316716317,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6902,7 +6902,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_per_s_ci_high": {
-   "value": 46.815819575489826,
+   "value": 46.327585979788296,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6916,7 +6916,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_per_s_ci_low": {
-   "value": 14.97846781926613,
+   "value": 15.466701414967657,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -6962,7 +6962,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_per_spike_ci_high": {
-   "value": 0.1593587325818481,
+   "value": 0.1594549815406102,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -6978,7 +6978,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_per_spike_ci_low": {
-   "value": 0.09230788626810096,
+   "value": 0.09221163730933887,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7022,7 +7022,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_two_sided_per_s_ci_high": {
-   "value": 52.3688117513901,
+   "value": 51.960844196517826,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7036,7 +7036,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_two_sided_per_s_ci_low": {
-   "value": 17.348407536130892,
+   "value": 17.75637509100316,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7078,7 +7078,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_two_sided_per_spike_ci_high": {
-   "value": 0.176847940958744,
+   "value": 0.17726793165662164,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7092,7 +7092,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_none_two_sided_per_spike_ci_low": {
-   "value": 0.11064846299598025,
+   "value": 0.11022847229810262,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7134,7 +7134,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_per_s_ci_high": {
-   "value": 8.760667748143156,
+   "value": 8.79937291612011,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7148,7 +7148,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_per_s_ci_low": {
-   "value": 2.6582059161413585,
+   "value": 2.619500748164405,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7194,7 +7194,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_per_spike_ci_high": {
-   "value": 0.028215845476927643,
+   "value": 0.028266903251066483,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7210,7 +7210,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_per_spike_ci_low": {
-   "value": 0.015966560851543184,
+   "value": 0.015915503077404344,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7254,7 +7254,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_two_sided_per_s_ci_high": {
-   "value": 13.80160177054254,
+   "value": 13.82207956979129,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7268,7 +7268,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_two_sided_per_s_ci_low": {
-   "value": 4.757228280186781,
+   "value": 4.73675048093803,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7310,7 +7310,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.043844894045056995,
+   "value": 0.043859359533440084,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7324,7 +7324,7 @@
    "pending": null
   },
   "restriction_immobile_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": 0.029266694050079995,
+   "value": 0.029252228561696902,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7352,7 +7352,7 @@
    "pending": null
   },
   "restriction_immobile_share_captured_by_swr_only_ci_high": {
-   "value": 0.8623570732917404,
+   "value": 0.8629939388140105,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7366,7 +7366,7 @@
    "pending": null
   },
   "restriction_immobile_share_captured_by_swr_only_ci_low": {
-   "value": 0.7766752828048841,
+   "value": 0.7760384172826139,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7394,7 +7394,7 @@
    "pending": null
   },
   "restriction_immobile_share_captured_by_swr_only_two_sided_ci_high": {
-   "value": 0.7805563223632503,
+   "value": 0.782110234008426,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7408,7 +7408,7 @@
    "pending": null
   },
   "restriction_immobile_share_captured_by_swr_only_two_sided_ci_low": {
-   "value": 0.694587787208262,
+   "value": 0.6930338755630863,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7450,7 +7450,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_per_s_ci_high": {
-   "value": 37.1873699395166,
+   "value": 36.88496658899591,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7464,7 +7464,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_per_s_ci_low": {
-   "value": 12.386448816454955,
+   "value": 12.688852166975645,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7510,7 +7510,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_per_spike_ci_high": {
-   "value": 0.1317503646067194,
+   "value": 0.13174281285955344,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7526,7 +7526,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_per_spike_ci_low": {
-   "value": 0.07331250496672821,
+   "value": 0.07332005671389417,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7570,7 +7570,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_two_sided_per_s_ci_high": {
-   "value": 38.141244359210134,
+   "value": 37.80937644615052,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7584,7 +7584,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_two_sided_per_s_ci_low": {
-   "value": 12.650888920813118,
+   "value": 12.98275683387273,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7626,7 +7626,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_two_sided_per_spike_ci_high": {
-   "value": 0.13460769843611528,
+   "value": 0.134540293924253,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7640,7 +7640,7 @@
    "pending": null
   },
   "restriction_immobile_swr_minus_none_two_sided_per_spike_ci_low": {
-   "value": 0.07534218790516933,
+   "value": 0.0754095924170316,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7710,7 +7710,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_outside_heldout_events_per_s_ci_high": {
-   "value": -0.31473950592276545,
+   "value": -0.3105046338752306,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7724,7 +7724,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_outside_heldout_events_per_s_ci_low": {
-   "value": -1.1748899488095628,
+   "value": -1.1791248208570977,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7766,7 +7766,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_outside_heldout_events_per_spike_ci_high": {
-   "value": -0.0021354163861115856,
+   "value": -0.0021685791675904766,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7780,7 +7780,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_outside_heldout_events_per_spike_ci_low": {
-   "value": -0.005577443615017677,
+   "value": -0.005544280833538786,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7822,7 +7822,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_per_s_ci_high": {
-   "value": 9.82091084379703,
+   "value": 9.856031872752528,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7836,7 +7836,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_per_s_ci_low": {
-   "value": 3.2337818722441476,
+   "value": 3.19866084328865,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -7878,7 +7878,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_per_spike_ci_high": {
-   "value": 0.035854783831932295,
+   "value": 0.03592974852430342,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7892,7 +7892,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_per_spike_ci_low": {
-   "value": 0.020631269842324267,
+   "value": 0.020556305149953148,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -7920,7 +7920,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_share_in_heldout_non_swr_events_ci_high": {
-   "value": 0.9865876622979511,
+   "value": 0.9862471060914318,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7934,7 +7934,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_share_in_heldout_non_swr_events_ci_low": {
-   "value": 0.8695134106964612,
+   "value": 0.8698539669029804,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7962,7 +7962,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_share_in_heldout_swr_events_outside_swr_ci_high": {
-   "value": 0.2452962713734364,
+   "value": 0.2468968048719425,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7976,7 +7976,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_share_in_heldout_swr_events_outside_swr_ci_low": {
-   "value": 0.1152878825115285,
+   "value": 0.11368734901302242,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8046,7 +8046,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_outside_heldout_events_per_s_ci_high": {
-   "value": 0.5404091811487024,
+   "value": 0.5193367533892554,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -8060,7 +8060,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_outside_heldout_events_per_s_ci_low": {
-   "value": 0.04857087797133014,
+   "value": 0.06964330573077712,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -8102,7 +8102,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_outside_heldout_events_per_spike_ci_high": {
-   "value": 0.002613912808548652,
+   "value": 0.0025309308137158775,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -8116,7 +8116,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_outside_heldout_events_per_spike_ci_low": {
-   "value": 0.00027785104642405836,
+   "value": 0.00036083304125683266,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -8158,7 +8158,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_per_s_ci_high": {
-   "value": 14.074484322586759,
+   "value": 14.104728396844969,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -8172,7 +8172,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_per_s_ci_low": {
-   "value": 4.819964141797562,
+   "value": 4.789720067539352,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per s",
@@ -8214,7 +8214,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_per_spike_ci_high": {
-   "value": 0.050246288220354304,
+   "value": 0.05037268473336724,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -8228,7 +8228,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_per_spike_ci_low": {
-   "value": 0.03269962747088384,
+   "value": 0.0325732309578709,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -8256,7 +8256,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_share_in_heldout_non_swr_events_ci_high": {
-   "value": 0.8533984046558449,
+   "value": 0.8532174583481902,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8270,7 +8270,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_share_in_heldout_non_swr_events_ci_low": {
-   "value": 0.7358835192290569,
+   "value": 0.7360644655367117,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8298,7 +8298,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_share_in_heldout_swr_events_outside_swr_ci_high": {
-   "value": 0.19920217017777442,
+   "value": 0.2000877962837691,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8312,7 +8312,7 @@
    "pending": null
   },
   "restriction_outside_swr_full_minus_swr_two_sided_share_in_heldout_swr_events_outside_swr_ci_low": {
-   "value": 0.1001419849843106,
+   "value": 0.09925635887831591,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -9532,7 +9532,7 @@
    "pending": null
   },
   "swr_heldout_control_gain_per_spike_ci_high": {
-   "value": 0.0011841433951859405,
+   "value": 0.0011960767678614156,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -9548,7 +9548,7 @@
    "pending": null
   },
   "swr_heldout_control_gain_per_spike_ci_low": {
-   "value": 0.00014392260022519842,
+   "value": 0.0001319892275497233,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per spike",
@@ -9596,7 +9596,7 @@
    "pending": null
   },
   "swr_heldout_gain_per_spike_ci_high": {
-   "value": 0.9050404294225889,
+   "value": 0.9148391403717757,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -9612,7 +9612,7 @@
    "pending": null
   },
   "swr_heldout_gain_per_spike_ci_low": {
-   "value": 0.5881481190673743,
+   "value": 0.5783494081181875,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -9644,7 +9644,7 @@
    "pending": null
   },
   "swr_heldout_spiking_gain_per_spike_ci_high": {
-   "value": 1.1213280673145585,
+   "value": 1.127488536429077,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -9660,7 +9660,7 @@
    "pending": null
   },
   "swr_heldout_spiking_gain_per_spike_ci_low": {
-   "value": 0.8027888846200975,
+   "value": 0.796628415505579,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -9718,7 +9718,7 @@
    "pending": null
   },
   "swr_likelihood_advantage_per_spike_ci_high": {
-   "value": 1.3372152719427852,
+   "value": 1.35849569175881,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -9732,7 +9732,7 @@
    "pending": null
   },
   "swr_likelihood_advantage_per_spike_ci_low": {
-   "value": 0.8062710529728406,
+   "value": 0.7849906331568157,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
