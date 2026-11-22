@@ -742,3 +742,25 @@ def test_a_fit_not_kept_records_what_the_refit_left_out(monkeypatch) -> None:
     assert record.left_out_round == {"x": 1}
     assert record.cohort_counts["rows_dropped"] == {}
     assert record.n_rows == len(frame) and np.isnan(record.coef).all()
+
+
+def test_a_term_that_is_not_a_level_drops_no_rows(rate_sessions) -> None:
+    """A 0/1 slope on two visits fails the support rule and is made
+    inactive; the category's levels pass. No row is dropped for the slope:
+    the fit sees every row."""
+    keys, frames = list(rate_sessions), list(rate_sessions.values())
+    sessions = {}
+    for key, rows in zip(keys[:2], frames[:2], strict=True):
+        rows = _grouped_rate(rows, np.arange(0, 200, 2))
+        sessions[key] = rows.assign(flag=rows["well_visit_id"].isin([0, 1]) * 1.0)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    grp = Category("grp", ("a", "b"), reference="a")
+    design = build_design(
+        [grp, Slope("flag"), Slope("x"), Offset("exposure")], pooled, intercept=True
+    )
+    record = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")[
+        0
+    ]
+    assert record.left_out == {"flag": Removed.SUPPORT}
+    assert record.cohort_counts["rows_dropped"] == {}
+    assert record.n_rows == len(sessions[keys[0]])

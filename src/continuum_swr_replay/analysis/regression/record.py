@@ -118,7 +118,9 @@ class FitRecord:
     cohort_counts : dict
         Rows left out before the fit, by reason: ``rows_missing_values``,
         ``rows_dropped`` (level coefficient -> its rows, the support rule's
-        row rule), and under the grouped softmax
+        row rule; a row shared by levels of two categories that fail in the
+        same pass is counted under the first in column order), and under the
+        grouped softmax
         ``events_without_response`` (events given with no response) and
         ``events_emptied_by_dropped_rows`` (events whose response was all on
         dropped rows); a caller adds its own cohort counts.
