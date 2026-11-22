@@ -147,6 +147,52 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert list(none.columns) == ["start_offset_s", "end_offset_s"]
 
 
+def test_boundary_timing_classes_each_bound_against_the_tolerance():
+    """Event minus SWR, ms: below -25 earlier, above +25 later, within (the
+    edges included) together."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.030, -0.025, 0.0, 0.025, 0.026],
+            "end_offset_s": [0.030, 0.025, -0.0251, 0.0, -0.025],
+        }
+    )
+    classes = stats.boundary_timing_classes(offsets)
+    assert classes["start"].tolist() == [
+        "earlier", "together", "together", "together", "later",
+    ]  # fmt: skip
+    assert classes["end"].tolist() == [
+        "later", "together", "earlier", "together", "together",
+    ]  # fmt: skip
+    assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.025
+
+
+def test_boundary_timing_statistics_pool_the_events_and_range_the_animals():
+    """Animal a: (earlier, later), (together, together), (together, together);
+    b: (earlier, later). Pooled over 4 events; a's shares 1/3 and 2/3, b's 1."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.05, 0.0, 0.01, -0.04],
+            "end_offset_s": [0.05, 0.0, -0.01, 0.03],
+        },
+        index=[10, 11, 12, 13],
+    )
+    animal = pd.Series(["a", "a", "a", "b", "c"], index=[10, 11, 12, 13, 99])
+    table = stats.boundary_timing_statistics(offsets, animal)
+    assert len(table) == 9
+    assert list(table.index.get_level_values("start")[:3]) == ["earlier"] * 3
+    assert table["share"].sum() == pytest.approx(1.0)
+    wide = table.loc[("earlier", "later")]
+    assert wide["share"] == pytest.approx(0.5) and wide["n_events"] == 2
+    assert wide["animal_min"] == pytest.approx(1 / 3)
+    assert wide["animal_max"] == pytest.approx(1.0)
+    together = table.loc[("together", "together")]
+    assert together["share"] == pytest.approx(0.5)
+    assert together["animal_min"] == 0.0
+    assert together["animal_max"] == pytest.approx(2 / 3)
+    empty = table.loc[("later", "earlier")]
+    assert empty["share"] == 0.0 and empty["animal_max"] == 0.0
+
+
 def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
     broken = EVENTS.copy()
     broken.loc[3, "matched_swr_end"] = np.nan

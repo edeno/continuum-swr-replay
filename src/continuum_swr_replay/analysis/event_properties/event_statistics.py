@@ -310,13 +310,104 @@ def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
         "end_offset_median_s": offsets["end_offset_s"].median(),
     }
     for bound in ("start", "end"):
-        # in whole microseconds, so a bound exactly at a tail's edge is not in it
-        magnitude_us = np.round(1e6 * offsets[f"{bound}_offset_s"].abs())
+        magnitude_us = _offset_us(offsets[f"{bound}_offset_s"]).abs()
         for name, tail_s in OFFSET_TAILS_S.items():
             statistics[f"{bound}_offset_beyond_{name}_fraction"] = float(
                 (magnitude_us > round(1e6 * tail_s)).mean()
             )
     return statistics
+
+
+def _offset_us(offset_s: pd.Series) -> pd.Series:
+    """An offset in whole microseconds, so that a bound exactly at a
+    tolerance's edge is within it."""
+    return np.round(1e6 * offset_s)
+
+
+TIMING_TOLERANCE = "twenty_five_ms"
+"""The :data:`OFFSET_TAILS_S` tolerance within which an event's bound is
+together with its SWR's (:func:`boundary_timing_statistics`): the same 25 ms
+as the ``*_beyond_twenty_five_ms_fraction`` statistics."""
+TIMING_CLASSES = ("earlier", "together", "later")
+"""How an event's bound sits against its SWR's, in order."""
+
+
+def boundary_timing_classes(offsets: pd.DataFrame) -> pd.DataFrame:
+    """Each SWR-overlapping event's start and end against its SWR's.
+
+    A bound is ``"earlier"`` when its offset (event minus SWR,
+    :func:`boundary_offsets`) is below minus the tolerance
+    (:data:`TIMING_TOLERANCE`), ``"later"`` when above it, and ``"together"``
+    within it (an offset exactly at the edge is together, as it is not in the
+    ``*_beyond_*`` tail). So a positive start offset is an event that starts
+    later than its SWR, a positive end offset one that ends later.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_overlapping_events, 2)
+        ``start`` and ``end``, each one of :data:`TIMING_CLASSES`, indexed as
+        ``offsets``.
+    """
+    tolerance_us = round(1e6 * OFFSET_TAILS_S[TIMING_TOLERANCE])
+    classes = {}
+    for bound in ("start", "end"):
+        offset_us = _offset_us(offsets[f"{bound}_offset_s"])
+        classes[bound] = np.select(
+            [offset_us < -tolerance_us, offset_us > tolerance_us],
+            [TIMING_CLASSES[0], TIMING_CLASSES[2]],
+            TIMING_CLASSES[1],
+        )
+    return pd.DataFrame(classes, index=offsets.index)
+
+
+def boundary_timing_statistics(
+    offsets: pd.DataFrame, animal: pd.Series
+) -> pd.DataFrame:
+    """The share of SWR-overlapping events in each of the nine combinations of
+    their start and end against their SWR's (:func:`boundary_timing_classes`).
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+    animal : pd.Series
+        Each event's animal, indexed as ``offsets`` (or a superset of it).
+
+    Returns
+    -------
+    pd.DataFrame, shape (9, 4)
+        Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
+        order): ``share``, pooled over every event, as panels c and d pool;
+        ``animal_min`` and ``animal_max``, the lowest and highest of each
+        animal's share over its own events; ``n_events``, the events in the
+        cell.
+    """
+    classes = boundary_timing_classes(offsets)
+    cells = pd.MultiIndex.from_product(
+        [TIMING_CLASSES, TIMING_CLASSES], names=["start", "end"]
+    )
+    counts = classes.value_counts(["start", "end"]).reindex(cells, fill_value=0)
+    per_animal = (
+        classes.assign(animal=animal.loc[classes.index])
+        .groupby("animal")
+        .value_counts(["start", "end"], normalize=True)
+        .unstack("animal")
+        .reindex(cells, fill_value=0.0)
+        .fillna(0.0)
+    )
+    return pd.DataFrame(
+        {
+            "share": counts / counts.sum(),
+            "animal_min": per_animal.min(axis=1),
+            "animal_max": per_animal.max(axis=1),
+            "n_events": counts,
+        }
+    )
 
 
 # --- theta, ripple, MUA and gamma during events -----------------------------------
