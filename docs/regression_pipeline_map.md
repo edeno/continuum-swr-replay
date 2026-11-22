@@ -162,9 +162,9 @@ Which times lie inside a well visit.
 
 ### `src/continuum_swr_replay/analysis/event_evidence/bin_facts.py`
 
-Per-bin facts of a decode: the spikes of each bin and whether it is inside a well visit.
+Per-bin facts of a decode: the spikes of each bin, whether it is inside a well visit, and whether SWR detection was observed there.
 
-`decoder_bin_spike_counts`, `bin_facts`
+`require_swr_observed`, `decoder_bin_spike_counts`, `bin_facts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/heldout_events.py`
 
@@ -194,13 +194,13 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
+`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
 The non-local restriction models summed over event windows.
 
-`restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+`outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -992,7 +992,7 @@ Does each detector's content reproduce in cells it never saw?
 
 What the per-event runners share: their arguments, the canonical event table, their input records, an epoch's decode inputs, the CPU and GPU worker pools, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `file_input`, `trials_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
+`event_table_path`, `file_input`, `trials_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `add_bin_facts_dir_argument`, `bin_facts_run_dir`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -1008,7 +1008,7 @@ Non-local events detected from held-out data, for Figure 2's panel g.
 
 ### `scripts/event_evidence/measure_bin_facts.py`
 
-Each decode bin's spikes over every tetrode and whether it is inside a well visit.
+Each decode bin's spikes over every tetrode, whether it is inside a well visit, and whether SWR detection was observed there.
 
 `run_epoch`, `main`
 
