@@ -1,0 +1,65 @@
+name: float-diagnostic
+
+# DIAGNOSTIC, on a throwaway branch that is never merged: two tests that require
+# bit-for-bit equality of the fold fit failed on GitHub's runners at d2d3df23 and
+# pass on the development machine. Each job repeats the fold fit on one runner
+# and reports which repeat differs (.github/diagnostics/fold_fit_repeats.py).
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      # the same job several times: GitHub's runners are not all one machine type
+      matrix:
+        sample: [1, 2, 3, 4]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev --python 3.12
+
+      - name: Machine
+        run: |
+          lscpu | grep -E "Model name|^CPU\(s\)|Thread|L1d|L2|L3" || true
+          free -g
+
+      - name: Fold fit repeats, default threads
+        env:
+          JAX_PLATFORMS: cpu
+        run: uv run --frozen --python 3.12 python .github/diagnostics/fold_fit_repeats.py default
+
+      - name: Fold fit repeats, one XLA thread
+        if: always()
+        env:
+          JAX_PLATFORMS: cpu
+          XLA_FLAGS: "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+        run: uv run --frozen --python 3.12 python .github/diagnostics/fold_fit_repeats.py one_thread
+
+      - name: The two tests alone
+        if: always()
+        run: >-
+          uv run --frozen --python 3.12 pytest -q
+          tests/integration/test_nonlocal_restriction_simulated.py
+          -k "test_each_bin_is_scored_by_its_own_folds_fit or test_a_folds_spikes_reach_none_of_its_fit"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: float-diagnostic-${{ matrix.sample }}
+          path: diagnostic_*.json
