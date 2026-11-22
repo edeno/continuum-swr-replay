@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "b9e0923c9e49",
+ "commit": "ba82b02086b2",
  "code": {
-  "head": "b9e0923c9e496d96861112f862f1a27ec752f810",
+  "head": "ba82b02086b2130448e4a89d71e44efd48d11a8d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -107,8 +107,8 @@
     "code_sha256": "787ddea46e138922855103f0093fc178e1569407967c84d48034c0f645101e37"
    },
    "src/continuum_swr_replay/analysis/decode_quality/quality_metrics.py": {
-    "sha256": "591684fea5ad5f7458eb90a33b0540d6ae38c46a00cba748a2e3e0f3974f20ff",
-    "code_sha256": "eb3a92f75caab11fc49336f259556fa53b92a7b60abdcab4c75a19e34951a4df"
+    "sha256": "4ede9b45dd41878ca632e60a10446b6f8017e9fb174b141acd14b1a555959d51",
+    "code_sha256": "4f467066ee3d77c0b7a4eaeafd3c3f9b133733de4f072f0eda4577839e1e3195"
    },
    "src/continuum_swr_replay/analysis/detection/__init__.py": {
     "sha256": "f2cc16849a6d11442113ddeee3cbd9a4da6a1523131af837641c3d2964f124a4",
@@ -371,8 +371,8 @@
     "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
    },
    "src/continuum_swr_replay/analysis/event_properties/rule_sweep.py": {
-    "sha256": "f72be9ae567202661949857f9efe3fd517d92bec941c786d4a5b03d024084ac0",
-    "code_sha256": "46098b1e7ed20ff2043dd3748f7d0577d2f415d78fe8d5a35d7a4975c4dad39c"
+    "sha256": "e5af69b200103d31969b5368b859126742ff09bab71edfced2d40ba5fb3940fb",
+    "code_sha256": "f6459d8a2d2c8b926196664bc2c7686b66c0d7550f4f5697edfd363775ef280f"
    },
    "src/continuum_swr_replay/analysis/event_tables/__init__.py": {
     "sha256": "cbb29294c811a4b945fdd3aede000b0fcb85102d8258312c41bb98e099c3630a",
@@ -519,8 +519,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "6ffd9da4dbecc038a362e2d093688fcee294e27310140a08679ad04cfa80f90d",
-    "code_sha256": "06dd32af98fd722c90128e768c82fced7e37af4e6065d7abb2aa39cf8b0e97d7"
+    "sha256": "acd187ecabbcc789d3e847950afbe6c7425cfea804d9ea9cafd6c2d2e3ad7641",
+    "code_sha256": "ab4ae61e4fe52def82cfb0a57fed836172209290650d9e53dd34fc2c6a91998f"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -757,7 +757,7 @@
   },
   {
    "path": "Processed-Data/decoder_quality/sessions.parquet",
-   "sha256": "c6821595f171ffc314c1aaa49d0bfc17e4a59bfe7f4eb004529fe7e178fe1cc5"
+   "sha256": "e2bbff03fa0fb2d68085f8de39b8c67fbdbdcca56c0019208dad588a837743df"
   },
   {
    "path": "Processed-Data/decoder_quality/calibration.parquet",
@@ -765,7 +765,7 @@
   },
   {
    "path": "Processed-Data/decoder_quality/manifest.json",
-   "sha256": "4587fe6b978c79a2a3578a3a8f740b5a83e3d7a3119384e066e50959c5472862"
+   "sha256": "6e0ecee10d287b4eb87c199a01026cfc687a10a121e3441c5b679d7ef4b47be8"
   },
   {
    "path": "Processed-Data/ripple_class_structure/distribution.csv",
@@ -789,11 +789,11 @@
   },
   {
    "path": "Processed-Data/event_rule_sweep/counts.parquet",
-   "sha256": "9df8842d4f5a3398a1c7abea1a70693a8c9ae38eefd635675df06737b7c873f0"
+   "sha256": "1ecd92299fd225496175defd56777f22f932008403a1086a250823bc107e6814"
   },
   {
    "path": "Processed-Data/event_rule_sweep/manifest.json",
-   "sha256": "903b789874d1c06cc1efde1b99bebff4fd614b19a8e09852d7a89eac0e75e144"
+   "sha256": "42a6fabb3d448f82a8fdc6c54f2e39004540ec8a20d062e2c70579e5a0693d66"
   },
   {
    "path": "Processed-Data/state_calibration_in_visits/calibration_bins.csv",
@@ -2583,7 +2583,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2599,7 +2599,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2615,7 +2615,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2631,7 +2631,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2647,7 +2647,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2663,7 +2663,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2679,7 +2679,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -2695,7 +2695,7 @@
     "2d.5"
    ],
    "figures": [
-    "S2f"
+    "S2g"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "hpd_tight_values",
@@ -3983,7 +3983,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
@@ -4015,7 +4015,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
@@ -4207,7 +4207,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4223,7 +4223,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4239,7 +4239,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4255,7 +4255,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4271,7 +4271,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4287,7 +4287,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4303,7 +4303,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4319,7 +4319,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4335,7 +4335,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4351,7 +4351,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4367,7 +4367,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4383,7 +4383,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4399,7 +4399,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -5233,7 +5233,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
@@ -12533,7 +12533,199 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_and_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_and_half_no_swr_fraction": {
+   "value": 0.8496387283236995,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_and_half_no_swr_fraction_animal_max": {
+   "value": 0.9000922541551787,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_and_half_no_swr_fraction_animal_min": {
+   "value": 0.8109922803972281,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_no_swr_fraction": {
+   "value": 0.8324421965317919,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_no_swr_fraction_animal_max": {
+   "value": 0.884836043192588,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_five_no_swr_fraction_animal_min": {
+   "value": 0.7905519619050334,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_and_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 4.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_and_half_no_swr_fraction": {
+   "value": 0.8103612716763006,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 4.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_and_half_no_swr_fraction_animal_max": {
+   "value": 0.8670876031629454,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_and_half_no_swr_fraction_animal_min": {
+   "value": 0.7617657697998418,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 4.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12549,7 +12741,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12565,7 +12757,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12581,7 +12773,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12597,7 +12789,71 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_half_no_swr_fraction": {
+   "value": 0.1702456647398844,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_half_no_swr_fraction_animal_max": {
+   "value": 0.221522575834104,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_half_no_swr_fraction_animal_min": {
+   "value": 0.09849687360576677,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12613,7 +12869,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12629,7 +12885,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12645,7 +12901,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12661,7 +12917,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12677,7 +12933,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12693,7 +12949,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12709,7 +12965,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12725,7 +12981,135 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_six_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 6, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_six_no_swr_fraction": {
+   "value": 0.8644797687861272,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 6 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_six_no_swr_fraction_animal_max": {
+   "value": 0.9127303897832065,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_six_no_swr_fraction_animal_min": {
+   "value": 0.8239047966609521,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 6 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_and_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 3.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_and_half_no_swr_fraction": {
+   "value": 0.7475,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 3.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_and_half_no_swr_fraction_animal_max": {
+   "value": 0.8159646624390408,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_and_half_no_swr_fraction_animal_min": {
+   "value": 0.6791228265851355,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 3.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12741,7 +13125,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12757,7 +13141,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12773,7 +13157,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12789,7 +13173,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12805,7 +13189,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12821,7 +13205,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12837,7 +13221,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12853,7 +13237,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12869,7 +13253,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12885,7 +13269,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12901,7 +13285,7 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -12917,7 +13301,71 @@
     "2a.5"
    ],
    "figures": [
-    "S2c"
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_zero_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_zero_no_swr_fraction": {
+   "value": 0.07355491329479769,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_zero_no_swr_fraction_animal_max": {
+   "value": 0.11399879378431906,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_zero_no_swr_fraction_animal_min": {
+   "value": 0.04224533619197913,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR detector's threshold, not a setting of the event rule (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it; the share with no SWR changes strongly with it, as a threshold on one distribution must) at 0 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2i"
    ],
    "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
    "function": "rule_sweep_values",
@@ -13780,67 +14228,67 @@
    "pending": null
   },
   "state_fraction_immobile_continuous": {
-   "value": 0.060076020658016205,
+   "value": 0.05261857062578201,
    "kind": "fraction",
    "style": "pct1",
    "unit": "",
-   "description": "median over sessions of each session's mean Non-Local_Continuous_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "description": "median over sessions of each session's mean Non-Local_Continuous_prob over its bins slower than 4 cm/s inside a well visit (from the first poke-in at a well to the final poke-out) outside excluded time, sessions pooled; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
    "questions": [
     "2a.6"
    ],
    "figures": [
-    "decoder_validation"
+    "2a"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)",
-   "function": "state_fraction_values",
+   "function": "immobile_state_fraction_values",
    "pending": null
   },
   "state_fraction_immobile_fragmented": {
-   "value": 0.009040279313921928,
+   "value": 0.0090964799746871,
    "kind": "fraction",
    "style": "pct1",
    "unit": "",
-   "description": "median over sessions of each session's mean Non-Local_Fragmented_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "description": "median over sessions of each session's mean Non-Local_Fragmented_prob over its bins slower than 4 cm/s inside a well visit (from the first poke-in at a well to the final poke-out) outside excluded time, sessions pooled; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
    "questions": [
     "2a.6"
    ],
    "figures": [
-    "decoder_validation"
+    "2a"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)",
-   "function": "state_fraction_values",
+   "function": "immobile_state_fraction_values",
    "pending": null
   },
   "state_fraction_immobile_local": {
-   "value": 0.7018222212791443,
+   "value": 0.707481861114502,
    "kind": "fraction",
    "style": "pct1",
    "unit": "",
-   "description": "median over sessions of each session's mean Local_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "description": "median over sessions of each session's mean Local_prob over its bins slower than 4 cm/s inside a well visit (from the first poke-in at a well to the final poke-out) outside excluded time, sessions pooled; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
    "questions": [
     "2a.6"
    ],
    "figures": [
-    "decoder_validation"
+    "2a"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)",
-   "function": "state_fraction_values",
+   "function": "immobile_state_fraction_values",
    "pending": null
   },
   "state_fraction_immobile_no_spike": {
-   "value": 0.2286837100982666,
+   "value": 0.23593467473983765,
    "kind": "fraction",
    "style": "pct1",
    "unit": "",
-   "description": "median over sessions of each session's mean No-Spike_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "description": "median over sessions of each session's mean No-Spike_prob over its bins slower than 4 cm/s inside a well visit (from the first poke-in at a well to the final poke-out) outside excluded time, sessions pooled; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
    "questions": [
     "2a.6"
    ],
    "figures": [
-    "decoder_validation"
+    "2a"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)",
-   "function": "state_fraction_values",
+   "function": "immobile_state_fraction_values",
    "pending": null
   },
   "state_fraction_moving_continuous": {
@@ -14097,7 +14545,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
@@ -14129,7 +14577,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
@@ -14273,7 +14721,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14289,7 +14737,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14305,7 +14753,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14321,7 +14769,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14337,7 +14785,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14353,7 +14801,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14369,7 +14817,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14385,7 +14833,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14401,7 +14849,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14417,7 +14865,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14433,7 +14881,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14449,7 +14897,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -14465,7 +14913,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -15331,7 +15779,7 @@
     "2d.9"
    ],
    "figures": [
-    "S2g"
+    "S2f"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
