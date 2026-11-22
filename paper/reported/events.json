@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "5cfc25f66ed8",
+ "commit": "1c5f96565be1",
  "code": {
-  "head": "5cfc25f66ed8ecf795d8343dd4f5d5be793c8f94",
+  "head": "1c5f96565be1fbabb1a1aa7f18e08c744d6ece6d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -195,8 +195,8 @@
     "code_sha256": "bb64ffe554f873854a27ff88324f1f0a6c3551122d060c8307b63306f6d64043"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/nonlocal_comparison.py": {
-    "sha256": "df50e60ddc3b6153ce755585a56554e9a0c7eddddd7299480cbb34cb95c105bd",
-    "code_sha256": "664a1a9fa10212f93840fea1f6cf6b614b11a82217ae4026b930af7de4e2ef80"
+    "sha256": "7c09d7b1424f710b1afb2560982bca96c8bdf44eaeca9ca87612d1ea696552b4",
+    "code_sha256": "066c1883a3b2e5f10f2f4c8a88aeef25dfa1c3e61e0fafb7a917abb6fba50fa2"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/overlap.py": {
     "sha256": "3ee0b0212ce7d78bf9ef525428ed0ed14614bc7a153e477faf8fa154408d9445",
@@ -267,8 +267,8 @@
     "code_sha256": "f8eb9a1d3f80534ed229785a3f89767ae18a5e6ea7474ab7f2033d2d3a2cd92b"
    },
    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
-    "sha256": "006d0bbf2d5028c3db82062d3d3bddc6fc0c9770517b61e78b80c29d3199a1b2",
-    "code_sha256": "63b363c841a79e429a0da49cb52089feaf0f3c030b07583d94c91f47ec91df6e"
+    "sha256": "574288e1cc26ca3645d5c0fabc74480a1fb95910310d3544cae1c4885541c2eb",
+    "code_sha256": "be09b1fa67df01a4faf4ca21340980e7e555b58a7ad69b2336ced412b0b90fcf"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
     "sha256": "f357bff572df4493cda9c27ff958f8aabc88fb36a0e73741e18cd3688f03fae7",
@@ -303,8 +303,8 @@
     "code_sha256": "870e60557d17a9e49a6d9ea79a563f9c9911b9977f860e39c926013a78ade74c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
-    "sha256": "f6b8e2db090de9858e09289c6862d6e5473e6a37ed9f3d11ed8ffcb1e8472a17",
-    "code_sha256": "ab19477eaa9ba48a3012f4e1ed211281f862a39fbe998f2a938e63a40b92f8f2"
+    "sha256": "1fd253bfc69f2bab2b72ed68169cf47faa1e74aa5d7b2f26992eb76053aefb20",
+    "code_sha256": "49677c1c6097d6c8d9f912b7aa18130e2202723f2df675d11cd876fc53f91393"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
     "sha256": "8bddc2992907df5de62240b055ca876be991dd67420dbc09fd35f0a93c2ada52",
@@ -319,8 +319,8 @@
     "code_sha256": "1b9bf3b6851bdee069d909f30c418a5a4f9a1e5020b28bdc2759e4ee3d350499"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/__init__.py": {
-    "sha256": "f9dfb379e8bd98ca25d2496f57c71b12d908614c847e2012b2b3d4dbb9975b89",
-    "code_sha256": "f29703c7bdf509c972156da024c7003bef0f59c80dc0f3e409959d56486dad6e"
+    "sha256": "295533ffd97c4cdf42f538ffd56fb5f2974bce607da070bdaee3f32b8719f686",
+    "code_sha256": "ad3761022a514034b6dff42ff02841c157da1c7ac8e21cabd8075812e337f628"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/evidence.py": {
     "sha256": "27579039bce8971a8875d8816a30b48e12a416c0ea27c71d22e9c6cbe743ab5d",
@@ -331,8 +331,8 @@
     "code_sha256": "bc5234303fc14c6e17855f10f14cb60af613dd0d1f2dd009acabdf9a823e3824"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/summary.py": {
-    "sha256": "05fa99c3977e74fcd6fde15d468d26b19888e5ce7107bd64cd708d74f7c17fb9",
-    "code_sha256": "0521b7dd9a2c5a7acd734befba30f954e315997c446ecaf9494273012a2a9bb2"
+    "sha256": "d2ce96265cda0dbffb3d3ec2d83572ada0a5be641fd8e1f7009be7d6f4932d44",
+    "code_sha256": "fe7aaeb0c51fbd543f6e61248135669b0bc75ebcc8e8cbe46789aa06d5fb090d"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
     "sha256": "bc55c36f4e7dfedb75454f1d58ef6e553f17552adc6f5a982660faff9fbe4314",
@@ -343,28 +343,36 @@
     "code_sha256": "5287a678cd0925a5783ccfabc8650caadd3423e7f338781acb8ea144f7006e42"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
-    "sha256": "fb51944dc60ec36110034d4308d6c2cdf0100eb5a18d9888c39bd016c4a60a3b",
-    "code_sha256": "9472bba65557329ab44485556d0fe40683cd7dd432a927843e69e4c1ee006fa0"
+    "sha256": "7bf397655c44bb9e842ee8ef9b0961102f5d3944ae94a1972b4c172819187599",
+    "code_sha256": "e8d3b88fcaef38115d82422020ba80c8431de2f8f40e1e87d445e1a58d36cdbd"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py": {
-    "sha256": "8c30ee1325691d7fd1349effddb5882391723f155fdfc46e53d6b20e15d176fc",
-    "code_sha256": "32dea87442091dc8fe1a66fd1ddefa6ef26029b8fd7aab3316fb11e77279af06"
+    "sha256": "7514e5c1d5cfb413ca94e2f51465b74ca5d292dc81936c595378fd83ec000771",
+    "code_sha256": "c0429e4ae8280633ccdf123bf3a2882e2e79f6b08d2a96bbed0ba34162e9d1ee"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
     "sha256": "83bc35c9b3c390372098ed012f5584d938d945afd8233f4934febcc19bb8e4f8",
     "code_sha256": "d7b4bb815f91a50bc8639721cf7aa1dd0f6b293617a94eb7d9340177310a1e24"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "dd4dfc471c42632c58f48c271db600864b4775685dd3897ce4e5fcf289002022",
-    "code_sha256": "4ab79ffcd6e8ecd0577b8eb07702d3dad135aaf781de09f5f60b9ede6a133f50"
+    "sha256": "4e0a3193132fe567201bd485e12c9c59df470edbf21e6cfcffc4fdbcb2a3314a",
+    "code_sha256": "f9c1521348751693a036a25349d79bdf60a55992665a6b24e007657b3d4ad69d"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/nonlocal_by_signal.py": {
+    "sha256": "39d3c4bdb1c46e1a341adc90f52d0f203a69e5033956e5d619943f2778fdded2",
+    "code_sha256": "9bc47aae043346e1523dbfa4deddc411c8af2c562486f1d47e369c7b0d51fad9"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
     "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/rule_sweep.py": {
+    "sha256": "f72be9ae567202661949857f9efe3fd517d92bec941c786d4a5b03d024084ac0",
+    "code_sha256": "46098b1e7ed20ff2043dd3748f7d0577d2f415d78fe8d5a35d7a4975c4dad39c"
    },
    "src/continuum_swr_replay/analysis/event_tables/__init__.py": {
     "sha256": "cbb29294c811a4b945fdd3aede000b0fcb85102d8258312c41bb98e099c3630a",
@@ -503,16 +511,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "06ec93e2a305ce874275ba6df810c5089fe7af488669ae8e58f9f5f580c0e57e",
-    "code_sha256": "b4699636b1474b3cd0b1cc79f2ccfd4263ca50add122013558f2b25954fd113d"
+    "sha256": "b2574b000ea245ab5d0fff015ad1e4b251f85c77a1c2f81b4f554eb37a797976",
+    "code_sha256": "ca1427feedf3efa7fb84e98200aa0e884bea365ad5209a51540d1e27f5e207e9"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "222d8242c7d49e802c1fddf9df51fcdd0c19cdf439094d85966edf7ec93d13e4",
-    "code_sha256": "a35295417e483a926d162645f1b3b24e6281f24425b884351df310c44e8984d2"
+    "sha256": "7a7fe21702e464e6f0baadf01494f486de838947d6175352f412a824ed0d9333",
+    "code_sha256": "a841717029e51ee993c2511d6ddb730bb451d1fcd53b8d559413060b07d5be89"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -772,12 +780,32 @@
    "sha256": "822bc337bef783c465d61e60c879abd9efc672ccaa7767e49c201e2465a449fa"
   },
   {
-   "path": "Processed-Data/nonlocal_by_ripple_power/counts.parquet",
-   "sha256": "b666496170a2886510afbaf56d1443cca01edd8e7f09e64a05116f07d0e4420e"
+   "path": "Processed-Data/nonlocal_by_signal/counts.parquet",
+   "sha256": "737ded19a5200ebf2200cc19132ae84be0801064b90e990d3138caa0f0df92f0"
   },
   {
-   "path": "Processed-Data/nonlocal_by_ripple_power/manifest.json",
-   "sha256": "4662162d3e43b79218a4e8583719fd13215453cb35cf169620ed17d8a25f6dd5"
+   "path": "Processed-Data/nonlocal_by_signal/manifest.json",
+   "sha256": "1e44cac5f0f670649c3aa97ceb7e5324e618aa557e1e53a89ec09449604ee6b8"
+  },
+  {
+   "path": "Processed-Data/event_rule_sweep/counts.parquet",
+   "sha256": "9df8842d4f5a3398a1c7abea1a70693a8c9ae38eefd635675df06737b7c873f0"
+  },
+  {
+   "path": "Processed-Data/event_rule_sweep/manifest.json",
+   "sha256": "903b789874d1c06cc1efde1b99bebff4fd614b19a8e09852d7a89eac0e75e144"
+  },
+  {
+   "path": "Processed-Data/state_calibration_in_visits/calibration_bins.csv",
+   "sha256": "7b9f8b684c5830318a6d327ffb60d0df186ec7ecb28f415bf80c496b678c9a9b"
+  },
+  {
+   "path": "Processed-Data/state_calibration_in_visits/calibration_trends.csv",
+   "sha256": "5ada7d19a75e8a3f4b2ddc124ab5eece59e05e44095bd72b7d8c4e29a1b5b9bd"
+  },
+  {
+   "path": "Processed-Data/state_calibration_in_visits/manifest.json",
+   "sha256": "8bcdfcf5441b46eda73b77583cc4c17f94e00ee911844b778e22111d7d0e9142"
   }
  ],
  "values": {
@@ -2447,6 +2475,118 @@
    "function": "property_values",
    "pending": null
   },
+  "hpd_coverage_animal_mean_non_swr": {
+   "value": 65.15092911190634,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "HPD coverage, the length of track that holds 95 % of the decoded probability averaged over the event's bins (hpd_coverage_cm) of immobile non-SWR non-local events: an epoch's median over its events, an animal's median over its epochs, the mean over animals; 95 % interval from the nested bootstrap of the animals, their epochs and their events, small-sample t correction; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animal_mean_non_swr_ci_high": {
+   "value": 100.96828782135617,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper bound of that interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animal_mean_non_swr_ci_low": {
+   "value": 29.333570402456502,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower bound of its 95 % interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animal_mean_swr": {
+   "value": 107.63859297278199,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "HPD coverage, the length of track that holds 95 % of the decoded probability averaged over the event's bins (hpd_coverage_cm) of immobile SWR-overlapping non-local events: an epoch's median over its events, an animal's median over its epochs, the mean over animals; 95 % interval from the nested bootstrap of the animals, their epochs and their events, small-sample t correction; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animal_mean_swr_ci_high": {
+   "value": 137.70109836238657,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper bound of that interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animal_mean_swr_ci_low": {
+   "value": 77.57608758317741,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower bound of its 95 % interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
+  "hpd_coverage_animals_non_swr_lower": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR HPD coverage, the length of track that holds 95 % of the decoded probability averaged over the event's bins (hpd_coverage_cm), the median over its epochs of each epoch's median, is below their SWR one; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2d.5"
+   ],
+   "figures": [
+    "S2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "hpd_animal_values",
+   "pending": null
+  },
   "hpd_difference_high": {
    "value": 83.78191586182399,
    "kind": "quantity",
@@ -3213,6 +3353,22 @@
    "function": "detector_visit_values",
    "pending": null
   },
+  "mua_level_z": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "z",
+   "description": "the MUA level of the values below: 2 z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded tetrodes; the value of the MUA event detector's threshold, which z-scores its own smoothed rate); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
   "mua_median_non_swr": {
    "value": 0.8272136733345711,
    "kind": "quantity",
@@ -3810,7 +3966,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3840,7 +3998,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -4031,7 +4191,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4047,7 +4207,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4063,7 +4223,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4079,7 +4239,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4095,7 +4255,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4111,7 +4271,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4127,7 +4287,55 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_silent_gain_per_spike": {
+   "value": -0.24276244682364592,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode was silent (the expected-firing term alone: the gain from the absence of spikes); with the spiking bins' part it adds to the gain for each event, but each of the three is a median over events, so over the cohort they need not add up, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_silent_gain_per_spike_ci_high": {
+   "value": -0.19559901370188063,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_silent_gain_per_spike_ci_low": {
+   "value": -0.28992587994541125,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4138,12 +4346,12 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "description": "held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked (its spikes' waveform terms with the expected-firing term of those bins); with the silent bins' part it adds to the gain for each event, but each of the three is a median over events, so over the cohort they need not add up, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
    "questions": [
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4159,7 +4367,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4175,7 +4383,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4433,7 +4641,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4449,7 +4657,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4465,7 +4673,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4481,7 +4689,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4497,7 +4705,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4513,7 +4721,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4529,7 +4737,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4545,7 +4753,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4561,7 +4769,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4577,7 +4785,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4593,7 +4801,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4609,7 +4817,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4625,7 +4833,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4641,7 +4849,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4657,7 +4865,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4673,7 +4881,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4689,7 +4897,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4705,7 +4913,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4721,7 +4929,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4737,7 +4945,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4753,7 +4961,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4769,7 +4977,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4785,7 +4993,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4801,7 +5009,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4817,7 +5025,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4833,7 +5041,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4849,7 +5057,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4865,7 +5073,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4881,7 +5089,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4897,7 +5105,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4913,7 +5121,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4929,7 +5137,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4945,7 +5153,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4961,7 +5169,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4977,7 +5185,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -4993,7 +5201,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -5008,7 +5216,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -5027,6 +5237,342 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_carey_fraction": {
+   "value": 0.2743063583815029,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a carey event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_carey_fraction_animal_max": {
+   "value": 0.5516431852787371,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a carey event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_carey_fraction_animal_min": {
+   "value": 0.16514597578781934,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a carey event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_karlsson_fraction": {
+   "value": 0.5236705202312139,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a karlsson event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_karlsson_fraction_animal_max": {
+   "value": 0.6151163772637417,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a karlsson event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_karlsson_fraction_animal_min": {
+   "value": 0.47532017798759923,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a karlsson event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_kay_fraction": {
+   "value": 0.4548265895953757,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a kay event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_kay_fraction_animal_max": {
+   "value": 0.5652246937806705,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a kay event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_kay_fraction_animal_min": {
+   "value": 0.37003208709314706,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a kay event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_mua_fraction": {
+   "value": 0.49758670520231213,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a mua event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_mua_fraction_animal_max": {
+   "value": 0.6592905965757396,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a mua event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_mua_fraction_animal_min": {
+   "value": 0.44924160096077903,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a mua event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_widloski_fraction": {
+   "value": 0.06332461451755084,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a memoryless event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_widloski_fraction_animal_max": {
+   "value": 0.07508062918905438,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a memoryless event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_widloski_fraction_animal_min": {
+   "value": 0.033177473838885425,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a memoryless event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_yu_fraction": {
+   "value": 0.7173988439306358,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a yu event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_yu_fraction_animal_max": {
+   "value": 0.8416776950884882,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a yu event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_yu_fraction_animal_min": {
+   "value": 0.6254075606979846,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a yu event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_zugaro_fraction": {
+   "value": 0.20536165907941326,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events that a zugaro event overlaps (of those whose overlap is known, inside the two detectors' shared exposure), pooled over events; over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_zugaro_fraction_animal_max": {
+   "value": 0.2680860409386676,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of the non-local events that a zugaro event overlaps (the mean over the animal's epochs); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
+   "pending": null
+  },
+  "nonlocal_events_found_by_zugaro_fraction_animal_min": {
+   "value": 0.14579343232118533,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of the non-local events that a zugaro event overlaps (an animal's share is the mean over its epochs of the epoch's share); over the other detectors' events whose first sample is inside a well visit and the non-local events that start inside one, each selected by its own start; whether an event overlaps an event of the other side is read against all of that side's events, so its partner may start outside a visit",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
+   "function": "nonlocal_found_values",
    "pending": null
   },
   "nonlocal_events_non_swr": {
@@ -5203,6 +5749,102 @@
    "function": "event_cohort_values",
    "pending": null
   },
+  "nonlocal_share_mua_above_level": {
+   "value": 0.9143459822104161,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the immobile time bins with MUA at or above 2 z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded tetrodes; the value of the MUA event detector's threshold, which z-scores its own smoothed rate) that are decoded non-local (non-local probability above 0.8): mean over animals of each animal's share of its bins; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
+  "nonlocal_share_mua_above_level_animal_max": {
+   "value": 0.9754279273375449,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
+  "nonlocal_share_mua_above_level_animal_min": {
+   "value": 0.8626339845825579,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lowest per-animal share of the bins with MUA at or above 2 z that are decoded non-local; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
+  "nonlocal_time_below_mua_level_fraction": {
+   "value": 0.6566012834558526,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the immobile time bins decoded non-local (non-local probability above 0.8) whose MUA is below 2 z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded tetrodes; the value of the MUA event detector's threshold, which z-scores its own smoothed rate): mean over animals of each animal's share of its bins; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
+  "nonlocal_time_below_mua_level_fraction_animal_max": {
+   "value": 0.716936769968795,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
+  "nonlocal_time_below_mua_level_fraction_animal_min": {
+   "value": 0.5733954937515034,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lowest per-animal share of non-local time bins with MUA below 2 z; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "S2e"
+   ],
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
+   "function": "nonlocal_mua_values",
+   "pending": null
+  },
   "nonlocal_time_below_swr_threshold_fraction": {
    "value": 0.7110875010449791,
    "kind": "fraction",
@@ -5215,7 +5857,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
    "function": "nonlocal_power_values",
    "pending": null
   },
@@ -5231,7 +5873,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
    "function": "nonlocal_power_values",
    "pending": null
   },
@@ -5247,7 +5889,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "source": "Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)",
    "function": "nonlocal_power_values",
    "pending": null
   },
@@ -8293,6 +8935,286 @@
    "function": "restriction_immobile_values",
    "pending": null
   },
+  "restriction_inside_swr_full_minus_swr_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_epochs_positive": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose gain per second inside SWRs is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_s": {
+   "value": -21.926274158728507,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with each of five folds of whole trials (balanced by destination well; a trial's run to a well with its whole stay there, when longer than 30 s, is cut into pieces of at most 30 s that can fall in different folds) scored under a decoder whose place-field encodings were fit on the decode's training bins (outside every SWR and artifact) of the other folds, more than 1 s from the fold, and whose state transitions and initial conditions were fit by EM with the fold's bins missing, under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every one of the epoch's immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit and divided by their duration: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_s_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_s_ci_high": {
+   "value": -19.186928068896552,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "upper bound of that interval; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_s_ci_low": {
+   "value": -24.66562024856046,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_spike": {
+   "value": -0.020625587845845384,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes, with each of five folds of whole trials (balanced by destination well; a trial's run to a well with its whole stay there, when longer than 30 s, is cut into pieces of at most 30 s that can fall in different folds) scored under a decoder whose place-field encodings were fit on the decode's training bins (outside every SWR and artifact) of the other folds, more than 1 s from the fold, and whose state transitions and initial conditions were fit by EM with the fold's bins missing, under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every one of the epoch's immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit and divided by their spikes: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_spike_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_spike_ci_high": {
+   "value": -0.014201763145456812,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_per_spike_ci_low": {
+   "value": -0.027049412546233956,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_epochs_positive": {
+   "value": 191,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose gain per second inside SWRs is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_s": {
+   "value": 3.689421059039384,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin; summed, two-sided scores are not a log likelihood), with each of five folds of whole trials (balanced by destination well; a trial's run to a well with its whole stay there, when longer than 30 s, is cut into pieces of at most 30 s that can fall in different folds) scored under a decoder whose place-field encodings were fit on the decode's training bins (outside every SWR and artifact) of the other folds, more than 1 s from the fold, and whose state transitions and initial conditions were fit by EM with the fold's bins missing, under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every one of the epoch's immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit and divided by their duration: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_s_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_s_ci_high": {
+   "value": 6.346208858594228,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "upper bound of that interval; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_s_ci_low": {
+   "value": 1.0326332594845402,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per s",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_spike": {
+   "value": 0.0033952089209352706,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "two-sided predictive log score of each 2 ms bin's spikes (from every other bin; summed, two-sided scores are not a log likelihood), with each of five folds of whole trials (balanced by destination well; a trial's run to a well with its whole stay there, when longer than 30 s, is cut into pieces of at most 30 s that can fall in different folds) scored under a decoder whose place-field encodings were fit on the decode's training bins (outside every SWR and artifact) of the other folds, more than 1 s from the fold, and whose state transitions and initial conditions were fit by EM with the fold's bins missing, under the full decoder (every state at every bin) minus under the SWR-only decoder (only the non-local states in SWR bins, only the local states elsewhere), summed over every one of the epoch's immobile bins inside SWRs (inside an SWR of the source, where both decoders may use the non-local states) inside a well visit and divided by their spikes: mean over animals of each animal's median over its epochs; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction over the animals; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_spike_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose value is above zero; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_spike_ci_high": {
+   "value": 0.005538747393408636,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval; over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
+  "restriction_inside_swr_full_minus_swr_two_sided_per_spike_ci_low": {
+   "value": 0.0012516704484619055,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [],
+   "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
+   "function": "restriction_inside_swr_values",
+   "pending": null
+  },
   "restriction_outside_swr_beyond_half_s_full_minus_swr_epochs": {
    "value": 242,
    "kind": "count",
@@ -8387,7 +9309,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8403,7 +9325,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8419,7 +9341,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8435,7 +9357,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8703,7 +9625,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8719,7 +9641,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8735,7 +9657,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -8751,7 +9673,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -9019,7 +9941,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -9035,7 +9957,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -9051,7 +9973,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -9067,7 +9989,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2e"
+    "S2j"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
@@ -9510,9 +10432,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9526,9 +10446,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9542,9 +10460,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9558,9 +10474,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9574,9 +10488,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9590,9 +10502,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9606,9 +10516,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9622,9 +10530,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -9638,9 +10544,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "S2f"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
    "pending": null
@@ -10890,7 +11794,9 @@
    "questions": [
     "2b.5"
    ],
-   "figures": [],
+   "figures": [
+    "S2i"
+   ],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
@@ -10904,7 +11810,9 @@
    "questions": [
     "2b.5"
    ],
-   "figures": [],
+   "figures": [
+    "S2i"
+   ],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
@@ -10918,7 +11826,9 @@
    "questions": [
     "2b.5"
    ],
-   "figures": [],
+   "figures": [
+    "S2i"
+   ],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
@@ -10955,6 +11865,1046 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_fifteen_events_vs_rule": {
+   "value": 0.8644797687861272,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the minimum run length (2 ms decode samples) at 15, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_fifteen_no_swr_fraction": {
+   "value": 0.49911403831366385,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the minimum run length (2 ms decode samples) at 15 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_fifteen_no_swr_fraction_animal_max": {
+   "value": 0.5911323800334202,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_fifteen_no_swr_fraction_animal_min": {
+   "value": 0.3984945911977162,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the minimum run length (2 ms decode samples) at 15 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_seven_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the minimum run length (2 ms decode samples) at 7 (the rule's), as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_seven_no_swr_fraction": {
+   "value": 0.5453034682080925,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the minimum run length (2 ms decode samples) at 7 (the rule's) that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_seven_no_swr_fraction_animal_max": {
+   "value": 0.6300689230078631,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_seven_no_swr_fraction_animal_min": {
+   "value": 0.4348894875392655,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the minimum run length (2 ms decode samples) at 7 (the rule's) (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_ten_events_vs_rule": {
+   "value": 0.9612861271676301,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the minimum run length (2 ms decode samples) at 10, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_ten_no_swr_fraction": {
+   "value": 0.5314411990198584,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the minimum run length (2 ms decode samples) at 10 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_ten_no_swr_fraction_animal_max": {
+   "value": 0.6198240753443135,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_ten_no_swr_fraction_animal_min": {
+   "value": 0.4243366072961939,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the minimum run length (2 ms decode samples) at 10 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_twenty_five_events_vs_rule": {
+   "value": 0.6316907514450867,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the minimum run length (2 ms decode samples) at 25, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_twenty_five_no_swr_fraction": {
+   "value": 0.4161233500331709,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the minimum run length (2 ms decode samples) at 25 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_twenty_five_no_swr_fraction_animal_max": {
+   "value": 0.4935060853594248,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_minimum_samples_twenty_five_no_swr_fraction_animal_min": {
+   "value": 0.3261217442712425,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the minimum run length (2 ms decode samples) at 25 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_half_events_vs_rule": {
+   "value": 1.0976156069364162,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_half_no_swr_fraction": {
+   "value": 0.5877954051741162,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_half_no_swr_fraction_animal_max": {
+   "value": 0.6714654420254322,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_half_no_swr_fraction_animal_min": {
+   "value": 0.4921427293121397,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_eight_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.8 (the rule's), as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_eight_no_swr_fraction": {
+   "value": 0.5453034682080925,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.8 (the rule's) that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_eight_no_swr_fraction_animal_max": {
+   "value": 0.6300689230078631,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_eight_no_swr_fraction_animal_min": {
+   "value": 0.4348894875392655,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.8 (the rule's) (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_events_vs_rule": {
+   "value": 0.9584104046242775,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.9, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_five_events_vs_rule": {
+   "value": 0.9259104046242774,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.95, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_five_no_swr_fraction": {
+   "value": 0.5007725563029669,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.95 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_five_no_swr_fraction_animal_max": {
+   "value": 0.5817534780595852,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_five_no_swr_fraction_animal_min": {
+   "value": 0.3906439137084856,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.95 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_no_swr_fraction": {
+   "value": 0.5225566177135792,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.9 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_no_swr_fraction_animal_max": {
+   "value": 0.6076567717737263,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_nine_no_swr_fraction_animal_min": {
+   "value": 0.40989131154649455,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.9 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_seven_events_vs_rule": {
+   "value": 1.0339595375722543,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.7, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_seven_no_swr_fraction": {
+   "value": 0.5613976240391335,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.7 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_seven_no_swr_fraction_animal_max": {
+   "value": 0.6470019306209442,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_seven_no_swr_fraction_animal_min": {
+   "value": 0.45680771183738994,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.7 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_six_events_vs_rule": {
+   "value": 1.0646531791907514,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the non-local probability an event stays strictly above at 0.6, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_six_no_swr_fraction": {
+   "value": 0.5746260553248093,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the non-local probability an event stays strictly above at 0.6 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_six_no_swr_fraction_animal_max": {
+   "value": 0.6597937860364117,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_probability_threshold_point_six_no_swr_fraction_animal_min": {
+   "value": 0.4735935054285024,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the non-local probability an event stays strictly above at 0.6 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_criterion_agreement": {
+   "value": 0.9926734104046243,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events whose Kay criterion on the decode grid gives their canonical SWR label at the detector's 2 z (the stand-in by which the SWR threshold is swept, since the SWRs are not detected again); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 4, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_no_swr_fraction": {
+   "value": 0.7831502890173411,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 4 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_no_swr_fraction_animal_max": {
+   "value": 0.8439418320519106,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_four_no_swr_fraction_animal_min": {
+   "value": 0.7279893028485477,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 4 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_and_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_and_half_no_swr_fraction": {
+   "value": 0.4391763005780347,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_and_half_no_swr_fraction_animal_max": {
+   "value": 0.5084691023110138,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_and_half_no_swr_fraction_animal_min": {
+   "value": 0.33407181342519376,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_no_swr_fraction": {
+   "value": 0.3063150289017341,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_no_swr_fraction_animal_max": {
+   "value": 0.34468656906826023,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_one_no_swr_fraction_animal_min": {
+   "value": 0.2155231098978599,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 1 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 3, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_no_swr_fraction": {
+   "value": 0.6994942196531792,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 3 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_no_swr_fraction_animal_max": {
+   "value": 0.7726695259727415,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_three_no_swr_fraction_animal_min": {
+   "value": 0.6174089384126836,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 3 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_and_half_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2.5, as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_and_half_no_swr_fraction": {
+   "value": 0.6360838150289018,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2.5 that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_and_half_no_swr_fraction_animal_max": {
+   "value": 0.7184783326289043,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_and_half_no_swr_fraction_animal_min": {
+   "value": 0.5368002978351375,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2.5 (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_events_vs_rule": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2 (the rule's), as a multiple of the rule's; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_no_swr_fraction": {
+   "value": 0.5497976878612717,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the events detected again with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2 (the rule's) that overlap no SWR, pooled over events; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_no_swr_fraction_animal_max": {
+   "value": 0.6345998817697114,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
+   "pending": null
+  },
+  "rule_sweep_swr_threshold_two_no_swr_fraction_animal_min": {
+   "value": 0.44038426819893556,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share with no SWR with the SWR threshold (z of the Kay consensus ripple power; an event is counted as overlapping an SWR when its Kay criterion on the decode grid is at or above it) at 2 (the rule's) (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2a.5"
+   ],
+   "figures": [
+    "S2c"
+   ],
+   "source": "Processed-Data/event_rule_sweep (scripts/event_properties/sweep_event_rule.py: each analyzed epoch's decode, detected again at each setting)",
+   "function": "rule_sweep_values",
    "pending": null
   },
   "slow_gamma_animals_above_rest_non_swr": {
@@ -11461,6 +13411,358 @@
    "function": "boundary_offset_values",
    "pending": null
   },
+  "state_calibration_continuous_bottom_bin": {
+   "value": 0.0495750339108619,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Non-Local Continuous over the random 10-bin immobile windows whose Non-Local Continuous probability is in the bottom bin (0-0.2): the place decoded from one half of the tetrodes scored on the other half against mismatched places (other windows' decoded places), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_slope": {
+   "value": 5.481276544463047,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "rise of that held-out evidence for Non-Local Continuous with the state's probability: each epoch's least-squares slope over its windows (nats per window per unit of probability), then the mean over animals of each animal's mean epoch slope; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_slope_ci_high": {
+   "value": 8.041673460133767,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_slope_ci_low": {
+   "value": 2.920879628792326,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "lower bound of its 95 % interval (nested bootstrap); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_top_bin": {
+   "value": 2.809843578614341,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Non-Local Continuous over the random 10-bin immobile windows whose Non-Local Continuous probability is in the top bin (0.8-1.0): the place decoded from one half of the tetrodes scored on the other half against mismatched places (other windows' decoded places), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_top_bin_ci_high": {
+   "value": 4.274395300989308,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_continuous_top_bin_ci_low": {
+   "value": 1.3452918562393736,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_bottom_bin": {
+   "value": 0.0552822493632745,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Non-Local Fragmented over the random 10-bin immobile windows whose Non-Local Fragmented probability is in the bottom bin (0-0.2): the place decoded from one half of the tetrodes scored on the other half against mismatched places (other windows' decoded places), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_slope": {
+   "value": 7.115174994024963,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "rise of that held-out evidence for Non-Local Fragmented with the state's probability: each epoch's least-squares slope over its windows (nats per window per unit of probability), then the mean over animals of each animal's mean epoch slope; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_slope_ci_high": {
+   "value": 9.98104672556484,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_slope_ci_low": {
+   "value": 4.249303262485087,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "lower bound of its 95 % interval (nested bootstrap); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_top_bin": {
+   "value": 5.097704103938969,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Non-Local Fragmented over the random 10-bin immobile windows whose Non-Local Fragmented probability is in the top bin (0.8-1.0): the place decoded from one half of the tetrodes scored on the other half against mismatched places (other windows' decoded places), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_top_bin_ci_high": {
+   "value": 7.699437419107312,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_fragmented_top_bin_ci_low": {
+   "value": 2.495970788770625,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_bottom_bin": {
+   "value": 0.0242562092762479,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Local over the random 10-bin immobile windows whose Local probability is in the bottom bin (0-0.2): the held-out tetrodes' spikes scored at the animal's place against at mismatched places (other windows' animal positions at least 20 cm away), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_slope": {
+   "value": 1.2822277107600342,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "rise of that held-out evidence for Local with the state's probability: each epoch's least-squares slope over its windows (nats per window per unit of probability), then the mean over animals of each animal's mean epoch slope; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_slope_ci_high": {
+   "value": 2.109005753859328,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_slope_ci_low": {
+   "value": 0.4554496676607404,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window per unit probability",
+   "description": "lower bound of its 95 % interval (nested bootstrap); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_top_bin": {
+   "value": 0.4887883949352744,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence for Local over the random 10-bin immobile windows whose Local probability is in the top bin (0.8-1.0): the held-out tetrodes' spikes scored at the animal's place against at mismatched places (other windows' animal positions at least 20 cm away), the spike-mark log likelihood ratio summed over the window; per epoch the median over its windows, then the mean over animals of each animal's mean epoch value; 95 % interval from the nested bootstrap of the animals and their epochs, small-sample t correction. Caveats: the probability bins come from the decode with every tetrode, so the scored half's spikes helped make the state probability; only the remote place is held out by the tetrode split (one half chooses it, the other scores it); the place-field encodings are fit on running time in other time blocks (alternating 30 s blocks), so a window's own spikes are not in its encoding; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_top_bin_ci_high": {
+   "value": 0.8832518045051281,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of that interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_local_top_bin_ci_low": {
+   "value": 0.0943249853654206,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % interval; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
+  "state_calibration_windows": {
+   "value": 449911,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "random 10-bin immobile calibration windows that start inside a well visit and have a finite held-out score for Local, over the analyzed epochs; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2a.7"
+   ],
+   "figures": [
+    "S2a"
+   ],
+   "source": "Processed-Data/state_calibration_in_visits (scripts/event_evidence/summarize_state_calibration_in_visits.py, from the held-out tetrode run _refresh_20261016/state_evidence)",
+   "function": "state_calibration_values",
+   "pending": null
+  },
   "state_fraction_immobile_continuous": {
    "value": 0.060076020658016205,
    "kind": "fraction",
@@ -11778,7 +14080,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -11808,7 +14112,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -11951,7 +14257,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11967,7 +14273,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11983,7 +14289,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11999,7 +14305,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12015,7 +14321,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12031,7 +14337,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12047,7 +14353,55 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_silent_gain_per_spike": {
+   "value": -0.1940264773686468,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode was silent (the expected-firing term alone: the gain from the absence of spikes); with the spiking bins' part it adds to the gain for each event, but each of the three is a median over events, so over the cohort they need not add up, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_silent_gain_per_spike_ci_high": {
+   "value": -0.14356872199595974,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_silent_gain_per_spike_ci_low": {
+   "value": -0.24448423274133388,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12058,12 +14412,12 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
+   "description": "held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked (its spikes' waveform terms with the expected-firing term of those bins); with the silent bins' part it adds to the gain for each event, but each of the three is a median over events, so over the cohort they need not add up, summed over tetrodes and bins and divided by the window's spikes; each tetrode is left out of the decoder in turn; at a scored bin, that tetrode's and the other tetrodes' place-field encodings are fit on the other folds (5 folds of whole trials balanced by destination well, a segment longer than 30 s cut into pieces, training bins within 1 s of the fold left out); the state transitions and initial conditions are the canonical decoder's, fit on the whole epoch with every tetrode; the posterior is smoothed over the whole epoch; the windows are the canonical events and their controls, chosen from the decode of every tetrode, so the choice of time is not held out; mean over animals of each animal's median over epochs of each epoch's median; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against Local-rest control windows of each event's length lying wholly inside one well visit",
    "questions": [
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12079,7 +14433,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12095,7 +14449,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2c"
+    "S2g"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -12385,7 +14739,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12401,7 +14755,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12417,7 +14771,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12433,7 +14787,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12449,7 +14803,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12465,7 +14819,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12481,7 +14835,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12497,7 +14851,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12513,7 +14867,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12529,7 +14883,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12545,7 +14899,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12561,7 +14915,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12577,7 +14931,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12593,7 +14947,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12609,7 +14963,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12625,7 +14979,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12641,7 +14995,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12657,7 +15011,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12673,7 +15027,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12689,7 +15043,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12705,7 +15059,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12721,7 +15075,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12737,7 +15091,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12753,7 +15107,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12769,7 +15123,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12785,7 +15139,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12801,7 +15155,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12817,7 +15171,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12833,7 +15187,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12849,7 +15203,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12865,7 +15219,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12881,7 +15235,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12897,7 +15251,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12913,7 +15267,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12929,7 +15283,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12945,7 +15299,7 @@
     "2c.3"
    ],
    "figures": [
-    "S2d"
+    "S2h"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "shared_content_values",
@@ -12960,7 +15314,9 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [],
+   "figures": [
+    "S2g"
+   ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -13191,7 +15547,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13207,7 +15563,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13223,7 +15579,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13239,7 +15595,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13255,7 +15611,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13271,7 +15627,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13287,7 +15643,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13303,7 +15659,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13319,7 +15675,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13335,7 +15691,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13351,7 +15707,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13367,7 +15723,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13383,7 +15739,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13399,7 +15755,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13415,7 +15771,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13431,7 +15787,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13447,7 +15803,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13463,7 +15819,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13479,7 +15835,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13495,7 +15851,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13511,7 +15867,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13527,7 +15883,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13543,7 +15899,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13559,7 +15915,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13575,7 +15931,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13591,7 +15947,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
@@ -13607,7 +15963,7 @@
     "2b.4"
    ],
    "figures": [
-    "S2b"
+    "S2d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_timing_values",
