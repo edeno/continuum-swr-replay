@@ -284,6 +284,8 @@ The review of the restriction and held-out tetrode runs before the
   `tests/integration/` of the restriction and held-out tetrode runs take about 13 and 23
   minutes.
   *When:* when the suite's time matters (CI).
+- [ ] **Is an event's decoded place where silence alone would put it?** Not done and not planned unless a reviewer asks: compare each event's decoded place with the lowest-rate place bins of the saved encoding model (`decoding/encoding_model.py`), where the ground process alone would put it. The split of the held-out tetrode gain into bins with a spike and silent bins (Figure 2's supplement, panel g) and the events' spike rate against matched Local rest (`non_swr_event_spike_rate_hz`, `non_swr_control_spike_rate_hz`) already speak against a silence-driven estimate; events with a wide estimate (a quarter of no-SWR events, `non_swr_shared_content_hundred_cm_or_more_share_of_events`) are where it could still hold.
+  *When:* only if a reviewer asks.
 
 ## Run infrastructure
 
