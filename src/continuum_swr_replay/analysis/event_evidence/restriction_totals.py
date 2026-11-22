@@ -32,7 +32,8 @@ holds it; :func:`outside_swr_not_observed_counts` counts those left out. The
 sums over all immobile time keep them: they are immobile time, inside an SWR
 or not.
 
-**All immobile time** (:func:`epoch_immobile_gains`, Figure 2g's first axis):
+**All immobile time** (:func:`epoch_immobile_gains`, Figure 2g's first axis
+and the first column of its second):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
 ``immobile_outside_swr``) inside a well visit, each decoder's gain over the
 local-only decoder, ``(swr - none)`` and ``(full - none)``, and their
@@ -46,7 +47,8 @@ over the ``immobile_outside_swr`` bins inside a well visit, where ``swr`` may
 not use the non-local states and ``full`` may, so ``full - swr`` is what the
 non-local states buy outside SWRs:
 
-- the gain per spike and per second;
+- the gain per spike and per second (the second column of Figure 2g's second
+  axis);
 - the share in the given events with no SWR, and the share in the given events'
   time outside the SWR of those that overlap one: the events' summed
   ``full - swr`` over their ``immobile_outside_swr`` bins inside a well visit
@@ -115,7 +117,6 @@ from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     _window_bounds,
     not_observed_outside_swr_bins,
     outside_swr_bins,
-    restriction_window_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -853,12 +854,26 @@ RESTRICTION_FIGURE_FAMILY = "filter"
 """Figure 2g, the decoders compared, in one score family (the events summary's
 values of it carry the panel's tag; the other family's do not)."""
 RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
-"""Figure 2g's first axis, "All immobile time": each decoder's gain over the
-local-only decoder per spike of the immobile time inside a well visit, by its
-measure (:data:`IMMOBILE_MEASURES`), in drawing order (SWR-only, Full)."""
+"""Figure 2g's first axis: each decoder's gain over the local-only decoder per
+spike of the immobile time inside a well visit, by its measure
+(:data:`IMMOBILE_MEASURES`), in drawing order (SWR-only, Full)."""
 RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
-"""The measure of the two decoders' difference, which the line joining an
-animal's two dots on Figure 2g's first axis shows."""
+"""Figure 2g's second axis, first column: the full decoder minus the SWR-only
+decoder per spike of all the immobile time inside a well visit, each epoch's
+paired difference (:data:`IMMOBILE_MEASURES`)."""
+RESTRICTION_FIGURE_OUTSIDE_SWR = "gain_per_spike"
+"""Figure 2g's second axis, second column: the full decoder minus the SWR-only
+decoder per spike of the immobile time outside SWRs inside a well visit
+(:data:`MEASURES`)."""
+RESTRICTION_FIGURE_SHARES = (
+    "share_in_no_swr_events",
+    "share_in_swr_events_outside_swr",
+    "share_outside_events",
+)
+"""Figure 2g's third axis: where that gain outside SWRs sits, as shares of it
+(:data:`MEASURES`), in drawing order: in the no-SWR events, in the time outside
+the SWR of the events partly in one (both detected from the held-out decode),
+and outside those events."""
 RESTRICTION_FIGURE = {
     "parts": ["outside_swr"],
     "families": [RESTRICTION_FIGURE_FAMILY],
@@ -866,26 +881,27 @@ RESTRICTION_FIGURE = {
     "units": ["per_spike"],
     "kinds": ["event"],
 }
-"""Figure 2g's second axis, "Immobile time outside SWR bounds": the choice of
-``restriction_windows.restriction_window_statistics`` (its keywords), the full
-decoder minus the SWR-only decoder per spike over the bins outside SWRs of the
-events detected from the held-out decode."""
+"""The choice of ``restriction_windows.restriction_window_statistics`` (its
+keywords) for the full decoder minus the SWR-only decoder per spike over the
+bins outside SWRs of each event, which the events summary reports (Figure 2g
+drew it before it drew the total outside SWRs)."""
 RESTRICTION_FIGURE_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
-"""The second axis' groups in drawing order: events with no SWR, then the time
-outside the SWR of the events that overlap one."""
+"""The groups of :data:`RESTRICTION_FIGURE`, in order: events with no SWR, then
+the time outside the SWR of the events that overlap one."""
 
 
 def restriction_figure_statistics(
     windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Figure 2g's two axes, as the events summary computes them.
+    """Figure 2g's statistics, as the events summary computes them.
 
     Parameters
     ----------
     windows : pd.DataFrame
         The held-out event run's events of every epoch
         (``scripts/event_evidence/detect_heldout_events.py``), those that start
-        inside a well visit (``starts_in_well_visit``).
+        inside a well visit (``starts_in_well_visit``), as
+        :func:`epoch_outside_swr_gains` takes them.
     time_sums : pd.DataFrame
         The held-out event run's time sums of every epoch
         (:func:`restriction_time_sums`).
@@ -896,15 +912,18 @@ def restriction_figure_statistics(
     -------
     decoders : pd.DataFrame
         :func:`immobile_gain_statistics` over the immobile time inside a well
-        visit, indexed by ``family`` and ``measure``.
-    parts : pd.DataFrame
-        ``restriction_windows.restriction_window_statistics`` with
-        :data:`RESTRICTION_FIGURE` over ``windows``, indexed by ``group``.
+        visit, indexed by ``family`` and ``measure`` (the first axis and the
+        second axis' first column).
+    outside : pd.DataFrame
+        :func:`outside_swr_gain_statistics` over the immobile time outside SWRs
+        inside a well visit, with the shares of it in the events of
+        ``windows``, indexed by ``family`` and ``measure`` (the second axis'
+        second column and the third axis).
     """
     decoders = immobile_gain_statistics(
         epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    parts = restriction_window_statistics(windows, **RESTRICTION_FIGURE).set_index(
-        "group"
-    )
-    return decoders, parts
+    outside = outside_swr_gain_statistics(
+        epoch_outside_swr_gains(time_sums, bin_s, windows)
+    ).set_index(["family", "measure"])
+    return decoders, outside

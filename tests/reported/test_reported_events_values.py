@@ -1060,7 +1060,7 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     # per unit, and the two groups' events without spikes and after the visit
     assert len(numbers) == 2 * 6 * 4 + 2 * 4 + 1 + 2 * 2 * 2 * 4 + 2 * 2 + 2 * 2
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    # Figure 2g draws the events detected from the held-out decode, not these
+    # no figure draws these
     assert {v.figures for v in values.values()} == {()}
     # the summary says what they are over (``over``), once
     assert not any(
@@ -1068,10 +1068,10 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     )
 
 
-def test_restriction_heldout_event_values_are_figure_2gs_right_axis():
+def test_restriction_heldout_event_values_are_the_canonical_statistic_untagged():
     """The canonical windows' events, read as held-out events: the same
-    statistic as the canonical values outside SWRs, every value with Figure
-    2g's tag."""
+    statistic as the canonical values outside SWRs. No figure draws them:
+    Figure 2g draws the gain over all the time outside SWRs and its shares."""
     windows = _restriction_windows()
     events = windows[windows["kind"] == "event"]
     values = _by_key(builder.restriction_heldout_event_values(events, "s"))
@@ -1089,7 +1089,7 @@ def test_restriction_heldout_event_values_are_figure_2gs_right_axis():
     # per group: the estimate, two bounds, animals positive, the events, those
     # scored and those without spikes
     assert len(numbers) == 2 * 7
-    assert {v.figures for v in values.values()} == {("2g",)}
+    assert {v.figures for v in values.values()} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
@@ -1140,7 +1140,7 @@ def test_restriction_agreement_values_are_the_shares_found_again():
     assert {v.questions for v in values.values()} == {("2c.3",)}
 
 
-def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
+def _outside_swr_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """Animals a (epochs a1, a2), b (b1, b2) and c (c1, c2), 10 bins of 1 s
     outside SWRs inside a well visit each, 5 spikes, ``full - swr`` there of 20,
     40, 60, 80, 50 and 70 (two-sided twice that); 4 of the bins and 2 of the
@@ -1149,7 +1149,8 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     it, which never counts), and the selected SWR events a fifth of the gain in
     their time outside the SWR. Time outside a visit and SWR bins never count;
     the summary selects the windows (an event that starts outside a visit,
-    planted here, is not handed to the builder)."""
+    planted here, is not handed to the builder). Returns the time sums, the
+    time steps and the selected windows."""
     rows, windows = [], []
     for epoch, gain, in_events in (
         ("a1", 20.0, 10.0),
@@ -1187,9 +1188,13 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         windows[f"full{suffix}_outside_swr_in_visit"] = scale * windows["in_visit"]
     selected = windows[~windows["event_id"].str.endswith("away")]
     bin_s = pd.Series(1.0, index=["a1", "a2", "b1", "b2", "c1", "c2"])
-    groups = builder.restriction_outside_swr_values(
-        time_sums(rows), bin_s, selected, "s"
-    )
+    return time_sums(rows), bin_s, selected
+
+
+def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
+    """The gain outside SWRs and its shares, on :func:`_outside_swr_inputs`."""
+    sums, bin_s, selected = _outside_swr_inputs()
+    groups = builder.restriction_outside_swr_values(sums, bin_s, selected, "s")
     values = _by_key([*groups.with_events, *groups.outside_events])
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_outside_swr_full_minus_swr"
@@ -1232,10 +1237,37 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     assert numbers[f"{key}_two_sided_share_in_heldout_swr_events_outside_swr"] == (
         pytest.approx(0.2)
     )
+    # elsewhere: 1 - 0.5 - 0.2 and 1 - 0.4 - 0.2 in every animal, median 0.35
+    assert numbers[f"{key}_share_outside_heldout_events"] == pytest.approx(0.35)
+    assert numbers[f"{key}_two_sided_share_outside_heldout_events"] == (
+        pytest.approx(0.35)
+    )
+    # a quantity: below 0 where the full decoder does worse
+    assert values[f"{key}_share_outside_heldout_events"].kind == "quantity"
+    assert (
+        numbers[f"{key}_share_outside_heldout_events_ci_low"]
+        <= 0.35
+        <= numbers[f"{key}_share_outside_heldout_events_ci_high"]
+    )
     # per family: per spike and per second, the gain and the rest (four each),
-    # the epochs (two), and two shares (three each)
-    assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 2 * 3)
-    assert {v.figures for v in values.values()} == {()}
+    # the epochs (two), and three shares (three each)
+    assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 3 * 3)
+    # Figure 2g draws the filter family's gain per spike (its second axis) and
+    # the three shares (its third)
+    drawn = {f"{key}_per_spike{end}" for end in ("", "_ci_low", "_ci_high")} | {
+        f"{key}_per_spike_animals_positive"
+    }
+    drawn |= {
+        f"{key}_{share}{end}"
+        for share in (
+            "share_in_heldout_non_swr_events",
+            "share_in_heldout_swr_events_outside_swr",
+            "share_outside_heldout_events",
+        )
+        for end in ("", "_ci_low", "_ci_high")
+    }
+    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
 def _immobile_time_sums() -> pd.DataFrame:
@@ -1314,25 +1346,36 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
 
 
 def test_restriction_figure_statistics_are_the_tagged_values():
-    """Figure 2g's two axes are the rows the drawn values are made from."""
-    windows = _restriction_windows()
-    sums = _immobile_time_sums()
-    bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
-    decoders, parts = builder.restriction_totals.restriction_figure_statistics(
+    """Figure 2g's statistics are the rows the drawn values are made from."""
+    sums, bin_s, windows = _outside_swr_inputs()
+    decoders, outside = builder.restriction_totals.restriction_figure_statistics(
         windows, sums, bin_s
     )
     numbers = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
-    for measure in builder.RESTRICTION_FIGURE_DECODERS:
+    for measure in (
+        *builder.RESTRICTION_FIGURE_DECODERS,
+        builder.RESTRICTION_FIGURE_DIFFERENCE,
+    ):
         assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
             numbers[f"restriction_immobile_{measure}"]
         )
-    numbers = _numbers(builder.restriction_heldout_event_values(windows, "s"))
-    for word, group in (("non_swr", "no SWR"), ("swr", "SWR")):
-        assert parts.loc[group, "estimate"] == pytest.approx(
-            numbers[
-                f"restriction_heldout_{word}_events_outside_swr_full_minus_swr_per_spike"
-            ]
+    groups = builder.restriction_outside_swr_values(sums, bin_s, windows, "s")
+    numbers = _numbers(groups.with_events)
+    key = "restriction_outside_swr_full_minus_swr"
+    for measure, name in (
+        (builder.RESTRICTION_FIGURE_OUTSIDE_SWR, "per_spike"),
+        ("share_in_no_swr_events", "share_in_heldout_non_swr_events"),
+        ("share_in_swr_events_outside_swr", "share_in_heldout_swr_events_outside_swr"),
+        ("share_outside_events", "share_outside_heldout_events"),
+    ):
+        np.testing.assert_allclose(
+            outside.loc[("filter", measure), "estimate"], numbers[f"{key}_{name}"]
         )
+    assert set(builder.restriction_totals.RESTRICTION_FIGURE_SHARES) == {
+        "share_in_no_swr_events",
+        "share_in_swr_events_outside_swr",
+        "share_outside_events",
+    }
 
 
 def _part_time_sums() -> pd.DataFrame:

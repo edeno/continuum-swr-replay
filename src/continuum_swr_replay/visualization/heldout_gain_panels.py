@@ -1,11 +1,11 @@
 """The held-out gain panels: a gain for each of two kinds of event.
 
 The held-out tetrode supplementary figure (the gain over local coding per spike)
-and Figure 2g's second axis (the full decoder's gain over the SWR-only decoder
-per spike, in two kinds of event time) draw each gain the same way: a dot per
-animal in the group's color and, beside them, the animals' mean with its 95 %
-interval in black, with a dashed line at zero, where neither side predicts the
-spikes better.
+and Figure 2g's second and third axes (the full decoder's gain over the SWR-only
+decoder per spike, and the shares of it outside SWRs) draw each value the same
+way: a dot per animal in the group's color and, beside them, the animals' mean
+with its 95 % interval in black, with a dashed line at zero, where neither side
+predicts the spikes better.
 """
 
 from __future__ import annotations

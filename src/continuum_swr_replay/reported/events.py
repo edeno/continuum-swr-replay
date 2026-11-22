@@ -153,6 +153,7 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
+    RESTRICTION_FIGURE_OUTSIDE_SWR,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     BASELINE_GROUP,
@@ -2240,10 +2241,8 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     canonical events of ``windows`` (those that start inside a well visit,
     ``cohort_selection.select_events_in``) and their Local-rest controls, in
     both score families, and the full decoder against the SWR-only decoder per
-    spike and per second over the events' bins outside SWRs. Figure 2g draws
-    the latter over the events detected from the held-out decode instead
-    (:func:`restriction_heldout_event_values`), so none of these carries its
-    tag. Every key starts ``restriction_canonical_``, and the summary adds
+    spike and per second over the events' bins outside SWRs. No figure draws
+    these, so none carries a figure's tag. Every key starts ``restriction_canonical_``, and the summary adds
     :data:`CANONICAL_WINDOWS_SUBSET` to every description."""
     make = value_factory(
         restriction_window_values, source, TAGS["nonlocal_restriction"]
@@ -2372,17 +2371,17 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
 
 
 def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2g's second axis: the full decoder minus the
-    SWR-only decoder per spike over the bins outside SWRs of the events
-    detected from the held-out decode (``windows``, those that start inside a
-    well visit), events with no SWR and events that overlap one, in
-    :data:`RESTRICTION_FIGURE_FAMILY` (:data:`RESTRICTION_FIGURE`); with the
-    events of each group, those with a value and those with bins outside SWRs
-    but no spike in them. Every value carries that panel's tag."""
+    """Question 2c.3: the full decoder minus the SWR-only decoder per spike
+    over the bins outside SWRs of the events detected from the held-out decode
+    (``windows``, those that start inside a well visit), events with no SWR and
+    events that overlap one, in :data:`RESTRICTION_FIGURE_FAMILY`
+    (:data:`RESTRICTION_FIGURE`); with the events of each group, those with a
+    value and those with bins outside SWRs but no spike in them. No figure
+    draws these: the events are the full decoder's own, so Figure 2g draws the
+    gain over all the time outside SWRs and the shares of it in these events
+    (:func:`restriction_outside_swr_values`)."""
     make = value_factory(
-        restriction_heldout_event_values,
-        source,
-        TAGS["nonlocal_restriction_figure"],
+        restriction_heldout_event_values, source, TAGS["nonlocal_restriction"]
     )
     statistics = restriction_windows.restriction_window_statistics(
         windows, **RESTRICTION_FIGURE
@@ -2530,9 +2529,16 @@ def restriction_outside_swr_values(
     second, the share of it in the events of ``windows`` (the events detected
     from the held-out decode that start inside a well visit), and the rest
     outside every held-out event (``time_sums``' ``in_event_window``, which
-    marks every held-out event, wherever it starts)."""
-    make = value_factory(
+    marks every held-out event, wherever it starts). The gain per spike and
+    the three shares (in the no-SWR events, in the time outside the SWR of the
+    events that overlap one, and the rest outside those events) in
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's second and third
+    axes and carry that panel's tag."""
+    make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_figure = value_factory(
+        restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
     )
     statistics = restriction_totals.outside_swr_gain_statistics(
         restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -2545,10 +2551,13 @@ def restriction_outside_swr_values(
     for family, suffix in FAMILY_SUFFIX.items():
         key = f"restriction_outside_swr_full_minus_swr{suffix}"
         scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
+        figure = family == RESTRICTION_FIGURE_FAMILY
         for unit, divided, words in _RESTRICTION_UNITS:
             row = statistics.loc[(family, f"gain_{unit}")]
             values += _interval_and_animals_positive(
-                make,
+                make_figure
+                if figure and f"gain_{unit}" == RESTRICTION_FIGURE_OUTSIDE_SWR
+                else make_text,
                 f"{key}_{unit}",
                 row,
                 f"{scored}, {full_minus_swr}, summed over {time} and divided by "
@@ -2557,14 +2566,14 @@ def restriction_outside_swr_values(
             )
             if unit == "per_s":
                 values += [
-                    make(
+                    make_text(
                         f"{key}_epochs_positive",
                         row["n_epochs_positive"],
                         "count",
                         "count",
                         "epochs whose gain per second is above zero",
                     ),
-                    make(
+                    make_text(
                         f"{key}_epochs",
                         row["n_epochs"],
                         "count",
@@ -2574,7 +2583,7 @@ def restriction_outside_swr_values(
                 ]
             row = statistics.loc[(family, f"outside_events_gain_{unit}")]
             outside_events += _interval_and_animals_positive(
-                make,
+                make_text,
                 f"{key}_outside_heldout_events_{unit}",
                 row,
                 f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
@@ -2597,7 +2606,7 @@ def restriction_outside_swr_values(
             ),
         ):
             values += _share_interval(
-                make,
+                make_figure if figure else make_text,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
                 f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
@@ -2609,6 +2618,41 @@ def restriction_outside_swr_values(
                 "be above 1 or below 0 and the two shares need not add to 1. "
                 f"Over the cohort: {_EPOCH_REDUCTION}",
             )
+        # a share that is below 0 where the full decoder does worse: a
+        # unitless quantity, as a fraction must lie in [0, 1]
+        make = make_figure if figure else make_text
+        row = statistics.loc[(family, "share_outside_events")]
+        values += [
+            make(
+                f"{key}_share_outside_heldout_events",
+                row["estimate"],
+                "quantity",
+                "dec2",
+                f"{scored}; the gain is the score {full_minus_swr}. Per epoch, 1 "
+                "minus the share of the gain in the events detected from the "
+                "held-out decode with no SWR and minus its share in the time "
+                "outside the SWR of those that overlap an SWR, so the three shares "
+                f"add to 1: the share of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
+                "inside a well visit that lies outside those events (no value when "
+                "the gain summed over those bins is not positive), as a fraction of "
+                "1, below 0 when the full decoder does worse than the SWR-only "
+                f"decoder there. Over the cohort: {_EPOCH_REDUCTION}",
+            ),
+            make(
+                f"{key}_share_outside_heldout_events_ci_low",
+                row["ci_low"],
+                "quantity",
+                "dec2",
+                "lower bound of its 95 % interval",
+            ),
+            make(
+                f"{key}_share_outside_heldout_events_ci_high",
+                row["ci_high"],
+                "quantity",
+                "dec2",
+                "upper bound of that interval",
+            ),
+        ]
     return OutsideSwrValues(values, outside_events)
 
 
@@ -2753,9 +2797,9 @@ def restriction_immobile_values(
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
-    decoder captures. The gains per spike and their difference in
-    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's first axis and
-    carry that panel's tag."""
+    decoder captures. The gains per spike in :data:`RESTRICTION_FIGURE_FAMILY`
+    are drawn on Figure 2g's first axis and their paired difference on its
+    second; they carry that panel's tag."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
     )
