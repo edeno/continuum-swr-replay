@@ -208,6 +208,12 @@ The non-local restriction models summed over event windows.
 
 `outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
+### `src/continuum_swr_replay/analysis/event_evidence/shared_content.py`
+
+Shared content: during an event, do the tetrodes point to the same remote place?
+
+`spread_bins`, `agreement_by_spread_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
 Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
