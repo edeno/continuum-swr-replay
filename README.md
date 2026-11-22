@@ -1,4 +1,4 @@
-# title tbd
+# continuum-swr-replay
 
 Source code, analyses, and manuscript for a paper on non-local hippocampal
 events: periods when the hippocampus represents a place other than the animal's
