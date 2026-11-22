@@ -539,7 +539,8 @@ def session_copy_values(
     NDArray, shape (n_draws, n_animals, n_most)
         Each slot's values, one per drawn session copy, in the order of the
         session codes; NaN beyond the slot's number of copies (``n_most`` is
-        the largest animal's number of sessions).
+        the largest number of copies in a slot: the number of sessions of the
+        largest animal drawn).
 
     Raises
     ------
