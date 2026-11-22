@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.tables.io import read_table, write_table
+from continuum_swr_replay.tables.io import read_table, resolved_table_path, write_table
 
 from .constants import REFIT_MAX_ROUNDS
 from .reml import ALONG_THE_INTERCEPT
@@ -211,17 +211,29 @@ def write_records(records: Sequence[FitRecord], path: str | Path) -> Path:
     """Write ``records`` to a parquet table at ``path``, atomically
     (:func:`continuum_swr_replay.tables.io.write_table`).
 
+    Any suffix of ``path`` is replaced with ``.parquet``.
+
     Returns
     -------
     Path
-        The file written (``path`` with the suffix ``.parquet``).
+        The file written.
     """
     return write_table(records_frame(records), path)
 
 
 def read_records(path: str | Path) -> list[FitRecord]:
-    """The records of a table written by :func:`write_records`."""
-    frame = read_table(path)
+    """The records of a table written by :func:`write_records`.
+
+    Raises
+    ------
+    FileNotFoundError
+        If there is no file at ``path`` (with the suffix ``.parquet``),
+        naming it.
+    """
+    parquet = resolved_table_path(path)
+    if not parquet.exists():
+        raise FileNotFoundError(f"no fit records at {parquet}")
+    frame = read_table(parquet)
     names = [f.name for f in fields(FitRecord)]
     if list(frame.columns) != names:
         raise ValueError(f"{path}: columns {list(frame.columns)}, not {names}")

@@ -107,3 +107,15 @@ def test_each_cause_has_its_words() -> None:
     for code, text in words.items():
         assert describe(code) == text
     assert describe(Removed.NO_FINITE_MAXIMUM, 2) == "no finite maximum (round 2)"
+
+
+def test_a_missing_record_file_is_named(tmp_path) -> None:
+    """Reading records that are not there names the path, without the
+    canonical tables' advice; writing replaces any suffix with .parquet."""
+    import pytest
+
+    missing = tmp_path / "fits" / "none.parquet"
+    with pytest.raises(FileNotFoundError, match=r"no fit records at .*none\.parquet$"):
+        read_records(missing)
+    written = write_records([], tmp_path / "fits" / "empty.pq")
+    assert written == tmp_path / "fits" / "empty.parquet" and written.exists()
