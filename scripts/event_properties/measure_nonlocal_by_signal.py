@@ -67,6 +67,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.io import write_atomically
 
 
 def _epoch(job: tuple[str, str]) -> tuple[pd.DataFrame, dict[str, int]]:
@@ -114,9 +115,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     out_dir = args.output_dir or processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     table = pd.concat(tables, ignore_index=True)
-    tmp = out_dir / "counts.parquet.tmp"
-    table.to_parquet(tmp, index=False)
-    tmp.replace(out_dir / "counts.parquet")
+    write_atomically(
+        out_dir / "counts.parquet", lambda path: table.to_parquet(path, index=False)
+    )
     write_json(
         out_dir / "manifest.json",
         {

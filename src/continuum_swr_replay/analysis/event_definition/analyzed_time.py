@@ -955,11 +955,9 @@ def read_dot_with_swr_source(
     return with_swr_source(frame, non_local_threshold=non_local_threshold)
 
 
-def read_verified_dot_with_swr_source(
-    path: str | Path,
-    expected_sha256: str,
-) -> pd.DataFrame:
-    """:func:`read_dot_with_swr_source` of a decode whose bytes are the run's.
+def read_verified_dot(path: str | Path, expected_sha256: str) -> pd.DataFrame:
+    """A decode's frame as the decoder saved it (not read through the SWR
+    source), if its bytes are the run's.
 
     The file is read once; the same bytes are hashed and unpickled, so the frame
     is the one the hash vouches for.
@@ -984,7 +982,22 @@ def read_verified_dot_with_swr_source(
             f"{expected_sha256}"
         )
     frame: Any = pickle.load(io.BytesIO(raw))
-    return with_swr_source(frame)
+    return frame
+
+
+def read_verified_dot_with_swr_source(
+    path: str | Path,
+    expected_sha256: str,
+) -> pd.DataFrame:
+    """:func:`read_dot_with_swr_source` of a decode whose bytes are the run's
+    (:func:`read_verified_dot`).
+
+    Raises
+    ------
+    ValueError
+        The file's sha256 is not `expected_sha256`.
+    """
+    return with_swr_source(read_verified_dot(path, expected_sha256))
 
 
 def analyzed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:

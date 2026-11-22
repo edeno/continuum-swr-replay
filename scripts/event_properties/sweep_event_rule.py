@@ -30,8 +30,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
-import pickle
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -39,7 +37,10 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
-from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    read_swr_table,
+    read_verified_dot,
+)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
     select_visit_context,
@@ -49,6 +50,7 @@ from continuum_swr_replay.analysis.event_properties.rule_sweep import (
     RULE,
     SETTINGS,
     epoch_sweep_counts,
+    rule_rows,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
@@ -68,17 +70,13 @@ from continuum_swr_replay.runs.io import (
     write_json,
 )
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.io import write_atomically
 
 
 def _epoch(job: tuple[str, str]) -> pd.DataFrame:
     """One epoch's counts at every setting, from the decode the run recorded."""
     identifier, expected_sha256 = job
-    raw_bytes = Path(inventory_run.decode_path(identifier)).read_bytes()
-    if (sha256 := hashlib.sha256(raw_bytes).hexdigest()) != expected_sha256:
-        raise ValueError(
-            f"{identifier}: decode sha256 {sha256} is not the run's {expected_sha256}"
-        )
-    raw = pickle.loads(raw_bytes)
+    raw = read_verified_dot(inventory_run.decode_path(identifier), expected_sha256)
     animal, day, epoch = (raw[c].iloc[0] for c in ("animal", "day", "epoch"))
     counts = epoch_sweep_counts(raw, *well_visit_times(identifier))
     counts.insert(0, "epoch", str(epoch))
@@ -98,10 +96,9 @@ def check_rule_counts(counts: pd.DataFrame, events: pd.DataFrame) -> None:
     ValueError
         If an epoch's counts differ.
     """
-    rule = counts[
-        (counts["setting"] == "probability_threshold")
-        & (counts["value"] == RULE["probability_threshold"])
-    ].set_index("epoch_id")[["n_events", "n_no_swr"]]
+    rule = rule_rows(counts, "probability_threshold").set_index("epoch_id")[
+        ["n_events", "n_no_swr"]
+    ]
     epochs = event_epoch_ids(events)
     table = pd.DataFrame(
         {
@@ -145,9 +142,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     check_rule_counts(table, events)
     out_dir = args.output_dir or processed_data_dir() / EVENT_RULE_SWEEP_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
-    tmp = out_dir / "counts.parquet.tmp"
-    table.to_parquet(tmp, index=False)
-    tmp.replace(out_dir / "counts.parquet")
+    write_atomically(
+        out_dir / "counts.parquet", lambda path: table.to_parquet(path, index=False)
+    )
     write_json(
         out_dir / "manifest.json",
         {
