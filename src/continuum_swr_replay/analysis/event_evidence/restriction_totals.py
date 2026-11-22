@@ -62,7 +62,7 @@ non-local states buy outside SWRs:
   numerators, as :func:`.restriction_windows.window_contrasts` leaves it out of
   the window statistics;
 - the share outside those events, the rest: 1 minus the two shares, so the three
-  add to 1 (the held-out tetrode supplementary figure draws the three). It holds the bins inside no
+  add to 1 (Figure 2's supplement draws the three, panel S2d). It holds the bins inside no
   event window and the bins of the windows the two shares leave out;
 - the gain per spike and per second in the rest of that time, the bins inside
   no event window of any group (``in_event_window`` false): every event the
@@ -874,7 +874,7 @@ OUTSIDE_SWR_SHARES = (
 """Where that gain outside SWRs sits, as shares of it (:data:`MEASURES`), in
 drawing order: in the no-SWR events, in the time outside the SWR of the events
 partly in one (both detected from the held-out decode), and outside those
-events; the held-out tetrode supplementary figure draws them."""
+events; Figure 2's supplement draws them (panel S2d)."""
 RESTRICTION_FIGURE = {
     "parts": ["outside_swr"],
     "families": [RESTRICTION_FIGURE_FAMILY],
@@ -919,7 +919,7 @@ def restriction_figure_statistics(
         :func:`outside_swr_gain_statistics` over the immobile time outside SWRs
         inside a well visit, with the shares of it in the events of
         ``windows``, indexed by ``family`` and ``measure`` (the second axis'
-        second column; the held-out tetrode supplementary figure draws its
+        second column; Figure 2's supplement draws its
         shares).
     """
     decoders = immobile_gain_statistics(

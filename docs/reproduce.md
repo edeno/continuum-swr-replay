@@ -82,7 +82,7 @@ after a change to fitting code only, start at step 6.
    6. `sum_nonlocal_restriction_windows.py`: the restriction scores over the canonical windows (needs 1, 2,
       4 and 5);
    7. `reported/summarize.py --summary events`, then `reported/emit_reported_values.py`;
-   8. `figures/generate_figure02.py` and `figures/generate_supp_heldout_tetrode.py` (the second is not drawn
+   8. `figures/generate_figure02.py` and `figures/generate_supp_figure02.py` (the second is not drawn
       by `figures/generate_all_figures.py`).
 
    ```bash

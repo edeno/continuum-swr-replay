@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""Supplementary figure, the companion to Figure 1: a sliding-window sequence
-detector on the same run.
+"""Supplementary Figure S1, the supplement to Figure 1: a sliding-window
+sequence detector on the same run.
 
 Figure 1 shows how the switching state-space model works on a simulated run.
 This figure runs the published sliding-window sequence detector (Widloski &
@@ -41,7 +41,7 @@ that contradicts itself (:func:`check_recording_claims`,
 :func:`check_summary_claims`).
 
 Usage:
-    python scripts/figures/generate_supp_memoryless_comparison.py
+    python scripts/figures/generate_supp_figure01.py
 """
 
 import argparse
@@ -892,7 +892,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("paper/figures/supp_memoryless_comparison"),
+        default=Path("paper/figures/supp_figure01"),
     )
     parser.add_argument(
         "--recording-numbers", type=Path, default=RECORDING_NUMBERS_PATH
@@ -911,7 +911,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     check_journal_limits(fig)
-    save_figure(fig, "supp_memoryless_comparison", base_dir=args.output_dir)
+    save_figure(fig, "supp_figure01", base_dir=args.output_dir)
     plt.close(fig)
     write_recording_numbers(
         recording_numbers(decoded), N_NEURONS, args.recording_numbers

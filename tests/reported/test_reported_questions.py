@@ -93,7 +93,9 @@ def test_every_figure_script_exists_and_the_figure_pipeline_names_it():
 def test_a_figure_name_is_a_figure_or_a_lettered_panel():
     assert parse_figure("2b") == ("2", "b")
     assert parse_figure("2") == ("2", "")
-    assert parse_figure("memoryless_comparison") == ("memoryless_comparison", "")
+    assert parse_figure("S1") == ("S1", "")
+    assert parse_figure("S2b") == ("S2", "b")
+    assert parse_figure("S2z") is None
     assert parse_figure("2z") is None
     assert parse_figure("spike support") is None
     assert parse_figure("") is None

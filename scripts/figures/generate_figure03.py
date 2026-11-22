@@ -38,7 +38,7 @@ from the animal and by which well it is at
 animal's choices and rewards, and when the events happen. The state the events
 occur in is not drawn here either: ripple power, MUA, theta and head speed
 around the events are Figure 2's, and slow and fast gamma during them are a
-supplementary figure (``generate_supp_event_gamma.py``).
+supplementary figure (``generate_supp_figure03.py``).
 
 b comes before c and d because the far mode of c and the fastest events of d
 (its end bin) are the events with Fragmented time. d's axis is linear: a decoded

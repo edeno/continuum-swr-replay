@@ -47,7 +47,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         zero. The bins outside SWRs are chosen by speed, ripple detection and
         the well visits alone, not by the decoder: the test. An animal's dots
         are spread sideways so that each shows. The held-out tetrode
-        supplementary figure (``generate_supp_heldout_tetrode.py``) looks at
+        supplementary figure (``generate_supp_figure02.py``) looks at
         the gain outside SWRs more closely: away from the SWRs, at
         well-sampled places, and where it sits in the events detected from the
         held-out decode. All from

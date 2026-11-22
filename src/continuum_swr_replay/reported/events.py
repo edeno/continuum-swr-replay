@@ -261,7 +261,7 @@ TAGS = {
     "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
     "mua": Tags(("2d.8",), ("2i",)),
     "theta": Tags(("2d.8",), ("2i",)),
-    "gamma_z": Tags(("2d.8",), ("event_gamma",)),
+    "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
@@ -271,11 +271,13 @@ TAGS = {
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("heldout_tetrode",)),
+    "tetrode_holdout": Tags(("2c.3",), ("S2a",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
-    "nonlocal_restriction_supplement": Tags(("2c.3",), ("heldout_tetrode",)),
+    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2b",)),
+    "nonlocal_restriction_sampling": Tags(("2c.3",), ("S2c",)),
+    "nonlocal_restriction_shares": Tags(("2c.3",), ("S2d",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -1913,8 +1915,8 @@ _CONTROL_AGREEMENT = (
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding and the
     agreement, per spike, of the events and their Local-rest controls. The
-    gain is drawn on the held-out tetrode supplementary figure and carries its
-    tag; the agreement is drawn on no figure."""
+    gain is drawn on Figure 2's supplement (panel S2a) and carries its tag; the
+    agreement is drawn on no figure."""
     make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     make_text = value_factory(
         tetrode_holdout_values, source, TAGS["tetrode_holdout_text"]
@@ -2113,8 +2115,8 @@ def restriction_inputs_note(restriction_dir: Path, epochs: Iterable[str]) -> str
     """Why the restriction run in ``restriction_dir`` was not made from the
     current decode frames and SWR source, or None: :func:`restriction_input_staleness`
     with the decode frames the event features run records for each epoch. The
-    figures that draw the restriction run refuse it then (Figure 2g, the
-    held-out tetrode supplementary figure)."""
+    figures that draw the restriction run refuse it then (Figure 2g, and Figure
+    2's supplement, ``scripts/figures/generate_supp_figure02.py``)."""
     features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)["epochs"]
     return restriction_input_staleness(
         read_output_manifest(restriction_dir),
@@ -2549,18 +2551,18 @@ def restriction_outside_swr_values(
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
     :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2g, the
-    shares on the held-out tetrode supplementary figure; each carries its
-    figure's tag."""
+    shares on Figure 2's supplement (panel S2d); each carries its panel's
+    tag."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
     )
     make_figure = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
     )
-    make_supplement = value_factory(
+    make_shares = value_factory(
         restriction_outside_swr_values,
         source,
-        TAGS["nonlocal_restriction_supplement"],
+        TAGS["nonlocal_restriction_shares"],
     )
     statistics = restriction_totals.outside_swr_gain_statistics(
         restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -2628,7 +2630,7 @@ def restriction_outside_swr_values(
             ),
         ):
             values += _share_interval(
-                make_supplement if figure else make_text,
+                make_shares if figure else make_text,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
                 f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
@@ -2642,7 +2644,7 @@ def restriction_outside_swr_values(
             )
         # a share that is below 0 where the full decoder does worse: a
         # unitless quantity, as a fraction must lie in [0, 1]
-        make = make_supplement if figure else make_text
+        make = make_shares if figure else make_text
         row = statistics.loc[(family, "share_outside_events")]
         values += [
             make(
@@ -2722,16 +2724,24 @@ def restriction_outside_swr_part_values(
     the immobile bins outside every SWR where SWR detection was not observed,
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
-    spike in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on the held-out
-    tetrode supplementary figure and carry its tag."""
+    spike in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2's
+    supplement and carry its panel's tag: away from the SWRs S2b, at
+    well-sampled places S2c."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
     )
-    make_supplement = value_factory(
-        restriction_outside_swr_part_values,
-        source,
-        TAGS["nonlocal_restriction_supplement"],
-    )
+    make_panel = {
+        "beyond_swr_margin": value_factory(
+            restriction_outside_swr_part_values,
+            source,
+            TAGS["nonlocal_restriction_distance"],
+        ),
+        "place_sampling": value_factory(
+            restriction_outside_swr_part_values,
+            source,
+            TAGS["nonlocal_restriction_sampling"],
+        ),
+    }
     counts = restriction_totals.outside_swr_not_observed_counts(time_sums)
     values = [
         make(
@@ -2770,7 +2780,7 @@ def restriction_outside_swr_part_values(
                     row = statistics.loc[(subset, threshold, family, f"gain_{unit}")]
                     drawn = family == RESTRICTION_FIGURE_FAMILY and unit == "per_spike"
                     values += _interval_and_animals_positive(
-                        make_supplement if drawn else make,
+                        make_panel[subset] if drawn else make,
                         f"{key}_{unit}",
                         row,
                         f"{scored}, {full_minus_swr}, summed over {time} and "

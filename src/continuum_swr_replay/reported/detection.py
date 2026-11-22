@@ -23,7 +23,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
 - the one labeled recording of that figure's panel (a)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
-  ``scripts/figures/generate_supp_memoryless_comparison.py``);
+  ``scripts/figures/generate_supp_figure01.py``);
 - the pilot epoch of the main memoryless run (:data:`MEMORYLESS_PILOT_RUN`, a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
@@ -90,10 +90,10 @@ SWEEP_DIR = Path("paper/reported/inputs/detection")
 
 TAGS = {
     "state_evidence": Tags(("2a.7",)),
-    "memoryless": Tags(("1.1",), ("memoryless_comparison",)),
+    "memoryless": Tags(("1.1",), ("S1",)),
     "controls": Tags(("1.2",)),
     "heldout": Tags(("1.3",)),
-    "pilot": Tags(("2a.3",), ("memoryless_comparison",)),
+    "pilot": Tags(("2a.3",), ("S1",)),
 }
 """Each group of values: the questions it answers and the figures that show it.
 The memoryless-comparison values are used in that supplementary figure and its

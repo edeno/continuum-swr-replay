@@ -328,7 +328,7 @@ has to confront them.
 ## What the port does on simulated data
 
 Run on the simulation this project's Figure 1 uses to explain the state-space model
-(`scripts/figures/generate_supp_memoryless_comparison.py`, pinned by
+(`scripts/figures/generate_supp_figure01.py`, pinned by
 `tests/integration/test_memoryless_figure_one_simulation.py`). The simulation labels a
 continuous outbound replay, a fragmented replay, a continuous inbound replay, a silent
 stretch and an unmanipulated pause; a remote stationary event is added here, because the
@@ -458,7 +458,7 @@ The numbers the detection summary holds are written as value markers; the rest, 
 tables included, are copied from that file, and no summary holds them. A number from
 an earlier version of the sweep is dated where it appears.
 The sweep takes about four minutes to reproduce, and
-`scripts/figures/generate_supp_memoryless_comparison.py` draws the lower panels of
+`scripts/figures/generate_supp_figure01.py` draws the lower panels of
 the supplemental figure from the same file.
 
 **Two things the sweep is careful about**, both because getting them wrong

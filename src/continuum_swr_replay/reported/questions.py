@@ -114,17 +114,21 @@ FIGURES: dict[str, Figure] = {
     "decoder_validation": Figure(
         "Decoder validation", "scripts/figures/generate_supp_decoder_validation.py"
     ),
-    "memoryless_comparison": Figure(
+    "S1": Figure(
         "Our detector and the Widloski & Foster detector on simulated replays",
-        "scripts/figures/generate_supp_memoryless_comparison.py",
+        "scripts/figures/generate_supp_figure01.py",
+        "abcd",
     ),
-    "event_gamma": Figure(
+    "S2": Figure(
+        "The held-out tetrode gain over local coding, the gain outside SWRs, and "
+        "MUA in the No-Spike state",
+        "scripts/figures/generate_supp_figure02.py",
+        "abcde",
+    ),
+    "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
-        "scripts/figures/generate_supp_event_gamma.py",
-    ),
-    "heldout_tetrode": Figure(
-        "The held-out tetrode gain over local coding, and the gain outside SWRs",
-        "scripts/figures/generate_supp_heldout_tetrode.py",
+        "scripts/figures/generate_supp_figure03.py",
+        "ab",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -139,10 +143,12 @@ FIGURES: dict[str, Figure] = {
         "scripts/figures/plot_swr_contrast_coefs.py",
     ),
 }
-"""Every figure a value may name, by id: the main figures (``"2"``), with the panel
-letters their scripts draw now, and the supplementary figures by their output
-folder's name (``"memoryless_comparison"``). A value names one by its id or, for
-a lettered panel, its id and the letter (``"2b"``). A value placed in a main
+"""Every figure a value may name, by id: the main figures (``"2"``) and the
+supplement of each (``"S2"``, ``scripts/figures/generate_supp_figure02.py``),
+with the panel letters their scripts draw now, and the other supplementary
+figures by their output folder's name (``"decoder_validation"``). A value names
+one by its id or, for a lettered panel, its id and the letter (``"2b"``,
+``"S2b"``). A value placed in a main
 figure whose panel is not designed yet names the figure without a letter
 (``"2"``), whether or not the script draws it yet."""
 
@@ -163,7 +169,7 @@ class Question:
         Why the status is not ``computed``; empty when it is.
     figures : tuple of str
         The figures or panels the paper places it in (``"2b"``,
-        ``"memoryless_comparison"``); empty for a question no figure shows. Every
+        ``"S1"``); empty for a question no figure shows. Every
         figure one of its values names must be listed here.
     note : str
         An editorial note for the lead, if any.
@@ -189,7 +195,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "1.1",
         "On simulated replays of known shape, how often does each detector report the replay and how well does it place its start and end, the state-space detector against the Widloski & Foster sliding-window detector?",
-        figures=("1", "memoryless_comparison"),
+        figures=("1", "S1"),
     ),
     Question(
         "1.2",
@@ -211,7 +217,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2a.3",
         "On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?",
-        figures=("memoryless_comparison",),
+        figures=("S1",),
     ),
     Question(
         "2a.5",
@@ -261,8 +267,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position (against matched windows and on held-out tetrodes), and do held-out spikes favor a decoder that may be non-local outside SWRs over one that is non-local only in SWRs or never?",
-        figures=("2", "2g", "heldout_tetrode"),
-        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of the supplementary figure is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2g draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; the held-out tetrode supplementary figure draws that gain outside SWRs away from the SWRs and at well-sampled places, and its shares in the events detected from the held-out decode and outside them) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
+        figures=("2", "2g", "S2a", "S2b", "S2c", "S2d"),
+        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of Figure 2's supplement, panel S2a, is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2g draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; Figure 2's supplement draws that gain outside SWRs away from the SWRs (S2b) and at well-sampled places (S2c), and its shares (S2d) in the events detected from the held-out decode and outside them) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
         "2c.4",
@@ -307,7 +313,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("2i", "event_gamma", "decoder_validation"),
+        figures=("2i", "S3", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(
@@ -443,7 +449,7 @@ QUESTION_IDS: dict[str, Question] = {q.id: q for q in QUESTIONS}
 def parse_figure(name: str) -> tuple[str, str] | None:
     """The figure id and panel letter ``name`` gives, or None.
 
-    ``"2b"`` is ``("2", "b")``; ``"2"`` and ``"memoryless_comparison"`` have no
+    ``"2b"`` is ``("2", "b")``, ``"S2b"`` is ``("S2", "b")``; ``"2"`` and ``"S1"`` have no
     panel (``""``). A name that is no figure of :data:`FIGURES`, or a panel its
     figure does not have, is None.
     """

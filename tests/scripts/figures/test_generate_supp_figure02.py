@@ -1,4 +1,4 @@
-"""The held-out tetrode supplementary figure: what it draws and from which values."""
+"""Figure 2's supplement: what it draws and from which values."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
-from scripts.figures import generate_supp_heldout_tetrode as figure  # noqa: E402
+from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     OUTSIDE,
     SHARES,
@@ -255,10 +255,9 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
-    """Values tagged ``heldout_tetrode`` name this script."""
-    assert FIGURES["heldout_tetrode"].script == (
-        "scripts/figures/generate_supp_heldout_tetrode.py"
-    )
+    """Values tagged ``S2`` (by panel, ``S2a`` to ``S2e``) name this script."""
+    assert FIGURES["S2"].panels == "abcde"
+    assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
 class _HeldoutRestriction:

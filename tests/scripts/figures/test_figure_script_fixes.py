@@ -1662,7 +1662,7 @@ def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
         animal_signal_levels,
     )
 
-    figure = offline("scripts.figures.generate_supp_event_gamma")
+    figure = offline("scripts.figures.generate_supp_figure03")
     rng = np.random.default_rng(0)
     epochs = [("a", "e1"), ("a", "e2"), ("b", "e1")]
     events = pd.DataFrame(
@@ -2044,16 +2044,17 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
         restriction_totals.RESTRICTION_FIGURE_DECODERS
     )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
-    assert events.TAGS["nonlocal_restriction_supplement"].figures == (
-        "heldout_tetrode",
-    )
+    # Figure 2's supplement, panel by panel
+    assert events.TAGS["tetrode_holdout"].figures == ("S2a",)
+    assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2b",)
+    assert events.TAGS["nonlocal_restriction_sampling"].figures == ("S2c",)
+    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2d",)
     assert events.TAGS["participation"].figures == ("2h",)
-    assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)
 
 
 @pytest.mark.parametrize(
     "module",
-    ["scripts.figures.generate_figure03", "scripts.figures.generate_supp_event_gamma"],
+    ["scripts.figures.generate_figure03", "scripts.figures.generate_supp_figure03"],
 )
 def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
     offline, monkeypatch, module
@@ -2074,7 +2075,9 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
 
     monkeypatch.setattr(figure, "read_swr_table", lambda path: table)
     reader = (
-        "content_along_arms_bins" if module.endswith("figure03") else "with_brain_state"
+        "content_along_arms_bins"
+        if module.endswith("generate_figure03")
+        else "with_brain_state"
     )
     monkeypatch.setattr(figure, reader, stop)
     with pytest.raises(Read):
@@ -2098,7 +2101,7 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     )
     from continuum_swr_replay.analysis.event_tables import prepare_data
 
-    figure = offline("scripts.figures.generate_supp_event_gamma")
+    figure = offline("scripts.figures.generate_supp_figure03")
     monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", tmp_path / "cache")
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)

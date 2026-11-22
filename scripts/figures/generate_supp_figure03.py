@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Generate the supplementary figure: slow and fast gamma during SWR and no-SWR events.
+"""Generate Supplementary Figure S3, the supplement to Figure 3: slow and fast
+gamma during SWR and no-SWR events.
 
 The immobile non-local events of the canonical event table that start inside
 a well visit (``cohort_selection.select_visit_context``), split by whether
@@ -18,7 +19,7 @@ panel; ripple power, MUA, theta and head speed around the events are Figure 2's.
 
 Usage
 -----
-    python scripts/figures/generate_supp_event_gamma.py
+    python scripts/figures/generate_supp_figure03.py
 """
 
 import argparse
@@ -164,14 +165,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/supp_event_gamma")
+        "--output-dir", type=Path, default=Path("paper/figures/supp_figure03")
     )
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     fig = generate_figure(read_inputs())
     check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
-    save_figure(fig, "supp_event_gamma", base_dir=args.output_dir)
+    save_figure(fig, "supp_figure03", base_dir=args.output_dir)
     plt.close("all")
 
 

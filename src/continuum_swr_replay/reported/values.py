@@ -55,7 +55,7 @@ class Tags:
     questions : tuple of str
         Question ids (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
     figures : tuple of str
-        Figures or lettered panels (``"2"``, ``"2b"``, ``"memoryless_comparison"``;
+        Figures or lettered panels (``"2"``, ``"2b"``, ``"S1"``, ``"S2b"``;
         :data:`~continuum_swr_replay.reported.questions.FIGURES`); empty for
         values no figure shows.
     """

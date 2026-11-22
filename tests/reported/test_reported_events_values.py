@@ -879,13 +879,11 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
     by_key = _by_key(values)
-    # the held-out tetrode supplementary figure draws the gains; Figure 2 does
-    # not, and no figure draws the agreement
+    # Figure 2's supplement draws the gains (panel S2a); Figure 2 does not, and
+    # no figure draws the agreement
     agreement = {k for k in by_key if "agreement" in k}
     assert {by_key[k].figures for k in agreement} == {()}
-    assert {v.figures for k, v in by_key.items() if k not in agreement} == {
-        ("heldout_tetrode",)
-    }
+    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2a",)}
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
@@ -1267,9 +1265,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for end in ("", "_ci_low", "_ci_high")
     }
     assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
-    assert {
-        k for k, v in values.items() if v.figures == ("heldout_tetrode",)
-    } == supplement
+    assert {k for k, v in values.items() if v.figures == ("S2d",)} == supplement
     assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
 
@@ -1458,13 +1454,18 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     # per part: two families x (two units x four + two epoch counts), and the
     # share with the animals' lowest; and the two counts left out
     assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
-    # the held-out tetrode supplementary figure draws each part's gain per spike
-    # in the filter family
+    # Figure 2's supplement draws each part's gain per spike in the filter
+    # family: away from the SWRs in panel S2b, at well-sampled places in S2c
     drawn = {
         k for k in values if "_full_minus_swr_per_spike" in k and "_two_sided" not in k
     }
     assert len(drawn) == 5 * 4
-    assert {k for k, v in values.items() if v.figures == ("heldout_tetrode",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("S2b",)} == {
+        k for k in drawn if "_beyond_" in k
+    }
+    assert {k for k, v in values.items() if v.figures == ("S2c",)} == {
+        k for k in drawn if "_sampled_" in k
+    }
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 

@@ -190,7 +190,7 @@ the error estimates the real-data held-out results will be read with.
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
   `paper/reported/inputs/detection/detection_heldout_summary.csv`. About 3 x 5100 cells at the sweep's
   0.045 s per cell, near 12 minutes, measured on one seed of one fold first.
-- `scripts/figures/generate_supp_memoryless_comparison.py`: reads all three summaries.
+- `scripts/figures/generate_supp_figure01.py`: reads all three summaries.
 
 ## Figure
 

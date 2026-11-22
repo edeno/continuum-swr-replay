@@ -21,7 +21,7 @@ Figures it covers (``FIGURE_SCRIPTS``):
 It does not draw the other figure scripts in ``scripts/figures/`` (the
 supplementary, gallery and diagnostic figures, such as
 ``generate_supp_decoder_validation.py`` or
-``generate_supp_memoryless_comparison.py``); run those directly.
+``generate_supp_figure01.py``); run those directly.
 
 Usage:
     uv run python scripts/figures/generate_all_figures.py

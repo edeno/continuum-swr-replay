@@ -13,7 +13,7 @@ under every field, as the reference does; the reference also runs without it,
 to show what the floor does.
 
 Two inputs. The Figure 1 simulation of
-``scripts/figures/generate_supp_memoryless_comparison.py`` is compared step by
+``scripts/figures/generate_supp_figure01.py`` is compared step by
 step, so a disagreement can be placed: the posterior, each window's center,
 spread and gates, the candidate sequences, their duration, dispersion and
 replay verdict, and the p-values. Every cell of

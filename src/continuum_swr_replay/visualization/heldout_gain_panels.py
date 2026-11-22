@@ -1,12 +1,13 @@
 """The held-out gain panels: a held-out gain per animal and its mean.
 
-The held-out tetrode supplementary figure (the gain over local coding per spike),
 Figure 2g (each decoder's gain over the local-only decoder, and the full
-decoder's over the SWR-only decoder) and the outside-SWR supplementary figure
-(that gain outside SWRs, by distance from the SWRs and by place sampling, and
-where it sits) draw each value the same way: a dot per animal and, beside them,
-the animals' mean with its 95 % interval in black, with a dashed line at zero,
-where neither side predicts the spikes better.
+decoder's over the SWR-only decoder) and Figure 2's supplement
+(``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
+local coding per spike; the full decoder's gain outside SWRs, by distance from
+the SWRs and by place sampling; and where that gain sits) draw each value the
+same way: a dot per animal and, beside them, the animals' mean with its 95 %
+interval in black, with a dashed line at zero, where neither side predicts the
+spikes better.
 """
 
 from __future__ import annotations

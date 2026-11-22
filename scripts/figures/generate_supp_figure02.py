@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""Generate the supplementary figure: the held-out tetrode gain, and the gain
-outside SWRs.
+"""Generate Supplementary Figure S2, the supplement to Figure 2: the held-out
+tetrode gain, the gain outside SWRs, and MUA in the No-Spike state.
 
     a — The held-out tetrode gain over local coding. The immobile non-local
         events of the canonical event table that start inside a well visit
@@ -86,7 +86,7 @@ few minutes; it has no reported value.
 
 Usage
 -----
-    python scripts/figures/generate_supp_heldout_tetrode.py
+    python scripts/figures/generate_supp_figure02.py
 """
 
 import argparse
@@ -214,7 +214,7 @@ TRIGGER_WINDOW_S = 0.3
 """Panel e's window around each start (s, in all), Figure 2i's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
-REFUSED = "the held-out tetrode figure's panels b to d are not drawn"
+REFUSED = "Figure 2's supplement: panels b to d are not drawn"
 RERUN = {
     "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
     "and the runs made from it",
@@ -457,14 +457,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/supp_heldout_tetrode")
+        "--output-dir", type=Path, default=Path("paper/figures/supp_figure02")
     )
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     fig = generate_figure(read_inputs())
     check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
-    save_figure(fig, "supp_heldout_tetrode", base_dir=args.output_dir)
+    save_figure(fig, "supp_figure02", base_dir=args.output_dir)
     plt.close("all")
 
 

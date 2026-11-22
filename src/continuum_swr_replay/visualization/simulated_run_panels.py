@@ -1,7 +1,7 @@
 """What the figures of the simulated run share: colors, sizes and drawing helpers.
 
 Figure 1 (``scripts/figures/generate_figure01.py``) and the memoryless
-comparison (``scripts/figures/generate_supp_memoryless_comparison.py``) draw the same
+comparison (``scripts/figures/generate_supp_figure01.py``) draw the same
 simulated run (``analysis.detection.simulated_run``) and read as one pair, so
 the state colors, the type sizes, the decoded-position panel and the hand
 layout (rows spaced from what they draw, letters on measured edges) are defined
