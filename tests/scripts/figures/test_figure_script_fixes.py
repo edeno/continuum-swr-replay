@@ -2022,9 +2022,10 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
     # Figure 2's supplement, panel by panel
-    assert events.TAGS["tetrode_holdout"].figures == ("S2a",)
-    assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2b",)
-    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2c",)
+    assert events.TAGS["tetrode_holdout"].figures == ("S2b",)
+    assert events.TAGS["shared_content"].figures == ("S2c",)
+    assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2d",)
+    assert events.TAGS["nonlocal_restriction_shares"].figures == ("S2e",)
     assert events.TAGS["participation"].figures == ("2h",)
 
 

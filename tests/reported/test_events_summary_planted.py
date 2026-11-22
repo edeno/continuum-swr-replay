@@ -80,6 +80,7 @@ EVENT_BUILDERS = (
     "participation_values",
     "likelihood_advantage_values",
     "tetrode_holdout_values",
+    "shared_content_values",
     "content_occupancy_values",
 )
 #: The restriction builders, by the argument holding the canonical windows
@@ -488,6 +489,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "participation_values",
         "likelihood_advantage_values",
         "tetrode_holdout_values",
+        "shared_content_values",
     ):
         assert len(seen[name][0]) == 2 * 13, name
     # the restriction windows too; the time sums and the time steps are whole
@@ -645,12 +647,12 @@ PENDING_CASES = [
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_table", {"sha256": "old"}),
-        {"tetrode_holdout"},
+        {"tetrode_holdout", "shared_content"},
     ),
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_participation", {"sha256": "old"}),
-        {"tetrode_holdout"},
+        {"tetrode_holdout", "shared_content"},
     ),
     ("state_evidence", ("subset", None), {"heldout_by_swr"}),
     ("state_evidence", ("session_cache", _other_cache()), {"heldout_by_swr"}),

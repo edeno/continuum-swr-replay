@@ -879,11 +879,11 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
     by_key = _by_key(values)
-    # Figure 2's supplement draws the gains (panel S2a); Figure 2 does not, and
+    # Figure 2's supplement draws the gains (panel S2b); Figure 2 does not, and
     # no figure draws the agreement
     agreement = {k for k in by_key if "agreement" in k}
     assert {by_key[k].figures for k in agreement} == {()}
-    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2a",)}
+    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2b",)}
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
@@ -1265,7 +1265,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for end in ("", "_ci_low", "_ci_high")
     }
     assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
-    assert {k for k, v in values.items() if v.figures == ("S2c",)} == supplement
+    assert {k for k, v in values.items() if v.figures == ("S2e",)} == supplement
     assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
 
@@ -1455,7 +1455,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     # share with the animals' lowest; and the two counts left out
     assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
     # Figure 2's supplement draws the gain per spike away from the SWRs in the
-    # filter family (panel S2b); the gain at well-sampled places is for the text
+    # filter family (panel S2d); the gain at well-sampled places is for the text
     drawn = {
         k
         for k in values
@@ -1464,7 +1464,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
         and "_two_sided" not in k
     }
     assert len(drawn) == 3 * 4
-    assert {k for k, v in values.items() if v.figures == ("S2b",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("S2d",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 

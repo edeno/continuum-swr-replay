@@ -120,10 +120,11 @@ FIGURES: dict[str, Figure] = {
         "abcd",
     ),
     "S2": Figure(
-        "The held-out tetrode gain over local coding, the gain outside SWRs, and "
-        "MUA in the No-Spike state",
+        "MUA in the No-Spike state, the held-out tetrode gain over local coding, "
+        "shared content by the spread of the other tetrodes' estimate, and the "
+        "gain outside SWRs",
         "scripts/figures/generate_supp_figure02.py",
-        "abcd",
+        "abcde",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -267,8 +268,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position (against matched windows and on held-out tetrodes), and do held-out spikes favor a decoder that may be non-local outside SWRs over one that is non-local only in SWRs or never?",
-        figures=("2", "2j", "S2a", "S2b", "S2c"),
-        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of Figure 2's supplement, panel S2a, is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2j draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; Figure 2's supplement draws that gain outside SWRs away from the SWRs (S2b) and its shares in the events detected from the held-out decode and outside them (S2c); the gain at well-sampled places is for the text) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
+        figures=("2", "2j", "S2b", "S2c", "S2d", "S2e"),
+        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of Figure 2's supplement, panel S2b, is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values; panel S2c, shared content, is the *_shared_content_* values: the held-out agreement per spike of the events by the spread of the other tetrodes' estimate, in bins fixed in advance). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time (restriction_immobile_* and restriction_outside_swr_*; Figure 2j draws each decoder's gain over the local-only decoder and the full minus the SWR-only decoder over all immobile time and outside SWRs; Figure 2's supplement draws that gain outside SWRs away from the SWRs (S2d) and its shares in the events detected from the held-out decode and outside them (S2e); the gain at well-sampled places is for the text) and over the events detected from the held-out decode (restriction_heldout_*) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
         "2c.4",
