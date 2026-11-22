@@ -59,7 +59,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   probabilities, with which held-out and canonical events share a bin and the
   bins summed by category, well visit and held-out event window
   (``Processed-Data/event_nonlocal_restriction_heldout_events``, from
-  ``scripts/event_evidence/detect_heldout_events.py``, which Figure 2g draws);
+  ``scripts/event_evidence/detect_heldout_events.py``, which Figure 2j draws);
   each bin's spikes and well-visit flag from ``Processed-Data/event_bin_facts``
   (``scripts/event_evidence/measure_bin_facts.py``); summarized by
   ``analysis.event_evidence.restriction_windows``,
@@ -258,15 +258,15 @@ TAGS = {
     "other_detectors": Tags(("2b.3",)),
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
-    "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
-    "mua": Tags(("2d.8",), ("2i",)),
-    "theta": Tags(("2d.8",), ("2i",)),
+    "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
+    "mua": Tags(("2d.8",), ("2g",)),
+    "theta": Tags(("2d.8",), ("2g",)),
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
-    "nonlocal_power": Tags(("2b.5",), ("2j",)),
+    "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
@@ -274,7 +274,7 @@ TAGS = {
     "tetrode_holdout": Tags(("2c.3",), ("S2a",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
-    "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
+    "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2b",)),
     "nonlocal_restriction_shares": Tags(("2c.3",), ("S2c",)),
     "spike": Tags(("2d.9", "2c.3")),
@@ -333,7 +333,7 @@ one well visit (``event_evidence.participation.CONTROL_RULE``)."""
 
 CANONICAL_WINDOWS_SUBSET = (
     "the canonical events, chosen from the decode fit on the whole epoch (the "
-    "scores are held out; the choice of events is not; Figure 2g's values use "
+    "scores are held out; the choice of events is not; Figure 2j's values use "
     f"the events detected from the held-out decode instead): {CONTROL_SUBSET}"
 )
 """What the restriction values over the canonical windows are over
@@ -2086,7 +2086,7 @@ def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str
 
 @dataclass(frozen=True)
 class HeldoutRestriction:
-    """The held-out event run's inputs to the restriction values and Figure 2g
+    """The held-out event run's inputs to the restriction values and Figure 2j
     (:func:`read_heldout_restriction`), and why a value read from them is
     pending (each None when it is not)."""
 
@@ -2114,7 +2114,7 @@ def restriction_inputs_note(restriction_dir: Path, epochs: Iterable[str]) -> str
     """Why the restriction run in ``restriction_dir`` was not made from the
     current decode frames and SWR source, or None: :func:`restriction_input_staleness`
     with the decode frames the event features run records for each epoch. The
-    figures that draw the restriction run refuse it then (Figure 2g, and Figure
+    figures that draw the restriction run refuse it then (Figure 2j, and Figure
     2's supplement, ``scripts/figures/generate_supp_figure02.py``)."""
     features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)["epochs"]
     return restriction_input_staleness(
@@ -2394,7 +2394,7 @@ def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list
     events that overlap one, in :data:`RESTRICTION_FIGURE_FAMILY`
     (:data:`RESTRICTION_FIGURE`); with the events of each group, those with a
     value and those with bins outside SWRs but no spike in them. No figure
-    draws these: the events are the full decoder's own, so Figure 2g draws the
+    draws these: the events are the full decoder's own, so Figure 2j draws the
     gain over all the time outside SWRs and the shares of it in these events
     (:func:`restriction_outside_swr_values`)."""
     make = value_factory(
@@ -2549,7 +2549,7 @@ def restriction_outside_swr_values(
     marks every held-out event, wherever it starts). The gain per spike and
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
-    :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2g, the
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2j, the
     shares on Figure 2's supplement (panel S2c); each carries its panel's
     tag."""
     make_text = value_factory(
@@ -2834,7 +2834,7 @@ def restriction_immobile_values(
     their difference, and the share of the full decoder's gain the SWR-only
     decoder captures. The gains per spike over the local-only decoder and
     their paired difference in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on
-    Figure 2g and carry that panel's tag, with the epoch counts; the share
+    Figure 2j and carry that panel's tag, with the epoch counts; the share
     captured is for the text."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
@@ -2963,7 +2963,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
 
 def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5: how much of the non-local time has ripple power below the
-    Kay threshold (Figure 2j)?
+    Kay threshold (Figure 2i)?
 
     Over the immobile time bins decoded non-local, each animal's bins pooled
     over its epochs.
@@ -4022,7 +4022,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     restriction_dir = inputs.nonlocal_restriction
     restriction_windows_dir = inputs.nonlocal_restriction_windows
     heldout_dir = inputs.nonlocal_restriction_heldout_events
-    # the held-out event run (Figure 2g): its events that start inside a well
+    # the held-out event run (Figure 2j): its events that start inside a well
     # visit, its time sums and time steps, and why a value read from them is
     # pending; a restriction run of the earlier design is refused (the window
     # and held-out event runs must have read this run, staleness below)

@@ -65,7 +65,7 @@ after a change to fitting code only, start at step 6.
    5. `tables/build_timebin_tables.py`;
    6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
 5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
-   the supplements). The runs behind Figure 2g, the supplementary held-out tetrode figure and the restriction
+   the supplements). The runs behind Figure 2j, the supplementary held-out tetrode figure and the restriction
    and held-out tetrode values of the events summary go in this order (in `scripts/event_evidence/` unless
    named otherwise; the two GPU runners need `--gpus`):
    1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on

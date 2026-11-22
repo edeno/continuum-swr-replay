@@ -1008,7 +1008,7 @@ Spike-evidence reality analysis for non-SWR non-local events.
 
 ### `scripts/event_evidence/detect_heldout_events.py`
 
-Non-local events detected from held-out data, for Figure 2's panel g.
+Non-local events detected from held-out data, for Figure 2's panel j.
 
 `read_raw_frame`, `run_epoch`, `main`
 

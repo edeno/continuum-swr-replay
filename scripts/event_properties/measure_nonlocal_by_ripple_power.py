@@ -2,7 +2,7 @@
 
 Where the non-local time sits against the SWR threshold: how much of it has
 ripple power below the threshold, and the share of bins that are non-local at
-each power (Figure 2j), over the immobile time inside the well visits (the
+each power (Figure 2i), over the immobile time inside the well visits (the
 epoch's port experiences, read from the session cache:
 ``event_tables.prepare_data.well_visit_times``). The manifest records each
 epoch's immobile bins kept and left out as outside every visit, and the

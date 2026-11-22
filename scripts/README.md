@@ -61,7 +61,7 @@ them importable.
 - `score_tetrode_holdout.py` — the held-out tetrode score of every canonical non-local event and its Local-rest control: each tetrode left out of the decoder in turn and scored under the other tetrodes' position distribution against local coding, with encodings held out in folds of whole trials balanced by destination well (GPU; needs `--gpus`).
 - `measure_bin_facts.py` — each decode bin's spikes over every tetrode and whether it is inside a well visit (the visits from the session cache only, whose entries the run records), on every epoch of the restriction run (CPU; reads the lab's database, read only).
 - `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control, with each window's spike count and its sums over the bins outside SWRs (CPU; `--restriction-dir` reads another restriction run).
-- `detect_heldout_events.py` — the non-local events detected by the canonical rule from the restriction run's held-out state probabilities (Figure 2g reads them), with the restriction scores summed over each, which held-out and canonical events share a bin, and each epoch's bins, spikes and scores by category, well visit and held-out event window; each epoch checks that the rule on the canonical decode's own probabilities gives its canonical labels (CPU; `--restriction-dir` reads another restriction run).
+- `detect_heldout_events.py` — the non-local events detected by the canonical rule from the restriction run's held-out state probabilities (Figure 2j reads them), with the restriction scores summed over each, which held-out and canonical events share a bin, and each epoch's bins, spikes and scores by category, well visit and held-out event window; each epoch checks that the rule on the canonical decode's own probabilities gives its canonical labels (CPU; `--restriction-dir` reads another restriction run).
 
 ## `event_properties/` — what the events are like (Part 2)
 Each is over the events that start inside a well visit and the time inside one
@@ -71,7 +71,7 @@ and the `measure` stage of `measure_ripple_class_structure.py` measure every eve
 and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
-- `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2j).
+- `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2i).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 
 ## `tables/` — the event, stop and time-bin tables
@@ -121,7 +121,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.
 - `generate_supp_figure01.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
-- `generate_supp_figure02.py` — Figure 2's supplement (S2): the held-out tetrode gain over local coding of no-SWR and SWR events (was Figure 2h), Figure 2g's gain outside SWRs away from the SWRs and where it sits, and MUA around the start of No-Spike periods (reads every analyzed epoch's decode frame, a few minutes).
+- `generate_supp_figure02.py` — Figure 2's supplement (S2): the held-out tetrode gain over local coding of no-SWR and SWR events (was a panel of Figure 2), Figure 2j's gain outside SWRs away from the SWRs and where it sits, and MUA around the start of No-Spike periods (reads every analyzed epoch's decode frame, a few minutes).
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
 

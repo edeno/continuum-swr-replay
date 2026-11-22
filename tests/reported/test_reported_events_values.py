@@ -351,9 +351,9 @@ def test_brain_state_values_name_each_signal_class_and_reference():
                 "animals_below_running_swr": 0,
             }
         assert own == pytest.approx(expected), signal
-    assert values["ripple_median_swr"].figures == ("2i",)
-    assert values["mua_median_swr"].figures == ("2i",)
-    assert values["theta_median_swr"].figures == ("2i",)
+    assert values["ripple_median_swr"].figures == ("2g",)
+    assert values["mua_median_swr"].figures == ("2g",)
+    assert values["theta_median_swr"].figures == ("2g",)
 
 
 def test_gamma_db_values_name_each_band_and_class():
@@ -1069,7 +1069,7 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
 def test_restriction_heldout_event_values_are_the_canonical_statistic_untagged():
     """The canonical windows' events, read as held-out events: the same
     statistic as the canonical values outside SWRs. No figure draws them:
-    Figure 2g draws the gain over all the time outside SWRs and its shares."""
+    Figure 2j draws the gain over all the time outside SWRs and its shares."""
     windows = _restriction_windows()
     events = windows[windows["kind"] == "event"]
     values = _by_key(builder.restriction_heldout_event_values(events, "s"))
@@ -1250,7 +1250,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     # per family: per spike and per second, the gain and the rest (four each),
     # the epochs (two), and three shares (three each)
     assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 3 * 3)
-    # Figure 2g draws the filter family's gain per spike; the held-out tetrode
+    # Figure 2j draws the filter family's gain per spike; the held-out tetrode
     # supplementary figure its three shares
     drawn = {f"{key}_per_spike{end}" for end in ("", "_ci_low", "_ci_high")} | {
         f"{key}_per_spike_animals_positive"
@@ -1264,7 +1264,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         )
         for end in ("", "_ci_low", "_ci_high")
     }
-    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
     assert {k for k, v in values.items() if v.figures == ("S2c",)} == supplement
     assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
@@ -1326,7 +1326,7 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # Figure 2g draws the filter family's gains per spike over the local-only
+    # Figure 2j draws the filter family's gains per spike over the local-only
     # decoder and their paired difference, with the epoch counts; per second,
     # the share and the two-sided family carry no figure
     drawn = {
@@ -1337,7 +1337,7 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
         "restriction_immobile_epochs_full_above_swr_only",
         "restriction_immobile_epochs",
     }
-    assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # the summary says what they are over (``over``), once
@@ -1345,7 +1345,7 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
 
 
 def test_restriction_figure_statistics_are_the_tagged_values():
-    """Figure 2g's statistics are the rows the drawn values are made from."""
+    """Figure 2j's statistics are the rows the drawn values are made from."""
     sums, bin_s, windows = _outside_swr_inputs()
     decoders, outside = builder.restriction_totals.restriction_figure_statistics(
         windows, sums, bin_s

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Non-local events detected from held-out data, for Figure 2's panel g.
+"""Non-local events detected from held-out data, for Figure 2's panel j.
 
 For each epoch of the restriction run (``score_nonlocal_restriction.py``, the
 fold fit; its ``ok`` records): read its per-bin table, the epoch's decode frame

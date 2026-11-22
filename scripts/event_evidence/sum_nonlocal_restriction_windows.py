@@ -19,7 +19,7 @@ the facts' spikes to that run's loader: the restriction run's record counts no
 spikes). An epoch that is ``ok`` in only one of the two runs is left out and
 named in a warning. CPU only: pandas and numpy, nothing is decoded or refit.
 The epoch's bins summed by category, well visit and event window, and Figure
-2g's events, come from ``detect_heldout_events.py``, from events detected on
+2j's events, come from ``detect_heldout_events.py``, from events detected on
 held-out data.
 
 ``--restriction-dir`` reads another restriction run (a second scoring of the

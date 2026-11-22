@@ -1926,8 +1926,8 @@ def _has_zero_line(ax) -> bool:
     )
 
 
-def test_figure02_panel_g_first_axis_draws_each_decoders_gain(offline):
-    """Panel g's first axis: each decoder's gain over the local-only decoder,
+def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline):
+    """Panel j's first axis: each decoder's gain over the local-only decoder,
     the SWR-only decoder's dots dark gray and the full decoder's green, spread
     about the column, the mean with its interval beside them, and the dashed
     zero line labeled "local-only"."""
@@ -1956,8 +1956,8 @@ def test_figure02_panel_g_first_axis_draws_each_decoders_gain(offline):
     plt.close(fig)
 
 
-def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
-    """Panel g's second axis: the full minus the SWR-only decoder over all
+def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_only(offline):
+    """Panel j's second axis: the full minus the SWR-only decoder over all
     immobility (the paired difference) and outside SWRs (the main result, its
     label in bold), dark gray dots spread about each column, the mean with its
     interval beside them, and the dashed zero line with "full better"."""
@@ -1987,8 +1987,8 @@ def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
     plt.close(fig)
 
 
-def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
-    """Panel g draws the restriction rows the events summary tags with it, by
+def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(offline):
+    """Panel j draws the restriction rows the events summary tags with it, by
     the summary's own definitions; participation is panel h; the held-out
     tetrode values are the supplementary figure's."""
     from continuum_swr_replay.analysis.event_evidence import restriction_totals
@@ -2020,7 +2020,7 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
     assert list(figure02.DECODER_X) == list(
         restriction_totals.RESTRICTION_FIGURE_DECODERS
     )
-    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
+    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
     # Figure 2's supplement, panel by panel
     assert events.TAGS["tetrode_holdout"].figures == ("S2a",)
     assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2b",)
@@ -2326,13 +2326,13 @@ def _heldout_events_run(
 def test_figure02_refuses_a_heldout_event_run_not_from_the_current_fold_fit(
     offline, tmp_path, monkeypatch, change, message
 ):
-    """Panel g draws only the fold fit on whole trials, from a held-out event
+    """Panel j draws only the fold fit on whole trials, from a held-out event
     run made from the restriction run as it is now."""
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
     _heldout_events_run(tmp_path, **change)
 
     def refuse(*args):
-        raise AssertionError("panel g was drawn from another restriction run")
+        raise AssertionError("panel j was drawn from another restriction run")
 
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
     with pytest.raises(ValueError, match=message) as refused:
@@ -2343,7 +2343,7 @@ def test_figure02_refuses_a_heldout_event_run_not_from_the_current_fold_fit(
 def test_figure02_refuses_a_restriction_run_off_the_current_decodes_or_swr_source(
     offline, tmp_path, monkeypatch
 ):
-    """Panel g is not drawn from a restriction run made from other decode
+    """Panel j is not drawn from a restriction run made from other decode
     frames or another SWR source than the current ones: the summary's reason,
     and the runner to make again."""
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
@@ -2355,14 +2355,15 @@ def test_figure02_refuses_a_restriction_run_off_the_current_decodes_or_swr_sourc
         return "the restriction run records another SWR source; rerun x before citing"
 
     def refuse(*args):
-        raise AssertionError("panel g was drawn from other decodes")
+        raise AssertionError("panel j was drawn from other decodes")
 
     monkeypatch.setattr(figure02, "restriction_inputs_note", note)
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
     with pytest.raises(ValueError) as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert str(refused.value) == (
-        "panel g is not drawn: the restriction run records another SWR source. "
+        "the decoder comparison (panel j) is not drawn: the restriction run "
+        "records another SWR source. "
         "Rerun scripts/event_evidence/score_nonlocal_restriction.py and the runs "
         "made from it."
     )
@@ -2372,7 +2373,7 @@ def test_figure02_refuses_a_restriction_run_off_the_current_decodes_or_swr_sourc
 def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
     offline, tmp_path, monkeypatch
 ):
-    """Panel g reads the held-out event run: its events that start inside a
+    """Panel j reads the held-out event run: its events that start inside a
     well visit (not the two planted outside one) and its time sums whole."""
     from continuum_swr_replay.reported import events
 
@@ -2404,7 +2405,7 @@ def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
 def test_figure02_refuses_bin_facts_made_from_other_visits(
     offline, tmp_path, monkeypatch, problem
 ):
-    """Panel g's time inside a well visit is the per-bin facts' flag: a facts
+    """Panel j's time inside a well visit is the per-bin facts' flag: a facts
     run that records no session cache (made before it did) or another than the
     current one is refused, naming the runs to make again."""
     from continuum_swr_replay.paths import EVENT_BIN_FACTS_DIR
@@ -2426,7 +2427,7 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
     }[problem]
 
     def refuse(*args):
-        raise AssertionError("panel g was drawn from the facts without their check")
+        raise AssertionError("panel j was drawn from the facts without their check")
 
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
     with pytest.raises(ValueError, match=f"{EVENT_BIN_FACTS_DIR}.*{note}") as refused:
@@ -2443,14 +2444,14 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
 def test_figure02_refuses_a_heldout_event_run_not_made_from_the_current_bin_facts(
     offline, tmp_path, monkeypatch
 ):
-    """Panel g draws the held-out event run, whose events' start and time sums
+    """Panel j draws the held-out event run, whose events' start and time sums
     take their well visits from the per-bin facts: a run that recorded another
     facts run than the current one is refused, naming the run to make again."""
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
     _heldout_events_run(tmp_path, facts_sha256="0" * 64)
 
     def refuse(*args):
-        raise AssertionError("panel g was drawn from another facts run's events")
+        raise AssertionError("panel j was drawn from another facts run's events")
 
     monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
     with pytest.raises(

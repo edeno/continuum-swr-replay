@@ -1,6 +1,6 @@
 """The held-out gain panels: a held-out gain per animal and its mean.
 
-Figure 2g (each decoder's gain over the local-only decoder, and the full
+Figure 2j (each decoder's gain over the local-only decoder, and the full
 decoder's over the SWR-only decoder) and Figure 2's supplement
 (``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
 local coding per spike; the full decoder's gain outside SWRs, by distance from
@@ -50,7 +50,7 @@ DOT_SPREAD = 0.05
 group's dots are spread so that each shows (:func:`spread_offsets`)."""
 
 NEUTRAL_DOTS = "#444444"
-"""A dark gray for dots that need no class's color (Figure 2g's differences,
+"""A dark gray for dots that need no class's color (Figure 2j's differences,
 the SWR-only decoder)."""
 
 
@@ -135,7 +135,7 @@ def label_gain_axis(
 
 
 GAIN_FLOOR = 0.13
-"""A gain axis' floor below zero, as a share of its top (Figure 2g, Figure 2's
+"""A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
 supplement, panel b)."""
 
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"

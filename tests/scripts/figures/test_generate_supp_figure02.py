@@ -330,7 +330,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
 def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     monkeypatch, notes, inputs_note, rerun
 ):
-    """Panels b and c are refused as Figure 2g is: from a restriction run off
+    """Panels b and c are refused as Figure 2j is: from a restriction run off
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {

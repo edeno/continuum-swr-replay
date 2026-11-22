@@ -20,7 +20,7 @@ tetrode gain, the gain outside SWRs, and MUA in the No-Spike state.
         ``Processed-Data/event_tetrode_holdout``; the events summary's
         ``*_heldout_*`` values).
 
-    b and c — Figure 2g's main result, the full decoder's gain over the
+    b and c — Figure 2j's main result, the full decoder's gain over the
     SWR-only decoder outside SWRs, looked at more closely. Every value is over
     the immobile bins inside a well visit, which runs from the animal's first
     nose-poke at a reward well to its last poke-out there. Each is per epoch, summed over its bins and
@@ -51,18 +51,18 @@ tetrode gain, the gain outside SWRs, and MUA in the No-Spike state.
         the events are defined, and so describe where the gain sits and do not
         test the events.
 
-    d — Multiunit activity (``MUA_zscore``, as Figure 2i draws it) around the
+    d — Multiunit activity (``MUA_zscore``, as Figure 2g draws it) around the
         start of No-Spike periods: the median over periods with the
         interquartile band, a dotted line at the start and a dashed line at the
         MUA level of immobile time outside the periods
         (``no_spike_periods.level_outside_periods``, each epoch's median, then
-        the median over epochs; Figure 2i's "between events" level is outside
+        the median over epochs; Figure 2g's "between events" level is outside
         every non-local, SWR and MUA event, which does not carry over). A
         period is the non-local events' rule applied to the No-Spike state
         (``no_spike_periods.no_spike_periods``: P(No-Spike) strictly above 0.8
         for at least 7 samples, the animal immobile throughout), wholly outside
         excluded time and starting inside a well visit, read from every
-        analyzed epoch's decode frame in one pass; the windows are panel i's
+        analyzed epoch's decode frame in one pass; the windows are Figure 2g's
         (0.3 s in all, ``triggered_analysis.get_signal_windows``, a window
         that touches excluded time left out). The decoder enters the No-Spike
         state when the decoded tetrodes fall silent, so the fall in their MUA
@@ -73,7 +73,7 @@ and refuses a run not held out in folds of whole trials, as the summary does.
 Panels b and c read the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
-(``reported.events.read_heldout_restriction``), and refuse it, as Figure 2g
+(``reported.events.read_heldout_restriction``), and refuse it, as Figure 2j
 does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
@@ -204,7 +204,7 @@ LETTER_HEIGHT = 0.07
 above the highest drawn top."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
 TRIGGER_WINDOW_S = 0.3
-"""Panel d's window around each start (s, in all), Figure 2i's: the periods
+"""Panel d's window around each start (s, in all), Figure 2g's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
 REFUSED = "Figure 2's supplement: panels b and c are not drawn"
@@ -375,7 +375,7 @@ def draw_outside_swr_series(
 
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     """Panel d: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
-    the median with its interquartile band as Figure 2i draws its rows, a dotted
+    the median with its interquartile band as Figure 2g draws its rows, a dotted
     line at the start and a dashed line at the level outside the periods."""
     t_ms = 1000 * np.asarray(trace["time"])
     ax.fill_between(

@@ -166,7 +166,7 @@ Work that is deferred on purpose. Each item says when it should be done.
 The review of the restriction and held-out tetrode runs before the
 `swr-restricted-models` merge left these on purpose.
 
-- [ ] **Panel 2g's caption or text gives what no figure draws.** From
+- [ ] **Panel 2j's caption or text gives what no figure draws.** From
   `paper/reported/events.json`, over the immobile time inside a well visit (from
   the animal's first nose-poke at a reward well to its last poke-out there): the
   share of the full decoder's gain that the SWR-only decoder captures
@@ -232,8 +232,8 @@ The review of the restriction and held-out tetrode runs before the
   the held-out tetrode run's; the restriction run records no spike count, so the facts'
   spikes elsewhere (the time sums, the held-out events) are not checked.
   *When:* if the restriction run is changed to record its spike counts.
-- [ ] **Figure 2 draws panel g when only the event table changed.** The figure
-  refuses panel g for another restriction run, per-bin facts run or session cache, and
+- [ ] **Figure 2 draws panel j when only the event table changed.** The figure
+  refuses panel j for another restriction run, per-bin facts run or session cache, and
   for a restriction run made from other decode frames or another SWR source
   (`restriction_inputs_note`), but not when only the event table changed (the held-out
   event run's canonical check), while the events summary marks the values pending.

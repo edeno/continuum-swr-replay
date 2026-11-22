@@ -43,7 +43,7 @@ producer. Time and SWRs count only inside a well visit
 (`analysis/event_definition/well_visits.py:in_well_visit`, the visits read from
 the session cache by `analysis/event_tables/prepare_data.py:well_visit_times`):
 the quiet rest of the brain-state reference, of the rest-theta windows and of
-the gamma reference, the immobile time bins of Figure 2j, and the SWRs and other
+the gamma reference, the immobile time bins of Figure 2i, and the SWRs and other
 detectors' events of Figure 2c and 2e, which count when their first sample is
 inside a visit (running, the theta-like benchmark, is the epoch's running
 wherever it is). Each producer re-run over the subset records
@@ -100,7 +100,7 @@ panels.
 | Decoder validation: the 0.8 threshold, state fractions, calibration, triggered averages, event durations | `scripts/figures/generate_supp_decoder_validation.py` | `paper/figures/supp_decoder_validation/` |
 | The companion to Figure 1: the Widloski & Foster sliding-window detector on the same simulated run, and on replays swept over path length and duration | `scripts/figures/generate_supp_figure01.py` | `paper/figures/supp_figure01/` |
 | Slow and fast gamma during SWR and no-SWR events: each animal's level in each kind of event, between quiet-rest and running windows as long as the kind's events (was Figure 3's last panel) | `scripts/figures/generate_supp_figure03.py` | `paper/figures/supp_figure03/` |
-| Figure 2's supplement (S2). a: the held-out tetrode gain over local coding per spike of no-SWR and SWR events (was Figure 2's panel h); b and c, over the immobile time inside a well visit: Figure 2g's gain of the full decoder over the SWR-only decoder outside SWRs, then only farther than 100, 250 and 500 ms from every SWR (b), and where that gain sits in and outside the events detected from the held-out decode (c, a description), each a dot per animal, the animals' mean and its interval (the gain at well-sampled places is a reported value for the text, not drawn); d: MUA around the start of No-Spike periods (the non-local events' rule on the No-Spike state), the median with its interquartile band | `scripts/figures/generate_supp_figure02.py` | `paper/figures/supp_figure02/` |
+| Figure 2's supplement (S2). a: the held-out tetrode gain over local coding per spike of no-SWR and SWR events (was a panel of Figure 2); b and c, over the immobile time inside a well visit: Figure 2j's gain of the full decoder over the SWR-only decoder outside SWRs, then only farther than 100, 250 and 500 ms from every SWR (b), and where that gain sits in and outside the events detected from the held-out decode (c, a description), each a dot per animal, the animals' mean and its interval (the gain at well-sampled places is a reported value for the text, not drawn); d: MUA around the start of No-Spike periods (the non-local events' rule on the No-Spike state), the median with its interquartile band | `scripts/figures/generate_supp_figure02.py` | `paper/figures/supp_figure02/` |
 | The analysis pipeline, as a schematic and as a data flow | `scripts/figures/generate_supp_pipeline_schematic.py`, `scripts/figures/generate_supp_pipeline_data_flow.py` | `paper/figures/qc_diagnosis/` |
 | Examples from each cell of the detector comparison | `scripts/figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` |
 | Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
