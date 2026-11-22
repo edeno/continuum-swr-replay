@@ -675,8 +675,9 @@ def animal_balanced_bootstrap(
     Raises
     ------
     ValueError
-        If no session has a finite value.
+        If no session has a finite value, or a label has missing values.
     """
+    _check_labels({"animal": animal, "day": day})
     values = np.asarray(values, dtype=float)
     finite = np.isfinite(values).all(axis=tuple(range(1, values.ndim)))
     if not finite.any():
@@ -732,6 +733,51 @@ def _day_and_animal_means(
     return day_values, np.bincount(day_animal, day_values) / np.bincount(day_animal)
 
 
+RANK_SIGN_DIGITS = 12
+"""The significant digits, relative to the largest absolute value, that the
+day-level test and the animals' signs read (:func:`_snapped`)."""
+
+
+def _snapped(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Values rounded to :data:`RANK_SIGN_DIGITS` significant digits of the
+    largest absolute value among them.
+
+    The rule behind every rank and sign the session -> day -> animal reduction
+    reports: the day values :func:`day_level_test` ranks, and the animals'
+    values :func:`estimand_summary` compares with the estimate's sign. Means
+    that are equal in exact arithmetic can come out a bit apart, depending on
+    the order of a sum; that makes or breaks a tie of the signed-rank test (and
+    switches scipy between its exact and its approximate p) or gives a zero a
+    sign. A difference below ``10 ** -RANK_SIGN_DIGITS`` of the largest value
+    is below anything the data can mean and far above a sum's rounding error.
+    A value that snaps to zero is zero: a zero difference for the day test,
+    and an animal without the estimate's sign. The estimate, its interval and
+    its draws are not snapped.
+
+    Parameters
+    ----------
+    values : NDArray, shape (n,)
+        Finite values.
+
+    Returns
+    -------
+    NDArray, shape (n,)
+    """
+    scale = float(np.max(np.abs(values))) if values.size else 0.0
+    if scale == 0.0:
+        return values
+    unit = 10.0 ** (np.floor(np.log10(scale)) - (RANK_SIGN_DIGITS - 1))
+    return np.round(values / unit) * unit + 0.0
+
+
+def _check_labels(labels: dict[str, ArrayLike]) -> None:
+    """Refuse a label column with missing values, naming it and how many."""
+    for name, label in labels.items():
+        n_missing = int(pd.isna(np.asarray(label, dtype=object)).sum())
+        if n_missing:
+            raise ValueError(f"the {name} labels have {n_missing} missing values")
+
+
 def _finite_rows(
     values: pd.Series, labels: dict[str, pd.Series]
 ) -> tuple[pd.Series, list[pd.Series]]:
@@ -740,11 +786,12 @@ def _finite_rows(
     Raises
     ------
     ValueError
-        If a label is not indexed as ``values``.
+        If a label is not indexed as ``values``, or has missing values.
     """
     if not all(values.index.equals(s.index) for s in labels.values()):
         names = ", ".join(["values", *labels][:-1]) + f" and {list(labels)[-1]}"
         raise ValueError(f"{names} are not indexed alike")
+    _check_labels(labels)
     finite = np.isfinite(values.to_numpy(dtype=float))
     return values[finite], [s[finite] for s in labels.values()]
 
@@ -780,7 +827,7 @@ def animal_day_session_values(
     Raises
     ------
     ValueError
-        If the labels are not indexed as ``values``.
+        If the labels are not indexed as ``values`` or have missing values.
     """
     values, (animal, day, session) = _finite_rows(
         values, {"animal": animal, "day": day, "session": session}
@@ -803,7 +850,8 @@ def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> floa
     """The signed-rank p over recording days of a per-session number.
 
     Each recording day's value is the mean of its sessions' values; the test
-    is :func:`signed_rank_p` of those day values against zero.
+    is :func:`signed_rank_p` of those day values against zero, read to
+    :data:`RANK_SIGN_DIGITS` significant digits (:func:`_snapped`).
 
     Parameters
     ----------
@@ -823,14 +871,14 @@ def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> floa
     Raises
     ------
     ValueError
-        If the labels are not indexed as ``values``.
+        If the labels are not indexed as ``values`` or have missing values.
     """
     values, (animal, day) = _finite_rows(values, {"animal": animal, "day": day})
     day_values, _ = _day_and_animal_means(
         values.to_numpy(dtype=float),
         *_animal_day_codes(animal.to_numpy(), day.to_numpy()),
     )
-    return signed_rank_p(day_values)
+    return signed_rank_p(_snapped(day_values))
 
 
 def estimand_summary(
@@ -875,15 +923,15 @@ def estimand_summary(
         - ``n_animals``, ``n_days``, ``n_sessions``: those with a finite
           value; every entry is computed on those sessions only.
         - ``n_animals_same_sign``: animals whose own value has the sign of
-          ``estimate`` (zero has its own sign).
-        - ``day_p``: the day-level signed-rank p.
+          ``estimate``; an animal at zero has no sign (:func:`_snapped`).
+        - ``day_p``: the day-level signed-rank p (:func:`day_level_test`).
         - ``n_draws``, ``seed``: the bootstrap's.
 
     Raises
     ------
     ValueError
         If no session has a finite value, a session has more than one value,
-        or the labels are not indexed as ``values``.
+        or the labels are not indexed as ``values`` or have missing values.
     """
     values, (animal, day, session) = _finite_rows(
         values, {"animal": animal, "day": day, "session": session}
@@ -902,6 +950,7 @@ def estimand_summary(
     )
     estimate = float(estimate[0, 0])
     interval = bootstrap_interval(estimate, draws[:, 0], animal_values.size)
+    animal_signs = np.sign(_snapped(animal_values))
     return {
         "estimate": estimate,
         "low": interval.low,
@@ -910,8 +959,10 @@ def estimand_summary(
         "n_animals": animal_values.size,
         "n_days": day_values.size,
         "n_sessions": session_values.size,
-        "n_animals_same_sign": int((np.sign(animal_values) == np.sign(estimate)).sum()),
-        "day_p": signed_rank_p(day_values),
+        "n_animals_same_sign": int(
+            ((animal_signs != 0) & (animal_signs == np.sign(estimate))).sum()
+        ),
+        "day_p": signed_rank_p(_snapped(day_values)),
         "n_draws": n_draws,
         "seed": seed,
     }

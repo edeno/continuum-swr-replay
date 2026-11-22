@@ -615,7 +615,11 @@ little.
 interval (`bootstrap_interval` over the nested draws), the number of animals whose own
 value has the estimate's sign, and the signed-rank p over recording days. The day and
 animal values behind the last two are the same means as the estimate's, and
-`animal_day_session_values` and `day_level_test` give them alone. A kind difference is
+`animal_day_session_values` and `day_level_test` give them alone. The day test and the
+animals' signs read those means to 12 significant digits of the largest of them, so that
+a tie or a zero does not depend on the order of a sum (the rule is stated in
+`_snapped`); an animal at zero does not count as having the estimate's sign. A missing
+animal, day or session label is refused. A kind difference is
 the difference of the two kinds' session estimates, reduced the same way. With five
 animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
 alone.
