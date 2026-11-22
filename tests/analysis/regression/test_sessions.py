@@ -638,3 +638,25 @@ def test_an_unpenalized_term_leaves_whole() -> None:
     )
     alone = fit_at_penalties(GroupedSoftmax(), [data], [], [])
     np.testing.assert_array_equal(record.coef, alone.sessions[0].fit.beta)
+
+
+def test_an_offset_needs_the_poisson_likelihood(
+    rate_sessions, content_sessions
+) -> None:
+    """An Offset term is refused under any other likelihood: a Bernoulli on
+    the rate rows, a grouped softmax on the content rows."""
+    from continuum_swr_replay.analysis.regression.likelihoods import Bernoulli
+
+    rates = {k: r.assign(y=(r["count"] > 0) * 1.0) for k, r in rate_sessions.items()}
+    design = _rate_design(pd.concat(rates.values(), ignore_index=True))
+    with pytest.raises(ValueError, match="an Offset term needs the Poisson"):
+        _fit(design, rates, Bernoulli(), response="y", unit="well_visit_id")
+
+    content = {k: r.assign(exposure=1.0) for k, r in content_sessions.items()}
+    design = build_design(
+        [ROLE, Offset("exposure")],
+        pd.concat(content.values(), ignore_index=True),
+        intercept=False,
+    )
+    with pytest.raises(ValueError, match="an Offset term needs the Poisson"):
+        _fit(design, content, GroupedSoftmax(), response="share", unit="event_id")
