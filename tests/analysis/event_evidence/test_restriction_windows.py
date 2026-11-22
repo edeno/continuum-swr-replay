@@ -136,6 +136,11 @@ def test_the_outside_swr_rule_is_the_category_where_detection_was_observed():
     )
     with pytest.raises(ValueError, match="one value per bin"):
         rw.outside_swr_bins(category, [True])
+    # the bins left out: the category outside SWRs where it was not observed
+    np.testing.assert_array_equal(
+        rw.not_observed_outside_swr_bins(category, [True, False, False, False]),
+        [False, True, False, False],
+    )
 
 
 def test_facts_without_the_observed_flag_are_refused():

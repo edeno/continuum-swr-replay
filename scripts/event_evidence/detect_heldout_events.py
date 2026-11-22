@@ -98,7 +98,6 @@ from continuum_swr_replay.analysis.event_evidence import heldout_events as he
 from continuum_swr_replay.analysis.event_evidence import restriction_totals as rt
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
-    IMMOBILE_OUTSIDE_SWR,
     STATE_PROBABILITY_COLUMNS,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
@@ -322,9 +321,9 @@ def run_epoch(
     time_sums.insert(0, "epoch_id", epoch_id)
     write_table(time_sums, output_path(epoch_id, output, HELDOUT_TIME_SUMS_NAME))
     not_observed = rt.outside_swr_not_observed_counts(time_sums)
-    left_out = (time_sums["category"] == IMMOBILE_OUTSIDE_SWR) & ~time_sums[
-        "swr_observed"
-    ].astype(bool)
+    left_out = rw.not_observed_outside_swr_bins(
+        time_sums["category"], time_sums["swr_observed"]
+    )
 
     return json_ready(
         {

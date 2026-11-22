@@ -273,12 +273,7 @@ def test_the_gain_outside_swrs_leaves_out_bins_where_detection_was_not_observed(
     assert epochs.loc[0, "gain_per_spike"] == pytest.approx(21 / 6)
     assert epochs.loc[0, "gain_per_s"] == pytest.approx(21 / 0.6)
     counts = rt.outside_swr_not_observed_counts(sums)
-    assert counts == {
-        "n_bins": 1,
-        "n_epochs": 1,
-        "n_bins_outside_swr": 6,
-        "n_epochs_total": 1,
-    }
+    assert counts == {"n_bins": 1, "n_epochs": 1}
     # all immobile time keeps it: bins 0-7, 28 nats
     immobile = rt.epoch_immobile_gains(sums, pd.Series({"a1": 0.1}))
     assert immobile.loc[0, "n_bins"] == 8
@@ -328,17 +323,39 @@ def test_subset_statistics_have_a_row_per_part_family_and_measure():
     )
     n_parts = len(rt.OUTSIDE_SWR_MARGINS_S) + len(rt.PLACE_SAMPLING_THRESHOLDS_S)
     assert len(stats) == n_parts * 2 * len(rt.SUBSET_MEASURES)
+    assert "share_of_bins" not in set(stats["measure"])
     key = stats.set_index(["subset", "threshold_s", "family", "measure"])
     row = key.loc[("beyond_swr_margin", 0.25, "filter", "gain_per_spike")]
     # a: mean of bins 3-6 = 4.5; b: -4.5
     np.testing.assert_allclose(row["animals"], [4.5, -4.5])
     assert row["estimate"] == pytest.approx(0.0)
     assert row["n_epochs"] == 2 and row["n_epochs_positive"] == 1
-    share = key.loc[("place_sampling", 60.0, "filter", "share_of_bins")]
+    shares = rt.outside_swr_subset_shares(sums, pd.Series({"a1": 0.1, "b1": 0.1}))
+    assert len(shares) == n_parts
+    share = shares.loc[("place_sampling", 60.0)]
+    # bins 4-6 of 6 in both epochs: each animal 0.5
     assert share["estimate"] == pytest.approx(0.5)
+    assert share["animal_min"] == pytest.approx(0.5)
+    assert share["n_animals"] == 2 and share["n_epochs"] == 2
 
 
 def test_time_sums_of_the_earlier_design_are_refused():
     earlier = _time_sums().drop(columns=["swr_observed"])
     with pytest.raises(ValueError, match="made before"):
         rt.epoch_outside_swr_gains(earlier, _bin_s(), _windows())
+
+
+def test_subset_shares_are_the_mean_over_animals_of_their_epoch_medians():
+    """a1 keeps bins 3-6 of 1-6 beyond 0.25 s (2 bins); b1 has the scoring
+    mask at bins 0 and 7, so only bins 3 and 4 are more than 2 bins from it:
+    animals 4/6 and 2/6, no bootstrap."""
+    bins, facts, windows = _keyed_bins()
+    bins["in_swr"] = np.isin(np.arange(8), [0, 7])
+    other = rt.restriction_time_sums(bins, facts, windows)
+    sums = pd.concat(
+        [_keyed_sums(), other.assign(epoch_id="b1", animal="b")], ignore_index=True
+    )
+    shares = rt.outside_swr_subset_shares(sums, pd.Series({"a1": 0.1, "b1": 0.1}))
+    share = shares.loc[("beyond_swr_margin", 0.25)]
+    assert share["estimate"] == pytest.approx((4 / 6 + 2 / 6) / 2)
+    assert share["animal_min"] == pytest.approx(2 / 6)

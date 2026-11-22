@@ -177,6 +177,28 @@ def outside_swr_bins(category: ArrayLike, swr_observed: ArrayLike) -> NDArray[np
     return (category == IMMOBILE_OUTSIDE_SWR) & swr_observed
 
 
+def not_observed_outside_swr_bins(
+    category: ArrayLike, swr_observed: ArrayLike
+) -> NDArray[np.bool_]:
+    """Which bins (or rows of sums keyed by both) :func:`outside_swr_bins`
+    leaves out: in the category ``immobile_outside_swr`` where SWR detection was
+    not observed.
+
+    Parameters
+    ----------
+    category, swr_observed : array_like, shape (n,)
+        As :func:`outside_swr_bins` takes them.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n,)
+    """
+    category = np.asarray(category).astype(str)
+    return (category == IMMOBILE_OUTSIDE_SWR) & ~outside_swr_bins(
+        category, swr_observed
+    )
+
+
 def restriction_window_sums(
     bins: pd.DataFrame, windows: pd.DataFrame, *, swr_observed: ArrayLike
 ) -> pd.DataFrame:
@@ -232,8 +254,9 @@ def restriction_window_sums(
         "n_bins_immobile": np.isin(category, [IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR]),
         "n_bins_excluded": category == "excluded",
         "n_bins_not_finite": ~finite.all(axis=1),
-        "n_bins_outside_swr_not_observed": (category == IMMOBILE_OUTSIDE_SWR)
-        & ~outside,
+        "n_bins_outside_swr_not_observed": not_observed_outside_swr_bins(
+            every_category, swr_observed
+        )[rows],
         "n_bins_outside_swr": outside,
     }
     # every bin, then the bins outside SWRs only: the bins with a score not

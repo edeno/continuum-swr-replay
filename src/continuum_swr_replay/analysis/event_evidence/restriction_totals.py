@@ -110,6 +110,7 @@ from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     WINDOW_BIN_COLUMNS,
     _check_facts_time,
     _window_bounds,
+    not_observed_outside_swr_bins,
     outside_swr_bins,
     restriction_window_statistics,
 )
@@ -117,6 +118,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
     SWR_LABELS,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_rows
+from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.intervals import sample_step
 
 OUTSIDE_SWR_MARGINS_S = (0.1, 0.25, 0.5)
@@ -154,7 +156,7 @@ MEASURES = (
 """The per-epoch measures of each family over the immobile time outside SWRs,
 by their column stem (:func:`epoch_outside_swr_gains`)."""
 
-SUBSET_MEASURES = ("gain_per_spike", "gain_per_s", "share_of_bins")
+SUBSET_MEASURES = ("gain_per_spike", "gain_per_s")
 """The per-epoch measures of each family over a part of the time outside SWRs,
 by their column stem (:func:`epoch_outside_swr_subset_gains`)."""
 
@@ -557,7 +559,8 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
 
 def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
     """The immobile bins outside every SWR of the source, inside a well visit,
-    where SWR detection was not observed: left out of every sum outside SWRs.
+    where SWR detection was not observed: left out of every sum outside SWRs
+    (:func:`.restriction_windows.not_observed_outside_swr_bins`).
 
     Parameters
     ----------
@@ -568,9 +571,8 @@ def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
     Returns
     -------
     dict
-        ``n_bins`` (those bins over the cohort), ``n_epochs`` (epochs with at
-        least one), ``n_bins_outside_swr`` (the bins outside SWRs inside a well
-        visit, which the sums keep) and ``n_epochs_total``.
+        ``n_bins`` (those bins over the cohort) and ``n_epochs`` (epochs with
+        at least one).
 
     Raises
     ------
@@ -578,17 +580,11 @@ def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
         If the time sums are of an earlier design (:data:`TIME_SUM_KEYS`).
     """
     _check_time_sums(time_sums, None)
-    left_out = (time_sums["category"] == IMMOBILE_OUTSIDE_SWR).to_numpy() & ~time_sums[
-        "swr_observed"
-    ].to_numpy(bool)
+    left_out = not_observed_outside_swr_bins(
+        time_sums["category"], time_sums["swr_observed"]
+    )
     by_epoch = _chosen_time(time_sums, left_out)["n_bins"]
-    kept = _chosen_time(time_sums, _outside_swr_rows(time_sums))["n_bins"]
-    return {
-        "n_bins": int(by_epoch.sum()),
-        "n_epochs": int((by_epoch > 0).sum()),
-        "n_bins_outside_swr": int(kept.sum()),
-        "n_epochs_total": len(by_epoch),
-    }
+    return {"n_bins": int(by_epoch.sum()), "n_epochs": int((by_epoch > 0).sum())}
 
 
 def epoch_outside_swr_subset_gains(
@@ -623,9 +619,9 @@ def epoch_outside_swr_subset_gains(
         ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds`` of
         the kept bins, and for each family (suffix ``""`` for the filter score,
         ``"_two_sided"``): ``full_minus_swr`` (nats), ``gain_per_spike``,
-        ``gain_per_s`` (NaN without spikes or bins) and ``share_of_bins``
+        ``gain_per_s`` (NaN without spikes or bins); and ``share_of_bins``
         (kept bins over every bin outside SWRs inside a well visit, NaN
-        without such bins; the same in both families).
+        without such bins; one for both families).
 
     Raises
     ------
@@ -654,13 +650,12 @@ def epoch_outside_swr_subset_gains(
             "seconds": kept["n_bins"].to_numpy() * step,
         }
     )
-    share = list(map(ratio_or_nan, kept["n_bins"], every["n_bins"]))
+    out["share_of_bins"] = list(map(ratio_or_nan, kept["n_bins"], every["n_bins"]))
     for suffix in FAMILY_SUFFIX.values():
         gain = (kept[f"full{suffix}"] - kept[f"swr{suffix}"]).to_numpy()
         out[f"full_minus_swr{suffix}"] = gain
         out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
         out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
-        out[f"share_of_bins{suffix}"] = share
     return out
 
 
@@ -700,6 +695,54 @@ def outside_swr_subset_statistics(
             table.insert(0, "subset", subset)
             parts.append(table)
     return pd.concat(parts, ignore_index=True)
+
+
+def outside_swr_subset_shares(
+    time_sums: pd.DataFrame, bin_s: pd.Series
+) -> pd.DataFrame:
+    """Each part of the time outside SWRs (:data:`SUBSETS`): the share of the
+    bins outside SWRs inside a well visit it keeps, over the cohort, with no
+    interval.
+
+    The share is the same in both score families, and it is a description of
+    the part, not an effect: an animal's value is the median over its epochs
+    (``shared_statistics.animal_session_values``), the estimate the mean over
+    animals, and the lowest animal's value is given beside it. (A t interval
+    of a share near 1 can pass 1.)
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``subset`` and ``threshold_s``: ``estimate``,
+        ``animal_min``, ``n_animals`` and ``n_epochs`` (epochs with a share).
+    """
+    rows = []
+    for subset, (key, thresholds) in SUBSETS.items():
+        for threshold in thresholds:
+            epochs = epoch_outside_swr_subset_gains(
+                time_sums, bin_s, **{key: threshold}
+            )
+            per_animal = animal_session_values(
+                epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
+            )
+            rows.append(
+                {
+                    "subset": subset,
+                    "threshold_s": threshold,
+                    "estimate": float(per_animal.mean()),
+                    "animal_min": float(per_animal.min()),
+                    "n_animals": len(per_animal),
+                    "n_epochs": int(epochs["share_of_bins"].notna().sum()),
+                }
+            )
+    return pd.DataFrame(rows).set_index(["subset", "threshold_s"])
 
 
 def outside_swr_gain_statistics(
