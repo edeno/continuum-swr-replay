@@ -686,6 +686,32 @@ def test_animal_class_medians_give_each_animal_s_median_of_each_class():
     assert np.isnan(stats.animal_class_medians(no_swr, "extent").loc["c", "swr"])
 
 
+def test_class_median_rows_hold_the_medians_their_interval_and_the_animals():
+    """Per class: the pooled median, the stored bootstrap interval of it, and
+    each animal's median (an animal without the class left out)."""
+    intervals = pd.Series(
+        {
+            "median_non_swr_low": 1.0,
+            "median_non_swr_high": 5.0,
+            "median_swr_low": 4.5,
+            "median_swr_high": 8.0,
+        }
+    )
+    events = _property_events()
+    events = events[~((events.animal == "c") & events.is_swr)]
+    rows = stats.class_median_rows(events, "extent", intervals)
+    assert list(rows.index) == ["no SWR", "SWR"]
+    # non-SWR: 1, 1, 3, 7, 8; SWR (no c): 4, 5, 7
+    assert rows.loc["no SWR", "estimate"] == 3.0
+    assert rows.loc["SWR", "estimate"] == 5.0
+    assert (rows.loc["no SWR", "ci_low"], rows.loc["no SWR", "ci_high"]) == (1.0, 5.0)
+    assert (rows.loc["SWR", "ci_low"], rows.loc["SWR", "ci_high"]) == (4.5, 8.0)
+    np.testing.assert_array_equal(rows.loc["no SWR", "animals"], [2.0, 8.0, 1.0, 7.0])
+    assert list(rows.loc["no SWR", "animal_names"]) == ["a", "b", "c", "d"]
+    np.testing.assert_array_equal(rows.loc["SWR", "animals"], [5.0, 4.0, 7.0])
+    assert list(rows.loc["SWR", "animal_names"]) == ["a", "b", "d"]
+
+
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():
     events = _property_events()
     # a: 2 < 5; b: 8 > 4; c: 1 < 9; d: 7 against 7, in neither direction

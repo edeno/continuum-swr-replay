@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
 the order the text cites them: MUA in the No-Spike state, the timing of events
-against their SWRs, the held-out tetrode gain, shared content, and the gain
-outside SWRs away from the SWRs.
+against their SWRs, the held-out tetrode gain, shared content, the gain
+outside SWRs away from the SWRs, and the posterior's spread.
 
     a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
@@ -102,6 +102,19 @@ outside SWRs away from the SWRs.
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
+    f — Supports Figure 2's case that the no-SWR events are specific: how
+        concentrated the decoded position is, no-SWR against SWR events. Each
+        event's HPD coverage is the mean over its bins of the length of track
+        (cm) covered by the 95 % highest-posterior-density region of the
+        position posterior (``hpd_coverage_cm`` of the canonical event table,
+        the per-bin ``hpd`` of the decode frames). A dot per animal (its
+        median, event -> epoch -> animal) and, beside them, the pooled median
+        with its 95 % interval from the property bootstrap
+        (``event_statistics.class_median_rows``;
+        ``Processed-Data/event_property_bootstrap``; the events summary's
+        ``hpd_*`` values). The pooled median and the animals' medians differ,
+        as the animals hold different numbers of events.
+
 Panels c and d read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
 Panel e reads the held-out event run
@@ -144,6 +157,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_events_in,
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
     level_outside_periods,
@@ -172,6 +186,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TIMING_CLASSES,
     boundary_offsets,
     boundary_timing_statistics,
+    class_median_rows,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     get_signal_windows,
@@ -186,6 +201,7 @@ from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.paths import TETRODE_HOLDOUT_NAME, processed_data_dir
 from continuum_swr_replay.reported.events import (
     default_inputs,
+    event_table_staleness,
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
@@ -198,6 +214,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_YLABEL,
     GAIN_FLOOR,
     GROUP_COLORS,
+    HELDOUT_X,
     MEAN_OFFSET,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
@@ -249,6 +266,9 @@ TIMING_CMAP = "bone_r"
 """Panel b's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
 SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
+HPD_YLABEL = "95 % HPD region\n(cm, event mean)"
+"""The HPD panel's y label: each event's mean over its bins of the length of
+track the 95 % highest-posterior-density region covers."""
 SHARED_OFFSET = 0.2
 """Panel d: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
@@ -267,12 +287,13 @@ PANELS = (
     "heldout_gain",
     "shared_content",
     "outside_distance",
+    "hpd",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
     ((0.6, 0.9), ("no_spike_mua", "boundary_timing", "heldout_gain")),
-    ((0.155, 0.41), ("shared_content", "outside_distance")),
+    ((0.155, 0.41), ("shared_content", "outside_distance", "hpd")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
@@ -281,7 +302,8 @@ FRAMES = {
     "boundary_timing": (0.4, 0.18),
     "heldout_gain": (0.73, 0.1),
     "shared_content": (0.075, 0.36),
-    "outside_distance": (0.6, 0.3),
+    "outside_distance": (0.53, 0.25),
+    "hpd": (0.9, 0.09),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -358,6 +380,7 @@ def read_inputs() -> dict:
             raise ValueError(f"{REFUSED}: {cause}. Rerun {RERUN[name]}.")
     windows = window_scores(selected)
     return {
+        "hpd": read_hpd(events, inputs.property_bootstrap, inputs.event_table),
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
         ),
@@ -371,6 +394,32 @@ def read_inputs() -> dict:
         ).set_index(["subset", "threshold_s", "family", "measure"]),
         "no_spike": read_no_spike_trace(),
     }
+
+
+def read_hpd(events: pd.DataFrame, bootstrap: Path, event_table: Path) -> pd.DataFrame:
+    """The HPD panel's rows (``event_statistics.class_median_rows``): each
+    animal's median HPD coverage of the selected events by class, the pooled
+    medians and the property bootstrap's intervals of them, as the events
+    summary reads them.
+
+    Raises
+    ------
+    ValueError
+        If the bootstrap was not made from the current event table over the
+        analyses' subset (the summary marks its values pending).
+    """
+    manifest = read_output_manifest(bootstrap)
+    for reason in (
+        event_table_staleness(manifest, sha256_file(event_table), rel(bootstrap)),
+        subset_staleness(manifest, rel(bootstrap)),
+    ):
+        if reason is not None:
+            raise ValueError(
+                f"Figure 2's supplement: panel {LETTERS['hpd']} is not drawn: "
+                f"{reason}. Rerun scripts/event_properties/bootstrap_event_properties.py."
+            )
+    intervals = pd.read_csv(bootstrap / "intervals.csv", index_col=0)
+    return class_median_rows(events, "hpd_coverage_cm", intervals.loc["hpd"])
 
 
 def read_no_spike_trace() -> dict:
@@ -552,6 +601,18 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
+def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
+    """The HPD panel: no-SWR and SWR events in their colors, a dot per animal
+    (its median) and, beside them, the pooled median with its 95 % interval in
+    black (``rows``: :func:`read_hpd`)."""
+    for group, color in GROUP_COLORS.items():
+        draw_animal_gain(ax, HELDOUT_X[group], rows.loc[group], color)
+    ax.set_xlim(-0.6, 1.6)
+    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
+    ax.set_ylabel(HPD_YLABEL)
+    ax.set_title("Posterior spread", fontsize=SMALL_SIZE, pad=3)
+
+
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     """Panel a: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
     the median with its interquartile band as Figure 2g draws its rows, a dotted
@@ -591,6 +652,7 @@ def generate_figure(statistics: dict) -> Figure:
         "beyond_swr_margin", OUTSIDE_SWR_MARGINS_S,
         [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
     )  # fmt: skip
+    draw_hpd(axes["hpd"], statistics["hpd"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge

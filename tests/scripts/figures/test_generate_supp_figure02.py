@@ -108,8 +108,31 @@ def _timing() -> pd.DataFrame:
     )  # fmt: skip
 
 
+HPD = {
+    "no SWR": [33.0, 67.0, 94.0, 44.0, 89.0],
+    "SWR": [123.0, 119.0, 82.0, 90.0, 124.0],
+}
+
+
+def _hpd() -> pd.DataFrame:
+    """``class_median_rows``' two rows: pooled medians 47 and 82, intervals
+    20 either side, the animals of :data:`HPD`."""
+    return pd.DataFrame.from_dict(
+        {
+            group: {
+                "estimate": estimate, "ci_low": estimate - 20.0,
+                "ci_high": estimate + 20.0, "animals": np.array(HPD[group]),
+                "animal_names": np.array(list("abcde")),
+            }
+            for group, estimate in (("no SWR", 47.0), ("SWR", 82.0))
+        },
+        orient="index",
+    )  # fmt: skip
+
+
 def _statistics() -> dict:
     return {
+        "hpd": _hpd(),
         "timing": _timing(),
         "tetrode": _gain_statistics([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7]),
         "shared": _shared_statistics(),
@@ -125,7 +148,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters at one left edge, no heading."""
     assert figure.PANELS == (
         "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
-        "outside_distance",
+        "outside_distance", "hpd",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
@@ -139,9 +162,9 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcde")
+    assert sorted(letters) == list("abcdef")
     assert len({letters[k][1] for k in "abc"}) == 1
-    assert len({letters[k][1] for k in "de"}) == 1
+    assert len({letters[k][1] for k in "def"}) == 1
     assert letters["a"][1] > letters["d"][1]
     assert letters["a"][0] == letters["d"][0]
     assert "Immobile, at wells" not in [
@@ -276,6 +299,27 @@ def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
     plt.close(fig)
 
 
+def test_the_hpd_panel_draws_each_animals_median_and_the_pooled_median():
+    """No SWR and SWR in their colors: a dot per animal, the pooled median
+    with its interval in black beside them, a y label in cm that says what the
+    length is, and no zero line (a length, not a gain)."""
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[figure.PANELS.index("hpd")]
+    for x, group in enumerate(("no SWR", "SWR")):
+        (dots,) = [
+            c for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.allclose(c.get_offsets()[:, 0], x)
+        ]  # fmt: skip
+        np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(HPD[group]))
+        assert np.allclose(_means_at(ax, x), _hpd().loc[group, "estimate"])
+    assert ax.get_ylabel() == figure.HPD_YLABEL
+    assert "95 % HPD" in ax.get_ylabel() and "cm" in ax.get_ylabel()
+    assert not any(np.allclose(line.get_ydata(), 0) for line in ax.lines)
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    plt.close(fig)
+
+
 def test_panel_a_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
@@ -346,8 +390,8 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
 
 
 def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
-    """Values tagged ``S2`` (by panel, ``S2b`` to ``S2e``) name this script."""
-    assert FIGURES["S2"].panels == "abcde"
+    """Values tagged ``S2`` (by panel, ``S2b`` to ``S2f``) name this script."""
+    assert FIGURES["S2"].panels == "abcdef"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -388,6 +432,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             {"family": ["filter"], "measure": ["gain_per_spike"]}
         ),
         "read_no_spike_trace": lambda: "trace",
+        "read_hpd": lambda events, bootstrap, table: seen.setdefault("hpd", events),
         "outside_swr_subset_statistics": lambda sums, bin_s: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
@@ -421,7 +466,9 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert list(seen["tetrode"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
+    assert seen["hpd"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
+        "hpd",
         "timing",
         "tetrode",
         "shared",
@@ -490,3 +537,16 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     monkeypatch.setattr(figure, "read_swr_table", read_swr_table)
     with pytest.raises(ValueError, match=message):
         figure.read_inputs()
+
+
+def test_the_hpd_panel_refuses_a_bootstrap_off_the_subset(monkeypatch, tmp_path):
+    """A property bootstrap not over the analyses' subset is refused, as the
+    events summary marks its values pending."""
+    monkeypatch.setattr(figure, "read_output_manifest", lambda folder: {})
+    monkeypatch.setattr(figure, "sha256_file", lambda path: "0" * 64)
+    monkeypatch.setattr(figure, "event_table_staleness", lambda m, sha, what: None)
+    monkeypatch.setattr(
+        figure, "subset_staleness", lambda manifest, what: "made over other events"
+    )
+    with pytest.raises(ValueError, match="panel f is not drawn: made over other"):
+        figure.read_hpd(pd.DataFrame(), tmp_path, tmp_path / "table.parquet")

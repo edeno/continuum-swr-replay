@@ -114,6 +114,7 @@ OTHER_BUILDERS = (
     "gamma_db_values",
     "other_detector_values",
     "nonlocal_found_values",
+    "hpd_interval_values",
     "detector_visit_values",
     "spike_evidence_values",
     "spike_evidence_visit_values",
@@ -611,11 +612,15 @@ PENDING_CASES = [
         ("event_table", {"sha256": "old"}),
         {"rest_theta", "start_distance"},
     ),
-    (EVENT_PROPERTY_BOOTSTRAP_DIR, ("subset", None), {"property_interval"}),
+    (
+        EVENT_PROPERTY_BOOTSTRAP_DIR,
+        ("subset", None),
+        {"property_interval", "hpd_interval"},
+    ),
     (
         EVENT_PROPERTY_BOOTSTRAP_DIR,
         ("event_table", {"sha256": "old"}),
-        {"property_interval"},
+        {"property_interval", "hpd_interval"},
     ),
     (BRAIN_STATE_REFERENCE_DIR, ("subset", None), {"brain_state", "gamma_z"}),
     (

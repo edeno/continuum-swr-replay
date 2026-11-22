@@ -673,6 +673,46 @@ def test_property_values_name_each_property_class_and_direction():
     assert values["extent_animals_in_direction"].value == 1
 
 
+def test_hpd_values_are_the_hpd_panels_medians_and_their_intervals():
+    """The HPD panel's class medians' intervals (the property bootstrap's),
+    from the function the panel draws with; every HPD value carries the
+    panel's tag."""
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b"],
+            "session_date": "d1",
+            "epoch": "e1",
+            "is_swr": [False, True, False, True],
+            "hpd_coverage_cm": [10.0, 30.0, 20.0, 40.0],
+        }
+    )
+    intervals = pd.Series(
+        {
+            "median_non_swr_low": 5.0,
+            "median_non_swr_high": 25.0,
+            "median_swr_low": 25.0,
+            "median_swr_high": 45.0,
+        }
+    )
+    values = _by_key(
+        builder.hpd_interval_values(events, intervals.to_frame("hpd").T, "s")
+    )
+    assert {k: v.value for k, v in values.items()} == {
+        "hpd_median_non_swr_ci_low": 5.0,
+        "hpd_median_non_swr_ci_high": 25.0,
+        "hpd_median_swr_ci_low": 25.0,
+        "hpd_median_swr_ci_high": 45.0,
+    }
+    for value in values.values():
+        assert (
+            value.questions == ("2d.5",)
+            and value.figures == builder.TAGS["hpd"].figures
+        )
+        assert value.unit == "cm"
+    (hpd,) = [p for p in builder._PROPERTIES if p[0] == "hpd"]
+    assert hpd[6] == builder.TAGS["hpd"]
+
+
 def test_property_interval_values_name_each_bound():
     rows = {}
     for i, (word, *_) in enumerate(builder._PROPERTIES):

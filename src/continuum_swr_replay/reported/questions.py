@@ -124,7 +124,7 @@ FIGURES: dict[str, Figure] = {
         "held-out tetrode gain over local coding, shared content by the spread of "
         "the other tetrodes' estimate, and the gain outside SWRs away from the SWRs",
         "scripts/figures/generate_supp_figure02.py",
-        "abcde",
+        "abcdef",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -306,6 +306,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.5",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
+        figures=("S2f",),
+        note="Figure 2's supplement, panel S2f, draws the HPD coverage (the hpd_* values): each animal's median of each class, and the pooled median with the property bootstrap's interval.",
     ),
     Question(
         "2d.6",

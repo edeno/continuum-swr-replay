@@ -360,7 +360,7 @@ def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tag
 
 def test_a_question_with_no_figure_shows_no_figures_line():
     view = emit.questions_view({})
-    question_2d_5 = view.split("### 2d.5. ")[1].split("\n\n")[1]
+    question_2d_4 = view.split("### 2d.4. ")[1].split("\n\n")[1]
     assert (
-        question_2d_5.startswith("Status: computed.") and "Figures" not in question_2d_5
+        question_2d_4.startswith("Status: computed.") and "Figures" not in question_2d_4
     )

@@ -1116,6 +1116,47 @@ def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
     )
 
 
+def class_median_rows(
+    events: pd.DataFrame, column: str, intervals: pd.Series
+) -> pd.DataFrame:
+    """A per-event property by class, as a figure draws it: the pooled median
+    (:func:`class_medians`), its 95 % interval from the property bootstrap
+    (``scripts/event_properties/bootstrap_event_properties.py``, its
+    ``intervals.csv`` row of the property) and each animal's median
+    (:func:`animal_class_medians`).
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        As :func:`animal_class_medians` takes them.
+    column : str
+        The property.
+    intervals : pd.Series
+        The bootstrap's row of the property: ``median_non_swr_low``,
+        ``median_non_swr_high``, ``median_swr_low`` and ``median_swr_high``.
+
+    Returns
+    -------
+    rows : pd.DataFrame, shape (2, 5)
+        Indexed by group (``"no SWR"``, ``"SWR"``): ``estimate``, ``ci_low``,
+        ``ci_high``, ``animals`` (the animals with the class, sorted) and
+        ``animal_names``.
+    """
+    medians = class_medians(events, column)
+    animals = animal_class_medians(events, column)
+    rows = {}
+    for group, word in (("no SWR", "non_swr"), ("SWR", "swr")):
+        known = animals[word].dropna()
+        rows[group] = {
+            "estimate": medians[f"median_{word}"],
+            "ci_low": float(intervals[f"median_{word}_low"]),
+            "ci_high": float(intervals[f"median_{word}_high"]),
+            "animals": known.to_numpy(),
+            "animal_names": known.index.to_numpy(),
+        }
+    return pd.DataFrame.from_dict(rows, orient="index")
+
+
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:
     """The animals whose own non-SWR median of a per-event property is
     ``direction`` than their SWR median.

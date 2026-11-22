@@ -291,6 +291,7 @@ TAGS = {
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
+    "hpd": Tags(("2d.5",), ("S2f",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
 }
@@ -3415,7 +3416,7 @@ _PROPERTIES = (
         "higher",
         TAGS["certainty"],
     ),
-    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", TAGS["certainty"]),
+    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", TAGS["hpd"]),
     (
         "pause",
         "pause_fraction",
@@ -3551,6 +3552,45 @@ def _class_median_values(
             "median, each the median over the animal's epochs of the epoch's median",
         ),
     ]
+
+
+def hpd_interval_values(
+    events: pd.DataFrame, intervals: pd.DataFrame, source: str
+) -> list[Value]:
+    """Question 2d.5 and the HPD panel of Figure 2's supplement: the 95 %
+    interval of each class's median HPD coverage, the property bootstrap's
+    (``event_statistics.class_median_rows``, which the panel draws; the
+    medians themselves are :func:`property_values`'; ``intervals``: the
+    bootstrap's ``intervals.csv``, indexed by property)."""
+    make = value_factory(hpd_interval_values, source, TAGS["hpd"])
+    rows = event_statistics.class_median_rows(
+        events, "hpd_coverage_cm", intervals.loc["hpd"]
+    )
+    values = []
+    for group, word in (("no SWR", "non_swr"), ("SWR", "swr")):
+        events_name = "non-SWR" if word == "non_swr" else "SWR-overlapping"
+        values += [
+            make(
+                f"hpd_median_{word}_ci_low",
+                rows.loc[group, "ci_low"],
+                "quantity",
+                "sig2",
+                f"lower bound of the 95 % interval of the median "
+                f"{_PROPERTY_NAMES['hpd']} of immobile {events_name} non-local "
+                "events (nested bootstrap of the animals, their epochs and their "
+                "events, small-sample t correction over the animals)",
+                "cm",
+            ),
+            make(
+                f"hpd_median_{word}_ci_high",
+                rows.loc[group, "ci_high"],
+                "quantity",
+                "sig2",
+                "upper bound of that interval",
+                "cm",
+            ),
+        ]
+    return values
 
 
 def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value]:
@@ -3943,6 +3983,22 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     intervals,
                     f"{rel(inputs.property_bootstrap)} "
                     "(scripts/event_properties/bootstrap_event_properties.py)",
+                ),
+                stale(inputs.property_bootstrap),
+                off_subset(inputs.property_bootstrap),
+            ),
+            EVENTS_SUBSET,
+        )
+    )
+    summary.add(
+        *over(
+            pend(
+                hpd_interval_values(
+                    events,
+                    intervals,
+                    f"{rel(inputs.property_bootstrap)} "
+                    "(scripts/event_properties/bootstrap_event_properties.py) and "
+                    f"{rel(inputs.event_table)} (canonical event table)",
                 ),
                 stale(inputs.property_bootstrap),
                 off_subset(inputs.property_bootstrap),
