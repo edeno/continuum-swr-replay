@@ -494,8 +494,8 @@ FRAMES = {
     "boundary_timing": (0.66, 0.32),
     "nonlocal_mua": (0.075, 0.13),
     "heldout_gain": (0.305, 0.19),
-    "hpd": (0.57, 0.155),
-    "shared_content": (0.8, 0.185),
+    "hpd": (0.56, 0.16),
+    "shared_content": (0.815, 0.175),
     "ripple_modes": (0.085, 0.3),
     "outside_distance": (0.55, 0.36),
 }
