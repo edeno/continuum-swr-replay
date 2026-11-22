@@ -41,6 +41,7 @@ not a test on the animals.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from typing import NamedTuple
 
 import numpy as np
@@ -360,10 +361,18 @@ def nested_bootstrap_draw(
     animal draws its sessions with replacement (as many as it has); each draw of
     a session draws its rows with replacement (as many as it has). Drawing an
     animal or a session ``k`` times and resampling its members each time is
-    drawn as one multinomial of ``k`` times as many members, so the ``k``
-    copies' members are pooled: exact for a statistic pooled over the rows and
-    for a mean of means; a median within a drawn animal or session is taken
-    over the pooled members of its copies.
+    drawn as one multinomial of ``k`` times as many members: the counts of
+    ``k`` separate resamples, added (a sum of multinomials is a multinomial).
+
+    So the counts say how often each member is drawn, not which copy drew it.
+    A statistic may read them when the copies need not be told apart: a
+    statistic of the row counts alone (a mean or a median over every drawn
+    row), and a mean of means with every level resampled (the copies of a
+    member have one size, so the mean over their pooled members is the mean of
+    their means). A statistic with a median, or with a level that is not
+    resampled, inside a drawn animal or session needs each copy apart
+    (:func:`nested_bootstrap_copies`): taken over the pooled members it is one
+    median counted ``k`` times, not ``k`` medians.
 
     Parameters
     ----------
@@ -443,6 +452,125 @@ def nested_bootstrap_draws(
             np.full(members.size, 1.0 / members.size),
         )
     return NestedDraw(animal_draws, session_draws, counts)
+
+
+class NestedCopies(NamedTuple):
+    """Replicates of the nested bootstrap with every drawn copy kept apart
+    (:func:`nested_bootstrap_copies`).
+
+    A replicate has as many animal slots as there are animals. Each slot is
+    one draw of an animal, and resamples that animal's sessions on its own.
+
+    Attributes
+    ----------
+    animal : NDArray of int, shape (n_draws, n_animals)
+        The animal drawn into each slot, by animal code.
+    sessions : NDArray of int, shape (n_draws, n_animals, n_sessions)
+        How often each slot draws each session, by session code: zero outside
+        the slot's animal, and summing to that animal's number of sessions.
+    """
+
+    animal: NDArray[np.int64]
+    sessions: NDArray[np.int64]
+
+
+def nested_bootstrap_copies(
+    session_animal: NDArray[np.int64], rng: np.random.Generator, n_draws: int
+) -> NestedCopies:
+    """``n_draws`` replicates of the nested bootstrap of animals and their
+    sessions, every drawn copy of an animal resampled on its own.
+
+    The standard bootstrap of a nested design: a replicate draws the animals
+    with replacement (as many as there are), and every draw of an animal draws
+    that animal's sessions with replacement (as many as it has). An animal
+    drawn twice is two animals of the replicate, each with its own sessions,
+    so a statistic within an animal (a median over its sessions, a mean over
+    its days) is taken once for each copy, as it is on the data. Summed over
+    the slots, the counts have the distribution of
+    :func:`nested_bootstrap_draws`'. The rows of a drawn session are resampled
+    by :func:`session_copy_values`.
+
+    Parameters
+    ----------
+    session_animal : NDArray of int, shape (n_sessions,)
+        Each session's animal, codes ``0..n_animals-1``
+        (:func:`nested_codes`); every animal has a session.
+    rng : numpy.random.Generator
+        The draws' source: the slots' animals, then each animal's sessions for
+        all of its slots, in the order of the animal codes.
+    n_draws : int
+        Replicates.
+
+    Returns
+    -------
+    NestedCopies
+    """
+    session_animal = np.asarray(session_animal, dtype=np.int64)
+    n_animals = int(session_animal.max()) + 1
+    slot_animal = rng.integers(n_animals, size=(n_draws, n_animals))
+    sessions = np.zeros((n_draws, n_animals, session_animal.size), dtype=np.int64)
+    for a in range(n_animals):
+        mine = np.flatnonzero(session_animal == a)
+        draw, slot = np.nonzero(slot_animal == a)
+        sessions[draw[:, None], slot[:, None], mine] = rng.multinomial(
+            mine.size, np.full(mine.size, 1.0 / mine.size), size=draw.size
+        )
+    return NestedCopies(slot_animal, sessions)
+
+
+def session_copy_values(
+    copies: NestedCopies, resample: Callable[[int, int], NDArray[np.float64]]
+) -> NDArray[np.float64]:
+    """The value of every drawn copy of a session, slot by slot.
+
+    The third level of the nested bootstrap with the copies apart: a session
+    drawn ``k`` times in a slot is ``k`` sessions of that slot, each with its
+    own resample of the session's rows and its own value.
+
+    Parameters
+    ----------
+    copies : NestedCopies
+    resample : callable
+        ``resample(session, n)`` returns the session's statistic on ``n``
+        separate resamples of its rows, shape (n,), without NaN.
+
+    Returns
+    -------
+    NDArray, shape (n_draws, n_animals, n_most)
+        Each slot's values, one per drawn session copy, in the order of the
+        session codes; NaN beyond the slot's number of copies (``n_most`` is
+        the largest number of copies in a slot: the number of sessions of the
+        largest animal drawn).
+
+    Raises
+    ------
+    ValueError
+        If a resample's value is NaN: it would be read as a place without a
+        copy, and the slot's statistic would leave the session out unseen.
+    """
+    n_draws, n_slots, n_sessions = copies.sessions.shape
+    values = np.full((n_draws, n_slots, int(copies.sessions.sum(axis=2).max())), np.nan)
+    filled = np.zeros((n_draws, n_slots), dtype=np.int64)
+    for session in range(n_sessions):
+        draw, slot = np.nonzero(copies.sessions[:, :, session])
+        n_copies = copies.sessions[draw, slot, session]
+        if n_copies.size == 0:
+            continue
+        of_slot = np.repeat(np.arange(draw.size), n_copies)
+        # The place of each copy among its slot's copies of this session.
+        nth = np.arange(of_slot.size) - np.repeat(
+            np.cumsum(n_copies) - n_copies, n_copies
+        )
+        place = filled[draw, slot][of_slot] + nth
+        resampled = resample(session, of_slot.size)
+        if np.isnan(resampled).any():
+            raise ValueError(
+                f"session {session}: {int(np.isnan(resampled).sum())} of "
+                f"{of_slot.size} resamples have no value (NaN)"
+            )
+        values[draw[of_slot], slot[of_slot], place] = resampled
+        filled[draw, slot] += n_copies
+    return values
 
 
 class BootstrapInterval(NamedTuple):
@@ -538,53 +666,40 @@ class AnimalBalancedDraws(NamedTuple):
 
 
 def _animal_balanced_weights(
-    animal: NDArray[np.int64],
-    day: NDArray[np.int64],
-    animal_counts: NDArray[np.int64],
-    session_counts: NDArray[np.int64],
+    day: NDArray[np.int64], sessions: NDArray[np.int64]
 ) -> NDArray[np.float64]:
     """Each session's weight in the day -> animal mean of each replicate.
 
-    A session's weight is ``A_a / n_animals / n_a * R_s / sum_{s' of d} R_s'``,
-    with ``A_a`` and ``R_s`` how often its animal and the session itself are
-    drawn and ``n_a`` the number of its animal's days with a drawn session: a
-    day's mean is over its drawn sessions, and a day with none is absent. An
-    animal drawn ``k`` times draws ``k`` times as many sessions, pooled
-    (:func:`nested_bootstrap_draws`), so its days' means are taken over the
-    pooled sessions.
+    A replicate's statistic is the mean over its animal slots of each slot's
+    mean over its days with a drawn session of each day's mean over the
+    sessions the slot drew. In a slot a session's weight is
+    ``R_s / sum_{s' of d} R_s' / n_d``, with ``R_s`` how often the slot draws
+    it and ``n_d`` the slot's number of days with a drawn session (a day with
+    none is absent); in the replicate it is the mean of its weights over the
+    slots. Two slots of one animal each take their own day means.
 
     Parameters
     ----------
-    animal, day : NDArray of int, shape (n_sessions,)
+    day : NDArray of int, shape (n_sessions,)
         Codes; every day belongs to one animal.
-    animal_counts : NDArray of int, shape (n_draws, n_animals)
-    session_counts : NDArray of int, shape (n_draws, n_sessions)
+    sessions : NDArray of int, shape (n_draws, n_slots, n_sessions)
+        How often each animal slot draws each session
+        (``NestedCopies.sessions``); every slot draws a session.
 
     Returns
     -------
     NDArray, shape (n_draws, n_sessions)
     """
-    n_animals = animal_counts.shape[1]
-    n_days = int(day.max()) + 1
-    day_animal = np.zeros(n_days, dtype=np.int64)
-    day_animal[day] = animal
-    day_total = np.stack([np.bincount(day, r, n_days) for r in session_counts])
-    days_drawn = np.stack(
-        [np.bincount(day_animal, t > 0, n_animals) for t in day_total]
-    )
+    n_draws, n_slots, n_sessions = sessions.shape
+    drawn = sessions.reshape(-1, n_sessions).astype(float)
+    in_day = np.zeros((n_sessions, int(day.max()) + 1))
+    in_day[np.arange(n_sessions), day] = 1.0
+    day_total = drawn @ in_day
     within_day = np.divide(
-        session_counts,
-        day_total[:, day],
-        out=np.zeros(session_counts.shape),
-        where=session_counts > 0,
+        drawn, day_total[:, day], out=np.zeros_like(drawn), where=drawn > 0
     )
-    per_day = np.divide(
-        1.0,
-        days_drawn[:, animal],
-        out=np.zeros(session_counts.shape),
-        where=days_drawn[:, animal] > 0,
-    )
-    return animal_counts[:, animal] / n_animals * per_day * within_day
+    weights = within_day / np.count_nonzero(day_total, axis=1)[:, None]
+    return weights.reshape(n_draws, n_slots, n_sessions).mean(axis=1)
 
 
 def _balanced_estimate_and_draws(
@@ -611,27 +726,11 @@ def _balanced_estimate_and_draws(
     estimate : NDArray, shape (1, n_points)
     draws : NDArray, shape (n_draws, n_points)
     """
-    n_sessions = flat.shape[0]
-    n_animals = int(animal.max()) + 1
-    estimate = (
-        _animal_balanced_weights(
-            animal,
-            day,
-            np.ones((1, n_animals), dtype=np.int64),
-            np.ones((1, n_sessions), dtype=np.int64),
-        )
-        @ flat
-    )
-    counts = nested_bootstrap_draws(
-        animal,
-        np.arange(n_sessions, dtype=np.int64),
-        np.random.default_rng(seed),
-        n_draws,
-    )
-    draws = (
-        _animal_balanced_weights(animal, day, counts.animals, counts.sessions) @ flat
-    )
-    return estimate, draws
+    # The data: every animal in one slot, each of its sessions once.
+    once = (animal == np.arange(int(animal.max()) + 1)[:, None]).astype(np.int64)
+    estimate = _animal_balanced_weights(day, once[None]) @ flat
+    copies = nested_bootstrap_copies(animal, np.random.default_rng(seed), n_draws)
+    return estimate, _animal_balanced_weights(day, copies.sessions) @ flat
 
 
 def animal_balanced_bootstrap(
@@ -646,11 +745,12 @@ def animal_balanced_bootstrap(
 
     The estimate is the mean over animals of each animal's mean over its
     recording days of each day's mean over its sessions. The draws are the
-    project's nested bootstrap of animals, then their sessions
-    (:func:`nested_bootstrap_draws`, each session one row); the days are not
-    resampled. In each draw the estimate is recomputed on the sessions drawn:
-    a day's mean over its drawn sessions, an animal's mean over its days with
-    a drawn session, the mean over the drawn animals.
+    project's nested bootstrap of animals, then their sessions, every drawn
+    copy of an animal with its own sessions (:func:`nested_bootstrap_copies`);
+    the days are not resampled. In each draw the estimate is recomputed on the
+    sessions drawn: a day's mean over the sessions a drawn animal drew of it,
+    that animal's mean over its days with a drawn session, the mean over the
+    drawn animals (an animal drawn twice is two of them).
     The draws depend on the seed and on the sorted order of the animal labels
     (the animals' codes, :func:`nested_codes`), so relabeling the animals
     changes the draws, not the estimate.
@@ -994,6 +1094,30 @@ def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
     low = np.searchsorted(cumulative, (total + 1) // 2, side="left")
     high = np.searchsorted(cumulative, total // 2 + 1, side="left")
     return float((values_sorted[low] + values_sorted[high]) / 2.0)
+
+
+def weighted_medians(values_sorted: NDArray, weights: NDArray) -> NDArray:
+    """:func:`weighted_median` row by row.
+
+    Parameters
+    ----------
+    values_sorted : NDArray, shape (n_rows, n_values)
+        Ascending along each row.
+    weights : NDArray of int, shape (n_rows, n_values)
+        Non-negative counts.
+
+    Returns
+    -------
+    NDArray, shape (n_rows,)
+        NaN where a row's weights sum to 0.
+    """
+    cumulative = np.cumsum(weights, axis=1)
+    total = cumulative[:, -1:]
+    low = np.argmax(cumulative > (total - 1) // 2, axis=1)
+    high = np.argmax(cumulative > total // 2, axis=1)
+    rows = np.arange(values_sorted.shape[0])
+    medians = (values_sorted[rows, low] + values_sorted[rows, high]) / 2
+    return np.where(total[:, 0] > 0, medians, np.nan)
 
 
 # --- curves over sessions and animals ----------------------------------------------

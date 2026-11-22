@@ -44,11 +44,11 @@ from continuum_swr_replay.analysis.shared_statistics import (
     animal_medians,
     benjamini_hochberg,
     bootstrap_interval,
-    nested_bootstrap_draw,
+    nested_bootstrap_copies,
     nested_codes,
     session_median_statistics,
     signed_rank_p,
-    weighted_median,
+    weighted_medians,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -250,11 +250,11 @@ def animal_median_bootstrap(
     from a nested bootstrap.
 
     Each draw is one replicate of the nested bootstrap
-    (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`):
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_copies`):
     the animals with replacement, then each drawn animal's sessions with
-    replacement. Its statistic is the median over the drawn animals (an animal
-    drawn twice counting twice) of each one's median over its drawn sessions
-    (the sessions of an animal drawn twice pooled). The interval is
+    replacement. Its statistic is the median over the drawn animals of each
+    one's median over its drawn sessions (an animal drawn twice is two animals,
+    each with its own sessions and its own median). The interval is
     :func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
     of the statistic on the data and the draws, a small-sample t correction
     over the animals.
@@ -266,9 +266,10 @@ def animal_median_bootstrap(
     animal : pd.Series, shape (n_sessions,)
         Each session's animal, indexed as ``values``.
     rng : numpy.random.Generator
-        The draws' source, used for the draws in order, so a caller that shares
-        one generator over several summaries gets reproducible draws in the
-        order it makes the calls; nothing is drawn when no animal has a value.
+        The draws' source, used for all the draws of one call together, so a
+        caller that shares one generator over several summaries gets
+        reproducible draws in the order it makes the calls; nothing is drawn
+        when no animal has a value.
     n_draws : int
         Bootstrap replicates.
 
@@ -296,30 +297,22 @@ def animal_median_bootstrap(
     if n_animals == 0:
         interval = BootstrapInterval(np.nan, np.nan, np.nan)
     else:
-        own = animal[known.index].to_numpy()
-        animal_codes, session_codes = nested_codes(own, np.arange(len(known)))
-        # Each animal's sessions, in ascending order of their values.
-        sessions = [
-            np.flatnonzero(animal_codes == a)[
-                np.argsort(known.to_numpy()[animal_codes == a], kind="stable")
-            ]
-            for a in range(n_animals)
-        ]
-        sorted_values = [known.to_numpy(dtype=float)[rows] for rows in sessions]
-        statistic = np.empty(n_draws)
-        for i in range(n_draws):
-            draw = nested_bootstrap_draw(animal_codes, session_codes, rng)
-            drawn = np.flatnonzero(draw.animals)
-            own_medians = np.array(
-                [
-                    weighted_median(sorted_values[a], draw.rows[sessions[a]])
-                    for a in drawn
-                ]
+        numbers = known.to_numpy(dtype=float)
+        animal_codes, _ = nested_codes(
+            animal[known.index].to_numpy(), np.arange(len(known))
+        )
+        copies = nested_bootstrap_copies(animal_codes, rng, n_draws)
+        own_medians = np.empty((n_draws, n_animals))
+        for a in range(n_animals):
+            # The animal's sessions, in ascending order of their values.
+            sessions = np.flatnonzero(animal_codes == a)
+            sessions = sessions[np.argsort(numbers[sessions], kind="stable")]
+            of_animal = copies.animal == a
+            drawn = copies.sessions[of_animal][:, sessions]
+            own_medians[of_animal] = weighted_medians(
+                np.broadcast_to(numbers[sessions], drawn.shape), drawn
             )
-            order = np.argsort(own_medians, kind="stable")
-            statistic[i] = weighted_median(
-                own_medians[order], draw.animals[drawn][order]
-            )
+        statistic = np.median(own_medians, axis=1)
         interval = bootstrap_interval(estimate, statistic, n_animals)
     return {
         "n_sessions": len(known),

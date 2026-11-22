@@ -77,8 +77,8 @@ _DATA = Path(__file__).resolve().parent / "data"
 def test_the_committed_tables_say_what_the_fitter_doc_says() -> None:
     """docs/design/regression_fitter.md and bands.py quote these tables: the
     two-level rule covers at least 95 % in every setting and the third level is
-    up to 41 % wider; the band holds the whole curve in 0.953 to 0.997 of the
-    data sets in the checked settings, in only 0.91 to 0.94 in the hard
+    up to 40 % wider; the band holds the whole curve in 0.950 to 0.997 of the
+    data sets in the checked settings, in only 0.91 to 0.92 in the hard
     five-animal ones, always with three animals at a critical value about 40,
     and covers 0.997 to 1.0 at a single point."""
     table = pd.read_csv(_DATA / "interval_coverage_full.csv")
@@ -86,21 +86,21 @@ def test_the_committed_tables_say_what_the_fitter_doc_says() -> None:
     three_level = table[table.scheme == "animals_days_sessions"].set_index("setting")
     assert (two_level.coverage >= 0.95).all()
     ratio = three_level.mean_width / two_level.mean_width
-    assert round(ratio.max() - 1, 2) == 0.41
+    assert round(ratio.max() - 1, 2) == 0.40
     assert three_level.coverage.max() == 1.0
     bands = pd.read_csv(_DATA / "band_coverage_full.csv").set_index("setting")
     names = [s.name for s in (*coverage.BAND_SETTINGS, *coverage.BAND_HARD_SETTINGS)]
     assert list(bands.index) == names
     checked = bands[bands.checked]
     assert list(checked.index) == [s.name for s in coverage.BAND_SETTINGS]
-    assert round(checked.whole_curve_coverage.min(), 3) == 0.953
+    assert round(checked.whole_curve_coverage.min(), 3) == 0.950
     assert round(checked.whole_curve_coverage.max(), 3) == 0.997
     hard = bands[~bands.checked & (bands.n_animals == 5)]
     assert len(hard) == 3
     assert (hard.whole_curve_coverage < 0.95).all()
     assert round(hard.whole_curve_coverage.min(), 2) == 0.91
-    assert round(hard.whole_curve_coverage.max(), 2) == 0.94
-    assert round(hard.coverage_se.mean(), 3) == 0.015
+    assert round(hard.whole_curve_coverage.max(), 2) == 0.92
+    assert round(hard.coverage_se.mean(), 3) == 0.016
     three = bands[bands.n_animals == 3]
     assert len(three) == 1 and three.whole_curve_coverage.iloc[0] == 1.0
     assert round(three.mean_critical.iloc[0], -1) == 40

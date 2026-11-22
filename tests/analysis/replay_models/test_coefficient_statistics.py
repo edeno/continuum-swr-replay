@@ -8,7 +8,8 @@ import pytest
 
 from continuum_swr_replay.analysis.replay_models import coefficient_statistics as stats
 from continuum_swr_replay.analysis.shared_statistics import (
-    nested_bootstrap_draw,
+    NestedCopies,
+    nested_bootstrap_copies,
     nested_codes,
 )
 
@@ -198,20 +199,15 @@ def test_the_bootstrap_resamples_the_animals_then_their_sessions():
     # the mean of the two animals' medians; the median over sessions is 2
     assert result["animal_median"] == 1.5
     # Each replicate is a nested draw of the six sessions (animal a is code 0,
-    # b code 1): the median over the drawn animals, each as often as drawn, of
-    # each one's median over its drawn sessions, each as often as drawn.
+    # b code 1): two drawn animals, each with its own three drawn sessions; the
+    # median over the two of each one's median over its drawn sessions.
     known = values.dropna()
-    animal_codes, session_codes = nested_codes(animal[known.index], np.arange(6))
-    rng = np.random.default_rng(7)
-    expected = []
-    for _ in range(200):
-        draw = nested_bootstrap_draw(animal_codes, session_codes, rng)
-        drawn = np.flatnonzero(draw.animals)
-        own = [
-            np.median(np.repeat(known[animal_codes == a], draw.rows[animal_codes == a]))
-            for a in drawn
-        ]
-        expected.append(np.median(np.repeat(own, draw.animals[drawn])))
+    animal_codes, _ = nested_codes(animal[known.index], np.arange(6))
+    copies = nested_bootstrap_copies(animal_codes, np.random.default_rng(7), 200)
+    expected = [
+        np.median([np.median(np.repeat(known.to_numpy(), drawn)) for drawn in slots])
+        for slots in copies.sessions
+    ]
     # The interval: 1.5 +/- t(0.975, 1) sqrt(2) SD(draws), two animals.
     half = 12.7062047362 * np.sqrt(2) * np.std(expected, ddof=1)
     assert result["bootstrap_sd"] == pytest.approx(np.std(expected, ddof=1))
@@ -219,6 +215,25 @@ def test_the_bootstrap_resamples_the_animals_then_their_sessions():
     assert result["high"] == pytest.approx(1.5 + half)
     # resampling the animals alone could give only 0, 1.5 or 3
     assert not set(expected) <= {0.0, 1.5, 3.0}
+
+
+def test_an_animal_drawn_twice_is_two_animals_each_with_its_own_median(monkeypatch):
+    """Animal a has sessions 0, 1 and 10; animal b one session, 4. The first
+    replicate draws a twice: one copy draws session 0 three times (median 0),
+    the other session 1 once and session 10 twice (median 10); the replicate is
+    the median of 0 and 10, 5. With the two copies' sessions pooled it would
+    be the median of 0, 0, 0, 1, 10, 10: 0.5. The second replicate draws a
+    (each session once, median 1) and b: 2.5."""
+    values, animal = _animal_values([0.0, 1.0, 10.0, 4.0], ["a", "a", "a", "b"])
+    copies = NestedCopies(
+        np.array([[0, 0], [0, 1]]),
+        np.array([[[3, 0, 0, 0], [0, 1, 2, 0]], [[1, 1, 1, 0], [0, 0, 0, 1]]]),
+    )
+    monkeypatch.setattr(stats, "nested_bootstrap_copies", lambda *_: copies)
+    result = stats.animal_median_bootstrap(
+        values, animal, rng=np.random.default_rng(0), n_draws=2
+    )
+    assert result["bootstrap_sd"] == pytest.approx(np.std([5.0, 2.5], ddof=1))
 
 
 def test_the_bootstrap_of_one_animal_has_no_interval_and_of_none_draws_nothing():

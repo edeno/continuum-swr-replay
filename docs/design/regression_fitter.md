@@ -593,12 +593,12 @@ Whether a band reaches its level depends on the curve. What was measured:
   (`scripts/checks/simulate_interval_coverage.py --band-out`; 300 data sets per setting,
   table `tests/scripts/checks/data/band_coverage_full.csv`):
   - With 20 grid points, smooth animal and day curves (correlation length 0.2 of the
-    range) and session noise of SD 0.3 or 1, it held the whole curve in 0.953 to 0.997 of
+    range) and session noise of SD 0.3 or 1, it held the whole curve in 0.950 to 0.997 of
     the data sets.
   - When the animals carried almost all the variance (session noise SD 0.02) and the
     curve was rough for its 100-point grid (correlation length 0.05 or 0.02, or white
-    noise), it held the whole curve in only 0.91 to 0.94 of them (standard error about
-    0.015), below 95 %. The pivot's grid correlation is estimated from the draws, and five
+    noise), it held the whole curve in only 0.91 to 0.92 of them (standard error about
+    0.016), below 95 %. The pivot's grid correlation is estimated from the draws, and five
     animals show at most four independent directions of difference between curves: a
     curve with more independent directions than that has a larger maximum than the
     simulated pivot.
@@ -615,14 +615,15 @@ measured: it is checked when those curves exist.
 The 242 epochs are not independent, so each per-session estimate is reduced session to
 recording day to animal (`analysis/shared_statistics.py`): the mean over animals of each
 animal's mean over its days of each day's mean over its sessions. Its draws are the
-project's nested bootstrap, animals and then each drawn animal's sessions; the days are
-not resampled but stay in the estimate. The rule is stated once, in
+project's nested bootstrap, animals and then each drawn animal's sessions, an animal
+drawn twice being two animals, each with its own sessions and its own day means; the
+days are not resampled but stay in the estimate. The rule is stated once, in
 `animal_balanced_bootstrap`. A simulation (`scripts/checks/simulate_interval_coverage.py`;
 5 animals, 45 days, 244 sessions, 2,000 data sets per setting; table
 `tests/scripts/checks/data/interval_coverage_full.csv`) found the t-corrected interval of
 this rule at or above 95 % coverage in every setting of animal, day and session variance,
 missing sessions and a paired kind difference included; resampling days as a third level
-gave intervals up to 41 % wider that over-covered (up to 100 %) when the animals varied
+gave intervals up to 40 % wider that over-covered (up to 100 %) when the animals varied
 little.
 
 `estimand_summary` summarizes a scalar estimand: the animal-balanced estimate, its 95 %

@@ -84,7 +84,7 @@ as the window statistics are
 (``likelihood_advantage.likelihood_advantage_statistics``, with one row per
 epoch): an animal's value is the median over its epochs, the estimate is the
 mean over animals, and its 95 % interval is from the nested bootstrap of the
-animals and then their epochs (``shared_statistics.nested_bootstrap_draws``,
+animals and then their epochs (``shared_statistics.nested_bootstrap_copies``,
 ``shared_statistics.bootstrap_interval``).
 """
 
