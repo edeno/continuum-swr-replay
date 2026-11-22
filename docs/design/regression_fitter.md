@@ -109,7 +109,9 @@ Newton step (`NewtonFit.step`), the direction along which the likelihood rises w
 bound, and the columns running away along it (`NewtonFit.running_away`,
 `running_away_columns`): those whose part of the step, `max_i |X_ij step_j|`, moves the
 linear predictor by more than 0.1 on some row, the threshold of the stop itself, the
-largest first. Along the direction each such column moves the linear predictor by about
+largest first (the columns of one direction have parts that differ in the last digit only,
+and which is larger depends on the machine: parts whose logarithms agree to 9 decimals are
+a tie, in column order). Along the direction each such column moves the linear predictor by about
 one a step and the others by about the square root of the decrement; on the simulated
 content model's separated sessions the columns named moved it by 1.0 and every other by
 less than 5e-4. A separation that combines columns (an arm column at -19.6 with a role

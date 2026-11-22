@@ -305,6 +305,25 @@ def test_running_away_columns_by_their_part_of_the_step() -> None:
     np.testing.assert_array_equal(
         newton.running_away_columns(X, np.array([0.2, 0.0, 0.0])), [0]
     )
+    # parts 0.05, 1.0, 1.2: the largest first
+    np.testing.assert_array_equal(
+        newton.running_away_columns(X, np.array([0.05, -1.0, 0.6])), [2, 1]
+    )
+
+
+@pytest.mark.parametrize("larger", [1, 2])
+def test_running_away_columns_equal_but_for_rounding_keep_column_order(
+    larger: int,
+) -> None:
+    """Two columns of one direction have parts that differ in the last digit
+    only, and which comes out larger depends on the machine's linear-algebra
+    kernel: they are a tie, in column order, whichever is larger."""
+    X = np.array([[1.0, 0.0, 2.0], [1.0, 1.0, -1.0]])
+    step = np.array([0.05, -1.0, 0.5])  # parts 0.05, 1.0, 1.0
+    step[larger] *= 1.0 + 4e-16
+    part = np.max(np.abs(X * step), axis=0)
+    assert part[larger] > part[3 - larger]
+    np.testing.assert_array_equal(newton.running_away_columns(X, step), [1, 2])
 
 
 def test_each_status() -> None:

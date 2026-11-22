@@ -112,8 +112,11 @@ def test_clamp_beyond_range(rate_sessions) -> None:
     rows = pd.DataFrame({"time_since_s": [3.0, 7.5, 0.0, -1.0]})
     X, offset = design.session(rows)
     assert offset is None
-    np.testing.assert_array_equal(X[1], X[0])
-    np.testing.assert_array_equal(X[3], X[2])
+    # Rows of one matrix product: equal but for the last digit on a machine
+    # whose kernel treats rows differently by their place (the basis rows
+    # themselves are equal bit for bit, test_pspline).
+    np.testing.assert_allclose(X[1], X[0], rtol=1e-12, atol=1e-14)
+    np.testing.assert_allclose(X[3], X[2], rtol=1e-12, atol=1e-14)
     assert design.blocks == ()
 
 
