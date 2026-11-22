@@ -151,17 +151,17 @@ Work that is deferred on purpose. Each item says when it should be done.
 The review of the restriction and held-out tetrode runs before the
 `swr-restricted-models` merge left these on purpose.
 
-- [ ] **Panel 2g's caption or text gives what the panel no longer draws.** From
+- [ ] **Panel 2g's caption or text gives what no figure draws.** From
   `paper/reported/events.json`, over the immobile time inside a well visit (from
-  the animal's first nose-poke at a reward well to its last poke-out there):
-  each decoder's gain over the local-only decoder per spike
-  (`restriction_immobile_swr_minus_none_per_spike`,
-  `restriction_immobile_full_minus_none_per_spike`), the share of the full
-  decoder's gain that the SWR-only decoder captures
+  the animal's first nose-poke at a reward well to its last poke-out there): the
+  share of the full decoder's gain that the SWR-only decoder captures
   (`restriction_immobile_share_captured_by_swr_only`), and the full minus the
   SWR-only decoder per spike inside the events detected from the held-out decode
   (`restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike`,
-  `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`).
+  `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`). The
+  gain outside SWRs away from the SWRs, at well-sampled places, and its shares
+  in and outside those events are in the held-out tetrode supplementary figure
+  (`scripts/figures/generate_supp_heldout_tetrode.py`, panels b to d).
   *When:* when the caption of Figure 2 is written.
 - [ ] **The library does not repeat itself on one kind of CI machine.** On
   GitHub's runners with an AMD EPYC 7763 (no AVX-512), the fold fit of the

@@ -1252,12 +1252,12 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     # per family: per spike and per second, the gain and the rest (four each),
     # the epochs (two), and three shares (three each)
     assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 3 * 3)
-    # Figure 2g draws the filter family's gain per spike (its second axis) and
-    # the three shares (its third)
+    # Figure 2g draws the filter family's gain per spike; the held-out tetrode
+    # supplementary figure its three shares
     drawn = {f"{key}_per_spike{end}" for end in ("", "_ci_low", "_ci_high")} | {
         f"{key}_per_spike_animals_positive"
     }
-    drawn |= {
+    supplement = {
         f"{key}_{share}{end}"
         for share in (
             "share_in_heldout_non_swr_events",
@@ -1267,7 +1267,10 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for end in ("", "_ci_low", "_ci_high")
     }
     assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
-    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
+    assert {
+        k for k, v in values.items() if v.figures == ("heldout_tetrode",)
+    } == supplement
+    assert {v.figures for k, v in values.items() if k not in drawn | supplement} == {()}
 
 
 def _immobile_time_sums() -> pd.DataFrame:
@@ -1327,11 +1330,12 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # Figure 2g's first axis draws the filter family's paired difference per
-    # spike, with the epoch counts; the gains over the local-only decoder, per
-    # second, the share and the two-sided family carry no figure (the text's)
+    # Figure 2g draws the filter family's gains per spike over the local-only
+    # decoder and their paired difference, with the epoch counts; per second,
+    # the share and the two-sided family carry no figure
     drawn = {
-        f"restriction_immobile_full_minus_swr_per_spike{end}"
+        f"restriction_immobile_{contrast}_per_spike{end}"
+        for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     } | {
         "restriction_immobile_epochs_full_above_swr_only",
@@ -1367,7 +1371,7 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         np.testing.assert_allclose(
             outside.loc[("filter", measure), "estimate"], numbers[f"{key}_{name}"]
         )
-    assert set(builder.restriction_totals.RESTRICTION_FIGURE_SHARES) == {
+    assert set(builder.restriction_totals.OUTSIDE_SWR_SHARES) == {
         "share_in_no_swr_events",
         "share_in_swr_events_outside_swr",
         "share_outside_events",
@@ -1454,7 +1458,14 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     # per part: two families x (two units x four + two epoch counts), and the
     # share with the animals' lowest; and the two counts left out
     assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 2) + 2
-    assert {v.figures for v in values.values()} == {()}
+    # the held-out tetrode supplementary figure draws each part's gain per spike
+    # in the filter family
+    drawn = {
+        k for k in values if "_full_minus_swr_per_spike" in k and "_two_sided" not in k
+    }
+    assert len(drawn) == 5 * 4
+    assert {k for k, v in values.items() if v.figures == ("heldout_tetrode",)} == drawn
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 
 

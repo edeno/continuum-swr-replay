@@ -1862,6 +1862,8 @@ def _measure_rows(measures: dict[str, list[float]]) -> pd.DataFrame:
     return table
 
 
+SWR_ONLY = [0.099, 0.103, 0.081, 0.138, 0.093]
+FULL = [0.119, 0.117, 0.107, 0.172, 0.115]
 PAIRED = [0.022, 0.023, 0.03, 0.042, 0.025]
 OUTSIDE = [0.029, 0.02, 0.025, 0.038, 0.022]
 SHARES = {
@@ -1875,23 +1877,39 @@ SHARES["share_outside_events"] = list(
 
 def _decoder_rows() -> pd.DataFrame:
     """``immobile_gain_statistics``' rows the panel reads."""
-    return _measure_rows({"full_minus_swr_per_spike": PAIRED})
+    return _measure_rows(
+        {
+            "swr_minus_none_per_spike": SWR_ONLY,
+            "full_minus_none_per_spike": FULL,
+            "full_minus_swr_per_spike": PAIRED,
+        }
+    )
 
 
 def _outside_rows() -> pd.DataFrame:
-    """``outside_swr_gain_statistics``' rows the panel reads."""
+    """``outside_swr_gain_statistics``' rows the panels read."""
     return _measure_rows({"gain_per_spike": OUTSIDE, **SHARES})
 
 
 def _dots_at(ax, x: float):
-    """The one scatter of ``ax`` at ``x``."""
+    """The one scatter of ``ax`` whose dots are spread about ``x``."""
     (dots,) = [
         c
         for c in ax.collections
         if isinstance(c, matplotlib.collections.PathCollection)
-        and np.allclose(c.get_offsets()[:, 0], x)
+        and np.allclose(c.get_offsets()[:, 0], x, atol=0.2)
     ]
     return dots
+
+
+def assert_spread_about(dots, x: float) -> None:
+    """The dots sit symmetrically about ``x``, alternating sides by value."""
+    xs, ys = dots.get_offsets()[:, 0], dots.get_offsets()[:, 1]
+    assert np.mean(xs) == pytest.approx(x)
+    by_value = xs[np.argsort(ys)] - x
+    # neighbors in value never on the same side, the middle one on x
+    assert all(a * b <= 0 for a, b in zip(by_value, by_value[1:], strict=False))
+    assert by_value[len(by_value) // 2] == pytest.approx(0.0)
 
 
 def _means_at(ax, x: float) -> list:
@@ -1908,88 +1926,87 @@ def _has_zero_line(ax) -> bool:
     )
 
 
-def test_figure02_panel_g_first_axis_draws_full_minus_swr_only(offline):
-    """Panel g's first axis: the full minus the SWR-only decoder over all
-    immobile time (the paired difference, gray dots) and outside SWRs (the main
-    result: green dots, its label in bold), each a dot per animal and the mean
-    with its interval beside them, and a dashed zero line."""
+def test_figure02_panel_g_first_axis_draws_each_decoders_gain(offline):
+    """Panel g's first axis: each decoder's gain over the local-only decoder,
+    the SWR-only decoder's dots dark gray and the full decoder's green, spread
+    about the column, the mean with its interval beside them, and the dashed
+    zero line labeled "local-only"."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
+    figure02.draw_decoder_gains(ax, _decoder_rows())
     fig.canvas.draw()
     for x, values, color in (
-        (0.0, PAIRED, figure02.C_REFERENCE),
-        (1.0, OUTSIDE, figure02.COLORS["Non-Local"]),
+        (0.0, SWR_ONLY, figure02.NEUTRAL_DOTS),
+        (1.0, FULL, figure02.COLORS["Non-Local"]),
     ):
         dots = _dots_at(ax, x)
-        np.testing.assert_allclose(dots.get_offsets()[:, 1], values)
+        np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
+        assert_spread_about(dots, x)
         np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
-    labels = ax.get_xticklabels()
-    assert [t.get_text() for t in labels] == ["All", "Outside\nSWRs"]
-    assert [t.get_fontweight() for t in labels] == ["normal", "bold"]
-    # horizontal, so that they do not hang below panel h's labels
-    assert {t.get_rotation() for t in labels} == {0.0}
-    assert ax.get_title() == ""
-    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/spike)"
-    # no tick label at the frame's top, where it would meet the heading's rule
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-\nonly", "Full"]
+    assert [t.get_text() for t in ax.texts] == ["local-only"]
+    assert (
+        ax.get_ylabel() == "Held-out log score\nover local-only\ndecoder (nats/spike)"
+    )
     assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
     plt.close(fig)
 
 
-def test_figure02_panel_g_second_axis_names_each_share_beside_its_dots(offline):
-    """Panel g's second axis: the three shares of the gain outside SWRs in
-    percent, in one column, in panel d's colors and a gray for the rest, each
-    a dot per animal, the mean with its interval beside them and its name
-    beside that in its color; no x tick labels; a dashed zero line."""
+def test_figure02_panel_g_second_axis_draws_full_minus_swr_only(offline):
+    """Panel g's second axis: the full minus the SWR-only decoder over all
+    immobility (the paired difference) and outside SWRs (the main result, its
+    label in bold), dark gray dots spread about each column, the mean with its
+    interval beside them, the dashed zero line with "full better", and the
+    outside-SWR row returned for the count note."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
-    from continuum_swr_replay.visualization.palettes import readable_text_color
+    figure02 = offline("scripts.figures.generate_figure02")
+    fig, ax = plt.subplots()
+    counted = figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
+    fig.canvas.draw()
+    for x, values in ((0.0, PAIRED), (1.0, OUTSIDE)):
+        dots = _dots_at(ax, x)
+        np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
+        assert_spread_about(dots, x)
+        np.testing.assert_allclose(
+            dots.get_facecolors()[0], to_rgba(figure02.NEUTRAL_DOTS)
+        )
+        assert np.allclose(_means_at(ax, x), np.mean(values))
+    assert _has_zero_line(ax)
+    labels = ax.get_xticklabels()
+    assert [t.get_text() for t in labels] == ["All\nimmobility", "Outside\nSWRs"]
+    assert [t.get_fontweight() for t in labels] == ["normal", "bold"]
+    # horizontal, so that they do not hang below panel h's labels
+    assert {t.get_rotation() for t in labels} == {0.0}
+    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
+    assert [t.get_text() for t in ax.texts] == ["↑ full better"]
+    # no tick label at the frame's top, where it would meet the heading's rule
+    assert max(ax.get_yticks()) <= 0.9 * ax.get_ylim()[1]
+    np.testing.assert_allclose(counted["animals"], OUTSIDE)
+    plt.close(fig)
+
+
+def test_figure02_panel_g_count_note_reads_the_counts_from_the_statistics(offline):
+    """The note under panel g's second axis gives the outside-SWR row's
+    animals and the epochs above zero of all its epochs, in the reference
+    gray, ending at the frame's right edge."""
+    import matplotlib.pyplot as plt
 
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    figure02.draw_outside_swr_shares(ax, _outside_rows())
+    row = pd.Series({"n_animals": 5, "n_epochs_positive": 240, "n_epochs": 242})
     fig.canvas.draw()
-    colors = (
-        figure02.COLORS["No SWR"],
-        figure02.COLORS["SWR partial"],
-        figure02.C_OUTSIDE_EVENTS,
-    )
-    dots = [
-        c
-        for c in ax.collections
-        if isinstance(c, matplotlib.collections.PathCollection)
-    ]
-    assert len(dots) == 3
-    means = _means_at(ax, 0.0)
-    names = list(ax.texts)
-    for drawn, mean, name, (measure, values), color in zip(
-        dots, means, names, SHARES.items(), colors, strict=True
-    ):
-        np.testing.assert_allclose(drawn.get_offsets()[:, 0], 0.0)
-        np.testing.assert_allclose(drawn.get_offsets()[:, 1], 100 * np.asarray(values))
-        np.testing.assert_allclose(drawn.get_facecolors()[0], to_rgba(color))
-        assert np.allclose(mean, 100 * np.mean(values)), measure
-        # the name, at the mean's height, right of it, in the share's color
-        assert name.get_text() == figure02.SHARE_LABELS[measure]
-        assert name.xy[1] == pytest.approx(100 * np.mean(values))
-        assert name.get_ha() == "left"
-        assert name.get_color() == readable_text_color(color)
-    assert [n.get_text() for n in names] == [
-        "No-SWR\nevents",
-        "Partly in\nan SWR",
-        "Outside\nevents",
-    ]
-    assert list(ax.get_xticks()) == []
-    assert _has_zero_line(ax)
-    # the rest is below zero here, and inside the axis
-    assert ax.get_ylim()[0] < 100 * min(SHARES["share_outside_events"])
-    assert ax.get_ylabel() == "Share of gain\noutside SWRs (%)"
+    figure02.count_note(fig, fig.canvas.get_renderer(), ax, row)
+    (note,) = ax.texts
+    assert note.get_text() == "5 animals; 240 of 242 epochs > 0"
+    assert note.get_color() == figure02.C_REFERENCE
+    assert note.get_ha() == "right"
     plt.close(fig)
 
 
@@ -2008,24 +2025,28 @@ def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
         is restriction_totals.restriction_figure_statistics
     )
     for name in (
+        "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
         "RESTRICTION_FIGURE_FAMILY",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
-        "RESTRICTION_FIGURE_SHARES",
     ):
         assert getattr(figure02, name) is getattr(restriction_totals, name), name
     for name in (
         "RESTRICTION_FIGURE",
+        "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
         "RESTRICTION_FIGURE_FAMILY",
         "RESTRICTION_FIGURE_GROUPS",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name
-    assert list(figure02.SHARE_LABELS) == list(
-        restriction_totals.RESTRICTION_FIGURE_SHARES
+    assert list(figure02.DECODER_X) == list(
+        restriction_totals.RESTRICTION_FIGURE_DECODERS
     )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
+    assert events.TAGS["nonlocal_restriction_supplement"].figures == (
+        "heldout_tetrode",
+    )
     assert events.TAGS["participation"].figures == ("2h",)
     assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)
 

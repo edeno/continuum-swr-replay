@@ -149,6 +149,7 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE,
+    RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_GROUPS,
@@ -274,6 +275,7 @@ TAGS = {
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
+    "nonlocal_restriction_supplement": Tags(("2c.3",), ("heldout_tetrode",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -2107,6 +2109,21 @@ class HeldoutRestriction:
     """The run was not made from the current event table."""
 
 
+def restriction_inputs_note(restriction_dir: Path, epochs: Iterable[str]) -> str | None:
+    """Why the restriction run in ``restriction_dir`` was not made from the
+    current decode frames and SWR source, or None: :func:`restriction_input_staleness`
+    with the decode frames the event features run records for each epoch. The
+    figures that draw the restriction run refuse it then (Figure 2g, the
+    held-out tetrode supplementary figure)."""
+    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)["epochs"]
+    return restriction_input_staleness(
+        read_output_manifest(restriction_dir),
+        {e: record.get("decode", {}).get("sha256") for e, record in features.items()},
+        epochs,
+        f"the restriction run ({restriction_dir})",
+    )
+
+
 def restriction_input_staleness(
     manifest: dict,
     decode_sha256: Mapping[str, str],
@@ -2531,13 +2548,19 @@ def restriction_outside_swr_values(
     marks every held-out event, wherever it starts). The gain per spike and
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
-    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's two axes and
-    carry that panel's tag."""
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn: the gain on Figure 2g, the
+    shares on the held-out tetrode supplementary figure; each carries its
+    figure's tag."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
     )
     make_figure = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction_figure"]
+    )
+    make_supplement = value_factory(
+        restriction_outside_swr_values,
+        source,
+        TAGS["nonlocal_restriction_supplement"],
     )
     statistics = restriction_totals.outside_swr_gain_statistics(
         restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -2605,7 +2628,7 @@ def restriction_outside_swr_values(
             ),
         ):
             values += _share_interval(
-                make_figure if figure else make_text,
+                make_supplement if figure else make_text,
                 f"{key}_{name}",
                 statistics.loc[(family, measure)],
                 f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
@@ -2619,7 +2642,7 @@ def restriction_outside_swr_values(
             )
         # a share that is below 0 where the full decoder does worse: a
         # unitless quantity, as a fraction must lie in [0, 1]
-        make = make_figure if figure else make_text
+        make = make_supplement if figure else make_text
         row = statistics.loc[(family, "share_outside_events")]
         values += [
             make(
@@ -2698,10 +2721,16 @@ def restriction_outside_swr_part_values(
     with the epochs above zero and the share of the bins each part keeps; and
     the immobile bins outside every SWR where SWR detection was not observed,
     which every value outside SWRs leaves out
-    (``restriction_totals.outside_swr_not_observed_counts``). No figure draws
-    these."""
+    (``restriction_totals.outside_swr_not_observed_counts``). The gains per
+    spike in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on the held-out
+    tetrode supplementary figure and carry its tag."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_supplement = value_factory(
+        restriction_outside_swr_part_values,
+        source,
+        TAGS["nonlocal_restriction_supplement"],
     )
     counts = restriction_totals.outside_swr_not_observed_counts(time_sums)
     values = [
@@ -2739,8 +2768,9 @@ def restriction_outside_swr_part_values(
                 scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
                 for unit, divided, words in _RESTRICTION_UNITS:
                     row = statistics.loc[(subset, threshold, family, f"gain_{unit}")]
+                    drawn = family == RESTRICTION_FIGURE_FAMILY and unit == "per_spike"
                     values += _interval_and_animals_positive(
-                        make,
+                        make_supplement if drawn else make,
                         f"{key}_{unit}",
                         row,
                         f"{scored}, {full_minus_swr}, summed over {time} and "
@@ -2796,10 +2826,10 @@ def restriction_immobile_values(
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
-    decoder captures. Of these, Figure 2g draws only the paired difference per
-    spike in :data:`RESTRICTION_FIGURE_FAMILY` (its first axis), which carries
-    that panel's tag with the epoch counts; the gains over the local-only
-    decoder are for the text."""
+    decoder captures. The gains per spike over the local-only decoder and
+    their paired difference in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on
+    Figure 2g and carry that panel's tag, with the epoch counts; the share
+    captured is for the text."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
     )
@@ -2809,7 +2839,7 @@ def restriction_immobile_values(
     statistics = restriction_totals.immobile_gain_statistics(
         restriction_totals.epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    drawn = (RESTRICTION_FIGURE_DIFFERENCE,)
+    drawn = (*RESTRICTION_FIGURE_DECODERS, RESTRICTION_FIGURE_DIFFERENCE)
     values = []
     for family, suffix in FAMILY_SUFFIX.items():
         scored = (
