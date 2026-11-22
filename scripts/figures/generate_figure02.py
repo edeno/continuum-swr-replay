@@ -86,8 +86,9 @@ events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
 held-out decode that start inside a well visit, and the time inside a well
 visit) and by ``restriction_totals.restriction_figure_statistics``, refused when
-the restriction run is not the fold fit on folds of whole trials, when the
-held-out event run was not made from the current restriction run or per-bin
+the restriction run is not the fold fit on folds of whole trials or was not
+made from the current decode frames and SWR source, when the held-out event
+run was not made from the current restriction run or per-bin
 facts run, or when the per-bin facts, which give the time and the events' start
 their well-visit flag, were not made from the current session cache. Panel g is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
@@ -376,7 +377,6 @@ LOCAL_SWR_START_S = 1617036373.982971
 # window_sec; the curves span half of it either side of the start), seconds.
 TRIGGERED_WINDOW_S = 0.3
 TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed"]
-# Panel i: ripple-power bins, z.
 # Panel e: the detectors, in the order drawn, and their labels.
 DETECTOR_LABELS = dict(
     zip(

@@ -42,7 +42,7 @@ BIN_FACTS_COLUMNS = ("time", "n_spikes", "in_well_visit", "swr_observed")
 """The columns of a per-bin facts table, in order."""
 
 
-def require_swr_observed(facts: pd.DataFrame, what: str = "the per-bin facts") -> None:
+def require_swr_observed(facts: pd.DataFrame) -> None:
     """Refuse per-bin facts (or sums made from them) without ``swr_observed``:
     they were made before the flag was measured.
 
@@ -53,7 +53,7 @@ def require_swr_observed(facts: pd.DataFrame, what: str = "the per-bin facts") -
     """
     if "swr_observed" not in facts.columns:
         raise ValueError(
-            f"{what} have no swr_observed column: they were made before SWR "
+            "the per-bin facts have no swr_observed column: they were made before SWR "
             "detection's coverage was recorded per bin. Rerun "
             "scripts/event_evidence/measure_bin_facts.py and the runs made from "
             "it (docs/reproduce.md, Parts 1 and 2)"

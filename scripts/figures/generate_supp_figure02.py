@@ -235,20 +235,22 @@ the order the text cites them, in four rows:
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
-Panels g and h read the held-out tetrode run over the epochs the events
-summary reads and refuse a run not held out in folds of whole trials, as the summary does.
-Panel j reads the held-out event run
+Panels f and h read the held-out tetrode run over the epochs the events
+summary reads and refuse a run not held out in folds of whole trials, as the
+summary does. Panel j reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
-(``reported.events.read_heldout_restriction``), and refuse it, as Figure 2j
+(``reported.events.read_heldout_restriction``) and refuses it, as Figure 2j
 does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
-or when the per-bin facts were not made from the current session cache. Their
+or when the per-bin facts were not made from the current session cache. Its
 values are the events summary's ``restriction_outside_swr_*`` values. Panels d,
-f and i read the canonical event table (i with the stored output it names), refused, as their values are marked pending, when an output was not
-made from the current event table over the analyses' subset; c, e and a their
-stored outputs likewise. Panel b reads every analyzed epoch's decode frame
+g and i read the canonical event table (i with the stored output it names); a,
+c and e read their stored outputs. Each output is refused, as the summary marks
+its values pending, when it was not made from the current event table (c and
+i), over the analyses' subset, or from the current well visits (a, c and e; e
+also from the decodes the event features run records, as Figure 2i). Panel b reads every analyzed epoch's decode frame
 (``Processed-Data``), which takes a few minutes; it has no reported value.
 
 Usage
@@ -514,16 +516,21 @@ def read_inputs() -> dict:
     Returns
     -------
     dict
-        ``tetrode``: the held-out tetrode statistics of the events that start
-        inside a well visit, indexed by group (a held-out tetrode run not held
-        out in folds of whole trials is refused,
-        ``reported.events.require_tetrode_holdout_folds``); ``timing``: the
-        selected events' ``boundary_timing_statistics``; ``shared``: their
-        agreement by spread bin (``agreement_by_spread_statistics``); ``outside``:
+        In panel order: ``calibration`` (a): :func:`read_state_calibration`;
+        ``no_spike`` (b): :func:`read_no_spike_trace`; ``sweep`` (c):
+        :func:`read_rule_sweep`; ``timing`` (d): the selected events'
+        ``boundary_timing_statistics``; ``mua`` (e): :func:`read_mua_counts`;
+        ``tetrode`` (f): the held-out tetrode statistics of the events that
+        start inside a well visit, by column of ``SPLIT_LABELS``, each indexed
+        by group (a held-out tetrode run not held out in folds of whole trials
+        is refused, ``reported.events.require_tetrode_holdout_folds``); ``hpd``
+        (g): the selected events' ``hpd_distribution``; ``shared`` (h): their
+        agreement by spread bin (``agreement_by_spread_statistics``);
+        ``ripple_modes`` (i): :func:`read_ripple_modes`; ``outside`` (j):
         ``outside_swr_statistics`` over the held-out event run, indexed by
-        family and measure; ``parts``: ``outside_swr_subset_statistics`` over
-        its time sums, indexed by subset, threshold, family and measure;
-        ``no_spike``: :func:`read_no_spike_trace`.
+        family and measure; ``parts`` (j): ``outside_swr_subset_statistics`` of
+        the margins over its time sums, indexed by subset, threshold, family
+        and measure.
 
     Raises
     ------
@@ -561,7 +568,7 @@ def read_inputs() -> dict:
         "ripple_modes": read_ripple_modes(
             events, inputs.class_structure, inputs.event_table
         ),
-        "hpd": read_hpd(events),
+        "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
         ),
@@ -574,18 +581,10 @@ def read_inputs() -> dict:
             heldout.time_sums, heldout.bin_s, heldout.events
         ),
         "parts": outside_swr_subset_statistics(
-            heldout.time_sums, heldout.bin_s
+            heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
         ).set_index(["subset", "threshold_s", "family", "measure"]),
         "no_spike": read_no_spike_trace(),
     }
-
-
-def read_hpd(events: pd.DataFrame) -> pd.DataFrame:
-    """The posterior-spread panel's distribution: each animal's percent of its
-    events of each class per HPD coverage bin
-    (``event_statistics.hpd_distribution``); the share below the tight cut is
-    the events summary's (``hpd_tight_share_*``)."""
-    return hpd_distribution(events)
 
 
 def _refuse_stale(
@@ -892,26 +891,24 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
 
 
 def draw_outside_swr_series(
-    ax: Axes,
-    outside: pd.DataFrame,
-    parts: pd.DataFrame,
-    subset: str,
-    thresholds: Sequence[float],
-    names: Sequence[str],
-    xlabel: str,
+    ax: Axes, outside: pd.DataFrame, parts: pd.DataFrame
 ) -> None:
     """The gain outside SWRs: the full decoder minus the SWR-only decoder per spike
-    over every immobile bin outside SWRs, then over each part of them
-    (``subset``, at each of ``thresholds``), a dot per animal and the mean
-    with its interval, a thin line through the means, the parts' label under
-    their tick labels (``xlabel``), a dashed zero line and which way the full
-    decoder is better."""
+    over every immobile bin outside SWRs, then over the bins farther than each
+    of :data:`OUTSIDE_SWR_MARGINS_S` from every SWR (``parts``' ``beyond_swr_margin``
+    rows), a dot per animal and the mean with its interval, a thin line through
+    the means, the margins' label under their tick labels
+    (:data:`DISTANCE_LABEL`), a dashed zero line and which way the full decoder
+    is better."""
     rows = [outside.loc[(RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_OUTSIDE_SWR)]]
     rows += [
-        parts.loc[(subset, threshold, RESTRICTION_FIGURE_FAMILY, "gain_per_spike")]
-        for threshold in thresholds
+        parts.loc[
+            ("beyond_swr_margin", margin, RESTRICTION_FIGURE_FAMILY, "gain_per_spike")
+        ]
+        for margin in OUTSIDE_SWR_MARGINS_S
     ]
-    xs = [0.0, *(SERIES_START + k for k in range(len(thresholds)))]
+    names = [f"{margin * 1000:g}" for margin in OUTSIDE_SWR_MARGINS_S]
+    xs = [0.0, *(SERIES_START + k for k in range(len(OUTSIDE_SWR_MARGINS_S)))]
     for x, row in zip(xs, rows, strict=True):
         draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True)
     ax.plot(
@@ -927,7 +924,7 @@ def draw_outside_swr_series(
     full_better_cue(ax)
     # the parts' label, centered under their tick labels
     ax.annotate(
-        xlabel, (float(np.mean(xs[1:])), 0), xycoords=("data", "axes fraction"),
+        DISTANCE_LABEL, (float(np.mean(xs[1:])), 0), xycoords=("data", "axes fraction"),
         xytext=(0, -PARTS_LABEL_DROP), textcoords="offset points", ha="center",
         va="top",
         fontsize=SMALL_SIZE, annotation_clip=False,
@@ -1171,10 +1168,8 @@ def generate_figure(statistics: dict) -> Figure:
     draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
     draw_shared_content(*axes["shared_content"], statistics["shared"])
     draw_outside_swr_series(
-        axes["outside_distance"][0], statistics["outside"], statistics["parts"],
-        "beyond_swr_margin", OUTSIDE_SWR_MARGINS_S,
-        [f"{t * 1000:g}" for t in OUTSIDE_SWR_MARGINS_S], DISTANCE_LABEL,
-    )  # fmt: skip
+        axes["outside_distance"][0], statistics["outside"], statistics["parts"]
+    )
     draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])

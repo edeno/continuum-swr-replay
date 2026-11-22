@@ -29,9 +29,6 @@ GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["S
 REFERENCE_COLOR = "#777777"
 """A reference level (the zero line): a neutral gray, not the No-Spike state's."""
 
-HELDOUT_X = {SWR_LABELS[False]: 0.0, SWR_LABELS[True]: 1.0}
-"""Each group's position on a gain axis' x axis."""
-
 
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
     """A statistics row's per-animal values, indexed by animal."""
@@ -161,7 +158,7 @@ def label_gain_axis(
 
 GAIN_FLOOR = 0.13
 """A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
-supplement, panel e)."""
+supplement, panel j)."""
 
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""

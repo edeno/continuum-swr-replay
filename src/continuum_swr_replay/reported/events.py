@@ -154,11 +154,11 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FIT,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
-    RESTRICTION_FIGURE,
+    OUTSIDE_SWR_EVENT_WINDOWS,
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_FAMILY,
-    RESTRICTION_FIGURE_GROUPS,
+    OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
@@ -2656,7 +2656,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     outside = restriction_windows.restriction_window_statistics(
         windows,
         **{
-            **RESTRICTION_FIGURE,
+            **OUTSIDE_SWR_EVENT_WINDOWS,
             "families": list(FAMILY_SUFFIX),
             "units": ["per_spike", "per_s"],
         },
@@ -2665,7 +2665,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     a, b = restriction_windows.CONTRASTS["full_minus_swr"]
     for family, suffix in FAMILY_SUFFIX.items():
         for unit, divided, words in _RESTRICTION_UNITS:
-            for group in RESTRICTION_FIGURE_GROUPS:
+            for group in OUTSIDE_SWR_EVENT_WINDOW_GROUPS:
                 row = outside.loc[(family, unit, group)]
                 word = _GROUP_WORDS[group]
                 values += _interval_and_animals_positive(
@@ -2697,7 +2697,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
                             ),
                         )
                     )
-    for group in RESTRICTION_FIGURE_GROUPS:
+    for group in OUTSIDE_SWR_EVENT_WINDOW_GROUPS:
         row = counts.loc[("event", group)]
         word = _GROUP_WORDS[group]
         values.append(
@@ -2758,7 +2758,7 @@ def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list
     over the bins outside SWRs of the events detected from the held-out decode
     (``windows``, those that start inside a well visit), events with no SWR and
     events that overlap one, in :data:`RESTRICTION_FIGURE_FAMILY`
-    (:data:`RESTRICTION_FIGURE`); with the events of each group, those with a
+    (:data:`OUTSIDE_SWR_EVENT_WINDOWS`); with the events of each group, those with a
     value and those with bins outside SWRs but no spike in them. No figure
     draws these: the events are the full decoder's own, so Figure 2j draws the
     gain over all the time outside SWRs and the shares of it in these events
@@ -2767,12 +2767,12 @@ def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list
         restriction_heldout_event_values, source, TAGS["nonlocal_restriction"]
     )
     statistics = restriction_windows.restriction_window_statistics(
-        windows, **RESTRICTION_FIGURE
+        windows, **OUTSIDE_SWR_EVENT_WINDOWS
     ).set_index("group")
     counts = restriction_windows.outside_swr_window_counts(windows)
     a, b = restriction_windows.CONTRASTS["full_minus_swr"]
     values = []
-    for group in RESTRICTION_FIGURE_GROUPS:
+    for group in OUTSIDE_SWR_EVENT_WINDOW_GROUPS:
         row = statistics.loc[group]
         word = _GROUP_WORDS[group]
         values += _interval_and_animals_positive(

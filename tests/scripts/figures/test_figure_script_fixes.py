@@ -1977,11 +1977,11 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     ):
         assert getattr(figure02, name) is getattr(restriction_totals, name), name
     for name in (
-        "RESTRICTION_FIGURE",
+        "OUTSIDE_SWR_EVENT_WINDOWS",
         "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
         "RESTRICTION_FIGURE_FAMILY",
-        "RESTRICTION_FIGURE_GROUPS",
+        "OUTSIDE_SWR_EVENT_WINDOW_GROUPS",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name

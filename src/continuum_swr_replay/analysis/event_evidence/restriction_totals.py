@@ -97,6 +97,7 @@ animals and then their epochs (``shared_statistics.nested_bootstrap_copies``,
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable, Iterator
 
 import numpy as np
 import pandas as pd
@@ -356,6 +357,32 @@ def _chosen_time(time_sums: pd.DataFrame, rows: np.ndarray) -> pd.DataFrame:
     )
 
 
+def _epoch_gain_frame(
+    time_sums: pd.DataFrame, bin_s: pd.Series, total: pd.DataFrame
+) -> pd.DataFrame:
+    """Each epoch's chosen bins (``total``, :func:`_chosen_time`'s rows):
+    ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``, and for
+    each family ``full_minus_swr`` (nats), ``gain_per_spike`` and ``gain_per_s``
+    (NaN without spikes or bins)."""
+    animals = time_sums.groupby("epoch_id")["animal"].first()
+    out = pd.DataFrame(
+        {
+            "epoch_id": total.index,
+            "animal": animals.reindex(total.index).to_numpy(),
+            "n_bins": total["n_bins"].to_numpy(),
+            "n_spikes": total["n_spikes"].to_numpy(),
+            "seconds": total["n_bins"].to_numpy()
+            * bin_s.reindex(total.index).to_numpy(dtype=float),
+        }
+    )
+    for suffix in FAMILY_SUFFIX.values():
+        gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
+        out[f"full_minus_swr{suffix}"] = gain
+        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
+        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
+    return out
+
+
 def _outside_swr_rows(
     time_sums: pd.DataFrame,
     *,
@@ -464,21 +491,13 @@ def epoch_outside_swr_gains(
         .reindex(total.index, fill_value=0.0)
         for group, swr in (("no_swr", False), ("swr", True))
     }
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    step = bin_s.reindex(total.index).to_numpy(dtype=float)
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": total["n_spikes"].to_numpy(),
-            "seconds": total["n_bins"].to_numpy() * step,
-            "outside_events_n_spikes": rest["n_spikes"].to_numpy(),
-            "outside_events_seconds": rest["n_bins"].to_numpy() * step,
-        }
-    )
+    out = _epoch_gain_frame(time_sums, bin_s, total)
+    out["outside_events_n_spikes"] = rest["n_spikes"].to_numpy()
+    out["outside_events_seconds"] = rest["n_bins"].to_numpy() * bin_s.reindex(
+        total.index
+    ).to_numpy(dtype=float)
     for suffix in FAMILY_SUFFIX.values():
-        gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
+        gain = out[f"full_minus_swr{suffix}"].to_numpy()
         rest_gain = (rest[f"full{suffix}"] - rest[f"swr{suffix}"]).to_numpy()
         no_swr, flanks = (
             (
@@ -487,9 +506,6 @@ def epoch_outside_swr_gains(
             ).to_numpy()
             for group in ("no_swr", "swr")
         )
-        out[f"full_minus_swr{suffix}"] = gain
-        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
-        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
         out[f"no_swr_events_full_minus_swr{suffix}"] = no_swr
         out[f"share_in_no_swr_events{suffix}"] = list(map(ratio_or_nan, no_swr, gain))
         out[f"swr_events_outside_swr_full_minus_swr{suffix}"] = flanks
@@ -603,23 +619,7 @@ def epoch_inside_swr_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.Data
     """
     _check_time_sums(time_sums, bin_s)
     total = _chosen_time(time_sums, time_sums["category"] == IMMOBILE_IN_SWR)
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": total["n_spikes"].to_numpy(),
-            "seconds": total["n_bins"].to_numpy()
-            * bin_s.reindex(total.index).to_numpy(float),
-        }
-    )
-    for suffix in FAMILY_SUFFIX.values():
-        gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
-        out[f"full_minus_swr{suffix}"] = gain
-        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
-        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
-    return out
+    return _epoch_gain_frame(time_sums, bin_s, total)
 
 
 def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
@@ -704,28 +704,36 @@ def epoch_outside_swr_subset_gains(
             place_sampling_at_least_s=place_sampling_at_least_s,
         ),
     )
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    step = bin_s.reindex(kept.index).to_numpy(dtype=float)
-    out = pd.DataFrame(
-        {
-            "epoch_id": kept.index,
-            "animal": animals.reindex(kept.index).to_numpy(),
-            "n_bins": kept["n_bins"].to_numpy(),
-            "n_spikes": kept["n_spikes"].to_numpy(),
-            "seconds": kept["n_bins"].to_numpy() * step,
-        }
+    out = _epoch_gain_frame(time_sums, bin_s, kept)
+    out.insert(
+        5, "share_of_bins", list(map(ratio_or_nan, kept["n_bins"], every["n_bins"]))
     )
-    out["share_of_bins"] = list(map(ratio_or_nan, kept["n_bins"], every["n_bins"]))
-    for suffix in FAMILY_SUFFIX.values():
-        gain = (kept[f"full{suffix}"] - kept[f"swr{suffix}"]).to_numpy()
-        out[f"full_minus_swr{suffix}"] = gain
-        out[f"gain_per_spike{suffix}"] = list(map(ratio_or_nan, gain, out["n_spikes"]))
-        out[f"gain_per_s{suffix}"] = list(map(ratio_or_nan, gain, out["seconds"]))
     return out
 
 
+def _subset_epochs(
+    time_sums: pd.DataFrame, bin_s: pd.Series, subsets: Iterable[str]
+) -> Iterator[tuple[str, float, pd.DataFrame]]:
+    """Each part of the time outside SWRs of ``subsets`` (keys of
+    :data:`SUBSETS`), at each of its thresholds: the part, the threshold and
+    :func:`epoch_outside_swr_subset_gains`' rows."""
+    for subset in subsets:
+        key, thresholds = SUBSETS[subset]
+        for threshold in thresholds:
+            yield (
+                subset,
+                threshold,
+                epoch_outside_swr_subset_gains(time_sums, bin_s, **{key: threshold}),
+            )
+
+
 def outside_swr_subset_statistics(
-    time_sums: pd.DataFrame, bin_s: pd.Series, *, n_boot: int = 1000, seed: int = 0
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    *,
+    subsets: Iterable[str] = tuple(SUBSETS),
+    n_boot: int = 1000,
+    seed: int = 0,
 ) -> pd.DataFrame:
     """Each part of the time outside SWRs (:data:`SUBSETS`): each measure's
     per-animal values, their mean and its interval, by score family.
@@ -736,6 +744,8 @@ def outside_swr_subset_statistics(
         The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
     bin_s : pd.Series
         Each epoch's decode time step (s), indexed by ``epoch_id``.
+    subsets : iterable of str, optional
+        The parts to compute (keys of :data:`SUBSETS`; by default every one).
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
 
@@ -748,17 +758,13 @@ def outside_swr_subset_statistics(
         :func:`epoch_outside_swr_subset_gains`' rows.
     """
     parts = []
-    for subset, (key, thresholds) in SUBSETS.items():
-        for threshold in thresholds:
-            epochs = epoch_outside_swr_subset_gains(
-                time_sums, bin_s, **{key: threshold}
-            )
-            table = _epoch_measure_statistics(
-                epochs, SUBSET_MEASURES, n_boot=n_boot, seed=seed
-            )
-            table.insert(0, "threshold_s", threshold)
-            table.insert(0, "subset", subset)
-            parts.append(table)
+    for subset, threshold, epochs in _subset_epochs(time_sums, bin_s, subsets):
+        table = _epoch_measure_statistics(
+            epochs, SUBSET_MEASURES, n_boot=n_boot, seed=seed
+        )
+        table.insert(0, "threshold_s", threshold)
+        table.insert(0, "subset", subset)
+        parts.append(table)
     return pd.concat(parts, ignore_index=True)
 
 
@@ -789,24 +795,20 @@ def outside_swr_subset_shares(
         ``animal_min``, ``n_animals`` and ``n_epochs`` (epochs with a share).
     """
     rows = []
-    for subset, (key, thresholds) in SUBSETS.items():
-        for threshold in thresholds:
-            epochs = epoch_outside_swr_subset_gains(
-                time_sums, bin_s, **{key: threshold}
-            )
-            per_animal = animal_session_values(
-                epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
-            )
-            rows.append(
-                {
-                    "subset": subset,
-                    "threshold_s": threshold,
-                    "estimate": float(per_animal.mean()),
-                    "animal_min": float(per_animal.min()),
-                    "n_animals": len(per_animal),
-                    "n_epochs": int(epochs["share_of_bins"].notna().sum()),
-                }
-            )
+    for subset, threshold, epochs in _subset_epochs(time_sums, bin_s, SUBSETS):
+        per_animal = animal_session_values(
+            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
+        )
+        rows.append(
+            {
+                "subset": subset,
+                "threshold_s": threshold,
+                "estimate": float(per_animal.mean()),
+                "animal_min": float(per_animal.min()),
+                "n_animals": len(per_animal),
+                "n_epochs": int(epochs["share_of_bins"].notna().sum()),
+            }
+        )
     return pd.DataFrame(rows).set_index(["subset", "threshold_s"])
 
 
@@ -947,7 +949,7 @@ RESTRICTION_FIGURE_OUTSIDE_SWR = "gain_per_spike"
 """Figure 2j's second axis, second column: the full decoder minus the SWR-only
 decoder per spike of the immobile time outside SWRs inside a well visit
 (:data:`MEASURES`)."""
-RESTRICTION_FIGURE = {
+OUTSIDE_SWR_EVENT_WINDOWS = {
     "parts": ["outside_swr"],
     "families": [RESTRICTION_FIGURE_FAMILY],
     "contrasts": ["full_minus_swr"],
@@ -956,10 +958,9 @@ RESTRICTION_FIGURE = {
 }
 """The choice of ``restriction_windows.restriction_window_statistics`` (its
 keywords) for the full decoder minus the SWR-only decoder per spike over the
-bins outside SWRs of each event, which the events summary reports (Figure 2j
-drew it before it drew the total outside SWRs)."""
-RESTRICTION_FIGURE_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
-"""The groups of :data:`RESTRICTION_FIGURE`, in order: events with no SWR, then
+bins outside SWRs of each event window, which the events summary reports."""
+OUTSIDE_SWR_EVENT_WINDOW_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
+"""The groups of :data:`OUTSIDE_SWR_EVENT_WINDOWS`, in order: events with no SWR, then
 the time outside the SWR of the events that overlap one."""
 
 

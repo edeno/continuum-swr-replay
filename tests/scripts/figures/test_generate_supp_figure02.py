@@ -30,18 +30,15 @@ TRIAL_FOLD_SETTINGS = {"n_folds": 5, "fold_design": "trials"}
 MARGINS = {0.1: [0.022, 0.019, 0.026, 0.030, 0.021]}
 MARGINS[0.25] = list(np.asarray(MARGINS[0.1]) - 0.001)
 MARGINS[0.5] = list(np.asarray(MARGINS[0.1]) - 0.002)
-SAMPLED = {10.0: [0.029, 0.021, 0.024, 0.037, 0.023]}
-SAMPLED[60.0] = list(np.asarray(SAMPLED[10.0]) + 0.001)
 
 
 def _parts() -> pd.DataFrame:
-    """``outside_swr_subset_statistics``' rows indexed by subset, threshold,
-    family and measure: each part's gain per spike."""
+    """``outside_swr_subset_statistics``' rows of the margins indexed by subset,
+    threshold, family and measure: each margin's gain per spike."""
     tables = []
-    for subset, parts in (("beyond_swr_margin", MARGINS), ("place_sampling", SAMPLED)):
-        for threshold, values in parts.items():
-            rows = _measure_rows({"gain_per_spike": values}).reset_index()
-            tables.append(rows.assign(subset=subset, threshold_s=threshold))
+    for threshold, values in MARGINS.items():
+        rows = _measure_rows({"gain_per_spike": values}).reset_index()
+        tables.append(rows.assign(subset="beyond_swr_margin", threshold_s=threshold))
     return pd.concat(tables).set_index(["subset", "threshold_s", "family", "measure"])
 
 
@@ -312,7 +309,7 @@ def test_each_panels_values_carry_its_letter():
     assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua"}
 
 
-def test_panel_b_draws_the_timing_table():
+def test_the_timing_panel_draws_the_timing_table():
     """The nine shares as a 3 by 3 heat map (rows the start, columns the end),
     each cell's percent and its animals' range, white on the dark cell and
     black on the pale ones, and the labels."""
@@ -334,7 +331,7 @@ def test_panel_b_draws_the_timing_table():
     plt.close(fig)
 
 
-def test_panel_b_names_the_four_corner_cells():
+def test_the_timing_panel_names_the_four_corner_cells():
     """The corner cells, where the event and its SWR overlap but neither
     bound is together, are named in small text at the top of each cell: start
     and end earlier, the event leads; start earlier and end later, it
@@ -360,7 +357,7 @@ def test_panel_b_names_the_four_corner_cells():
     plt.close(fig)
 
 
-def test_panel_d_draws_the_agreement_by_spread():
+def test_the_shared_content_panel_draws_the_agreement_by_spread():
     """Each group's dots per spread bin on its side of the bin, its means with
     their intervals farther out joined by a thin line in the group's color, the
     bins' labels, a dashed zero line and which way means shared content."""
@@ -425,7 +422,7 @@ def test_panel_d_draws_the_agreement_by_spread():
     plt.close(fig)
 
 
-def test_panel_e_draws_the_outside_swr_gain_then_away_from_swrs():
+def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs():
     """Outside SWRs, then only farther than each margin from every SWR: dots
     spread about each column, the mean with its interval, a thin line through
     the means, the margins' label, the difference's y label, the zero line and
@@ -603,7 +600,7 @@ def test_the_calibration_panel_draws_each_states_evidence_by_its_probability():
     plt.close(fig)
 
 
-def test_panel_a_draws_the_mua_around_no_spike_starts():
+def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts():
     """The median with its interquartile band, a dotted line at the start, a
     dashed line at the level outside the periods, and its labels."""
     trace = _no_spike_trace()
@@ -672,7 +669,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
     assert trace["median_duration"] == pytest.approx(9 * 0.002)
 
 
-def test_the_figure_is_the_question_lists_held_out_tetrode_figure():
+def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
     assert FIGURES["S2"].panels == "abcdefghij"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
@@ -712,14 +709,14 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "restriction", (sums, bin_s, events)
         ),
         "read_no_spike_trace": lambda: "trace",
-        "read_hpd": lambda events: seen.setdefault("hpd", events),
+        "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
         "read_ripple_modes": lambda events, folder, table: seen.setdefault(
             "ripple", events
         ),
-        "outside_swr_subset_statistics": lambda sums, bin_s: pd.DataFrame(
+        "outside_swr_subset_statistics": lambda sums, bin_s, subsets: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
                 "threshold_s": [0.1],
@@ -782,7 +779,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
 def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     monkeypatch, notes, inputs_note, rerun
 ):
-    """Panel e is refused as Figure 2j is: from a restriction run off
+    """Panel j is refused as Figure 2j is: from a restriction run off
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {
