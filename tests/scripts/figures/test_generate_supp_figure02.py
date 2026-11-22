@@ -407,7 +407,7 @@ def test_panel_d_draws_the_agreement_by_spread():
         assert sorted(t.get_position()[0] for t in row) == list(bins)
     assert "% of events" in [t.get_text() for t in ax.texts]
     texts = [t.get_text() for t in ax.texts]
-    assert "\u2191 shared content" in texts
+    assert "\u2191 shared\ncontent" in texts
     assert {"No SWR", "SWR"} <= set(texts)
     assert ax.get_ylabel() == "Held-out agreement\n(nats/spike)"
     assert ax.get_xlabel() == "Spread of the other tetrodes'\nestimate (cm)"

@@ -474,9 +474,9 @@ FRAMES = {
     "rule_sweep": (0.085, 0.47),
     "boundary_timing": (0.71, 0.27),
     "nonlocal_mua": (0.075, 0.13),
-    "hpd": (0.28, 0.18),
-    "heldout_gain": (0.535, 0.2),
-    "shared_content": (0.815, 0.17),
+    "hpd": (0.275, 0.17),
+    "heldout_gain": (0.52, 0.2),
+    "shared_content": (0.8, 0.185),
     "ripple_modes": (0.085, 0.3),
     "outside_distance": (0.55, 0.36),
 }
@@ -826,7 +826,7 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
     dots (one per animal) in its color on its side of the bin, the animals'
     mean with its 95 % interval in black farther out, a thin line through the
     group's means, the group's name beside its first bin, a dashed line at zero
-    and, under it at the left, which way means shared content; under the data,
+    and, above it at the right, which way means shared content; under the data,
     each group's percent of its events in each bin in its color
     (``share_of_events``), with a gray note of what the numbers are."""
     bins = np.arange(len(SPREAD_BIN_LABELS))
@@ -848,12 +848,13 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
         )  # fmt: skip
         ax.plot(means, estimates, color=color, lw=0.6, zorder=1)
     ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-    # under the zero line at the left, where no group's values lie
+    # above the zero line at the right, over the widest bin, whose values are
+    # all below zero
     ax.annotate(
-        "\u2191 shared content", (0.02, 0.0),
+        "\u2191 shared\ncontent", (0.99, 0.0),
         xycoords=blended_transform_factory(ax.transAxes, ax.transData),
-        xytext=(0, -2), textcoords="offset points", ha="left", va="top",
-        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+        xytext=(0, 4), textcoords="offset points", ha="right", va="bottom",
+        fontsize=SMALL_SIZE, color=REFERENCE_COLOR, linespacing=0.95,
     )  # fmt: skip
     for k, (name, color) in enumerate(
         zip(("No SWR", "SWR"), GROUP_COLORS.values(), strict=True)
