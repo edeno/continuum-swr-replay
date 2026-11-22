@@ -1,7 +1,7 @@
 """Simple folds for the held-out tests: contiguous blocks of time.
 
 Not a design the runners use (they hold out folds of whole trials,
-``tetrode_holdout.trial_folds``); any folds array is a valid input to the
+``regression.folds.trial_folds``); any folds array is a valid input to the
 held-out functions, and these are the easiest to reason about in a test.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import N_FOLDS
+from continuum_swr_replay.analysis.regression.folds import N_FOLDS
 
 TIME_BLOCK_MARGIN_BINS = 2
 """The margin used with :func:`time_blocks`, bins: the library pads each

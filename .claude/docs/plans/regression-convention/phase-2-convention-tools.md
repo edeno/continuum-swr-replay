@@ -155,7 +155,7 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
   `day_level_test` of [designs.md#session-to-day-to-animal](designs.md#session-to-day-to-animal), plus
   `estimand_summary(values, animal, day, session, *, n_draws, seed)` returning the animal-balanced estimate,
   the t-corrected nested bootstrap interval, the animals with the estimate's sign, and the day-level p.
-- **Declared tests** (`analysis/regression/declared_tests.py`, new): the list of
+- **Declared tests** (`analysis/replay_models/declared_tests.py`, new; not in the fitter package, which knows nothing of the task): the list of
   [C8](shared-contracts.md#c8-the-declared-family-of-tests) (twelve estimands, 36 tests; settled), each entry with its question,
   estimand id, model, and contrast definition (range pairs or coefficient names). One tuple; nothing else
   hard-codes the count.
@@ -205,7 +205,7 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
 | `tests/analysis/test_shared_statistics.py::test_animal_day_session_values` | three-level reduction on a hand table (mean and median) |
 | `test_shared_statistics.py::test_day_level_test` | equals `signed_rank_p` of the day values; NaN below six non-zero differences |
 | `test_shared_statistics.py::test_estimand_summary` | estimate, interval (as `bootstrap_interval`), sign count, day p on a hand table with a fixed seed |
-| `tests/analysis/regression/test_declared_tests.py::test_list_is_unique_and_complete` | every estimand has a model and contrast; ids unique; each is tested for SWR, No SWR and the difference |
+| `tests/analysis/replay_models/test_declared_tests.py::test_list_is_unique_and_complete` | every estimand has a model and contrast; ids unique; each is tested for SWR, No SWR and the difference |
 
 ## Fixtures
 

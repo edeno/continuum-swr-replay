@@ -35,9 +35,10 @@ Constants are left out where they do not depend on ``beta``: the Poisson
 ``-log y!`` and the multinomial coefficient. The Gaussian keeps its
 normalizing constant, which depends on the scale.
 
-A family's ``quadratic`` is True when its log-likelihood is quadratic in
-``eta`` (the Gaussian): one full Newton step from any start is then the exact
-optimum, and the fit takes it without a cap on its length.
+A family's ``name`` is how a fit record names it. Its ``quadratic`` is True
+when its log-likelihood is quadratic in ``eta`` (the Gaussian): one full Newton
+step from any start is then the exact optimum, and the fit takes it without a
+cap on its length.
 """
 
 from __future__ import annotations
@@ -60,6 +61,8 @@ __all__ = [
 class Likelihood(Protocol):
     """The interface the Newton fit and REML read."""
 
+    #: The family's name in a fit record.
+    name: str
     quadratic: bool
 
     def check(self, y: np.ndarray, aux: object) -> None: ...
@@ -135,6 +138,7 @@ class Poisson(_DiagonalFamily):
     ``l = sum y (eta + o) - exp(eta + o)``.
     """
 
+    name = "poisson"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: np.ndarray) -> None:
@@ -175,6 +179,7 @@ class Bernoulli(_DiagonalFamily):
     ``l = sum y eta - log(1 + exp(eta))``.
     """
 
+    name = "bernoulli"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: object) -> None:
@@ -206,6 +211,7 @@ class Gaussian(_DiagonalFamily):
     ``l = -sum (y - eta)^2 / (2 phi) - n/2 log(2 pi phi)``.
     """
 
+    name = "gaussian"
     quadratic = True
 
     def check(self, y: np.ndarray, aux: float) -> None:
@@ -269,6 +275,7 @@ class GroupedSoftmax:
     not be in ``X``.
     """
 
+    name = "grouped_softmax"
     quadratic = False
 
     def check(self, y: np.ndarray, aux: np.ndarray) -> None:

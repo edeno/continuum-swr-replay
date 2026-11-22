@@ -116,8 +116,12 @@ class PSplineBasis:
             Each row sums to one.
         """
         clamped = np.clip(np.asarray(x, dtype=float), self.lo, self.hi)
+        if clamped.size == 0:
+            return np.empty((0, self.n_basis))
+        # The clamp keeps x inside the basis range, so scipy's range check
+        # (extrapolate=False) is not needed; the basis is the same to the bit.
         return BSpline.design_matrix(
-            clamped, self.knots, self.degree, extrapolate=False
+            clamped, self.knots, self.degree, extrapolate=True
         ).toarray()
 
     def penalty(self, order: int = 2) -> np.ndarray:

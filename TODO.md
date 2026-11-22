@@ -181,6 +181,13 @@ The review of the restriction and held-out tetrode runs before the
   compares it on a resume.
   *When:* delete the old cache files when the lead agrees; compare the digest on a
   resume if the runners are rerun.
+- [ ] **The participation run's record names a staging folder.**
+  `event_participation/manifest.json` records the paths of its event table and session
+  cache under a staging root that held links to the real files (the run of 2026-11-21
+  with controls inside well visits). The digests it records are the real files', and no
+  code reads those paths. Do not edit the manifest by hand: the held-out tetrode run and
+  the events summary record its digest.
+  *When:* the paths become correct at the next participation run.
 - [ ] **A run made from a restriction run of another design is pending, not refused.**
   The window run (`sum_nonlocal_restriction_windows.py`) and the held-out event run
   (`detect_heldout_events.py`) record the restriction run's manifest digest but not its
@@ -266,24 +273,17 @@ reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
   columns. Measured: the rotation takes 28 ms and the two checks 10.5 ms of a 109 ms
   score-only evaluation.
   *When:* before the fitter runs the real models' searches.
-- [ ] **The step cap depends on column scaling.** The cap is in coefficient units. A
-  prototype (2026-11-21, simulated designs of 600 rows) showed the effect: with one
-  N(0,1) column multiplied by 1e-4 or less, the Poisson, Bernoulli and softmax fits end
-  at the step limit, and a Poisson fit from a far start ends "no finite maximum" although
-  its maximum is finite; multiplied by 1e-2 or by any factor above 1, every fit
-  converges to the same optimum. Two replacements were tried and both failed the saved
-  failure cases, so the cap stays. A cap of 10 on the change of the linear predictor
-  cannot find a separation along a smooth's line and runs out of steps from a saturated
-  start. No cap, with halving alone, overshoots until the information underflows: a
-  separated session ends "information not positive definite", not "no finite maximum".
-  Until a better rule exists, a design must not hold a column whose values are all very
-  small: the convention's design check refuses one (planned with the collinearity and
-  support checks). A rule not tried: no cap, except where a step would saturate a row.
-  *When:* the design check with the convention tools; a new rule only if needed.
-- [ ] **Who refits the set-aside sessions.** Refitting a set-aside session with columns
-  left out is model policy. Decide whether it belongs to the caller, which owns the
-  support rule, with the search returning the set-aside sessions and their directions.
-  *When:* when the first model's caller is written.
+- [ ] **The step cap depends on column scaling.** The cap is in coefficient units, so a
+  column whose values are all very small ends a fit at the step limit (a prototype,
+  2026-11-21: one N(0,1) column multiplied by 1e-4 on simulated designs of 600 rows;
+  a Poisson fit from a far start then ends "no finite maximum" although its maximum is
+  finite). The design check (`analysis/regression/terms.py:check_column_sizes`) refuses such a
+  column before any fit. Two replacement rules failed the saved failure cases: a cap of
+  10 on the change of the linear predictor cannot find a separation along a smooth's line
+  and runs out of steps from a saturated start; no cap, with halving alone, overshoots
+  until the information underflows. A rule not tried: no cap, except where a step would
+  saturate a row.
+  *When:* only if a design that passes the check still ends at the step limit.
 - [ ] **The Hessian's trace terms by leverages.** For the diagonal families the trace
   terms can use leverages (`sum_i lev_i * (...)`) instead of two Gram products and a
   solve per pair of penalties. Measured: 22.0 ms to 6.6 ms per pair, with a relative
@@ -293,6 +293,28 @@ reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
   fits; score a halving candidate before computing its derivatives; cache `X'X` and
   `X'y` for the Gaussian.
   *When:* with the trace terms above.
+- [ ] **Rescale columns inside the fitter.** A second way to remove the step cap's dependence on
+  column units, not tried: the fitter scales every column to unit size before the Newton
+  steps and maps the coefficients, the penalty and the covariance back. It would remove the
+  design's small-column check. It changes the paths of the fits, so it needs the saved
+  failure cases and the mgcv comparison again.
+  *When:* only if the small-column check gets in the way.
+- [ ] **Contrasts built from the design.** `range_mean_contrast` is given its term's range and
+  curve rows by the caller, and `SDChangeContrast` is given a pooled mean and SD, although the
+  design holds all of them. Note that "per pooled SD" has two meanings in the declared
+  list: for a smooth's SD change it is the SD on one role's rows; for a slope it is the SD
+  over every level on which a slope of that covariate is fitted.
+  *When:* with the first model's design (rate or content).
+- [ ] **The across-session band on a curve's coefficients.** Every session shares one design,
+  so a curve is `C beta` with one `C`; a band built on the term's coefficients needs no
+  grid correlation and has no refusal at a reference point. With five animals it does not
+  remove the weak case (more independent directions than animals).
+  *When:* with the band's check on the models' own curves.
+- [ ] **Collinearity from the Gram matrix.** The measures take one QR of the weighted
+  design per session (about 0.18 s at 50,000 rows by 60 columns, a reviewer's timing). A
+  factor of the p by p Gram matrix is about ten times cheaper, but it must tolerate a
+  column that is zero in a session and it squares the condition number.
+  *When:* if the per-session loop's time matters.
 - [ ] **The Gaussian in the Newton loop.** The Gaussian goes through the loop and is
   exempted from its step rules at three places. One exact step does not replace the
   loop: the loop's second step refines the first. A reviewer measured, on a design with

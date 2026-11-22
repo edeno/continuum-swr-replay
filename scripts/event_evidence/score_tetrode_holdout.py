@@ -15,7 +15,7 @@ The encodings are held out by folds of whole trials, as in
 departure from a well (the trial's ``movement_start_time``, the final poke-out
 at its origin) to the next, so the run to a well and the whole stay there are
 one segment, and the segments are dealt into ``N_FOLDS`` folds balanced by
-destination well (``tetrode_holdout.trial_folds``), with a margin of
+destination well (``regression.folds.trial_folds``), with a margin of
 ``TRIAL_MARGIN_S``. The time before the first trial and after the last trial's
 end are segments of their own two classes, and a segment longer than
 ``MAX_SEGMENT_S`` is cut into equal pieces, each a group of its own, so that
@@ -79,6 +79,7 @@ from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     epoch_windows,
 )
+from continuum_swr_replay.analysis.regression.folds import N_FOLDS
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
@@ -192,7 +193,7 @@ def main(argv: list[str] | None = None) -> None:
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"n_folds": th.N_FOLDS, **th.fold_settings()},
+        "settings": {"n_folds": N_FOLDS, **th.fold_settings()},
         "inputs": {
             "event_table": file_input(event_table),
             "event_participation": participation_input(data_dir),

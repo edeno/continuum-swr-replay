@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
-from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.files import DecodePaths
 from continuum_swr_replay.paths import (
     NONLOCAL_RESTRICTION_BINS_NAME,
@@ -187,11 +187,11 @@ def patched(tmp_path, monkeypatch):
         ):
             np.testing.assert_array_equal(
                 folds,
-                th.trial_folds(
+                fo.trial_folds(
                     TIME,
                     TIME[[0, 2, 4, 6, 8, 10, 11]],
-                    np.r_[TRIALS["to_well"], th.AFTER_LAST_TRIAL],
-                    nr.N_FOLDS,
+                    np.r_[TRIALS["to_well"], fo.AFTER_LAST_TRIAL],
+                    fo.N_FOLDS,
                 ),
             )
             assert margin_bins == 500  # 1 s of 2 ms bins

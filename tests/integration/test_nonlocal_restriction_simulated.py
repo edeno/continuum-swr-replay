@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     fold_training_masks,
 )
+from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
 from tests.support._restriction_tables import restriction_contrasts
@@ -445,7 +446,7 @@ def fold_fit():
     )
     canonical = sim.fit_detector(recording)
     starts, classes = sim.trials(recording)
-    folds = th.trial_folds(recording.time, starts, classes, nr.N_FOLDS)
+    folds = fo.trial_folds(recording.time, starts, classes, fo.N_FOLDS)
     margin = th.margin_in_bins(th.TRIAL_MARGIN_S, recording.time)
     remote = recording.events[~recording.events.kind.isin(NOT_REMOTE)]
     in_swr = _event_mask(recording, remote)
@@ -520,8 +521,8 @@ def test_each_fold_is_fit_without_its_bins(fold_fit):
     and the decode's missing bins as missing; every fold's pass passes the
     model checks."""
     _, _, folds, margin, _, table, record, fits, is_training, is_missing, *_ = fold_fit
-    masks = fold_training_masks(is_training, folds, nr.N_FOLDS, margin)
-    assert len(fits) == nr.N_FOLDS
+    masks = fold_training_masks(is_training, folds, fo.N_FOLDS, margin)
+    assert len(fits) == fo.N_FOLDS
     for k, (training, missing, detector) in enumerate(fits):
         np.testing.assert_array_equal(training, masks[k])
         np.testing.assert_array_equal(missing, is_missing | (folds == k))
@@ -531,7 +532,7 @@ def test_each_fold_is_fit_without_its_bins(fold_fit):
             np.asarray(detector.discrete_state_transitions_).sum(axis=1), 1.0
         )
     assert nr.fold_check_failures(record) == []
-    assert [f["fold"] for f in record["folds"]] == list(range(nr.N_FOLDS))
+    assert [f["fold"] for f in record["folds"]] == list(range(fo.N_FOLDS))
     assert all(1 <= f["em_iterations"] <= 20 for f in record["folds"])
     assert np.isfinite(table[list(nr.SCORE_COLUMNS)].to_numpy()).all()
     probability = table[list(nr.STATE_PROBABILITY_COLUMNS.values())].to_numpy()
@@ -564,7 +565,7 @@ def test_the_fold_fit_table_has_its_columns_and_place_sampling(fold_fit):
         table["place_sampling_s"],
         th.place_sampling(
             th.animal_place_bins(environment, recording.position),
-            th.fold_training_masks(is_training, folds, nr.N_FOLDS, margin),
+            th.fold_training_masks(is_training, folds, fo.N_FOLDS, margin),
             folds,
             float(np.median(np.diff(recording.time))),
         ),
@@ -591,7 +592,7 @@ def test_each_bin_is_scored_by_its_own_folds_fit(fold_fit):
         recording.marks,
         is_missing,
     )
-    assert len(passes) == nr.N_FOLDS
+    assert len(passes) == fo.N_FOLDS
     for k, made in enumerate(passes):
         detector = fits[k][2]
         args, kwargs = made["likelihood_args"]
@@ -690,7 +691,7 @@ def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
         _,
     ) = fold_fit
     zero = folds == 0
-    masks = fold_training_masks(is_training, folds, nr.N_FOLDS, margin)
+    masks = fold_training_masks(is_training, folds, fo.N_FOLDS, margin)
     spike_times, marks = _fold_spikes_replaced(recording, zero)
     changed_spikes = sum(
         int((~np.isin(new, old)).sum())
@@ -791,7 +792,7 @@ def test_the_decodes_missing_bins_score_zero_in_every_fold(fold_fit):
     recording, _, folds, _, _, table, _, fits, _, is_missing, likelihoods, _ = fold_fit
     assert is_missing[0] and (is_missing & (folds == 0)).sum() >= 150
     assert (is_missing & (folds == 3)).sum() >= 150
-    assert len(likelihoods) == len(fits) == nr.N_FOLDS
+    assert len(likelihoods) == len(fits) == fo.N_FOLDS
     for likelihood in likelihoods:
         assert (likelihood[is_missing] == 0).all()
         assert (likelihood[~is_missing] != 0).any(axis=1).all()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy.interpolate import BSpline
 
 from continuum_swr_replay.analysis.regression.pspline import (
     PSplineBasis,
@@ -48,6 +49,34 @@ def test_clamped_outside_the_range() -> None:
     np.testing.assert_array_equal(B[4], B[3])
     np.testing.assert_array_equal(B[5], B[3])
     np.testing.assert_allclose(B.sum(axis=1), 1.0, rtol=0, atol=1e-12)
+
+
+def test_the_design_is_scipys_unextrapolated_basis_at_the_clamped_values() -> None:
+    """The clamp keeps every value inside the basis range, so the basis is the
+    one scipy gives without extrapolation, to the bit: at both ends, at the
+    knots, just inside the ends and outside them."""
+    for basis in (
+        BASIS,
+        PSplineBasis(0.0, float(np.log(60.0)), 9),
+        PSplineBasis(-1.5, 2.25, 7),
+    ):
+        x = np.r_[
+            basis.lo,
+            basis.hi,
+            basis.lo - 1.0,
+            basis.hi + 1.0,
+            -np.inf,
+            np.inf,
+            basis.knots,
+            np.nextafter(basis.lo, np.inf),
+            np.nextafter(basis.hi, -np.inf),
+            np.random.default_rng(0).uniform(basis.lo - 2.0, basis.hi + 2.0, 200),
+        ]
+        clamped = np.clip(x, basis.lo, basis.hi)
+        expected = BSpline.design_matrix(
+            clamped, basis.knots, basis.degree, extrapolate=False
+        ).toarray()
+        np.testing.assert_array_equal(basis.design(x), expected)
 
 
 def test_penalty_null_space_is_the_linear_functions() -> None:
@@ -105,3 +134,9 @@ def test_constrained_smooth_is_the_basis_times_the_constraint() -> None:
     assert design.shape == (200, 9) and penalty.shape == (9, 9)
     np.testing.assert_allclose(design.sum(axis=0), 0.0, atol=1e-10)
     assert penalty_rank(penalty) == 10 - 2
+
+
+def test_no_rows_give_an_empty_design() -> None:
+    """The basis at no rows is an empty design of the basis's width (scipy's
+    design matrix refuses an empty input)."""
+    assert PSplineBasis(0.0, 1.0, 8).design(np.empty(0)).shape == (0, 8)

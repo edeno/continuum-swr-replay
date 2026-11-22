@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -14,6 +15,7 @@ from continuum_swr_replay.analysis.regression import reml
 from continuum_swr_replay.analysis.regression.constants import (
     LOG_PENALTY_BOUNDS,
     NULL_SPACE_EDF_TOL,
+    REFIT_MAX_ROUNDS,
 )
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
@@ -38,6 +40,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     in_null_space,
     pooled_reml,
     refine_penalties,
+    refit_session,
     reml_and_derivatives,
     select_penalties,
 )
@@ -50,6 +53,8 @@ from scripts.checks.compare_regression_to_mgcv import (
     make_data,
     stop_bins,
 )
+
+from .conftest import draw_response
 
 FAMILIES = ("poisson", "bernoulli", "gaussian", "grouped_softmax")
 N_BASIS = 7  # 6 constrained columns per smooth
@@ -88,18 +93,16 @@ def _session(
     X = np.hstack(parts)
     if family == "poisson":
         offset = np.log(rng.uniform(0.5, 2.0, size=n_rows))
-        y = rng.poisson(np.exp(0.7 + truth + offset)).astype(float)
+        y = draw_response(rng, "poisson", 0.7 + truth + offset)
         return Poisson(), SessionData(X, y, offset), blocks
     if family == "bernoulli":
-        y = (rng.uniform(size=n_rows) < 1 / (1 + np.exp(-truth))).astype(float)
+        y = draw_response(rng, "bernoulli", truth)
         return Bernoulli(), SessionData(X, y), blocks
     if family == "gaussian":
         y = 1.0 + truth + rng.normal(scale=0.5, size=n_rows)
         return Gaussian(), SessionData(X, y), blocks
     groups = np.repeat(np.arange(n_rows // 4), 4)
-    weight = np.exp(truth).reshape(-1, 4)
-    p = weight / weight.sum(axis=1, keepdims=True)
-    y = np.concatenate([rng.dirichlet(30.0 * row) for row in p])
+    y = draw_response(rng, "shares", truth, total=30.0)
     return GroupedSoftmax(), SessionData(X, y, groups), blocks
 
 
@@ -223,7 +226,7 @@ def test_a_session_whose_design_is_not_identified_raises() -> None:
         has_reward = index != 3  # session 3 has no rewarded row
         reward = (rng.uniform(size=600) < 0.5).astype(float) * has_reward
         X = np.column_stack([np.ones(600), reward, design])
-        y = rng.poisson(np.exp(-1.0 + np.sin(x) + 0.3 * reward)).astype(float)
+        y = draw_response(rng, "poisson", -1.0 + np.sin(x) + 0.3 * reward)
         sessions.append(SessionData(X, y, np.zeros(600), name=f"s{index}"))
     blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     message = (
@@ -575,7 +578,7 @@ def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
     x = rng.uniform(size=500)
     design, penalty = _smooth(x, n_basis=10)
     X = np.column_stack([np.ones(500), x, design])
-    y = rng.poisson(np.exp(0.5 + np.sin(3.0 * x))).astype(float)
+    y = draw_response(rng, "poisson", 0.5 + np.sin(3.0 * x))
     blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
     assert score.score == np.inf
@@ -791,9 +794,7 @@ def test_softmax_penalty_selection_is_stationary() -> None:
     X = np.column_stack([design, rng.normal(size=n_rows)])
     eta = np.sin(1.5 * s) + 0.4 * X[:, -1]
     groups = np.repeat(np.arange(n_events), n_arms)
-    weight = np.exp(eta).reshape(-1, n_arms)
-    p = weight / weight.sum(axis=1, keepdims=True)
-    y = np.concatenate([rng.dirichlet(10.0 * row) for row in p])
+    y = draw_response(rng, "shares", eta, total=10.0, group_size=n_arms)
     data = SessionData(X, y, groups)
     blocks = [PenaltyBlock(np.arange(11), penalty)]
 
@@ -1041,6 +1042,146 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     assert np.all(np.isnan(refitted.fit.beta[[arm, role]]))
 
 
+def test_the_search_refits_a_set_aside_session_by_refit_session() -> None:
+    """The search's refit of a set-aside session is :func:`refit_session` at
+    the chosen penalties: the same fits, columns left out, rounds and reason;
+    the columns are left out in round 1."""
+    sessions = []
+    for seed in range(10):
+        data, blocks = _content_session(seed)
+        sessions.append(_with_arm_columns(data, seed, separated=seed == 4))
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+    (set_aside,) = result.search.set_aside
+    refit = refit_session(GroupedSoftmax(), sessions[4], blocks, result.rho, index=4)
+    assert refit.fitted and refit.reason == set_aside.reason
+    np.testing.assert_array_equal(refit.left_out, set_aside.left_out)
+    np.testing.assert_array_equal(refit.rounds, [1, 1])
+    assert len(refit.refits) == len(set_aside.refits)
+    for one, two in zip(refit.refits, set_aside.refits, strict=True):
+        np.testing.assert_array_equal(one.fit.beta, two.fit.beta)
+        assert one.fit.status == two.fit.status
+
+
+def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
+    """Rounds: a direction spread over near-copies of a 0/1 column is left out
+    over several rounds, each column with the round that left it out. A
+    separation by a smooth's own line ends without a fit, with the reason, and
+    is not an error."""
+    rng = np.random.default_rng(0)
+    basis = PSplineBasis(0.0, 4.0, 10)
+    x = rng.uniform(0.0, 4.0, 600)
+    design, penalty, _ = basis.constrained(x)
+    indicator = (rng.uniform(size=600) < 0.2).astype(float)
+    copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
+    X = np.column_stack([np.ones(600), design, *copies])
+    y = draw_response(rng, "bernoulli", np.sin(x))
+    y[indicator == 1] = 1.0
+    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
+    with np.errstate(over="ignore"):
+        refit = refit_session(Bernoulli(), SessionData(X, y), blocks, [6.0])
+    assert refit.fitted and len(refit.refits) > 2
+    assert refit.ended == reml.RefitEnd.CONVERGED
+    assert refit.rounds.size == refit.left_out.size
+    assert refit.rounds[0] == 1 and refit.rounds[-1] == len(refit.refits) - 1
+    assert np.all(np.diff(refit.rounds) >= 0)
+
+    data, blocks = _content_session(6, by_the_clock=True)
+    line = refit_session(GroupedSoftmax(), data, blocks, [6.0])
+    assert not line.fitted and line.left_out.size == 0
+    assert line.ended == reml.RefitEnd.ALONG_A_PENALTY
+    assert "block 0's null space" in line.reason
+
+
+def _rate_session_with_levels(
+    seed: int, empty_reference: bool
+) -> tuple[SessionData, np.ndarray]:
+    """A Poisson session of 40 visits of 30 bins: an intercept, two level
+    columns (the reference level is the first 10 visits), a slope and a
+    P-spline of 7 columns. ``empty_reference``: no event on the reference
+    level's rows, so the fit has no finite maximum along the intercept."""
+    rng = np.random.default_rng(seed)
+    visit = np.repeat(np.arange(40), 30)
+    level = np.where(visit < 10, 0, np.where(visit < 25, 1, 2))
+    x = rng.normal(size=40)[visit]
+    t = np.tile(np.arange(30) * 0.1, 40)
+    count = rng.poisson(0.2, visit.size).astype(float)
+    if empty_reference:
+        count[level == 0] = 0.0
+    smooth = PSplineBasis(0.0, 3.0, 8).constrained(t)
+    X = np.column_stack([np.ones(visit.size), level == 1, level == 2, x, smooth.design])
+    offset = np.full(visit.size, np.log(0.1))
+    return SessionData(X, count, offset, name=f"s{seed}"), smooth.penalty
+
+
+def test_the_search_never_refits_a_session_without_its_intercept() -> None:
+    """Six Poisson sessions, one whose reference level holds no event: the
+    search sets it aside and leaves it without a fit, with the intercept
+    reason and NaN coefficients; it does not fit it with the intercept left
+    out. The chosen penalty and the other sessions' fits are as before."""
+    sessions, penalty = [], None
+    for seed in range(6):
+        data, penalty = _rate_session_with_levels(seed, empty_reference=seed == 0)
+        sessions.append(data)
+    blocks = [PenaltyBlock(np.arange(4, 11), penalty)]
+    result = select_penalties(Poisson(), sessions, blocks)
+    (left_out,) = result.search.set_aside
+    assert left_out.index == 0 and not left_out.fitted
+    assert left_out.left_out.size == 0
+    assert left_out.reason.startswith("no finite maximum along the intercept")
+    assert left_out.refits[-1].fit.status == NO_FINITE_MAXIMUM
+    assert np.isnan(result.sessions[0].fit.beta).all()
+    assert result.search.share_without_fit == pytest.approx(1 / 6)
+    np.testing.assert_array_equal(result.rho, [20.0])
+    assert result.sessions[1].fit.beta[3] == pytest.approx(
+        -0.1197006834685946, rel=1e-12
+    )
+
+
+def test_refit_session_does_not_make_the_intercept_inactive() -> None:
+    """A session whose fit has no finite maximum along the intercept (the
+    column with one nonzero value on every row) is left without a fit, with
+    that reason, and no column is made inactive."""
+    data, penalty = _rate_session_with_levels(0, empty_reference=True)
+    blocks = [PenaltyBlock(np.arange(4, 11), penalty)]
+    refit = refit_session(Poisson(), data, blocks, [6.0])
+    assert not refit.fitted and refit.left_out.size == 0
+    assert len(refit.refits) == 1
+    assert 0 in refit.refits[0].fit.running_away
+    assert refit.ended == reml.RefitEnd.ALONG_THE_INTERCEPT
+    assert refit.reason == reml.ALONG_THE_INTERCEPT
+    # Doubling the intercept column is still an intercept.
+    doubled = replace(data, X=np.column_stack([2.0 * data.X[:, :1], data.X[:, 1:]]))
+    assert refit_session(Poisson(), doubled, blocks, [6.0]).ended == (
+        reml.RefitEnd.ALONG_THE_INTERCEPT
+    )
+
+
+def test_the_intercept_is_named_before_the_rounds_run_out(monkeypatch) -> None:
+    """Scripted fits: each round runs away along one new column, and the fit
+    of the last round allowed along the intercept. The refit ends along the
+    intercept, which no further round could leave out, not after too many
+    rounds."""
+
+    def running_away(columns: list[int]) -> SimpleNamespace:
+        fit = SimpleNamespace(
+            converged=False, status=NO_FINITE_MAXIMUM, running_away=np.array(columns)
+        )
+        directions = tuple(reml.FreeDirection(None, c, True) for c in columns)
+        return SimpleNamespace(fit=fit, running_away_directions=directions)
+
+    fits = iter(
+        [running_away([k]) for k in range(1, REFIT_MAX_ROUNDS + 1)]
+        + [running_away([0])]
+    )
+    monkeypatch.setattr(reml, "_labeled_score", lambda *args: next(fits))
+    rng = np.random.default_rng(0)
+    X = np.column_stack([np.ones(40), rng.normal(size=(40, REFIT_MAX_ROUNDS))])
+    refit = refit_session(Poisson(), SessionData(X, np.ones(40), np.zeros(40)), [], [])
+    assert len(refit.refits) == REFIT_MAX_ROUNDS + 1
+    assert refit.ended == reml.RefitEnd.ALONG_THE_INTERCEPT
+    assert refit.left_out.tolist() == list(range(1, REFIT_MAX_ROUNDS + 1))
+
+
 def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
     """A content session whose responses are each event's row of smallest
     clock is separated by the smooth's own line, which cannot be made
@@ -1089,7 +1230,7 @@ def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
         indicator = (rng.uniform(size=600) < 0.2).astype(float)
         copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
         X = np.column_stack([np.ones(600), design, *copies])
-        y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
+        y = draw_response(rng, "bernoulli", np.sin(x))
         if seed == 2:
             y[indicator == 1] = 1.0
         sessions.append(SessionData(X, y, name=f"s{seed}"))

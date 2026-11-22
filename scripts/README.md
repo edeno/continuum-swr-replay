@@ -141,6 +141,8 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into one table.
 - `compare_regression_to_mgcv.py` (with `compare_regression_to_mgcv.R`) — the shared regression fitter beside mgcv on four synthetic data sets; rewrites the fixtures in `tests/analysis/regression/data/mgcv/` ([../docs/design/regression_fitter.md](../docs/design/regression_fitter.md)).
 - `compare_regression_to_neurospatial.py` — run with neurospatial's own interpreter: its REML penalty selection on one synthetic term, written to `tests/analysis/regression/data/neurospatial/`.
+- `simulate_interval_coverage.py` — the coverage of the animal-balanced interval when the draws resample animals then sessions (the convention's rule), animals then days then sessions, or animals only, in simulation; writes the table to `--out` (`--quick` for a smoke run).
+- `check_stored_folds_reproduce.py` — reads only: the held-out runs' stored folds are the fold rule's (`analysis/regression/folds.py`) from the session cache's trials, with the counts their manifests record, and the held-out tetrode run records the same fold counts as the restriction run; exits non-zero on any difference (`--workers`, `--epochs`).
 - `compare_regression_to_current_fitters.py` — the shared fitter without a penalty beside the current per-bin and content fitters on three real sessions.
 - `write_pipeline_map.py` — regenerates `docs/regression_pipeline_map.md`; `--check` fails on drift.
 - `write_epoch_register_doc.py` — rewrites the generated parts of `docs/epoch_register.md`; `--check` fails on drift.

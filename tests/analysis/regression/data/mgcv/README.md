@@ -6,11 +6,16 @@ mgcv's REML fits of the four synthetic data sets of
 each: the smoothing parameters `sp`, the trace of each smooth's penalty matrix as mgcv
 scaled it (`trace_S`), the edf, the REML score (`gcv.ubre`), the scale, the 0/1
 coefficient `rew` and its standard error (Poisson sets), and each centered smooth and
-its standard error on the grid 0.05, 0.10, ..., 3.95 (`predict(type = "terms")`).
+its standard error on the grid 0.05, 0.10, ..., 3.95 (`predict(type = "terms")`), and
+the three concurvity measures of every term (`concurvity(full = TRUE)`: `worst`,
+`observed`, `estimate`, with `terms` naming them; `para` is the parametric columns
+together, the intercept included).
 `n_rows` and `y_sum` let the test check that it rebuilt the same data.
 
 `tests/analysis/regression/test_reml.py::test_matches_mgcv_fixtures` rebuilds each data
 set from its seed, fits it with the shared fitter and compares; it does not need R.
+`tests/analysis/regression/test_collinearity.py::test_matches_mgcv_concurvity` compares
+the smooths' concurvity.
 
 Made with R 4.5.3 and mgcv 1.9-4 (the `csr-mgcv` conda environment), from the
 repository root:

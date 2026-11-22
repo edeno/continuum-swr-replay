@@ -203,7 +203,7 @@ def simulate_recording(
 
 
 def trials(recording: Recording) -> tuple[np.ndarray, np.ndarray]:
-    """The recording's trials as ``tetrode_holdout.trial_folds`` takes them:
+    """The recording's trials as ``regression.folds.trial_folds`` takes them:
     each lap is a trial, from its departure (the first running bin) through the
     rest at the end it runs to.
 
