@@ -11,6 +11,21 @@ Work that is deferred on purpose. Each item says when it should be done.
   class and bibliography style.
   *When:* once the journal is chosen.
 
+## Figures
+
+- [ ] **Figures that are the supplement of no main figure.** Each supplementary
+  figure is the supplement of one main figure (`docs/development.md`, convention
+  11). These are not in `paper/main.tex` and are named for no main figure; each needs
+  a main figure, or a place as panels in a main figure's supplement, before it
+  enters the paper: in `reported/questions.py`, `decoder_validation`
+  (`scripts/figures/generate_supp_decoder_validation.py`), `content_estimators`
+  (`scripts/replay_models/content/compare_content_estimators.py`),
+  `uncertainty_content` (`scripts/figures/generate_uncertainty_content_figure.py`)
+  and `swr_contrast` (`scripts/figures/plot_swr_contrast_coefs.py`); and the scripts
+  `scripts/figures/generate_supp_pipeline_schematic.py` and
+  `generate_supp_pipeline_data_flow.py`.
+  *When:* before any of them enters the paper.
+
 ## Reproduction
 
 - [ ] **Public reproduction from archived tables (Tier 1).** Archive the
@@ -160,8 +175,8 @@ The review of the restriction and held-out tetrode runs before the
   (`restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike`,
   `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`). The
   gain outside SWRs away from the SWRs, at well-sampled places, and its shares
-  in and outside those events are in the held-out tetrode supplementary figure
-  (`scripts/figures/generate_supp_heldout_tetrode.py`, panels b to d).
+  in and outside those events are in Figure 2's supplement
+  (`scripts/figures/generate_supp_figure02.py`, panels b to d).
   *When:* when the caption of Figure 2 is written.
 - [ ] **The library does not repeat itself on one kind of CI machine.** On
   GitHub's runners with an AMD EPYC 7763 (no AVX-512), the fold fit of the
@@ -220,9 +235,10 @@ The review of the restriction and held-out tetrode runs before the
   (`restriction_inputs_note`), but not when only the event table changed (the held-out
   event run's canonical check), while the events summary marks the values pending.
   *When:* when Figure 2's checks are next changed.
-- [ ] **The supplementary held-out tetrode figure checks no staleness.**
-  `scripts/figures/generate_supp_heldout_tetrode.py` refuses a run not on folds of whole
-  trials, but draws a run made from another event table or participation run.
+- [ ] **Figure 2's supplement, panel a, checks no staleness.**
+  `scripts/figures/generate_supp_figure02.py` refuses a held-out tetrode run not on
+  folds of whole trials, but draws a run made from another event table or
+  participation run.
   *When:* before the figure is final.
 - [ ] **The restriction run's categories still count bins without ripple signal as
   outside an SWR.** `nonlocal_restriction.bin_categories` puts an immobile analyzed bin

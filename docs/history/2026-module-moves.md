@@ -798,3 +798,17 @@ event and event × arm tables gained the visit columns (`docs/covariate_dictiona
 | `analysis.behavior.covariates.reward_basis_from_lags`, `analysis.behavior.covariates.history.reward_basis_from_lags` (removed: re-exports) | `analysis.behavior.history_basis.reward_basis_from_lags` |
 | `analysis.replay_models.per_bin_design.arrival_spanning_stop_ids` (removed: moved) | `analysis.replay_models.visit_design.arrival_spanning_stop_ids`, beside the outcome-boundary shift and the bin coverage the two designs share |
 | the rate and history constants re-exported by `analysis.replay_models.model_specs` (`RATE_BIN_S`, `TMAX`, `TMAX_ARRIVAL`, `N_HISTORY_LAGS`, `N_HISTORY_BASIS`, `N_REWARD_LAGS`, `REWARD_HISTORY_*`, `RECENCY_SPLINE_*`, `ARRIVAL_*`, `ARM_FE_PREDICTORS`, `SPLINE_KNOTS`, `N_CROSS_LONG_*`) (removed: re-exports) | `analysis.behavior.design_constants` |
+
+## The supplementary figures named for their main figures, 2026-11-22
+
+Each supplementary figure in the paper is the supplement of one main figure and is named for
+it (`docs/development.md`, convention 11); its id in `reported/questions.py` is `SN`, a panel
+`SNb`.
+
+| Old place | New place |
+|---|---|
+| `scripts/figures/generate_supp_memoryless_comparison.py`, `paper/figures/supp_memoryless_comparison/`, figure id `memoryless_comparison` | `scripts/figures/generate_supp_figure01.py`, `paper/figures/supp_figure01/`, figure id `S1` (the supplement to Figure 1) |
+| `scripts/figures/generate_supp_heldout_tetrode.py`, `paper/figures/supp_heldout_tetrode/`, figure id `heldout_tetrode` | `scripts/figures/generate_supp_figure02.py`, `paper/figures/supp_figure02/`, figure id `S2`, values tagged by panel `S2a` to `S2d` (the supplement to Figure 2) |
+| `scripts/figures/generate_supp_event_gamma.py`, `paper/figures/supp_event_gamma/`, figure id `event_gamma` | `scripts/figures/generate_supp_figure03.py`, `paper/figures/supp_figure03/`, figure id `S3` (the supplement to Figure 3) |
+| `tests/scripts/figures/test_generate_supp_memoryless_comparison.py`, `test_generate_supp_heldout_tetrode.py` | `test_generate_supp_figure01.py`, `test_generate_supp_figure02.py` |
+
