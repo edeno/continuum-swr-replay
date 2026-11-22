@@ -873,17 +873,33 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
                         "kind": kind,
                         "gain_per_spike": value,
                         "spiking_gain_per_spike": value + 0.1,
+                        "agreement_per_spike": value / 2,
                     }
                 )
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
-    # the held-out tetrode supplementary figure draws them; Figure 2 does not
-    assert {v.figures for v in values} == {("heldout_tetrode",)}
+    by_key = _by_key(values)
+    # the held-out tetrode supplementary figure draws the gains; Figure 2 does
+    # not, and no figure draws the agreement
+    agreement = {k for k in by_key if "agreement" in k}
+    assert {by_key[k].figures for k in agreement} == {()}
+    assert {v.figures for k, v in by_key.items() if k not in agreement} == {
+        ("heldout_tetrode",)
+    }
+    assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
     assert numbers["non_swr_heldout_control_gain_per_spike"] == pytest.approx(0.0)
     assert numbers["swr_heldout_events_scored"] == 3
-    assert len(numbers) == 3 * 3 * 2 + 2
+    # the agreement: the same statistic over agreement_per_spike
+    assert numbers["non_swr_heldout_agreement_per_spike"] == pytest.approx(0.3)
+    assert numbers["swr_heldout_agreement_per_spike_ci_low"] < 0.3
+    assert numbers["swr_heldout_control_agreement_per_spike"] == pytest.approx(0.0)
+    description = by_key["non_swr_heldout_agreement_per_spike"].description
+    assert "no place preference" in description
+    assert "not held out" in description
+    # five estimates, three values each, two groups; two counts
+    assert len(numbers) == 5 * 3 * 2 + 2
 
 
 def _restriction_windows() -> pd.DataFrame:
@@ -1304,3 +1320,91 @@ def test_restriction_figure_statistics_are_the_tagged_values():
                 f"restriction_heldout_{word}_events_outside_swr_full_minus_swr_per_spike"
             ]
         )
+
+
+def _part_time_sums() -> pd.DataFrame:
+    """Animals a, b, c, one epoch each, bins of 1 s outside SWRs inside a well
+    visit, one spike a bin, ``full - swr`` per bin by part: 4 bins within
+    100 ms of the scoring mask at 0 nats, 3 bins beyond 100 ms at k nats each
+    (k = 1, 2, 3 for a, b, c), 2 beyond 250 ms at 2k, 1 beyond 500 ms at 4k,
+    all sampled under 10 s but the last, sampled 60 s or more; and in each
+    epoch 1 bin where SWR detection was not observed (b's has 2), at 100 nats,
+    which never counts."""
+    rows, observed, margin, sampling = [], [], [], []
+    for k, epoch in enumerate(("a1", "b1", "c1"), start=1):
+        for n_bins, nats, beyond, sampled, seen in (
+            (4, 0.0, 0.0, 0.0, True),
+            (3, 3.0 * k, 0.1, 0.0, True),
+            (2, 4.0 * k, 0.25, 0.0, True),
+            (1, 4.0 * k, 0.5, 60.0, True),
+            (2 if epoch == "b1" else 1, 100.0, 0.5, 60.0, False),
+        ):
+            rows.append(
+                (epoch, "immobile_outside_swr", True, False, n_bins, n_bins, 0.0, nats)
+            )
+            observed.append(seen)
+            margin.append(beyond)
+            sampling.append(sampled)
+    return time_sums(
+        rows,
+        swr_observed=observed,
+        beyond_swr_margin_s=margin,
+        place_sampling_at_least_s=sampling,
+    )
+
+
+def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
+    bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
+    values = _by_key(
+        builder.restriction_outside_swr_part_values(_part_time_sums(), bin_s, "s")
+    )
+    numbers = {key: value.value for key, value in values.items()}
+    stem = "restriction_outside_swr"
+    assert numbers[f"{stem}_not_observed_bins"] == 4
+    assert numbers[f"{stem}_not_observed_epochs"] == 3
+    # beyond 100 ms: bins of 3k, 2k, 4k over 6 bins, so 11k / 6 per spike;
+    # animals 11/6, 22/6, 33/6, mean 22/6
+    key = f"{stem}_beyond_hundred_ms_full_minus_swr"
+    assert numbers[f"{key}_per_spike"] == pytest.approx(22 / 6)
+    assert numbers[f"{key}_per_s"] == pytest.approx(22 / 6)
+    assert numbers[f"{key}_two_sided_per_spike"] == pytest.approx(44 / 6)
+    assert numbers[f"{key}_epochs_positive"] == 3
+    assert numbers[f"{key}_epochs"] == 3
+    assert numbers[f"{stem}_beyond_hundred_ms_share_of_bins"] == pytest.approx(0.6)
+    # beyond 250 ms: 4k and 4k over 3 bins (mean 16 / 3); beyond 500 ms: 4k
+    # over 1 bin
+    assert numbers[f"{stem}_beyond_quarter_s_full_minus_swr_per_spike"] == (
+        pytest.approx(16 / 3)
+    )
+    assert numbers[f"{stem}_beyond_half_s_full_minus_swr_per_spike"] == (
+        pytest.approx(8.0)
+    )
+    assert numbers[f"{stem}_beyond_half_s_share_of_bins"] == pytest.approx(0.1)
+    # sampled at least 10 s and at least 60 s: the last bin only
+    assert numbers[f"{stem}_sampled_ten_s_full_minus_swr_per_spike"] == (
+        pytest.approx(8.0)
+    )
+    assert numbers[f"{stem}_sampled_minute_full_minus_swr_per_s"] == (
+        pytest.approx(8.0)
+    )
+    assert values[f"{key}_per_spike"].unit == "nats per spike"
+    assert values[f"{stem}_beyond_hundred_ms_share_of_bins"].kind == "fraction"
+    assert "100 ms" in values[f"{key}_per_spike"].description
+    assert "60 s" in values[f"{stem}_sampled_minute_share_of_bins"].description
+    # per part: two families x (two units x four + two epoch counts), and the
+    # share with its bounds; and the two counts left out
+    assert len(numbers) == 5 * (2 * (2 * 4 + 2) + 3) + 2
+    assert {v.figures for v in values.values()} == {()}
+    assert {v.questions for v in values.values()} == {("2c.3",)}
+
+
+def test_the_gain_outside_swrs_leaves_out_the_bins_without_ripple_signal():
+    """The headline's bins are those observed: 10 per epoch, 11k nats."""
+    bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
+    groups = builder.restriction_outside_swr_values(
+        _part_time_sums(), bin_s, _restriction_windows().iloc[:0], "s"
+    )
+    numbers = _numbers(groups.with_events)
+    assert numbers["restriction_outside_swr_full_minus_swr_per_spike"] == (
+        pytest.approx(22 / 10)
+    )

@@ -271,6 +271,7 @@ TAGS = {
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("heldout_tetrode",)),
+    "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
     "spike": Tags(("2d.9", "2c.3")),
@@ -1872,24 +1873,58 @@ _TETRODE_HELD_OUT = (
 (``tetrode_holdout.holdout_scores``)."""
 
 
+#: Each held-out tetrode measure reported: its column of
+#: ``tetrode_holdout.window_scores``, the score in words, and what its
+#: description adds after how the score is held out.
+_TETRODE_MEASURES = {
+    "gain": (
+        "gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal",
+        "",
+    ),
+    "spiking_gain": (
+        "spiking_gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal in the bins "
+        "where the scored tetrode spiked",
+        "",
+    ),
+    "agreement": (
+        "agreement_per_spike",
+        "the agreement, each tetrode's log predictive score under the other "
+        "tetrodes' position distribution minus under no place preference (the "
+        "mean over place bins), positive only when the other tetrodes' "
+        "distribution predicts where the scored tetrode points better than no "
+        "preference does, so that the tetrodes share content (the gain over "
+        "local coding is positive for any non-local activity the distribution "
+        "covers, coherent or not)",
+        "; the windows are the canonical events and their controls, chosen from "
+        "the decode of every tetrode, so the choice of time is not held out",
+    ),
+}
+
+
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
-    the events and their Local-rest controls (the held-out tetrode
-    supplementary figure)."""
-    make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
+    """Question 2c.3: the held-out tetrode gain over local coding and the
+    agreement, per spike, of the events and their Local-rest controls. The
+    gain is drawn on the held-out tetrode supplementary figure and carries its
+    tag; the agreement is drawn on no figure."""
+    make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
+    make_text = value_factory(
+        tetrode_holdout_values, source, TAGS["tetrode_holdout_text"]
+    )
     values = []
     estimates = (
-        ("gain", "event", "gain_per_spike", "events", ""),
-        (
-            "spiking_gain",
-            "event",
-            "spiking_gain_per_spike",
-            "events",
-            " in the bins where the scored tetrode spiked",
-        ),
-        ("control_gain", "control", "gain_per_spike", "Local-rest controls", ""),
+        ("gain", "gain", "event", "events"),
+        ("spiking_gain", "spiking_gain", "event", "events"),
+        ("control_gain", "gain", "control", "Local-rest controls"),
+        ("agreement", "agreement", "event", "events"),
+        ("control_agreement", "agreement", "control", "Local-rest controls"),
     )
-    for name, kind, column, label, spiking in estimates:
+    for name, measure, kind, label in estimates:
+        column, words, note = _TETRODE_MEASURES[measure]
+        make = make_text if measure == "agreement" else make_figure
         statistics = tetrode_holdout.holdout_statistics(windows, kind, column)
         for word, group in _RUN_GROUPS.items():
             row = statistics.loc[group]
@@ -1897,12 +1932,10 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
                 make,
                 f"{word}_heldout_{name}_per_spike",
                 row,
-                f"held-out tetrode score of {group} {label}: each tetrode's "
-                "log predictive score under the other tetrodes' position "
-                "distribution minus under local coding around the animal"
-                f"{spiking}, summed over tetrodes and bins and divided by the "
-                f"window's spikes; {_TETRODE_HELD_OUT}; mean over animals of "
-                "each animal's median over epochs of each epoch's median",
+                f"held-out tetrode score of {group} {label}: {words}, summed over "
+                "tetrodes and bins and divided by the window's spikes; "
+                f"{_TETRODE_HELD_OUT}{note}; mean over animals of each animal's "
+                "median over epochs of each epoch's median",
                 # the controls' values are near zero: two significant digits
                 style="sig2" if kind == "control" else "dec2",
             )
@@ -2568,6 +2601,129 @@ def restriction_outside_swr_values(
                 f"Over the cohort: {_EPOCH_REDUCTION}",
             )
     return OutsideSwrValues(values, outside_events)
+
+
+#: Each part of the time outside SWRs: its word in a key (which holds no digit)
+#: and what it keeps, in words, by kind of part and threshold (s).
+_OUTSIDE_SWR_PARTS = {
+    "beyond_swr_margin": {
+        threshold: (
+            f"beyond_{word}",
+            f"farther than {threshold * 1000:g} ms (on each side) from every bin "
+            "of the scoring mask (every SWR of the source)",
+        )
+        for threshold, word in zip(
+            restriction_totals.OUTSIDE_SWR_MARGINS_S,
+            ("hundred_ms", "quarter_s", "half_s"),
+            strict=True,
+        )
+    },
+    "place_sampling": {
+        threshold: (
+            f"sampled_{word}",
+            f"whose place was sampled for at least {threshold:g} s in the "
+            "training data of the bin's own fold (the seconds of the decode's "
+            "training bins outside the fold and its margin at the animal's place "
+            "bin)",
+        )
+        for threshold, word in zip(
+            restriction_totals.PLACE_SAMPLING_THRESHOLDS_S,
+            ("ten_s", "minute"),
+            strict=True,
+        )
+    },
+}
+
+
+def restriction_outside_swr_part_values(
+    time_sums: pd.DataFrame, bin_s: pd.Series, source: str
+) -> list[Value]:
+    """Question 2c.3: the full decoder against the SWR-only decoder over parts
+    of the immobile time outside SWRs inside a well visit
+    (``restriction_totals.outside_swr_subset_statistics``): away from the SWRs
+    (farther than a margin from every bin of the scoring mask) and where the
+    animal's place was well sampled in training, per spike and per second,
+    with the epochs above zero and the share of the bins each part keeps; and
+    the immobile bins outside every SWR where SWR detection was not observed,
+    which every value outside SWRs leaves out
+    (``restriction_totals.outside_swr_not_observed_counts``). No figure draws
+    these."""
+    make = value_factory(
+        restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
+    )
+    counts = restriction_totals.outside_swr_not_observed_counts(time_sums)
+    values = [
+        make(
+            "restriction_outside_swr_not_observed_bins",
+            counts["n_bins"],
+            "count",
+            "count",
+            "immobile bins outside every SWR of the source where SWR detection "
+            "was not observed (a gap in the stored ripple band): not known to be "
+            "outside an SWR, so every value over the immobile time outside SWRs "
+            "leaves them out",
+        ),
+        make(
+            "restriction_outside_swr_not_observed_epochs",
+            counts["n_epochs"],
+            "count",
+            "count",
+            "epochs with immobile bins outside every SWR where SWR detection was "
+            "not observed",
+        ),
+    ]
+    statistics = restriction_totals.outside_swr_subset_statistics(
+        time_sums, bin_s
+    ).set_index(["subset", "threshold_s", "family", "measure"])
+    full_minus_swr = (
+        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
+    )
+    for subset, parts in _OUTSIDE_SWR_PARTS.items():
+        for threshold, (word, kept) in parts.items():
+            time = f"the immobile bins outside SWRs of the epoch {kept}"
+            for family, suffix in FAMILY_SUFFIX.items():
+                key = f"restriction_outside_swr_{word}_full_minus_swr{suffix}"
+                scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
+                for unit, divided, words in _RESTRICTION_UNITS:
+                    row = statistics.loc[(subset, threshold, family, f"gain_{unit}")]
+                    values += _interval_and_animals_positive(
+                        make,
+                        f"{key}_{unit}",
+                        row,
+                        f"{scored}, {full_minus_swr}, summed over {time} and "
+                        f"divided by {divided}: {_EPOCH_REDUCTION}",
+                        unit=words,
+                    )
+                    if unit == "per_s":
+                        values += [
+                            make(
+                                f"{key}_epochs_positive",
+                                row["n_epochs_positive"],
+                                "count",
+                                "count",
+                                "epochs whose gain per second is above zero",
+                            ),
+                            make(
+                                f"{key}_epochs",
+                                row["n_epochs"],
+                                "count",
+                                "count",
+                                f"epochs with immobile bins outside SWRs {kept}",
+                            ),
+                        ]
+            values += _share_interval(
+                make,
+                f"restriction_outside_swr_{word}_share_of_bins",
+                statistics.loc[
+                    (subset, threshold, RESTRICTION_FIGURE_FAMILY, "share_of_bins")
+                ],
+                f"share of the epoch's immobile bins outside SWRs that lie {kept}"
+                f" (both families): {_EPOCH_REDUCTION}"
+                if subset == "beyond_swr_margin"
+                else f"share of the epoch's immobile bins outside SWRs {kept} (both "
+                f"families): {_EPOCH_REDUCTION}",
+            )
+    return values
 
 
 def restriction_immobile_values(
@@ -3900,6 +4056,22 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     # those values are over the time alone
     summary.add(
         *over(pend(outside_swr_values.outside_events, *heldout_stale), TIME_SUBSET)
+    )
+    # over parts of the time outside SWRs, from the time sums alone: no event
+    # enters
+    summary.add(
+        *over(
+            pend(
+                restriction_outside_swr_part_values(
+                    restriction_time_sums,
+                    restriction_bin_s,
+                    f"{heldout_source} (its time sums)",
+                ),
+                *heldout_runs_stale,
+                heldout.session_cache,
+            ),
+            TIME_SUBSET,
+        )
     )
     # over immobile time only: no event enters
     summary.add(

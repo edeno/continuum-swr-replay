@@ -90,6 +90,7 @@ RESTRICTION_BUILDERS = {
     "restriction_agreement_values": None,
     "restriction_outside_swr_values": None,
     "restriction_immobile_values": None,
+    "restriction_outside_swr_part_values": None,
 }
 #: The builders given the held-out events, by the argument holding them.
 HELDOUT_BUILDERS = {
@@ -502,7 +503,11 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     # the canonical events found again: the selected ones only
     found = seen["restriction_agreement_values"][1]
     assert len(found) == 13 and PLANTED not in set(found["event_id"])
-    for name in ("restriction_outside_swr_values", "restriction_immobile_values"):
+    for name in (
+        "restriction_outside_swr_values",
+        "restriction_immobile_values",
+        "restriction_outside_swr_part_values",
+    ):
         assert seen[name][0]["epoch_id"].tolist() == EPOCHS
         assert seen[name][1].to_dict() == dict.fromkeys(EPOCHS, BIN_S)
     # the other detectors' events are selected by the comparison, given the visits
@@ -539,7 +544,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "so its partner may start outside a visit"
     )
     # the time no event holds is outside every event, selected or not
-    for key in ("restriction_immobile", OUTSIDE_EVENTS):
+    for key in ("restriction_immobile", "restriction_outside_swr_part", OUTSIDE_EVENTS):
         assert values[key].description.endswith(f"; over {builder.TIME_SUBSET}")
 
 
@@ -565,7 +570,10 @@ HELDOUT_EVENT_VALUES = {
     "restriction_outside_swr",
     OUTSIDE_EVENTS,
 }
-HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {"restriction_immobile"}
+HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {
+    "restriction_immobile",
+    "restriction_outside_swr_part",
+}
 RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES) - {"restriction_window"}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
 #: The values against the participation run's Local-rest controls
