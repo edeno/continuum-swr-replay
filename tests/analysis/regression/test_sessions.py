@@ -660,3 +660,42 @@ def test_an_offset_needs_the_poisson_likelihood(
     )
     with pytest.raises(ValueError, match="an Offset term needs the Poisson"):
         _fit(design, content, GroupedSoftmax(), response="share", unit="event_id")
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
+def test_a_missing_unit_id_is_refused(family, rate_sessions, content_sessions) -> None:
+    """A row whose unit id (an event id under the softmax) is missing means a
+    broken table: fit_sessions refuses it, naming the session, the unit
+    column and the rows, before any design is built."""
+    from continuum_swr_replay.analysis.regression.likelihoods import (
+        Bernoulli,
+        Gaussian,
+    )
+
+    if family == "softmax":
+        sessions, unit, response = dict(content_sessions), "event_id", "share"
+        design = build_design(
+            [ROLE], pd.concat(sessions.values(), ignore_index=True), intercept=False
+        )
+        lik = GroupedSoftmax()
+    else:
+        sessions = {
+            k: r.assign(y=(r["count"] > 0) * 1.0) for k, r in rate_sessions.items()
+        }
+        unit, response = "well_visit_id", "count" if family == "poisson" else "y"
+        terms = [Slope("x")] + ([Offset("exposure")] if family == "poisson" else [])
+        design = build_design(
+            terms, pd.concat(sessions.values(), ignore_index=True), intercept=True
+        )
+        lik = {"poisson": Poisson(), "bernoulli": Bernoulli(), "gaussian": Gaussian()}[
+            family
+        ]
+    key = list(sessions)[1]
+    broken = sessions[key].astype({unit: float})
+    broken.loc[[0, 3, 5], unit] = np.nan
+    sessions[key] = broken
+    name = "/".join(key)
+    with pytest.raises(
+        ValueError, match=rf"session {name}: 3 rows with a missing {unit}"
+    ):
+        _fit(design, sessions, lik, response=response, unit=unit)

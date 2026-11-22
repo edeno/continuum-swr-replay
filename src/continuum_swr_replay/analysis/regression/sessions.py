@@ -536,7 +536,9 @@ def fit_sessions(
     ------
     ValueError
         If the design has an intercept under the grouped softmax, or an
-        offset under another likelihood than the Poisson; if a session's first
+        offset under another likelihood than the Poisson; if a session has a
+        row whose unit id is missing (before any design is built, naming the
+        session, the unit column and the rows); if a session's first
         fit finds its design not identified or fails for a numerical reason,
         naming the session.
     """
@@ -544,6 +546,13 @@ def fit_sessions(
         raise ValueError("the grouped softmax cannot see an intercept")
     if design.offset is not None and not isinstance(lik, Poisson):
         raise ValueError("an Offset term needs the Poisson likelihood")
+    for key, rows in sessions.items():
+        n_missing = int(rows[unit].isna().sum())
+        if n_missing:
+            raise ValueError(
+                f"session {'/'.join(key)}: {n_missing} rows with a missing {unit} "
+                "(a unit id is never missing in a whole table)"
+            )
     return [
         _fit_session(
             design, rows, lik, _Identity(key, model, kind, table_sha256), response, unit
