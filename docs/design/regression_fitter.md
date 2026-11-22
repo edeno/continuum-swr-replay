@@ -16,8 +16,8 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
 | `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
-| `support.py` | the support rule and the row rule for an inactive level |
-| `sessions.py` | the per-session fitting loop |
+| `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) |
+| `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
 | `record.py` | the fit-row record and its parquet storage |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
@@ -497,6 +497,16 @@ design on every pass and stacked the pooled design for the check: four Poisson s
 of 50,000 rows and 54 columns, 2.65 s to 1.33 s; `build_design` at 1,000,000 rows, 6.84 s
 to 2.26 s; its peak resident memory at 2,000,000 rows, 2.25 GB to 1.09 GB (0.44 GB before
 the build).
+
+## What is exact and what is not
+
+A session's design equals the pooled design on its rows bitwise, and so does the design
+of the rows a session keeps, which is a slice of it. The exception is a design built on
+very few rows: a smooth by a level with fewer than about 8 rows of the level, or a
+session with fewer than about 8 rows, can differ in the last bit (at most 5.6e-17,
+measured by an independent review, 2026-11-21), because numpy computes a product with so
+few rows by another path. Against the code before the cleanup, no kept fit differed in
+1,612 compared (the same review: coefficients and covariances bitwise equal).
 
 ## The fit record
 
