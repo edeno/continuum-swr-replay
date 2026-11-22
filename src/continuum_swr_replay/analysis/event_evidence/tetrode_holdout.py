@@ -895,7 +895,9 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         :data:`_SUMMED`, the mean over tetrodes of ``spread_cm`` and
         ``nonlocal_prob``, and per spike of the window (NaN without spikes):
         ``gain_per_spike``, ``spiking_gain_per_spike`` (the gain of the bins
-        where the scored tetrode spiked) and ``agreement_per_spike``.
+        where the scored tetrode spiked), ``silent_gain_per_spike`` (that of
+        the bins where it was silent; the two add to ``gain_per_spike``) and
+        ``agreement_per_spike``.
     """
     keys = ["epoch_id", "animal", "window_id", "event_id", "kind", "group"]
     grouped = table.groupby(keys, sort=False)
@@ -909,6 +911,7 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
     windows["spiking_gain_per_spike"] = (
         windows["gain"] - windows["gain_silent"]
     ) / spikes
+    windows["silent_gain_per_spike"] = windows["gain_silent"] / spikes
     windows["agreement_per_spike"] = windows["agreement"] / spikes
     return windows
 

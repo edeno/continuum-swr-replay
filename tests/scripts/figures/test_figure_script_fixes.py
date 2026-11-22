@@ -1805,41 +1805,6 @@ def _gain_statistics(no_swr: list[float], swr: list[float]) -> pd.DataFrame:
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
 
 
-def assert_draws_group_gain(ax, statistics: pd.DataFrame) -> None:
-    """``ax`` holds, for each group, its animals' dots in the group's color at
-    its x, the mean beside them and the dashed zero line."""
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    for group, color in panels.GROUP_COLORS.items():
-        x = panels.HELDOUT_X[group]
-        mine = [
-            c
-            for c in ax.collections
-            if isinstance(c, matplotlib.collections.PathCollection)
-            and np.allclose(c.get_offsets()[:, 0], x)
-        ]
-        assert len(mine) == 1
-        np.testing.assert_allclose(
-            mine[0].get_offsets()[:, 1], statistics.loc[group, "animals"]
-        )
-        np.testing.assert_allclose(
-            mine[0].get_facecolor()[0], matplotlib.colors.to_rgba(color)
-        )
-        # the mean, as an errorbar's marker beside the dots
-        means = [
-            line.get_ydata()
-            for line in ax.lines
-            if np.allclose(line.get_xdata(), x + 0.25)
-        ]
-        assert np.allclose(means, statistics.loc[group, "estimate"])
-    assert any(
-        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-        for line in ax.lines
-    )
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
-    assert [t.get_text() for t in ax.texts] == ["no gain"]
-
-
 def _measure_rows(measures: dict[str, list[float]]) -> pd.DataFrame:
     """Statistics rows indexed by family and measure: the filter family's
     per-animal values of each measure, their mean as the estimate and an

@@ -271,7 +271,7 @@ TAGS = {
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "participation": Tags(("2d.9",), ("2h",)),
-    "spike_rate": Tags(("2d.9",)),
+    "spike_rate": Tags(("2d.9",), ("S2c",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("S2c",)),
@@ -1999,7 +1999,19 @@ _TETRODE_MEASURES = {
         "spiking_gain_per_spike",
         "each tetrode's log predictive score under the other tetrodes' position "
         "distribution minus under local coding around the animal in the bins "
-        "where the scored tetrode spiked",
+        "where the scored tetrode spiked (its spikes' waveform terms with the "
+        "expected-firing term of those bins); with the silent bins' part it adds "
+        "to the gain for each event, but each of the three is a median over "
+        "events, so over the cohort they need not add up",
+    ),
+    "silent_gain": (
+        "silent_gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal in the bins "
+        "where the scored tetrode was silent (the expected-firing term alone: "
+        "the gain from the absence of spikes); with the spiking bins' part it "
+        "adds to the gain for each event, but each of the three is a median over "
+        "events, so over the cohort they need not add up",
     ),
     "agreement": (
         "agreement_per_spike",
@@ -2033,6 +2045,7 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     estimates = (
         ("gain", "gain", "event", "events"),
         ("spiking_gain", "spiking_gain", "event", "events"),
+        ("silent_gain", "silent_gain", "event", "events"),
         ("control_gain", "gain", "control", "Local-rest controls"),
         ("agreement", "agreement", "event", "events"),
         ("control_agreement", "agreement", "control", "Local-rest controls"),

@@ -58,11 +58,24 @@ outside SWRs away from the SWRs, and the posterior's spread.
         and a line at zero, where local coding predicts the held-out spikes as
         well. The line is not a control: the Local-rest controls sit there by
         construction (in Local rest the decoded position is the animal's own),
-        so they are in the events summary and not drawn
+        so they are in the events summary and not drawn. The gain is drawn
+        whole ("All bins") and split by the scored tetrode's own bins: those
+        where it spiked ("Bins with a spike") and those where it was silent
+        ("Silent bins"). The split answers whether the events' advantage over
+        local coding comes from the spikes or from their absence (the ground
+        process). A silent bin's term is the expected-firing term alone; a
+        spiking bin's holds the spike's waveform term and the bin's
+        expected-firing term, so the split is by bins, not an exact split of
+        the likelihood into its mark and ground terms. For each event the two
+        parts add to the whole; each drawn value is a median over events, so
+        over the cohort they need not add up exactly. The events' spike rate
+        against matched Local rest, which speaks to the same question, is a
+        value for the text (``*_event_spike_rate_hz``, ``*_control_spike_rate_hz``)
         (``tetrode_holdout.holdout_statistics`` of the held-out tetrode run,
         ``scripts/event_evidence/score_tetrode_holdout.py``;
         ``Processed-Data/event_tetrode_holdout``; the events summary's
-        ``*_heldout_*`` values).
+        ``*_heldout_gain_*``, ``*_heldout_spiking_gain_*`` and
+        ``*_heldout_silent_gain_*`` values).
     d — Shared content: during an event, do the tetrodes point to the same
         remote place? The same events and run as c, each left-out tetrode
         scored under the other tetrodes' position distribution against no
@@ -218,8 +231,9 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     MEAN_OFFSET,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
+    SPLIT_LABELS,
     draw_animal_gain,
-    draw_group_gain,
+    draw_split_gain,
     full_better_cue,
     label_gain_axis,
     spread_offsets,
@@ -300,7 +314,7 @@ right."""
 FRAMES = {
     "no_spike_mua": (0.075, 0.155),
     "boundary_timing": (0.4, 0.18),
-    "heldout_gain": (0.73, 0.1),
+    "heldout_gain": (0.73, 0.25),
     "shared_content": (0.075, 0.36),
     "outside_distance": (0.53, 0.25),
     "hpd": (0.9, 0.09),
@@ -384,7 +398,10 @@ def read_inputs() -> dict:
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
         ),
-        "tetrode": holdout_statistics(windows, "event"),
+        "tetrode": {
+            column: holdout_statistics(windows, "event", column)
+            for column in SPLIT_LABELS
+        },
         "shared": agreement_by_spread_statistics(windows[windows["kind"] == "event"]),
         "outside": outside_swr_gain_statistics(
             epoch_outside_swr_gains(heldout.time_sums, heldout.bin_s, heldout.events)
@@ -505,11 +522,16 @@ def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
     ax.set_title("Timing against the SWR", fontsize=SMALL_SIZE, pad=3)
 
 
-def draw_heldout_tetrode(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel c: the held-out tetrode gain over local coding per spike, by group
-    (``statistics``: :func:`read_inputs`' ``tetrode``)."""
-    draw_group_gain(ax, statistics, TITLE)
-    label_gain_axis(ax, YLABEL)
+def draw_heldout_tetrode(ax: Axes, statistics: dict) -> None:
+    """The held-out tetrode gain over local coding per spike, by group, over
+    all bins, the bins with a spike and the silent bins (``statistics``:
+    :func:`read_inputs`' ``tetrode``)."""
+    draw_split_gain(ax, statistics, TITLE)
+    rows = [table.loc[group] for table in statistics.values() for group in table.index]
+    low = min(min(float(np.min(r["animals"])), r["ci_low"]) for r in rows)
+    high = max(max(float(np.max(r["animals"])), r["ci_high"]) for r in rows)
+    label_gain_axis(ax, YLABEL, floor=min(-0.12, low - 0.08 * (high - low)))
+    ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
 
 
 def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:

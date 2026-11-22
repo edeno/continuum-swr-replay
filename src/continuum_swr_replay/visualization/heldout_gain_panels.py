@@ -20,7 +20,7 @@ from matplotlib.transforms import blended_transform_factory
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
 
 GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["SWR"]}
@@ -91,27 +91,56 @@ def draw_animal_gain(
     )  # fmt: skip
 
 
-def draw_group_gain(ax: Axes, statistics: pd.DataFrame, title: str) -> None:
-    """One gain axis: a gain per spike, by group.
+SPLIT_LABELS = {
+    "gain_per_spike": "All bins",
+    "spiking_gain_per_spike": "Bins with\na spike",
+    "silent_gain_per_spike": "Silent\nbins",
+}
+"""The held-out tetrode gain and its two parts, by ``tetrode_holdout.window_scores``
+column: over every bin, over the bins where the scored tetrode spiked, and over
+those where it was silent."""
 
-    A dot per animal in the group's color and, beside them, the animals' mean
-    with its 95 % interval in black, for no-SWR and SWR events, with a dashed
-    line at zero and the axis' title.
+SPLIT_GROUP_GAP = 0.8
+"""The extra x space between the no-SWR and the SWR positions."""
+
+
+def split_x(group: int, part: int) -> float:
+    """The x position of a part (0, 1, 2 in :data:`SPLIT_LABELS`' order) of a
+    group's gain (0 no SWR, 1 SWR)."""
+    return group * (len(SPLIT_LABELS) + SPLIT_GROUP_GAP) + part
+
+
+def draw_split_gain(ax: Axes, statistics: dict, title: str) -> None:
+    """A gain per spike by group and by part: for no-SWR then SWR events, the
+    gain over all bins, over the bins with a spike and over the silent bins
+    (:data:`SPLIT_LABELS`), each a dot per animal in the group's color and the
+    animals' mean with its 95 % interval in black, the groups named over their
+    positions, a dashed line at zero and the axis' title.
 
     Parameters
     ----------
     ax : Axes
-    statistics : pd.DataFrame
-        Indexed by group (``"no SWR"``, ``"SWR"``): ``animals``,
-        ``animal_names``, ``estimate``, ``ci_low`` and ``ci_high``
+    statistics : dict
+        By column of :data:`SPLIT_LABELS`: statistics indexed by group
+        (``"no SWR"``, ``"SWR"``) with ``animals``, ``animal_names``,
+        ``estimate``, ``ci_low`` and ``ci_high``
         (``likelihood_advantage_statistics``' columns).
     title : str
     """
-    for group, color in GROUP_COLORS.items():
-        draw_animal_gain(ax, HELDOUT_X[group], statistics.loc[group], color)
+    ticks, labels = [], []
+    for k, (group, color) in enumerate(GROUP_COLORS.items()):
+        for j, (column, label) in enumerate(SPLIT_LABELS.items()):
+            draw_animal_gain(ax, split_x(k, j), statistics[column].loc[group], color)
+            ticks.append(split_x(k, j))
+            labels.append(label)
+        ax.text(
+            split_x(k, 1) + MEAN_OFFSET / 2, 1.0, "No SWR" if k == 0 else "SWR",
+            transform=ax.get_xaxis_transform(), ha="center", va="top",
+            fontsize=SMALL_SIZE, color=readable_text_color(color),
+        )  # fmt: skip
     ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-    ax.set_xlim(-0.6, 1.6)
-    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
+    ax.set_xlim(-0.5, split_x(1, len(SPLIT_LABELS) - 1) + 0.6)
+    ax.set_xticks(ticks, labels, rotation=90)
     ax.set_title(title, fontsize=SMALL_SIZE, pad=3)
 
 

@@ -254,6 +254,11 @@ def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
     assert event["gain_per_spike"] == pytest.approx(4.0 / 4)
     # the spiking bins' gain: 4 - (-1) = 5 over 4 spikes
     assert event["spiking_gain_per_spike"] == pytest.approx(5.0 / 4)
+    # the silent bins' gain: -1 over 4 spikes; the two parts add to the whole
+    assert event["silent_gain_per_spike"] == pytest.approx(-1.0 / 4)
+    assert event["spiking_gain_per_spike"] + event["silent_gain_per_spike"] == (
+        pytest.approx(event["gain_per_spike"])
+    )
     assert event["agreement_per_spike"] == pytest.approx(0.5)
     assert event["spread_cm"] == pytest.approx(50.0)
     assert np.isnan(windows.loc[1, "gain_per_spike"])

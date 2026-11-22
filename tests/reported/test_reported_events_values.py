@@ -971,6 +971,7 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
                         "kind": kind,
                         "gain_per_spike": value,
                         "spiking_gain_per_spike": value + 0.1,
+                        "silent_gain_per_spike": -0.1,
                         "agreement_per_spike": value / 2,
                     }
                 )
@@ -985,6 +986,12 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
+    assert numbers["swr_heldout_silent_gain_per_spike"] == pytest.approx(-0.1)
+    silent = by_key["non_swr_heldout_silent_gain_per_spike"].description
+    assert "silent" in silent and "need not add" in silent
+    assert (
+        "need not add" in by_key["non_swr_heldout_spiking_gain_per_spike"].description
+    )
     assert numbers["non_swr_heldout_control_gain_per_spike"] == pytest.approx(0.0)
     assert numbers["swr_heldout_events_scored"] == 3
     # the agreement: the same statistic over agreement_per_spike
@@ -1007,8 +1014,8 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     assert "not a zero reference" not in (
         by_key["swr_heldout_control_gain_per_spike"].description
     )
-    # five estimates, three values each, two groups; two counts
-    assert len(numbers) == 5 * 3 * 2 + 2
+    # six estimates, three values each, two groups; two counts
+    assert len(numbers) == 6 * 3 * 2 + 2
 
 
 def _restriction_windows() -> pd.DataFrame:

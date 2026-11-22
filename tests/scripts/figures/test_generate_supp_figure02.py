@@ -23,7 +23,6 @@ from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     _means_at,
     _measure_rows,
     _outside_rows,
-    assert_draws_group_gain,
     assert_spread_about,
 )
 
@@ -130,11 +129,24 @@ def _hpd() -> pd.DataFrame:
     )  # fmt: skip
 
 
+SPLIT = {
+    "gain_per_spike": ([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7, 0.75, 0.9]),
+    "spiking_gain_per_spike": ([0.3, 0.2, 0.1, 0.2, 0.25], [0.6, 0.5, 0.4, 0.5, 0.6]),
+    "silent_gain_per_spike": ([0.2, 0.25, 0.15, 0.2, 0.2], [0.25, 0.3, 0.3, 0.2, 0.3]),
+}
+"""Each part's animals, no SWR then SWR."""
+
+
+def _split_statistics() -> dict:
+    """``holdout_statistics`` of each part of the gain, by column."""
+    return {column: _gain_statistics(*groups) for column, groups in SPLIT.items()}
+
+
 def _statistics() -> dict:
     return {
         "hpd": _hpd(),
         "timing": _timing(),
-        "tetrode": _gain_statistics([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7]),
+        "tetrode": _split_statistics(),
         "shared": _shared_statistics(),
         "outside": _outside_rows(),
         "parts": _parts(),
@@ -153,7 +165,6 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
     ax_gain = fig.axes[2]
-    assert_draws_group_gain(ax_gain, statistics["tetrode"])
     assert ax_gain.get_title() == "Held-out tetrode"
     assert ax_gain.get_ylabel() == "Held-out gain\nover local (nats/spike)"
     assert fig.axes[0].get_title() == "No-Spike state"
@@ -171,6 +182,44 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
     figure.check_journal_limits(fig)
+    plt.close(fig)
+
+
+def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes():
+    """For no-SWR then SWR events, three positions in the group's color (all
+    bins, the bins where the scored tetrode spiked, the silent bins): a dot per
+    animal, the mean with its interval beside them; the parts named so that a
+    reader needs no caption, the groups named over their positions, a dashed
+    zero line with its note."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    fig = figure.generate_figure(_statistics())
+    ax = fig.axes[figure.PANELS.index("heldout_gain")]
+    dots = [
+        c for c in ax.collections
+        if isinstance(c, matplotlib.collections.PathCollection)
+    ]  # fmt: skip
+    assert len(dots) == 6
+    for k, (group, color) in enumerate(panels.GROUP_COLORS.items()):
+        for j, (column, groups) in enumerate(SPLIT.items()):
+            x = panels.split_x(k, j)
+            (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
+            np.testing.assert_allclose(mine.get_offsets()[:, 1], groups[k])
+            np.testing.assert_allclose(mine.get_facecolor()[0], to_rgba(color))
+            assert np.allclose(_means_at(ax, x), np.mean(groups[k]))
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == 2 * list(panels.SPLIT_LABELS.values())
+    assert list(panels.SPLIT_LABELS.values()) == [
+        "All bins", "Bins with\na spike", "Silent\nbins",
+    ]  # fmt: skip
+    texts = [t.get_text() for t in ax.texts]
+    assert {"No SWR", "SWR", "no gain"} <= set(texts)
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
     plt.close(fig)
 
 
@@ -420,7 +469,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "analyzed_epoch_ids": lambda: ["e"],
         "read_complete_run": lambda folder, name, epochs: stored["scores"],
         "window_scores": lambda table: seen.setdefault("tetrode", table),
-        "holdout_statistics": lambda windows, kind: windows,
+        "holdout_statistics": lambda windows, kind, column: windows,
         "agreement_by_spread_statistics": lambda windows: windows,
         "sha256_file": lambda path: "0" * 64,
         "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),

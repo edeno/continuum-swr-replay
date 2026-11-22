@@ -1466,7 +1466,7 @@ Sources:
 
 ### 2d.9. How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?
 
-Status: computed. Figures: 2, 2h. Values: 33.
+Status: computed. Figures: 2, 2h, S2c. Values: 33.
 
 *Note:* Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.
 
@@ -3460,7 +3460,7 @@ Unlettered: `\DetectionPilotCallsDecidedByOutsideWindowPassing`, `\DetectionPilo
 
 ### Figure S2: MUA in the No-Spike state, the timing of events against their SWRs, the held-out tetrode gain over local coding, shared content by the spread of the other tetrodes' estimate, and the gain outside SWRs away from the SWRs
 
-Script: `scripts/figures/generate_supp_figure02.py`. Questions: 2b.4, 2c.3, 2d.5.
+Script: `scripts/figures/generate_supp_figure02.py`. Questions: 2b.4, 2c.3, 2d.5, 2d.9.
 
 Panel b: `\EventsTimingStartEarlierEndEarlierShareAnimalMax`, `\EventsTimingStartEarlierEndEarlierShareAnimalMin`, `\EventsTimingStartEarlierEndEarlierShare`, `\EventsTimingStartEarlierEndLaterShareAnimalMax`, `\EventsTimingStartEarlierEndLaterShareAnimalMin`, `\EventsTimingStartEarlierEndLaterShare`, `\EventsTimingStartEarlierEndTogetherShareAnimalMax`, `\EventsTimingStartEarlierEndTogetherShareAnimalMin`, `\EventsTimingStartEarlierEndTogetherShare`, `\EventsTimingStartLaterEndEarlierShareAnimalMax`, `\EventsTimingStartLaterEndEarlierShareAnimalMin`, `\EventsTimingStartLaterEndEarlierShare`, `\EventsTimingStartLaterEndLaterShareAnimalMax`, `\EventsTimingStartLaterEndLaterShareAnimalMin`, `\EventsTimingStartLaterEndLaterShare`, `\EventsTimingStartLaterEndTogetherShareAnimalMax`, `\EventsTimingStartLaterEndTogetherShareAnimalMin`, `\EventsTimingStartLaterEndTogetherShare`, `\EventsTimingStartTogetherEndEarlierShareAnimalMax`, `\EventsTimingStartTogetherEndEarlierShareAnimalMin`, `\EventsTimingStartTogetherEndEarlierShare`, `\EventsTimingStartTogetherEndLaterShareAnimalMax`, `\EventsTimingStartTogetherEndLaterShareAnimalMin`, `\EventsTimingStartTogetherEndLaterShare`, `\EventsTimingStartTogetherEndTogetherShareAnimalMax`, `\EventsTimingStartTogetherEndTogetherShareAnimalMin`, `\EventsTimingStartTogetherEndTogetherShare`
 

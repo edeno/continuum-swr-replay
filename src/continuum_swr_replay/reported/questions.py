@@ -323,7 +323,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.9",
         "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2", "2h"),
+        figures=("2", "2h", "S2c"),
         note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
     ),
     Question(
