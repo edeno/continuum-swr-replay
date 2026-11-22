@@ -3385,7 +3385,7 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
 _SWEEP_SETTINGS = {
     "probability_threshold": (
         "probability_threshold",
-        "the non-local probability an event stays strictly above",
+        "the event rule's non-local probability an event stays strictly above",
         dict(
             zip(
                 rule_sweep.PROBABILITY_THRESHOLDS,
@@ -3397,7 +3397,7 @@ _SWEEP_SETTINGS = {
     ),
     "minimum_samples": (
         "minimum_samples",
-        "the minimum run length (2 ms decode samples)",
+        "the event rule's minimum run length (2 ms decode samples)",
         dict(
             zip(
                 rule_sweep.MINIMUM_SAMPLES,
@@ -3408,9 +3408,11 @@ _SWEEP_SETTINGS = {
     ),
     "swr_threshold_z": (
         "swr_threshold",
-        "the SWR threshold (z of the Kay consensus ripple power; an event is "
-        "counted as overlapping an SWR when its Kay criterion on the decode grid "
-        "is at or above it)",
+        "the SWR detector's threshold, not a setting of the event rule (z of the "
+        "Kay consensus ripple power; an event is counted as overlapping an SWR "
+        "when its Kay criterion on the decode grid is at or above it; the share "
+        "with no SWR changes strongly with it, as a threshold on one "
+        "distribution must)",
         dict(
             zip(
                 rule_sweep.SWR_THRESHOLDS_Z,
@@ -3429,14 +3431,19 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
     (``rule_sweep.sweep_statistics``, which the panel draws), and how often the
     Kay criterion's label at 2 z is the canonical one
     (``rule_sweep.criterion_agreement``). A sensitivity check: the canonical
-    events and every other value are the rule's."""
+    events and every other value are the rule's. The share with no SWR changes
+    little with the event rule's two settings and strongly with the SWR
+    detector's threshold, as a threshold on one distribution must; about a
+    third of the events have no SWR even at 1 z."""
     make = value_factory(rule_sweep_values, source, TAGS["rule_sweep"])
     values = []
     for row in rule_sweep.sweep_statistics(counts).itertuples():
         setting_word, words, value_words = _SWEEP_SETTINGS[row.setting]
         value = int(row.value) if row.setting == "minimum_samples" else row.value
         key = f"rule_sweep_{setting_word}_{value_words[value]}"
-        at = f"with {words} at {value:g}" + (" (the rule's)" if row.is_rule else "")
+        at = f"with {words} at {value:g}" + (
+            " (the value the paper uses)" if row.is_rule else ""
+        )
         values += [
             make(
                 f"{key}_no_swr_fraction",

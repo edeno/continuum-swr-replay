@@ -549,6 +549,12 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting():
         np.testing.assert_allclose(rule.get_xdata(), RULE[setting])
         assert ax.get_shared_y_axes().joined(ax, axes[0])
     assert axes[0].get_ylabel() == "Events with\nno SWR (%)"
+    # one heading over the event rule's two axes, one over the detector's; the
+    # value used marked on all three
+    assert "Event rule" in [t.get_text() for t in axes[0].texts]
+    assert "SWR detector" in [t.get_text() for t in axes[2].texts]
+    for ax in axes:
+        assert " used" in [t.get_text() for t in ax.texts]
     assert [ax.get_xlabel() for ax in axes] == list(figure.SWEEP_XLABELS.values())
     plt.close(fig)
 

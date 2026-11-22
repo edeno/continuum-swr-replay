@@ -5,7 +5,8 @@ the order the text cites them, in four rows:
 - the decoder on these recordings (a, b): its states calibrated by held-out
   spikes, and MUA in the No-Spike state;
 - the count is robust (c, d): the share of events with no SWR at other
-  settings of the event rule, and the timing of events against their SWRs;
+  settings of the event rule and of the SWR detector, and the timing of events
+  against their SWRs;
 - the events are coordinated and specific (e to h): non-local time against
   MUA, the posterior's spread, the held-out tetrode gain split by bins with
   and without spikes, and shared content;
@@ -51,22 +52,26 @@ the order the text cites them, in four rows:
         state when the decoded tetrodes fall silent, so the fall in their MUA
         describes the state and is not a test of it.
 
-    c — Supports Figure 2d, the share of events with no SWR: it is not a
-        product of the event rule's settings. The share of the immobile
-        non-local events that start inside a well visit with no SWR, at each
-        value of three settings swept one at a time (the others at the rule's):
-        the non-local probability an event stays strictly above (0.5 to 0.95),
-        the minimum run length (7, the rule's 15 ms, to 25 samples of 2 ms) and
-        the SWR threshold (1 to 4 z). A thin line per animal (the mean over
-        its epochs of each epoch's share) and the share pooled over events in
-        bold, the rule's value dotted. The events are detected again from the
-        stored decode by the rule itself and labeled as the canonical table
-        labels them; at the rule's settings they are the canonical events. The
-        SWRs are not detected again: an event counts as overlapping an SWR at
-        a threshold when its Kay criterion on the decode grid reaches it, a
-        label that agrees with the canonical one for 99 % of the events at
-        2 z (``rule_sweep.sweep_statistics``;
-        ``Processed-Data/event_rule_sweep``,
+    c — Supports Figure 2d, the share of events with no SWR. The share of the
+        immobile non-local events that start inside a well visit with no SWR,
+        at each value of three settings swept one at a time (the others at the
+        values the paper uses). Two are settings of the event rule (heading
+        "Event rule"): the non-local probability an event stays strictly above
+        (0.5 to 0.95) and the minimum run length (7, the rule's 15 ms, to 25
+        samples of 2 ms). The third is the SWR detector's threshold (heading
+        "SWR detector", 1 to 4 z). A thin line per animal (the mean over its
+        epochs of each epoch's share) and the share pooled over events in bold;
+        the value the paper uses is dotted and marked "used" on every axis.
+        The share with no SWR changes little with the event rule's settings.
+        It changes strongly with the SWR threshold, as a threshold on one
+        distribution must (panel i), and about a third of the events have no
+        SWR even at 1 z. The events are detected again from the stored decode
+        by the rule itself and labeled as the canonical table labels them; at
+        the rule's settings they are the canonical events. The SWRs are not
+        detected again: an event counts as overlapping an SWR at a threshold
+        when its Kay criterion on the decode grid reaches it, a label that
+        agrees with the canonical one for 99 % of the events at 2 z
+        (``rule_sweep.sweep_statistics``; ``Processed-Data/event_rule_sweep``,
         ``scripts/event_properties/sweep_event_rule.py``; the events summary's
         ``rule_sweep_*`` values).
 
@@ -987,8 +992,10 @@ def draw_state_calibration(axes: Sequence[Axes], bins: pd.DataFrame) -> None:
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     """The sweep panel: the share of events with no SWR at each value of each
     swept setting (one axis each, sharing the y axis), a thin line per animal
-    and the pooled share in bold with its dots, the rule's value marked by a
-    dotted line (``sweep``: :func:`read_inputs`' ``sweep``)."""
+    and the pooled share in bold with its dots, and on every axis the value the
+    paper uses dotted and marked "used". The first two axes are settings of
+    the event rule, under one heading; the third is the SWR detector's
+    threshold (``sweep``: :func:`read_inputs`' ``sweep``)."""
     for ax, (setting, xlabel) in zip(axes, SWEEP_XLABELS.items(), strict=True):
         mine = sweep[sweep["setting"] == setting]
         x = mine["value"].to_numpy()
@@ -1007,11 +1014,21 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     axes[0].set_ylim(0, 100)
     axes[0].set_yticks([0, 50, 100])
     axes[0].set_ylabel("Events with\nno SWR (%)")
-    axes[1].set_title("The event rule's settings", fontsize=SMALL_SIZE, pad=3)
-    axes[0].text(
-        RULE["probability_threshold"], 3, " rule", fontsize=SMALL_SIZE,
-        color=REFERENCE_COLOR, ha="left", va="bottom",
-    )  # fmt: skip
+    for ax, setting in zip(axes, SWEEP_XLABELS, strict=True):
+        ax.text(
+            RULE[setting], 3, " used", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+            ha="left", va="bottom",
+        )  # fmt: skip
+    # one heading over the event rule's two axes, another over the detector's
+    first, second = axes[0].get_position(), axes[1].get_position()
+    for ax, heading, x in (
+        (axes[0], "Event rule", ((first.x0 + second.x1) / 2 - first.x0) / first.width),
+        (axes[2], "SWR detector", 0.5),
+    ):
+        ax.annotate(
+            heading, (x, 1.0), xycoords="axes fraction", xytext=(0, 3),
+            textcoords="offset points", ha="center", va="bottom", fontsize=SMALL_SIZE,
+        )  # fmt: skip
 
 
 def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
