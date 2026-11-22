@@ -501,6 +501,11 @@ left out of the family), the animal-balanced summary over sessions, the nested b
 their sessions, then the units or events of each session) behind every interval, and the interval itself:
 the estimate plus or minus t(0.975, A - 1) sqrt(A / (A - 1)) times the draws' standard deviation over the A
 animals, because the draws' percentiles under-cover with five animals; every other module calls those.
+An animal or a session drawn twice is two members of the replicate, each resampled on its own: a statistic
+with a median, or with a level that is not resampled (the recording day), inside an animal or a session
+takes it once for each copy (`nested_bootstrap_copies`). A statistic of how often each row is drawn, or a
+mean of means with every level resampled, is the same with the copies' counts added
+(`nested_bootstrap_draws`).
 Each builder's statistics:
 
 - survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger

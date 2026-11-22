@@ -45,16 +45,6 @@ def test_statistics_are_epoch_medians_then_animal_medians_then_their_mean():
     assert row["n_animals"] == 3
 
 
-def test_weighted_medians_are_the_shared_weighted_median_row_by_row():
-    from continuum_swr_replay.analysis.shared_statistics import weighted_median
-
-    rng = np.random.default_rng(0)
-    values = np.sort(rng.normal(size=(200, 6)), axis=1)
-    weights = rng.integers(0, 4, size=(200, 6))
-    expected = [weighted_median(v, w) for v, w in zip(values, weights, strict=True)]
-    np.testing.assert_allclose(la._weighted_medians(values, weights), expected)
-
-
 def _events(n_per_epoch: int, spread: float, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     rows = []
@@ -75,37 +65,92 @@ def _epoch_level_interval(events: pd.DataFrame, n_boot: int, seed: int):
     each epoch's median fixed), written out as the reference."""
     from continuum_swr_replay.analysis.shared_statistics import (
         bootstrap_interval,
-        nested_bootstrap_draws,
+        nested_bootstrap_copies,
         nested_codes,
-        weighted_median,
     )
 
     epochs = events.groupby(["animal", "epoch_id"])["D_spike"].median().reset_index()
-    animal, epoch = nested_codes(epochs["animal"], epochs["epoch_id"])
-    draws = nested_bootstrap_draws(animal, epoch, np.random.default_rng(seed), n_boot)
+    animal, _ = nested_codes(epochs["animal"], epochs["epoch_id"])
+    copies = nested_bootstrap_copies(animal, np.random.default_rng(seed), n_boot)
     values = epochs["D_spike"].to_numpy()
-    replicate = []
-    for i in range(n_boot):
-        total = mass = 0.0
-        for a in np.flatnonzero(draws.animals[i] > 0):
-            mine = animal == a
-            order = np.argsort(values[mine])
-            median = weighted_median(values[mine][order], draws.rows[i][mine][order])
-            total += draws.animals[i, a] * median
-            mass += draws.animals[i, a]
-        replicate.append(total / mass)
+    replicate = [
+        np.mean([np.median(np.repeat(values, drawn)) for drawn in slots])
+        for slots in copies.sessions
+    ]
     per_animal = epochs.groupby("animal")["D_spike"].median()
     return bootstrap_interval(float(per_animal.mean()), replicate, len(per_animal))
 
 
 def test_with_one_event_an_epoch_the_events_bootstrap_is_the_epochs():
-    # an epoch of one event draws it as often as the epoch is drawn, taking
-    # nothing from the generator, so the two bootstraps make the same draws
+    # an epoch of one event draws it in every copy, taking nothing from the
+    # generator, so the two bootstraps make the same draws
     events = _events(1, 0.0)
     stats = la.likelihood_advantage_statistics(events, n_boot=300, seed=4)
     reference = _epoch_level_interval(events, 300, 4)
     assert stats.loc["no SWR", "ci_low"] == pytest.approx(reference.low)
     assert stats.loc["no SWR", "ci_high"] == pytest.approx(reference.high)
+
+
+def test_an_animal_drawn_twice_is_two_animals_each_with_its_own_median(monkeypatch):
+    """Animal a has epochs of one event each: 0, 1 and 10; animal b one, 4.
+    The replicate draws a twice: one copy draws epoch 0 three times (median
+    0), the other epoch 1 once and epoch 10 twice (median 10); it is their
+    mean, 5. With the two copies' epochs pooled it would be the median of 0,
+    0, 0, 1, 10, 10: 0.5."""
+    from continuum_swr_replay.analysis.shared_statistics import NestedCopies
+
+    copies = NestedCopies(np.array([[0, 0]]), np.array([[[3, 0, 0, 0], [0, 1, 2, 0]]]))
+    monkeypatch.setattr(la, "nested_bootstrap_copies", lambda *_: copies)
+    replicate = la._replicates(
+        np.array([0.0, 1.0, 10.0, 4.0]),
+        np.array([0, 0, 0, 1]),
+        np.arange(4),
+        np.random.default_rng(0),
+        1,
+    )
+    np.testing.assert_allclose(replicate, [5.0])
+
+
+def test_each_replicate_is_the_statistic_on_its_resampled_events():
+    """Every drawn copy of an epoch resamples its own events. The replicates
+    equal the statistic taken, with plain medians, on the resampled events
+    written out copy by copy from the same generator: the copies, then each
+    epoch's resamples in the order of the epochs, and within an epoch in the
+    order of the replicates and their slots."""
+    from continuum_swr_replay.analysis.shared_statistics import (
+        nested_bootstrap_copies,
+        nested_codes,
+    )
+
+    events = _events(7, 2.0, seed=3)
+    events = events[events["epoch_id"] != "c2"]  # animals of unequal size
+    values = events["D_spike"].to_numpy()
+    animal, epoch = nested_codes(events["animal"], events["epoch_id"])
+    n = 40
+    replicate = la._replicates(values, animal, epoch, np.random.default_rng(11), n)
+
+    rng = np.random.default_rng(11)
+    epoch_animal = np.zeros(epoch.max() + 1, dtype=int)
+    epoch_animal[epoch] = animal
+    copies = nested_bootstrap_copies(epoch_animal, rng, n)
+    n_slots = copies.animal.shape[1]
+    own = [[[] for _ in range(n_slots)] for _ in range(n)]
+    for e in range(epoch_animal.size):
+        mine = np.sort(values[epoch == e])
+        drawn = rng.multinomial(
+            mine.size,
+            np.full(mine.size, 1.0 / mine.size),
+            size=int(copies.sessions[:, :, e].sum()),
+        )
+        resample = iter(drawn)
+        for draw, slot in np.ndindex(n, n_slots):
+            for _ in range(copies.sessions[draw, slot, e]):
+                own[draw][slot].append(np.median(np.repeat(mine, next(resample))))
+    expected = [np.mean([np.median(medians) for medians in slots]) for slots in own]
+    # slots of 3 and of 4 epochs, and an epoch drawn more than once in a slot
+    assert {len(medians) for slots in own for medians in slots} == {3, 4}
+    assert copies.sessions.max() > 1
+    np.testing.assert_allclose(replicate, expected, rtol=1e-12)
 
 
 def test_spread_within_epochs_widens_the_interval():

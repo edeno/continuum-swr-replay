@@ -337,6 +337,18 @@ def test_weighted_median_equals_median_of_repeated_sample():
         assert stats.weighted_median(values, weights) == pytest.approx(expected)
 
 
+def test_weighted_medians_are_the_weighted_median_row_by_row():
+    rng = np.random.default_rng(0)
+    values = np.sort(rng.normal(size=(200, 6)), axis=1)
+    weights = rng.integers(0, 4, size=(200, 6))
+    weights[:3] = 0  # rows without a draw
+    expected = [
+        stats.weighted_median(v, w) for v, w in zip(values, weights, strict=True)
+    ]
+    np.testing.assert_allclose(stats.weighted_medians(values, weights), expected)
+    assert np.isnan(expected[:3]).all()
+
+
 def _design(n_animals=5, n_sessions=8, n_events=40):
     animal = np.repeat(np.arange(n_animals), n_sessions * n_events)
     session = np.repeat(np.arange(n_animals * n_sessions), n_events)
@@ -413,6 +425,76 @@ def test_many_draws_at_once_keep_the_nesting_and_one_is_the_single_draw():
     for a, b in zip(single, batch, strict=True):
         np.testing.assert_array_equal(a, b[0])
     assert rng_one.integers(10**9) == rng_many.integers(10**9)
+
+
+def test_copies_give_every_slot_one_animal_and_that_animals_sessions():
+    session_animal = np.array([0, 0, 0, 1, 1, 2])
+    copies = stats.nested_bootstrap_copies(
+        session_animal, np.random.default_rng(3), 500
+    )
+    assert copies.animal.shape == (500, 3)
+    assert copies.sessions.shape == (500, 3, 6)
+    assert set(np.unique(copies.animal)) == {0, 1, 2}
+    # a slot draws the sessions of its own animal only, as many as it has
+    own = session_animal == copies.animal[:, :, None]
+    assert (copies.sessions[~own] == 0).all()
+    np.testing.assert_array_equal(
+        copies.sessions.sum(axis=2), np.bincount(session_animal)[copies.animal]
+    )
+    # two slots of one animal draw its sessions apart
+    twice = (copies.animal[:, 0] == 0) & (copies.animal[:, 1] == 0)
+    assert twice.sum() > 20
+    assert (copies.sessions[twice, 0] != copies.sessions[twice, 1]).any()
+    # every session is drawn once a replicate on average, as on the data
+    np.testing.assert_allclose(copies.sessions.sum(axis=1).mean(axis=0), 1.0, atol=0.15)
+    again = stats.nested_bootstrap_copies(session_animal, np.random.default_rng(3), 500)
+    np.testing.assert_array_equal(copies.animal, again.animal)
+    np.testing.assert_array_equal(copies.sessions, again.sessions)
+
+
+def test_every_drawn_copy_of_a_session_has_its_own_resample():
+    session_animal = np.array([0, 0, 1, 1, 1])
+    copies = stats.nested_bootstrap_copies(
+        session_animal, np.random.default_rng(0), 200
+    )
+    asked = []
+
+    def resample(session: int, n: int) -> np.ndarray:
+        asked.append((session, n))
+        # resample k of session s has the value s + k / 1000: all distinct
+        return session + np.arange(n) / 1000
+
+    values = stats.session_copy_values(copies, resample)
+    assert values.shape == (200, 2, 3)  # the largest animal has three sessions
+    # each session is asked once, for as many resamples as it has copies
+    assert asked == [(s, int(copies.sessions[:, :, s].sum())) for s in range(5)]
+    known = values[np.isfinite(values)]
+    # every resample is used, and none twice
+    assert known.size == np.unique(known).size == copies.sessions.sum()
+    for draw, slot in np.ndindex(200, 2):
+        mine = values[draw, slot]
+        drawn = mine[np.isfinite(mine)]
+        # as many copies of each session as the slot drew, NaN after them
+        np.testing.assert_array_equal(
+            np.bincount(np.floor(drawn).astype(int), minlength=5),
+            copies.sessions[draw, slot],
+        )
+        assert np.isnan(mine[drawn.size :]).all()
+
+
+def test_a_resample_without_a_value_is_refused_not_read_as_no_copy():
+    copies = stats.nested_bootstrap_copies(
+        np.array([0, 0, 1]), np.random.default_rng(0), 20
+    )
+
+    def resample(session: int, n: int) -> np.ndarray:
+        values = np.full(n, float(session))
+        if session == 1:
+            values[:2] = np.nan
+        return values
+
+    with pytest.raises(ValueError, match=r"session 1: 2 of \d+ resamples have no"):
+        stats.session_copy_values(copies, resample)
 
 
 def test_bootstrap_interval_is_the_estimate_plus_minus_the_corrected_t_half_width():
@@ -573,21 +655,42 @@ def test_each_draw_is_the_day_then_animal_mean_of_its_drawn_sessions():
     day = np.repeat(np.arange(6), 3)  # two days of three sessions per animal
     values = rng.normal(size=(18, 4))  # a curve of four points per session
     result = stats.animal_balanced_bootstrap(values, animal, day, n_draws=30, seed=7)
-    # The same counts, drawn again with the same seed: animals, then sessions.
-    codes = stats.nested_codes(animal, np.arange(18))
-    draws = stats.nested_bootstrap_draws(*codes, np.random.default_rng(7), 30)
+    # The same copies, drawn again with the same seed: animals, then sessions.
+    copies = stats.nested_bootstrap_copies(animal, np.random.default_rng(7), 30)
     for k in range(30):
-        expected = np.zeros(4)
-        for a in range(3):
-            if draws.animals[k, a] == 0:
-                continue
-            day_means = []
-            for d in np.unique(day[animal == a]):
-                counts = draws.sessions[k, day == d]
-                if counts.sum() > 0:
-                    day_means.append(counts @ values[day == d] / counts.sum())
-            expected += draws.animals[k, a] * np.mean(day_means, axis=0) / 3
-        np.testing.assert_allclose(result.draws[k], expected, rtol=1e-12)
+        own_means = []
+        for a, drawn in zip(copies.animal[k], copies.sessions[k], strict=True):
+            day_means = [
+                drawn[day == d] @ values[day == d] / drawn[day == d].sum()
+                for d in np.unique(day[animal == a])
+                if drawn[day == d].sum() > 0
+            ]
+            own_means.append(np.mean(day_means, axis=0))
+        np.testing.assert_allclose(
+            result.draws[k], np.mean(own_means, axis=0), rtol=1e-12
+        )
+
+
+def test_an_animal_drawn_twice_takes_its_day_means_once_for_each_copy(monkeypatch):
+    """Animal a: day d1 holds sessions 0 and 6, day d2 holds session 3; animal
+    b: one session. A replicate draws a twice. One copy draws session 0 three
+    times: day d1 alone, mean 0. The other draws each session once: days 3 and
+    3, mean 3. The replicate is (0 + 3) / 2 = 1.5. With the two copies'
+    sessions pooled, day d1 would be (4 * 0 + 6) / 5 = 1.2 and the replicate
+    (1.2 + 3) / 2 = 2.1."""
+    copies = stats.NestedCopies(
+        np.array([[0, 0]]), np.array([[[3, 0, 0, 0], [1, 1, 1, 0]]])
+    )
+    monkeypatch.setattr(stats, "nested_bootstrap_copies", lambda *_: copies)
+    result = stats.animal_balanced_bootstrap(
+        [0.0, 6.0, 3.0, 10.0],
+        ["a", "a", "a", "b"],
+        ["d1", "d1", "d2", "d1"],
+        n_draws=1,
+        seed=0,
+    )
+    assert result.estimate == pytest.approx((3.0 + 10.0) / 2)
+    np.testing.assert_allclose(result.draws, [1.5])
 
 
 def test_the_animal_balanced_bootstrap_leaves_out_a_session_without_a_finite_value():
