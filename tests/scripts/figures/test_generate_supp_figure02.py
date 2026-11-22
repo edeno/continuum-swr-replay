@@ -222,13 +222,14 @@ def _statistics() -> dict:
 
 
 def test_the_figure_draws_its_panels_in_the_cited_order():
-    """a, the No-Spike MUA; b, the timing table; c, the held-out tetrode gain;
-    d, shared content; e, the outside-SWR gain then away from SWRs: in two rows, each row's letters at one height, the rows' first
-    letters at one left edge, no heading."""
+    """In four rows, each a group the text cites in turn: the decoder (a, b),
+    the count is robust (c, d), the events are coordinated and specific (e to
+    h), ripple power and the held-out test (i, j); each row's letters at one
+    height, the rows' first letters at one left edge, no heading."""
     assert figure.PANELS == (
-        "no_spike_mua", "boundary_timing", "heldout_gain", "shared_content",
-        "outside_distance", "hpd", "ripple_modes", "nonlocal_mua", "rule_sweep",
-        "state_calibration",
+        "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
+        "nonlocal_mua", "hpd", "heldout_gain", "shared_content", "ripple_modes",
+        "outside_distance",
     )  # fmt: skip
     statistics = _statistics()
     fig = figure.generate_figure(statistics)
@@ -245,11 +246,12 @@ def test_the_figure_draws_its_panels_in_the_cited_order():
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
     assert sorted(letters) == list("abcdefghij")
-    assert len({letters[k][1] for k in "abc"}) == 1
-    assert len({letters[k][1] for k in "de"}) == 1
-    assert len({letters[k][1] for k in "fgh"}) == 1
-    assert letters["a"][1] > letters["d"][1]
-    assert letters["a"][0] == letters["d"][0]
+    rows = ("ab", "cd", "efgh", "ij")
+    for row in rows:
+        assert len({letters[k][1] for k in row}) == 1, row
+    heights = [letters[row[0]][1] for row in rows]
+    assert heights == sorted(heights, reverse=True)
+    assert len({letters[row[0]][0] for row in rows}) == 1
     assert "Immobile, at wells" not in [
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
@@ -293,6 +295,28 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
         for line in ax.lines
     )
     plt.close(fig)
+
+
+def test_each_panels_values_carry_its_letter():
+    """The events summary tags each panel's values with the panel's letter, as
+    the figure places it."""
+    from continuum_swr_replay.reported import events
+
+    panels = {
+        "state_calibration": "state_calibration",
+        "rule_sweep": "rule_sweep",
+        "boundary_timing": "boundary_timing",
+        "nonlocal_mua": "nonlocal_mua",
+        "hpd": "hpd",
+        "tetrode_holdout": "heldout_gain",
+        "spike_rate": "heldout_gain",
+        "shared_content": "shared_content",
+        "class_distribution": "ripple_modes",
+        "nonlocal_restriction_distance": "outside_distance",
+    }
+    for tag, panel in panels.items():
+        assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
+    assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua"}
 
 
 def test_panel_b_draws_the_timing_table():
@@ -736,7 +760,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "epoch_outside_swr_gains", refuse)
-    with pytest.raises(ValueError, match="panel e is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel j is not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 
@@ -778,5 +802,7 @@ def test_the_hpd_panel_refuses_a_bootstrap_off_the_subset(monkeypatch, tmp_path)
     monkeypatch.setattr(
         figure, "subset_staleness", lambda manifest, what: "made over other events"
     )
-    with pytest.raises(ValueError, match="panel f is not drawn: made over other"):
+    with pytest.raises(
+        ValueError, match=f"panel {figure.LETTERS['hpd']} is not drawn: made over other"
+    ):
         figure.read_hpd(pd.DataFrame(), tmp_path, tmp_path / "table.parquet")

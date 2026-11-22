@@ -1990,10 +1990,7 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
     # Figure 2's supplement, panel by panel
-    assert events.TAGS["boundary_timing"].figures == ("S2b",)
-    assert events.TAGS["tetrode_holdout"].figures == ("S2c",)
-    assert events.TAGS["shared_content"].figures == ("S2d",)
-    assert events.TAGS["nonlocal_restriction_distance"].figures == ("S2e",)
+    # (each panel's tag: test_generate_supp_figure02)
     assert events.TAGS["participation"].figures == ("2h",)
     # panel e's detectors are the analysis layer's, whose found shares the
     # summary tags with the panel

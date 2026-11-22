@@ -199,7 +199,9 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_max"
     ].value == pytest.approx(2 / 3)
-    assert {v.figures for v in values.values()} == {("S2b",)}
+    assert {v.figures for v in values.values()} == {
+        builder.TAGS["boundary_timing"].figures
+    }
     assert {v.questions for v in values.values()} == {("2b.4",)}
     assert "more than 25 ms later than the matched SWR's start" in (
         values["timing_start_later_end_earlier_share"].description
@@ -1090,7 +1092,9 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     # no figure draws the agreement
     agreement = {k for k in by_key if "agreement" in k}
     assert {by_key[k].figures for k in agreement} == {()}
-    assert {v.figures for k, v in by_key.items() if k not in agreement} == {("S2c",)}
+    assert {v.figures for k, v in by_key.items() if k not in agreement} == {
+        builder.TAGS["tetrode_holdout"].figures
+    }
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
     assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
@@ -1689,7 +1693,11 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
         and "_two_sided" not in k
     }
     assert len(drawn) == 3 * 4
-    assert {k for k, v in values.items() if v.figures == ("S2e",)} == drawn
+    assert {
+        k
+        for k, v in values.items()
+        if v.figures == builder.TAGS["nonlocal_restriction_distance"].figures
+    } == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
 

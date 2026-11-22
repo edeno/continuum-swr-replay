@@ -1,12 +1,39 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them: MUA in the No-Spike state, the timing of events
-against their SWRs, the held-out tetrode gain, shared content, the gain
-outside SWRs away from the SWRs, the posterior's spread, the events' peak
-ripple power, non-local time against MUA, the event rule's sensitivity, and
-the decoder's states calibrated by held-out spikes.
+the order the text cites them, in four rows:
 
-    a — Supports Figure 2a, where the No-Spike state first appears. Multiunit
+- the decoder on these recordings (a, b): its states calibrated by held-out
+  spikes, and MUA in the No-Spike state;
+- the count is robust (c, d): the share of events with no SWR at other
+  settings of the event rule, and the timing of events against their SWRs;
+- the events are coordinated and specific (e to h): non-local time against
+  MUA, the posterior's spread, the held-out tetrode gain split by bins with
+  and without spikes, and shared content;
+- ripple power and the held-out test (i, j): the events' peak ripple power has
+  one mode, and the gain outside SWRs away from the SWRs.
+
+    a — Supports Figure 2a: on these recordings the decoder's states mean
+        what they claim. Random 10-bin immobile windows that start inside a
+        well visit, grouped by a state's probability (five bins), and the
+        held-out evidence for what the state claims, one axis per state: for
+        Local, the held-out tetrodes' spikes at the animal's place against at
+        mismatched places; for Continuous and Fragmented, the place decoded
+        from one half of the tetrodes scored on the other half against
+        mismatched places (nats per window, the spike-mark log likelihood
+        ratio). The animals' mean with its 95 % interval, in the state's
+        color, and a dashed line at zero. No-Spike is not drawn: a confident
+        No-Spike label forces both halves silent, so it is no test (panel b
+        covers that state). Caveats: the probability bins come from the decode
+        with every tetrode; only the remote place is held out by the tetrode
+        split; the encodings are fit on running time in other time blocks
+        (``state_evidence.calibration_statistics`` over
+        ``IN_VISIT_CALIBRATION_METRICS``, re-summarized from the stored
+        windows of the held-out tetrode run by
+        ``scripts/event_evidence/summarize_state_calibration_in_visits.py``;
+        ``Processed-Data/state_calibration_in_visits``; the events summary's
+        ``state_calibration_*`` values).
+
+    b — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
         the start of No-Spike periods: the median over periods with the
         interquartile band, a dotted line at the start and a dashed line at the
@@ -24,7 +51,26 @@ the decoder's states calibrated by held-out spikes.
         state when the decoded tetrodes fall silent, so the fall in their MUA
         describes the state and is not a test of it.
 
-    b — Supports Figure 2f, which shows that a good share of the events start
+    c — Supports Figure 2d, the share of events with no SWR: it is not a
+        product of the event rule's settings. The share of the immobile
+        non-local events that start inside a well visit with no SWR, at each
+        value of three settings swept one at a time (the others at the rule's):
+        the non-local probability an event stays strictly above (0.5 to 0.95),
+        the minimum run length (7, the rule's 15 ms, to 25 samples of 2 ms) and
+        the SWR threshold (1 to 4 z). A thin line per animal (the mean over
+        its epochs of each epoch's share) and the share pooled over events in
+        bold, the rule's value dotted. The events are detected again from the
+        stored decode by the rule itself and labeled as the canonical table
+        labels them; at the rule's settings they are the canonical events. The
+        SWRs are not detected again: an event counts as overlapping an SWR at
+        a threshold when its Kay criterion on the decode grid reaches it, a
+        label that agrees with the canonical one for 99 % of the events at
+        2 z (``rule_sweep.sweep_statistics``;
+        ``Processed-Data/event_rule_sweep``,
+        ``scripts/event_properties/sweep_event_rule.py``; the events summary's
+        ``rule_sweep_*`` values).
+
+    d — Supports Figure 2f, which shows that a good share of the events start
         or end more than 25 ms from their SWR without saying which way. Each
         SWR-overlapping event of the canonical event table that starts inside
         a well visit, against its matched SWR (the pairs and offsets of Figure
@@ -43,12 +89,40 @@ the decoder's states calibrated by held-out spikes.
         SWR; start later and end earlier, it is inside the SWR; start and end
         later, it lags.
 
-    c and d — Support Figure 2h, the events driven by several tetrodes. Each
-    tetrode is left out of the decoder in turn: the other tetrodes' estimate
-    predicts its spikes better than local coding does (c), and in the events
-    where that estimate is specific, its activity is where the others point (d).
+    e — Supports Figure 2g and h, the events driven by population activity:
+        where the non-local time sits in MUA (the z-scored multiunit rate of
+        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
+        animal's immobile time bins decoded non-local spread over MUA (percent
+        per 0.25 z), the share below 2 z written; bottom, the percent of
+        immobile bins decoded non-local at each MUA level; a line per animal,
+        their mean in bold, a dashed line at 2 z, the MUA event detector's
+        threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
+        inside the well visits (``nonlocal_by_signal.nonlocal_counts`` of the
+        stored counts, the same table Figure 2i reads, by
+        ``signal_share_panels.draw_share_by_signal``;
+        ``Processed-Data/nonlocal_by_signal``; the events summary's
+        ``nonlocal_share_mua_above_level*`` and
+        ``nonlocal_time_below_mua_level_fraction*`` values).
 
-    c — The held-out tetrode gain over local coding. The immobile non-local
+    f — Supports Figure 2's case that the no-SWR events are specific: how
+        concentrated the decoded position is, no-SWR against SWR events. Each
+        event's HPD coverage is the mean over its bins of the length of track
+        (cm) covered by the 95 % highest-posterior-density region of the
+        position posterior (``hpd_coverage_cm`` of the canonical event table,
+        the per-bin ``hpd`` of the decode frames). A dot per animal (its
+        median, event -> epoch -> animal) and, beside them, the pooled median
+        with its 95 % interval from the property bootstrap
+        (``event_statistics.class_median_rows``;
+        ``Processed-Data/event_property_bootstrap``; the events summary's
+        ``hpd_*`` values). The pooled median and the animals' medians differ,
+        as the animals hold different numbers of events.
+
+    g and h — Support Figure 2h, the events driven by several tetrodes. Each
+    tetrode is left out of the decoder in turn: the other tetrodes' estimate
+    predicts its spikes better than local coding does (g), and in the events
+    where that estimate is specific, its activity is where the others point (h).
+
+    g — The held-out tetrode gain over local coding. The immobile non-local
         events of the canonical event table that start inside a well visit
         (``cohort_selection.select_visit_context``), split by whether they
         overlap an SWR. Each tetrode is left out of the decoder's smoother in
@@ -78,8 +152,9 @@ the decoder's states calibrated by held-out spikes.
         ``Processed-Data/event_tetrode_holdout``; the events summary's
         ``*_heldout_gain_*``, ``*_heldout_spiking_gain_*`` and
         ``*_heldout_silent_gain_*`` values).
-    d — Shared content: during an event, do the tetrodes point to the same
-        remote place? The same events and run as c, each left-out tetrode
+
+    h — Shared content: during an event, do the tetrodes point to the same
+        remote place? The same events and run as g, each left-out tetrode
         scored under the other tetrodes' position distribution against no
         place preference (the agreement; above zero only when the left-out
         tetrode's activity is where the others point), summed over tetrodes and
@@ -93,7 +168,21 @@ the decoder's states calibrated by held-out spikes.
         at zero, no place preferred (``shared_content.agreement_by_spread_statistics``;
         the events summary's ``*_shared_content_*`` values).
 
-    e — Supports Figure 2j: its main result, the full decoder's gain over the
+    i — Supports Figure 2i, which shows no step in non-local time at the SWR
+        threshold: the events' peak ripple power (the maximum of the z-scored
+        Kay consensus over the event's rows) has one mode. Each animal's
+        density of it, a thin line per animal and their mean in bold (as
+        Figure 2i draws its animals), is the Gaussian KDE (Silverman's
+        bandwidth) whose main mode the one-class-or-two analysis reports
+        (``class_or_continuum.peak_power_densities``), read from -2 to 12 z
+        (a thin tail lies beyond); a dashed line at the SWR threshold; and the
+        dip test's result (``event_statistics.peak_ripple_mode_statistics``;
+        ``Processed-Data/ripple_class_structure``, its per-event ``criterion``
+        files and ``distribution.csv``; the events summary's ``ripple_peak_*``
+        values). The distribution is not split by SWR label: the label is set
+        from this power, so a split would show the threshold, not two kinds.
+
+    j — Supports Figure 2j: its main result, the full decoder's gain over the
         SWR-only decoder outside SWRs, looked at more closely. Every value is
         over the immobile bins inside a well visit, which runs from the
         animal's first nose-poke at a reward well to its last poke-out there.
@@ -117,91 +206,9 @@ the decoder's states calibrated by held-out spikes.
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
-    f — Supports Figure 2's case that the no-SWR events are specific: how
-        concentrated the decoded position is, no-SWR against SWR events. Each
-        event's HPD coverage is the mean over its bins of the length of track
-        (cm) covered by the 95 % highest-posterior-density region of the
-        position posterior (``hpd_coverage_cm`` of the canonical event table,
-        the per-bin ``hpd`` of the decode frames). A dot per animal (its
-        median, event -> epoch -> animal) and, beside them, the pooled median
-        with its 95 % interval from the property bootstrap
-        (``event_statistics.class_median_rows``;
-        ``Processed-Data/event_property_bootstrap``; the events summary's
-        ``hpd_*`` values). The pooled median and the animals' medians differ,
-        as the animals hold different numbers of events.
-
-    g — Supports Figure 2i, which shows no step in non-local time at the SWR
-        threshold: the events' peak ripple power (the maximum of the z-scored
-        Kay consensus over the event's rows) has one mode. Each animal's
-        density of it, a thin line per animal and their mean in bold (as
-        Figure 2i draws its animals), is the Gaussian KDE (Silverman's
-        bandwidth) whose main mode the one-class-or-two analysis reports
-        (``class_or_continuum.peak_power_densities``), read from -2 to 12 z
-        (a thin tail lies beyond); a dashed line at the SWR threshold; and the
-        dip test's result (``event_statistics.peak_ripple_mode_statistics``;
-        ``Processed-Data/ripple_class_structure``, its per-event ``criterion``
-        files and ``distribution.csv``; the events summary's ``ripple_peak_*``
-        values). The distribution is not split by SWR label: the label is set
-        from this power, so a split would show the threshold, not two kinds.
-
-    h — Supports Figure 2g and h, the events driven by population activity:
-        where the non-local time sits in MUA (the z-scored multiunit rate of
-        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
-        animal's immobile time bins decoded non-local spread over MUA (percent
-        per 0.25 z), the share below 2 z written; bottom, the percent of
-        immobile bins decoded non-local at each MUA level; a line per animal,
-        their mean in bold, a dashed line at 2 z, the MUA event detector's
-        threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
-        inside the well visits (``nonlocal_by_signal.nonlocal_counts`` of the
-        stored counts, the same table Figure 2i reads, by
-        ``signal_share_panels.draw_share_by_signal``;
-        ``Processed-Data/nonlocal_by_signal``; the events summary's
-        ``nonlocal_share_mua_above_level*`` and
-        ``nonlocal_time_below_mua_level_fraction*`` values).
-
-    i — Supports Figure 2d, the share of events with no SWR: it is not a
-        product of the event rule's settings. The share of the immobile
-        non-local events that start inside a well visit with no SWR, at each
-        value of three settings swept one at a time (the others at the rule's):
-        the non-local probability an event stays strictly above (0.5 to 0.95),
-        the minimum run length (7, the rule's 15 ms, to 25 samples of 2 ms) and
-        the SWR threshold (1 to 4 z). A thin line per animal (the mean over
-        its epochs of each epoch's share) and the share pooled over events in
-        bold, the rule's value dotted. The events are detected again from the
-        stored decode by the rule itself and labeled as the canonical table
-        labels them; at the rule's settings they are the canonical events. The
-        SWRs are not detected again: an event counts as overlapping an SWR at
-        a threshold when its Kay criterion on the decode grid reaches it, a
-        label that agrees with the canonical one for 99 % of the events at
-        2 z (``rule_sweep.sweep_statistics``;
-        ``Processed-Data/event_rule_sweep``,
-        ``scripts/event_properties/sweep_event_rule.py``; the events summary's
-        ``rule_sweep_*`` values).
-
-    j — Supports Figure 2a: on these recordings the decoder's states mean
-        what they claim. Random 10-bin immobile windows that start inside a
-        well visit, grouped by a state's probability (five bins), and the
-        held-out evidence for what the state claims, one axis per state: for
-        Local, the held-out tetrodes' spikes at the animal's place against at
-        mismatched places; for Continuous and Fragmented, the place decoded
-        from one half of the tetrodes scored on the other half against
-        mismatched places (nats per window, the spike-mark log likelihood
-        ratio). The animals' mean with its 95 % interval, in the state's
-        color, and a dashed line at zero. No-Spike is not drawn: a confident
-        No-Spike label forces both halves silent, so it is no test (panel a
-        covers that state). Caveats: the probability bins come from the decode
-        with every tetrode; only the remote place is held out by the tetrode
-        split; the encodings are fit on running time in other time blocks
-        (``state_evidence.calibration_statistics`` over
-        ``IN_VISIT_CALIBRATION_METRICS``, re-summarized from the stored
-        windows of the held-out tetrode run by
-        ``scripts/event_evidence/summarize_state_calibration_in_visits.py``;
-        ``Processed-Data/state_calibration_in_visits``; the events summary's
-        ``state_calibration_*`` values).
-
-Panels c and d read the held-out tetrode run over the epochs the events
+Panels g and h read the held-out tetrode run over the epochs the events
 summary reads and refuse a run not held out in folds of whole trials, as the summary does.
-Panel e reads the held-out event run
+Panel j reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
 (``reported.events.read_heldout_restriction``), and refuse it, as Figure 2j
@@ -209,10 +216,12 @@ does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Their
-values are the events summary's ``restriction_outside_swr_*`` values. Panel b
-reads the canonical event table. Panel a reads every analyzed epoch's decode
-frame (``Processed-Data``), which takes a
-few minutes; it has no reported value.
+values are the events summary's ``restriction_outside_swr_*`` values. Panels d,
+f and i read the canonical event table (f and i with the stored outputs they
+name), refused, as their values are marked pending, when an output was not
+made from the current event table over the analyses' subset; c, e and a their
+stored outputs likewise. Panel b reads every analyzed epoch's decode frame
+(``Processed-Data``), which takes a few minutes; it has no reported value.
 
 Usage
 -----
@@ -345,21 +354,21 @@ figure_utilities.set_figure_defaults(context="paper")
 set_publication_style()
 warnings.filterwarnings("ignore")
 
-# Inches: the full page width, two rows: a, b and c, then d and e.
+# Inches: the full page width, four rows (the module's docstring).
 WIDTH = 6.5
-HEIGHT = 7.8
+HEIGHT = 7.6
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
 TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
-"""Panel b's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
+"""The timing table's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
 TIMING_CORNERS = {
     ("earlier", "earlier"): "event leads",
     ("earlier", "later"): "contains SWR",
     ("later", "earlier"): "inside SWR",
     ("later", "later"): "event lags",
 }
-"""Panel b's names of its corner cells, by (start, end) class: the event and its
+"""The timing table's names of its corner cells, by (start, end) class: the event and its
 SWR overlap there, and neither bound is within 25 ms of the SWR's."""
 CORNER_DROP = -0.3
 SHARE_DROP = 0.0
@@ -367,7 +376,7 @@ RANGE_DROP = 0.28
 """Where a cell's corner name, share and animals' range sit, from its center
 (cell heights, down)."""
 TIMING_CMAP = "bone_r"
-"""Panel b's colormap: sequential, the posteriors' (prints in gray)."""
+"""The timing table's colormap: sequential, the posteriors' (prints in gray)."""
 SHARED_YLABEL = "Held-out agreement\n(nats/spike)"
 SHARED_XLABEL = "Spread of the other tetrodes'\nestimate (cm)"
 RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
@@ -396,7 +405,7 @@ HPD_YLABEL = "95 % HPD region\n(cm, event mean)"
 """The HPD panel's y label: each event's mean over its bins of the length of
 track the 95 % highest-posterior-density region covers."""
 SHARED_OFFSET = 0.2
-"""Panel d: each group's dots sit this far either side of its spread bin; the
+"""The shared-content panel: each group's dots sit this far either side of its spread bin; the
 mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
 SHARED_MEAN_OFFSET = 0.11
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
@@ -408,38 +417,38 @@ SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
 PANELS = (
+    "state_calibration",
     "no_spike_mua",
+    "rule_sweep",
     "boundary_timing",
+    "nonlocal_mua",
+    "hpd",
     "heldout_gain",
     "shared_content",
-    "outside_distance",
-    "hpd",
     "ripple_modes",
-    "nonlocal_mua",
-    "rule_sweep",
-    "state_calibration",
+    "outside_distance",
 )
 """The panels in the order the text cites them; their letters follow from it."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
 ROWS = (
-    ((0.8, 0.95), ("no_spike_mua", "boundary_timing", "heldout_gain")),
-    ((0.56, 0.69), ("shared_content", "outside_distance")),
-    ((0.31, 0.45), ("hpd", "ripple_modes", "nonlocal_mua")),
-    ((0.07, 0.2), ("rule_sweep", "state_calibration")),
+    ((0.81, 0.95), ("state_calibration", "no_spike_mua")),
+    ((0.56, 0.7), ("rule_sweep", "boundary_timing")),
+    ((0.31, 0.45), ("nonlocal_mua", "hpd", "heldout_gain", "shared_content")),
+    ((0.06, 0.2), ("ripple_modes", "outside_distance")),
 )
 """Each row's frames' bottom and top (figure height) and its panels, left to
 right."""
 FRAMES = {
-    "no_spike_mua": (0.075, 0.155),
-    "boundary_timing": (0.38, 0.22),
-    "heldout_gain": (0.7, 0.28),
-    "shared_content": (0.075, 0.36),
-    "outside_distance": (0.6, 0.3),
-    "hpd": (0.075, 0.09),
-    "ripple_modes": (0.3, 0.25),
-    "nonlocal_mua": (0.7, 0.25),
-    "rule_sweep": (0.075, 0.4),
-    "state_calibration": (0.56, 0.4),
+    "state_calibration": (0.085, 0.47),
+    "no_spike_mua": (0.71, 0.27),
+    "rule_sweep": (0.085, 0.47),
+    "boundary_timing": (0.71, 0.27),
+    "nonlocal_mua": (0.085, 0.15),
+    "hpd": (0.32, 0.06),
+    "heldout_gain": (0.47, 0.22),
+    "shared_content": (0.77, 0.21),
+    "ripple_modes": (0.085, 0.3),
+    "outside_distance": (0.55, 0.36),
 }
 """Each panel's frame's left edge and width (figure width)."""
 LETTER_HEIGHT = 0.035
@@ -447,7 +456,7 @@ LETTER_HEIGHT = 0.035
 above the highest drawn top of their row."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
 TRIGGER_WINDOW_S = 0.3
-"""Panel a's window around each start (s, in all), Figure 2g's: the periods
+"""The No-Spike panel's window around each start (s, in all), Figure 2g's: the periods
 last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
@@ -699,7 +708,7 @@ def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> 
 
 
 def read_no_spike_trace() -> dict:
-    """Panel a's trace: MUA around the start of every analyzed epoch's No-Spike
+    """The No-Spike panel's trace: MUA around the start of every analyzed epoch's No-Spike
     periods, in one pass over the decode frames (the SWR source's reader).
 
     Returns
@@ -743,7 +752,7 @@ def read_no_spike_trace() -> dict:
 
 
 def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
-    """Panel b: the share of SWR-overlapping events in each combination of
+    """The timing table: the share of SWR-overlapping events in each combination of
     start (rows) and end (columns) against the matched SWR's, as a heat map
     with the percent in each cell, the animals' range (in percent) under it
     and the corner cells' names (:data:`TIMING_CORNERS`) above it, in black
@@ -794,12 +803,12 @@ def draw_heldout_tetrode(ax: Axes, statistics: dict) -> None:
 
 
 def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel d: the held-out agreement per spike by spread bin, for no-SWR and
+    """The shared-content panel: the held-out agreement per spike by spread bin, for no-SWR and
     SWR events (``statistics``: :func:`read_inputs`' ``shared``). Each group's
     dots (one per animal) in its color on its side of the bin, the animals'
     mean with its 95 % interval in black farther out, a thin line through the
     group's means, the group's name beside its first bin, a dashed line at zero
-    and which way means shared content."""
+    and, under it at the left, which way means shared content."""
     bins = np.arange(len(SPREAD_BIN_LABELS))
     for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
         rows = [statistics.loc[(label, group)] for label in SPREAD_BIN_LABELS]
@@ -819,9 +828,11 @@ def draw_shared_content(ax: Axes, statistics: pd.DataFrame) -> None:
         )  # fmt: skip
         ax.plot(means, estimates, color=color, lw=0.6, zorder=1)
     ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-    ax.text(
-        0.99, 0.0, "\u2191 shared content", ha="right", va="bottom",
-        transform=blended_transform_factory(ax.transAxes, ax.transData),
+    # under the zero line at the left, where no group's values lie
+    ax.annotate(
+        "\u2191 shared content", (0.02, 0.0),
+        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
+        xytext=(0, -2), textcoords="offset points", ha="left", va="top",
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
     for k, (name, color) in enumerate(
@@ -848,7 +859,7 @@ def draw_outside_swr_series(
     names: Sequence[str],
     xlabel: str,
 ) -> None:
-    """Panel e: the full decoder minus the SWR-only decoder per spike
+    """The gain outside SWRs: the full decoder minus the SWR-only decoder per spike
     over every immobile bin outside SWRs, then over each part of them
     (``subset``, at each of ``thresholds``), a dot per animal and the mean
     with its interval, a thin line through the means, the parts' label under
@@ -997,7 +1008,7 @@ def draw_hpd(ax: Axes, rows: pd.DataFrame) -> None:
 
 
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
-    """Panel a: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
+    """The No-Spike panel: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
     the median with its interquartile band as Figure 2g draws its rows, a dotted
     line at the start and a dashed line at the level outside the periods."""
     t_ms = 1000 * np.asarray(trace["time"])

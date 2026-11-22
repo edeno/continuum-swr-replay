@@ -269,29 +269,29 @@ TAGS = {
     "nonlocal_found": Tags(("2b.3",), ("2e",)),
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
-    "boundary_timing": Tags(("2b.4",), ("S2b",)),
+    "boundary_timing": Tags(("2b.4",), ("S2d",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
     "mua": Tags(("2d.8",), ("2g",)),
     "theta": Tags(("2d.8",), ("2g",)),
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
-    "class_distribution": Tags(("2b.5",), ("S2g",)),
+    "class_distribution": Tags(("2b.5",), ("S2i",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
-    "nonlocal_mua": Tags(("2b.5",), ("S2h",)),
-    "rule_sweep": Tags(("2a.5",), ("S2i",)),
-    "state_calibration": Tags(("2a.7",), ("S2j",)),
+    "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
+    "rule_sweep": Tags(("2a.5",), ("S2c",)),
+    "state_calibration": Tags(("2a.7",), ("S2a",)),
     "participation": Tags(("2d.9",), ("2h",)),
-    "spike_rate": Tags(("2d.9",), ("S2c",)),
+    "spike_rate": Tags(("2d.9",), ("S2g",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("S2c",)),
+    "tetrode_holdout": Tags(("2c.3",), ("S2g",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
-    "shared_content": Tags(("2c.3",), ("S2d",)),
-    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2e",)),
+    "shared_content": Tags(("2c.3",), ("S2h",)),
+    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2j",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -908,7 +908,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.4 and Figure 2's supplement, panel S2b: the share of
+    """Question 2b.4 and Figure 2's supplement, panel S2d: the share of
     SWR-overlapping events in each of the nine combinations of their start and
     end against their matched SWR's (earlier, together within 25 ms, later;
     ``event_statistics.boundary_timing_statistics``), pooled over events, with
@@ -2052,7 +2052,7 @@ _CONTROL_AGREEMENT = (
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding and the
     agreement, per spike, of the events and their Local-rest controls. The
-    gain is drawn on Figure 2's supplement (panel S2c) and carries its tag; the
+    gain is drawn on Figure 2's supplement (panel S2g) and carries its tag; the
     agreement is drawn on no figure."""
     make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     make_text = value_factory(
@@ -2122,7 +2122,7 @@ _SPREAD_WORDS = (
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2's supplement, panel S2d: during an event, do
+    """Question 2c.3 and Figure 2's supplement, panel S2h: during an event, do
     the tetrodes point to the same remote place? The held-out tetrode agreement
     per spike of the events of each SWR group, by the spread of the other
     tetrodes' position distribution in fixed bins
@@ -2960,7 +2960,7 @@ def restriction_outside_swr_part_values(
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
     spike in :data:`RESTRICTION_FIGURE_FAMILY` away from the SWRs are drawn on
-    Figure 2's supplement and carry its panel's tag (S2e); the gain at
+    Figure 2's supplement and carry its panel's tag (S2j); the gain at
     well-sampled places is for the text."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
