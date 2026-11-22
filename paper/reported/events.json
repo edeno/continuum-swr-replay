@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "c3db2f422b03",
+ "commit": "db7a3ab02e60",
  "code": {
-  "head": "c3db2f422b031ee2949bdc9b53dc4bdaca602e1b",
+  "head": "db7a3ab02e60ac1ffedc63b02192dd98f7142ffd",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -303,8 +303,8 @@
     "code_sha256": "870e60557d17a9e49a6d9ea79a563f9c9911b9977f860e39c926013a78ade74c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
-    "sha256": "ca1e920e0cd57f4dd4f720b9de8532eb03a947cbda3d50260ba0633a086a2cf8",
-    "code_sha256": "3730b2088b4f554fe3010b697610a844eeb7977eab7a469e7b10b63c1727459b"
+    "sha256": "f7f8d1a2eccc6518adc2c81e6646864ad172795b585dd392ce737b434dda144d",
+    "code_sha256": "ab19477eaa9ba48a3012f4e1ed211281f862a39fbe998f2a938e63a40b92f8f2"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
     "sha256": "1778fce3dcb7d9ffbf963a58beda68533d30885fd5cb48136aadb3b8f86ce537",
@@ -507,15 +507,15 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "92e07853f266c3d742d9b7b6f6dd4accabcb1c8193e9614df3035c2993f9a183",
-    "code_sha256": "9685440953295d4776d0808ba9cc738ded4f07d527034b70e37c6bcdf1d4b53f"
+    "sha256": "77d4aca54430ef61d596164e47259ee45cd650de20cdf17998f5532d2cdfda00",
+    "code_sha256": "236ae224ea01acc8ef7c62ddb1ee75d2b23509f6940447efc4d9e001c217a6e3"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
     "code_sha256": "d866ba8479cbc8d226b4737d5d51dae5a5cdfa8fb1b34d523c3e89ba9735001a"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "78756d3df88b11d80073dbe49e154d99071dd4e7ac27b5e8db563df6486ac002",
+    "sha256": "080c01c30eaaa88a8ab66a8545e6e5930b59b390d8606dd452e749a2a2b48183",
     "code_sha256": "169ece09d286064b8dc65a9dec4d16763c4ab3fad9af22bee2030c62898e3f27"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
@@ -1967,7 +1967,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1983,7 +1983,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1999,7 +1999,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2015,7 +2015,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2087,7 +2087,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2103,7 +2103,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2119,7 +2119,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2135,7 +2135,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2151,7 +2151,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -2167,7 +2167,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4027,7 +4027,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4043,7 +4043,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4059,7 +4059,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4075,7 +4075,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4091,7 +4091,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4107,7 +4107,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4123,7 +4123,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4139,7 +4139,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4155,7 +4155,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -4171,7 +4171,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -6998,7 +6998,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7012,7 +7014,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7026,7 +7030,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7040,7 +7046,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7538,7 +7546,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7552,7 +7562,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7566,7 +7578,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7580,7 +7594,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "2g"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_immobile_values",
    "pending": null
@@ -7790,7 +7806,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -7804,7 +7822,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -7818,7 +7838,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -7832,7 +7854,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8098,7 +8122,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8112,7 +8138,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8126,7 +8154,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8140,7 +8170,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8406,7 +8438,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8420,7 +8454,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8434,7 +8470,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8448,7 +8486,9 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [],
+   "figures": [
+    "S2b"
+   ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its time sums)",
    "function": "restriction_outside_swr_part_values",
    "pending": null
@@ -8891,7 +8931,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8907,7 +8947,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8923,7 +8963,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8939,7 +8979,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8955,7 +8995,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8971,7 +9011,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -8987,7 +9027,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -9003,7 +9043,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -9019,7 +9059,7 @@
     "2c.3"
    ],
    "figures": [
-    "2g"
+    "S2c"
    ],
    "source": "Processed-Data/event_nonlocal_restriction_heldout_events (scripts/event_evidence/detect_heldout_events.py, from Processed-Data/event_nonlocal_restriction, scripts/event_evidence/score_nonlocal_restriction.py, and Processed-Data/event_bin_facts, scripts/event_evidence/measure_bin_facts.py) (its held-out events and time sums)",
    "function": "restriction_outside_swr_values",
@@ -10347,7 +10387,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10363,7 +10403,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10379,7 +10419,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10395,7 +10435,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10467,7 +10507,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10483,7 +10523,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10499,7 +10539,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10515,7 +10555,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10531,7 +10571,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -10547,7 +10587,7 @@
     "2d.8"
    ],
    "figures": [
-    "event_gamma"
+    "S3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -11331,7 +11371,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11347,7 +11387,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11363,7 +11403,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11379,7 +11419,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11395,7 +11435,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11411,7 +11451,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11427,7 +11467,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11443,7 +11483,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11459,7 +11499,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",
@@ -11475,7 +11515,7 @@
     "2c.3"
    ],
    "figures": [
-    "heldout_tetrode"
+    "S2a"
    ],
    "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
    "function": "tetrode_holdout_values",

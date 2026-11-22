@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "c3db2f422b03",
+ "commit": "db7a3ab02e60",
  "code": {
-  "head": "c3db2f422b031ee2949bdc9b53dc4bdaca602e1b",
+  "head": "db7a3ab02e60ac1ffedc63b02192dd98f7142ffd",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,7 +31,7 @@
     "code_sha256": "d13e698505baf703f76df758efb47db9b104ff5368c6e52f34734430c8313d56"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "dc197e8e965f8fd965f38fddf2ff222abed5beedaab331396d3d0189639fe856",
+    "sha256": "e76c736f3968bbbd6bc20b44fe66324cb0185a5dac6153506e801bb4d577cacc",
     "code_sha256": "1ca9c7fb96fe8ec61bfe57a06c13f04eaf3913d80b865a09eb35b714e14436fe"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
@@ -203,15 +203,15 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "4c78045c9c2eb8dcb036fc79efa4571a09fc0f8315cad8b41cc0e21c0f106896",
-    "code_sha256": "aad05823d83df0a8cb99c79e511fa18d883234b4ad8bd9b60e6abafeeae95588"
+    "sha256": "2e8599ce25b27a2bbb3b69019f91f16a0d6c5458fbebb36c4a2784ebec8224d6",
+    "code_sha256": "fa051f8c957aeff2a35ab17dd994f0d148db5f76fa3934e87b83981cabc40c19"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
     "code_sha256": "d866ba8479cbc8d226b4737d5d51dae5a5cdfa8fb1b34d523c3e89ba9735001a"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "78756d3df88b11d80073dbe49e154d99071dd4e7ac27b5e8db563df6486ac002",
+    "sha256": "080c01c30eaaa88a8ab66a8545e6e5930b59b390d8606dd452e749a2a2b48183",
     "code_sha256": "169ece09d286064b8dc65a9dec4d16763c4ab3fad9af22bee2030c62898e3f27"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
@@ -255,8 +255,8 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "ed6a717b6fabf0e51a15036e4e2b03de9708f0ce834d963743ec98599c93cfa1",
-    "code_sha256": "ed6a717b6fabf0e51a15036e4e2b03de9708f0ce834d963743ec98599c93cfa1"
+    "sha256": "676f3d9c3d92caa4bf7122559d9c0145a424019313a9f60add4c3f193684b255",
+    "code_sha256": "676f3d9c3d92caa4bf7122559d9c0145a424019313a9f60add4c3f193684b255"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
     "sha256": "57d0b394406e7d48b60429e4b0217fec7faeb58ca6cb72c684dab346889919fc",
@@ -291,7 +291,7 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "ed6a717b6fabf0e51a15036e4e2b03de9708f0ce834d963743ec98599c93cfa1"
+   "sha256": "676f3d9c3d92caa4bf7122559d9c0145a424019313a9f60add4c3f193684b255"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
@@ -1465,7 +1465,7 @@
     "2a.3"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
@@ -1481,7 +1481,7 @@
     "2a.3"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
@@ -1497,7 +1497,7 @@
     "2a.3"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
@@ -1513,9 +1513,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1529,9 +1529,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1545,9 +1545,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1561,9 +1561,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1577,9 +1577,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1593,9 +1593,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1609,9 +1609,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1625,9 +1625,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1641,9 +1641,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1657,9 +1657,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1673,9 +1673,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1689,9 +1689,9 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cedbd25af2ba)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_figure01.py, commit cedbd25af2ba)",
    "function": "recording_values",
    "pending": null
   },
@@ -1747,7 +1747,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1763,7 +1763,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1779,7 +1779,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1795,7 +1795,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1811,7 +1811,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1827,7 +1827,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1843,7 +1843,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1859,7 +1859,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1875,7 +1875,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1891,7 +1891,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1907,7 +1907,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1923,7 +1923,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1939,7 +1939,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1955,7 +1955,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1971,7 +1971,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -1987,7 +1987,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2003,7 +2003,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2019,7 +2019,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2035,7 +2035,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2051,7 +2051,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2067,7 +2067,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2083,7 +2083,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2099,7 +2099,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2115,7 +2115,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2131,7 +2131,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2147,7 +2147,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2163,7 +2163,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2179,7 +2179,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2195,7 +2195,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2211,7 +2211,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2227,7 +2227,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2243,7 +2243,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2259,7 +2259,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2275,7 +2275,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2291,7 +2291,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2307,7 +2307,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2323,7 +2323,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2339,7 +2339,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2355,7 +2355,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2371,7 +2371,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2387,7 +2387,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2403,7 +2403,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2419,7 +2419,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2435,7 +2435,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2451,7 +2451,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2467,7 +2467,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2483,7 +2483,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2499,7 +2499,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2515,7 +2515,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2531,7 +2531,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2547,7 +2547,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2563,7 +2563,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2579,7 +2579,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2595,7 +2595,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2611,7 +2611,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2627,7 +2627,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2643,7 +2643,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2659,7 +2659,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2675,7 +2675,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2691,7 +2691,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2707,7 +2707,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2723,7 +2723,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2739,7 +2739,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2755,7 +2755,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2771,7 +2771,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2787,7 +2787,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2803,7 +2803,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2819,7 +2819,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2835,7 +2835,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2851,7 +2851,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2867,7 +2867,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
@@ -2883,7 +2883,7 @@
     "1.1"
    ],
    "figures": [
-    "memoryless_comparison"
+    "S1"
    ],
    "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
