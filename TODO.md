@@ -151,6 +151,24 @@ Work that is deferred on purpose. Each item says when it should be done.
 The review of the restriction and held-out tetrode runs before the
 `swr-restricted-models` merge left these on purpose.
 
+- [ ] **The library does not repeat itself on one kind of CI machine.** On
+  GitHub's runners with an AMD EPYC 7763 (no AVX-512), the fold fit of the
+  simulated recording is not the same twice from the same inputs: the
+  library's likelihood of fold 0 differed between two calls back to back in
+  481,504 of 16,430,000 values (by up to 7.2), and its EM on fold 0 ran 6, 7, 7
+  and 12 iterations (transitions up to 4.6e-4 apart; with one XLA thread the
+  likelihood repeated and the EM still did not, with a marginal that went
+  down twice). Fold 1 repeated. On the runners with an EPYC 9V45 or a Xeon
+  8573C, and on the development machine (Xeon Gold 6342, 1, 2 and 96 cores,
+  and an A100), every repeat was bit for bit; there a one-step float change of
+  the inputs moves the transitions by 4e-10 and a planted leak by 1.4e-2. So
+  the cause is below this repository, in JAX's CPU execution or in how the
+  library uses it, and it is not found. The three tests that compare two
+  computations bit for bit (`tests/integration/test_nonlocal_restriction_simulated.py`)
+  skip, with that reason, on a machine that does not repeat the computation,
+  and are exact everywhere else. Not done: a reproducer that needs only the
+  library, and an issue on `non_local_detector` or JAX. The script and the
+  runners' reports are in `.claude/research/ci_float_reproducibility/`.
 - [ ] **Old session-cache files hold other trials.** Both GPU runners make their
   folds from the trials `load_data` returns (the DIO parse). The current session
   cache (`replay_content/_session_cache/comrie_photogate_trials_v4/`) is a saved

@@ -358,6 +358,54 @@ def test_bursts_without_shared_content_are_credited_as_non_local(chance, suffix)
 # The fold fit: the whole decoder refit by EM on each fold's training folds.
 
 
+def _same_arrays(first, second) -> bool:
+    """Whether two sequences of arrays are equal, bit for bit."""
+    first = [np.asarray(a) for a in first]
+    second = [np.asarray(b) for b in second]
+    return len(first) == len(second) and all(
+        a.shape == b.shape and np.array_equal(a, b, equal_nan=True)
+        for a, b in zip(first, second, strict=True)
+    )
+
+
+def _skip_if_not_repeatable(compute, what: str) -> None:
+    """Skip the test when this machine does not repeat a computation.
+
+    The tests below compare two computations bit for bit, which says something
+    only where the same computation, made twice from the same inputs, gives the
+    same bits. That holds on the development machine (CPU and GPU) and on most
+    of GitHub's runners. On the runners with an AMD EPYC 7763 it does not: the
+    library's likelihood of one fold differed between two calls in 3 % of its
+    values (by up to 7), and its EM ran 6 to 12 iterations on the same inputs
+    (TODO.md, "Event evidence"). A test calls this only after its comparison
+    has differed, so nothing more is computed where the comparison holds.
+
+    Parameters
+    ----------
+    compute : callable
+        No arguments; returns a sequence of arrays. Called twice.
+    what : str
+        What it computes, for the skip's reason.
+    """
+    if not _same_arrays(compute(), compute()):
+        pytest.skip(
+            f"this machine does not give the same {what} twice from the same "
+            "inputs, so the bit-for-bit comparison cannot be made here "
+            "(TODO.md, Event evidence)"
+        )
+
+
+def test_a_computation_that_does_not_repeat_skips_and_one_that_does_goes_on():
+    """The skip is taken only when two calls differ, in a value or in a shape."""
+    _skip_if_not_repeatable(lambda: (np.arange(3.0), [1.0, np.nan]), "sum")
+    rng = np.random.default_rng(0)
+    with pytest.raises(pytest.skip.Exception, match="the same draw twice"):
+        _skip_if_not_repeatable(lambda: (rng.random(3),), "draw")
+    lengths = iter((2, 3))
+    with pytest.raises(pytest.skip.Exception):
+        _skip_if_not_repeatable(lambda: (np.zeros(next(lengths)),), "trace")
+
+
 def _fold_spikes_replaced(recording, mine, seed=0):
     """The recording's spikes with every spike the decoder bins into a bin of
     ``mine`` replaced: those removed, and as many again, with random marks, put
@@ -594,6 +642,23 @@ def test_a_folds_pass_is_reproduced_from_its_fitted_detector(fold_fit):
             detector, likelihood, in_swr, summary_bins=folds == k, log=sim.quiet
         )
         mine = folds == k
+        if not _same_arrays(
+            [table[column].to_numpy()[mine] for column in columns],
+            [again[column][mine] for column in columns],
+        ):
+            _skip_if_not_repeatable(
+                lambda detector=detector: [
+                    nr.fold_log_likelihood(
+                        detector,
+                        recording.time,
+                        recording.position[:, None],
+                        recording.spike_times,
+                        recording.marks,
+                        is_missing,
+                    )
+                ],
+                "likelihood",
+            )
         for column in columns:
             np.testing.assert_array_equal(
                 table[column].to_numpy()[mine], again[column][mine]
@@ -642,6 +707,36 @@ def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
         is_missing | zero,
     )
     original = fits[0][2]
+
+    def fit_again():
+        again, again_record = nr.fit_fold_detector(
+            canonical,
+            recording.time,
+            recording.position[:, None],
+            recording.spike_times,
+            recording.marks,
+            masks[0],
+            is_missing | zero,
+        )
+        return (
+            again.discrete_state_transitions_,
+            again.initial_conditions_,
+            again_record["marginal_log_likelihoods"],
+        )
+
+    if not _same_arrays(
+        (
+            detector.discrete_state_transitions_,
+            detector.initial_conditions_,
+            refit["marginal_log_likelihoods"],
+        ),
+        (
+            original.discrete_state_transitions_,
+            original.initial_conditions_,
+            record["folds"][0]["marginal_log_likelihoods"],
+        ),
+    ):
+        _skip_if_not_repeatable(fit_again, "EM fit")
     np.testing.assert_array_equal(
         detector.discrete_state_transitions_, original.discrete_state_transitions_
     )
@@ -680,6 +775,10 @@ def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
     # float32 rounding only: the library's KDE batches the spikes, so the
     # batches change shape with the spikes (observed: 32 of 12 million values
     # off, at most 1.7e-7 of the value)
+    if not np.allclose(after[~zero], before[~zero], rtol=1e-6, atol=1e-5):
+        _skip_if_not_repeatable(
+            lambda: [likelihood(recording.spike_times, recording.marks)], "likelihood"
+        )
     np.testing.assert_allclose(after[~zero], before[~zero], rtol=1e-6, atol=1e-5)
     assert np.abs(after[zero & ~is_missing] - before[zero & ~is_missing]).max() > 1.0
 
