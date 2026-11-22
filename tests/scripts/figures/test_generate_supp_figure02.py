@@ -226,7 +226,7 @@ def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes
     ]  # fmt: skip
     assert len(dots) == 6
     for k, (_group, color) in enumerate(panels.GROUP_COLORS.items()):
-        for j, (column, groups) in enumerate(SPLIT.items()):
+        for j, groups in enumerate(SPLIT.values()):
             x = panels.split_x(k, j)
             (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
             np.testing.assert_allclose(mine.get_offsets()[:, 1], groups[k])
