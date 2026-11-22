@@ -569,6 +569,37 @@ def test_each_bin_is_scored_by_its_own_folds_fit(fold_fit):
     assert np.abs(full_1[zero] - table["full"].to_numpy()[zero]).max() > 1e-3
 
 
+def test_a_folds_pass_is_reproduced_from_its_fitted_detector(fold_fit):
+    """A fold's pass depends on nothing but its fitted detector and the data:
+    computed again after every fold has been fit and scored, the likelihood and
+    the three models of folds 0 and 1 give the table's rows bit for bit. A pass
+    that read anything a later fit or pass changes would not."""
+    recording, _, folds, _, in_swr, table, _, fits, _, is_missing, *_ = fold_fit
+    columns = [
+        *nr.SCORE_COLUMNS,
+        *nr.STATE_PROBABILITY_COLUMNS.values(),
+        nr.NONLOCAL_PLACE_BIN_COLUMN,
+    ]
+    for k in (0, 1):
+        detector = fits[k][2]
+        likelihood = nr.fold_log_likelihood(
+            detector,
+            recording.time,
+            recording.position[:, None],
+            recording.spike_times,
+            recording.marks,
+            is_missing,
+        )
+        again, _ = nr.model_scores(
+            detector, likelihood, in_swr, summary_bins=folds == k, log=sim.quiet
+        )
+        mine = folds == k
+        for column in columns:
+            np.testing.assert_array_equal(
+                table[column].to_numpy()[mine], again[column][mine]
+            )
+
+
 def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
     """Replacing every spike in fold 0's bins leaves fold 0's fitted encoding,
     discrete transitions, initial conditions and EM trace as they were, and its
