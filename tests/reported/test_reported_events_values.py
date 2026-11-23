@@ -890,7 +890,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     for name, value in values.items():
         assert value.questions == ("2d.1",)
         pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S2l",)), name
+        assert value.figures == (() if pooled else ("S2k",)), name
     assert "under 20 cm from the animal" in values[key].description
 
 
@@ -1319,16 +1319,22 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
         ]
         == 3
     )
-    # the panel draws the agreement, the reference and the animals' shares; the
-    # difference, the pooled share and the reference's events are for the text
-    text = {
+    # Figure 2j draws the difference and the animals' shares, with the counts;
+    # the supplement (S2f) the agreement and the reference; the pooled share
+    # is for the text
+    raw = {
         k for k in values
-        if "minus_reference" in k
-        or k.endswith(("_share_of_events", "_width_matched_events"))
+        if "minus" not in k
+        and k.removesuffix("_ci_low").removesuffix("_ci_high").endswith(
+            ("_agreement_per_spike", "_reference_per_spike")
+        )
     }  # fmt: skip
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (() if name in text else ("2h",)), name
+        if name.endswith("_share_of_events"):
+            assert value.figures == (), name
+        else:
+            assert value.figures == (("S2f",) if name in raw else ("2j",)), name
     # five bins, two groups: agreement and reference (three values each), the
     # difference (four), the share positive (three), the share pooled and by
     # animal (four), the epochs, the events and the reference's events
@@ -1433,14 +1439,10 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
         pytest.approx(0.3)
     )
     assert numbers["non_swr_low_rate_heldout_events_scored"] == 3
-    drawn = {
-        k for k in values
-        if "_tenth_share" in k
-        or any(m in k for m in ("_heldout_gain_mark_", "_heldout_mark_information_"))
-    }  # fmt: skip
+    # no figure draws these
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("S2n",) if name in drawn else ()), name
+        assert value.figures == (), name
     # two groups: five share values, ten tenths; the fraction and its events;
     # three measures x two places x two groups x four, and the events scored
     assert len(values) == 2 * (5 + 10) + 2 + 3 * 2 * 2 * 4 + 2 * 2
@@ -1621,10 +1623,10 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic():
     # per group: the estimate, two bounds, animals positive, the events, those
     # scored and those without spikes
     assert len(numbers) == 2 * 7
-    assert {k for k, v in values.items() if v.figures == ("2j",)} == {
+    assert {k for k, v in values.items() if v.figures == ("2k",)} == {
         k for k in values if k.startswith("restriction_heldout_non_swr_")
     }
-    assert {v.figures for v in values.values()} == {(), ("2j",)}
+    assert {v.figures for v in values.values()} == {(), ("2k",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
@@ -1799,7 +1801,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for where in ("", "_outside_heldout_events")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     }
-    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2k",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
@@ -1871,7 +1873,7 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
         "restriction_immobile_epochs_full_above_swr_only",
         "restriction_immobile_epochs",
     }
-    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2k",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # the summary says what they are over (``over``), once
@@ -1958,7 +1960,7 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     }
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("2j",) if name in drawn else ())
+        assert value.figures == (("2k",) if name in drawn else ())
     assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 
@@ -2085,7 +2087,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("S2m",) if name in drawn else ()), name
+        assert value.figures == (("S2l",) if name in drawn else ()), name
     # no key of the canonical builders is made again
     canonical_keys = set(canonical) | set(
         _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
@@ -2233,3 +2235,25 @@ def test_the_gain_outside_swrs_leaves_out_the_bins_without_ripple_signal():
         "restriction_outside_swr_full_minus_swr_per_spike"
     ]
     assert "where SWR detection was observed" in headline.description
+
+
+def test_resolved_content_values_name_the_share_with_no_swr_by_width():
+    """The analysis test's events (``test_resolved_content``): among the
+    resolved events 5/12 have no SWR, among the wide ones 3/4."""
+    from tests.analysis.event_properties.test_resolved_content import (
+        _events_and_windows,
+    )
+
+    values = _by_key(builder.resolved_content_values(*_events_and_windows(), "s"))
+    numbers = {key: value.value for key, value in values.items()}
+    assert numbers["non_swr_fraction_animal_mean_resolved"] == pytest.approx(5 / 12)
+    assert numbers["non_swr_fraction_animal_min_resolved"] == pytest.approx(1 / 3)
+    assert numbers["non_swr_fraction_animal_mean_wide"] == pytest.approx(3 / 4)
+    assert numbers["nonlocal_events_resolved"] == 6
+    assert numbers["nonlocal_events_wide"] == 3
+    assert numbers["resolved_share_animal_mean"] == pytest.approx(31 / 48)
+    assert numbers["nonlocal_events_without_width"] == 1
+    assert len(values) == 2 * 4 + 4
+    assert {v.questions for v in values.values()} == {("2b.2",)}
+    assert {v.figures for v in values.values()} == {()}
+    assert "200 cm" in values["non_swr_fraction_animal_mean_resolved"].description

@@ -223,7 +223,7 @@ LINE_WIDTH_LIMITS_PT = (0.5, 1.5)
 """Cell Press's thinnest and thickest line."""
 
 
-def check_journal_limits(fig: Figure, max_height_cm: float | None = None) -> None:
+def check_journal_limits(fig: Figure) -> None:
     """Stop rather than save a figure outside Cell Press's figure guidelines.
 
     Checks the size of the figure as it is saved (cropped to what it draws,
@@ -235,16 +235,11 @@ def check_journal_limits(fig: Figure, max_height_cm: float | None = None) -> Non
     ----------
     fig : matplotlib.figure.Figure
         The finished figure.
-    max_height_cm : float, optional
-        The tallest the saved figure may be (cm), when not
-        :data:`MAX_FIGURE_SIZE_CM`'s height: a figure that is knowingly above
-        the common height says so where it passes this.
 
     Raises
     ------
     ValueError
-        If the saved figure is wider than :data:`MAX_FIGURE_SIZE_CM` or taller
-        than it (or than ``max_height_cm``),
+        If the saved figure is wider or taller than :data:`MAX_FIGURE_SIZE_CM`,
         a text is outside :data:`TEXT_SIZE_LIMITS_PT`, or a line is outside
         :data:`LINE_WIDTH_LIMITS_PT`.
     """
@@ -254,14 +249,10 @@ def check_journal_limits(fig: Figure, max_height_cm: float | None = None) -> Non
     saved = fig.get_tightbbox()
     margin = 2 * float(plt.rcParams["savefig.pad_inches"])
     size_cm = ((saved.width + margin) * 2.54, (saved.height + margin) * 2.54)
-    limit = (
-        MAX_FIGURE_SIZE_CM[0],
-        MAX_FIGURE_SIZE_CM[1] if max_height_cm is None else max_height_cm,
-    )
-    if size_cm[0] > limit[0] or size_cm[1] > limit[1]:
+    if size_cm[0] > MAX_FIGURE_SIZE_CM[0] or size_cm[1] > MAX_FIGURE_SIZE_CM[1]:
         problems.append(
             f"saved size {size_cm[0]:.2f} x {size_cm[1]:.2f} cm is over "
-            f"{limit[0]} x {limit[1]} cm"
+            f"{MAX_FIGURE_SIZE_CM[0]} x {MAX_FIGURE_SIZE_CM[1]} cm"
         )
 
     low, high = TEXT_SIZE_LIMITS_PT

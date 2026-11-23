@@ -292,6 +292,12 @@ Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
 `duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
 
+### `src/continuum_swr_replay/analysis/event_properties/resolved_content.py`
+
+The share of events with no SWR among the events whose content is resolved.
+
+`event_widths`, `resolved_share_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_properties/rule_sweep.py`
 
 How the count of non-local events and the share with no SWR depend on the event rule's settings: a sensitivity check, not a change to the events.

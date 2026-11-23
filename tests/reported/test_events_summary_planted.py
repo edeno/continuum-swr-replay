@@ -93,6 +93,7 @@ EVENT_BUILDERS = (
     "shared_content_values",
     "tetrode_holdout_extra_values",
     "low_rate_values",
+    "resolved_content_values",
     "content_occupancy_values",
 )
 #: The restriction builders, by the argument holding the canonical windows
@@ -672,7 +673,12 @@ CONTROL_VALUES = {
     AFTER_VISIT,
 }
 #: The values that read the held-out tetrode run with its extra scores
-EXTRA_VALUES = {"shared_content", "tetrode_holdout_extra", "low_rate"}
+EXTRA_VALUES = {
+    "shared_content",
+    "tetrode_holdout_extra",
+    "low_rate",
+    "resolved_content",
+}
 
 #: (folder, (manifest key, value or None to drop it)) -> the values made pending
 PENDING_CASES = [
