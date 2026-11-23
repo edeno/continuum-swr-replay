@@ -220,9 +220,9 @@ def stored_record(
     folds: np.ndarray,
     fold_counts: dict,
     margin_bins: int,
-) -> tuple[dict, str]:
+) -> tuple[dict, str, pd.DataFrame]:
     """The stored run's record of the epoch, checked to be ``ok`` and of the
-    same inputs, and how its folds were checked.
+    same inputs, how its folds were checked, and its per-bin table.
 
     Each input's SHA-256 must be the stored record's, and its margin in bins.
     The folds are checked by the trials' digest when the stored record holds
@@ -251,6 +251,8 @@ def stored_record(
     record : dict
     check : str
         ``"digest"`` or ``"block_column"``.
+    bins : pd.DataFrame
+        The stored per-bin table's :data:`STORED_BIN_COLUMNS`, read once.
 
     Raises
     ------
@@ -285,11 +287,11 @@ def stored_record(
         raise ValueError(
             f"the stored record of {epoch_id} was made from other inputs: {differ}"
         )
+    bins = pd.read_parquet(
+        output_path(epoch_id, stored_dir, NONLOCAL_RESTRICTION_BINS_NAME),
+        columns=STORED_BIN_COLUMNS,
+    )
     if check == "block_column":
-        bins = pd.read_parquet(
-            output_path(epoch_id, stored_dir, NONLOCAL_RESTRICTION_BINS_NAME),
-            columns=["time", "block"],
-        )
         if len(bins) != len(time) or not np.array_equal(
             bins["time"].to_numpy(dtype=float), time
         ):
@@ -304,7 +306,7 @@ def stored_record(
                 f"{moved.size} bins of {epoch_id} (first at bin {int(moved[0])}): "
                 "the trials are not the stored run's"
             )
-    return record, check
+    return record, check, bins
 
 
 def run_epoch(
@@ -325,8 +327,8 @@ def run_epoch(
     frame = epoch.frame
     folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
     inputs = current_epoch_inputs(epoch_id, epoch.paths, epoch.loaded["trials"])
-    stored, folds_check = (
-        (None, None)
+    stored, folds_check, stored_bins = (
+        (None, None, None)
         if stored_dir is None
         else stored_record(
             stored_dir, epoch_id, inputs, epoch.time, folds, fold_counts, margin_bins
@@ -375,10 +377,6 @@ def run_epoch(
     failures = nr.fold_check_failures(record, models)
     copied: list[str] = []
     if stored is not None:
-        stored_bins = pd.read_parquet(
-            output_path(epoch_id, stored_dir, NONLOCAL_RESTRICTION_BINS_NAME),
-            columns=STORED_BIN_COLUMNS,
-        )
         for fold, difference in zip(
             record["folds"],
             nr.stored_score_differences(scores, stored_bins, models),
