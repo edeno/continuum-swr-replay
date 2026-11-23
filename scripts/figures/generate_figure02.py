@@ -1005,7 +1005,7 @@ def fit_axes_in_row(
     most :data:`FIT_PASSES` times).
     """
     for _ in range(FIT_PASSES):
-        fig.canvas.draw()
+        fig.draw_without_rendering()
         to_figure = fig.transFigure.inverted()
         pads = []
         for ax in axes:
@@ -1997,7 +1997,7 @@ def generate_figure(
         "decoder_comparison": [ax_decoder_drawing, ax_time, ax_outside],
     }
 
-    fig.canvas.draw()
+    fig.draw_without_rendering()
     renderer = fig.canvas.get_renderer()
     # panel a's track starts where the drawing of the a, b, c, g column does
     x_left = (
@@ -2044,7 +2044,7 @@ def generate_figure(
     fit_track_to_height(fig, ax_a, x_left)
     # panel a's example fills the space the track drawing leaves: its labels
     # start a gap after the drawing, and its right edge stays
-    fig.canvas.draw()
+    fig.draw_without_rendering()
     to_figure = fig.transFigure.inverted()
     labels = max(
         ax.get_position().x0 - ax.get_tightbbox(renderer).transformed(to_figure).x0
@@ -2054,7 +2054,7 @@ def generate_figure(
     for ax in decode_axes:
         box = ax.get_position()
         ax.set_position((decode_left, box.y0, box.x1 - decode_left, box.height))
-    fig.canvas.draw()
+    fig.draw_without_rendering()
     positions = place_letters(
         fig,
         {
