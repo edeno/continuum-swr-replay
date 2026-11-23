@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     SIGNALS,
     signal_bin_index,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_range
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
 STATE_THRESHOLD = float(DEFAULT_NON_LOCAL_THRESHOLD)
@@ -214,13 +215,4 @@ def detection_level_statistics(
     totals = table[["non_local", "local"]].groupby(level=epochs).sum()
     shares = above.groupby(level=epochs).sum() / totals.where(totals > 0)
     per_epoch = shares.dropna().set_axis(list(LEVEL_MEASURES), axis=1)
-    per_animal = per_epoch.groupby(level="animal").mean()
-    return pd.DataFrame(
-        {
-            "animal_mean": per_animal.mean(),
-            "animal_min": per_animal.min(),
-            "animal_max": per_animal.max(),
-            "n_animals": len(per_animal),
-            "n_epochs": len(per_epoch),
-        }
-    ).rename_axis("measure")
+    return animal_range(per_epoch).rename_axis("measure")

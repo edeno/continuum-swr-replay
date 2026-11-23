@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import rest_bi
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_range
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
 PROBABILITY_BIN_EDGES = np.arange(51) / 50
@@ -152,13 +153,4 @@ def probability_share_statistics(counts: pd.DataFrame) -> pd.DataFrame:
         .unstack("part", fill_value=0.0)
         .reindex(columns=list(SHARES), fill_value=0.0)
     )
-    per_animal = per_epoch.groupby(level="animal").mean()
-    return pd.DataFrame(
-        {
-            "animal_mean": per_animal.mean(),
-            "animal_min": per_animal.min(),
-            "animal_max": per_animal.max(),
-            "n_animals": len(per_animal),
-            "n_epochs": len(per_epoch),
-        }
-    ).rename_axis("part")
+    return animal_range(per_epoch).rename_axis("part")
