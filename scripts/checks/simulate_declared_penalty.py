@@ -36,6 +36,17 @@ The simulation:
 - the estimand: the Q1 contrast, the curve's mean 2 to 4 s after arrival less
   its mean in the first second (:data:`CONTRAST`).
 
+The scope: every session shares one curve and one rate, with no session, day
+or animal effect, and its events are independent Poisson counts, not
+clustered in time. The bias, spread, coverage and rejection rates therefore
+speak only to sampling noise and the penalty's shrinkage, not to the
+variation between sessions, days and animals that the project's interval is
+built for. Without that variation the interval is known to be wide: it
+covers 0.999 of the truth with no animal or day effect
+(``simulate_interval_coverage.py``, setting ``sd 0/0/1`` of
+``tests/scripts/checks/data/interval_coverage_full.csv``), so a coverage near
+1 here is expected and is not a finding about real data.
+
 The bins of a session are summed over those with the same time since the
 visit's start (every full bin of a given index, and each last partial bin
 alone). The design row of such bins is the same, so the summed counts are
@@ -54,13 +65,26 @@ one row per target and curve (``declared_penalty.parquet`` in
   the animal-balanced estimate less ``planted``), ``bias_share`` (``bias`` as
   a share of ``planted``; NaN for the flat curve), ``sd`` (over data sets),
   ``bias_se``;
-- ``reject_t``: the share of data sets whose t test over the 5 animal values
-  (``animal_day_session_values``) against zero has p below 0.05 (false
-  positives for the flat curve, power for the rise), ``reject_t_se``;
-- ``coverage``: the share whose 95 % interval (``estimand_summary``: the
-  nested bootstrap, t-corrected) holds ``planted``, ``coverage_se``;
-- ``share_converged``: the session fits that converged; ``n_data_sets``,
-  ``n_sessions``, ``n_draws``.
+- the project's inference for a scalar (``estimand_summary``): ``coverage``,
+  the share of data sets whose 95 % interval (the nested bootstrap,
+  t-corrected) holds ``planted``; ``excludes_zero``, the share whose interval
+  excludes zero; ``reject_day``, the share whose day-level signed-rank p
+  (``day_p``) is below 0.05, a NaN p (fewer than six non-zero day values)
+  counted as no rejection. For the flat curve ``excludes_zero`` and
+  ``reject_day`` are false positives, for the rise power. Each has its
+  binomial standard error (``*_se``);
+- ``reject_t_reference``: the share whose t test over the 5 animal values
+  (``animal_day_session_values``) against zero has p below 0.05, with
+  ``reject_t_reference_se``. It is a reference only, not the project's test:
+  no claim rests on a p over five animals;
+- ``share_converged``: the session fits that converged; a row below 1 is
+  printed as a warning. A session without a converged fit leaves that data
+  set's estimate: ``n_sessions_used_min`` and ``n_sessions_used_mean`` are the
+  sessions that entered the estimates over the data sets, ``n_sessions`` the
+  cohort's; ``n_data_sets``, ``n_draws``.
+
+The bootstrap seed of each (curve, data set, target) row is drawn from a
+``SeedSequence`` spawned from the data set's seed.
 
 ::
 
@@ -342,7 +366,8 @@ def summarize_data_set(
     seed: int,
 ) -> dict[str, float]:
     """One data set's animal-balanced estimate, its interval's coverage of
-    ``planted`` and the t test over animals."""
+    ``planted`` and of zero, its day-level p, the reference t test over
+    animals, and the sessions with a finite estimate."""
     animal = pd.Series([s.animal for s in sessions], index=estimates.index)
     day = pd.Series([s.day for s in sessions], index=estimates.index)
     session = pd.Series([s.key[2] for s in sessions], index=estimates.index)
@@ -353,8 +378,25 @@ def summarize_data_set(
     return {
         "estimate": summary["estimate"],
         "covered": float(summary["low"] <= planted <= summary["high"]),
+        "excludes_zero": float(not summary["low"] <= 0.0 <= summary["high"]),
+        "day_p": float(summary["day_p"]),
         "t_p": float(scipy.stats.ttest_1samp(per_animal.to_numpy(), 0.0).pvalue),
+        "n_sessions_used": int(summary["n_sessions"]),
     }
+
+
+def data_seed(curve: str, index: int) -> np.random.SeedSequence:
+    """The seed of data set ``index`` of ``curve``."""
+    return np.random.SeedSequence([DATA_SEED, list(CURVES).index(curve), index])
+
+
+def bootstrap_seeds(curve: str, index: int, n_targets: int) -> tuple[int, ...]:
+    """The bootstrap seed of each target's row of a data set, spawned from
+    the data set's seed."""
+    return tuple(
+        int(child.generate_state(1)[0])
+        for child in data_seed(curve, index).spawn(n_targets)
+    )
 
 
 def run_data_set(
@@ -368,20 +410,18 @@ def run_data_set(
     Returns
     -------
     list of dict
-        One per target: the data set's estimate, its interval's coverage, the
-        t test's p, and each session's edf.
+        One per target: :func:`summarize_data_set`'s entries and each
+        session's edf.
     """
     curve, index = task
-    seed = np.random.SeedSequence([DATA_SEED, list(CURVES).index(curve), index])
-    data = simulate(sessions, curve, np.random.default_rng(seed))
+    data = simulate(sessions, curve, np.random.default_rng(data_seed(curve, index)))
     pooled = pd.concat(data.values(), ignore_index=True)
     planted = planted_contrast(curve)
     out = []
-    for target, log_penalty in penalties.items():
+    seeds = bootstrap_seeds(curve, index, len(penalties))
+    for (target, log_penalty), seed in zip(penalties.items(), seeds, strict=True):
         fits = fit_contrasts(design_at(pooled, log_penalty), data)
-        row = summarize_data_set(
-            fits["estimate"], sessions, planted, n_draws, seed=DATA_SEED + index
-        )
+        row = summarize_data_set(fits["estimate"], sessions, planted, n_draws, seed)
         out.append(
             {
                 "target_edf": target,
@@ -413,6 +453,12 @@ def calibrate(target: float, sessions: list[Session]) -> tuple[float, float, flo
     return target, found.log_penalty, found.median_edf
 
 
+def _share(hits: pd.Series, name: str) -> dict[str, float]:
+    """The share of data sets in ``hits`` and its binomial standard error."""
+    p = float(hits.mean())
+    return {name: p, f"{name}_se": float(np.sqrt(p * (1 - p) / len(hits)))}
+
+
 def summarize(
     rows: list[dict],
     calibration: list[tuple[float, float, float]],
@@ -428,8 +474,6 @@ def summarize(
         n = len(group)
         estimate = group["estimate"].to_numpy()
         bias = float(np.mean(estimate) - planted)
-        reject = float(np.mean(group["t_p"] < 0.05))
-        coverage = float(group["covered"].mean())
         out.append(
             {
                 "target_edf": target,
@@ -445,11 +489,13 @@ def summarize(
                 "bias_share": bias / planted if planted != 0 else np.nan,
                 "sd": float(np.std(estimate, ddof=1)),
                 "bias_se": float(np.std(estimate, ddof=1) / np.sqrt(n)),
-                "reject_t": reject,
-                "reject_t_se": float(np.sqrt(reject * (1 - reject) / n)),
-                "coverage": coverage,
-                "coverage_se": float(np.sqrt(coverage * (1 - coverage) / n)),
+                **_share(group["covered"], "coverage"),
+                **_share(group["excludes_zero"], "excludes_zero"),
+                **_share(group["day_p"] < 0.05, "reject_day"),
+                **_share(group["t_p"] < 0.05, "reject_t_reference"),
                 "share_converged": float(group["share_converged"].mean()),
+                "n_sessions_used_min": int(group["n_sessions_used"].min()),
+                "n_sessions_used_mean": float(group["n_sessions_used"].mean()),
                 "n_data_sets": n,
                 "n_sessions": n_sessions,
                 "n_draws": config.n_draws,
@@ -478,12 +524,34 @@ def run(config: Config, workers: int = 1) -> pd.DataFrame:
     processes."""
     _COHORT[:] = cohort(config)
     tasks = [(curve, i) for curve in CURVES for i in range(config.n_data_sets)]
-    with multiprocessing.get_context("fork").Pool(workers) as pool:
-        calibration = pool.map(_calibrate, TARGETS)
+
+    def compute(map_):
+        calibration = map_(_calibrate, TARGETS)
         penalties = {target: rho for target, rho, _ in calibration}
         work = partial(_run_data_set, penalties=penalties, n_draws=config.n_draws)
-        rows = [row for chunk in pool.map(work, tasks, chunksize=1) for row in chunk]
+        return calibration, [row for chunk in map_(work, tasks) for row in chunk]
+
+    if workers == 1:
+        calibration, rows = compute(lambda f, xs: list(map(f, xs)))
+    else:
+        with multiprocessing.get_context("fork").Pool(workers) as pool:
+            calibration, rows = compute(partial(pool.map, chunksize=1))
     return summarize(rows, calibration, config, len(_COHORT))
+
+
+def report(table: pd.DataFrame) -> None:
+    """Print the table, and a warning line for each row in which not every
+    session fit converged."""
+    with pd.option_context("display.width", 200, "display.max_columns", 40):
+        print(table.round(4).to_string(index=False))
+    for row in table.itertuples():
+        if row.share_converged < 1:
+            print(
+                f"warning: target_edf {row.target_edf}, curve {row.curve}: "
+                f"{100 * row.share_converged:.1f} % of session fits converged; "
+                f"an estimate used as few as {row.n_sessions_used_min} of the "
+                f"{row.n_sessions} sessions"
+            )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -501,8 +569,7 @@ def main(argv: list[str] | None = None) -> None:
     table = run(config, args.workers)
     table.attrs["seconds"] = time.perf_counter() - started
     path = write_table(table, args.output_dir / OUTPUT_NAME)
-    with pd.option_context("display.width", 200, "display.max_columns", 30):
-        print(table.round(4).to_string(index=False))
+    report(table)
     print(f"wrote {path} in {table.attrs['seconds']:.0f} s")
 
 

@@ -932,7 +932,7 @@ Compute decoding quality metrics across all sessions.
 
 The declared-penalty rule for a per-session smooth, in simulation.
 
-`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `run_data_set`, `calibrate`, `summarize`, `run`, `main`
+`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `data_seed`, `bootstrap_seeds`, `run_data_set`, `calibrate`, `summarize`, `run`, `report`, `main`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 

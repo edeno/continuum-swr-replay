@@ -91,6 +91,15 @@ def test_the_table_on_a_tiny_cohort(tmp_path, monkeypatch) -> None:
     assert table["calibration_median_edf"].iloc[0] == pytest.approx(6.0, abs=0.01)
     assert (table["share_converged"] == 1.0).all()
     assert (table["n_data_sets"] == 2).all() and (table["n_sessions"] == 10).all()
+    assert (table["n_sessions_used_min"] == 10).all()
+    assert (table["n_sessions_used_mean"] == 10.0).all()
+    # Five recording days: fewer than six, so the day-level p is NaN and no
+    # data set rejects by it.
+    assert (table["reject_day"] == 0.0).all()
+    for column in ("reject_t_reference", "reject_day", "excludes_zero"):
+        assert table[column].between(0.0, 1.0).all()
+        assert f"{column}_se" in table
+    assert "reject_t" not in table
     assert table["planted"].iloc[1] == 0.0 and np.isnan(table["bias_share"].iloc[1])
     rise = table.iloc[0]
     assert rise["bias_share"] == pytest.approx(rise["bias"] / rise["planted"])
@@ -113,3 +122,38 @@ def test_the_contrast_vector_gives_the_planted_contrast() -> None:
     coef[columns] = projected[1:]
     planted = sim.planted_contrast("rise")
     assert sim.contrast_vector(design) @ coef == pytest.approx(planted, abs=0.02)
+
+
+def test_a_session_without_a_converged_fit_is_counted_and_warned(
+    monkeypatch, capsys
+) -> None:
+    """One session's fit not converged in every data set: it leaves the
+    estimate, ``n_sessions_used_*`` count 9 of the 10 sessions,
+    ``share_converged`` is 0.9, and a warning line names the row."""
+    real = sim.fit_contrasts
+
+    def one_failed(design, data):
+        fits = real(design, data)
+        fits.iloc[0] = (np.nan, np.nan, False)
+        return fits
+
+    monkeypatch.setattr(sim, "fit_contrasts", one_failed)
+    monkeypatch.setattr(sim, "TARGETS", (6.0,))
+    table = sim.run(TINY)
+    assert (table["n_sessions_used_min"] == 9).all()
+    assert (table["share_converged"] == 0.9).all()
+    assert (table["n_sessions"] == 10).all()
+    sim.report(table)
+    out = capsys.readouterr().out
+    assert out.count("warning:") == 2
+    assert "target_edf 6.0, curve rise: 90.0 % of session fits converged" in out
+
+
+def test_the_bootstrap_seeds_differ_across_rows() -> None:
+    """Each (curve, data set, target) row has its own bootstrap seed."""
+    seeds = {
+        sim.bootstrap_seeds(curve, index, 3)
+        for curve in sim.CURVES
+        for index in range(2)
+    }
+    assert len(seeds) == 4 and len({s for row in seeds for s in row}) == 12
