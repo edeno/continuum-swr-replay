@@ -34,6 +34,12 @@ Raw-data quality statistics for hippocampal clusterless decoding.
 
 `extract_discrete_transition_matrix`, `compute_hpc_raw_stats_single`, `check_transition_matrix_flags`, `apply_raw_stats_flags`
 
+### `src/continuum_swr_replay/analysis/decode_quality/nonlocal_probability.py`
+
+How the immobile time inside the well visits is spread over non-local probability.
+
+`probability_counts`, `animal_probability_distribution`, `probability_share_statistics`
+
 ### `src/continuum_swr_replay/analysis/decode_quality/posterior_analysis.py`
 
 Analysis of decoded posterior distributions.
@@ -44,7 +50,7 @@ Analysis of decoded posterior distributions.
 
 Quality metrics for hippocampal decoding analysis.
 
-`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
+`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `animal_distance_by_local_probability`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
 
 ### `src/continuum_swr_replay/analysis/detection/artifacts/detect.py`
 
@@ -697,6 +703,12 @@ The flow both decode runners share, and the record of what differs.
 Measure each analyzed epoch's decoder quality: Local-state error, state fractions, calibration.
 
 `measure_epoch`, `main`
+
+### `scripts/decoding/measure_nonlocal_probability.py`
+
+Count each epoch's immobile time bins inside the well visits by non-local probability.
+
+`main`
 
 ### `scripts/decoding/run_decoding_bandit.py`
 
