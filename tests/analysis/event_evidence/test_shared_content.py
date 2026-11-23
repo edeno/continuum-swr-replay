@@ -71,3 +71,30 @@ def test_the_agreement_by_spread_is_the_gain_statistic_per_bin():
     assert swr["estimate"] == pytest.approx(4.0) and swr["share_of_events"] == 1.0
     # no row for a bin a group has no event in
     assert ("25–50", "no SWR") not in stats.index
+
+
+def test_the_width_and_the_score_are_named_columns():
+    """Binned on another width column and read on another score column, the
+    statistic is the default one of a table where those columns hold the
+    default ones' values; the widths sort the events into other bins."""
+    windows = _windows()
+    renamed = windows.rename(
+        columns={
+            "spread_cm": "hpd_cm",
+            "agreement_per_spike": "agreement_null_per_spike",
+        }
+    )
+    default = agreement_by_spread_statistics(windows, n_boot=50, seed=1)
+    named = agreement_by_spread_statistics(
+        renamed,
+        n_boot=50,
+        seed=1,
+        width_column="hpd_cm",
+        column="agreement_null_per_spike",
+    )
+    pd.testing.assert_frame_equal(default, named)
+    wider = windows.assign(hpd_cm=windows["spread_cm"] + 1000.0)
+    moved = agreement_by_spread_statistics(
+        wider, n_boot=50, seed=1, width_column="hpd_cm"
+    )
+    assert set(moved.reset_index().query("n_events > 0")["spread_bin"]) == {"≥100"}

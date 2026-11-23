@@ -11,7 +11,10 @@ allowed at each time bin, ``a_t`` in {0, 1}^S:
 - ``swr``: an SWR is non-local activity. Inside an SWR bin (not padded) only
   the non-local states, outside SWRs only the local states: the SWR times set
   the state;
-- ``full``: every state at every bin (the paper's decoder).
+- ``full``: every state at every bin (the paper's decoder);
+- ``swr_allowed``, scored only when asked for (not one of :data:`MODELS`):
+  every state inside an SWR bin, only the local states outside SWRs. The SWR
+  times allow the non-local states but do not force them.
 
 **The restricted model.** State bins s = 1..N (the track-interior bins of every
 state), with discrete state ``d(s)``. The library's joint transition is
@@ -125,7 +128,7 @@ outside SWRs and the share outside SWRs are understated, not overstated.
 from __future__ import annotations
 
 import time as clock
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import Any
 
 import jax
@@ -156,7 +159,15 @@ from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 MODELS = ("none", "swr", "full")
-"""The three models: never non-local, non-local exactly in SWRs, unrestricted."""
+"""The three models: never non-local, non-local exactly in SWRs, unrestricted.
+The canonical run scores these and only these."""
+
+SWR_ALLOWED = "swr_allowed"
+"""The fourth model: every state allowed inside SWRs, only the local states
+outside them. Scored only when asked for (:data:`ALL_MODELS`)."""
+
+ALL_MODELS = (*MODELS, SWR_ALLOWED)
+"""Every model :func:`allowed_states` knows, in column order."""
 
 LOCAL_STATES = (LOCAL, NO_SPIKE)
 """The local states; every other state is a non-local one."""
@@ -166,17 +177,71 @@ FAMILY_SUFFIX = {"filter": "", "two_sided": "_two_sided"}
 and the suffix of their columns: a model's filter score is column ``<model>``,
 its two-sided score ``<model>_two_sided``."""
 
-SCORE_COLUMNS = tuple(
-    f"{model}{suffix}" for suffix in FAMILY_SUFFIX.values() for model in MODELS
-)
-"""The six score columns, the filter scores first."""
+
+def score_columns(models: Sequence[str] = MODELS) -> tuple[str, ...]:
+    """The score columns of ``models``: each model's filter score, then each
+    model's two-sided score."""
+    return tuple(
+        f"{model}{suffix}" for suffix in FAMILY_SUFFIX.values() for model in models
+    )
+
+
+SCORE_COLUMNS = score_columns(MODELS)
+"""The six score columns of :data:`MODELS`, the filter scores first."""
+
+
+def table_models(columns: Collection[str]) -> tuple[str, ...]:
+    """The models a table holds scores of: :data:`MODELS` always (a reader
+    fails on a missing column of theirs, as before), then each other model of
+    :data:`ALL_MODELS` whose two score columns are both in ``columns``."""
+    columns = set(columns)
+    return tuple(
+        model
+        for model in ALL_MODELS
+        if model in MODELS
+        or all(f"{model}{suffix}" in columns for suffix in FAMILY_SUFFIX.values())
+    )
+
+
+def table_score_columns(columns: Collection[str]) -> tuple[str, ...]:
+    """The score columns of :func:`table_models`: :data:`SCORE_COLUMNS` for a
+    table of the canonical run, more for a run that scored more models."""
+    return score_columns(table_models(columns))
+
 
 CONTRASTS = {
     "full_minus_swr": ("full", "swr"),
     "swr_minus_none": ("swr", "none"),
     "full_minus_none": ("full", "none"),
 }
-"""Each contrast's name and its two models, ``a - b``."""
+"""Each contrast's name and its two models, ``a - b``: the canonical three."""
+
+SWR_ALLOWED_CONTRASTS = {
+    "full_minus_swr_allowed": ("full", SWR_ALLOWED),
+    "swr_allowed_minus_swr": (SWR_ALLOWED, "swr"),
+    "swr_allowed_minus_none": (SWR_ALLOWED, "none"),
+}
+"""The contrasts of the fourth model. Inside SWRs ``swr_allowed`` and ``full``
+allow the same states, and outside them ``swr_allowed`` and ``swr`` (and
+``none``) do; the two models still differ everywhere, a little, because each
+bin's prediction carries the posterior from the bins before it. So:
+``swr_allowed - swr`` inside SWRs is what letting the decoder stay local in an
+SWR buys over forcing it non-local; ``full - swr_allowed`` outside SWRs is
+what the non-local states buy outside SWRs when the SWRs are not forced;
+``swr_allowed - none`` is what allowing the non-local states inside SWRs
+only buys."""
+
+ALL_CONTRASTS = {**CONTRASTS, **SWR_ALLOWED_CONTRASTS}
+"""Every contrast, the canonical three first. A contrast is read only from a
+table that holds both of its models (:func:`table_models`)."""
+
+
+def table_contrasts(columns: Collection[str]) -> dict[str, tuple[str, str]]:
+    """The contrasts of :data:`ALL_CONTRASTS` whose two models a table holds
+    (:func:`table_models`)."""
+    models = set(table_models(columns))
+    return {name: pair for name, pair in ALL_CONTRASTS.items() if set(pair) <= models}
+
 
 IMMOBILE_IN_SWR = "immobile_in_swr"
 IMMOBILE_OUTSIDE_SWR = "immobile_outside_swr"
@@ -255,8 +320,9 @@ def allowed_states(
     -------
     dict of str to ndarray of bool, shape (n_time, n_states)
         ``none`` (the local states at every bin), ``swr`` (the non-local
-        states inside SWRs, the local states outside them) and ``full`` (every
-        state at every bin) (:data:`MODELS`).
+        states inside SWRs, the local states outside them), ``full`` (every
+        state at every bin) (:data:`MODELS`) and ``swr_allowed`` (every state
+        inside SWRs, the local states outside them; :data:`SWR_ALLOWED`).
     """
     in_swr = np.asarray(in_swr, dtype=bool)
     local = np.isin(np.asarray(state_names), LOCAL_STATES)
@@ -265,6 +331,7 @@ def allowed_states(
         "none": np.broadcast_to(local, (in_swr.size, local.size)),
         "swr": np.where(in_swr[:, None], ~local, local),
         "full": np.broadcast_to(every, (in_swr.size, local.size)),
+        SWR_ALLOWED: np.where(in_swr[:, None], every, local),
     }
 
 
@@ -745,7 +812,7 @@ def model_scores(
     in_swr : ndarray of bool, shape (n_time,)
         The bins inside an SWR, where ``swr`` allows only the non-local states.
     models : sequence of str
-        The models to score, of :data:`MODELS`.
+        The models to score, of :data:`ALL_MODELS`.
     summary_bins : ndarray of bool, shape (n_time,), optional
         Given (with ``full`` among ``models``), ``scores`` also has the ``full``
         model's smoothed state probabilities (:data:`STATE_PROBABILITY_COLUMNS`,
@@ -756,7 +823,7 @@ def model_scores(
     Returns
     -------
     scores : dict of str to ndarray, shape (n_time,)
-        Each model's columns of :data:`SCORE_COLUMNS` (float32), and the
+        Each model's columns of :func:`score_columns` (float32), and the
         summary's columns with ``summary_bins``.
     record : dict
         ``continuous_block_deviation``; per model the library's
@@ -779,6 +846,8 @@ def model_scores(
     }
     scores: dict[str, NDArray] = {}
     allowed = allowed_states(detector.state_names, in_swr)
+    if unknown := sorted(set(models) - set(allowed)):
+        raise ValueError(f"unknown models {unknown}; the models are {ALL_MODELS}")
     state_names = list(detector.state_names)
     if summary_bins is not None:
         if "full" not in models:
@@ -841,7 +910,7 @@ def model_scores(
     return scores, record
 
 
-def check_failures(record: dict) -> list[str]:
+def check_failures(record: dict, models: Sequence[str] = MODELS) -> list[str]:
     """The model checks a record of :func:`model_scores` (one fold's pass of
     :func:`fold_fit_scores`) fails, as messages.
 
@@ -850,7 +919,8 @@ def check_failures(record: dict) -> list[str]:
     :data:`FILTER_IDENTITY_TOLERANCE`), its filtered posterior mass must be within
     :data:`CAUSAL_MASS_TOLERANCE` of 1 and its predictive posterior mass within
     :data:`PREDICTED_MASS_TOLERANCE`; the blocks of ``C`` must have rows that sum
-    to 1 within :data:`CONTINUOUS_BLOCK_TOLERANCE`.
+    to 1 within :data:`CONTINUOUS_BLOCK_TOLERANCE`. Every model of ``models``
+    (the scored ones) is checked.
     """
     failures = []
     deviation = record["continuous_block_deviation"]
@@ -859,7 +929,7 @@ def check_failures(record: dict) -> list[str]:
             f"rows of the continuous transitions' blocks are {deviation} from "
             f"summing to 1 (tolerance {CONTINUOUS_BLOCK_TOLERANCE})"
         )
-    for model in MODELS:
+    for model in models:
         deviation = record[f"filter_identity_deviation_{model}"]
         if not deviation <= FILTER_IDENTITY_TOLERANCE:
             failures.append(
@@ -1146,6 +1216,233 @@ def fit_fold_detector(
     }
 
 
+STORED_FIT_KEYS = (
+    "fold",
+    "n_training_bins",
+    "discrete_transition",
+    "initial_discrete",
+    "em_iterations",
+    "converged",
+    "marginal_log_likelihoods",
+)
+"""The keys of a stored fold record (one entry of a restriction record's
+``folds``) that :func:`fold_detector_from_record` reads."""
+
+
+def fold_detector_from_record(
+    canonical: Any,
+    time: NDArray,
+    position: NDArray,
+    spike_times: Sequence[NDArray],
+    marks: Sequence[NDArray],
+    is_training: NDArray,
+    fold_record: dict,
+) -> tuple[Any, dict]:
+    """A fold's fitted decoder rebuilt from its stored record, without EM.
+
+    The library's ``estimate_parameters`` (``ClusterlessDetector``,
+    non_local_detector 2d730c3a) first calls ``fit``: the environment, state
+    bins, initial conditions, discrete and continuous transitions from the
+    configuration, and the encoding from the position, spikes and marks of the
+    training bins. Its EM (``_DetectorBase.estimate_parameters``) then changes,
+    with ``estimate_encoding_model=False``, only the discrete transitions
+    (``discrete_state_transitions_``) and the initial conditions
+    (``initial_conditions_`` over the interior state bins, set to the smoothed
+    posterior of the first bin; ``discrete_initial_conditions``, its sum per
+    state; ``continuous_initial_conditions_``, their ratio). So the same
+    ``fit`` call (as :func:`fit_fold_detector` makes it through
+    ``estimate_parameters``) with the stored discrete transitions and initial
+    distribution set afterward gives the EM-fit decoder, except for the
+    initial conditions within a state: the record keeps only each state's
+    initial mass. Here each state's mass is spread over its state bins as the
+    configured continuous initial conditions spread it
+    (``initialize_initial_conditions``). For a state of one state bin
+    (No-Spike) that is the EM fit's value. The decodes' Local state has a
+    state bin per place bin (``local_position_std`` is set), and EM leaves
+    the smoothed posterior of the first bin there, which the record does not
+    keep; in every fold of the canonical run only Local has initial mass. So
+    the rebuilt decoder may differ from the EM fit in where in Local the first
+    bin starts, and then its scores at the first bins of the epoch, until the
+    spikes have fixed the place. In the simulated fold fit
+    (``tests/integration/test_nonlocal_restriction_simulated.py``, whose
+    first 150 bins are missing) every score, state probability and place bin
+    is the EM fit's to the bit; on real epochs the runner records the
+    difference per fold (:func:`stored_score_differences`).
+
+    The stored initial distribution is the library's float32 smoothed
+    posterior and need not sum to 1 (for example ``[1.000084638595581, 0, 0,
+    0]``); it is set as stored, as EM sets it, and the models renormalize it
+    over the states allowed at the first bin (:func:`predictive_log_scores`).
+    The stored discrete transitions are float64 written by ``json`` (17
+    significant digits), so they are read back bit for bit.
+
+    Parameters
+    ----------
+    canonical : NonLocalClusterlessDetector
+        The epoch's saved decoder (its configuration only, :func:`fresh_detector`).
+    time : ndarray, shape (n_time,)
+    position : ndarray, shape (n_time, 2)
+    spike_times, marks : sequence of ndarray, one per tetrode
+    is_training : ndarray of bool, shape (n_time,)
+        The fold's encoding training bins (``tetrode_holdout.fold_training_masks``).
+    fold_record : dict
+        The fold's stored record (:data:`STORED_FIT_KEYS`).
+
+    Returns
+    -------
+    detector : NonLocalClusterlessDetector
+    record : dict
+        ``discrete_transition`` and ``initial_discrete`` (as stored),
+        ``em_iterations``, ``converged`` and ``marginal_log_likelihoods`` of
+        the stored fit, ``fit_from_stored`` (True) and ``fit_s`` (the seconds
+        of the rebuild).
+
+    Raises
+    ------
+    ValueError
+        When the record's training bins are not ``is_training``'s count, its
+        matrices do not fit the detector's states.
+    """
+    started = clock.time()
+    if int(np.sum(is_training)) != fold_record["n_training_bins"]:
+        raise ValueError(
+            f"fold {fold_record['fold']}: {int(np.sum(is_training))} training "
+            f"bins, the stored fit {fold_record['n_training_bins']}: are the "
+            "folds the stored run's?"
+        )
+    detector = fresh_detector(canonical)
+    detector.fit(
+        np.asarray(time),
+        np.asarray(position),
+        list(spike_times),
+        list(marks),
+        is_training=np.asarray(is_training, dtype=bool),
+        discrete_transition_covariate_data=None,
+    )
+    discrete = np.asarray(fold_record["discrete_transition"], dtype=np.float64)
+    initial = np.asarray(fold_record["initial_discrete"], dtype=np.float64)
+    n_states = len(detector.state_names)
+    if discrete.shape != (n_states, n_states) or initial.shape != (n_states,):
+        raise ValueError(
+            f"fold {fold_record['fold']}: stored transitions {discrete.shape} and "
+            f"initial distribution {initial.shape} do not fit {n_states} states"
+        )
+    detector.discrete_state_transitions_ = discrete
+    detector.discrete_initial_conditions = initial
+    detector.initial_conditions_ = (
+        detector.continuous_initial_conditions_ * initial[detector.state_ind_]
+    )
+    return detector, {
+        "discrete_transition": discrete,
+        "initial_discrete": initial,
+        **{
+            key: fold_record[key]
+            for key in ("em_iterations", "converged", "marginal_log_likelihoods")
+        },
+        "fit_from_stored": True,
+        "fit_s": round(clock.time() - started, 1),
+    }
+
+
+def stored_fold_fit(fold_records: Sequence[dict]) -> Callable[..., tuple[Any, dict]]:
+    """A ``fit`` for :func:`fold_fit_scores` that rebuilds each fold's fitted
+    decoder from a stored restriction record (:func:`fold_detector_from_record`)
+    instead of running EM.
+
+    :func:`fold_fit_scores` calls its ``fit`` once per fold in fold order, so
+    the k-th call takes the stored record of fold k; each call checks that the
+    record is of fold k and of as many training bins as it is given.
+
+    Parameters
+    ----------
+    fold_records : sequence of dict
+        The stored record's ``folds``, in fold order.
+
+    Raises
+    ------
+    ValueError
+        When called more often than there are records, or the records are not
+        folds 0, 1, ... in order.
+    """
+    records = list(fold_records)
+    if [r["fold"] for r in records] != list(range(len(records))):
+        raise ValueError(
+            f"the stored folds are {[r['fold'] for r in records]}, not 0, 1, ..."
+        )
+    calls = iter(records)
+
+    def fit(canonical, time, position, spike_times, marks, is_training, is_missing):
+        record = next(calls, None)
+        if record is None:
+            raise ValueError(f"the stored fit has {len(records)} folds, no more")
+        return fold_detector_from_record(
+            canonical, time, position, spike_times, marks, is_training, record
+        )
+
+    return fit
+
+
+def stored_score_differences(
+    scores: pd.DataFrame, stored: pd.DataFrame, models: Sequence[str]
+) -> list[dict[str, Any]]:
+    """Per fold, the largest absolute per-bin difference between each score
+    scored again from a stored fit and the stored run's, over the fold's bins.
+
+    Two GPU runs of the same code differ by up to about 3e-4 nats a bin (the
+    library is not bit-repeatable on the GPU), so a run rebuilt from the stored
+    fit is the stored run where these are of that size.
+
+    Parameters
+    ----------
+    scores : pd.DataFrame
+        :func:`fold_fit_scores`' table of the new run.
+    stored : pd.DataFrame
+        The stored run's per-bin table of the same epoch: ``time``, ``block``,
+        ``in_swr`` and the score columns.
+    models : sequence of str
+        The models scored again; only those of :data:`MODELS` (the stored
+        run's) are compared.
+
+    Returns
+    -------
+    list of dict
+        One per fold, in fold order: ``fold``, ``n_bins`` and, for each
+        compared score column ``c``, ``c`` (the largest absolute difference,
+        nats; 0 for a fold without bins).
+
+    Raises
+    ------
+    ValueError
+        When the two tables differ in their bins: time, fold or SWR mask.
+    """
+    for column in ("time", "block", "in_swr"):
+        if len(scores) != len(stored) or not np.array_equal(
+            scores[column].to_numpy(), stored[column].to_numpy()
+        ):
+            raise ValueError(
+                f"the stored table's {column!r} is not the new run's: not the "
+                "same bins, folds or SWRs"
+            )
+    columns = score_columns([m for m in models if m in MODELS])
+    difference = np.abs(
+        scores[list(columns)].to_numpy(np.float64)
+        - stored[list(columns)].to_numpy(np.float64)
+    )
+    blocks = scores["block"].to_numpy()
+    out = []
+    for k in range(int(blocks.max()) + 1):
+        mine = blocks == k
+        largest = difference[mine].max(axis=0) if mine.any() else np.zeros(len(columns))
+        out.append(
+            {
+                "fold": k,
+                "n_bins": int(mine.sum()),
+                **{c: float(v) for c, v in zip(columns, largest, strict=True)},
+            }
+        )
+    return out
+
+
 def fold_log_likelihood(
     detector: Any,
     time: NDArray,
@@ -1222,6 +1519,7 @@ def fold_fit_scores(
     margin_bins: int,
     linear_position: NDArray | None = None,
     fit: Callable[..., tuple[Any, dict]] = fit_fold_detector,
+    models: Sequence[str] = MODELS,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
     """Every bin's score under the three models, each fold's bins under a whole
@@ -1260,15 +1558,22 @@ def fold_fit_scores(
         Given, the table also has ``place_sampling_s``.
     fit : callable
         ``fit(canonical, time, position, spike_times, marks, is_training,
-        is_missing)``, returning the fitted detector and its record.
+        is_missing)``, returning the fitted detector and its record; called
+        once per fold, in fold order. :func:`stored_fold_fit` makes one that
+        rebuilds each fold's fit from a stored record instead of running EM.
+    models : sequence of str
+        The models scored (of :data:`ALL_MODELS`; ``full`` must be one, for
+        the state summary); by default :data:`MODELS`, the canonical run's.
     log : callable
 
     Returns
     -------
     scores : pd.DataFrame
-        One row per bin: ``time``; ``none``, ``swr``, ``full`` (float32
-        filter scores, ``log p(y_t | y_1..y_{t-1})``) and ``none_two_sided``,
-        ``swr_two_sided``, ``full_two_sided`` (``log p(y_t | y_{-t})``), each
+        One row per bin: ``time``; each model's float32 filter score
+        (``log p(y_t | y_1..y_{t-1})``; column ``<model>``) and two-sided
+        score (``log p(y_t | y_{-t})``; ``<model>_two_sided``), in
+        :func:`score_columns` order (for :data:`MODELS`: ``none``, ``swr``,
+        ``full``, ``none_two_sided``, ``swr_two_sided``, ``full_two_sided``), each
         bin from its own fold's pass; ``in_swr`` and ``block`` (the bin's
         fold); with ``linear_position``, ``place_sampling_s`` (float32): the
         seconds the training bins of the bin's fold's encoding spend at the
@@ -1301,6 +1606,11 @@ def fold_fit_scores(
     is_missing = np.asarray(is_missing, dtype=bool)
     if in_swr.shape != time.shape:
         raise ValueError(f"in_swr has shape {in_swr.shape}, time {time.shape}")
+    models = tuple(models)
+    if "full" not in models or len(set(models)) != len(models):
+        raise ValueError(
+            f"models {list(models)} must name each model once, full among them"
+        )
     blocks = fold_blocks(time, n_folds, folds)
     masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
     check_no_fold_leakage(time, head_position, masks, blocks)
@@ -1332,7 +1642,7 @@ def fold_fit_scores(
         likelihood_s = round(clock.time() - t0, 1)
         t0 = clock.time()
         scores, part = model_scores(
-            detector, likelihood, in_swr, summary_bins=mine, log=log
+            detector, likelihood, in_swr, models=models, summary_bins=mine, log=log
         )
         scoring_s = round(clock.time() - t0, 1)
         del likelihood
@@ -1374,7 +1684,7 @@ def fold_fit_scores(
     table = pd.DataFrame(
         {
             "time": time,
-            **{column: columns[column] for column in SCORE_COLUMNS},
+            **{column: columns[column] for column in score_columns(models)},
             "in_swr": in_swr,
             "block": blocks,
         }
@@ -1392,10 +1702,11 @@ def fold_fit_scores(
     return table, record
 
 
-def fold_check_failures(record: dict) -> list[str]:
+def fold_check_failures(record: dict, models: Sequence[str] = MODELS) -> list[str]:
     """The checks a :func:`fold_fit_scores` record fails, as messages, each
     named by its fold: a fold whose EM did not converge (it stopped at the
-    library's ``max_iter``), and :func:`check_failures` of every fold's pass."""
+    library's ``max_iter``), and :func:`check_failures` of every fold's pass
+    (of the scored ``models``)."""
     failures = []
     for fold in record["folds"]:
         if not fold["converged"]:
@@ -1403,7 +1714,7 @@ def fold_check_failures(record: dict) -> list[str]:
                 f"fold {fold['fold']}: EM did not converge in "
                 f"{fold['em_iterations']} iterations"
             )
-        failures += [f"fold {fold['fold']}: {m}" for m in check_failures(fold)]
+        failures += [f"fold {fold['fold']}: {m}" for m in check_failures(fold, models)]
     return failures
 
 
@@ -1424,7 +1735,8 @@ def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
     pd.DataFrame
         One row per category (index ``category``): ``n_bins`` and every model's
         summed score (nats) of both families, ``<model>`` (filter) and
-        ``<model>_two_sided``.
+        ``<model>_two_sided``, for every model the table holds
+        (:func:`table_models`).
 
     Raises
     ------
@@ -1432,7 +1744,7 @@ def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
         When a labeled bin has a score that is not finite.
     """
     labels = pd.Series(np.asarray(labels, dtype=object), index=scores.index)
-    columns = list(SCORE_COLUMNS)
+    columns = list(table_score_columns(scores.columns))
     kept = labels.notna()
     not_finite = ~np.isfinite(scores.loc[kept, columns].to_numpy(np.float64))
     if not_finite.any():

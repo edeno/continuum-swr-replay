@@ -193,6 +193,13 @@ whose place-field encodings were fit on the decode's training bins of the other
 folds (more than 1 s from the fold) and whose discrete transitions and initial
 conditions were fit by EM with the fold's bins missing, under the processed-data
 root (``scripts/event_evidence/score_nonlocal_restriction.py``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR = "event_nonlocal_restriction_swr_allowed"
+"""The restriction models scored again with the fourth model (``swr_allowed``:
+every state inside SWRs, the local states outside them), each fold under the
+fold fit a stored restriction run recorded (no EM), under the processed-data
+root (``scripts/event_evidence/score_nonlocal_restriction.py
+--from-stored-fit``). Its tables are the restriction run's, with the fourth
+model's columns."""
 EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
 """The non-local restriction models' per-bin scores summed over each canonical
 non-local event and its Local-rest control (the windows of the held-out tetrode

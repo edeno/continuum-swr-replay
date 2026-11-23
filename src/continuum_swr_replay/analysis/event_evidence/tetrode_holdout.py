@@ -563,6 +563,285 @@ def predictive_log_score(terms: NDArray, weights: NDArray) -> NDArray:
     return logsumexp(terms + log_weights, axis=1)
 
 
+HPD_COVERAGE = 0.95
+"""The coverage of :func:`hpd_lengths`, the event table's (``hpd``)."""
+
+HPD_CHUNK_ROWS = 20_000
+"""Rows per batch of :func:`hpd_lengths` (it builds a full-grid copy)."""
+
+
+def hpd_lengths(
+    distribution: NDArray, environment: Any, *, chunk_rows: int = HPD_CHUNK_ROWS
+) -> NDArray[np.float64]:
+    """Each row's 95 % highest-posterior-density length, cm, as the event
+    table's ``hpd`` column is made.
+
+    The decode frame's ``hpd`` (``decode_quality.posterior_analysis.
+    get_posterior_stats``) is the library's
+    ``get_HPD_spatial_coverage(posterior, get_highest_posterior_threshold(
+    posterior, coverage=0.95))`` on the decode's posterior over every place bin
+    of the environment, where the junction placeholders (the bins that are not
+    track interior, ``edge_id = -1``) hold NaN: the threshold step drops those
+    columns, the coverage step counts the bins at or above the threshold and
+    multiplies by the first spacing of the place-bin centers. The event table's
+    ``hpd_coverage_cm`` is its mean over the event's bins
+    (``event_tables.trajectory._hpd_coverage_mean``). Here the same two
+    library functions are applied to ``distribution`` laid out the same way.
+
+    Parameters
+    ----------
+    distribution : ndarray, shape (n_rows, n_interior_bins)
+        A distribution over the real place bins (``interior_bin_mask`` order),
+        rows summing to 1; a row with a NaN gets NaN. Kept in its own
+        precision (the decode's posterior is float32, the held-out
+        distribution float64).
+    environment : non_local_detector.environment.Environment
+        Fitted, one position dimension (a linearized track).
+    chunk_rows : int
+
+    Returns
+    -------
+    ndarray of float64, shape (n_rows,)
+    """
+    import xarray as xr
+    from non_local_detector.model_checking.highest_posterior_density import (
+        get_highest_posterior_threshold,
+        get_HPD_spatial_coverage,
+    )
+
+    # in the distribution's own precision: the threshold step sorts and sums
+    # it, and a cast moves a bin at the threshold in or out
+    distribution = np.asarray(distribution)
+    interior = interior_bin_mask(environment)
+    centers = np.asarray(environment.place_bin_centers_, dtype=float).reshape(-1)
+    if centers.size != interior.size:
+        raise ValueError("hpd_lengths needs a one-dimensional place grid")
+    out = np.full(distribution.shape[0], np.nan)
+    finite = np.flatnonzero(np.isfinite(distribution).all(axis=1))
+    for start in range(0, finite.size, chunk_rows):
+        mine = finite[start : start + chunk_rows]
+        full = np.full((mine.size, centers.size), np.nan, dtype=distribution.dtype)
+        full[:, interior] = distribution[mine]
+        posterior = xr.DataArray(
+            full, dims=("time", "position"), coords={"position": centers}
+        )
+        out[mine] = get_HPD_spatial_coverage(
+            posterior, get_highest_posterior_threshold(posterior, HPD_COVERAGE)
+        )
+    return out
+
+
+def rate_terms(ground: NDArray, counts: NDArray) -> NDArray[np.float64]:
+    """The rate part of a tetrode's bin term,
+    ``r(t, x) = -ground(t, x) + n_t log ground(t, x)``.
+
+    ``l_k(t, x) = r(t, x) + m(t, x)``, ``m(t, x) = sum_i (log_intensity[i, x] -
+    log ground(t, x))`` over the bin's spikes: the Poisson log-likelihood of
+    the spike count at place x (less ``log n!``, the same at every x), and the
+    log density of the marks given a spike at x. In a silent bin ``r = l_k``.
+
+    The library floors both terms at ``EPS = 1e-15``: ``ground`` is the mean
+    rate times the spike density over the occupancy, clipped at ``EPS``
+    (``state_evidence.terms.per_tetrode_terms``), and each spike's log joint
+    mark intensity is clipped at ``log EPS`` (``clusterless_kde.
+    block_estimate_log_joint_mark_intensity``). So ``log ground`` is finite. At
+    a place where both are at the floor (no training spikes of the tetrode
+    near it), a spike's mark term is ``log EPS - log EPS = 0`` and the whole
+    term is the rate part: the floor, not the marks, says that the place is
+    unlikely.
+
+    Parameters
+    ----------
+    ground : ndarray, shape (n_rows, n_place_bins)
+        The tetrode's expected spikes per bin at each place, under each row's
+        fold's encoding.
+    counts : ndarray of int, shape (n_rows,)
+        Its spikes in each row's bin.
+
+    Returns
+    -------
+    ndarray of float64, shape (n_rows, n_place_bins)
+    """
+    ground = np.asarray(ground, dtype=np.float64)
+    return np.asarray(counts, dtype=np.float64)[:, None] * np.log(ground) - ground
+
+
+GROUND_FLOOR_FACTOR = 1.001
+"""A place is at the floor of a tetrode's ground intensity where its expected
+spikes are at most this many times the library's ``EPS`` (``EPS`` is stored in
+the encoding's float32, 1.0000000036e-15, so an exact comparison would miss
+it)."""
+
+INFORMATION_CHUNK_SPIKES = 20_000
+"""Spikes per batch of :func:`spike_information`."""
+
+
+def _information(log_weights: NDArray, n_places: NDArray) -> NDArray:
+    """``log(n_places) - H(q)``, ``q`` proportional to ``exp(log_weights)``
+    over each row's finite entries, nats."""
+    # a row without a finite entry is NaN (its spike is not counted)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        top = log_weights.max(axis=1, keepdims=True)
+        weights = np.exp(log_weights - top)
+        total = weights.sum(axis=1, keepdims=True)
+        q = weights / total
+        cross = np.where(q > 0, q * (log_weights - top), 0.0).sum(axis=1)
+        entropy = np.log(total[:, 0]) - cross
+        return np.log(n_places) - entropy
+
+
+def spike_information(
+    terms: FoldTerms, *, chunk_spikes: int = INFORMATION_CHUNK_SPIKES
+) -> dict[str, NDArray]:
+    """Each spike's place information, from its own terms under its bin's
+    fold's encoding (nothing of the other tetrodes or of the decode).
+
+    For spike i of tetrode k:
+
+    - ``mark``: ``q_i(x)`` proportional to ``exp(log_intensity[i, x] - log
+      ground[k, x])``, the conditional density of the mark given a spike at x,
+      normalized over place with equal weight per place bin;
+    - ``spike``: ``p_i(x)`` proportional to ``exp(log_intensity[i, x])``, the
+      whole per-spike term (rate map and mark together);
+
+    each as ``log(n) - H``, nats: 0 when the spike is equally likely at every
+    place (a mark of a cell with no place field), ``log(n)`` when it points to
+    one place bin.
+
+    The place bins are the scores' (the real place bins). Floors: where
+    tetrode k's ground intensity is at its floor (:data:`GROUND_FLOOR_FACTOR`
+    times ``EPS``: no training spike of the tetrode near the place), the
+    conditional mark density is 0 over 0 and its value there is the floors'
+    ratio, an arbitrary 1; such places are left out of ``q_i`` and of its
+    ``n``, which is the number of the tetrode's places above the floor in the
+    spike's fold. A spike whose tetrode has fewer than 2 such places has no
+    ``mark`` information and is not counted (``counted`` false; the window
+    sums keep the count of those counted). A log intensity at its floor
+    (``log EPS``) at a place above the ground floor gives that place a weight
+    of about 0, which is what it is. ``p_i`` is over every real place bin, the
+    log intensity's floor giving a weight of about 0.
+
+    Parameters
+    ----------
+    terms : FoldTerms
+    chunk_spikes : int
+
+    Returns
+    -------
+    dict
+        ``mark`` and ``spike`` (float64, shape (n_spikes,); NaN where not
+        counted), ``counted`` (bool, shape (n_spikes,)) and ``n_places``
+        (int, shape (n_folds, n_tetrodes): the places above the ground floor).
+    """
+    from non_local_detector.likelihoods.common import EPS
+
+    ground = np.asarray(terms.ground, dtype=np.float64)
+    above = ground > GROUND_FLOOR_FACTOR * EPS
+    n_places = above.sum(axis=2)
+    log_ground = np.log(ground)
+    fold = terms.block[terms.time_bin]
+    n_spikes, n_bins = terms.log_intensity.shape
+    mark = np.full(n_spikes, np.nan)
+    spike = np.full(n_spikes, np.nan)
+    counted = n_places[fold, terms.tetrode] >= 2
+    for start in range(0, n_spikes, chunk_spikes):
+        batch = slice(start, min(start + chunk_spikes, n_spikes))
+        f, k = fold[batch], terms.tetrode[batch]
+        intensity = terms.log_intensity[batch].astype(np.float64)
+        conditional = np.where(above[f, k], intensity - log_ground[f, k], -np.inf)
+        mark[batch] = _information(conditional, n_places[f, k])
+        spike[batch] = _information(intensity, np.full(intensity.shape[0], n_bins))
+    mark[~counted] = np.nan
+    spike[~counted] = np.nan
+    return {"mark": mark, "spike": spike, "counted": counted, "n_places": n_places}
+
+
+NULL_DONOR_RULE = (
+    "each event window whose bins lie in one fold takes a donor event window of "
+    "the same group and fold: the windows of a group and fold, in a random order "
+    "of numpy.random.default_rng([seed, fold, crc32(group)]), each take the next "
+    "(the last the first); a donor's bins are matched by offset from its first "
+    "bin, wrapping when the donor is shorter; a group of one window in a fold, a "
+    "window that spans folds and a control window have no donor"
+)
+"""The shuffled-window reference's donor rule (:func:`null_donors`), as the
+run's header records it."""
+
+
+def null_donors(windows: pd.DataFrame, folds: NDArray, seed: int) -> NDArray[np.int64]:
+    """Each window's donor window for the shuffled-window reference
+    (:data:`NULL_DONOR_RULE`).
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        ``window_id``, ``kind``, ``group``, ``s`` and ``e``.
+    folds : ndarray of int, shape (n_time,)
+        Each bin's fold.
+    seed : int
+
+    Returns
+    -------
+    ndarray of int, shape (n_windows,)
+        The position (in ``windows``) of each window's donor, -1 without one.
+    """
+    import zlib
+
+    folds = np.asarray(folds)
+    s = windows["s"].to_numpy(dtype=np.int64)
+    e = windows["e"].to_numpy(dtype=np.int64)
+    first = folds[s]
+    one_fold = np.array(
+        [(folds[a : b + 1] == f).all() for a, b, f in zip(s, e, first, strict=True)],
+        dtype=bool,
+    )
+    eligible = (windows["kind"].to_numpy() == "event") & one_fold
+    groups = windows["group"].astype(str).to_numpy()
+    donor = np.full(len(windows), -1, dtype=np.int64)
+    for group in sorted(set(groups[eligible])):
+        for fold in sorted(set(first[eligible & (groups == group)])):
+            members = np.flatnonzero(eligible & (groups == group) & (first == fold))
+            if members.size < 2:
+                continue
+            rng = np.random.default_rng([seed, int(fold), zlib.crc32(group.encode())])
+            order = members[rng.permutation(members.size)]
+            donor[order] = np.roll(order, -1)
+    return donor
+
+
+def null_pairs(
+    windows: pd.DataFrame, donors: NDArray, rows: NDArray
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """The scored bins of the shuffled-window reference: each bin of a window
+    with a donor and its donor bin (matched by offset from the first bin,
+    wrapping), as positions in ``rows``.
+
+    Returns
+    -------
+    receiver, donor, window : ndarray of int, shape (n_pairs,)
+        Positions in ``rows`` of each receiving bin and its donor bin, and the
+        receiving window's position in ``windows``.
+    """
+    s = windows["s"].to_numpy(dtype=np.int64)
+    e = windows["e"].to_numpy(dtype=np.int64)
+    receivers, donated, owner = [], [], []
+    for w in np.flatnonzero(np.asarray(donors) >= 0):
+        d = donors[w]
+        offset = np.arange(e[w] - s[w] + 1)
+        receivers.append(s[w] + offset)
+        donated.append(s[d] + offset % (e[d] - s[d] + 1))
+        owner.append(np.full(offset.size, w))
+    if not receivers:
+        empty = np.zeros(0, dtype=np.int64)
+        return empty, empty, empty
+    rows = np.asarray(rows)
+    return (
+        np.searchsorted(rows, np.concatenate(receivers)),
+        np.searchsorted(rows, np.concatenate(donated)),
+        np.concatenate(owner),
+    )
+
+
 def window_rows(starts: NDArray, ends: NDArray) -> NDArray[np.int64]:
     """The distinct bins of windows ``[s, e]`` (inclusive), sorted."""
     lengths = np.asarray(ends) - np.asarray(starts) + 1
@@ -708,9 +987,56 @@ def holdout_scores(
     folds: NDArray,
     margin_bins: int,
     refit: Callable[..., dict] = refit_encoding,
+    extras: bool = False,
+    null_seed: int = 0,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
     """The held-out score of every window, one row per window and tetrode.
+
+    With ``extras``, three more things per window and tetrode
+    (:data:`EXTRA_COLUMNS`):
+
+    - the width of the other tetrodes' distribution as the event table
+      measures a posterior's: ``hpd_cm``, the mean over the scored bins of its
+      95 % HPD length (:func:`hpd_lengths`);
+    - the rate part of each score (:func:`rate_terms`): with ``r(t, x)``, the
+      bin term of the tetrode's spike count alone, a score's rate part is the
+      same score of ``r``, ``log sum_x exp(r(t, x)) w(t, x)`` for its weights
+      ``w`` (the population's ``pi``, the Local kernel, uniform). Its mark part
+      is the score less its rate part. That is the predictive score of the
+      marks given the count: ``log sum_x exp(l) w - log sum_x exp(r) w = log
+      sum_x exp(m) w'`` with ``w'(x)`` proportional to ``exp(r(x)) w(x)``, the
+      weights updated by the count. In a silent bin ``r = l``, so the mark
+      part is exactly 0 there. Stored: ``gain_rate`` and ``agreement_rate``
+      (summed over the scored bins). A reader gets the mark parts as ``gain -
+      gain_rate`` and ``agreement - agreement_rate``, and the parts over the
+      bins with a spike by subtracting the silent bins' (``gain_silent``,
+      ``agreement_silent``, all rate);
+    - a shuffled-window reference for the agreement (event windows only): each
+      scored bin of the window scored against the other tetrodes'
+      distribution at a bin of a donor window (:func:`null_donors`, seeded by
+      ``null_seed``: another event window of the same group and fold, so the
+      same encodings and the same decode without the tetrode),
+      ``population_null = log sum_x exp(l_k(t, x)) pi(t', x)``. The agreement
+      is negative in expectation for any distribution unrelated to the scored
+      spikes (by Jensen's inequality, when the distribution's mean over such
+      bins is near uniform), so 0 is not its level for no shared content; the
+      reference is. Stored: ``agreement_null`` (``population_null - uniform``
+      summed over the bins scored both at the window and at its donor),
+      ``agreement_null_silent``, ``agreement_null_rate``, ``n_null_bins``,
+      ``n_null_spikes``, the donor's ``spread_null_cm`` and ``hpd_null_cm``
+      (means over the donor bins used) and ``null_window_id``; NaN (and -1)
+      for a window without a donor;
+    - the place information of the scored tetrode's spikes
+      (:func:`spike_information`), event and control windows alike: summed
+      over its spikes in the window's scored bins, ``mark_information`` (of
+      the conditional mark density given a spike at each place) and
+      ``spike_information`` (of the whole per-spike term), with
+      ``n_information_spikes``, the spikes counted (the reader divides by
+      it). It is a property of each spike and its fold's encoding. The
+      record keeps ``information_places``, each fold's and tetrode's places
+      above the ground floor (the bound of ``mark_information`` per spike is
+      their log).
 
     Parameters
     ----------
@@ -750,9 +1076,10 @@ def holdout_scores(
         ``agreement_silent`` (the part of each from bins where the tetrode did
         not spike) and ``spread_cm`` (the mean over scored bins of the
         population distribution's effective width, ``exp(entropy)`` place bins
-        times the place-bin size).
+        times the place-bin size); with ``extras``, :data:`EXTRA_COLUMNS`.
     record : dict
-        Timings and checks.
+        Timings and checks; with ``extras``, ``n_null_windows`` (event windows
+        with a donor) and ``n_event_windows_spanning_folds``.
     """
     started = clock.time()
     time = np.asarray(time, dtype=float)
@@ -791,6 +1118,41 @@ def holdout_scores(
     bin_cm = float(np.median(np.diff(np.sort(centers.ravel()))))
     missing = is_missing[rows]
     n_bins = e - s + 1
+    if extras:
+        donors = null_donors(windows, folds, null_seed)
+        receiver, donor_row, owner = null_pairs(windows, donors, rows)
+        record["n_null_windows"] = int((donors >= 0).sum())
+        record["n_event_windows_spanning_folds"] = int(
+            sum(
+                (windows["kind"].to_numpy()[w] == "event")
+                and not (np.asarray(folds)[s[w] : e[w] + 1] == folds[s[w]]).all()
+                for w in range(len(windows))
+            )
+        )
+        has_donor = donors >= 0
+        null_window_id = np.where(
+            has_donor, windows["window_id"].to_numpy()[np.maximum(donors, 0)], -1
+        )
+        # each spike's place information, summed per scored row and tetrode
+        information = spike_information(terms)
+        record["information_places"] = information["n_places"].tolist()
+        position = np.searchsorted(rows, terms.time_bin)
+        in_rows = (position < rows.size) & (
+            rows[np.minimum(position, rows.size - 1)] == terms.time_bin
+        )
+        kept = in_rows & information["counted"]
+        row_information = {
+            name: np.zeros((rows.size, terms.n_tetrodes))
+            for name in ("mark", "spike", "counted")
+        }
+        for name in ("mark", "spike"):
+            np.add.at(
+                row_information[name],
+                (position[kept], terms.tetrode[kept]),
+                information[name][kept],
+            )
+        np.add.at(row_information["counted"], (position[kept], terms.tetrode[kept]), 1)
+        del information
 
     parts = []
     record["smooth_s"] = []
@@ -837,6 +1199,44 @@ def holdout_scores(
             "agreement_silent": np.where(silent, population - uniform, 0.0),
             "spread_cm": np.where(scored, np.exp(entropy) * bin_cm, 0.0),
         }
+        if extras:
+            rate = rate_terms(terms.ground[terms.block[rows], k], counts[:, k])
+            population_rate = predictive_log_score(rate, distribution)
+            uniform_rate = logsumexp(rate, axis=1) - np.log(rate.shape[1])
+            local_rate = logsumexp(rate + log_local_weights, axis=1)
+            width = np.exp(entropy) * bin_cm
+            hpd = hpd_lengths(distribution, environment)
+            per_bin |= {
+                "gain_rate": np.where(scored, population_rate - local_rate, 0.0),
+                "agreement_rate": np.where(scored, population_rate - uniform_rate, 0.0),
+                "hpd_cm": np.where(scored, hpd, 0.0),
+                "mark_information": np.where(
+                    scored, row_information["mark"][:, k], 0.0
+                ),
+                "spike_information": np.where(
+                    scored, row_information["spike"][:, k], 0.0
+                ),
+                "n_information_spikes": np.where(
+                    scored, row_information["counted"][:, k], 0.0
+                ),
+            }
+            null = _null_sums(
+                mine,
+                rate,
+                distribution,
+                uniform,
+                uniform_rate,
+                scored & np.isfinite(hpd),
+                missing,
+                counts[:, k],
+                width,
+                hpd,
+                receiver,
+                donor_row,
+                owner,
+                len(windows),
+            )
+            del rate
         sums = dict(
             zip(
                 per_bin,
@@ -861,6 +1261,28 @@ def holdout_scores(
                     "agreement_silent": sums["agreement_silent"],
                     "spread_cm": sums["spread_cm"]
                     / np.maximum(sums["n_scored_bins"], 1),
+                    **(
+                        {
+                            "gain_rate": sums["gain_rate"],
+                            "agreement_rate": sums["agreement_rate"],
+                            "hpd_cm": sums["hpd_cm"]
+                            / np.maximum(sums["n_scored_bins"], 1),
+                            "mark_information": sums["mark_information"],
+                            "spike_information": sums["spike_information"],
+                            "n_information_spikes": np.rint(
+                                sums["n_information_spikes"]
+                            ).astype(np.int64),
+                            **{
+                                name: np.where(has_donor, values, np.nan)
+                                for name, values in null.items()
+                            },
+                            "n_null_bins": null["n_null_bins"].astype(np.int64),
+                            "n_null_spikes": null["n_null_spikes"].astype(np.int64),
+                            "null_window_id": null_window_id,
+                        }
+                        if extras
+                        else {}
+                    ),
                 }
             )
         )
@@ -874,8 +1296,108 @@ def holdout_scores(
     return scores, record
 
 
+def _null_sums(
+    terms: NDArray,
+    rate: NDArray,
+    distribution: NDArray,
+    uniform: NDArray,
+    uniform_rate: NDArray,
+    scored: NDArray,
+    missing: NDArray,
+    counts: NDArray,
+    spread: NDArray,
+    hpd: NDArray,
+    receiver: NDArray,
+    donor: NDArray,
+    owner: NDArray,
+    n_windows: int,
+) -> dict[str, NDArray]:
+    """One tetrode's shuffled-window reference, summed per window
+    (:func:`holdout_scores` with ``extras``): each receiving bin's terms scored
+    under its donor bin's distribution. Arrays are over the scored rows;
+    ``receiver``, ``donor`` and ``owner`` are :func:`null_pairs`'."""
+    weights = distribution[donor]
+    population = predictive_log_score(terms[receiver], weights)
+    population_rate = predictive_log_score(rate[receiver], weights)
+    kept = scored[receiver] & scored[donor] & ~missing[donor] & np.isfinite(population)
+    silent = kept & (counts[receiver] == 0)
+    agreement = population - uniform[receiver]
+
+    def summed(values: NDArray, where: NDArray) -> NDArray:
+        return np.bincount(owner[where], weights=values[where], minlength=n_windows)
+
+    n_bins = np.bincount(owner[kept], minlength=n_windows).astype(float)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return {
+            "agreement_null": summed(agreement, kept),
+            "agreement_null_silent": summed(agreement, silent),
+            "agreement_null_rate": summed(
+                population_rate - uniform_rate[receiver], kept
+            ),
+            "n_null_bins": n_bins,
+            "n_null_spikes": summed(counts[receiver].astype(float), kept),
+            "spread_null_cm": summed(spread[donor], kept) / n_bins,
+            "hpd_null_cm": summed(hpd[donor], kept) / n_bins,
+        }
+
+
+EXTRA_COLUMNS = (
+    "gain_rate",
+    "agreement_rate",
+    "hpd_cm",
+    "agreement_null",
+    "agreement_null_silent",
+    "agreement_null_rate",
+    "n_null_bins",
+    "n_null_spikes",
+    "spread_null_cm",
+    "hpd_null_cm",
+    "null_window_id",
+    "mark_information",
+    "spike_information",
+    "n_information_spikes",
+)
+"""The columns :func:`holdout_scores` adds with ``extras`` (a run made with
+``--extra-scores``); the canonical run's tables have none of them."""
+
 #: The per-tetrode sums :func:`window_scores` adds over a window's tetrodes.
 _SUMMED = ("gain", "gain_silent", "agreement", "agreement_silent", "n_spikes")
+
+_SUMMED_EXTRA = (
+    "gain_rate",
+    "agreement_rate",
+    "agreement_null",
+    "agreement_null_silent",
+    "agreement_null_rate",
+    "n_null_bins",
+    "n_null_spikes",
+    "mark_information",
+    "spike_information",
+    "n_information_spikes",
+)
+"""The per-tetrode sums of :data:`EXTRA_COLUMNS` :func:`window_scores` adds
+when the table has them."""
+
+_MEANS_EXTRA = ("hpd_cm", "spread_null_cm", "hpd_null_cm")
+"""The per-tetrode means of :data:`EXTRA_COLUMNS` :func:`window_scores` takes
+when the table has them."""
+
+
+def require_extra_columns(table: pd.DataFrame, what: str) -> None:
+    """Refuse a table of the canonical held-out tetrode run where ``what``
+    needs the columns a run with ``--extra-scores`` adds.
+
+    Raises
+    ------
+    ValueError
+        Naming the missing columns and the run that makes them.
+    """
+    if missing := [c for c in EXTRA_COLUMNS if c not in table.columns]:
+        raise ValueError(
+            f"{what} needs {missing}, which only a held-out tetrode run made with "
+            "--extra-scores has (scripts/event_evidence/score_tetrode_holdout.py "
+            "--extra-scores --output-dir <new folder>); the canonical run has not"
+        )
 
 
 def window_scores(table: pd.DataFrame) -> pd.DataFrame:
@@ -897,14 +1419,32 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         ``gain_per_spike``, ``spiking_gain_per_spike`` (the gain of the bins
         where the scored tetrode spiked), ``silent_gain_per_spike`` (that of
         the bins where it was silent; the two add to ``gain_per_spike``) and
-        ``agreement_per_spike``.
+        ``agreement_per_spike``. For a table with :data:`EXTRA_COLUMNS` (a run
+        with ``--extra-scores``), also the sums over tetrodes of
+        :data:`_SUMMED_EXTRA` (NaN in the reference's for a window without a
+        donor), the means over tetrodes of :data:`_MEANS_EXTRA`,
+        ``null_window_id``, and per spike: ``gain_rate_per_spike``,
+        ``gain_mark_per_spike``, ``agreement_rate_per_spike`` and
+        ``agreement_mark_per_spike`` (each pair adds to its score per spike),
+        ``mark_information_per_spike`` and ``spike_information_per_spike``
+        (over ``n_information_spikes``),
+        and ``agreement_null_per_spike`` (over the spikes of the bins the
+        reference scored, ``n_null_spikes``). A canonical table gives the
+        canonical columns only (:func:`require_extra_columns` refuses it where
+        they are needed).
     """
     keys = ["epoch_id", "animal", "window_id", "event_id", "kind", "group"]
     grouped = table.groupby(keys, sort=False)
+    extra = all(c in table.columns for c in EXTRA_COLUMNS)
+    means = ["spread_cm", "nonlocal_prob", *(_MEANS_EXTRA if extra else ())]
     windows = grouped[list(_SUMMED)].sum()
-    windows[["spread_cm", "nonlocal_prob"]] = grouped[
-        ["spread_cm", "nonlocal_prob"]
-    ].mean()
+    if extra:
+        windows[list(_SUMMED_EXTRA)] = grouped[list(_SUMMED_EXTRA)].sum()
+        # a window without a donor keeps NaN in the reference's sums
+        null = [c for c in _SUMMED_EXTRA if c.startswith("agreement_null")]
+        windows[null] = grouped[null].sum(min_count=1)
+        windows["null_window_id"] = grouped["null_window_id"].first()
+    windows[means] = grouped[means].mean()
     windows = windows.reset_index()
     spikes = windows["n_spikes"].where(windows["n_spikes"] > 0)
     windows["gain_per_spike"] = windows["gain"] / spikes
@@ -913,6 +1453,26 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
     ) / spikes
     windows["silent_gain_per_spike"] = windows["gain_silent"] / spikes
     windows["agreement_per_spike"] = windows["agreement"] / spikes
+    if extra:
+        windows["gain_rate_per_spike"] = windows["gain_rate"] / spikes
+        windows["gain_mark_per_spike"] = (
+            windows["gain"] - windows["gain_rate"]
+        ) / spikes
+        windows["agreement_rate_per_spike"] = windows["agreement_rate"] / spikes
+        windows["agreement_mark_per_spike"] = (
+            windows["agreement"] - windows["agreement_rate"]
+        ) / spikes
+        informative = windows["n_information_spikes"].where(
+            windows["n_information_spikes"] > 0
+        )
+        windows["mark_information_per_spike"] = (
+            windows["mark_information"] / informative
+        )
+        windows["spike_information_per_spike"] = (
+            windows["spike_information"] / informative
+        )
+        null_spikes = windows["n_null_spikes"].where(windows["n_null_spikes"] > 0)
+        windows["agreement_null_per_spike"] = windows["agreement_null"] / null_spikes
     return windows
 
 

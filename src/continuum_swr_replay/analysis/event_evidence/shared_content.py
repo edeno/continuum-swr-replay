@@ -54,7 +54,12 @@ def spread_bins(spread_cm: pd.Series) -> pd.Series:
 
 
 def agreement_by_spread_statistics(
-    windows: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+    windows: pd.DataFrame,
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+    width_column: str = SPREAD_COLUMN,
+    column: str = "agreement_per_spike",
 ) -> pd.DataFrame:
     """The agreement per spike of the events of each SWR group, by spread bin.
 
@@ -62,11 +67,24 @@ def agreement_by_spread_statistics(
     ----------
     windows : pd.DataFrame
         ``tetrode_holdout.window_scores`` of the events (``kind`` ``"event"``):
-        ``animal``, ``epoch_id``, ``group``, :data:`SPREAD_COLUMN` and
-        ``agreement_per_spike`` (NaN for an event without spikes, which counts
-        in no statistic).
+        ``animal``, ``epoch_id``, ``group``, ``width_column`` and ``column``
+        (NaN for an event without spikes, which counts in no statistic).
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
+    width_column : str, optional
+        The width the events are binned by (cm), in :data:`SPREAD_BINS_CM`:
+        :data:`SPREAD_COLUMN` (the default, ``spread_cm``, the published panel's), or ``hpd_cm``, the
+        95 % HPD length of a run with ``--extra-scores``
+        (``tetrode_holdout.hpd_lengths``), or the reference's ``spread_null_cm``
+        or ``hpd_null_cm``. The bins were fixed in advance for ``spread_cm``.
+        The two widths measure a distribution differently (for a normal
+        distribution of standard deviation sigma, ``exp(entropy)`` is about
+        4.13 sigma and the 95 % HPD 3.92 sigma; for one with several modes or
+        long tails they differ more), so the same edges need not sort the
+        events the same way.
+    column : str, optional
+        The score per spike, by default ``agreement_per_spike``; for example
+        ``agreement_null_per_spike``, the shuffled-window reference.
 
     Returns
     -------
@@ -87,19 +105,19 @@ def agreement_by_spread_statistics(
         - ``share_of_events``: the share of the group's scored events that fall
           in the bin, pooled over every event.
     """
-    scored = windows.dropna(subset=["agreement_per_spike"]).assign(
-        spread_bin=lambda t: spread_bins(t[SPREAD_COLUMN])
+    scored = windows.dropna(subset=[column]).assign(
+        spread_bin=lambda t: spread_bins(t[width_column])
     )
     totals = scored.groupby("group").size()
     rows = []
     for label in SPREAD_BIN_LABELS:
         mine = scored[scored["spread_bin"] == label]
         statistics = likelihood_advantage_statistics(
-            mine, column="agreement_per_spike", n_boot=n_boot, seed=seed
+            mine, column=column, n_boot=n_boot, seed=seed
         )
         for group, row in statistics.iterrows():
             events = mine[mine["group"] == group]
-            positive = (events["agreement_per_spike"] > 0).astype(float)
+            positive = (events[column] > 0).astype(float)
             per_animal = animal_session_values(
                 positive.groupby([events["animal"], events["epoch_id"]]).transform(
                     "mean"
