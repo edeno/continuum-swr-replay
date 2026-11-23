@@ -4,6 +4,7 @@ pinned to a CPU set; pools started by spawn."""
 from __future__ import annotations
 
 import ast
+import json
 import os
 import subprocess
 import sys
@@ -148,3 +149,43 @@ def test_pinning_refuses_a_thread_count_numpy_already_read(monkeypatch):
     assert os.sched_getaffinity(0) == before
     with pytest.raises(ValueError, match="no CPUs"):
         pin_to_cpus([])
+
+
+_PIN_OUTSIDE_THE_ALLOWED_SET = """
+import json, os, sys
+from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES, pin_to_cpus
+
+for name in BLAS_THREAD_VARIABLES:
+    os.environ[name] = "7"
+before = os.sched_getaffinity(0)
+cpus = [min(before), max(before) + 1]
+message = None
+try:
+    pin_to_cpus(cpus)
+except ValueError as error:
+    message = str(error)
+threads = [sorted(os.sched_getaffinity(int(t))) for t in os.listdir("/proc/self/task")]
+print(json.dumps({
+    "numpy": "numpy" in sys.modules,
+    "message": message,
+    "blas": [os.environ[name] for name in BLAS_THREAD_VARIABLES],
+    "unchanged": all(set(t) == before for t in threads),
+}))
+"""
+
+
+@linux_only
+def test_pinning_refuses_cpus_outside_the_allowed_set_before_changing_anything():
+    # In a fresh process without numpy, so the thread-count check passes and
+    # only the CPU check can refuse.
+    result = subprocess.run(
+        [sys.executable, "-c", _PIN_OUTSIDE_THE_ALLOWED_SET],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out = json.loads(result.stdout)
+    assert out["numpy"] is False
+    assert "not in this process's allowed CPUs" in out["message"]
+    assert out["blas"] == ["7"] * len(BLAS_THREAD_VARIABLES)
+    assert out["unchanged"] is True

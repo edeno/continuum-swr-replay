@@ -77,7 +77,10 @@ def pin_to_cpus(cpus: Collection[int]) -> None:
     Raises
     ------
     ValueError
-        When `cpus` is empty.
+        When `cpus` is empty, or holds a CPU not in this process's allowed set
+        (``os.sched_getaffinity(0)``). Linux would pin to the CPUs of `cpus`
+        that are allowed and say nothing, so this is checked before anything
+        is changed.
     RuntimeError
         When numpy is already imported and one of the variables says another
         number of threads: numpy's BLAS read it at import and keeps it, so the
@@ -88,6 +91,12 @@ def pin_to_cpus(cpus: Collection[int]) -> None:
     cpus = sorted({int(cpu) for cpu in cpus})
     if not cpus:
         raise ValueError("no CPUs to pin to")
+    outside = sorted(set(cpus) - os.sched_getaffinity(0))
+    if outside:
+        raise ValueError(
+            f"CPUs {outside} are not in this process's allowed CPUs "
+            f"{sorted(os.sched_getaffinity(0))}"
+        )
     count = str(len(cpus))
     if "numpy" in sys.modules:
         read = {name: os.environ.get(name) for name in BLAS_THREAD_VARIABLES}
