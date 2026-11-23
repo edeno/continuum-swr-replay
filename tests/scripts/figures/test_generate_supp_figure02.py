@@ -235,6 +235,17 @@ def _event_traces() -> dict:
     }
 
 
+def _four_decoders():
+    """``swr_allowed_statistics`` of the builder test's inputs."""
+    from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+        swr_allowed_statistics,
+    )
+    from tests.reported.test_reported_events_values import _swr_allowed_inputs
+
+    sums, bin_s, events = _swr_allowed_inputs()
+    return swr_allowed_statistics(events, sums, bin_s)
+
+
 def _statistics() -> dict:
     return {
         "calibration": _calibration(),
@@ -250,6 +261,7 @@ def _statistics() -> dict:
         "parts": _parts(),
         "no_spike": _no_spike_trace(),
         "event_traces": _event_traces(),
+        "four_decoders": _four_decoders(),
     }
 
 
@@ -263,15 +275,15 @@ def drawn():
 
 
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
-    """In five rows, each a group the text cites in turn: the decoder (a, b),
+    """In six rows, each a group the text cites in turn: the decoder (a, b),
     the count is robust (c, d), the events are coordinated and specific (e to
     h), ripple power and the held-out test (i, j), the animals agree and where
-    the content lies (k, l); each row's letters at one height, the rows' first
-    letters at one left edge, no heading."""
+    the content lies (k, l), the fourth decoder (m); each row's letters at one
+    height, the rows' first letters at one left edge, no heading."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
         "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
-        "outside_distance", "event_traces", "content_distance",
+        "outside_distance", "event_traces", "content_distance", "four_decoders",
     )  # fmt: skip
     fig = drawn
     ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
@@ -286,8 +298,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijkl")
-    rows = ("ab", "cd", "efgh", "ij", "kl")
+    assert sorted(letters) == list("abcdefghijklm")
+    rows = ("ab", "cd", "efgh", "ij", "kl", "m")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -354,6 +366,7 @@ def test_each_panels_values_carry_its_letter():
         "class_step_evidence": "step_test",
         "nonlocal_restriction_distance": "outside_distance",
         "content_distance": "content_distance",
+        "nonlocal_restriction_swr_allowed": "four_decoders",
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
@@ -762,7 +775,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijkl"
+    assert FIGURES["S2"].panels == "abcdefghijklm"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -813,6 +826,9 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
         "read_step_test": lambda folder, table: "steps",
+        "swr_allowed_statistics": lambda events, sums, bin_s: seen.setdefault(
+            "four_decoders", (events, sums, bin_s)
+        ),
         "outside_swr_subset_statistics": lambda sums, bin_s, subsets: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
@@ -860,9 +876,12 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "participation",
         "outside",
         "parts",
+        "four_decoders",
         "no_spike",
         "event_traces",
     ]
+    events, sums, bin_s = seen["four_decoders"]
+    assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
 
 
 @pytest.mark.parametrize(
@@ -924,3 +943,93 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     monkeypatch.setattr(figure, "read_swr_table", read_swr_table)
     with pytest.raises(ValueError, match=message):
         figure.read_inputs()
+
+
+def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):
+    """Panel m is refused on the same grounds as panel j, from its own
+    held-out event run (read by the same reader from its own folders)."""
+    stored = {
+        "table": _figure02_events().assign(event_id=range(8)),
+        "scores": pd.DataFrame({"event_id": [0]}),
+    }
+    _patch_reading(monkeypatch, stored, {})
+    current, stale = (
+        _HeldoutRestriction(),
+        _HeldoutRestriction(restriction_run="made from another restriction run"),
+    )
+    four_dir = figure.default_inputs().nonlocal_restriction_swr_allowed_heldout_events
+    monkeypatch.setattr(
+        figure,
+        "read_heldout_restriction",
+        lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
+    )
+    with pytest.raises(ValueError, match="panel m is not drawn") as refused:
+        figure.read_inputs()
+    assert "detect_heldout_events" in str(refused.value)
+
+
+def test_the_four_decoder_panel_draws_figure_2js_axes_with_the_fourth(drawn):
+    """Panel m: the SWR-only, SWR-allowed (open dots) and full decoders over
+    the local-only decoder; at each time, the full minus the SWR-allowed
+    decoder (filled) and the SWR-allowed minus the SWR-only decoder (open),
+    named in a legend; and the full minus the SWR-allowed decoder in the
+    held-out no-SWR events, each from ``swr_allowed_statistics``' rows."""
+    from matplotlib.colors import to_rgba
+
+    statistics = _four_decoders()
+    ax_decoders, ax_difference, ax_events = figure.panel_axes(drawn, "four_decoders")
+
+    def dots_at(ax, x):
+        (dots,) = [
+            c for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.isclose(np.mean(c.get_offsets()[:, 0]), x, atol=0.1)
+        ]  # fmt: skip
+        return dots
+
+    def animals(time, measure):
+        return statistics.times.loc[(time, "filter", measure), "animals"]
+
+    assert [t.get_text() for t in ax_decoders.get_xticklabels()] == [
+        "SWR-\nonly", "SWR-\nallowed", "Full",
+    ]  # fmt: skip
+    for x, measure in enumerate(figure.SWR_ALLOWED_FIGURE_DECODERS):
+        dots = dots_at(ax_decoders, float(x))
+        np.testing.assert_allclose(
+            sorted(dots.get_offsets()[:, 1]), sorted(animals("immobile", measure))
+        )
+    # the SWR-allowed decoder in open dots of the SWR-only decoder's gray
+    assert len(dots_at(ax_decoders, 1.0).get_facecolors()) == 0
+    np.testing.assert_allclose(
+        dots_at(ax_decoders, 1.0).get_edgecolors()[0],
+        to_rgba(figure.NEUTRAL_DOTS),
+    )
+    np.testing.assert_allclose(
+        dots_at(ax_decoders, 0.0).get_facecolors()[0], to_rgba(figure.NEUTRAL_DOTS)
+    )
+    for k, time in enumerate(figure.FOUR_DECODER_TIMES):
+        for j, measure in enumerate(figure.SWR_ALLOWED_FIGURE_DIFFERENCES):
+            x = k * figure.FOUR_DECODER_GROUP + j * figure.FOUR_DECODER_STEP
+            dots = dots_at(ax_difference, x)
+            np.testing.assert_allclose(
+                sorted(dots.get_offsets()[:, 1]), sorted(animals(time, measure))
+            )
+            assert (len(dots.get_facecolors()) == 0) == (j == 1)
+            assert np.allclose(
+                _means_at(ax_difference, x),
+                statistics.times.loc[(time, "filter", measure), "estimate"],
+            )
+    assert [t.get_text() for t in ax_difference.get_xticklabels()] == [
+        "All\nimmobility", "Inside\nSWRs", "Outside\nSWRs",
+    ]  # fmt: skip
+    assert [t.get_text() for t in ax_difference.get_legend().get_texts()] == [
+        "Full \u2212 SWR-allowed", "SWR-allowed \u2212 SWR-only",
+    ]  # fmt: skip
+    row = statistics.events.loc["no SWR"]
+    dots = dots_at(ax_events, 0.0)
+    np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(row["animals"]))
+    assert np.allclose(_means_at(ax_events, 0.0), row["estimate"])
+    assert ax_events.get_title() == "Outside SWRs,\nheld-out events"
+    assert ax_events.get_ylabel() == (
+        "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"
+    )

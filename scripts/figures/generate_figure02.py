@@ -290,13 +290,13 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    GAIN_FLOOR,
+    DIFFERENCE_LABELS,
+    EVENTS_LABELS,
+    EVENTS_TITLE,
     GROUP_COLORS,
-    NEUTRAL_DOTS,
     REFERENCE_COLOR,
-    draw_animal_gain,
+    draw_decoder_gain_axis,
     draw_full_minus_swr_axis,
-    label_gain_axis,
     spread_offsets,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
@@ -1160,38 +1160,11 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
-DECODER_STYLES = {
-    "swr_minus_none_per_spike": ("SWR-\nonly", NEUTRAL_DOTS),
-    "full_minus_none_per_spike": ("Full", C_NL),
-}
-"""Panel j, first axis: each decoder's label and dot color, by its measure: the
-SWR-only decoder in a neutral dark gray, the full decoder in the Non-Local
-state's green. A decoder added to ``RESTRICTION_FIGURE_DECODERS`` needs only an
-entry here."""
-DECODER_X = {measure: float(k) for k, measure in enumerate(RESTRICTION_FIGURE_DECODERS)}
-"""Panel j, first axis: each decoder's position on the x axis, in the order of
-``RESTRICTION_FIGURE_DECODERS``."""
-DECODERS_YLABEL = "Held-out log score\nover local-only\n(nats/spike)"
-DECODERS_REFERENCE = "local-only"
-DIFFERENCE_LABELS = {
-    "all": "All\nimmobility",
-    "inside_swr": "Inside\nSWRs",
-    "outside_swr": "Outside\nSWRs",
-}
-"""Panel j, second axis: the full minus the SWR-only decoder over all the
-immobile time, over its bins inside SWRs and over its bins outside SWRs, left
-to right; horizontal, on two lines; the main result, outside SWRs, in bold (as
-panels c and d mark their key class)."""
 DIFFERENCE_X = {name: float(k) for k, name in enumerate(DIFFERENCE_LABELS)}
-EVENTS_LABELS = {
-    "in_events": "In no-SWR\nevents",
-    "outside_events": "Outside\nevents",
-}
-"""Panel j, third axis: the full minus the SWR-only decoder outside SWRs,
-inside the no-SWR events detected from the held-out decode and outside every
-held-out event, left to right."""
+"""Panel j, second axis: the full minus the SWR-only decoder at each time of
+``DIFFERENCE_LABELS``; the main result, outside SWRs, has its label in bold (as
+panels c and d mark their key class)."""
 EVENTS_X = {name: float(k) for k, name in enumerate(EVENTS_LABELS)}
-EVENTS_TITLE = "Outside SWRs,\nheld-out events"
 
 
 def restriction_refusal(cause: str, rerun: str) -> str:
@@ -1340,13 +1313,10 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
 
 def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     """Panel j, first axis: the SWR-only and full decoders' gains over the
-    local-only decoder per spike of the immobile time inside a well visit.
-
-    For each decoder (:data:`DECODER_STYLES`), a dot per animal (the median
-    over its epochs, spread sideways) and the animals' mean with its 95 %
-    interval, with a dashed line at zero, the local-only decoder
+    local-only decoder per spike of the immobile time inside a well visit
     (``restriction_totals.immobile_gain_statistics``,
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`).
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`),
+    drawn by ``heldout_gain_panels.draw_decoder_gain_axis``.
 
     Parameters
     ----------
@@ -1355,26 +1325,13 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
         ``immobile_gain_statistics``' rows, indexed by ``family`` and
         ``measure``.
     """
-    rows = {
-        measure: statistics.loc[(RESTRICTION_FIGURE_FAMILY, measure)]
-        for measure in RESTRICTION_FIGURE_DECODERS
-    }
-    for measure, row in rows.items():
-        draw_animal_gain(
-            ax, DECODER_X[measure], row, DECODER_STYLES[measure][1], spread=True
-        )
-    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    ax.set_xlim(-0.45, max(DECODER_X.values()) + 0.5)
-    ax.set_xticks(list(DECODER_X.values()), [DECODER_STYLES[m][0] for m in DECODER_X])
-    top = (
-        max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
+    draw_decoder_gain_axis(
+        ax,
+        {
+            measure: statistics.loc[(RESTRICTION_FIGURE_FAMILY, measure)]
+            for measure in RESTRICTION_FIGURE_DECODERS
+        },
     )
-    # twice the usual floor, so that the reference's name clears the frame of
-    # this short axis
-    label_gain_axis(
-        ax, DECODERS_YLABEL, DECODERS_REFERENCE, floor=-2 * GAIN_FLOOR * top
-    )
-    ax.set_ylim(top=top)
 
 
 def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> None:

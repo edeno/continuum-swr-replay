@@ -4,7 +4,8 @@ Figure 2j (each decoder's gain over the local-only decoder, and the full
 decoder's over the SWR-only decoder) and Figure 2's supplement
 (``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
 local coding per spike; the full decoder's gain outside SWRs by distance from
-the SWRs) draw each value the
+the SWRs; the four restriction decoders, with the SWR-allowed one) draw each
+value the
 same way: a dot per animal and, beside them, the animals' mean with its 95 %
 interval in black, with a dashed line at zero, where neither side predicts the
 spikes better.
@@ -12,7 +13,7 @@ spikes better.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -63,7 +64,13 @@ def spread_offsets(values: np.ndarray, step: float = DOT_SPREAD) -> np.ndarray:
 
 
 def draw_animal_gain(
-    ax: Axes, x: float, row: pd.Series, color: str, *, spread: bool = False
+    ax: Axes,
+    x: float,
+    row: pd.Series,
+    color: str,
+    *,
+    spread: bool = False,
+    hollow: bool = False,
 ) -> None:
     """One group's gain at ``x``: a dot per animal in ``color`` and, at
     ``x + MEAN_OFFSET``, the animals' mean with its 95 % interval in black.
@@ -79,10 +86,19 @@ def draw_animal_gain(
     spread : bool, optional
         Spread the dots sideways about ``x`` (:func:`spread_offsets`), so that
         animals with close values each show.
+    hollow : bool, optional
+        Open dots (an outline in ``color``): a variant of the group drawn
+        filled beside it.
     """
     animals = animal_values(row, "animals")
     offsets = spread_offsets(animals.to_numpy()) if spread else np.zeros(animals.size)
-    ax.scatter(x + offsets, animals, s=6, color=color, lw=0, zorder=2)
+    if hollow:
+        ax.scatter(
+            x + offsets, animals, s=7, facecolors="none", edgecolors=color, lw=0.5,
+            zorder=2,
+        )  # fmt: skip
+    else:
+        ax.scatter(x + offsets, animals, s=6, color=color, lw=0, zorder=2)
     ax.errorbar(
         x + MEAN_OFFSET, row["estimate"],
         yerr=[[row["estimate"] - row["ci_low"]], [row["ci_high"] - row["estimate"]]],
@@ -165,6 +181,61 @@ supplement, panel j)."""
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""
 
+DIFFERENCE_LABELS = {
+    "all": "All\nimmobility",
+    "inside_swr": "Inside\nSWRs",
+    "outside_swr": "Outside\nSWRs",
+}
+"""An axis of differences between decoders (Figure 2j's second axis, Figure 2's
+supplement, panel m): over all the immobile time, over its bins inside SWRs and
+over its bins outside SWRs, left to right; horizontal, on two lines."""
+EVENTS_LABELS = {
+    "in_events": "In no-SWR\nevents",
+    "outside_events": "Outside\nevents",
+}
+"""The axis of a difference outside SWRs in the held-out events (Figure 2j's
+third axis, Figure 2's supplement, panel m): inside the no-SWR events detected
+from the held-out decode and outside every held-out event, left to right."""
+EVENTS_TITLE = "Outside SWRs,\nheld-out events"
+
+DECODER_STYLES = {
+    "swr_minus_none_per_spike": ("SWR-\nonly", NEUTRAL_DOTS, False),
+    "swr_allowed_minus_none_per_spike": ("SWR-\nallowed", NEUTRAL_DOTS, True),
+    "full_minus_none_per_spike": ("Full", COLORS["Non-Local"], False),
+}
+"""Each decoder's gain over the local-only decoder (Figure 2j's first axis,
+Figure 2's supplement, panel m), by its measure: its label, its dots' color and
+whether they are open. The SWR-only decoder in a neutral dark gray, the
+SWR-allowed decoder, a variant of it, in open dots of the same gray, the full
+decoder in the Non-Local state's green."""
+DECODERS_YLABEL = "Held-out log score\nover local-only\n(nats/spike)"
+DECODERS_REFERENCE = "local-only"
+
+
+def draw_decoder_gain_axis(ax: Axes, rows: Mapping[str, pd.Series]) -> None:
+    """Each decoder's gain over the local-only decoder, at 0, 1, ... in the
+    order of ``rows`` (statistics rows by measure of :data:`DECODER_STYLES`): a
+    dot per animal in the decoder's style (spread sideways) and the animals'
+    mean with its 95 % interval, the decoders named under the axis, a dashed
+    line at zero labeled as the local-only decoder."""
+    for x, (measure, row) in enumerate(rows.items()):
+        _, color, hollow = DECODER_STYLES[measure]
+        draw_animal_gain(ax, float(x), row, color, spread=True, hollow=hollow)
+    ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+    ax.set_xlim(-0.45, len(rows) - 0.5)
+    ax.set_xticks(
+        [float(x) for x in range(len(rows))], [DECODER_STYLES[m][0] for m in rows]
+    )
+    top = (
+        max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
+    )
+    # twice the usual floor, so that the reference's name clears the frame of
+    # this short axis
+    label_gain_axis(
+        ax, DECODERS_YLABEL, DECODERS_REFERENCE, floor=-2 * GAIN_FLOOR * top
+    )
+    ax.set_ylim(top=top)
+
 
 def full_better_cue(ax: Axes) -> None:
     """ "\u2191 full better" just above the zero line at the axis' left, in the
@@ -183,16 +254,22 @@ def draw_full_minus_swr_axis(
     top_scale: float,
     *,
     through_means: bool = False,
+    hollow: Sequence[bool] | None = None,
+    ylabel: str = DIFFERENCE_YLABEL,
+    cue: bool = True,
 ) -> None:
     """An axis of the full decoder minus the SWR-only decoder: at each of ``xs``
     a dot per animal (spread sideways, :data:`NEUTRAL_DOTS`) and the animals'
     mean with its interval (``rows``, statistics rows), a thin line through the
     means when ``through_means``, a dashed line at zero, the y axis from
     :data:`GAIN_FLOOR` below zero (or ``top_scale`` times the lowest dot or
-    bound, when lower) to ``top_scale`` times the highest dot or bound, :data:`DIFFERENCE_YLABEL` and :func:`full_better_cue`. The x axis is
-    the caller's (Figure 2j's second axis, Figure 2's supplement, panel j)."""
-    for x, row in zip(xs, rows, strict=True):
-        draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True)
+    bound, when lower) to ``top_scale`` times the highest dot or bound, ``ylabel`` (by default :data:`DIFFERENCE_YLABEL`) and, when ``cue``, :func:`full_better_cue`. ``hollow`` marks the columns drawn in open dots (none by default). The x axis is
+    the caller's (Figure 2j's second axis, Figure 2's supplement, panels j and
+    m)."""
+    if hollow is None:
+        hollow = [False] * len(xs)
+    for x, row, open_dots in zip(xs, rows, hollow, strict=True):
+        draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True, hollow=open_dots)
     if through_means:
         ax.plot(
             [x + MEAN_OFFSET for x in xs], [row["estimate"] for row in rows],
@@ -203,5 +280,6 @@ def draw_full_minus_swr_axis(
     low = min(min(float(r["animals"].min()), r["ci_low"]) for r in rows)
     # a value below zero sets the floor, with the same margin as the top
     ax.set_ylim(min(-GAIN_FLOOR * top, top_scale * low), top)
-    ax.set_ylabel(DIFFERENCE_YLABEL)
-    full_better_cue(ax)
+    ax.set_ylabel(ylabel)
+    if cue:
+        full_better_cue(ax)

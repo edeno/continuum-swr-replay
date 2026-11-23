@@ -42,6 +42,7 @@ from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
     swr_source,
 )
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
+from continuum_swr_replay.visualization import heldout_gain_panels  # noqa: E402
 from scripts.figures import generate_supp_pipeline_data_flow as flow  # noqa: E402
 from tests.support._swr_inventory_fixtures import (  # noqa: E402
     use_swr_source,
@@ -1934,7 +1935,7 @@ def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline
     figure02.draw_decoder_gains(ax, _decoder_rows())
     fig.canvas.draw()
     for x, values, color in (
-        (0.0, SWR_ONLY, figure02.NEUTRAL_DOTS),
+        (0.0, SWR_ONLY, heldout_gain_panels.NEUTRAL_DOTS),
         (1.0, FULL, figure02.COLORS["Non-Local"]),
     ):
         dots = _dots_at(ax, x)
@@ -1967,7 +1968,7 @@ def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_only(offli
         np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
         assert_spread_about(dots, x)
         np.testing.assert_allclose(
-            dots.get_facecolors()[0], to_rgba(figure02.NEUTRAL_DOTS)
+            dots.get_facecolors()[0], to_rgba(heldout_gain_panels.NEUTRAL_DOTS)
         )
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
@@ -2041,9 +2042,6 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name
-    assert list(figure02.DECODER_X) == list(
-        restriction_totals.RESTRICTION_FIGURE_DECODERS
-    )
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
     # Figure 2's supplement, panel by panel
     # (each panel's tag: test_generate_supp_figure02)

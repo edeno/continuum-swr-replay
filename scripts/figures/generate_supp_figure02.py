@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them, in five rows:
+the order the text cites them, in six rows:
 
 - the decoder on these recordings (a, b): its states calibrated by held-out
   spikes, and MUA in the No-Spike state;
@@ -14,7 +14,8 @@ the order the text cites them, in five rows:
   properties at the SWR threshold, and the gain outside SWRs away from the
   SWRs;
 - the animals agree, and where the content lies (k, l): Figure 2g's traces
-  animal by animal, and the distance of the content from the animal.
+  animal by animal, and the distance of the content from the animal;
+- a fourth decoder (m): Figure 2j's comparison with the SWR-allowed decoder.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -271,6 +272,25 @@ the order the text cites them, in five rows:
         over animals of each animal's share, the mean over its epochs of each
         epoch's share; the ``content_distance_*`` values).
 
+    m — Supports Figure 2j against a permissive comparator: a fourth decoder,
+        SWR-allowed (every state inside SWRs, only the local states outside
+        them; open dots, a variant of SWR-only), scored with the other three
+        in one pass under the stored fold fits
+        (``Processed-Data/event_nonlocal_restriction_swr_allowed``, from
+        ``scripts/event_evidence/score_nonlocal_restriction.py
+        --from-stored-fit``), drawn as Figure 2j is. First axis: the SWR-only,
+        SWR-allowed and full decoders' gains over the local-only decoder per
+        spike of all the immobile time inside a well visit. Second axis: the
+        full minus the SWR-allowed decoder (filled) and the SWR-allowed minus
+        the SWR-only decoder (open) over all the immobile time, inside SWRs and
+        outside SWRs; outside SWRs the SWR-allowed and SWR-only decoders are
+        the same, inside SWRs they differ only in whether the local states are
+        allowed. Third axis: the full minus the SWR-allowed decoder outside
+        SWRs in the no-SWR events detected from that run's held-out decode.
+        Each a dot per animal and the animals' mean with its 95 % interval
+        (``restriction_totals.swr_allowed_statistics``; the events summary's
+        values tagged S2m).
+
 Panel f reads the held-out tetrode run over the epochs the events summary
 reads and refuses a run not held out in folds of whole trials, as the summary
 does; panel h reads the participation run over the same epochs. Panel j reads the held-out event run
@@ -281,7 +301,10 @@ does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Its
-values are the events summary's ``restriction_outside_swr_*`` values. Panels d,
+values are the events summary's ``restriction_outside_swr_*`` values. Panel m
+reads the held-out event run made from the run with the fourth decoder
+(``Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events``) by
+the same reader and refuses it on the same grounds. Panels d,
 g, i and l read the canonical event table (i with the stored output it names); a,
 c and e read their stored outputs. Each output is refused, as the summary marks
 its values pending, when it was not made from the current event table (c and
@@ -309,6 +332,7 @@ import pandas as pd
 import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator, NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -335,10 +359,15 @@ from continuum_swr_replay.analysis.event_evidence.participation import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_MARGINS_S,
+    RESTRICTION_FIGURE_EVENT_GROUP,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
+    SWR_ALLOWED_FIGURE_DECODERS,
+    SWR_ALLOWED_FIGURE_DIFFERENCES,
+    SwrAllowedStatistics,
     outside_swr_statistics,
     outside_swr_subset_statistics,
+    swr_allowed_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
@@ -415,10 +444,16 @@ from continuum_swr_replay.runs.io import files_sha256, read_complete_run, sha256
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
+    DIFFERENCE_LABELS,
+    EVENTS_LABELS,
+    EVENTS_TITLE,
     GROUP_COLORS,
+    MEAN_OFFSET,
+    NEUTRAL_DOTS,
     REFERENCE_COLOR,
     SPLIT_LABELS,
     animal_values,
+    draw_decoder_gain_axis,
     draw_full_minus_swr_axis,
     draw_split_gain,
     label_gain_axis,
@@ -528,17 +563,19 @@ PAIR_COLOR = "#999999"
 
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
 OUTSIDE_LABEL = "Outside\nSWRs"
-PARTS_LABEL_DROP = 21
-"""How far below the axis a series' parts label starts (points): under the two
-lines of "Outside SWRs", so that it can be wider than its columns."""
+PARTS_LABEL_DROP = 13
+"""How far below the axis a series' parts label starts (points): just under
+the parts' one-line tick labels, beside the two lines of "Outside SWRs" (it
+is centered under the parts, clear of that column), so that it sits well above
+the next row's letters."""
 SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
 LAYOUT = (
-    ((0.855, 0.955), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
-    ((0.635, 0.75), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
+    ((0.892, 0.97), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
+    ((0.69, 0.8), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
     (
-        (0.415, 0.53),
+        (0.501, 0.599),
         (
             ("nonlocal_mua", 0.075, 0.13),
             ("heldout_gain", 0.305, 0.19),
@@ -546,11 +583,12 @@ LAYOUT = (
             ("participation", 0.835, 0.155),
         ),
     ),
-    ((0.2, 0.31), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
+    ((0.315, 0.396), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
     (
-        (0.04, 0.105),
+        (0.178, 0.237),
         (("event_traces", 0.085, 0.58), ("content_distance", 0.82, 0.17)),
     ),
+    ((0.039, 0.105), (("four_decoders", 0.11, 0.87),)),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -563,7 +601,7 @@ ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT
 """Each row's frames' bottom and top and its panels, left to right."""
 FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
 """Each panel's frame's left edge and width (figure width)."""
-LETTER_HEIGHT = 0.035
+LETTER_HEIGHT = 0.0235
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
@@ -577,6 +615,30 @@ default: each holds one frame at a time."""
 GROUP_NAMES = ("No SWR", "SWR")
 """The groups' names on the panels, in ``GROUP_COLORS``' order."""
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
+REFUSED_FOUR = f"Figure 2's supplement: panel {LETTERS['four_decoders']} is not drawn"
+FOUR_DECODER_TIMES = {
+    "immobile": "all",
+    "inside_swr": "inside_swr",
+    "outside_swr": "outside_swr",
+}
+"""Panel m, second axis: each time of ``restriction_totals.CONTRAST_TIMES``, in
+drawing order (Figure 2j's), by its label's key in ``DIFFERENCE_LABELS``."""
+FOUR_DECODER_DIFFERENCES = {
+    "full_minus_swr_allowed_per_spike": ("Full \u2212 SWR-allowed", False),
+    "swr_allowed_minus_swr_per_spike": ("SWR-allowed \u2212 SWR-only", True),
+}
+"""Panel m, second axis: each difference of
+``restriction_totals.SWR_ALLOWED_FIGURE_DIFFERENCES``, its name in the legend
+and whether its dots are open (the one against the SWR-only decoder, of which
+the SWR-allowed decoder is a variant)."""
+FOUR_DECODER_STEP = 0.75
+"""Panel m, second axis: the x distance between the two differences at one time."""
+FOUR_DECODER_GROUP = 2.0
+"""Panel m, second axis: the x distance between one time and the next."""
+FOUR_DECODER_YLABEL = "Held-out log score\ndifference\n(nats/spike)"
+FOUR_DECODER_EVENTS_YLABEL = (
+    "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"
+)
 
 
 def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
@@ -601,12 +663,13 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         ``outside_swr_statistics`` over the held-out event run, indexed by
         family and measure; ``parts`` (j): ``outside_swr_subset_statistics`` of
         the margins over its time sums, indexed by subset, threshold, family
-        and measure.
+        and measure; ``four_decoders`` (m): ``swr_allowed_statistics`` over
+        the held-out event run made from the run with the fourth decoder.
 
     Raises
     ------
     ValueError
-        If the held-out event run, or what it was made from, is not current
+        If a held-out event run, or what it was made from, is not current
         (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
@@ -631,6 +694,20 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     if refusal is not None:
         cause, rerun = refusal
         raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
+    # panel m: the run with the fourth decoder, read and refused as above
+    four = read_heldout_restriction(
+        inputs.nonlocal_restriction_swr_allowed_heldout_events,
+        inputs.nonlocal_restriction_swr_allowed,
+        inputs.bin_facts,
+        epochs,
+        sha256_file(inputs.event_table),
+    )
+    refusal = heldout_restriction_refusal(
+        four, restriction_inputs_note(inputs.nonlocal_restriction_swr_allowed, epochs)
+    )
+    if refusal is not None:
+        cause, rerun = refusal
+        raise ValueError(f"{REFUSED_FOUR}: {cause}. Rerun {rerun}.")
     windows = window_scores(selected)
     return {
         "calibration": read_state_calibration(inputs.state_calibration_in_visits),
@@ -653,6 +730,9 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "parts": outside_swr_subset_statistics(
             heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
         ).set_index(["subset", "threshold_s", "family", "measure"]),
+        "four_decoders": swr_allowed_statistics(
+            four.events, four.time_sums, four.bin_s
+        ),
         **read_frame_traces(events, workers),
     }
 
@@ -1355,18 +1435,79 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
+def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -> None:
+    """Panel m: Figure 2j's three axes with the fourth decoder (``statistics``:
+    :func:`read_inputs`' ``four_decoders``), in
+    ``restriction_totals.RESTRICTION_FIGURE_FAMILY`` per spike. First axis: the
+    SWR-only, SWR-allowed and full decoders over the local-only decoder over
+    all the immobile time (``SWR_ALLOWED_FIGURE_DECODERS``). Second axis: at
+    each time (:data:`FOUR_DECODER_TIMES`) the two differences of
+    :data:`FOUR_DECODER_DIFFERENCES`, named in a legend above the axis. Third
+    axis: the full minus the SWR-allowed decoder outside SWRs in the no-SWR
+    held-out events."""
+    ax_decoders, ax_difference, ax_events = axes
+    family = RESTRICTION_FIGURE_FAMILY
+    times = statistics.times
+    draw_decoder_gain_axis(
+        ax_decoders,
+        {m: times.loc[("immobile", family, m)] for m in SWR_ALLOWED_FIGURE_DECODERS},
+    )
+    xs, rows, hollow = [], [], []
+    for k, time in enumerate(FOUR_DECODER_TIMES):
+        for j, measure in enumerate(SWR_ALLOWED_FIGURE_DIFFERENCES):
+            xs.append(k * FOUR_DECODER_GROUP + j * FOUR_DECODER_STEP)
+            rows.append(times.loc[(time, family, measure)])
+            hollow.append(FOUR_DECODER_DIFFERENCES[measure][1])
+    draw_full_minus_swr_axis(
+        ax_difference, xs, rows, 1.08, hollow=hollow, ylabel=FOUR_DECODER_YLABEL,
+        cue=False,
+    )  # fmt: skip
+    centers = [
+        k * FOUR_DECODER_GROUP + (FOUR_DECODER_STEP + MEAN_OFFSET) / 2
+        for k in range(len(FOUR_DECODER_TIMES))
+    ]
+    ax_difference.set_xlim(-0.45, xs[-1] + MEAN_OFFSET + 0.45)
+    ax_difference.set_xticks(
+        centers, [DIFFERENCE_LABELS[name] for name in FOUR_DECODER_TIMES.values()]
+    )
+    handles = [
+        Line2D(
+            [], [], ls="", marker="o", ms=2.5, color=NEUTRAL_DOTS, mew=0.5,
+            mfc="none" if open_dots else NEUTRAL_DOTS,
+        )
+        for _, open_dots in FOUR_DECODER_DIFFERENCES.values()
+    ]  # fmt: skip
+    ax_difference.legend(
+        handles, [name for name, _ in FOUR_DECODER_DIFFERENCES.values()],
+        loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False,
+        fontsize=SMALL_SIZE, handletextpad=0.1, columnspacing=1.0,
+        borderaxespad=0.2,
+    )  # fmt: skip
+    draw_full_minus_swr_axis(
+        ax_events, [0.0], [statistics.events.loc[RESTRICTION_FIGURE_EVENT_GROUP]],
+        1.08, ylabel=FOUR_DECODER_EVENTS_YLABEL,
+    )  # fmt: skip
+    ax_events.set_xlim(-0.45, MEAN_OFFSET + 0.45)
+    ax_events.set_xticks([0.0], [EVENTS_LABELS["in_events"]])
+    ax_events.set_title(EVENTS_TITLE, fontsize=SMALL_SIZE, pad=3)
+
+
 PANEL_GRIDS = {
     "nonlocal_mua": (2, 1),
     "rule_sweep": (2, 3),
     "step_test": (1, 2),
     "event_traces": (1, len(TRIGGERED_SIGNALS)),
+    "four_decoders": (1, 3),
 }
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
-PANEL_COLUMN_GAPS = {"step_test": 0.6, "event_traces": 0.12}
+PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35)}
+"""The widths of a panel's columns, as shares (equal when not named): panel m's
+as Figure 2j's three axes."""
+PANEL_COLUMN_GAPS = {"step_test": 0.6, "event_traces": 0.12, "four_decoders": 0.16}
 """A panel's gap between its axes' columns, as a share of its frame's width,
 where :data:`GRID_GAP`'s is too small (the step panel's property names)."""
 
@@ -1402,16 +1543,17 @@ def generate_figure(statistics: dict) -> Figure:
             - np.arange(rows) * GRID_GAP[0] * (top - bottom)
         )
         gap = PANEL_COLUMN_GAPS.get(panel, GRID_GAP[1])
-        across = width * (1 - gap * (columns - 1)) / columns
+        column_shares = np.asarray(
+            PANEL_COLUMN_SHARES.get(panel, (1,) * columns), dtype=float
+        )
+        across = width * (1 - gap * (columns - 1)) * column_shares / column_shares.sum()
+        lefts = (
+            left
+            + np.concatenate([[0.0], np.cumsum(across[:-1])])
+            + np.arange(columns) * gap * width
+        )
         axes[panel] = [
-            fig.add_axes(
-                (
-                    left + c * (across + gap * width),
-                    tops[r] - heights[r],
-                    across,
-                    heights[r],
-                )
-            )
+            fig.add_axes((lefts[c], tops[r] - heights[r], across[c], heights[r]))
             for r in range(rows)
             for c in range(columns)
         ]
@@ -1429,6 +1571,7 @@ def generate_figure(statistics: dict) -> Figure:
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
+    draw_four_decoders(axes["four_decoders"], statistics["four_decoders"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge
