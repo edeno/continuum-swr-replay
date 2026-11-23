@@ -91,6 +91,26 @@ Each worker is given one GPU, ``--workers-per-gpu`` to a card, as in
 ``score_tetrode_holdout.py``; ``--shards``/``--n-shards`` split the epochs
 across hosts writing into one folder.
 
+**Scored from a stored fit** (``--from-stored-fit <run folder>``): the models
+of ``--models`` (by default all four, ``nonlocal_restriction.ALL_MODELS``: the
+three and ``swr_allowed``, every state inside SWRs and the local states outside
+them) scored with each fold's decoder rebuilt from the stored run's record
+(``nonlocal_restriction.stored_fold_fit``: the encoding fit as the fold fit
+fits it, the stored discrete transitions and initial distribution, no EM).
+Per epoch the stored record must be ``ok`` and of the same inputs (the
+SHA-256 of the decode frame, the detector, the trials and the SWR source's
+files, and the margin in bins); the tables are those above, with the new
+model's columns, and the record's folds also hold
+``stored_score_difference``: the largest absolute per-bin difference of each
+score scored again (of ``none``, ``swr``, ``full``) from the stored run's, over
+the fold's bins, and ``stored_score_difference_max`` its largest. A model of
+the three not in ``--models`` is copied from the stored per-bin table
+(``copied_from_stored`` in the record). The header records the models, the
+fit's source (``fit_source``: ``"stored"``) and the stored run as an input
+(``stored_fit``: its folder and manifest digest). It writes into
+``--output-dir``, by default ``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``,
+never into the canonical folder or the stored run's.
+
 Usage::
 
     uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
@@ -101,6 +121,9 @@ Usage::
         --gather
     uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
         --gpus 1 2 4 5 6 7 8 --shards 0 --n-shards 2
+    uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
+        --from-stored-fit Processed-Data/event_nonlocal_restriction \\
+        --epochs wilbur20210329_02_r1_HPC --gpus 1
 """
 
 from __future__ import annotations
@@ -127,11 +150,12 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
+    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
     NONLOCAL_RESTRICTION_BINS_NAME,
     NONLOCAL_RESTRICTION_NAME,
     processed_data_dir,
 )
-from continuum_swr_replay.runs.epoch_records import gather_manifest
+from continuum_swr_replay.runs.epoch_records import gather_manifest, read_record
 from continuum_swr_replay.runs.io import json_ready, output_path
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
@@ -146,6 +170,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     file_input,
     gpu_pool,
     run,
+    run_input,
     select_epochs,
     trials_input,
 )
@@ -166,17 +191,77 @@ def fit_settings() -> dict:
     }
 
 
+STORED_BIN_COLUMNS = ["time", "block", "in_swr", *nr.SCORE_COLUMNS]
+"""The stored per-bin table's columns a run from a stored fit reads."""
+
+
+def current_epoch_inputs(epoch_id: str, paths, trials: pd.DataFrame) -> dict:
+    """The epoch's inputs as a record keeps them (``epoch_inputs``)."""
+    return {
+        "data_over_time": file_input(paths.data_over_time),
+        "detector": file_input(paths.detector),
+        "trials": trials_input(trials),
+        **{
+            f"swr_{name}": entry
+            for name, entry in swr_source.swr_source_files(epoch_id).items()
+        },
+    }
+
+
+def stored_record(
+    stored_dir: Path, epoch_id: str, inputs: dict, margin_bins: int
+) -> dict:
+    """The stored run's record of the epoch, checked to be ``ok`` and of the
+    same inputs: each input's SHA-256 (and the trials' count) and the margin
+    in bins.
+
+    Raises
+    ------
+    ValueError
+        Naming what differs.
+    """
+    record = read_record(stored_dir, epoch_id, NONLOCAL_RESTRICTION_NAME)
+    if record is None or record.get("status") != "ok":
+        raise ValueError(f"the stored run {stored_dir} has no ok record of {epoch_id}")
+    stored = record.get("epoch_inputs", {})
+    differ = sorted(
+        key
+        for key in inputs.keys() | stored.keys()
+        if {k: v for k, v in inputs.get(key, {}).items() if k != "path"}
+        != {k: v for k, v in stored.get(key, {}).items() if k != "path"}
+    )
+    if record.get("margin_bins") != margin_bins:
+        differ.append("margin_bins")
+    if differ:
+        raise ValueError(
+            f"the stored record of {epoch_id} was made from other inputs: {differ}"
+        )
+    return record
+
+
 def run_epoch(
     epoch_id: str,
     data_dir: Path,
     output: Path,
+    stored_dir: Path | None = None,
+    models: tuple[str, ...] = nr.MODELS,
 ) -> dict:
-    """Score one epoch, write its two tables and return its record."""
+    """Score one epoch, write its two tables and return its record.
+
+    With ``stored_dir``, each fold's fit is rebuilt from that run's record of
+    the epoch (no EM) and ``models`` are scored; the record compares the
+    scores with the stored run's."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
     epoch = epoch_inputs(epoch_id, data_dir, trials=True)
     frame = epoch.frame
     folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
+    inputs = current_epoch_inputs(epoch_id, epoch.paths, epoch.loaded["trials"])
+    stored = (
+        None
+        if stored_dir is None
+        else stored_record(stored_dir, epoch_id, inputs, margin_bins)
+    )
     source_events = swr_source.epoch_source(epoch_id).events
     in_swr = interval_mask(epoch.time, source_events)
     in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
@@ -194,14 +279,14 @@ def run_epoch(
     linear_position = frame["linear_position"].to_numpy(dtype=float, copy=True)
     without_speed = ~np.isfinite(frame["head_speed"].to_numpy())
     n_bins = len(frame)
-    paths, time, loaded, detector = (
-        epoch.paths,
-        epoch.time,
-        epoch.loaded,
-        epoch.detector,
-    )
+    time, loaded, detector = epoch.time, epoch.loaded, epoch.detector
     del epoch, frame
 
+    from_stored = (
+        {}
+        if stored is None
+        else {"fit": nr.stored_fold_fit(stored["folds"]), "models": models}
+    )
     scores, record = nr.fold_fit_scores(
         detector,
         time,
@@ -215,8 +300,33 @@ def run_epoch(
         margin_bins=margin_bins,
         linear_position=linear_position,
         log=log,
+        **from_stored,
     )
-    failures = nr.fold_check_failures(record)
+    failures = nr.fold_check_failures(record, models)
+    copied: list[str] = []
+    if stored is not None:
+        stored_bins = pd.read_parquet(
+            output_path(epoch_id, stored_dir, NONLOCAL_RESTRICTION_BINS_NAME),
+            columns=STORED_BIN_COLUMNS,
+        )
+        for fold, difference in zip(
+            record["folds"],
+            nr.stored_score_differences(scores, stored_bins, models),
+            strict=True,
+        ):
+            compared = {
+                k: v for k, v in difference.items() if k not in ("fold", "n_bins")
+            }
+            fold["stored_score_difference"] = compared
+            fold["stored_score_difference_max"] = max(compared.values(), default=0.0)
+        # a model of the three not scored again is the stored run's
+        copied = [c for c in nr.SCORE_COLUMNS if c not in scores.columns]
+        for column in copied:
+            scores[column] = stored_bins[column].to_numpy()
+        order = [*nr.score_columns(nr.table_models(scores.columns))]
+        rest = [c for c in scores.columns if c not in order and c != "time"]
+        scores = scores[["time", *order, *rest]]
+        del stored_bins
     bins_path = write_table(
         scores.assign(category=categories),
         output_path(epoch_id, output, NONLOCAL_RESTRICTION_BINS_NAME),
@@ -241,6 +351,17 @@ def run_epoch(
             **record,
             **share,
             "fit": nr.FIT,
+            **(
+                {}
+                if stored is None
+                else {
+                    "models": list(models),
+                    "copied_from_stored": copied,
+                    "stored_score_difference_max": max(
+                        f["stored_score_difference_max"] for f in record["folds"]
+                    ),
+                }
+            ),
             "fold_design": th.TRIAL_DESIGN,
             "margin_bins": margin_bins,
             **fold_counts,
@@ -260,15 +381,7 @@ def run_epoch(
             "n_in_swr_label": int(in_label.sum()),
             "n_immobile_in_swr_label": int((immobile & in_label).sum()),
             "bins_table_bytes": bins_path.stat().st_size,
-            "epoch_inputs": {
-                "data_over_time": file_input(paths.data_over_time),
-                "detector": file_input(paths.detector),
-                "trials": trials_input(loaded["trials"]),
-                **{
-                    f"swr_{name}": entry
-                    for name, entry in swr_source.swr_source_files(epoch_id).items()
-                },
-            },
+            "epoch_inputs": inputs,
             "seconds": round(clock.time() - started, 1),
         }
     )
@@ -280,10 +393,47 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
+    parser.add_argument(
+        "--from-stored-fit",
+        type=Path,
+        default=None,
+        help="a restriction run folder: rebuild each fold's fit from its records "
+        "(no EM) and score --models; writes into --output-dir, by default "
+        f"{EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR}",
+    )
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        choices=nr.ALL_MODELS,
+        default=None,
+        help="with --from-stored-fit, the models to score (full among them); "
+        "default all four",
+    )
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
-    output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    stored_dir = args.from_stored_fit
+    if stored_dir is None:
+        if args.models is not None:
+            parser.error("--models needs --from-stored-fit")
+        models = nr.MODELS
+        output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    else:
+        models = tuple(m for m in nr.ALL_MODELS if m in (args.models or nr.ALL_MODELS))
+        if "full" not in models:
+            parser.error("--models must include full")
+        output = (
+            args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR
+        )
+        refused = {
+            (data_dir / EVENT_NONLOCAL_RESTRICTION_DIR).resolve(),
+            stored_dir.resolve(),
+        }
+        if output.resolve() in refused:
+            parser.error(
+                f"--output-dir {output} is the canonical restriction run or the "
+                "stored one; a run from a stored fit writes elsewhere"
+            )
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
@@ -294,15 +444,17 @@ def main(argv: list[str] | None = None) -> None:
             "sparse_sampling_s": SPARSE_SAMPLING_S,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
-            "models": list(nr.MODELS),
+            "models": list(models),
+            **({} if stored_dir is None else {"fit_source": "stored"}),
             "filter_identity_tolerance": nr.FILTER_IDENTITY_TOLERANCE,
             "causal_mass_tolerance": nr.CAUSAL_MASS_TOLERANCE,
             "predicted_mass_tolerance": nr.PREDICTED_MASS_TOLERANCE,
             "continuous_block_tolerance": nr.CONTINUOUS_BLOCK_TOLERANCE,
         },
         # every input is the epoch's own (its decode, detector and SWR files):
-        # each record holds their digests under "epoch_inputs"
-        "inputs": {},
+        # each record holds their digests under "epoch_inputs"; a run from a
+        # stored fit also names the stored run (its folder and manifest digest)
+        "inputs": {} if stored_dir is None else {"stored_fit": run_input(stored_dir)},
     }
     if args.gather:
         gather_manifest(output, NONLOCAL_RESTRICTION_NAME, header)
@@ -313,7 +465,9 @@ def main(argv: list[str] | None = None) -> None:
             args.epochs or analyzed_epoch_ids(), args.shards, args.n_shards
         ),
         task=run_epoch,
-        task_args=(data_dir, output),
+        task_args=(data_dir, output)
+        if stored_dir is None
+        else (data_dir, output, stored_dir, models),
         output=output,
         name=NONLOCAL_RESTRICTION_NAME,
         header=header,

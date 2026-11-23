@@ -109,13 +109,15 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    ALL_CONTRASTS,
     CATEGORIES,
     CONTRASTS,
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
-    SCORE_COLUMNS,
     ratio_or_nan,
+    table_contrasts,
+    table_score_columns,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     IN_VISIT_SUFFIX,
@@ -273,7 +275,9 @@ def restriction_time_sums(
         bin in time order: :data:`TIME_SUM_BIN_COLUMNS`, of which ``time``
         (s), ``category``, the six score columns
         (:data:`.nonlocal_restriction.SCORE_COLUMNS`), ``in_swr`` and
-        ``place_sampling_s`` are read.
+        ``place_sampling_s`` are read, and the score columns of any other
+        model the table holds (``nonlocal_restriction.table_score_columns``),
+        which are summed too.
     facts : pd.DataFrame
         The epoch's per-bin facts (``bin_facts.bin_facts``) on the same grid:
         ``time``, ``n_spikes``, ``in_well_visit`` and ``swr_observed``.
@@ -308,7 +312,7 @@ def restriction_time_sums(
     s, e = _window_bounds(windows[windows["kind"] == "event"], len(bins))
     in_event = np.zeros(len(bins), dtype=bool)
     in_event[window_rows(s, e)] = True
-    frame = bins[list(SCORE_COLUMNS)].astype(np.float64)
+    frame = bins[list(table_score_columns(bins.columns))].astype(np.float64)
     frame.insert(0, "n_spikes", facts["n_spikes"].to_numpy(dtype=np.int64))
     frame.insert(0, "n_bins", np.int64(1))
     bin_s = sample_step(bins["time"].to_numpy(dtype=float))
@@ -350,7 +354,7 @@ def _chosen_time(time_sums: pd.DataFrame, rows: np.ndarray) -> pd.DataFrame:
     visit: ``n_bins``, ``n_spikes`` and the scores, indexed by ``epoch_id``,
     every epoch of ``time_sums`` included."""
     rows = np.asarray(rows, dtype=bool) & time_sums["in_well_visit"].to_numpy(bool)
-    columns = ["n_bins", "n_spikes", *SCORE_COLUMNS]
+    columns = ["n_bins", "n_spikes", *table_score_columns(time_sums.columns)]
     epochs = sorted(time_sums["epoch_id"].unique())
     return (
         time_sums[rows].groupby("epoch_id")[columns].sum().reindex(epochs, fill_value=0)
@@ -620,6 +624,131 @@ def epoch_inside_swr_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.Data
     _check_time_sums(time_sums, bin_s)
     total = _chosen_time(time_sums, time_sums["category"] == IMMOBILE_IN_SWR)
     return _epoch_gain_frame(time_sums, bin_s, total)
+
+
+CONTRAST_TIMES = ("inside_swr", "outside_swr", "immobile")
+"""The immobile time a contrast is read over by :func:`epoch_contrast_gains`:
+the bins inside SWRs (``immobile_in_swr``), outside SWRs
+(:func:`.restriction_windows.outside_swr_bins`) or of both immobile categories,
+each inside a well visit."""
+
+
+def epoch_contrast_gains(
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    *,
+    time: str,
+    contrasts: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Each epoch's contrasts over one kind of immobile time inside a well
+    visit, in nats, per spike and per second, both score families.
+
+    It reads any contrast of :data:`.nonlocal_restriction.ALL_CONTRASTS` whose
+    models the time sums hold, the fourth model's (``swr_allowed``) among them
+    when the restriction run scored it, on the same bins as
+    :func:`epoch_inside_swr_gains`, :func:`epoch_outside_swr_gains` and
+    :func:`epoch_immobile_gains` (their ``full - swr`` is this function's
+    ``full_minus_swr``).
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+    time : str
+        One of :data:`CONTRAST_TIMES`.
+    contrasts : iterable of str, optional
+        The contrasts (of :data:`.nonlocal_restriction.ALL_CONTRASTS`); by
+        default every one the time sums hold.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per epoch of ``time_sums``, sorted by ``epoch_id``:
+        ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes``, ``seconds`` of the
+        chosen bins, and for each contrast and family (suffix ``""`` for the
+        filter score, ``"_two_sided"``): ``<contrast><suffix>`` (nats),
+        ``<contrast>_per_spike<suffix>`` and ``<contrast>_per_s<suffix>`` (NaN
+        without spikes or bins).
+
+    Raises
+    ------
+    ValueError
+        If ``time`` is not one of :data:`CONTRAST_TIMES`, a contrast is
+        unknown or its models are not in the time sums, an epoch has a row of
+        the time sums twice or no time step.
+    """
+    _check_time_sums(time_sums, bin_s)
+    held = table_contrasts(time_sums.columns)
+    chosen = list(held) if contrasts is None else list(contrasts)
+    if unknown := sorted(set(chosen) - set(ALL_CONTRASTS)):
+        raise ValueError(f"unknown contrasts {unknown}")
+    if missing := sorted(set(chosen) - set(held)):
+        raise ValueError(
+            f"the time sums do not hold the models of contrasts {missing}: they "
+            "are of a restriction run that did not score them"
+        )
+    immobile = time_sums["category"].isin([IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR])
+    rows = {
+        "inside_swr": time_sums["category"] == IMMOBILE_IN_SWR,
+        "outside_swr": _outside_swr_rows(time_sums),
+        "immobile": immobile,
+    }
+    if time not in rows:
+        raise ValueError(f"time {time!r} is not one of {CONTRAST_TIMES}")
+    total = _chosen_time(time_sums, np.asarray(rows[time]))
+    animals = time_sums.groupby("epoch_id")["animal"].first()
+    seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
+    spikes = total["n_spikes"].to_numpy()
+    out = pd.DataFrame(
+        {
+            "epoch_id": total.index,
+            "animal": animals.reindex(total.index).to_numpy(),
+            "n_bins": total["n_bins"].to_numpy(),
+            "n_spikes": spikes,
+            "seconds": seconds,
+        }
+    )
+    for contrast in chosen:
+        a, b = ALL_CONTRASTS[contrast]
+        for suffix in FAMILY_SUFFIX.values():
+            gain = (total[f"{a}{suffix}"] - total[f"{b}{suffix}"]).to_numpy()
+            out[f"{contrast}{suffix}"] = gain
+            for unit, divisor in (("per_spike", spikes), ("per_s", seconds)):
+                out[f"{contrast}_{unit}{suffix}"] = list(
+                    map(ratio_or_nan, gain, divisor)
+                )
+    return out
+
+
+def contrast_gain_statistics(
+    epochs: pd.DataFrame,
+    contrasts: Iterable[str],
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Each contrast per spike and per second over the epochs of
+    :func:`epoch_contrast_gains`, reduced over epochs and animals as
+    :func:`outside_swr_gain_statistics` reduces its measures, with the same
+    columns (``measure`` is ``<contrast>_per_spike`` or ``<contrast>_per_s``).
+
+    Parameters
+    ----------
+    epochs : pd.DataFrame
+        :func:`epoch_contrast_gains`' rows.
+    contrasts : iterable of str
+        Contrasts the rows hold.
+    n_boot, seed : int, optional
+        The bootstrap's replicates and seed, the same for every row.
+    """
+    measures = tuple(
+        f"{contrast}_{unit}"
+        for unit in ("per_spike", "per_s")
+        for contrast in contrasts
+    )
+    return _epoch_measure_statistics(epochs, measures, n_boot=n_boot, seed=seed)
 
 
 def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
