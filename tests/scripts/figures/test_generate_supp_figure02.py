@@ -246,6 +246,29 @@ def _four_decoders():
     return swr_allowed_statistics(events, sums, bin_s)
 
 
+def _low_rate_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The builder test's held-out tetrode windows with their extra scores,
+    and a place-rate run where each group and animal's narrowest event is a
+    low-rate event (rank 0.05) and the others are at rank 0.5."""
+    from tests.reported.test_reported_events_values import _extra_windows
+
+    windows = _extra_windows()
+    events = windows[windows["kind"] == "event"]
+    place_rate = events[["event_id", "animal", "epoch_id", "group"]].assign(
+        place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5)
+    )
+    return windows, place_rate
+
+
+def _low_rate():
+    """``low_rate_statistics`` of :func:`_low_rate_inputs`."""
+    from continuum_swr_replay.analysis.event_properties.low_rate_places import (
+        low_rate_statistics,
+    )
+
+    return low_rate_statistics(*_low_rate_inputs())
+
+
 def _statistics() -> dict:
     return {
         "calibration": _calibration(),
@@ -262,6 +285,7 @@ def _statistics() -> dict:
         "no_spike": _no_spike_trace(),
         "event_traces": _event_traces(),
         "four_decoders": _four_decoders(),
+        "low_rate": _low_rate(),
     }
 
 
@@ -284,6 +308,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
         "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
         "outside_distance", "event_traces", "content_distance", "four_decoders",
+        "low_rate",
     )  # fmt: skip
     fig = drawn
     ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
@@ -298,8 +323,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijklm")
-    rows = ("ab", "cd", "efgh", "ij", "kl", "m")
+    assert sorted(letters) == list("abcdefghijklmn")
+    rows = ("ab", "cd", "efgh", "ij", "kl", "m", "n")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -308,7 +333,9 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     assert "Immobile, at wells" not in [
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
-    figure.check_journal_limits(fig)
+    # above the common 20 cm until the lead chooses which panels stay
+    figure.check_journal_limits(fig, max_height_cm=figure.MAX_HEIGHT_CM)
+    assert figure.MAX_HEIGHT_CM == 22.5
 
 
 def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes(drawn):
@@ -367,6 +394,7 @@ def test_each_panels_values_carry_its_letter():
         "nonlocal_restriction_distance": "outside_distance",
         "content_distance": "content_distance",
         "nonlocal_restriction_swr_allowed": "four_decoders",
+        "low_rate": "low_rate",
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
@@ -775,7 +803,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijklm"
+    assert FIGURES["S2"].panels == "abcdefghijklmn"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -826,6 +854,10 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
         "read_step_test": lambda folder, table: "steps",
+        "require_extra_columns": lambda table, what: None,
+        "low_rate_statistics": lambda windows, place_rate: seen.setdefault(
+            "low_rate", (windows, place_rate)
+        ),
         "swr_allowed_statistics": lambda events, sums, bin_s: seen.setdefault(
             "four_decoders", (events, sums, bin_s)
         ),
@@ -877,9 +909,14 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "outside",
         "parts",
         "four_decoders",
+        "low_rate",
         "no_spike",
         "event_traces",
     ]
+    # panel n: the extra run's windows and the place-rate run, both over the
+    # selected events
+    windows, place_rate = seen["low_rate"]
+    assert list(place_rate["event_id"]) == [0, 0, *range(1, 8)]
     events, sums, bin_s = seen["four_decoders"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
 
@@ -1033,3 +1070,48 @@ def test_the_four_decoder_panel_draws_figure_2js_axes_with_the_fourth(drawn):
     assert ax_events.get_ylabel() == (
         "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"
     )
+
+
+def test_the_low_rate_panel_draws_the_tenths_and_each_measure_by_place(drawn):
+    """Panel n: each group's share in each tenth of the rank, a thin line per
+    animal and the mean in bold, chance dashed, the lowest tenth shaded; then
+    one axis per measure, the low-rate events in open dots and the others
+    filled, no-SWR and SWR side by side, each from ``low_rate_statistics``."""
+    from matplotlib.colors import to_rgba
+
+    statistics = _low_rate()
+    ax_tenths, *ax_measures = figure.panel_axes(drawn, "low_rate")
+    assert ax_tenths.get_title() == "Low-rate places"
+    for group, color in figure.GROUP_COLORS.items():
+        (mean,) = [
+            line for line in ax_tenths.lines
+            if line.get_linewidth() == 1.2
+            and to_rgba(line.get_color()) == to_rgba(color)
+        ]  # fmt: skip
+        np.testing.assert_allclose(
+            mean.get_ydata(), 100 * statistics.tenths.loc[group, "animal_mean"]
+        )
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 10.0)
+        for line in ax_tenths.lines
+    )
+    assert len(ax_tenths.patches) == 1  # the lowest tenth's shading
+    assert [ax.get_title() for ax in ax_measures] == list(
+        figure.LOW_RATE_TITLES.values()
+    )
+    for ax, column in zip(ax_measures, figure.LOW_RATE_FIGURE_MEASURES, strict=True):
+        assert [t.get_text() for t in ax.get_xticklabels()] == [
+            "Low-rate\nplaces", "Other\nplaces",
+        ]  # fmt: skip
+        for (group, place), x in figure.LOW_RATE_X.items():
+            (dots,) = [
+                c for c in ax.collections
+                if isinstance(c, matplotlib.collections.PathCollection)
+                and np.allclose(c.get_offsets()[:, 0], x)
+            ]  # fmt: skip
+            row = statistics.measures[column].loc[(place, group)]
+            np.testing.assert_allclose(
+                sorted(dots.get_offsets()[:, 1]), sorted(row["animals"])
+            )
+            assert (len(dots.get_facecolors()) == 0) == (place == "low_rate")
+            assert np.allclose(_means_at(ax, x), row["estimate"])

@@ -2161,7 +2161,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
         EVENT_BIN_FACTS_DIR,
-        EVENT_TETRODE_HOLDOUT_DIR,
+        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
         NONLOCAL_BY_SIGNAL_DIR,
         processed_data_dir,
         replay_content_dir,
@@ -2192,8 +2192,8 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)
     entry.write_bytes(b"the visits")
-    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR).mkdir(parents=True)
-    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+    (tmp_path / EVENT_TETRODE_HOLDOUT_EXTRA_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_TETRODE_HOLDOUT_EXTRA_DIR / "manifest.json").write_text(
         json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
     )
     (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
@@ -2220,7 +2220,8 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "event_table_epochs": lambda *args: ["e"],
         "read_complete_run": lambda *args: rows,
         "window_scores": lambda table: table.assign(kind="event"),
-        "agreement_by_spread_statistics": lambda windows: None,
+        "require_extra_columns": lambda table, what: None,
+        "shared_content_statistics": lambda windows: None,
         "well_visit_times": lambda identifier: None,
         "check_visit_context_starts": lambda table, visits: None,
         "restriction_inputs_note": lambda folder, epochs: None,
@@ -2242,7 +2243,7 @@ def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
         seen.append(windows)
         raise _Figure02Read
 
-    monkeypatch.setattr(figure02, "agreement_by_spread_statistics", stop)
+    monkeypatch.setattr(figure02, "shared_content_statistics", stop)
     with pytest.raises(_Figure02Read):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert sorted(seen[0]["event_id"]) == list(range(8))
@@ -2253,13 +2254,13 @@ def test_figure02_refuses_a_held_out_tetrode_run_not_on_trial_folds(
 ):
     """Panel h, as the events summary: a held-out tetrode run whose folds are
     not whole trials is refused before it is read."""
-    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_DIR
+    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_EXTRA_DIR
 
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+    (tmp_path / EVENT_TETRODE_HOLDOUT_EXTRA_DIR / "manifest.json").write_text(
         json.dumps({"settings": {"n_folds": 5, "fold_design": "blocks"}})
     )
-    monkeypatch.setattr(figure02, "agreement_by_spread_statistics", _refuse_drawing)
+    monkeypatch.setattr(figure02, "shared_content_statistics", _refuse_drawing)
     with pytest.raises(ValueError, match="whole trials"):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
 
@@ -2519,42 +2520,62 @@ SHARED = {
 """Panel h's animals in the narrowest spread bin; each wider bin is 0.1 lower."""
 
 
-SHARE_OF_EVENTS = {"no SWR": [0.12, 0.2, 0.43, 0.25], "SWR": [0.1, 0.3, 0.4, 0.2]}
-"""Each group's share of its events in each spread bin."""
+SHARE_OF_EVENTS = {
+    "no SWR": [0.12, 0.2, 0.33, 0.1, 0.25],
+    "SWR": [0.1, 0.3, 0.3, 0.1, 0.2],
+}
+"""Each group's mean share of its events in each width bin; the animals' range
+is 0.02 either side."""
+REFERENCE = {"no SWR": -0.15, "SWR": -0.3}
+"""Each group's shuffled-event reference in every width bin."""
 
 
-def _shared_statistics(figure) -> pd.DataFrame:
-    """``agreement_by_spread_statistics``' rows: each bin and group's animals,
-    their mean and an interval of 0.05 either side."""
-    rows = []
-    for k, label in enumerate(figure.SPREAD_BIN_LABELS):
+def _shared_statistics(figure):
+    """``shared_content_statistics``: each bin and group's animals, their mean
+    and an interval of 0.05 either side; the reference's mean
+    (:data:`REFERENCE`)."""
+    from continuum_swr_replay.analysis.event_evidence.shared_content import (
+        SharedContentStatistics,
+    )
+
+    rows, references = [], []
+    for k, label in enumerate(figure.WIDTH_BIN_LABELS):
         for group in ("no SWR", "SWR"):
             animals = np.asarray(SHARED[(group, 0)]) - 0.1 * k
             mean = float(animals.mean())
+            share = SHARE_OF_EVENTS[group][k]
             rows.append(
                 {
-                    "spread_bin": label, "group": group, "animals": animals,
+                    "width_bin": label, "group": group, "animals": animals,
                     "animal_names": np.array(list("abcde")), "estimate": mean,
                     "ci_low": mean - 0.05, "ci_high": mean + 0.05,
-                    "share_of_events": SHARE_OF_EVENTS[group][k],
+                    "share_of_events_animal_mean": share,
+                    "share_of_events_animal_min": share - 0.02,
+                    "share_of_events_animal_max": share + 0.02,
                 }
             )  # fmt: skip
-    return pd.DataFrame(rows).set_index(["spread_bin", "group"])
+            references.append(
+                {"width_bin": label, "group": group, "estimate": REFERENCE[group]}
+            )
+    agreement = pd.DataFrame(rows).set_index(["width_bin", "group"])
+    reference = pd.DataFrame(references).set_index(["width_bin", "group"])
+    return SharedContentStatistics(agreement, reference, agreement)
 
 
-def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
-    """Panel h: each group's dots per spread bin on its side of the bin, its means with
-    their intervals farther out joined by a thin line in the group's color, the
-    bins' labels, a dashed zero line and which way means shared content."""
+def test_figure02_shared_content_draws_the_agreement_by_width(offline):
+    """Panel h: each group's dots per width bin on its side of the bin, its
+    means with their intervals farther out joined by a thin line in the
+    group's color, the shuffled-event reference in open markers of the group's
+    color on a dotted line beside them, named once, the bins' labels, a dashed
+    zero line and which way means shared content."""
     import matplotlib.pyplot as plt
 
     figure = offline("scripts.figures.generate_figure02")
     fig, (ax_share, ax) = plt.subplots(2, 1)
     figure.draw_shared_content(ax_share, ax, _shared_statistics(figure))
-    assert [t.get_text() for t in ax.get_xticklabels()] == list(
-        figure.SPREAD_BIN_LABELS
-    )
-    bins = np.arange(len(figure.SPREAD_BIN_LABELS))
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(figure.WIDTH_BIN_LABELS)
+    assert figure.WIDTH_BIN_LABELS == ("<25", "25–50", "50–100", "100–200", "≥200")
+    bins = np.arange(len(figure.WIDTH_BIN_LABELS))
     for side, group in ((-1, "no SWR"), (1, "SWR")):
         expected = [np.mean(SHARED[(group, 0)]) - 0.1 * k for k in bins]
         means = bins + side * (figure.SHARED_OFFSET + figure.SHARED_MEAN_OFFSET)
@@ -2562,9 +2583,18 @@ def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
             line for line in ax.lines
             if len(line.get_xdata()) == bins.size
             and np.allclose(line.get_xdata(), means)
-            and line.get_linestyle() != "None"  # not the means' markers
+            and line.get_linestyle() == "-"
         ]  # fmt: skip
         np.testing.assert_allclose(series.get_ydata(), expected, atol=1e-12)
+        (reference,) = [
+            line for line in ax.lines
+            if len(line.get_xdata()) == bins.size
+            and np.allclose(line.get_xdata(), means)
+            and line.get_linestyle() == ":"
+        ]  # fmt: skip
+        np.testing.assert_allclose(reference.get_ydata(), REFERENCE[group])
+        assert reference.get_marker() == "o"
+        assert reference.get_markerfacecolor() == "white"
         for k in bins:
             (dots,) = [
                 c for c in ax.collections
@@ -2581,8 +2611,10 @@ def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
         line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
         for line in ax.lines
     )
-    # a strip above, sharing the x axis: each group's percent of its events per
-    # bin as two narrow bars side by side, in the groups' colors
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["shuffled events"]
+    # a strip above, sharing the x axis: each group's mean share over animals
+    # per bin as two narrow bars side by side in the groups' colors, with the
+    # animals' range
     from matplotlib.colors import to_rgba
 
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
@@ -2598,6 +2630,10 @@ def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
         np.testing.assert_allclose(
             [b.get_height() for b in mine], 100 * np.asarray(SHARE_OF_EVENTS[group])
         )
+    ranges = np.concatenate([c.get_segments() for c in ax_share.collections])
+    np.testing.assert_allclose(
+        sorted(seg[1, 1] - seg[0, 1] for seg in ranges), [4.0] * 2 * len(bins)
+    )
     assert ax_share.get_shared_x_axes().joined(ax_share, ax)
     assert ax_share.get_ylabel() == "% of\nevents"
     assert ax_share.get_title() == "Shared content"
@@ -2606,5 +2642,8 @@ def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
     assert "\u2191 shared\ncontent" in texts
     assert {"No SWR", "SWR"} <= set(texts)
     assert ax.get_ylabel() == "Agreement\n(nats/spike)"
-    assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
+    assert (
+        ax.get_xlabel()
+        == "95 % HPD length of the other\ntetrodes' position estimate (cm)"
+    )
     plt.close(fig)
