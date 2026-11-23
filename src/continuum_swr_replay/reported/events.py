@@ -625,6 +625,28 @@ def require_tetrode_holdout_folds(manifest: dict, what: str) -> None:
     )
 
 
+def read_tetrode_holdout(
+    folder: Path,
+    epoch_ids: Iterable[str],
+    selected: object,
+    *,
+    extra: bool = False,
+) -> pd.DataFrame:
+    """A held-out tetrode run's per-event table over the selected events: the
+    run refused when its folds are not whole trials
+    (:func:`require_tetrode_holdout_folds`), read over ``epoch_ids``
+    (``read_complete_run``) and selected by ``cohort_selection.select_events_in``
+    with ``selected``; with ``extra``, refused without the extra scores'
+    columns (``tetrode_holdout.require_extra_columns``)."""
+    require_tetrode_holdout_folds(read_output_manifest(folder), rel(folder))
+    table = select_events_in(
+        read_complete_run(folder, TETRODE_HOLDOUT_NAME, epoch_ids), selected
+    )
+    if extra:
+        tetrode_holdout.require_extra_columns(table, rel(folder))
+    return table
+
+
 def spike_evidence_staleness(
     manifest: dict, current_sha256: str, what: str
 ) -> str | None:
@@ -5795,26 +5817,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
         selected,
     )
-    require_tetrode_holdout_folds(
-        read_output_manifest(inputs.tetrode_holdout), rel(inputs.tetrode_holdout)
-    )
-    holdout_table = select_events_in(
-        read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),
-        selected,
-    )
+    holdout_table = read_tetrode_holdout(inputs.tetrode_holdout, analyzed, selected)
     # the held-out tetrode run with its extra scores (Figure 2j, the parts of
     # the evidence and the low-rate events): held out as the canonical run is,
     # and with the extra columns
-    require_tetrode_holdout_folds(
-        read_output_manifest(inputs.tetrode_holdout_extra),
-        rel(inputs.tetrode_holdout_extra),
-    )
-    extra_table = select_events_in(
-        read_complete_run(inputs.tetrode_holdout_extra, TETRODE_HOLDOUT_NAME, analyzed),
-        selected,
-    )
-    tetrode_holdout.require_extra_columns(
-        extra_table, rel(inputs.tetrode_holdout_extra)
+    extra_table = read_tetrode_holdout(
+        inputs.tetrode_holdout_extra, analyzed, selected, extra=True
     )
     # the place-rate run: every event of the table, read over the selected ones
     place_rate_table = select_events_in(

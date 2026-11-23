@@ -223,7 +223,6 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
-    require_extra_columns,
     window_scores,
 )
 from continuum_swr_replay.analysis.event_properties import triggered_analysis
@@ -281,7 +280,6 @@ from continuum_swr_replay.paths import (
     NONLOCAL_BY_SIGNAL_DIR,
     PARTICIPATION_NAME,
     STATE_BY_SIGNAL_DIR,
-    TETRODE_HOLDOUT_NAME,
     event_features_root,
     processed_data_dir,
     replay_content_dir,
@@ -291,7 +289,7 @@ from continuum_swr_replay.reported.events import (
     heldout_restriction_refusal,
     read_checked,
     read_heldout_restriction,
-    require_tetrode_holdout_folds,
+    read_tetrode_holdout,
     restriction_inputs_note,
 )
 from continuum_swr_replay.reported.formatting import format_number
@@ -1865,24 +1863,19 @@ def generate_figure(
     )
     # the held-out tetrode run with its extra scores, as the events summary
     # reads it: held out in folds of whole trials, over the selected events
-    holdout_dir = data_dir / EVENT_TETRODE_HOLDOUT_EXTRA_DIR
-    require_tetrode_holdout_folds(read_output_manifest(holdout_dir), rel(holdout_dir))
-    holdout_table = select_events_in(
-        read_complete_run(holdout_dir, TETRODE_HOLDOUT_NAME, event_epochs),
-        events["event_id"],
+    holdout = window_scores(
+        read_tetrode_holdout(
+            data_dir / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+            event_epochs,
+            events["event_id"],
+            extra=True,
+        )
     )
-    require_extra_columns(holdout_table, rel(holdout_dir))
-    holdout = window_scores(holdout_table)
     # the canonical held-out tetrode run, as the events summary reads it: the
     # gain over local coding of the events
-    canonical_dir = data_dir / EVENT_TETRODE_HOLDOUT_DIR
-    require_tetrode_holdout_folds(
-        read_output_manifest(canonical_dir), rel(canonical_dir)
-    )
     canonical = window_scores(
-        select_events_in(
-            read_complete_run(canonical_dir, TETRODE_HOLDOUT_NAME, event_epochs),
-            events["event_id"],
+        read_tetrode_holdout(
+            data_dir / EVENT_TETRODE_HOLDOUT_DIR, event_epochs, events["event_id"]
         )
     )
     participation = read_participation(

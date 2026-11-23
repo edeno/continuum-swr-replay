@@ -2256,7 +2256,6 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "event_table_epochs": lambda *args: ["e"],
         "read_complete_run": lambda *args: rows,
         "window_scores": lambda table: table.assign(kind="event"),
-        "require_extra_columns": lambda table, what: None,
         "holdout_statistics": lambda windows, kind, column: None,
         "read_participation": lambda folder, epochs, event_ids: None,
         "well_visit_times": lambda identifier: None,
@@ -2264,6 +2263,9 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "restriction_inputs_note": lambda folder, epochs: None,
     }.items():
         monkeypatch.setattr(figure02, name, value)
+    monkeypatch.setattr(
+        events.tetrode_holdout, "require_extra_columns", lambda table, what: None
+    )
     return figure02
 
 
@@ -2418,7 +2420,12 @@ def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
     heldout = pd.DataFrame(
         {"heldout_event_id": range(5), "starts_in_well_visit": [1, 0, 1, 1, 0]}
     ).astype({"starts_in_well_visit": bool})
-    read = {"heldout_events": heldout, "heldout_time_sums": pd.DataFrame(range(9))}
+    read = {
+        "heldout_events": heldout,
+        "heldout_time_sums": pd.DataFrame(range(9)),
+        # the held-out tetrode runs, read by the same reader
+        "tetrode_holdout": pd.DataFrame({"event_id": [*range(8), 99]}),
+    }
     monkeypatch.setattr(
         events, "read_complete_run", lambda folder, name, epochs: read[name]
     )
