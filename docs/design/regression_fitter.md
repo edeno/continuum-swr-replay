@@ -750,7 +750,13 @@ the process to `cpus` and sets the BLAS thread variables to their number; it ref
 numpy was already imported with another count, which its BLAS keeps. A pool whose
 processes compute with JAX starts them by spawn, `runs.threads.pool_context()`: a fork of
 a process with JAX's threads running can deadlock. `tests/repository/test_no_fork_pools.py`
-fails when `src/` or `scripts/` asks for a fork pool.
+fails when `src/` or `scripts/` asks for fork explicitly (`get_context("fork")`,
+`set_start_method("fork")`). A pool made with no start method also forks on Linux, so the
+same file fails when a module that imports `jax`, the regression fitter or
+`non_local_detector` (directly or through this repository's modules) makes a `Pool` or a
+`ProcessPoolExecutor` with no `mp_context=` or `context=`, other than by `pool_context()` or
+`get_context(...)`. The present offenders are listed there with their reasons; the test
+also fails when a listed one is gone.
 
 **Padding.** `jit` compiles once for each new shape, so a session's rows are padded to a
 bucket: a multiple of 4,096 rows for the Poisson, Bernoulli and Gaussian families
