@@ -183,9 +183,7 @@ def boundary_case_bounds(start: str, end: str) -> tuple[float, float]:
     return BOUNDARY_SWR[0] + shift[start], BOUNDARY_SWR[1] + shift[end]
 
 
-def draw_boundary_cases(
-    ax: Axes, cases: list[tuple[str, str, str]], name_x: float = 0.0
-) -> None:
+def draw_boundary_cases(ax: Axes, cases: list[tuple[str, str, str]]) -> None:
     """How an event's bounds sit against its SWR's, one row per case: at the
     left the case's name, at the right the SWR as a bar in the SWR color and
     under it the event as a bar in the non-local color, longer or shorter at
@@ -200,8 +198,6 @@ def draw_boundary_cases(
     cases : list of (name, start, end)
         Each row's name and its event's start and end class (``"earlier"``,
         ``"together"``, ``"later"``).
-    name_x : float, optional
-        Where the names start (data units).
     """
     for k, (name, start, end) in enumerate(cases):
         ax.add_patch(
@@ -218,7 +214,7 @@ def draw_boundary_cases(
                 fc=COLORS["Non-Local"], ec="none",
             )
         )  # fmt: skip
-        ax.text(name_x, k, name, fontsize=SMALL_SIZE, ha="left", va="center")
+        ax.text(0.0, k, name, fontsize=SMALL_SIZE, ha="left", va="center")
     # the two bars named in their colors, over the drawings
     middle = sum(BOUNDARY_SWR) / 2
     for name, color, side, shift in (

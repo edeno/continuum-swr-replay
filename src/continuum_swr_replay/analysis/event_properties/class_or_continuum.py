@@ -764,33 +764,6 @@ def _by_animal_and_pooled(events: pd.DataFrame):
     yield "pooled", events
 
 
-def peak_power_densities(events: pd.DataFrame, grid: NDArray) -> pd.DataFrame:
-    """Each animal's density of the events' peak ripple power: the KDE whose
-    main mode :func:`distribution_table` reports (:func:`kde_modes`), read on
-    one grid.
-
-    Parameters
-    ----------
-    events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``animal`` and ``ripple_z_max`` (an event whose
-        power is not finite is left out).
-    grid : NDArray, shape (n_grid,)
-        z.
-
-    Returns
-    -------
-    pd.DataFrame, shape (n_grid, n_animals)
-        Indexed by ``grid``, a column per animal (sorted): the density, per z.
-    """
-    densities = {}
-    for animal, frame in events.groupby("animal"):
-        x = frame[RIPPLE_POWERS["peak"]].to_numpy(dtype=np.float64)
-        densities[animal] = _kde(x[np.isfinite(x)])(grid)
-    return pd.DataFrame(
-        densities, index=pd.Index(np.asarray(grid, dtype=np.float64), name="power_z")
-    )
-
-
 def robust_sd(x: NDArray) -> float:
     """1.4826 times the median absolute deviation from the median."""
     return float(1.4826 * np.median(np.abs(x - np.median(x))))

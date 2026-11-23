@@ -110,17 +110,11 @@ OUTSIDE_SWR_SUFFIX = "_outside_swr"
 (:func:`outside_swr_bins`, :func:`restriction_window_sums`)."""
 
 
-def outside_swr_columns(score_columns: Sequence[str] = SCORE_COLUMNS) -> tuple:
-    """The window table's columns over the bins outside SWRs, for a per-bin
-    table with ``score_columns``."""
-    return (
-        "n_bins_outside_swr",
-        "duration_outside_swr_s",
-        *(f"{column}{OUTSIDE_SWR_SUFFIX}" for column in score_columns),
-    )
-
-
-OUTSIDE_SWR_COLUMNS = outside_swr_columns()
+OUTSIDE_SWR_COLUMNS = (
+    "n_bins_outside_swr",
+    "duration_outside_swr_s",
+    *(f"{column}{OUTSIDE_SWR_SUFFIX}" for column in SCORE_COLUMNS),
+)
 """The window table's columns over the bins outside SWRs (the canonical
 run's)."""
 

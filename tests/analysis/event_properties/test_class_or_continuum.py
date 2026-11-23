@@ -58,31 +58,6 @@ def test_kde_modes():
     assert cc.kde_modes(rng.lognormal(0.0, 1.0, 20_000)).size == 1
 
 
-def test_peak_power_densities_are_each_animals_kde_on_one_grid():
-    """Per animal, the KDE that :func:`kde_modes` reads (Silverman's
-    bandwidth), on one grid: it integrates to about 1 over a wide grid and
-    peaks at the animal's main mode."""
-    rng = np.random.default_rng(4)
-    events = pd.DataFrame(
-        {
-            "animal": np.repeat(["a", "b"], 5000),
-            "ripple_z_max": np.concatenate(
-                [rng.normal(1.0, 1.0, 5000), rng.normal(3.0, 1.0, 5000)]
-            ),
-        }
-    )
-    grid = np.linspace(-5.0, 9.0, 1401)
-    densities = cc.peak_power_densities(events, grid)
-    assert list(densities.columns) == ["a", "b"]
-    np.testing.assert_allclose(densities.index, grid)
-    for animal, mode in (("a", 1.0), ("b", 3.0)):
-        assert np.trapezoid(densities[animal], grid) == pytest.approx(1.0, abs=0.01)
-        peak = grid[np.argmax(densities[animal])]
-        x = events.loc[events.animal == animal, "ripple_z_max"].to_numpy()
-        assert peak == pytest.approx(cc.kde_modes(x)[0], abs=0.03)
-        assert peak == pytest.approx(mode, abs=0.15)
-
-
 @pytest.mark.parametrize(
     "sampler", [cc.matched_unimodal_sample, cc.matched_lognormal_sample]
 )
