@@ -13,7 +13,12 @@ ones, and the number of groups is padded too; the extra groups beyond it have
 no rows. A group with a response total of 0 adds 0, provided a kernel guards
 its ``n_g log(sum exp)`` term, which is ``0 * -inf`` for a group with no rows.
 
-Everything here is NumPy; nothing imports JAX.
+Everything here is NumPy; nothing imports JAX. The padding tests check the
+NumPy likelihoods and a weighted JAX stand-in for each kernel; run them again
+against the real JAX kernels when those exist (sub-phase 3), the guard for a
+softmax group with no rows included.
+Every quantity that depends on the number of rows (a degrees-of-freedom count,
+a mean, a dispersion) must use ``n_real``, not the padded count.
 """
 
 from __future__ import annotations
