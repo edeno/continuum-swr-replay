@@ -27,6 +27,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.io import files_sha256, sha256_file
+from scripts.event_properties import _epoch_counts as epoch_counts
 from scripts.event_properties import bootstrap_event_properties as bootstrap
 from scripts.event_properties import measure_brain_state_reference as brain_state
 from scripts.event_properties import measure_event_gamma as gamma
@@ -83,7 +84,7 @@ def _features_run(name: str) -> None:
 @pytest.fixture
 def decoded(processed_data_root, monkeypatch):
     """One epoch's decode frame (read through a stub) and its well visit."""
-    for module in (brain_state, power):
+    for module in (brain_state, epoch_counts):
         monkeypatch.setattr(
             module.analyzed_time,
             "read_verified_dot_with_swr_source",
@@ -128,7 +129,7 @@ def test_the_counts_by_signal_are_over_the_immobile_time_inside_the_visits(
     monkeypatch.setattr(power, "immobile_analyzed_bins", lambda dot: TIME < 0.3)
     power.main(["--event-features-run", "run1"])
     np.testing.assert_array_equal(seen[0], (TIME >= 0.1) & (TIME < 0.5))
-    folder = power.processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR
+    folder = epoch_counts.processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR
     manifest = json.loads((folder / "manifest.json").read_text())
     assert manifest["subset"] == ANALYZED_SUBSET
     assert manifest["session_cache"]["sha256"] == files_sha256(decoded)
