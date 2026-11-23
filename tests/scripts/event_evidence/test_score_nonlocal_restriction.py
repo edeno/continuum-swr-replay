@@ -210,6 +210,7 @@ def patched(tmp_path, monkeypatch):
             scores = _scores()
             if from_stored:
                 assert from_stored["models"] == models
+                scores["block"] = folds  # a real run's blocks are its folds
                 scores["swr_allowed"] = scores["swr_allowed_two_sided"] = np.float32(
                     -0.25
                 )
@@ -226,7 +227,7 @@ def patched(tmp_path, monkeypatch):
             return scores, {
                 "folds": [
                     {"fold": k, "converged": True, "em_iterations": 4, **record}
-                    for k in range(2 if from_stored else 1)
+                    for k in range(int(folds.max()) + 1 if from_stored else 1)
                 ],
                 "fit_s": 1.0,
                 "n_in_swr": int(IN_SWR.sum()),
@@ -361,6 +362,15 @@ def test_the_run_writes_to_the_canonical_folder(tmp_path, monkeypatch):
     ]
 
 
+FOLDS = fo.trial_folds(
+    TIME,
+    TIME[[0, 2, 4, 6, 8, 10, 11]],
+    np.r_[TRIALS["to_well"], fo.AFTER_LAST_TRIAL],
+    fo.N_FOLDS,
+)
+"""The folds the runner makes from the trials (the fake's check)."""
+
+
 def _stored_run(tmp_path, patched, **record_changes):
     """A canonical run of the epoch written to ``tmp_path / "stored"``, its
     ``full`` scores 0.001 off the ones the stored-fit run will score."""
@@ -368,6 +378,7 @@ def _stored_run(tmp_path, patched, **record_changes):
     bins_path = output_path(EPOCH, stored, NONLOCAL_RESTRICTION_BINS_NAME)
     bins = pd.read_parquet(bins_path)
     bins["full"] = bins["full"] + np.float32(0.001)
+    bins["block"] = FOLDS
     bins.to_parquet(bins_path)
     record = record | {"folds": [{"fold": k} for k in range(2)]} | record_changes
     (stored / f"{EPOCH}_{NONLOCAL_RESTRICTION_NAME}.json").write_text(
@@ -469,3 +480,38 @@ def test_a_run_from_a_stored_fit_never_writes_into_the_canonical_folder(
         runner.main(
             ["--gather", "--from-stored-fit", str(stored), "--models", "none", "swr"]
         )
+
+
+def _without_trials_digest(stored, **changes):
+    """The stored record as the canonical run wrote it: no trials digest."""
+    path = stored / f"{EPOCH}_{NONLOCAL_RESTRICTION_NAME}.json"
+    record = json.loads(path.read_text())
+    del record["epoch_inputs"]["trials"]
+    path.write_text(json.dumps(record | changes))
+
+
+def test_a_stored_record_without_a_trials_digest_is_checked_on_its_folds(
+    tmp_path, patched
+):
+    stored = _stored_run(tmp_path, patched)
+    record, _ = patched(_frame(), _record(), stored, nr.ALL_MODELS)
+    assert record["stored_folds_check"] == "digest"
+    _without_trials_digest(stored)
+    record, _ = patched(_frame(), _record(), stored, nr.ALL_MODELS)
+    assert record["status"] == "ok" and record["stored_folds_check"] == "block_column"
+    # one bin's fold differs: refused
+    bins_path = output_path(EPOCH, stored, NONLOCAL_RESTRICTION_BINS_NAME)
+    bins = pd.read_parquet(bins_path)
+    bins.loc[4, "block"] = (bins.loc[4, "block"] + 1) % fo.N_FOLDS
+    bins.to_parquet(bins_path)
+    with pytest.raises(ValueError, match="differ from the stored run's in 1 bins"):
+        patched(_frame(), _record(), stored, nr.ALL_MODELS)
+
+
+def test_a_stored_record_without_a_trials_digest_needs_its_fold_counts(
+    tmp_path, patched
+):
+    stored = _stored_run(tmp_path, patched)
+    _without_trials_digest(stored, n_groups=3)
+    with pytest.raises(ValueError, match="other inputs: \\['n_groups'\\]"):
+        patched(_frame(), _record(), stored, nr.ALL_MODELS)

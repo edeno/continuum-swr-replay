@@ -98,8 +98,12 @@ them) scored with each fold's decoder rebuilt from the stored run's record
 (``nonlocal_restriction.stored_fold_fit``: the encoding fit as the fold fit
 fits it, the stored discrete transitions and initial distribution, no EM).
 Per epoch the stored record must be ``ok`` and of the same inputs (the
-SHA-256 of the decode frame, the detector, the trials and the SWR source's
-files, and the margin in bins); the tables are those above, with the new
+SHA-256 of the decode frame, the detector and the SWR source's files, and the
+margin in bins) and folds: by the trials' digest where the stored record has
+one, otherwise (the canonical run's records) by the folds made now against the
+stored per-bin ``block`` at every bin and the folds' ``n_segments`` and
+``n_groups`` (``stored_folds_check`` in the record: ``"digest"`` or
+``"block_column"``); the tables are those above, with the new
 model's columns, and the record's folds also hold
 ``stored_score_difference``: the largest absolute per-bin difference of each
 score scored again (of ``none``, ``swr``, ``full``) from the stored run's, over
@@ -209,11 +213,44 @@ def current_epoch_inputs(epoch_id: str, paths, trials: pd.DataFrame) -> dict:
 
 
 def stored_record(
-    stored_dir: Path, epoch_id: str, inputs: dict, margin_bins: int
-) -> dict:
+    stored_dir: Path,
+    epoch_id: str,
+    inputs: dict,
+    time: np.ndarray,
+    folds: np.ndarray,
+    fold_counts: dict,
+    margin_bins: int,
+) -> tuple[dict, str]:
     """The stored run's record of the epoch, checked to be ``ok`` and of the
-    same inputs: each input's SHA-256 (and the trials' count) and the margin
-    in bins.
+    same inputs, and how its folds were checked.
+
+    Each input's SHA-256 must be the stored record's, and its margin in bins.
+    The folds are checked by the trials' digest when the stored record holds
+    one (``"digest"``). A record without one (the canonical run's: the
+    runner recorded the trials only from 2026-11-21) is checked on the folds
+    themselves (``"block_column"``): the folds made now must be the stored
+    per-bin table's ``block`` at every bin of the same time axis, and the
+    folds' ``n_segments`` and ``n_groups`` the stored record's, as
+    ``scripts/checks/check_stored_folds_reproduce.py`` compares them.
+
+    Parameters
+    ----------
+    stored_dir : Path
+    epoch_id : str
+    inputs : dict
+        The epoch's inputs now (:func:`current_epoch_inputs`).
+    time : ndarray, shape (n_time,)
+    folds : ndarray of int, shape (n_time,)
+        The folds made now (``tetrode_holdout.epoch_folds``).
+    fold_counts : dict
+        ``epoch_folds``' counts (``n_segments``, ``n_groups``, ...).
+    margin_bins : int
+
+    Returns
+    -------
+    record : dict
+    check : str
+        ``"digest"`` or ``"block_column"``.
 
     Raises
     ------
@@ -224,19 +261,50 @@ def stored_record(
     if record is None or record.get("status") != "ok":
         raise ValueError(f"the stored run {stored_dir} has no ok record of {epoch_id}")
     stored = record.get("epoch_inputs", {})
+    check = "digest" if "trials" in stored else "block_column"
+    compared = inputs.keys() | stored.keys()
+    if check == "block_column":
+        compared -= {"trials"}
     differ = sorted(
         key
-        for key in inputs.keys() | stored.keys()
+        for key in compared
         if {k: v for k, v in inputs.get(key, {}).items() if k != "path"}
         != {k: v for k, v in stored.get(key, {}).items() if k != "path"}
     )
-    if record.get("margin_bins") != margin_bins:
-        differ.append("margin_bins")
+    for key, value in (
+        ("margin_bins", margin_bins),
+        *(
+            (key, fold_counts[key])
+            for key in ("n_segments", "n_groups")
+            if check == "block_column"
+        ),
+    ):
+        if record.get(key) != value:
+            differ.append(key)
     if differ:
         raise ValueError(
             f"the stored record of {epoch_id} was made from other inputs: {differ}"
         )
-    return record
+    if check == "block_column":
+        bins = pd.read_parquet(
+            output_path(epoch_id, stored_dir, NONLOCAL_RESTRICTION_BINS_NAME),
+            columns=["time", "block"],
+        )
+        if len(bins) != len(time) or not np.array_equal(
+            bins["time"].to_numpy(dtype=float), time
+        ):
+            raise ValueError(
+                f"the stored per-bin table of {epoch_id} is not on the decode's "
+                "time axis"
+            )
+        moved = np.flatnonzero(bins["block"].to_numpy() != np.asarray(folds))
+        if moved.size:
+            raise ValueError(
+                f"the folds made now differ from the stored run's in "
+                f"{moved.size} bins of {epoch_id} (first at bin {int(moved[0])}): "
+                "the trials are not the stored run's"
+            )
+    return record, check
 
 
 def run_epoch(
@@ -257,10 +325,12 @@ def run_epoch(
     frame = epoch.frame
     folds, margin_bins, fold_counts = th.epoch_folds(epoch.time, epoch.loaded["trials"])
     inputs = current_epoch_inputs(epoch_id, epoch.paths, epoch.loaded["trials"])
-    stored = (
-        None
+    stored, folds_check = (
+        (None, None)
         if stored_dir is None
-        else stored_record(stored_dir, epoch_id, inputs, margin_bins)
+        else stored_record(
+            stored_dir, epoch_id, inputs, epoch.time, folds, fold_counts, margin_bins
+        )
     )
     source_events = swr_source.epoch_source(epoch_id).events
     in_swr = interval_mask(epoch.time, source_events)
@@ -356,6 +426,7 @@ def run_epoch(
                 if stored is None
                 else {
                     "models": list(models),
+                    "stored_folds_check": folds_check,
                     "copied_from_stored": copied,
                     "stored_score_difference_max": max(
                         f["stored_score_difference_max"] for f in record["folds"]
