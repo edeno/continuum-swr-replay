@@ -2,7 +2,12 @@
 
 The immobility bins a session's GLMs are fit on, and the four event sets
 (SWR, replay, and the two replay/SWR classes) its design matrices are
-keyed on, restricted to the shared stop cohort.
+keyed on. Two restrictions are here: the stop cohort
+(:func:`build_session_fit_mask`, :func:`build_session_event_sets`), which the
+shipped bundles were fit on, and the analyses' one subset
+(:func:`build_visit_fit_mask`, :func:`build_visit_event_sets`): the immobile
+bins inside a well visit, and the events that start inside one, selected by
+``cohort_selection.select_visit_context`` with the counts per label recorded.
 
 An extended event set adds a fifth class, ``SWR_no_non_local``: the kept,
 cohort-restricted SWRs that overlap no canonical non-local event of the
@@ -19,9 +24,15 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.constants import STARTS_IN_WELL_VISIT
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    count_visit_context,
     events_in_stops,
+    select_visit_context,
     stop_interval_mask,
+)
+from continuum_swr_replay.analysis.event_definition.well_visits import (
+    in_well_visit,
 )
 from continuum_swr_replay.intervals import (
     interval_mask,
@@ -30,6 +41,7 @@ from continuum_swr_replay.intervals import (
     pad_intervals,
 )
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+from continuum_swr_replay.tables.columns import require_columns
 
 logger = logging.getLogger(__name__)
 
@@ -494,3 +506,220 @@ def swr_without_non_local(
         "n_swr_no_non_local": int(keep.sum()),
         "n_swr_no_non_local_unknown": int(unknown.sum()),
     }
+
+
+# --- the analyses' subset: in-visit bins, events that start inside a visit ----------
+
+#: The label of a bin after the final poke-out of a stop that starts inside a
+#: visit: the stop's own label names where it starts, not this time.
+AFTER_VISIT = "after_visit_at_well"
+
+
+def _counts_record(counts: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    """``count_visit_context``'s table as a JSON-ready record: label ->
+    ``{"n": int, "kept": bool}``."""
+    return {
+        str(label): {"n": int(row.n), "kept": bool(row.kept)}
+        for label, row in counts.iterrows()
+    }
+
+
+def visit_bin_labels(
+    time: NDArray,
+    stops: pd.DataFrame,
+    arrival_times: NDArray,
+    departure_times: NDArray,
+) -> pd.DataFrame:
+    """The well-visit label of every time bin inside a stop.
+
+    A bin inside a well visit (``arrival <= t < departure``,
+    ``well_visits.in_well_visit``) is ``in_visit``. A bin of a stop outside
+    every visit carries its stop's ``visit_context``, except that the bins of a
+    stop that starts inside a visit (``STARTS_IN_WELL_VISIT``) are
+    ``after_visit_at_well`` once the visit has ended. So no bin is
+    ``spans_visit_end``, and ``select_visit_context`` keeps exactly the bins
+    inside the visits, as it does for the rate models' bins
+    (``replay_models.visit_design.visit_timebins``).
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The session's bins, s, ascending.
+    stops : pd.DataFrame
+        Every stop of the session (``stop_start``, ``stop_end``, closed, s;
+        ``visit_context``), disjoint.
+    arrival_times, departure_times : NDArray, shape (n_visits,)
+        The session's visits: first poke-in and final poke-out, s.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per bin inside a stop, in time order: ``bin`` (its position
+        in ``time``), ``time`` and ``visit_context``.
+    """
+    require_columns(
+        stops, ["stop_start", "stop_end", "visit_context"], "the session's stops"
+    )
+    time = np.asarray(time, dtype=float)
+    ordered = stops.sort_values("stop_start", kind="stable")
+    starts = ordered["stop_start"].to_numpy(dtype=float)
+    in_stop = stop_interval_mask(time, ordered)
+    bins = np.flatnonzero(in_stop)
+    stop_of_bin = np.searchsorted(starts, time[bins], side="right") - 1
+    stop_label = ordered["visit_context"].to_numpy(dtype=object)[stop_of_bin]
+    inside = in_well_visit(time[bins], arrival_times, departure_times)
+    label = np.where(
+        inside,
+        "in_visit",
+        np.where(np.isin(stop_label, STARTS_IN_WELL_VISIT), AFTER_VISIT, stop_label),
+    )
+    return pd.DataFrame({"bin": bins, "time": time[bins], "visit_context": label})
+
+
+def build_visit_fit_mask(
+    position_info: pd.DataFrame,
+    *,
+    stops: pd.DataFrame,
+    arrival_times: NDArray,
+    departure_times: NDArray,
+    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    excluded_intervals: pd.DataFrame | None = None,
+    basis_half_window_s: float = DEFAULT_BASIS_HALF_WINDOW_S,
+) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
+    """The bins the unit models are fit on: immobile, in a stop, in a visit.
+
+    The bins of the session's stops are labeled by :func:`visit_bin_labels`
+    and selected by ``select_visit_context`` (its default, the bins inside a
+    visit), among the immobile ones. Excluded time is then removed with the
+    reach of the peri-event basis, as :func:`build_session_fit_mask` does.
+
+    Parameters
+    ----------
+    position_info : pd.DataFrame
+        Time-indexed (s) with ``head_speed`` (cm/s).
+    stops : pd.DataFrame
+        Every stop of the session, as :func:`visit_bin_labels` takes them.
+    arrival_times, departure_times : NDArray, shape (n_visits,)
+        The session's visits (``prepare_data.well_visit_times``).
+    immobility_threshold : float
+        cm/s; a bin is immobile below it.
+    excluded_intervals : pd.DataFrame, optional
+        ``start_time``, ``end_time`` (s, closed); None excludes nothing.
+    basis_half_window_s : float
+        Half-width of the peri-event basis, s.
+
+    Returns
+    -------
+    is_immobile : pd.Series of bool, shape (n_time,)
+    fit_mask : pd.Series of bool, shape (n_time,)
+    counts : dict
+        ``n_bins_total``, ``n_bins_immobile``, ``n_bins_immobile_in_stops``,
+        ``n_bins_fit``, ``n_bins_excluded`` (in-visit bins removed because the
+        basis reaches excluded time) and ``bin_visit_context``: the immobile
+        bins in stops per label, kept or not (``count_visit_context``).
+    """
+    time = position_info.index.to_numpy(dtype=float)
+    is_immobile = position_info.head_speed < immobility_threshold
+    labels = visit_bin_labels(time, stops, arrival_times, departure_times)
+    labels = labels[is_immobile.to_numpy()[labels["bin"].to_numpy()]]
+    kept = select_visit_context(labels)
+    in_visit = np.zeros(time.size, dtype=bool)
+    in_visit[kept["bin"].to_numpy()] = True
+    reached = np.zeros(time.size, dtype=bool)
+    if excluded_intervals is not None and len(excluded_intervals):
+        reached = interval_mask(
+            time, pad_intervals(excluded_intervals, basis_half_window_s)
+        )
+    fit = in_visit & ~reached
+    counts = {
+        "n_bins_total": int(time.size),
+        "n_bins_immobile": int(is_immobile.sum()),
+        "n_bins_immobile_in_stops": int(len(labels)),
+        "n_bins_fit": int(fit.sum()),
+        "n_bins_excluded": int((in_visit & reached).sum()),
+        "bin_visit_context": _counts_record(count_visit_context(labels)),
+    }
+    return is_immobile, pd.Series(fit, index=position_info.index), counts
+
+
+def build_visit_event_sets(
+    canonical_events: pd.DataFrame,
+    swr_intervals: pd.DataFrame,
+    *,
+    arrival_times: NDArray,
+    departure_times: NDArray,
+    position_time: pd.Index,
+) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
+    """The four event classes, over the events that start inside a visit.
+
+    The non-local events are selected by ``select_visit_context`` (the
+    default set: ``in_visit`` and ``spans_visit_end``) before the split on
+    ``is_swr`` is read, so the two replay classes partition the kept events.
+    An SWR, which has no label, counts when its first sample is inside a visit
+    (``well_visits.in_well_visit``), the start rule applied to SWRs. Events
+    outside the position frame are dropped first and counted, as in
+    :func:`build_session_event_sets`.
+
+    Parameters
+    ----------
+    canonical_events : pd.DataFrame
+        The session's canonical events: ``event_id``, ``start_time``,
+        ``end_time``, ``is_swr``, ``visit_context``.
+    swr_intervals : pd.DataFrame
+        The session's SWR intervals: ``start_time``, ``end_time``.
+    arrival_times, departure_times : NDArray, shape (n_visits,)
+        The session's visits.
+    position_time : pd.Index
+        The session's time axis, s.
+
+    Returns
+    -------
+    event_times : dict of str to pd.DataFrame
+        ``non_local_no_SWR``, ``non_local_SWR``, ``non_local``, ``SWR``.
+    counts : dict
+        ``n_events_outside_frame``, ``n_swr_intervals_outside_frame``,
+        ``n_nonlocal_before``/``_after``, ``n_ripple_before``/``_after``,
+        ``n_nonlocal_swr``, ``n_nonlocal_no_swr`` and
+        ``event_visit_context``: the events per label, kept or not.
+
+    Raises
+    ------
+    ValueError
+        If the events lack a column read, ``visit_context`` included.
+    """
+    require_columns(
+        canonical_events,
+        ["event_id", "start_time", "end_time", "is_swr", "visit_context"],
+        "the canonical events",
+    )
+    non_local, n_events_outside = _restrict_to_frame(
+        canonical_events, position_time, what="canonical events"
+    )
+    swr, n_swr_outside = _restrict_to_frame(
+        swr_intervals, position_time, what="SWR intervals"
+    )
+    kept = select_visit_context(non_local)
+    swr_kept = swr.loc[
+        in_well_visit(
+            swr["start_time"].to_numpy(dtype=float), arrival_times, departure_times
+        )
+    ].reset_index(drop=True)
+    is_swr = kept["is_swr"].to_numpy(dtype=bool)
+    event_times = {
+        "non_local_no_SWR": kept.loc[~is_swr].reset_index(drop=True),
+        "non_local_SWR": kept.loc[is_swr].reset_index(drop=True),
+        "non_local": kept,
+        "SWR": swr_kept,
+    }
+    counts = {
+        "n_events_outside_frame": n_events_outside,
+        "n_swr_intervals_outside_frame": n_swr_outside,
+        "n_nonlocal_before": int(len(non_local)),
+        "n_nonlocal_after": int(len(kept)),
+        "n_ripple_before": int(len(swr)),
+        "n_ripple_after": int(len(swr_kept)),
+        "n_nonlocal_swr": int(is_swr.sum()),
+        "n_nonlocal_no_swr": int((~is_swr).sum()),
+        "event_visit_context": _counts_record(count_visit_context(non_local)),
+    }
+    return event_times, counts
