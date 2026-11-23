@@ -938,11 +938,25 @@ def test_a_penalized_binary_slope_is_the_penalized_maximum(cells) -> None:
 
 
 #: mgcv 1.9-4 (R 4.5.3, the ``csr-mgcv`` environment) on the two-cell data of
-#: :func:`_two_cells`: ``gam(y ~ flag + offset(log(e)), family = poisson,
-#: paraPen = list(flag = list(diag(1), sp = exp(rho))),
-#: control = gam.control(epsilon = 1e-14))``. mgcv's penalty on the deviance,
-#: ``sp b**2``, is the fitter's ``exp(rho) b**2 / 2`` on the log-likelihood.
-#: (cells, rho) -> (intercept, flag, edf of flag), as mgcv printed them.
+#: :func:`_two_cells`. mgcv's penalty on the deviance, ``sp b**2``, is the
+#: fitter's ``exp(rho) b**2 / 2`` on the log-likelihood. (cells, rho) ->
+#: (intercept, flag, edf of flag), as this R script printed them (rerun
+#: 2026-11-23, the same digits)::
+#:
+#:     library(mgcv)
+#:     fit <- function(y0, e0, y1, e1, rho) {
+#:       d <- data.frame(y = c(y0, rep(0, 9), y1, rep(0, 9)),
+#:                       e = c(rep(e0 / 10, 10), rep(e1 / 10, 10)),
+#:                       flag = rep(c(0, 1), each = 10))
+#:       m <- gam(y ~ flag + offset(log(e)), family = poisson, data = d,
+#:                paraPen = list(flag = list(diag(1), sp = exp(rho))),
+#:                control = gam.control(epsilon = 1e-14))
+#:       cat(sprintf("%.12f %.12f %.10f\n", coef(m)[1], coef(m)[2], m$edf[2]))
+#:     }
+#:     fit(30, 12, 18, 5, -2.0)  # counts
+#:     fit(30, 12, 18, 5, 1.5)   # counts
+#:     fit(30, 12, 0, 5, 0.0)    # no_event_on_1
+#:     fit(0, 12, 9, 5, 1.5)     # no_event_on_0
 MGCV_PARAPEN = {
     ("counts", -2.0): (0.917914817698, 0.360306342817, 0.9881004000),
     ("counts", 1.5): (0.954357044809, 0.259724286112, 0.7092165189),
