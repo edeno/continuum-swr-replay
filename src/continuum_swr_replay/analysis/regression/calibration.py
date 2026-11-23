@@ -13,7 +13,8 @@ itself uses (its support rule, its rows and its refits), and the edf is the
 one its records hold. The median is over the sessions with a kept fit in which
 the term is fitted. It is searched by bisection on the log penalty inside
 ``LOG_PENALTY_BOUNDS``, assuming that the median edf falls as the penalty
-rises; the search is deterministic.
+rises; the search is deterministic. A bound is fitted only when the bracket
+ends there, to tell whether the target is out of reach.
 """
 
 from __future__ import annotations
@@ -124,9 +125,11 @@ def log_penalty_for_edf(
     ------
     ValueError
         If ``term`` is not a term of the design or has no fixed penalty; if
-        no session has a kept fit with the term at a bound; if the target is
-        not between the median edf at the upper bound and at the lower bound
-        of ``LOG_PENALTY_BOUNDS`` (it cannot be reached inside them).
+        no session has a kept fit with the term at a log penalty tried; if
+        the target is not between the median edf at the upper bound and at
+        the lower bound of ``LOG_PENALTY_BOUNDS`` (it cannot be reached
+        inside them); if a session's first fit fails
+        (:func:`.sessions.fit_sessions`).
     """
     if term not in design.by_name:
         raise ValueError(f"{term!r} is not a term of the design")
@@ -154,19 +157,25 @@ def log_penalty_for_edf(
         return edf
 
     lo, hi = LOG_PENALTY_BOUNDS
-    loosest, stiffest = np.nanmedian(at(lo)), np.nanmedian(at(hi))
-    if not stiffest <= target_edf <= loosest:
-        raise ValueError(
-            f"a median edf of {target_edf} for {term!r} cannot be reached inside "
-            f"the log penalty bounds [{lo}, {hi}]: the median edf there runs from "
-            f"{loosest:.4g} to {stiffest:.4g}"
-        )
     while hi - lo > CALIBRATION_LOG_PENALTY_TOL:
         middle = 0.5 * (lo + hi)
         if np.nanmedian(at(middle)) > target_edf:
             lo = middle
         else:
             hi = middle
+    # A bracket left at a bound may not hold the target; the bound is fitted
+    # only then, since at the lower bound a smooth of many columns can need
+    # more than NEWTON_MAX_STEPS steps.
+    bound_lo, bound_hi = LOG_PENALTY_BOUNDS
+    for bound, sign in ((bound_lo, 1.0), (bound_hi, -1.0)):
+        if bound in (lo, hi):
+            edf = float(np.nanmedian(at(bound)))
+            if sign * (edf - target_edf) < 0:
+                raise ValueError(
+                    f"a median edf of {target_edf} for {term!r} cannot be reached "
+                    f"inside the log penalty bounds [{bound_lo}, {bound_hi}]: the "
+                    f"median edf at {bound} is {edf:.4g}"
+                )
     log_penalty = 0.5 * (lo + hi)
     edf = at(log_penalty)
     return EdfCalibration(log_penalty, float(np.nanmedian(edf)), edf)
