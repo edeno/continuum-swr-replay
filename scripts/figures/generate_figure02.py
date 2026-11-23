@@ -399,7 +399,7 @@ warnings.filterwarnings("ignore")
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
 HEIGHT = 7.86
-OUTER_HEIGHTS = (1.75, 1.9, 1.15, 1.2, 1.1)
+OUTER_HEIGHTS = (1.85, 1.9, 1.1, 1.15, 1.1)
 """The rows' heights, in proportion: a, b, c to f, then the bottom rows
 (:data:`BOTTOM_ROWS`)."""
 OUTER_HSPACE = 0.72
@@ -882,7 +882,7 @@ def draw_overview(
     )
     label_reward_well(ax_track, data["track_graph"])
     rows = gs[1].subgridspec(
-        5, 1, height_ratios=[1.35, 1.2, 0.42, 0.42, 0.42], hspace=0.14
+        5, 1, height_ratios=[1.3, 1.3, 0.42, 0.42, 0.42], hspace=0.14
     )
     ax_pos, ax_lane, ax_rip, ax_st, ax_sp = (fig.add_subplot(rows[i]) for i in range(5))
     draw_posterior(ax_pos, data, results, env, sl, start, max_pos)
@@ -1070,7 +1070,7 @@ def draw_examples(
     )
     n = len(windows)
     gs = spec.subgridspec(
-        4, n, hspace=0.08, wspace=0.14, height_ratios=[0.5, 0.65, 1.2, 0.5]
+        4, n, hspace=0.08, wspace=0.14, height_ratios=[0.5, 0.85, 1.1, 0.5]
     )
     first = None
     for j, (title, (start, end)) in enumerate(windows.items()):
