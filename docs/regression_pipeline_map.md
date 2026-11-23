@@ -826,6 +826,12 @@ The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track
 
 `ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `set_aside_pairs`, `shuffle_statistics`, `shuffle_p_values`
 
+### `scripts/checks/_regression_reference.py`
+
+Reference cases of the shared regression fitter, and the rule that compares them.
+
+`plain`, `differences`, `run`
+
 ### `scripts/checks/_report.py`
 
 Report helpers shared by the QA and PFC audit scripts: the run's command line, markdown tables.
@@ -873,6 +879,12 @@ Check that the held-out runs' stored folds are the fold rule's folds.
 Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
+
+### `scripts/checks/compare_regression_reference.py`
+
+Fit a real slice with the shared regression fitter, and compare it with a stored fit of the same slice.
+
+`rate_sessions`, `content_sessions`, `rate_records`, `content_records`, `real_slice`, `main`
 
 ### `scripts/checks/compare_regression_to_current_fitters.py`
 
@@ -958,6 +970,12 @@ Regenerate the canonical tables into a scratch root and diff two roots.
 
 `regen`, `frame_problems`, `diff`, `main`
 
+### `scripts/checks/time_regression_fitter.py`
+
+Time the shared regression fitter on fixed synthetic workloads: wall time and peak memory, the first call apart from the calls after it.
+
+`visit_bins`, `rate_inputs`, `content_inputs`, `diagonal_inputs`, `thirty_sessions`, `child`, `time_case`, `table`, `main`
+
 ### `scripts/checks/write_epoch_register_doc.py`
 
 Regenerate the parts of ``docs/epoch_register.md`` that mirror the register.
@@ -969,6 +987,12 @@ Regenerate the parts of ``docs/epoch_register.md`` that mirror the register.
 Generate the symbol-anchored regression pipeline code map.
 
 `render`, `main`
+
+### `scripts/checks/write_regression_reference.py`
+
+Write the shared regression fitter's reference outputs, the fixtures its tests compare it with.
+
+`group_text`, `main`
 
 ### `scripts/detection/sweep_memoryless_controls.py`
 
