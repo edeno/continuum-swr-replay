@@ -60,3 +60,49 @@ def test_the_recompute_runs_on_the_gpu_even_when_the_cpu_was_pinned(
     assert os.environ["JAX_PLATFORMS"] == "cuda"
     for flag in device.REQUIRED_XLA_FLAGS:
         assert flag in os.environ["XLA_FLAGS"].split()
+
+
+@pytest.mark.parametrize(
+    ("platforms", "visible", "allowed"),
+    [
+        ("cpu", None, True),
+        ("cpu", "GPU-a,GPU-b", True),  # JAX_PLATFORMS keeps every card away
+        (None, "GPU-a", True),  # one card
+        (None, "", True),  # no card
+        ("cuda", "GPU-a", True),
+        (None, None, False),  # every card on the host
+        (None, "GPU-a,GPU-b", False),
+        ("cuda", None, False),
+        ("cuda,cpu", "0,1", False),
+    ],
+)
+def test_jax_may_compute_only_where_it_reaches_at_most_one_card(
+    monkeypatch, platforms, visible, allowed
+):
+    monkeypatch.setattr(device, "_CONFIGURED", None)
+    for name, value in (
+        ("JAX_PLATFORMS", platforms),
+        ("CUDA_VISIBLE_DEVICES", visible),
+    ):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+
+    if allowed:
+        device.require_one_jax_device("The fitter")
+    else:
+        with pytest.raises(device.UnconfiguredDeviceError) as raised:
+            device.require_one_jax_device("The fitter")
+        message = str(raised.value)
+        assert message.startswith("The fitter computes with JAX")
+        assert "JAX_PLATFORMS=cpu" in message
+        assert "configure_jax_gpu()" in message
+
+
+def test_a_configured_device_lets_jax_compute(monkeypatch):
+    monkeypatch.delenv("JAX_PLATFORMS", raising=False)
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.setattr(device, "_CONFIGURED", {"jax_backend": "gpu"})
+
+    device.require_one_jax_device("The fitter")
