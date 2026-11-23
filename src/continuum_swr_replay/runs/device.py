@@ -72,6 +72,7 @@ __all__ = [
     "query_gpus",
     "recompute_device",
     "require_configured_device",
+    "require_one_jax_device",
     "select_free_gpu",
     "use_memoryless_device",
     "verify_jax_device",
@@ -474,6 +475,43 @@ def require_configured_device() -> None:
         "continuum_swr_replay.runs.device.configure_jax_gpu() first "
         "(the runner's --gpu/--allow-cpu do this), or set JAX_PLATFORMS=cpu "
         "to fit on CPU."
+    )
+
+
+def require_one_jax_device(user: str) -> None:
+    """Refuse to compute with JAX unless it can reach at most one card.
+
+    JAX started without a device choice takes most of every visible card, and
+    the host carries other people's jobs. So a computation is allowed only when
+    this process configured a device (:func:`configure_jax_gpu`), when
+    ``JAX_PLATFORMS`` excludes CUDA (:func:`cpu_is_pinned`), or when
+    ``CUDA_VISIBLE_DEVICES`` names at most one card. Only the environment and
+    this module's record are read: no JAX backend is started.
+
+    Parameters
+    ----------
+    user : str
+        What is about to compute, for the message (e.g. "The regression
+        fitter").
+
+    Raises
+    ------
+    UnconfiguredDeviceError
+        When none of the three holds, with what to set.
+    """
+    if _CONFIGURED is not None or cpu_is_pinned():
+        return
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None and len([c for c in visible.split(",") if c.strip()]) <= 1:
+        return
+    raise UnconfiguredDeviceError(
+        f"{user} computes with JAX, but no device was chosen: "
+        f"JAX_PLATFORMS={os.environ.get('JAX_PLATFORMS')!r}, "
+        f"CUDA_VISIBLE_DEVICES={visible!r}. JAX would take every visible card. "
+        "To run on the CPU, set JAX_PLATFORMS=cpu (a runner calls "
+        "continuum_swr_replay.runs.device.default_jax_platforms('cpu') in main). "
+        "To run on one GPU, call continuum_swr_replay.runs.device.configure_jax_gpu() "
+        "first, or set CUDA_VISIBLE_DEVICES to one card's uuid."
     )
 
 
