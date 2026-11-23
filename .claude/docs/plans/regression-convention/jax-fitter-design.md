@@ -2,8 +2,9 @@
 .claude/research/2026-11-20-regression-prototypes/jax_fitter/DESIGN.md. -->
 
 > **Note on this copy (plan folder, 2026-11-23).** The text below is the port design as written, not
-> shortened. One line is changed: in section 12, "After the series", the marker of the old smooth-term
-> question is replaced by a pointer to the open question that remains for the mPFC models. Since it was
+> shortened. Two lines are changed: in section 12, "After the series", the marker of the old smooth-term
+> question is replaced by a pointer to the open question that remains for the mPFC models; in section 5,
+> one British spelling is made American (the repository's spelling check). Since it was
 > written, the lead decided (design, twenty-first round, 2026-11-23, 12:32): float64 on the CPU and on the
 > GPU ("sure"; section 8 and question 2 of section 13), and the acceptance rule of section 9 ("ok";
 > question 3 of section 13, except whether the fixture script is kept). Question 1 (a slower CPU fit) is
@@ -249,7 +250,7 @@ bit for bit (`runs/device.py`, `DETERMINISTIC_XLA_FLAG`).
 | | Host loop around a jitted step | `lax.while_loop` for the whole fit |
 |---|---|---|
 | The rules as written now (`newton.py:311–345`) | carried over almost line for line | rewritten as a state machine with ring buffers |
-| Statuses and reasons | Python strings, as now | integer codes, mapped back afterwards |
+| Statuses and reasons | Python strings, as now | integer codes, mapped back afterward |
 | Patched constants (section 2) | read on the host | must be arguments, or patches are ignored |
 | Cost | one dispatch and one host read per step: 25–35 µs measured (appendix E), about 0.1 % of a rate step (about 50 ms) | none per step |
 | GPU | one sync per step | none |
