@@ -79,8 +79,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         another event's decoded place of the same group, fold and width bin
         (``Processed-Data/event_tetrode_holdout_extra``, column
         ``agreement_minus_null_per_spike``; the events summary's
-        ``*_heldout_agreement_minus_reference_per_spike`` values; Figure 2's
-        supplement draws it by width). Both runs are refused when they were not
+        ``*_heldout_agreement_minus_reference_per_spike`` values; by width it
+        is for the text, the ``*_shared_content_*`` values). Both runs are refused when they were not
         held out in folds of whole trials, the second also when it has no extra
         scores.
     k — Does the decoder need non-local states outside SWRs? At the left, a
@@ -1344,9 +1344,8 @@ DECODER_AXES_GAP = 0.012
 """The decoder comparison: the space between one axes' drawing and the next
 (figure width)."""
 BOTTOM_RIGHT = 0.995
-"""Where the decoder comparison's drawing may end when it is its row's last
-panel (figure width): the figure is saved cropped to its ink, so the edge is
-the page's."""
+"""Where the last panel of each bottom row may end (figure width): the figure
+is saved cropped to its ink, so the edge is the page's."""
 BOTTOM_COLUMNS = {
     "traces": "c",
     "participation": "e",
@@ -1370,8 +1369,8 @@ OVERVIEW_GAP = 0.02
 """Panel a: the space between the track drawing and the labels of the example
 beside it (figure width)."""
 COLUMN_GAP = 0.03
-"""The bottom rows: the space between the left panels' drawing and the right
-panels' left edge, panel e's (figure width)."""
+"""The bottom rows: the space between a panel's drawing and the left edge of
+the next panel of its row (figure width)."""
 
 
 LEFT_OUT_HEADING = "Do the spikes of a left-out tetrode point to the decoded place?"
