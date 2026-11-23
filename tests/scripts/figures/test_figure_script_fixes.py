@@ -1915,7 +1915,7 @@ def _texts(ax) -> list[str]:
 def test_figure02_decoder_comparison_draws_its_test_and_two_axes(offline):
     """Panel j: the drawing of the two decoders (the SWRs, "Non-local allowed:"
     only in SWRs or at any time) under the heading; then the full minus the
-    SWR-only decoder on two axes, "All still time" (inside SWRs, outside SWRs) and,
+    SWR-only decoder on two axes, "All immobility time" (inside SWRs, outside SWRs) and,
     on its own scale, "Outside SWRs" (the no-SWR held-out events, the other
     time): dark gray dots spread about each column, the mean with its interval
     beside them, a dashed zero line named "equal fit", one y label."""
@@ -1954,7 +1954,7 @@ def test_figure02_decoder_comparison_draws_its_test_and_two_axes(offline):
         "Other\ntime",
     ]
     assert (ax_time.get_title(), ax_outside.get_title()) == (
-        "All still time",
+        "All immobility time",
         "Outside SWRs",
     )
     assert ax_time.get_ylabel() == figure02.DECODER_YLABEL

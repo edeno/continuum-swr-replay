@@ -819,8 +819,9 @@ def draw_overview(
     inputs: dict,
     session_events: pd.DataFrame,
     max_pos: float,
-) -> tuple[Axes, Axes]:
-    """Panel a: the 2D track, then the decode over a run and the rest after it."""
+) -> tuple[Axes, list[Axes]]:
+    """Panel a: the 2D track, then the decode over a run and the rest after it
+    (returned: the track's axes and the example's five axes, top to bottom)."""
     data, results, env = inputs["data"], inputs["results"], inputs["env"]
     start, dur = OVERVIEW_START_S, OVERVIEW_DURATION_S
     sl = slice(start, start + dur)
@@ -925,7 +926,7 @@ def draw_overview(
         ax.set_xlim(0, dur)
     for ax in (ax_pos, ax_lane, ax_rip, ax_st):
         ax.tick_params(labelbottom=False)
-    return ax_track, ax_pos
+    return ax_track, [ax_pos, ax_lane, ax_rip, ax_st, ax_sp]
 
 
 def label_reward_well(ax: Axes, track_graph) -> None:
@@ -1254,6 +1255,9 @@ LETTER_COLUMNS = (
 """The panel letters that share a left edge (convention 10): a, b, c and the
 first panel of each bottom row at the figure's left; e and the second panel of
 each bottom row, which starts at panel e's left edge."""
+OVERVIEW_GAP = 0.02
+"""Panel a: the space between the track drawing and the labels of the example
+beside it (figure width)."""
 COLUMN_GAP = 0.03
 """The bottom rows: the space between the left panels' drawing and the right
 panels' left edge, panel e's (figure width)."""
@@ -1261,7 +1265,7 @@ panels' left edge, panel e's (figure width)."""
 
 LEFT_OUT_HEADING = "Do the spikes of a left-out tetrode point to the decoded place?"
 DECODER_HEADING = "Does the decoder need non-local states outside SWRs?"
-"""Panels i and j's headings, left-aligned over each panel."""
+"""Panels i and j's headings, centered over each panel."""
 HEADING_OFFSET_PT = 10
 """How far above its axes' top a panel's heading sits (points), clear of the
 axes' titles."""
@@ -1282,19 +1286,37 @@ EQUAL_FIT = "equal fit"
 """Panels i and j's name of their zero line."""
 DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
 DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
-"""Panel j's first axis, "All still time"."""
+"""Panel j's first axis, "All immobility time"."""
 DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime"}
 """Panel j's second axis, "Outside SWRs"."""
 
 
 def draw_heading(ax: Axes, text: str) -> None:
-    """A panel's heading, left-aligned at ``ax``'s left edge,
-    :data:`HEADING_OFFSET_PT` above its top."""
+    """A panel's heading, :data:`HEADING_OFFSET_PT` above ``ax``'s top; it is
+    centered over the panel once the panel's axes are placed
+    (:func:`center_heading`)."""
     ax.annotate(
         text, (0.0, 1.0), xycoords="axes fraction",
         xytext=(0, HEADING_OFFSET_PT), textcoords="offset points",
         ha="left", va="bottom", fontsize=SMALL_SIZE + 1,
     )  # fmt: skip
+
+
+def center_heading(
+    fig: Figure, axes: Sequence[Axes], left: float, right: float
+) -> None:
+    """Center a panel's heading (:func:`draw_heading`, on its first axes)
+    between ``left`` and ``right`` (figure coordinates). The heading stays in
+    its axes' coordinates: a text in figure coordinates moves when the figure
+    is saved cropped to its ink."""
+    heading = next(
+        text
+        for text in axes[0].texts
+        if text.get_text() in (LEFT_OUT_HEADING, DECODER_HEADING)
+    )
+    box = axes[0].get_position()
+    heading.xy = (((left + right) / 2 - box.x0) / box.width, 1.0)
+    heading.set_ha("center")
 
 
 def name_zero(ax: Axes, text: str = EQUAL_FIT) -> None:
@@ -1360,7 +1382,7 @@ def draw_decoder_need(
     (``evidence_drawings.draw_restriction_test``). Then two axes of how much
     better the decoder with the non-local states at any time predicts the
     spikes than the one with them only in SWRs (the full minus the SWR-only
-    decoder per spike, held-out score): "All still time", over the immobile bins
+    decoder per spike, held-out score): "All immobility time", over the immobile bins
     inside SWRs and outside SWRs inside a well visit
     (``restriction_totals.inside_swr_gain_statistics``,
     ``outside_swr_gain_statistics``); "Outside SWRs", over the bins outside
@@ -1385,7 +1407,7 @@ def draw_decoder_need(
                     (family, RESTRICTION_FIGURE_OUTSIDE_SWR)
                 ],
             },
-            "All still time",
+            "All immobility time",
         ),
         (
             ax_outside,
@@ -1818,7 +1840,8 @@ def generate_figure(
         bottom=0.085,
     )
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
-    ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
+    ax_a, decode_axes = draw_overview(fig, outer[0], inputs, session_events, max_pos)
+    ax_a_top = decode_axes[0]
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
     row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.1, 1.4, 1.15], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
@@ -1912,7 +1935,21 @@ def generate_figure(
     for row in BOTTOM_ROWS:
         for panel, (left, right) in zip(row, columns, strict=True):
             fitters[panel](left, right)
+            if panel in ("left_out", "decoder_comparison"):
+                center_heading(fig, bottom_axes[panel], left, right)
     fit_track_to_height(fig, ax_a, x_left)
+    # panel a's example fills the space the track drawing leaves: its labels
+    # start a gap after the drawing, and its right edge stays
+    fig.canvas.draw()
+    to_figure = fig.transFigure.inverted()
+    labels = max(
+        ax.get_position().x0 - ax.get_tightbbox(renderer).transformed(to_figure).x0
+        for ax in decode_axes
+    )
+    decode_left = panel_extent(fig, renderer, [ax_a]).x1 + OVERVIEW_GAP + labels
+    for ax in decode_axes:
+        box = ax.get_position()
+        ax.set_position((decode_left, box.y0, box.x1 - decode_left, box.height))
     fig.canvas.draw()
     positions = place_letters(
         fig,
