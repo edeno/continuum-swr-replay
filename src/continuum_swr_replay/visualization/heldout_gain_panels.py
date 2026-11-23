@@ -1,7 +1,7 @@
 """The held-out gain panels: a held-out gain per animal and its mean.
 
 Figure 2j (each decoder's gain over the local-only decoder, and the full
-decoder's over the SWR-only decoder) and Figure 2's supplement
+decoder's over the SWR-forced decoder) and Figure 2's supplement
 (``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
 local coding per spike; the full decoder's gain outside SWRs by distance from
 the SWRs) draw each value the
@@ -46,7 +46,7 @@ group's dots are spread so that each shows (:func:`spread_offsets`)."""
 
 NEUTRAL_DOTS = "#444444"
 """A dark gray for dots that need no class's color (Figure 2j's differences,
-the SWR-only decoder)."""
+the SWR-forced decoder)."""
 
 
 def spread_offsets(values: np.ndarray, step: float = DOT_SPREAD) -> np.ndarray:
@@ -162,8 +162,8 @@ GAIN_FLOOR = 0.13
 """A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
 supplement, panel j)."""
 
-DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
-"""The y label of an axis of the full decoder minus the SWR-only decoder."""
+DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-forced\n(nats/spike)"
+"""The y label of an axis of the full decoder minus the SWR-forced decoder."""
 
 
 def full_better_cue(ax: Axes) -> None:
@@ -184,12 +184,12 @@ def draw_full_minus_swr_axis(
     *,
     through_means: bool = False,
 ) -> None:
-    """An axis of the full decoder minus the SWR-only decoder: at each of ``xs``
+    """An axis of the full decoder minus the SWR-forced decoder: at each of ``xs``
     a dot per animal (spread sideways, :data:`NEUTRAL_DOTS`) and the animals'
     mean with its interval (``rows``, statistics rows), a thin line through the
     means when ``through_means``, a dashed line at zero, the y axis from
-    :data:`GAIN_FLOOR` below zero to ``top_scale`` times the highest dot or
-    bound, :data:`DIFFERENCE_YLABEL` and :func:`full_better_cue`. The x axis is
+    :data:`GAIN_FLOOR` below zero (or ``top_scale`` times the lowest dot or
+    bound, when lower) to ``top_scale`` times the highest dot or bound, :data:`DIFFERENCE_YLABEL` and :func:`full_better_cue`. The x axis is
     the caller's (Figure 2j's second axis, Figure 2's supplement, panel j)."""
     for x, row in zip(xs, rows, strict=True):
         draw_animal_gain(ax, x, row, NEUTRAL_DOTS, spread=True)
@@ -200,6 +200,8 @@ def draw_full_minus_swr_axis(
         )  # fmt: skip
     ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
     top = top_scale * max(max(float(r["animals"].max()), r["ci_high"]) for r in rows)
-    ax.set_ylim(-GAIN_FLOOR * top, top)
+    low = min(min(float(r["animals"].min()), r["ci_low"]) for r in rows)
+    # a value below zero sets the floor, with the same margin as the top
+    ax.set_ylim(min(-GAIN_FLOOR * top, top_scale * low), top)
     ax.set_ylabel(DIFFERENCE_YLABEL)
     full_better_cue(ax)

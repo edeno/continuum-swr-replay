@@ -204,11 +204,11 @@ The review of the restriction and held-out tetrode runs before the
 - [ ] **Panel 2j's caption or text gives what no figure draws.** From
   `paper/reported/events.json`, over the immobile time inside a well visit (from
   the animal's first nose-poke at a reward well to its last poke-out there): the
-  share of the full decoder's gain that the SWR-only decoder captures
-  (`restriction_immobile_share_captured_by_swr_only`), and the full minus the
-  SWR-only decoder per spike inside the events detected from the held-out decode
-  (`restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike`,
-  `restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`), and the
+  share of the full decoder's gain that the SWR-forced decoder captures
+  (`restriction_immobile_share_captured_by_swr_only`), the full minus the
+  SWR-forced decoder per spike inside the SWR events detected from the held-out
+  decode (`restriction_heldout_swr_events_outside_swr_full_minus_swr_per_spike`;
+  the no-SWR events' value is drawn on panel j's third axis), and the
   gain outside SWRs over only the bins whose place has at least 10 and at least
   60 s of training data (`restriction_outside_swr_sampled_ten_s_full_minus_swr_per_spike`,
   `restriction_outside_swr_sampled_minute_full_minus_swr_per_spike`). The gain

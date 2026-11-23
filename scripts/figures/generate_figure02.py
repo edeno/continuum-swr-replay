@@ -47,30 +47,40 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         each bin, the whole decoder (place fields, state transitions, initial
         conditions) fit on folds of whole trials and each fold scored under the
         fit that did not see it: the local-only decoder (Local and No-Spike
-        states only), the SWR-only decoder (non-local states only inside SWRs)
-        and the full decoder. Every value is over the immobile bins inside a
-        well visit, which runs from the animal's first nose-poke at a reward
-        well to its last poke-out there. Each value is per epoch, summed over
-        its bins and divided by the spikes in them; a dot per animal is the
-        median over its epochs.
-        First axis: the SWR-only and the full decoder's gain over the
+        states only), the SWR-forced decoder (inside SWRs only the non-local
+        states are allowed, so it is forced non-local there; outside them only
+        the local states) and the full decoder (every state everywhere). Every
+        value is over the immobile bins inside a well visit, which runs from
+        the animal's first nose-poke at a reward well to its last poke-out
+        there. Unless named otherwise, each value is per epoch, summed over its
+        bins and divided by the spikes in them; a dot per animal is the median
+        over its epochs.
+        First axis: the SWR-forced and the full decoder's gain over the
         local-only decoder over every immobile bin, a dot per animal (dark
         gray, the Non-Local state's green), the animals' mean with its 95 %
         interval and a dashed line at zero, the local-only decoder
         (``restriction_totals.immobile_gain_statistics``). Second axis, the
-        full minus the SWR-only decoder: over every immobile bin ("All
-        immobility", each epoch's paired difference, the same statistic) and
-        over the immobile bins outside SWRs ("Outside SWRs", the main result,
-        its label in bold; ``restriction_totals.outside_swr_gain_statistics``),
-        a dot per animal in dark gray, the mean with its interval, a dashed
-        line at zero with which way the full decoder is better. The bins
-        outside SWRs are chosen by speed, ripple detection and the well visits
-        alone, not by the decoder: the test. An animal's dots are spread
-        sideways so that each shows. Figure 2's supplement
-        (``generate_supp_figure02.py``) looks at the gain outside SWRs more
-        closely: away from the SWRs, and where it sits in the events detected
-        from the held-out decode (the gain at well-sampled places is a
-        reported value for the text). All from
+        full minus the SWR-forced decoder: over every immobile bin ("All
+        immobility", each epoch's paired difference, the same statistic), over
+        the immobile bins inside SWRs ("Inside SWRs",
+        ``restriction_totals.inside_swr_gain_statistics``: below zero, forcing
+        the non-local states there predicts the spikes better) and over the
+        immobile bins outside SWRs ("Outside SWRs", the main result, its label
+        in bold; ``restriction_totals.outside_swr_gain_statistics``), a dot per
+        animal in dark gray, the mean with its interval, a dashed line at zero
+        with which way the full decoder is better. The bins outside SWRs are
+        chosen by speed, ripple detection and the well visits alone, not by the
+        decoder: the test. Third axis, on its own scale (about ten times the
+        second's): where the gain outside SWRs sits. The same difference over
+        the bins outside SWRs of the no-SWR events detected from the held-out
+        decode (each event's value per spike, the epoch's median over its
+        events, then the animal's median over its epochs;
+        ``RestrictionFigureStatistics.events``) and over the bins outside SWRs
+        that no held-out event holds (summed per epoch as on the second axis).
+        The two reduce differently, so they show where the gain is, not one
+        quantity twice. An animal's dots are spread sideways so that each
+        shows. Figure 2's supplement (``generate_supp_figure02.py``) draws the
+        gain outside SWRs away from the SWRs. All from
         ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its time
         sums and events) by ``restriction_totals.restriction_figure_statistics``,
         which the events summary's values share.
@@ -174,8 +184,12 @@ from continuum_swr_replay.analysis.event_evidence.participation import (
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
+    RESTRICTION_FIGURE_EVENT_GROUP,
     RESTRICTION_FIGURE_FAMILY,
+    RESTRICTION_FIGURE_INSIDE_SWR,
+    RESTRICTION_FIGURE_OUTSIDE_EVENTS,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
+    RestrictionFigureStatistics,
     restriction_figure_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
@@ -1111,24 +1125,38 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
 """Panel h: each group's Local-rest and event positions on the x axis."""
 
-DECODER_X = dict(zip(RESTRICTION_FIGURE_DECODERS, (0.0, 1.0), strict=True))
-"""Panel j, first axis: each decoder's measure and its position on the x axis."""
-DECODER_LABELS = dict(
-    zip(RESTRICTION_FIGURE_DECODERS, ("SWR-\nonly", "Full"), strict=True)
-)
-DECODER_COLORS = dict(
-    zip(RESTRICTION_FIGURE_DECODERS, (NEUTRAL_DOTS, C_NL), strict=True)
-)
-"""The SWR-only decoder in a neutral dark gray, the full decoder in the
-Non-Local state's green."""
-DECODERS_YLABEL = "Held-out log score\nover local-only\ndecoder (nats/spike)"
+DECODER_STYLES = {
+    "swr_minus_none_per_spike": ("SWR-\nforced", NEUTRAL_DOTS),
+    "full_minus_none_per_spike": ("Full", C_NL),
+}
+"""Panel j, first axis: each decoder's label and dot color, by its measure: the
+SWR-forced decoder in a neutral dark gray, the full decoder in the Non-Local
+state's green. A decoder added to ``RESTRICTION_FIGURE_DECODERS`` needs only an
+entry here."""
+DECODER_X = {measure: float(k) for k, measure in enumerate(RESTRICTION_FIGURE_DECODERS)}
+"""Panel j, first axis: each decoder's position on the x axis, in the order of
+``RESTRICTION_FIGURE_DECODERS``."""
+DECODERS_YLABEL = "Held-out log score\nover local-only\n(nats/spike)"
 DECODERS_REFERENCE = "local-only"
-DIFFERENCE_X = {"all": 0.0, "outside_swr": 1.0}
-"""Panel j, second axis: the full minus the SWR-only decoder over all the
-immobile time, then over the immobile time outside SWRs."""
-DIFFERENCE_LABELS = {"all": "All\nimmobility", "outside_swr": "Outside\nSWRs"}
-"""Horizontal, on two lines; the main result, outside SWRs, in bold (as panels
-c and d mark their key class)."""
+DIFFERENCE_LABELS = {
+    "all": "All\nimmobility",
+    "inside_swr": "Inside\nSWRs",
+    "outside_swr": "Outside\nSWRs",
+}
+"""Panel j, second axis: the full minus the SWR-forced decoder over all the
+immobile time, over its bins inside SWRs and over its bins outside SWRs, left
+to right; horizontal, on two lines; the main result, outside SWRs, in bold (as
+panels c and d mark their key class)."""
+DIFFERENCE_X = {name: float(k) for k, name in enumerate(DIFFERENCE_LABELS)}
+EVENTS_LABELS = {
+    "in_events": "In no-SWR\nevents",
+    "outside_events": "Outside\nevents",
+}
+"""Panel j, third axis: the full minus the SWR-forced decoder outside SWRs,
+inside the no-SWR events detected from the held-out decode and outside every
+held-out event, left to right."""
+EVENTS_X = {name: float(k) for k, name in enumerate(EVENTS_LABELS)}
+EVENTS_TITLE = "Outside SWRs,\nheld-out events"
 
 
 def restriction_refusal(cause: str, rerun: str) -> str:
@@ -1151,17 +1179,18 @@ found by grepping for ``ROW4_LETTERS`` and "panel g" to "panel j")."""
 ROW4_LETTERS = dict(zip(ROW4_PANELS, "ghij", strict=True))
 """Each row-4 panel's letter, by its position."""
 ROW4_WIDTHS = {
-    "traces": 1.0,
-    "participation": 0.7,
-    "ripple_power": 0.9,
-    "decoder_comparison": 2.8,
+    "traces": 0.9,
+    "participation": 0.5,
+    "ripple_power": 0.8,
+    "decoder_comparison": 3.8,
 }
 """Each row-4 panel's cell width, in proportion; the decoder comparison's two
 axes are then placed in its space by :func:`fit_axes_in_row`."""
-ROW4_WSPACE = 0.6
-DECODER_AXES_WIDTHS = (0.7, 1.1)
-"""The decoder comparison's two axes' frame widths, in proportion: the decoders
-over the local-only decoder, the full minus the SWR-only decoder
+ROW4_WSPACE = 0.5
+DECODER_AXES_WIDTHS = (0.6, 1.2, 0.6)
+"""The decoder comparison's three axes' frame widths, in proportion: the
+decoders over the local-only decoder, the full minus the SWR-forced decoder,
+and that difference in and outside the held-out events
 (:func:`fit_axes_in_row`)."""
 DECODER_AXES_WSPACE = 1.0
 """The grid's first guess; :func:`fit_axes_in_row` then places the axes."""
@@ -1226,13 +1255,12 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
 
 
 def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel j, first axis: the SWR-only and full decoders' gains over the
+    """Panel j, first axis: the SWR-forced and full decoders' gains over the
     local-only decoder per spike of the immobile time inside a well visit.
 
-    For each decoder, a dot per animal (the median over its epochs, spread
-    sideways; dark gray for the SWR-only decoder, the Non-Local state's green
-    for the full one) and the animals' mean with its 95 % interval, with a
-    dashed line at zero, the local-only decoder
+    For each decoder (:data:`DECODER_STYLES`), a dot per animal (the median
+    over its epochs, spread sideways) and the animals' mean with its 95 %
+    interval, with a dashed line at zero, the local-only decoder
     (``restriction_totals.immobile_gain_statistics``,
     :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`).
 
@@ -1249,11 +1277,11 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     }
     for measure, row in rows.items():
         draw_animal_gain(
-            ax, DECODER_X[measure], row, DECODER_COLORS[measure], spread=True
+            ax, DECODER_X[measure], row, DECODER_STYLES[measure][1], spread=True
         )
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    ax.set_xlim(-0.45, 1.5)
-    ax.set_xticks(list(DECODER_X.values()), list(DECODER_LABELS.values()))
+    ax.set_xlim(-0.45, max(DECODER_X.values()) + 0.5)
+    ax.set_xticks(list(DECODER_X.values()), [DECODER_STYLES[m][0] for m in DECODER_X])
     top = (
         max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
     )
@@ -1261,13 +1289,13 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     ax.set_ylim(top=top)
 
 
-def draw_full_minus_swr(
-    ax: Axes, decoders: pd.DataFrame, outside: pd.DataFrame
-) -> None:
-    """Panel j, second axis: the full decoder minus the SWR-only decoder per
-    spike, over all the immobile time inside a well visit (the paired
+def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
+    """Panel j, second axis: the full decoder minus the SWR-forced decoder per
+    spike, over all the immobile time inside a well visit (each epoch's paired
     difference, ``restriction_totals.immobile_gain_statistics``'
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DIFFERENCE`)
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DIFFERENCE`),
+    over its bins inside SWRs (``restriction_totals.inside_swr_gain_statistics``'
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_INSIDE_SWR`)
     and over its bins outside SWRs
     (``restriction_totals.outside_swr_gain_statistics``'
     :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_OUTSIDE_SWR`).
@@ -1276,30 +1304,55 @@ def draw_full_minus_swr(
     in a neutral dark gray and the animals' mean with its 95 % interval, with
     a dashed line at zero, where the two decoders predict the spikes equally
     well, and which way the full decoder is better. The main result, outside
-    SWRs, has its label in bold.
-
-    Parameters
-    ----------
-    ax : Axes
-    decoders : pd.DataFrame
-        ``immobile_gain_statistics``' rows, indexed by ``family`` and
-        ``measure``.
-    outside : pd.DataFrame
-        ``outside_swr_gain_statistics``' rows, indexed by ``family`` and
-        ``measure``.
+    SWRs, has its label in bold. Inside SWRs the SWR-forced decoder must be
+    non-local and the full decoder need not, so a value below zero there says
+    that forcing the non-local states inside SWRs predicts those spikes
+    better.
     """
+    family = RESTRICTION_FIGURE_FAMILY
     rows = {
-        "all": decoders.loc[(RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_DIFFERENCE)],
-        "outside_swr": outside.loc[
-            (RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_OUTSIDE_SWR)
-        ],
+        "all": statistics.decoders.loc[(family, RESTRICTION_FIGURE_DIFFERENCE)],
+        "inside_swr": statistics.inside.loc[(family, RESTRICTION_FIGURE_INSIDE_SWR)],
+        "outside_swr": statistics.outside.loc[(family, RESTRICTION_FIGURE_OUTSIDE_SWR)],
     }
     draw_full_minus_swr_axis(
         ax, [DIFFERENCE_X[name] for name in rows], list(rows.values()), 1.08
     )
-    ax.set_xlim(-0.45, 1.5)
+    ax.set_xlim(-0.45, max(DIFFERENCE_X.values()) + 0.5)
     ax.set_xticks(list(DIFFERENCE_X.values()), list(DIFFERENCE_LABELS.values()))
     ax.get_xticklabels()[list(DIFFERENCE_X).index("outside_swr")].set_fontweight("bold")
+
+
+def draw_heldout_event_gain(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
+    """Panel j, third axis: where the gain outside SWRs sits. The full decoder
+    minus the SWR-forced decoder per spike over the bins outside SWRs of the
+    no-SWR events detected from the held-out decode
+    (``RestrictionFigureStatistics.events``, group
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_EVENT_GROUP`:
+    each event's value, each epoch's median over its events, each animal's
+    median over its epochs), and over the immobile bins outside SWRs that no
+    held-out event holds
+    (:data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_OUTSIDE_EVENTS`,
+    summed over the epoch's bins, each animal's median over its epochs).
+
+    Drawn as the second axis is, on its own y axis: the gain in the events is
+    about ten times the other values. The two columns reduce over events and
+    over time differently (a median over events against a sum over bins), so
+    they show where the gain sits, not two estimates of one quantity.
+    """
+    rows = {
+        "in_events": statistics.events.loc[RESTRICTION_FIGURE_EVENT_GROUP],
+        "outside_events": statistics.outside.loc[
+            (RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_OUTSIDE_EVENTS)
+        ],
+    }
+    draw_full_minus_swr_axis(
+        ax, [EVENTS_X[name] for name in rows], list(rows.values()), 1.08
+    )
+    ax.set_xlim(-0.45, max(EVENTS_X.values()) + 0.5)
+    ax.set_xticks(list(EVENTS_X.values()), list(EVENTS_LABELS.values()))
+    ax.set_ylabel("")
+    ax.set_title(EVENTS_TITLE, fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1666,7 +1719,7 @@ def generate_figure(
     )
     if refusal is not None:
         raise ValueError(restriction_refusal(*refusal))
-    restriction_decoders, restriction_outside = restriction_figure_statistics(
+    restriction = restriction_figure_statistics(
         heldout.events, heldout.time_sums, heldout.bin_s
     )
 
@@ -1718,16 +1771,19 @@ def generate_figure(
     ax_share = fig.add_subplot(power_grid[1], sharex=ax_spread)
     draw_share_by_power(ax_spread, ax_share, power_counts)
     decoder_grid = cells["decoder_comparison"].subgridspec(
-        1, 2, width_ratios=DECODER_AXES_WIDTHS, wspace=DECODER_AXES_WSPACE
+        1, 3, width_ratios=DECODER_AXES_WIDTHS, wspace=DECODER_AXES_WSPACE
     )
-    ax_decoders, ax_difference = (fig.add_subplot(decoder_grid[k]) for k in range(2))
-    draw_decoder_gains(ax_decoders, restriction_decoders)
-    draw_full_minus_swr(ax_difference, restriction_decoders, restriction_outside)
+    ax_decoders, ax_difference, ax_events = (
+        fig.add_subplot(decoder_grid[k]) for k in range(3)
+    )
+    draw_decoder_gains(ax_decoders, restriction.decoders)
+    draw_full_minus_swr(ax_difference, restriction)
+    draw_heldout_event_gain(ax_events, restriction)
     row4_axes = {
         "traces": triggered_axes,
         "participation": [ax_participation],
         "ripple_power": [ax_spread, ax_share],
-        "decoder_comparison": [ax_decoders, ax_difference],
+        "decoder_comparison": [ax_decoders, ax_difference, ax_events],
     }
 
     fig.canvas.draw()

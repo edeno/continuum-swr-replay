@@ -1297,10 +1297,11 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     )
 
 
-def test_restriction_heldout_event_values_are_the_canonical_statistic_untagged():
+def test_restriction_heldout_event_values_are_the_canonical_statistic():
     """The canonical windows' events, read as held-out events: the same
-    statistic as the canonical values outside SWRs. No figure draws them:
-    Figure 2j draws the gain over all the time outside SWRs and its shares."""
+    statistic as the canonical values outside SWRs. Figure 2j's third axis
+    draws the no-SWR events' gain, with their counts; the SWR events' values
+    are for the text."""
     windows = _restriction_windows()
     events = windows[windows["kind"] == "event"]
     values = _by_key(builder.restriction_heldout_event_values(events, "s"))
@@ -1318,7 +1319,10 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic_untagged()
     # per group: the estimate, two bounds, animals positive, the events, those
     # scored and those without spikes
     assert len(numbers) == 2 * 7
-    assert {v.figures for v in values.values()} == {()}
+    assert {k for k, v in values.items() if v.figures == ("2j",)} == {
+        k for k in values if k.startswith("restriction_heldout_non_swr_")
+    }
+    assert {v.figures for v in values.values()} == {(), ("2j",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
@@ -1411,7 +1415,12 @@ def _outside_swr_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         ),
         0.0,
     )
-    windows = windows.assign(n_bins_excluded=0, **columns)
+    windows = windows.assign(
+        n_bins_excluded=0, animal=windows["epoch_id"].str[0], **columns
+    )
+    # 2 spikes outside SWRs in each window, so that the windows have a value
+    # per spike there (Figure 2j's third axis)
+    windows["n_spikes_outside_swr"] = 2
     for suffix, scale in (("", 1.0), ("_two_sided", 2.0)):
         windows[f"full{suffix}_outside_swr"] = scale * windows["outside"]
         windows[f"full{suffix}_outside_swr_in_visit"] = scale * windows["in_visit"]
@@ -1481,10 +1490,12 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     # per family: per spike and per second, the gain and the rest (four each),
     # the epochs (two), and three shares (three each)
     assert len(numbers) == 2 * (2 * 2 * 4 + 2 + 3 * 3)
-    # Figure 2j draws the filter family's gain per spike; the shares are for
-    # the text, with no figure
-    drawn = {f"{key}_per_spike{end}" for end in ("", "_ci_low", "_ci_high")} | {
-        f"{key}_per_spike_animals_positive"
+    # Figure 2j draws the filter family's gain per spike, and per spike
+    # outside every held-out event; the shares are for the text, with no figure
+    drawn = {
+        f"{key}{where}_per_spike{end}"
+        for where in ("", "_outside_heldout_events")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     }
     assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
@@ -1568,9 +1579,10 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
 def test_restriction_figure_statistics_are_the_tagged_values():
     """Figure 2j's statistics are the rows the drawn values are made from."""
     sums, bin_s, windows = _outside_swr_inputs()
-    decoders, outside = builder.restriction_totals.restriction_figure_statistics(
+    statistics = builder.restriction_totals.restriction_figure_statistics(
         windows, sums, bin_s
     )
+    decoders, outside = statistics.decoders, statistics.outside
     numbers = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
     measure = builder.RESTRICTION_FIGURE_DIFFERENCE
     assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
@@ -1588,13 +1600,39 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         np.testing.assert_allclose(
             outside.loc[("filter", measure), "estimate"], numbers[f"{key}_{name}"]
         )
+    numbers = _numbers(groups.outside_events)
+    np.testing.assert_allclose(
+        outside.loc[("filter", builder.RESTRICTION_FIGURE_OUTSIDE_EVENTS), "estimate"],
+        numbers[f"{key}_outside_heldout_events_per_spike"],
+    )
+    numbers = _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
+    np.testing.assert_allclose(
+        statistics.inside.loc[
+            ("filter", builder.RESTRICTION_FIGURE_INSIDE_SWR), "estimate"
+        ],
+        numbers["restriction_inside_swr_full_minus_swr_per_spike"],
+    )
+    # the events' gain, on windows that carry their spikes outside SWRs
+    events = _restriction_windows()
+    events = events[events["kind"] == "event"]
+    statistics = builder.restriction_totals.restriction_figure_statistics(
+        events, sums, bin_s
+    )
+    numbers = _numbers(builder.restriction_heldout_event_values(events, "s"))
+    np.testing.assert_allclose(
+        statistics.events.loc[builder.RESTRICTION_FIGURE_EVENT_GROUP, "estimate"],
+        numbers[
+            "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike"
+        ],
+    )
 
 
 def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     """In SWRs: full - swr is 5, 3 and 4 nats over 10 spikes and 5 s per
     epoch; per spike 0.5, 0.3, 0.4 and per second twice that. The same
     statistic, interval and epoch counts as the gain outside SWRs, both score
-    families, question 2c.3 and no figure."""
+    families, question 2c.3; the filter family's gain per spike (and its
+    interval and animals) is drawn on Figure 2j."""
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
     values = _by_key(
         builder.restriction_inside_swr_values(_immobile_time_sums(), bin_s, "s")
@@ -1612,8 +1650,13 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     assert numbers[f"{key}_per_spike_ci_low"] <= 0.4
     # per family: two units x four, and the epochs (two)
     assert len(numbers) == 2 * (2 * 4 + 2)
-    for value in values.values():
-        assert value.questions == ("2c.3",) and value.figures == ()
+    drawn = {
+        f"{key}_per_spike{end}"
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    }
+    for name, value in values.items():
+        assert value.questions == ("2c.3",)
+        assert value.figures == (("2j",) if name in drawn else ())
     assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 

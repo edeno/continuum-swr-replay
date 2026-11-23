@@ -1841,6 +1841,9 @@ SWR_ONLY = [0.099, 0.103, 0.081, 0.138, 0.093]
 FULL = [0.119, 0.117, 0.107, 0.172, 0.115]
 PAIRED = [0.022, 0.023, 0.03, 0.042, 0.025]
 OUTSIDE = [0.029, 0.02, 0.025, 0.038, 0.022]
+INSIDE = [-0.02, -0.015, -0.025, -0.03, -0.018]
+IN_EVENTS = [0.38, 0.39, 0.23, 0.42, 0.40]
+OUTSIDE_EVENTS = [-0.003, -0.004, -0.005, -0.002, -0.004]
 
 
 def _decoder_rows() -> pd.DataFrame:
@@ -1855,8 +1858,27 @@ def _decoder_rows() -> pd.DataFrame:
 
 
 def _outside_rows() -> pd.DataFrame:
-    """``outside_swr_gain_statistics``' row the panels read."""
-    return _measure_rows({"gain_per_spike": OUTSIDE})
+    """``outside_swr_gain_statistics``' rows the panels read."""
+    return _measure_rows(
+        {"gain_per_spike": OUTSIDE, "outside_events_gain_per_spike": OUTSIDE_EVENTS}
+    )
+
+
+def _restriction_statistics():
+    """``restriction_totals.restriction_figure_statistics``' tables panel j
+    reads: the events' row indexed by group, as the window statistics are."""
+    from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+        RestrictionFigureStatistics,
+    )
+
+    events = _measure_rows({"no SWR": IN_EVENTS}).loc["filter"]
+    events.index.name = "group"
+    return RestrictionFigureStatistics(
+        decoders=_decoder_rows(),
+        inside=_measure_rows({"gain_per_spike": INSIDE}),
+        outside=_outside_rows(),
+        events=events,
+    )
 
 
 def _dots_at(ax, x: float):
@@ -1896,7 +1918,7 @@ def _has_zero_line(ax) -> bool:
 
 def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline):
     """Panel j's first axis: each decoder's gain over the local-only decoder,
-    the SWR-only decoder's dots dark gray and the full decoder's green, spread
+    the SWR-forced decoder's dots dark gray and the full decoder's green, spread
     about the column, the mean with its interval beside them, and the dashed
     zero line labeled "local-only"."""
     import matplotlib.pyplot as plt
@@ -1916,27 +1938,26 @@ def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline
         np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-\nonly", "Full"]
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-\nforced", "Full"]
     assert [t.get_text() for t in ax.texts] == ["local-only"]
-    assert (
-        ax.get_ylabel() == "Held-out log score\nover local-only\ndecoder (nats/spike)"
-    )
+    assert ax.get_ylabel() == "Held-out log score\nover local-only\n(nats/spike)"
     plt.close(fig)
 
 
-def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_only(offline):
-    """Panel j's second axis: the full minus the SWR-only decoder over all
-    immobility (the paired difference) and outside SWRs (the main result, its
-    label in bold), dark gray dots spread about each column, the mean with its
-    interval beside them, and the dashed zero line with "full better"."""
+def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_forced(offline):
+    """Panel j's second axis: the full minus the SWR-forced decoder over all
+    immobility (the paired difference), inside SWRs and outside SWRs (the main
+    result, its label in bold), dark gray dots spread about each column, the
+    mean with its interval beside them, and the dashed zero line with "full
+    better"; the axis reaches below the values under zero."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
     figure02 = offline("scripts.figures.generate_figure02")
     fig, ax = plt.subplots()
-    figure02.draw_full_minus_swr(ax, _decoder_rows(), _outside_rows())
+    figure02.draw_full_minus_swr(ax, _restriction_statistics())
     fig.canvas.draw()
-    for x, values in ((0.0, PAIRED), (1.0, OUTSIDE)):
+    for x, values in ((0.0, PAIRED), (1.0, INSIDE), (2.0, OUTSIDE)):
         dots = _dots_at(ax, x)
         np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
         assert_spread_about(dots, x)
@@ -1945,13 +1966,40 @@ def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_only(offli
         )
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
+    assert ax.get_ylim()[0] < min(INSIDE)
     labels = ax.get_xticklabels()
-    assert [t.get_text() for t in labels] == ["All\nimmobility", "Outside\nSWRs"]
-    assert [t.get_fontweight() for t in labels] == ["normal", "bold"]
+    assert [t.get_text() for t in labels] == [
+        "All\nimmobility",
+        "Inside\nSWRs",
+        "Outside\nSWRs",
+    ]
+    assert [t.get_fontweight() for t in labels] == ["normal", "normal", "bold"]
     # horizontal, so that they do not hang below panel h's labels
     assert {t.get_rotation() for t in labels} == {0.0}
-    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
+    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-forced\n(nats/spike)"
     assert [t.get_text() for t in ax.texts] == ["↑ full better"]
+    plt.close(fig)
+
+
+def test_figure02_decoder_comparison_third_axis_draws_the_heldout_events(offline):
+    """Panel j's third axis: the full minus the SWR-forced decoder outside SWRs
+    in the no-SWR held-out events and outside every held-out event, on its own
+    scale, with the zero line."""
+    import matplotlib.pyplot as plt
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    fig, ax = plt.subplots()
+    figure02.draw_heldout_event_gain(ax, _restriction_statistics())
+    fig.canvas.draw()
+    for x, values in ((0.0, IN_EVENTS), (1.0, OUTSIDE_EVENTS)):
+        dots = _dots_at(ax, x)
+        np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
+        assert np.allclose(_means_at(ax, x), np.mean(values))
+    assert _has_zero_line(ax)
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(
+        figure02.EVENTS_LABELS.values()
+    )
+    assert ax.get_title() == figure02.EVENTS_TITLE
     plt.close(fig)
 
 
@@ -1972,7 +2020,10 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     for name in (
         "RESTRICTION_FIGURE_DECODERS",
         "RESTRICTION_FIGURE_DIFFERENCE",
+        "RESTRICTION_FIGURE_EVENT_GROUP",
         "RESTRICTION_FIGURE_FAMILY",
+        "RESTRICTION_FIGURE_INSIDE_SWR",
+        "RESTRICTION_FIGURE_OUTSIDE_EVENTS",
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(figure02, name) is getattr(restriction_totals, name), name

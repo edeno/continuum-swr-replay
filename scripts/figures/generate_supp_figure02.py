@@ -212,7 +212,7 @@ the order the text cites them, in four rows:
         from this power, so a split would show the threshold, not two kinds.
 
     j — Supports Figure 2j: its main result, the full decoder's gain over the
-        SWR-only decoder outside SWRs, looked at more closely. Every value is
+        SWR-forced decoder outside SWRs, looked at more closely. Every value is
         over the immobile bins inside a well visit, which runs from the
         animal's first nose-poke at a reward well to its last poke-out there.
         Each is per epoch, summed over its bins and divided by the spikes in
@@ -907,7 +907,7 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
 def draw_outside_swr_series(
     ax: Axes, outside: pd.DataFrame, parts: pd.DataFrame
 ) -> None:
-    """The gain outside SWRs: the full decoder minus the SWR-only decoder per spike
+    """The gain outside SWRs: the full decoder minus the SWR-forced decoder per spike
     over every immobile bin outside SWRs, then over the bins farther than each
     of :data:`OUTSIDE_SWR_MARGINS_S` from every SWR (``parts``' ``beyond_swr_margin``
     rows), a dot per animal and the mean with its interval, a thin line through
