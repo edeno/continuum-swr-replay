@@ -9,6 +9,19 @@ reads fitted. :func:`estimand_summaries` reduces them with
 ``shared_statistics.estimand_summary`` for each kind and for the difference
 of the two kinds' session values (SWR minus No SWR, a session with both).
 
+A record's ``variance`` and ``se`` are on the model's scale: the fit's
+Bayesian covariance, with each event one categorical draw (or its weight,
+``role_content.EVENT_WEIGHTS``). They are not sampling errors of the estimate
+across data sets (under the share response they can be several times its
+spread), and no interval is built from them: an estimand's interval is the
+project's, over sessions, recording days and animals
+(``shared_statistics.estimand_summary``).
+
+:func:`penalized_edf` reports how much the weak penalty decides: each
+penalized simple coefficient's effective degrees of freedom in each session,
+beside the session's number of events, and :func:`penalized_edf_summary`
+summarizes it by kind.
+
 The model-free references (:func:`role_shares`, :func:`within_arm_slopes`,
 :func:`current_share_by_time_until_leaving`) describe the cohort rows without a
 model: what the model's estimates are compared with.
@@ -35,6 +48,8 @@ __all__ = [
     "LEAVING_BINS_S",
     "current_share_by_time_until_leaving",
     "estimand_summaries",
+    "penalized_edf",
+    "penalized_edf_summary",
     "role_shares",
     "session_estimands",
     "within_arm_slopes",
@@ -51,7 +66,8 @@ def session_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:
     pd.DataFrame
         One row per (session, estimand): ``animal``, ``session_date``,
         ``epoch``, ``model``, ``variant``, ``kind``, ``estimand_id``,
-        ``estimate``, ``variance``, ``se``, ``status``, ``no_fit``, ``kept``
+        ``estimate``, ``variance`` and ``se`` (on the model's scale, not
+        sampling errors: module docstring), ``status``, ``no_fit``, ``kept``
         (the value may enter a summary) and ``left_out`` (the coefficients the
         contrast reads that the session left out, comma-separated).
     """
@@ -85,6 +101,93 @@ def session_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
+
+
+def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
+    """Each penalized simple coefficient's edf in each session of a fit.
+
+    A penalized simple coefficient is a role level or a role slope with a
+    fixed penalty. Its edf (the record's ``edf`` by coefficient name) is near 1
+    when the data decide its value and lower as the penalty shrinks it; for
+    one coefficient alone it is the shrinkage factor of its estimate, on the
+    model's scale. The trunk level is left out: it is a function of the arm,
+    fitted at 0 by construction, so its edf of 0 says nothing of the data.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per (session, coefficient): ``animal``, ``session_date``,
+        ``epoch``, ``model``, ``variant``, ``kind``, ``prior_sd`` (the
+        fit's), ``coefficient``,
+        ``tested`` (a declared estimand reads it), ``edf`` (NaN where the
+        session left it out or has no kept fit), ``n_events`` (the events in
+        the session's fit).
+    """
+    design = fit.design
+    tested = set(rc.tested_coefficients(design, fit.contrasts))
+    names = [
+        t.name
+        for t in design.terms
+        if t.kind in ("level", "slope", "binary")
+        and t.block is not None
+        and t.name != rc.TRUNK_LEVEL
+    ]
+    rows = []
+    for record in fit.records:
+        fitted = record.status == CONVERGED and not record.no_fit
+        for name in names:
+            edf = record.edf.get(name, np.nan) if fitted else np.nan
+            if name in record.left_out:
+                edf = np.nan
+            rows.append(
+                {
+                    "animal": record.animal,
+                    "session_date": record.session_date,
+                    "epoch": record.epoch,
+                    "model": fit.model,
+                    "variant": fit.variant,
+                    "kind": fit.kind,
+                    "prior_sd": fit.settings.prior_sd,
+                    "coefficient": name,
+                    "tested": name in tested,
+                    "edf": float(edf),
+                    "n_events": int(record.n_units),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def penalized_edf_summary(per_session: pd.DataFrame) -> pd.DataFrame:
+    """The edf of each penalized coefficient over sessions, by kind.
+
+    Parameters
+    ----------
+    per_session : pd.DataFrame
+        :func:`penalized_edf` of any fits.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per (model, variant, kind, prior SD, coefficient): ``tested``,
+        ``n_sessions`` (with an edf), the ``edf`` quantiles ``edf_min``,
+        ``edf_q10``, ``edf_median``, ``edf_max``, and the median, smallest
+        and largest ``n_events`` of those sessions.
+    """
+    kept = per_session.loc[np.isfinite(per_session["edf"])]
+    grouped = kept.groupby(
+        ["model", "variant", "kind", "prior_sd", "coefficient"], sort=False
+    )
+    return grouped.agg(
+        tested=("tested", "first"),
+        n_sessions=("edf", "size"),
+        edf_min=("edf", "min"),
+        edf_q10=("edf", lambda e: float(np.quantile(e, 0.1))),
+        edf_median=("edf", "median"),
+        edf_max=("edf", "max"),
+        n_events_median=("n_events", "median"),
+        n_events_min=("n_events", "min"),
+        n_events_max=("n_events", "max"),
+    ).reset_index()
 
 
 def estimand_summaries(

@@ -53,8 +53,10 @@ def big_cohort() -> rc.RoleContentCohort:
 
 
 def _simulate(cohort, truth, seed, n_bins=60):
+    """Each session's rows of KIND with drawn shares, and the reference of the
+    scale rows (both kinds, the default pooling)."""
     rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
-    reference = sc.ScenarioReference(rows, cohort.reference_log_duration)
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
     sessions = {
         key: draw_shares(
             part, sc.expected_shares(part, truth, reference), n_bins, seed + i
@@ -64,14 +66,15 @@ def _simulate(cohort, truth, seed, n_bins=60):
     return sessions, reference
 
 
-def _fit(cohort, sessions, model, variant="unadjusted", settings=None):
+def _fit(cohort, sessions, model, variant="unadjusted", settings=None, kind=KIND):
     return rc.fit_role_content(
         sessions,
         model=model,
         variant=variant,
-        kind=KIND,
+        kind=kind,
         reference_log_duration=cohort.reference_log_duration,
         settings=settings,
+        scale_rows=cohort.model_rows(model),
     )
 
 
@@ -150,20 +153,59 @@ def test_spans_visit_end_events_in_cohort(table, cohort) -> None:
     assert counts["after_visit_at_well"]["kept"] is False
 
 
-def test_missing_covariate_drops_the_event_and_is_counted(table) -> None:
+def _with_missing(table, column):
+    """The table with ``column`` missing on one leaf row of one in-visit
+    event; the event and its kind."""
     table = table.copy()
     leaf = table[rc.ARM] < 6
     event = table.loc[leaf & (table["visit_context"] == "in_visit"), rc.UNIT].iloc[0]
     kind = "SWR" if table.loc[table[rc.UNIT] == event, "is_swr"].iloc[0] else "No SWR"
     row = table.index[(table[rc.UNIT] == event) & leaf][0]
-    table.loc[row, "reward_belief_variance_candidate_arm_preoutcome"] = np.nan
+    table.loc[row, column] = np.nan
+    return table, event, kind
+
+
+def test_a_value_only_the_uncertainty_model_reads_drops_the_event_there_only(
+    table,
+) -> None:
+    table, event, kind = _with_missing(
+        table, "reward_belief_variance_candidate_arm_preoutcome"
+    )
     cohort = rc.role_content_cohort(table)
-    assert event not in set(cohort.rows[rc.UNIT])
-    counts = cohort.counts["by_kind"][kind]
+    assert event in set(cohort.model_rows("role_content")[rc.UNIT])
+    assert event not in set(cohort.model_rows("role_content_uncertainty")[rc.UNIT])
+    plain = cohort.counts["by_model"]["role_content"][kind]
+    assert plain["events_dropped"] == 0 and plain["rows_dropped"] == 0
+    assert rc.BELIEF_VARIANCE not in plain["events_missing"]
+    counts = cohort.counts["by_model"]["role_content_uncertainty"][kind]
     assert counts["events_dropped"] == 1
     assert counts["events_missing"][rc.BELIEF_VARIANCE] == 1
     assert counts["rows_dropped"] == 9
     assert counts["events_kept"] == counts["events_selected"] - 1
+    assert plain["events_kept"] == counts["events_kept"] + 1
+    # The model's rows are finite in every column it reads; the plain model's
+    # rows keep the missing value, which it does not read.
+    for model in rc.MODELS:
+        values = cohort.model_rows(model)[list(rc.MODEL_COLUMNS[model])]
+        assert np.isfinite(values.to_numpy(dtype=float)).all()
+    assert cohort.model_rows("role_content")[rc.BELIEF_VARIANCE].isna().sum() == 1
+    # Handing the uncertainty model rows with the missing value is refused.
+    rows = cohort.rows[cohort.rows[rc.KIND] == kind]
+    with pytest.raises(ValueError, match="missing values in a column"):
+        _fit(cohort, rc.session_rows(rows), "role_content_uncertainty", kind=kind)
+
+
+def test_a_value_both_models_read_drops_the_event_from_both(table) -> None:
+    table, event, kind = _with_missing(
+        table, "reward_belief_mean_candidate_arm_preoutcome"
+    )
+    cohort = rc.role_content_cohort(table)
+    assert event not in set(cohort.rows[rc.UNIT])
+    for model in rc.MODELS:
+        counts = cohort.counts["by_model"][model][kind]
+        assert counts["events_dropped"] == 1
+        assert counts["events_missing"][rc.VALUE] == 1
+        assert counts["rows_dropped"] == 9
 
 
 def test_a_value_on_a_row_that_does_not_read_it_drops_nothing(table) -> None:
@@ -174,8 +216,9 @@ def test_a_value_on_a_row_that_does_not_read_it_drops_nothing(table) -> None:
         .all()
     )
     cohort = rc.role_content_cohort(table)
-    for counts in cohort.counts["by_kind"].values():
-        assert counts["events_dropped"] == 0
+    for by_kind in cohort.counts["by_model"].values():
+        for counts in by_kind.values():
+            assert counts["events_dropped"] == 0
 
 
 def test_reference_log_duration_is_the_pooled_median(table, cohort) -> None:
@@ -515,11 +558,16 @@ def test_a_thin_previous_level_is_dropped_with_its_rows(table) -> None:
         rc.RoleContentSettings(trial_number="completed_trial_id"),
         rc.RoleContentSettings(q4a_reading="full_range"),
         rc.RoleContentSettings(q5a_trials=(40.0, 5.0)),
+        rc.RoleContentSettings(scale_pooling="per_kind"),
+        rc.RoleContentSettings(event_weight="n_nonlocal_bins"),
     ],
     ids=lambda s: repr(s)[:60],
 )
 def test_each_open_setting_builds_and_fits(table, settings) -> None:
-    table = table.assign(completed_trial_id=table["n_visits_arrived"] - 1)
+    table = table.assign(
+        completed_trial_id=table["n_visits_arrived"] - 1,
+        n_nonlocal_bins=np.round(table["event_duration_s"] / 0.002),
+    )
     cohort = rc.role_content_cohort(table, settings)
     rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
     reference = sc.ScenarioReference(rows, cohort.reference_log_duration)
@@ -541,6 +589,10 @@ def test_each_open_setting_builds_and_fits(table, settings) -> None:
 def test_open_settings_refuse_values_outside_their_candidates() -> None:
     with pytest.raises(ValueError, match="candidate width"):
         rc.RoleContentSettings(prior_sd=3.0)
+    with pytest.raises(ValueError, match="scale_pooling"):
+        rc.RoleContentSettings(scale_pooling="pooled")
+    with pytest.raises(ValueError, match="event_weight"):
+        rc.RoleContentSettings(event_weight="n_bins")
     with pytest.raises(ValueError, match="trial_number"):
         rc.RoleContentSettings(trial_number="trial")
     with pytest.raises(ValueError, match="q4a_reading"):
@@ -558,10 +610,11 @@ def test_records_carry_the_cohort_counts_and_tested_collinearity(cohort) -> None
         variant="unadjusted",
         kind=KIND,
         reference_log_duration=cohort.reference_log_duration,
+        scale_rows=cohort.rows,
         cohort_counts=cohort.counts,
     )
     for record in fit.records:
-        assert record.cohort_counts["cohort"]["by_kind"] == cohort.counts["by_kind"]
+        assert record.cohort_counts["cohort"]["by_model"] == cohort.counts["by_model"]
         assert record.likelihood == "grouped_softmax"
         assert record.model == "role_content:unadjusted"
         assert {"role", "s(reward_fraction):role=current"} <= set(record.collinearity)
@@ -574,14 +627,252 @@ def test_records_carry_the_cohort_counts_and_tested_collinearity(cohort) -> None
     assert all(0 <= v["r2"] < 1 for v in collinearity.values())
 
 
+def _drawn(rows, truth, reference, n_bins=40, seed=0):
+    return {
+        key: draw_shares(
+            part, sc.expected_shares(part, truth, reference), n_bins, seed + i
+        )
+        for i, (key, part) in enumerate(rc.session_rows(rows).items())
+    }
+
+
+@pytest.mark.parametrize("pooling", rc.SCALE_POOLINGS)
+def test_scales_and_reference_points_by_the_pooling_setting(cohort, pooling) -> None:
+    """Under ``both_kinds`` the two kinds' designs use one set of scales,
+    constraints and reference points, those of the rows of both kinds; under
+    ``per_kind`` each kind's are its own."""
+    settings = rc.RoleContentSettings(scale_pooling=pooling)
+    model, variant = "role_content_uncertainty", "length_adjusted"
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 1.0})
+    fits = {}
+    for kind in ("SWR", "No SWR"):
+        rows = cohort.rows[cohort.rows[rc.KIND] == kind]
+        reference = sc.ScenarioReference(rows, cohort.reference_log_duration)
+        fits[kind] = _fit(
+            cohort, _drawn(rows, truth, reference), model, variant, settings, kind
+        )
+    swr, no_swr = fits["SWR"], fits["No SWR"]
+    if pooling == "both_kinds":
+        expected = rc.ContrastReference.from_rows(
+            cohort.rows, cohort.reference_log_duration, model
+        )
+        assert swr.reference == no_swr.reference == expected
+        assert swr.design.standardization_record() == (
+            no_swr.design.standardization_record()
+        )
+        assert swr.design.basis_record() == no_swr.design.basis_record()
+        for eid, c in swr.contrasts.items():
+            np.testing.assert_array_equal(c, no_swr.contrasts[eid])
+    else:
+        assert swr.reference.covariate_means != no_swr.reference.covariate_means
+        assert swr.design.standardization_record() != (
+            no_swr.design.standardization_record()
+        )
+    # L0 is pooled over both kinds under either option.
+    assert swr.reference.reference_log_duration == cohort.reference_log_duration
+    assert no_swr.reference.reference_log_duration == cohort.reference_log_duration
+
+
+@pytest.fixture(scope="module")
+def trunk_session():
+    """One session's fit of the plain model (the reviewer's check)."""
+    table = synthetic_event_arm_table(
+        (SESSIONS[0],), n_visits=400, events_per_visit=3.0, swr_share=0.0, seed=5
+    )
+    cohort = rc.role_content_cohort(table)
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 0.5, "previous": -0.3})
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
+    sessions = _drawn(cohort.rows, truth, reference, n_bins=50, seed=1)
+    return cohort, sessions, _fit(cohort, sessions, "role_content")
+
+
+def test_trunk_level_is_fitted_at_zero_and_changes_no_tested_coefficient(
+    trunk_session,
+) -> None:
+    from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
+    from continuum_swr_replay.analysis.regression.sessions import fit_sessions
+    from continuum_swr_replay.analysis.regression.terms import (
+        log_penalty_from_prior_sd,
+    )
+
+    cohort, sessions, fit = trunk_session
+    (record,) = fit.records
+    names = list(fit.design.coef_names)
+    assert record.status == "converged"
+    assert abs(record.coef[names.index(rc.TRUNK_LEVEL)]) < 1e-6
+    # The same model with no trunk level: the trunk rows join the reference
+    # level of the role category only (every term by role still reads role).
+    weak = log_penalty_from_prior_sd(rc.DEFAULT_PRIOR_SD)
+    terms = [
+        Category("role_no_trunk", rc.LEAF_ROLES[::-1], reference=rc.REFERENCE_ROLE,
+                 penalty=weak)
+        if isinstance(t, Category) and t.column == rc.ROLE
+        else t
+        for t in rc.role_terms("role_content", "unadjusted")
+    ]  # fmt: skip
+    ((key, rows),) = sessions.items()
+    rows = rows.assign(role_no_trunk=rows[rc.ROLE].replace("trunk", rc.REFERENCE_ROLE))
+    scale = cohort.rows.assign(
+        role_no_trunk=cohort.rows[rc.ROLE].replace("trunk", rc.REFERENCE_ROLE)
+    )
+    design = build_design(terms, scale, intercept=False)
+    (without,) = fit_sessions(
+        design, {key: rows}, GroupedSoftmax(), model="no_trunk", kind=KIND,
+        response=rc.RESPONSE, unit=rc.UNIT, table_sha256={},
+    )  # fmt: skip
+    other = list(design.coef_names)
+    tested = rc.tested_coefficients(fit.design, fit.contrasts)
+    assert tested
+    index = [names.index(n) for n in tested]
+    index_without = [other.index(n.replace("role[", "role_no_trunk[")) for n in tested]
+    np.testing.assert_allclose(
+        np.asarray(record.coef)[index],
+        np.asarray(without.coef)[index_without],
+        rtol=1e-6, atol=1e-8,
+    )  # fmt: skip
+    vcov = np.asarray(record.vcov)[np.ix_(index, index)]
+    vcov_without = np.asarray(without.vcov)[np.ix_(index_without, index_without)]
+    np.testing.assert_allclose(vcov, vcov_without, rtol=1e-6, atol=1e-12)
+
+
+def test_the_collinearity_rule_reads_the_tested_coefficients(trunk_session) -> None:
+    from continuum_swr_replay.analysis.regression.collinearity import (
+        MAX_EXPLAINED,
+        separable,
+    )
+
+    _, _, fit = trunk_session
+    (record,) = fit.records
+    key = (record.animal, record.session_date, record.epoch)
+    # The record reports the trunk level's exact collinearity with the arm
+    # effects in the term's worst case, while the term's rule reads its
+    # estimate, which passes: the record's term ``role`` is not the rule here.
+    assert record.collinearity["role"]["worst"] > 1 - 1e-6
+    assert separable(record.collinearity)["role"]
+    tested = fit.tested_collinearity[key]
+    assert set(fit.separable[key]) == set(tested) == {
+        "role[current]", "role[previous]", "value:role=other_leaf"
+    }  # fmt: skip
+    assert rc.TRUNK_LEVEL not in fit.separable[key]
+    assert fit.separable[key] == {n: m["r2"] < MAX_EXPLAINED for n, m in tested.items()}
+    # The role levels are separable; on these synthetic rows the value slope
+    # is not (the reward fraction and the belief mean share their outcomes).
+    assert fit.separable[key]["role[current]"] and fit.separable[key]["role[previous]"]
+
+
+def test_an_event_weight_counts_as_repeated_events(table) -> None:
+    rng = np.random.default_rng(0)
+    events = table[rc.UNIT].unique()
+    weight = pd.Series(rng.integers(1, 4, events.size), index=events)
+    table = table.assign(n_nonlocal_bins=table[rc.UNIT].map(weight).astype(float))
+    weighted = rc.RoleContentSettings(event_weight="n_nonlocal_bins")
+    cohort = rc.role_content_cohort(table, weighted)
+    rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
+    key = SESSIONS[0]
+    rows = rc.session_rows(rows)[key]
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 1.0})
+    reference = sc.ScenarioReference(rows, cohort.reference_log_duration)
+    rows = draw_shares(rows, sc.expected_shares(rows, truth, reference), 40, 3)
+    assert set(rows[rc.EVENT_WEIGHT]) == {1.0, 2.0, 3.0}
+    # Each event repeated as many times as its weight, each copy weight 1.
+    copies = []
+    for copy in range(3):
+        part = rows[rows[rc.EVENT_WEIGHT] > copy]
+        copies.append(part.assign(**{rc.UNIT: part[rc.UNIT] * 10 + copy}))
+    repeated = pd.concat(copies, ignore_index=True).assign(**{rc.EVENT_WEIGHT: 1.0})
+    fits = [
+        rc.fit_role_content(
+            {key: data},
+            model="role_content",
+            variant="unadjusted",
+            kind=KIND,
+            reference_log_duration=cohort.reference_log_duration,
+            settings=settings,
+            scale_rows=rows,
+        )  # fmt: skip
+        for data, settings in ((rows, weighted), (repeated, None))
+    ]
+    (a,), (b,) = (f.records for f in fits)
+    assert a.n_units == rows[rc.UNIT].nunique()
+    assert b.n_units == int(weight.loc[rows[rc.UNIT].unique()].sum())
+    np.testing.assert_allclose(a.coef, b.coef, rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(a.vcov, b.vcov, rtol=1e-6, atol=1e-12)
+
+
+def test_event_weights_are_checked_and_a_missing_one_drops_the_event(table) -> None:
+    settings = rc.RoleContentSettings(event_weight="n_nonlocal_bins")
+    with pytest.raises(ValueError, match="n_nonlocal_bins"):
+        rc.role_content_cohort(table, settings)
+    bins = table.assign(n_nonlocal_bins=20.0)
+    first = (
+        bins[rc.UNIT] == bins.loc[bins["visit_context"] == "in_visit", rc.UNIT].iloc[0]
+    )
+    with pytest.raises(ValueError, match="the same on an event's nine rows"):
+        rc.role_content_cohort(
+            bins.assign(
+                n_nonlocal_bins=np.where(first & (bins[rc.ARM] == 0), 3.0, 20.0)
+            ),
+            settings,
+        )
+    with pytest.raises(ValueError, match="positive"):
+        rc.role_content_cohort(bins.assign(n_nonlocal_bins=0.0), settings)
+    missing = bins.assign(n_nonlocal_bins=np.where(first, np.nan, 20.0))
+    cohort = rc.role_content_cohort(missing, settings)
+    assert not cohort.rows[rc.UNIT].isin(bins.loc[first, rc.UNIT]).any()
+    kind = "SWR" if bins.loc[first, "is_swr"].iloc[0] else "No SWR"
+    for model in rc.MODELS:
+        counts = cohort.counts["by_model"][model][kind]
+        assert counts["events_missing"][rc.EVENT_WEIGHT] == 1
+    # One unit per event, the default, reads no column.
+    assert (rc.role_content_cohort(table).rows[rc.EVENT_WEIGHT] == 1.0).all()
+
+
+def test_penalized_edf_reports_the_shrinkage(cohort) -> None:
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 1.0, "previous": -0.5})
+    sessions, _ = _simulate(cohort, truth, seed=12, n_bins=30)
+    per = {
+        sd: rs.penalized_edf(
+            _fit(cohort, sessions, "role_content",
+                 settings=rc.RoleContentSettings(prior_sd=sd))
+        )
+        for sd in (1.0, 8.0)
+    }  # fmt: skip
+    narrow, wide = per[1.0], per[8.0]
+    assert set(narrow["coefficient"]) == {
+        "role[current]", "role[previous]", "value:role=current",
+        "value:role=previous", "value:role=other_leaf",
+    }  # fmt: skip
+    tested = narrow.set_index("coefficient")["tested"].groupby(level=0).first()
+    assert tested["role[current]"] and tested["value:role=other_leaf"]
+    assert not tested["value:role=current"]
+    assert ((narrow["edf"] > 0) & (narrow["edf"] <= 1 + 1e-9)).all()
+    # A narrower prior shrinks more: a lower edf for every coefficient.
+    assert (narrow["edf"].to_numpy() < wide["edf"].to_numpy()).all()
+    n_events = {
+        (k[0], k[1], k[2]): part[rc.UNIT].nunique() for k, part in sessions.items()
+    }
+    for row in narrow.itertuples():
+        assert row.n_events == n_events[(row.animal, row.session_date, row.epoch)]
+    summary = rs.penalized_edf_summary(pd.concat([narrow, wide]))
+    assert len(summary) == 2 * narrow["coefficient"].nunique()
+    assert (summary["n_sessions"] == len(sessions)).all()
+    assert (summary["edf_min"] <= summary["edf_median"]).all()
+
+
 def test_one_session_fit(cohort) -> None:
     sessions, _ = _simulate(cohort, sc.Truth(arm=sc.arm_effects()), seed=7)
     key, rows = next(iter(sessions.items()))
+    both = rc.session_rows(cohort.rows)[key]
     fit = rc.fit_role_content_session(
         key, rows, model="role_content", variant="unadjusted", kind=KIND,
-        reference_log_duration=cohort.reference_log_duration,
+        reference_log_duration=cohort.reference_log_duration, scale_rows=both,
     )  # fmt: skip
     assert len(fit.records) == 1 and fit.records[0].status == "converged"
+    with pytest.raises(ValueError, match="needs scale_rows"):
+        rc.fit_role_content_session(
+            key, rows, model="role_content", variant="unadjusted", kind=KIND,
+            reference_log_duration=cohort.reference_log_duration,
+        )  # fmt: skip
 
 
 def test_a_session_of_another_kind_is_refused(cohort) -> None:
@@ -617,22 +908,27 @@ def test_one_real_session_of_each_kind_end_to_end() -> None:
         ],
     )
     cohort = rc.role_content_cohort(table)
-    rows = cohort.rows
-    assert len(rows) % 9 == 0 and rows[rc.UNIT].nunique() * 9 == len(rows)
-    for kind in ("SWR", "No SWR"):
-        counts = cohort.counts["by_kind"][kind]
-        assert (
-            counts["events_kept"] + counts["events_dropped"]
-            == counts["events_selected"]
-        )
-        of_kind = rc.session_rows(rows[rows[rc.KIND] == kind])
-        assert len(of_kind) == 1
-        for model in rc.MODELS:
+    assert len(cohort.rows) % 9 == 0
+    assert cohort.rows[rc.UNIT].nunique() * 9 == len(cohort.rows)
+    for model in rc.MODELS:
+        rows = cohort.model_rows(model)
+        for kind in ("SWR", "No SWR"):
+            counts = cohort.counts["by_model"][model][kind]
+            assert (
+                counts["events_kept"] + counts["events_dropped"]
+                == counts["events_selected"]
+            )
+            assert (
+                rows.loc[rows[rc.KIND] == kind, rc.UNIT].nunique()
+                == (counts["events_kept"])
+            )
+            of_kind = rc.session_rows(rows[rows[rc.KIND] == kind])
+            assert len(of_kind) == 1
             for variant in rc.VARIANTS:
                 fit = rc.fit_role_content(
                     of_kind, model=model, variant=variant, kind=kind,
                     reference_log_duration=cohort.reference_log_duration,
-                    cohort_counts=cohort.counts,
+                    scale_rows=rows, cohort_counts=cohort.counts,
                 )  # fmt: skip
                 (record,) = fit.records
                 assert record.status == "converged", record.no_fit

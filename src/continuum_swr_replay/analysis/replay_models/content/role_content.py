@@ -45,22 +45,37 @@ Two calls of this module, made where the plan does not fix them:
   only. The current arm is always 1 trial since its last visit and the previous
   arm always 2, so a recency curve on those rows is the same column as their
   role level: the split between the two would be set by the penalty's
-  extrapolation of the curve below 3 trials.
+  extrapolation of the curve to 1 and 2 trials. A visited other-leaf arm is at
+  least 3 trials since its last visit; one never visited carries the censored
+  count, which can be 2, and the never-visited indicator.
 - The trunk level of the role category is a function of the arm, so it is not
   identified beside the arm effects. It is kept as a level (so that the trunk
   rows are a role of their own for every term by role and for the support
   rule) and the weak penalty of the role category sets its coefficient to 0;
   the likelihood is flat along that one direction, so every other coefficient
   and its variance are those of the model without it. The record's
-  collinearity of the term ``role`` therefore counts that column; the
-  collinearity of each tested coefficient alone is measured by
-  :func:`tested_coefficient_collinearity`.
+  collinearity of the term ``role`` therefore counts that column, which is
+  exactly collinear with the arm effects (its ``worst`` is 1) while its
+  ``estimate`` can be far below the rule's limit. The collinearity rule of
+  these models reads the collinearity of each tested coefficient alone
+  (:func:`tested_coefficient_collinearity`, :attr:`RoleContentFit.separable`),
+  never the record's term ``role``; the trunk level is not a tested
+  coefficient and is left out of it, because its collinearity is a property of
+  the design (a function of the arm, fitted at 0), not of the data.
 
 The cohort step (:func:`role_content_cohort`) selects the events with
 ``select_visit_context`` (default ``STARTS_IN_WELL_VISIT``), checks the nine
-candidate rows of each event, assigns the roles and drops, per kind, every
-event with a missing value on a row that reads it (an event's choice set is
-never cut to fewer than nine arms), counting the events and rows by column.
+candidate rows of each event, assigns the roles and marks, per model, every
+event with a missing value on a row that reads one of the model's columns (an
+event's choice set is never cut to fewer than nine arms), counting the events
+and rows by model, kind and column. A model drops an event only for the
+columns it reads: the plain model keeps an event that lacks a value only the
+uncertainty model reads (:meth:`RoleContentCohort.model_rows`).
+
+Response weights: the grouped softmax reads a response that sums to ``n_g``
+over an event's rows as ``n_g`` draws (``regression.likelihoods.GroupedSoftmax``),
+so an event's weight enters as its shares times the weight
+(:data:`EVENT_WEIGHTS`); the fitter needs no change for it.
 """
 
 from __future__ import annotations
@@ -77,7 +92,10 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     count_visit_context,
     select_visit_context,
 )
-from continuum_swr_replay.analysis.regression.collinearity import term_collinearity
+from continuum_swr_replay.analysis.regression.collinearity import (
+    separable,
+    term_collinearity,
+)
 from continuum_swr_replay.analysis.regression.contrasts import range_mean_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
@@ -106,13 +124,17 @@ __all__ = [
     "COHORT_COLUMNS",
     "DEFAULT_PRIOR_SD",
     "DEFAULT_SMOOTH_LOG_PENALTIES",
+    "EVENT_WEIGHTS",
     "LEAF_ROLES",
     "MODELS",
+    "MODEL_COLUMNS",
     "PRIOR_SD_CANDIDATES",
     "Q4A_READINGS",
     "REFERENCE_ROLE",
     "ROLES",
+    "SCALE_POOLINGS",
     "TRIAL_NUMBER_COLUMNS",
+    "TRUNK_LEVEL",
     "VARIANTS",
     "ContrastReference",
     "RoleContentCohort",
@@ -138,15 +160,19 @@ __all__ = [
 # is made with it before the lead answers.
 # ---------------------------------------------------------------------------
 
-PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0)
+PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0)
 """OPEN (lead): penalty width. The Normal prior SD of every simple tested
 coefficient (each role level, each role slope), in the reported unit (a 0/1
 step; one pooled SD of a continuous covariate): the log penalty is
 ``log(1 / SD**2)``. One declared number for all models; these are the widths
-the simulations compare."""
+the simulations compare. A weak prior is not weak on this likelihood's scale:
+with one unit of weight per event (:data:`EVENT_WEIGHTS`) the information is
+small, and the penalty shrinks a rare role level or a slope in a small
+session toward 0 (:func:`.role_content_statistics.penalized_edf` reports by
+how much)."""
 
 DEFAULT_PRIOR_SD = 2.0
-"""The width used until the lead chooses one: the middle candidate."""
+"""The width used until the lead chooses one: a placeholder."""
 
 DEFAULT_SMOOTH_LOG_PENALTIES: Mapping[str, float] = {
     "reward_fraction": 0.0,
@@ -157,9 +183,36 @@ DEFAULT_SMOOTH_LOG_PENALTIES: Mapping[str, float] = {
 covariate, the same in every session. Each is to be set by
 ``regression.calibration.log_penalty_for_edf`` on this model's real rows at a
 target median edf (a target is not carried over from another model) and
-checked by the scenario list. Placeholders: recency at -4, the value the
-scratch simulation found cleaner than -2 for the belief-variance test; the
-two others at 0, with no measurement behind it."""
+checked by the scenario list. The defaults (recency -4, the two others 0) are
+placeholders, with no measurement on this model's rows behind them."""
+
+SCALE_POOLINGS: tuple[str, ...] = ("both_kinds", "per_kind")
+"""OPEN (lead): the rows the design's scales and reference points are computed
+on: each slope's pooled SD and centering mean, each smooth's sum-to-zero
+constraint, the reward fraction's mean and SD of Q4a and the covariate means of
+the length products. ``both_kinds``: the rows of both kinds (SWR and No SWR)
+pooled, so that "per pooled SD" and every reference point are the same for
+the two kinds and the kind difference is a difference of like quantities.
+``per_kind``: the rows of the kind fitted, so that each kind's estimand is
+per its own SD and at its own means. ``L0`` is pooled over both kinds in
+either case. The default is ``both_kinds``, for the reason above; the lead
+has not yet confirmed it."""
+
+EVENT_WEIGHTS: tuple[str, ...] = ("one_per_event", "n_nonlocal_bins")
+"""OPEN (lead): the weight of each event in the likelihood. ``one_per_event``
+(the default, the lead's earlier decision): the response is the event's
+shares, one categorical draw per event whatever the number of decode bins
+behind them. ``n_nonlocal_bins``: the response is the shares times the
+event's number of non-local decode bins (the event-arm table's column of
+that name), as if each bin were one draw; overdispersion across bins makes
+that information too large, so it bounds the other side."""
+
+
+def _event_weight_column(event_weight: str) -> str | None:
+    """The event-arm table's column of an event weight; None for one per
+    event."""
+    return None if event_weight == "one_per_event" else event_weight
+
 
 TRIAL_NUMBER_COLUMNS: tuple[str, ...] = ("n_visits_arrived", "completed_trial_id")
 """OPEN (lead): which trial number in the epoch the uncertainty model holds.
@@ -177,9 +230,9 @@ smooth. ``sd_change`` (the plan's): ``f(m + sd/2) - f(m - sd/2)``, ``m`` and
 variance."""
 
 DEFAULT_Q5A_TRIALS: tuple[float, float] = (20.0, 3.0)
-"""OPEN (lead): the two recency points of Q5a, trials since the last visit
-(the declared 20 against 3). The scratch simulation supported 5 to 80 trials,
-so 3 lies below the supported range."""
+"""OPEN (lead): the two recency points of Q5a, trials since the last visit.
+The default is the declared 20 against 3, a placeholder; 3 trials is the
+lower end of a visited other-leaf arm's recency, where few rows lie."""
 
 
 @dataclass(frozen=True)
@@ -198,6 +251,10 @@ class RoleContentSettings:
         One of :data:`Q4A_READINGS`.
     q5a_trials : tuple of float
         The two recency points of Q5a, ``(first, second)`` trials.
+    scale_pooling : str
+        One of :data:`SCALE_POOLINGS`.
+    event_weight : str
+        One of :data:`EVENT_WEIGHTS`.
     """
 
     prior_sd: float = DEFAULT_PRIOR_SD
@@ -207,8 +264,18 @@ class RoleContentSettings:
     trial_number: str = TRIAL_NUMBER_COLUMNS[0]
     q4a_reading: str = Q4A_READINGS[0]
     q5a_trials: tuple[float, float] = DEFAULT_Q5A_TRIALS
+    scale_pooling: str = SCALE_POOLINGS[0]
+    event_weight: str = EVENT_WEIGHTS[0]
 
     def __post_init__(self) -> None:
+        if self.scale_pooling not in SCALE_POOLINGS:
+            raise ValueError(
+                f"scale_pooling {self.scale_pooling!r} not in {SCALE_POOLINGS}"
+            )
+        if self.event_weight not in EVENT_WEIGHTS:
+            raise ValueError(
+                f"event_weight {self.event_weight!r} not in {EVENT_WEIGHTS}"
+            )
         if self.prior_sd not in PRIOR_SD_CANDIDATES:
             raise ValueError(
                 f"prior_sd {self.prior_sd} is not a candidate width "
@@ -247,6 +314,8 @@ Variant = Literal["unadjusted", "length_adjusted"]
 
 ROLES: tuple[str, ...] = ("other_leaf", "current", "previous", "trunk")
 REFERENCE_ROLE = "other_leaf"
+TRUNK_LEVEL = "role[trunk]"
+"""The trunk level's coefficient: a function of the arm, fitted at 0."""
 LEAF_ROLES: tuple[str, ...] = ("current", "previous", "other_leaf")
 
 RESPONSE = "arm_fraction"
@@ -266,6 +335,9 @@ LOG_DURATION_REL = "log_duration_rel"
 BELIEF_VARIANCE = "belief_variance"
 SAMPLE_COUNT = "sample_count"
 TRIAL_NUMBER = "trial_number"
+EVENT_WEIGHT = "event_weight"
+WEIGHTED_RESPONSE = "weighted_arm_fraction"
+"""The fitted response: the shares times the event's weight."""
 
 _RECENCY_TRIALS = (1.0, 200.0)
 """Recency is clamped to this range of trials since the last visit."""
@@ -298,7 +370,35 @@ _SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
     BELIEF_VARIANCE: ("reward_belief_variance_candidate_arm_preoutcome", LEAF_ROLES),
     SAMPLE_COUNT: ("log1p_n_known_visits_candidate_arm", LEAF_ROLES),
     TRIAL_NUMBER: (None, LEAF_ROLES),
+    EVENT_WEIGHT: (None, ROLES),
 }
+
+#: The cohort columns each model reads: a missing value on a row that reads
+#: one of them drops the event from that model only.
+MODEL_COLUMNS: dict[str, tuple[str, ...]] = {
+    "role_content": (
+        RESPONSE,
+        REWARD_FRACTION,
+        VALUE,
+        RECENCY,
+        NEVER_VISITED,
+        LEAVING,
+        LOG_DURATION,
+        EVENT_WEIGHT,
+    ),
+}
+MODEL_COLUMNS["role_content_uncertainty"] = (
+    *MODEL_COLUMNS["role_content"],
+    BELIEF_VARIANCE,
+    SAMPLE_COUNT,
+    TRIAL_NUMBER,
+)
+
+
+def _in_model(model: str) -> str:
+    """The cohort column that marks the events kept for ``model``."""
+    return f"in_{model}"
+
 
 COHORT_COLUMNS: tuple[str, ...] = (
     *SESSION_COLUMNS,
@@ -308,6 +408,7 @@ COHORT_COLUMNS: tuple[str, ...] = (
     ARM,
     ROLE,
     *_SOURCES,
+    *(_in_model(model) for model in MODEL_COLUMNS),
 )
 """The columns of the cohort rows (:func:`role_content_cohort`)."""
 
@@ -354,21 +455,33 @@ class RoleContentCohort(NamedTuple):
     Attributes
     ----------
     rows : pd.DataFrame
-        :data:`COHORT_COLUMNS`, nine rows per event, events contiguous.
+        :data:`COHORT_COLUMNS`, nine rows per event, events contiguous: every
+        event kept for at least one model, with ``in_<model>`` True for the
+        events kept for that model. A value missing on a row that reads it is
+        NaN; read a model's rows with :meth:`model_rows`.
     counts : dict
         ``visit_context``: events per label, kept or not
-        (``count_visit_context``); ``by_kind``: kind -> ``events_selected``,
-        ``events_dropped`` (any missing value), ``events_missing`` (column ->
+        (``count_visit_context``); ``by_model``: model -> kind ->
+        ``events_selected``, ``events_dropped`` (a missing value in a column
+        the model reads), ``events_missing`` (each column the model reads ->
         events with a missing value there), ``rows_dropped``, ``events_kept``,
         ``rows_kept``.
     reference_log_duration : float
-        ``L0``: the median of the log event duration (s) over the kept events
-        of both kinds.
+        ``L0``: the median of the log event duration (s) over the events of
+        both kinds in ``rows``.
     """
 
     rows: pd.DataFrame
     counts: dict
     reference_log_duration: float
+
+    def model_rows(self, model: Model) -> pd.DataFrame:
+        """The rows of the events kept for ``model``, finite in every column
+        it reads."""
+        if model not in MODELS:
+            raise ValueError(f"model {model!r} not in {MODELS}")
+        kept = self.rows[_in_model(model)].to_numpy(dtype=bool)
+        return self.rows.loc[kept].reset_index(drop=True)
 
 
 def _check_candidates(table: pd.DataFrame) -> None:
@@ -411,7 +524,7 @@ def role_content_cohort(
         Nine rows per event (the canonical event-arm table, or the rows of
         some sessions of it).
     settings : RoleContentSettings, optional
-        Read for the trial-number column.
+        Read for the trial-number column and the event weight.
     contexts : str or sequence of str
         The ``visit_context`` labels kept (``select_visit_context``).
 
@@ -423,12 +536,14 @@ def role_content_cohort(
     ------
     ValueError
         If a column is missing, a candidate arm is not one of the nine, an
-        event lacks one of its nine rows, a current arm is not a leaf arm, or
-        an event's shares do not sum to one.
+        event lacks one of its nine rows, a current arm is not a leaf arm, an
+        event's shares do not sum to one, or an event weight is not positive
+        or not the same on an event's nine rows.
     """
     settings = settings or RoleContentSettings()
     sources = dict(_SOURCES)
     sources[TRIAL_NUMBER] = (settings.trial_number, LEAF_ROLES)
+    sources[EVENT_WEIGHT] = (_event_weight_column(settings.event_weight), ROLES)
     require_columns(
         event_arm_table,
         [
@@ -439,7 +554,7 @@ def role_content_cohort(
             "visit_context",
             "occupancy_well_arm",
             "prev_arm",
-            *(source for source, _ in sources.values()),
+            *(source for source, _ in sources.values() if source is not None),
         ],
         "the event-arm table",
     )
@@ -464,11 +579,13 @@ def role_content_cohort(
         }
     )
     for column, (source, _) in sources.items():
-        rows[column] = table[source].to_numpy(dtype=float)
+        rows[column] = 1.0 if source is None else table[source].to_numpy(dtype=float)
+    _check_event_weights(rows)
     rows[RECENCY] = np.log(np.clip(rows[RECENCY].to_numpy(), *_RECENCY_TRIALS))
     rows[LOG_DURATION] = np.log(rows[LOG_DURATION].to_numpy())
     # A value a row does not read is not missing: it is set to 0 (trunk rows
     # carry no leaf covariates; the role or arm terms absorb what is constant).
+    # A missing value on a row that reads it stays NaN.
     missing = {}
     for column, (_, roles) in sources.items():
         reads = rows[ROLE].isin(roles).to_numpy()
@@ -482,33 +599,50 @@ def role_content_cohort(
         .to_numpy()
         for column, mask in missing.items()
     }
-    drop = np.zeros(len(rows), dtype=bool)
-    for mask in event_missing.values():
-        drop |= mask
-    by_kind = {}
-    for kind in dt.KINDS:
-        of_kind = (rows[KIND] == kind).to_numpy()
-        by_kind[kind] = {
-            "events_selected": int(rows.loc[of_kind, UNIT].nunique()),
-            "events_dropped": int(rows.loc[of_kind & drop, UNIT].nunique()),
-            "events_missing": {
-                column: int(rows.loc[of_kind & mask, UNIT].nunique())
-                for column, mask in event_missing.items()
-            },
-            "rows_dropped": int((of_kind & drop).sum()),
-            "events_kept": int(rows.loc[of_kind & ~drop, UNIT].nunique()),
-            "rows_kept": int((of_kind & ~drop).sum()),
-        }
-    rows = rows.loc[~drop, list(COHORT_COLUMNS)].reset_index(drop=True)
+    by_model = {}
+    for model, columns in MODEL_COLUMNS.items():
+        drop = np.zeros(len(rows), dtype=bool)
+        for column in columns:
+            drop |= event_missing[column]
+        rows[_in_model(model)] = ~drop
+        by_model[model] = {}
+        for kind in dt.KINDS:
+            of_kind = (rows[KIND] == kind).to_numpy()
+            by_model[model][kind] = {
+                "events_selected": int(rows.loc[of_kind, UNIT].nunique()),
+                "events_dropped": int(rows.loc[of_kind & drop, UNIT].nunique()),
+                "events_missing": {
+                    column: int(
+                        rows.loc[of_kind & event_missing[column], UNIT].nunique()
+                    )
+                    for column in columns
+                },
+                "rows_dropped": int((of_kind & drop).sum()),
+                "events_kept": int(rows.loc[of_kind & ~drop, UNIT].nunique()),
+                "rows_kept": int((of_kind & ~drop).sum()),
+            }
+    in_any = rows[[_in_model(model) for model in MODEL_COLUMNS]].any(axis=1)
+    rows = rows.loc[in_any, list(COHORT_COLUMNS)].reset_index(drop=True)
     durations = rows.groupby(UNIT, sort=False)[LOG_DURATION].first()
     counts = {
         "visit_context": {
             label: {"n": int(entry.n), "kept": bool(entry.kept)}
             for label, entry in visit_counts.iterrows()
         },
-        "by_kind": by_kind,
+        "by_model": by_model,
     }
     return RoleContentCohort(rows, counts, float(np.median(durations.to_numpy())))
+
+
+def _check_event_weights(rows: pd.DataFrame) -> None:
+    """An event weight is positive where it is finite (a missing one drops
+    the event) and the same on an event's nine rows."""
+    weight = rows[EVENT_WEIGHT].to_numpy(dtype=float)
+    if np.any(weight[np.isfinite(weight)] <= 0):
+        raise ValueError("an event weight must be positive")
+    per_event = pd.Series(weight).groupby(rows[UNIT].to_numpy())
+    if np.any((per_event.max() - per_event.min()).to_numpy() > 0):
+        raise ValueError("an event weight must be the same on an event's nine rows")
 
 
 def session_rows(rows: pd.DataFrame) -> dict[SessionKey, pd.DataFrame]:
@@ -526,7 +660,8 @@ def session_rows(rows: pd.DataFrame) -> dict[SessionKey, pd.DataFrame]:
 
 
 class ContrastReference(NamedTuple):
-    """The pooled quantities a fit fixes beyond its design.
+    """The pooled quantities a fit fixes beyond its design, computed on its
+    scale rows (:data:`SCALE_POOLINGS`).
 
     Attributes
     ----------
@@ -549,7 +684,8 @@ class ContrastReference(NamedTuple):
     def from_rows(
         cls, pooled_rows: pd.DataFrame, reference_log_duration: float, model: Model
     ) -> ContrastReference:
-        """The reference of the pooled cohort rows of one kind."""
+        """The reference of the scale rows: the cohort rows of both kinds or
+        of one (:data:`SCALE_POOLINGS`)."""
         leaf = pooled_rows[ROLE].isin(LEAF_ROLES)
         means = {
             covariate: float(pooled_rows.loc[leaf, covariate].mean())
@@ -644,12 +780,13 @@ def role_design(
     *,
     reference: ContrastReference,
 ) -> Design:
-    """The model's design, built on the pooled cohort rows of one kind.
+    """The model's design, built on the scale rows.
 
     Parameters
     ----------
     pooled_rows : pd.DataFrame
-        The cohort rows of every session of the fit (one kind).
+        The scale rows: the cohort rows of every session of the fit, of both
+        kinds or of the kind fitted (:data:`SCALE_POOLINGS`).
     reference : ContrastReference
         Of the same rows (:meth:`ContrastReference.from_rows`).
     """
@@ -843,7 +980,7 @@ class RoleContentFit:
     ----------
     model, variant, kind : str
     design : Design
-        Built on the pooled rows of the sessions given.
+        Built on the scale rows (:data:`SCALE_POOLINGS`).
     reference : ContrastReference
     contrasts : dict of str to np.ndarray
         :func:`estimand_contrasts`.
@@ -853,7 +990,7 @@ class RoleContentFit:
         Session key -> :func:`tested_coefficient_collinearity` of the simple
         tested coefficients (a role level, a slope; a smooth's is the
         record's concurvity of the term); empty for a session without a kept
-        fit.
+        fit. The trunk level is never among them (module docstring).
     settings : RoleContentSettings
     """
 
@@ -867,6 +1004,16 @@ class RoleContentFit:
     tested_collinearity: dict
     settings: RoleContentSettings
 
+    @property
+    def separable(self) -> dict[SessionKey, dict[str, bool]]:
+        """The collinearity rule of these models: session key -> tested
+        coefficient -> True when the other columns explain less than
+        ``collinearity.MAX_EXPLAINED`` of it (``collinearity.separable`` of
+        :attr:`tested_collinearity`). The record's collinearity of the term
+        ``role`` is not read: it counts the trunk level, exactly collinear
+        with the arm effects by construction."""
+        return {key: separable(m) for key, m in self.tested_collinearity.items()}
+
 
 def fit_role_content(
     sessions: Mapping[SessionKey, pd.DataFrame],
@@ -876,6 +1023,7 @@ def fit_role_content(
     kind: str,
     reference_log_duration: float,
     settings: RoleContentSettings | None = None,
+    scale_rows: pd.DataFrame | None = None,
     table_sha256: Mapping[str, str] | None = None,
     cohort_counts: Mapping | None = None,
 ) -> RoleContentFit:
@@ -884,11 +1032,19 @@ def fit_role_content(
     Parameters
     ----------
     sessions : mapping of (animal, session_date, epoch) to pd.DataFrame
-        Each session's cohort rows of ``kind`` (:func:`session_rows`).
+        Each session's cohort rows of ``kind`` for ``model``
+        (:meth:`RoleContentCohort.model_rows`, :func:`session_rows`).
     model, variant, kind : str
     reference_log_duration : float
         ``L0`` of the cohort.
     settings : RoleContentSettings, optional
+    scale_rows : pd.DataFrame, optional
+        The model's cohort rows of both kinds over the sessions of the fit
+        (:meth:`RoleContentCohort.model_rows`). Required when
+        ``settings.scale_pooling`` is ``both_kinds``, where the design's
+        scales and reference points are computed on them; under ``per_kind``
+        their rows of ``kind`` are used, or, when not given, the sessions'
+        rows.
     table_sha256 : mapping, optional
         The tables the rows were read from -> their hashes; recorded.
     cohort_counts : mapping, optional
@@ -902,20 +1058,41 @@ def fit_role_content(
     Raises
     ------
     ValueError
-        If a session holds rows of another kind, or a tested coefficient has
-        no fixed penalty (``support.require_tested_penalized``).
+        If a session holds rows of another kind or a missing value in a
+        column the model reads, ``scale_rows`` is missing under
+        ``both_kinds``, or a tested coefficient has no fixed penalty
+        (``support.require_tested_penalized``).
     """
     settings = settings or RoleContentSettings()
     if kind not in dt.KINDS:
         raise ValueError(f"kind {kind!r} not in {dt.KINDS}")
+    _check_model(model, variant)
     for key, rows in sessions.items():
         if not (rows[KIND] == kind).all():
             raise ValueError(f"session {'/'.join(key)} holds rows of another kind")
-    pooled = pd.concat(list(sessions.values()), ignore_index=True)
+        values = rows[list(MODEL_COLUMNS[model])].to_numpy(dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError(
+                f"session {'/'.join(key)} holds missing values in a column "
+                f"{model} reads: give it RoleContentCohort.model_rows({model!r})"
+            )
+    if settings.scale_pooling == "both_kinds":
+        if scale_rows is None:
+            raise ValueError(
+                "scale_pooling 'both_kinds' needs scale_rows: the model's cohort "
+                "rows of both kinds"
+            )
+        pooled = scale_rows
+    elif scale_rows is not None:
+        pooled = scale_rows.loc[scale_rows[KIND] == kind]
+    else:
+        pooled = pd.concat(list(sessions.values()), ignore_index=True)
     reference = ContrastReference.from_rows(pooled, reference_log_duration, model)
     design = role_design(pooled, model, variant, settings, reference=reference)
     prepared = {
-        key: design_rows(rows, model, variant, reference)
+        key: design_rows(rows, model, variant, reference).assign(
+            **{WEIGHTED_RESPONSE: rows[RESPONSE] * rows[EVENT_WEIGHT]}
+        )
         for key, rows in sessions.items()
     }
     contrasts = estimand_contrasts(design, model, variant, reference, settings)
@@ -926,7 +1103,7 @@ def fit_role_content(
         GroupedSoftmax(),
         model=f"{model}:{variant}",
         kind=kind,
-        response=RESPONSE,
+        response=WEIGHTED_RESPONSE,
         unit=UNIT,
         table_sha256=dict(table_sha256 or {}),
     )
@@ -936,6 +1113,7 @@ def fit_role_content(
         name
         for name in tested_coefficients(design, contrasts)
         if design.column_terms[design.coef_names.index(name)].kind != "smooth"
+        and name != TRUNK_LEVEL
     ]
     collinearity = {
         key: tested_coefficient_collinearity(design, prepared[key], record, simple)
@@ -963,9 +1141,11 @@ def fit_role_content_session(
     kind: str,
     reference_log_duration: float,
     settings: RoleContentSettings | None = None,
+    scale_rows: pd.DataFrame | None = None,
 ) -> RoleContentFit:
     """:func:`fit_role_content` for one session: the design, its
-    standardization and its constraints are built on that session's rows."""
+    standardization and its constraints are built on that session's rows
+    (``scale_rows``: its rows of both kinds, under ``both_kinds``)."""
     return fit_role_content(
         {key: rows},
         model=model,
@@ -973,6 +1153,7 @@ def fit_role_content_session(
         kind=kind,
         reference_log_duration=reference_log_duration,
         settings=settings,
+        scale_rows=scale_rows,
     )
 
 
@@ -993,7 +1174,7 @@ def _fitted_rows(design: Design, rows: pd.DataFrame, record: FitRecord) -> pd.Da
     for name in record.cohort_counts.get("rows_dropped", {}):
         keep &= ~built.level_rows[design.by_name[name].level]
     total = (
-        pd.Series(np.where(keep, rows[RESPONSE], 0.0))
+        pd.Series(np.where(keep, rows[WEIGHTED_RESPONSE], 0.0))
         .groupby(rows[UNIT])
         .transform("sum")
     )
@@ -1015,7 +1196,8 @@ def tested_coefficient_collinearity(
     ----------
     design : Design
     rows : pd.DataFrame
-        The session's rows as given to the fit (:func:`design_rows`).
+        The session's rows as given to the fit (:func:`design_rows`, with
+        the weighted response).
     record : FitRecord
         The session's record.
     tested : sequence of str
@@ -1047,7 +1229,7 @@ def tested_coefficient_collinearity(
     measured = term_collinearity(
         GroupedSoftmax(),
         X,
-        used[RESPONSE].to_numpy(dtype=float),
+        used[WEIGHTED_RESPONSE].to_numpy(dtype=float),
         aux,
         np.asarray(record.coef, dtype=float),
         terms,
