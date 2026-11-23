@@ -1,4 +1,4 @@
-"""Where the non-local time sits in a signal: Figure 2i (ripple power) and its
+"""Where the non-local time sits in a signal: Figure 2h (ripple power) and its
 MUA counterpart on Figure 2's supplement draw it the same way.
 
 Top, each animal's non-local time bins spread over the signal (the percent of

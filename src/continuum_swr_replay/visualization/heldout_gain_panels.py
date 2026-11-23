@@ -1,11 +1,12 @@
 """The held-out gain panels: a held-out gain per animal and its mean.
 
-Figure 2j (each decoder's gain over the local-only decoder, and the full
-decoder's over the SWR-only decoder) and Figure 2's supplement
-(``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
-local coding per spike; the full decoder's gain outside SWRs by distance from
-the SWRs; the four restriction decoders, with the SWR-allowed one) draw each
-value the
+Figure 2 (i, the held-out tetrode gain over local coding per spike; j, the
+agreement above shuffled events by width; k, each decoder's gain over the
+local-only decoder, and the full decoder's over the SWR-only decoder) and
+Figure 2's supplement (``scripts/figures/generate_supp_figure02.py``: the
+agreement and its shuffled reference by width; the full decoder's gain outside
+SWRs by distance from the SWRs; the four restriction decoders, with the
+SWR-allowed one) draw each value the
 same way: a dot per animal and, beside them, the animals' mean with its 95 %
 interval in black, with a dashed line at zero, where neither side predicts the
 spikes better.
@@ -18,8 +19,13 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
 from matplotlib.transforms import blended_transform_factory
 
+from continuum_swr_replay.analysis.event_evidence.shared_content import (
+    WIDTH_BIN_LABELS,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
@@ -46,7 +52,7 @@ DOT_SPREAD = 0.05
 group's dots are spread so that each shows (:func:`spread_offsets`)."""
 
 NEUTRAL_DOTS = "#444444"
-"""A dark gray for dots that need no class's color (Figure 2j's differences,
+"""A dark gray for dots that need no class's color (Figure 2k's differences,
 the SWR-only decoder)."""
 
 
@@ -175,8 +181,8 @@ def label_gain_axis(
 
 
 GAIN_FLOOR = 0.13
-"""A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
-supplement, panel j)."""
+"""A gain axis' floor below zero, as a share of its top (Figure 2k, Figure 2's
+supplement, panel i)."""
 
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""
@@ -186,15 +192,15 @@ DIFFERENCE_LABELS = {
     "inside_swr": "Inside\nSWRs",
     "outside_swr": "Outside\nSWRs",
 }
-"""An axis of differences between decoders (Figure 2j's second axis, Figure 2's
-supplement, panel m): over all the immobile time, over its bins inside SWRs and
+"""An axis of differences between decoders (Figure 2k's second axis, Figure 2's
+supplement, panel l): over all the immobile time, over its bins inside SWRs and
 over its bins outside SWRs, left to right; horizontal, on two lines."""
 EVENTS_LABELS = {
     "in_events": "In no-SWR\nevents",
     "outside_events": "Outside\nevents",
 }
-"""The axis of a difference outside SWRs in the held-out events (Figure 2j's
-third axis, Figure 2's supplement, panel m): inside the no-SWR events detected
+"""The axis of a difference outside SWRs in the held-out events (Figure 2k's
+third axis, Figure 2's supplement, panel l): inside the no-SWR events detected
 from the held-out decode and outside every held-out event, left to right."""
 EVENTS_TITLE = "Outside SWRs,\nheld-out events"
 
@@ -203,8 +209,8 @@ DECODER_STYLES = {
     "swr_allowed_minus_none_per_spike": ("SWR-\nallowed", NEUTRAL_DOTS, True),
     "full_minus_none_per_spike": ("Full", COLORS["Non-Local"], False),
 }
-"""Each decoder's gain over the local-only decoder (Figure 2j's first axis,
-Figure 2's supplement, panel m), by its measure: its label, its dots' color and
+"""Each decoder's gain over the local-only decoder (Figure 2k's first axis,
+Figure 2's supplement, panel l), by its measure: its label, its dots' color and
 whether they are open. The SWR-only decoder in a neutral dark gray, the
 SWR-allowed decoder, a variant of it, in open dots of the same gray, the full
 decoder in the Non-Local state's green."""
@@ -264,8 +270,8 @@ def draw_full_minus_swr_axis(
     means when ``through_means``, a dashed line at zero, the y axis from
     :data:`GAIN_FLOOR` below zero (or ``top_scale`` times the lowest dot or
     bound, when lower) to ``top_scale`` times the highest dot or bound, ``ylabel`` (by default :data:`DIFFERENCE_YLABEL`) and, when ``cue``, :func:`full_better_cue`. ``hollow`` marks the columns drawn in open dots (none by default). The x axis is
-    the caller's (Figure 2j's second axis, Figure 2's supplement, panels j and
-    m)."""
+    the caller's (Figure 2k's second axis, Figure 2's supplement, panels i and
+    l)."""
     if hollow is None:
         hollow = [False] * len(xs)
     for x, row, open_dots in zip(xs, rows, hollow, strict=True):
@@ -283,3 +289,116 @@ def draw_full_minus_swr_axis(
     ax.set_ylabel(ylabel)
     if cue:
         full_better_cue(ax)
+
+
+# --- by the width of the other tetrodes' estimate ------------------------------
+
+WIDTH_XLABEL = "95 % HPD length of the other\ntetrodes' position estimate (cm)"
+"""The x label of an axis by width (``shared_content.WIDTH_COLUMN``)."""
+WIDTH_OFFSET = 0.2
+"""Each group's dots sit this far either side of its width bin; the mean with
+its interval sits a further :data:`WIDTH_MEAN_OFFSET` out, and a reference's
+mean at the same place."""
+WIDTH_MEAN_OFFSET = 0.11
+SHARE_BAR_WIDTH = 0.3
+"""The width of each group's bar in the strip of shares by width (x units)."""
+WIDTH_GROUP_NAMES = {SWR_LABELS[False]: "No SWR", SWR_LABELS[True]: "SWR"}
+"""The name of each group of ``GROUP_COLORS`` on an axis by width."""
+WIDTH_REFERENCE_NAME = "shuffled events, same width"
+"""The name of the width-matched shuffled-event reference, in open markers."""
+
+
+def width_means_x(side: int) -> np.ndarray:
+    """The x positions of a group's means by width bin (``side`` -1 for no-SWR
+    events, 1 for SWR events)."""
+    return np.arange(len(WIDTH_BIN_LABELS)) + side * (WIDTH_OFFSET + WIDTH_MEAN_OFFSET)
+
+
+def draw_width_series(
+    ax: Axes, statistics: pd.DataFrame, reference: pd.DataFrame | None = None
+) -> None:
+    """A score per spike of each group by width bin (``statistics``, indexed by
+    ``width_bin`` and ``group``, ``shared_content.agreement_by_width_statistics``):
+    the group's dots (one per animal) in its color on its side of the bin, the
+    animals' mean with its 95 % interval in black farther out, and a thin line
+    through the group's means; with ``reference``, its means at the same place
+    in open markers of the group's color on a dotted line. The x axis holds
+    the bins' labels and :data:`WIDTH_XLABEL`."""
+    bins = np.arange(len(WIDTH_BIN_LABELS))
+    for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
+        rows = [statistics.loc[(label, group)] for label in WIDTH_BIN_LABELS]
+        for x, row in zip(bins + side * WIDTH_OFFSET, rows, strict=True):
+            animals = np.asarray(row["animals"], dtype=float)
+            ax.scatter(
+                x + spread_offsets(animals, 0.03), animals, s=5, color=color, lw=0,
+                zorder=2,
+            )  # fmt: skip
+        means = width_means_x(side)
+        estimates = np.array([row["estimate"] for row in rows])
+        ax.errorbar(
+            means, estimates,
+            yerr=[estimates - [r["ci_low"] for r in rows],
+                  [r["ci_high"] for r in rows] - estimates],
+            fmt="_", color="black", ms=4, lw=0.8, capsize=0, zorder=3,
+        )  # fmt: skip
+        ax.plot(means, estimates, color=color, lw=0.6, zorder=1)
+        if reference is not None:
+            ax.plot(
+                means,
+                [reference.loc[(label, group), "estimate"] for label in WIDTH_BIN_LABELS],
+                color=color, lw=0.5, ls=":", marker="o", ms=2.5, mfc="white",
+                mew=0.6, zorder=3,
+            )  # fmt: skip
+    ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+    ax.set_xlim(-0.6, bins[-1] + 0.6)
+    ax.set_xticks(bins, WIDTH_BIN_LABELS)
+    ax.set_xlabel(WIDTH_XLABEL)
+
+
+def name_width_groups(ax: Axes, top: float, step: float = 0.14) -> None:
+    """The groups' names at the axis' right, in their colors, the first with
+    its top at ``top`` (axes fraction)."""
+    for k, (group, color) in enumerate(GROUP_COLORS.items()):
+        ax.text(
+            0.99, top - step * k, WIDTH_GROUP_NAMES[group], ha="right", va="top",
+            transform=ax.transAxes, fontsize=SMALL_SIZE,
+            color=readable_text_color(color),
+        )  # fmt: skip
+
+
+def name_width_reference(ax: Axes, loc: str) -> None:
+    """:data:`WIDTH_REFERENCE_NAME` once, with its open marker on a dotted
+    line in the reference gray, at ``loc`` (a legend location)."""
+    ax.legend(
+        [Line2D([], [], ls=":", lw=0.5, marker="o", ms=2.5, mfc="white", mew=0.6,
+                color=REFERENCE_COLOR)],
+        [WIDTH_REFERENCE_NAME], loc=loc, frameon=False, fontsize=SMALL_SIZE,
+        handlelength=1.5, handletextpad=0.3, borderaxespad=0.2,
+    )  # fmt: skip
+
+
+def draw_width_shares(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> None:
+    """A thin strip above ``ax``, sharing its x axis: each group's percent of
+    its events in each width bin, the mean over animals of each animal's share
+    (``share_of_events_animal_mean``), two narrow bars side by side in the
+    groups' colors, each with a thin line from the lowest to the highest
+    animal."""
+    bins = np.arange(len(WIDTH_BIN_LABELS))
+    for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
+        rows = [statistics.loc[(label, group)] for label in WIDTH_BIN_LABELS]
+        x = bins + side * SHARE_BAR_WIDTH / 2
+        ax_share.bar(
+            x, [100 * row["share_of_events_animal_mean"] for row in rows],
+            width=SHARE_BAR_WIDTH, color=color, lw=0,
+        )  # fmt: skip
+        ax_share.vlines(
+            x,
+            [100 * row["share_of_events_animal_min"] for row in rows],
+            [100 * row["share_of_events_animal_max"] for row in rows],
+            color="black", lw=0.5,
+        )  # fmt: skip
+    ax_share.sharex(ax)
+    ax_share.tick_params(labelbottom=False)
+    ax_share.set_ylim(0, None)
+    ax_share.yaxis.set_major_locator(MaxNLocator(2))
+    ax_share.set_ylabel("% of\nevents")

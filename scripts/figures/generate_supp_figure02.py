@@ -1,22 +1,21 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them, in seven rows:
+the order the text cites them, in six rows:
 
 - the decoder on these recordings (a, b): its states calibrated by held-out
   spikes, and MUA in the No-Spike state;
 - the count is robust (c, d): the share of events with no SWR at other
   settings of the event rule and of the SWR detector, and the timing of events
   against their SWRs;
-- the events are coordinated and specific (e to h): non-local time against
-  MUA, the held-out tetrode gain split by bins with and without spikes, the
-  posterior's spread, and tetrode participation;
-- ripple power and the held-out test (i, j): no step in the events'
+- the events are coordinated (e to g): non-local time against MUA, the
+  agreement and its width-matched shuffled reference by width, and tetrode
+  participation;
+- ripple power and the held-out test (h, i): no step in the events'
   properties at the SWR threshold, and the gain outside SWRs away from the
   SWRs;
-- the animals agree, and where the content lies (k, l): Figure 2g's traces
+- the animals agree, and where the content lies (j, k): Figure 2g's traces
   animal by animal, and the distance of the content from the animal;
-- a fourth decoder (m): Figure 2j's comparison with the SWR-allowed decoder;
-- the events decoded at low-rate places (n).
+- a fourth decoder (l): Figure 2k's comparison with the SWR-allowed decoder.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -66,7 +65,7 @@ the order the text cites them, in seven rows:
     c — Supports Figure 2d, the share of events with no SWR. The text cites
         this panel twice: its event-rule axes with the count of events (the
         share changes little with the rule), and its SWR-threshold axis with
-        the ripple-power panels (Figure 2i, panel i), because the share follows
+        the ripple-power panels (Figure 2h, panel h), because the share follows
         the threshold, as a threshold on one distribution must. The share of
         the immobile non-local events that start inside a well visit with no
         SWR, at each value of three settings swept one at a time (the others
@@ -113,14 +112,14 @@ the order the text cites them, in seven rows:
 
     e — Supports Figure 2g and h, on population activity and the events:
         where the non-local time sits in MUA (the z-scored multiunit rate of
-        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
+        the decoded tetrodes, ``MUA_zscore``), in Figure 2h's format. Top, each
         animal's immobile time bins decoded non-local spread over MUA (percent
         per 0.25 z), the share below 2 z written; bottom, the percent of
         immobile bins decoded non-local at each MUA level; a line per animal,
         their mean in bold, a dashed line at 2 z, the MUA event detector's
         threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
         inside the well visits (``nonlocal_by_signal.animal_nonlocal_counts`` of
-        the stored counts, the same table Figure 2i reads, by
+        the stored counts, the same table Figure 2h reads, by
         ``signal_share_panels.draw_share_by_signal``;
         ``Processed-Data/nonlocal_by_signal``; the events summary's
         ``nonlocal_share_mua_above_level*`` and
@@ -129,62 +128,30 @@ the order the text cites them, in seven rows:
         decoded non-local. The panel does not show that non-local detection is
         independent of population bursts: the decoder needs spikes, so the two
         go together. It poses the question that the held-out tetrode panels
-        (f, h) answer: whether the spikes point to the decoded place.
+        (Figure 2i and j, and f and g here) answer: whether the spikes point
+        to the decoded place.
 
-    f and h — Support Figure 2h, shared content: the events are driven by
-    several tetrodes. Each tetrode is left out of the decoder in turn: the
-    other tetrodes' estimate predicts its spikes better than local coding does
-    (f); and the events have a spike on more tetrodes than Local rest of their
-    length (h).
+    f — Supports Figure 2j, the agreement above shuffled events: its two
+        curves. The held-out tetrode agreement per spike of the events (each
+        tetrode left out of the decoder in turn and scored under the other
+        tetrodes' position estimate against no place preference) by the width
+        of that estimate (the 95 % HPD length, mean over the event's bins and
+        left-out tetrodes; ``shared_content.WIDTH_BINS_CM``), for no-SWR and
+        SWR events, a dot per animal and the animals' mean with its 95 %
+        interval; and the width-matched shuffled-event reference (the event's
+        spikes scored under another event's estimate of the same group and
+        fold, over the events whose donor's estimate is in the same width
+        bin, since the reference depends on the donor's width) in open
+        markers on a dotted line, named once ("shuffled events, same
+        width"). Against no place preference a wide estimate scores below
+        zero even when nothing is shared; Figure 2j draws the difference of
+        the two curves (``shared_content.shared_content_statistics``, by
+        ``heldout_gain_panels.draw_width_series``;
+        ``Processed-Data/event_tetrode_holdout_extra``; the events summary's
+        ``*_shared_content_*_agreement_per_spike`` and
+        ``*_shared_content_*_reference_per_spike`` values).
 
-    f — The held-out tetrode gain over local coding. The immobile non-local
-        events of the canonical event table that start inside a well visit
-        (``cohort_selection.select_visit_context``), split by whether they
-        overlap an SWR. Each tetrode is left out of the decoder's smoother in
-        turn and scored at every bin of each event under the other tetrodes'
-        position distribution against local coding around the animal
-        (encodings held out in folds of whole trials); the gain is summed over
-        tetrodes and bins and divided by the event's spikes. A dot per animal
-        for no-SWR and SWR events, the animals' mean with its 95 % interval,
-        and a line at zero, where local coding predicts the held-out spikes as
-        well. The line is not a control: the Local-rest controls sit there by
-        construction (in Local rest the decoded position is the animal's own),
-        so they are in the events summary and not drawn. The gain is drawn
-        whole ("All bins") and split by the scored tetrode's own bins: those
-        where it spiked ("Bins with a spike") and those where it was silent
-        ("Silent bins"). The split answers whether the events' advantage over
-        local coding comes from the spikes or from their absence (the ground
-        process). A silent bin's term is the expected-firing term alone; a
-        spiking bin's holds the spike's waveform term and the bin's
-        expected-firing term, so the split is by bins, not an exact split of
-        the likelihood into its mark and ground terms. For each event the two
-        parts add to the whole; each drawn value is a median over events, so
-        over the cohort they need not add up exactly. The events' spike rate
-        against matched Local rest, which speaks to the same question, is a
-        value for the text (``*_event_spike_rate_hz``, ``*_control_spike_rate_hz``)
-        (``tetrode_holdout.holdout_statistics`` of the held-out tetrode run,
-        ``scripts/event_evidence/score_tetrode_holdout.py``;
-        ``Processed-Data/event_tetrode_holdout``; the events summary's
-        ``*_heldout_gain_*``, ``*_heldout_spiking_gain_*`` and
-        ``*_heldout_silent_gain_*`` values).
-
-    g — Supports Figure 2's case that the no-SWR events are specific: how
-        concentrated the decoded position is, no-SWR against SWR events. Each
-        event's HPD coverage is the length of track (cm) that holds 95 % of
-        the decoded probability, averaged over the event's bins
-        (``hpd_coverage_cm`` of the canonical event table). Its distribution
-        on a log axis, the percent of a class's events per bin
-        (``event_statistics.HPD_BIN_EDGES_CM``), a thin line per animal and
-        their mean in bold (``event_statistics.hpd_distribution``). Each class
-        holds a tight group of events (near 20-25 cm) and a diffuse one spread
-        over most of the track, so a median falls between them and describes
-        neither; the events summary reports the share of each class below the
-        dotted cut at 50 cm (``event_statistics.hpd_tight_share_statistics``;
-        the ``hpd_tight_*`` values). The track's length is not drawn: it
-        differs by animal and is known only from each decode's environment.
-        The pooled class medians (``hpd_median_*``) are for the text.
-
-    h — Tetrode participation (the share of tetrodes with a spike) of each
+    g — Tetrode participation (the share of tetrodes with a spike) of each
         event against a Local-rest window of its length lying wholly inside
         one well visit, one line per animal from its controls to its events,
         for no-SWR and SWR events (Local rest in the Local state's color, the
@@ -195,7 +162,7 @@ the order the text cites them, in seven rows:
         over the analyses' subset from the current well visits; the events
         summary's participation values). Was Figure 2h.
 
-    i — Supports Figure 2i, which shows no step in non-local time at the SWR
+    h — Supports Figure 2h, which shows no step in non-local time at the SWR
         threshold: at the SWR detector's threshold, does an event property
         jump (two kinds of events) or change smoothly with ripple power (one
         continuum)? The step test of the one-class-or-two analysis
@@ -221,7 +188,7 @@ the order the text cites them, in seven rows:
         rejects in none of the two-class samples planted at the observed
         separation, so it has no power here.
 
-    j — Supports Figure 2j: its main result, the full decoder's gain over the
+    i — Supports Figure 2k: its main result, the full decoder's gain over the
         SWR-only decoder outside SWRs, looked at more closely. Every value is
         over the immobile bins inside a well visit, which runs from the
         animal's first nose-poke at a reward well to its last poke-out there.
@@ -245,7 +212,7 @@ the order the text cites them, in seven rows:
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
-    k — Supports Figure 2g, whose lines are the mean over animals of these
+    j — Supports Figure 2g, whose lines are the mean over animals of these
         lines: the same signals around the same events' starts (ripple
         power, MUA, theta power, head speed; ``triggered_analysis.TRIGGERED_SIGNALS``
         over the window ``TRIGGERED_WINDOW_S``), a thin line per animal and
@@ -255,7 +222,7 @@ the order the text cites them, in seven rows:
         read from every analyzed epoch's decode frame in panel b's pass). The
         animals agree.
 
-    l — Supports Figure 2's case that the no-SWR events carry remote content,
+    k — Supports Figure 2's case that the no-SWR events carry remote content,
         as SWR events do: how far the content lies from the animal. Each
         event's distance is the mean over its bins of the absolute distance
         (cm along the track) of the decoded place from the animal's
@@ -265,7 +232,7 @@ the order the text cites them, in seven rows:
         ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per
         animal and their mean in bold
         (``event_statistics.content_distance_distribution``, each animal's
-        distribution as panel g takes the HPD coverage), with dotted lines at
+        distribution), with dotted lines at
         20 cm (near) and 100 cm (remote, ``constants.REMOTE_CM``): the heights
         there are the shares under 20 cm and under 100 cm. The events summary
         reports each class's share under 20 cm, 20 to 100 cm and 100 cm or
@@ -273,13 +240,13 @@ the order the text cites them, in seven rows:
         over animals of each animal's share, the mean over its epochs of each
         epoch's share; the ``content_distance_*`` values).
 
-    m — Supports Figure 2j against a permissive comparator: a fourth decoder,
+    l — Supports Figure 2k against a permissive comparator: a fourth decoder,
         SWR-allowed (every state inside SWRs, only the local states outside
         them; open dots, a variant of SWR-only), scored with the other three
         in one pass under the stored fold fits
         (``Processed-Data/event_nonlocal_restriction_swr_allowed``, from
         ``scripts/event_evidence/score_nonlocal_restriction.py
-        --from-stored-fit``), drawn as Figure 2j is. First axis: the SWR-only,
+        --from-stored-fit``), drawn as Figure 2k is. First axis: the SWR-only,
         SWR-allowed and full decoders' gains over the local-only decoder per
         spike of all the immobile time inside a well visit. Second axis: the
         full minus the SWR-allowed decoder (filled) and the SWR-allowed minus
@@ -293,49 +260,28 @@ the order the text cites them, in seven rows:
         (``restriction_totals.swr_allowed_statistics``; the events summary's
         values tagged S2m).
 
-    n — Low-rate places: is the evidence of the no-SWR events carried by
-        places where the tetrodes barely fire, so that silence itself points
-        there? An event's two places are the real places nearest its replay
-        start and end positions, each ranked among the track's real places by
-        the encoding model's summed ground intensity (0 the lowest rate;
-        ``Processed-Data/event_content_place_rate``); a low-rate event has
-        both places below ``content_place_rate.LOW_RATE_RANK``. Left: the share
-        of each group's events' places in each tenth of the rank (each event's
-        two places half each, ``content_place_rate.rank_tenth_shares``), a thin
-        line per animal (each animal's mean over its epochs) and their mean in
-        bold in the group's color, chance (the share of the track's places in
-        a tenth, about 10 %) dashed, the lowest tenth shaded. Right, one axis
-        each, the held-out tetrode scores of the low-rate and the other events
-        of each group (``low_rate_places.LOW_RATE_FIGURE_MEASURES``, from
-        ``Processed-Data/event_tetrode_holdout_extra``): the part of the gain
-        over local coding that only the waveform marks give and the place
-        information of the scored spikes' marks (the agreement minus the
-        shuffled reference is not split by place: low-rate events have narrow
-        estimates and their donors' widths would not match); a dot per animal
-        (open for the low-rate events)
-        and the animals' mean with its 95 % interval, as panel f
-        (``low_rate_places.low_rate_statistics``; the values tagged S2n).
-
-Panel f reads the held-out tetrode run over the epochs the events summary
-reads and refuses a run not held out in folds of whole trials, as the summary
-does; panel h reads the participation run over the same epochs. Panel j reads the held-out event run
+Panel f reads the held-out tetrode run with its extra scores over the epochs
+the events summary reads and refuses a run not held out in folds of whole
+trials or without the extra scores, as the summary does; panel g reads the
+participation run over the same epochs. Panel i reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
-(``reported.events.read_heldout_restriction``) and refuses it, as Figure 2j
+(``reported.events.read_heldout_restriction``) and refuses it, as Figure 2k
 does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Its
-values are the events summary's ``restriction_outside_swr_*`` values. Panel m
+values are the events summary's ``restriction_outside_swr_*`` values. Panel l
 reads the held-out event run made from the run with the fourth decoder
 (``Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events``) by
-the same reader and refuses it on the same grounds. Panels d,
-g, i and l read the canonical event table (i with the stored output it names); a,
-c and e read their stored outputs. Each output is refused, as the summary marks
-its values pending, when it was not made from the current event table (c and
-i), over the analyses' subset, or from the current well visits (a, c and e; e
-also from the decodes the event features run records, as Figure 2i). Panel b reads every analyzed epoch's decode frame
-(``Processed-Data``), which takes a few minutes; it has no reported value.
+the same reader and refuses it on the same grounds. Panels d, h and k read the
+canonical event table (h with the stored output it names); a, c and e read
+their stored outputs. Each output is refused, as the summary marks its values
+pending, when it was not made from the current event table (c and h), over the
+analyses' subset, or from the current well visits (a, c and e; e also from the
+decodes the event features run records, as Figure 2h). Panel b reads every
+analyzed epoch's decode frame (``Processed-Data``), which takes a few minutes;
+it has no reported value.
 
 Usage
 -----
@@ -394,32 +340,27 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     outside_swr_subset_statistics,
     swr_allowed_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.shared_content import (
+    SharedContentStatistics,
+    shared_content_statistics,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
-    holdout_statistics,
     require_extra_columns,
     window_scores,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     DISTANCE_BIN_EDGES_CM,
-    HPD_BIN_EDGES_CM,
-    HPD_TIGHT_CM,
     NEAR_CM,
     TIMING_CLASSES,
     boundary_offsets,
     boundary_timing_statistics,
     content_distance_distribution,
-    hpd_distribution,
     main_step_fits,
     nonlocal_below_threshold_statistics,
     threshold_step_statistics,
-)
-from continuum_swr_replay.analysis.event_properties.low_rate_places import (
-    LOW_RATE_FIGURE_MEASURES,
-    LowRateStatistics,
-    low_rate_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     MUA_LEVEL_Z,
@@ -451,7 +392,6 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
-    CONTENT_PLACE_RATE_NAME,
     PARTICIPATION_NAME,
     TETRODE_HOLDOUT_NAME,
     event_spike_evidence_dir,
@@ -483,13 +423,12 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     MEAN_OFFSET,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
-    SPLIT_LABELS,
     animal_values,
-    draw_animal_gain,
     draw_decoder_gain_axis,
     draw_full_minus_swr_axis,
-    draw_split_gain,
-    label_gain_axis,
+    draw_width_series,
+    name_width_groups,
+    name_width_reference,
 )
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
@@ -512,14 +451,9 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width, five rows (the module's docstring).
 WIDTH = 6.5
-HEIGHT = 8.65
-MAX_HEIGHT_CM = 22.5
-"""The tallest the saved supplement may be (cm): above the common 20 cm
-(``simulated_run_panels.MAX_FIGURE_SIZE_CM``) until the lead chooses which
-panels stay."""
-
-TITLE = "Held-out tetrode"
-YLABEL = "Held-out gain\nover local (nats/spike)"
+HEIGHT = 7.65
+SHARED_RAW_TITLE = "Agreement and shuffled events"
+SHARED_RAW_YLABEL = "Agreement\n(nats/spike)"
 TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
 """The timing table's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
 TIMING_CORNERS = {
@@ -579,11 +513,6 @@ SWEEP_TICKS = {
     "swr_threshold_z": (0, 2, 4, 6),
 }
 """The sweep panel's x ticks, in its drawn units: the value used and the ends."""
-HPD_XLABEL = "95 % HPD length (cm),\nmean over the event's bins"
-"""The posterior-spread panel's x label: each event's mean over its bins of the
-length of track that holds 95 % of the decoded probability."""
-HPD_YLABEL = "% of events"
-HPD_TICKS_CM = (10, 25, 50, 100, 200, 400)
 DISTANCE_XLABEL = "From the animal (cm)"
 """The distance panel's x label, under its title "Content distance": each
 event's mean over its bins of the distance along the track of the decoded place
@@ -609,24 +538,22 @@ SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
 LAYOUT = (
-    ((0.899, 0.968), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
-    ((0.721, 0.818), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
+    ((0.892, 0.97), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
+    ((0.69, 0.8), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
     (
-        (0.554, 0.64),
+        (0.501, 0.599),
         (
             ("nonlocal_mua", 0.075, 0.13),
-            ("heldout_gain", 0.305, 0.19),
-            ("hpd", 0.56, 0.16),
-            ("participation", 0.835, 0.155),
+            ("shared_raw", 0.33, 0.36),
+            ("participation", 0.815, 0.165),
         ),
     ),
-    ((0.389, 0.461), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
+    ((0.315, 0.396), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
     (
-        (0.268, 0.32),
+        (0.178, 0.237),
         (("event_traces", 0.085, 0.58), ("content_distance", 0.82, 0.17)),
     ),
-    ((0.145, 0.204), (("four_decoders", 0.11, 0.87),)),
-    ((0.035, 0.083), (("low_rate", 0.085, 0.88),)),
+    ((0.039, 0.105), (("four_decoders", 0.11, 0.87),)),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -639,7 +566,7 @@ ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT
 """Each row's frames' bottom and top and its panels, left to right."""
 FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
 """Each panel's frame's left edge and width (figure width)."""
-LETTER_HEIGHT = 0.0208
+LETTER_HEIGHT = 0.0235
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
@@ -660,7 +587,7 @@ FOUR_DECODER_TIMES = {
     "outside_swr": "outside_swr",
 }
 """Panel m, second axis: each time of ``restriction_totals.CONTRAST_TIMES``, in
-drawing order (Figure 2j's), by its label's key in ``DIFFERENCE_LABELS``."""
+drawing order (Figure 2k's), by its label's key in ``DIFFERENCE_LABELS``."""
 FOUR_DECODER_DIFFERENCES = {
     "full_minus_swr_allowed_per_spike": ("Full \u2212 SWR-allowed", False),
     "swr_allowed_minus_swr_per_spike": ("SWR-allowed \u2212 SWR-only", True),
@@ -687,25 +614,22 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     -------
     dict
         In panel order: ``calibration`` (a): :func:`read_state_calibration`;
-        ``no_spike`` (b) and ``event_traces`` (k): :func:`read_frame_traces`; ``sweep`` (c):
-        :func:`read_rule_sweep`; ``timing`` (d): the selected events'
-        ``boundary_timing_statistics``; ``mua`` (e): :func:`read_mua_counts`;
-        ``tetrode`` (f): the held-out tetrode statistics of the events that
-        start inside a well visit, by column of ``SPLIT_LABELS``, each indexed
-        by group (a held-out tetrode run not held out in folds of whole trials
-        is refused, ``reported.events.require_tetrode_holdout_folds``); ``hpd``
-        (g): the selected events' ``hpd_distribution``; ``distance`` (l): their
-        ``content_distance_distribution``; ``participation`` (h):
-        :func:`read_participation`;
-        ``step_test`` (i): :func:`read_step_test`; ``outside`` (j):
-        ``outside_swr_statistics`` over the held-out event run, indexed by
-        family and measure; ``parts`` (j): ``outside_swr_subset_statistics`` of
-        the margins over its time sums, indexed by subset, threshold, family
-        and measure; ``four_decoders`` (m): ``swr_allowed_statistics`` over
-        the held-out event run made from the run with the fourth decoder;
-        ``low_rate`` (n): ``low_rate_statistics`` of the held-out tetrode run
-        with its extra scores and the place-rate run (a run not held out in
-        folds of whole trials, or without the extra scores, is refused).
+        ``no_spike`` (b) and ``event_traces`` (j): :func:`read_frame_traces`;
+        ``sweep`` (c): :func:`read_rule_sweep`; ``timing`` (d): the selected
+        events' ``boundary_timing_statistics``; ``mua`` (e):
+        :func:`read_mua_counts`; ``shared`` (f): ``shared_content_statistics``
+        of the events of the held-out tetrode run with its extra scores that
+        start inside a well visit (a run not held out in folds of whole
+        trials, or without the extra scores, is refused,
+        ``reported.events.require_tetrode_holdout_folds``); ``participation``
+        (g): :func:`read_participation`; ``step_test`` (h):
+        :func:`read_step_test`; ``outside`` (i): ``outside_swr_statistics``
+        over the held-out event run, indexed by family and measure; ``parts``
+        (i): ``outside_swr_subset_statistics`` of the margins over its time
+        sums, indexed by subset, threshold, family and measure; ``distance``
+        (k): the selected events' ``content_distance_distribution``;
+        ``four_decoders`` (l): ``swr_allowed_statistics`` over the held-out
+        event run made from the run with the fourth decoder.
 
     Raises
     ------
@@ -714,14 +638,18 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
-    require_tetrode_holdout_folds(
-        read_output_manifest(inputs.tetrode_holdout), rel(inputs.tetrode_holdout)
-    )
+    extra_dir = inputs.tetrode_holdout_extra
+    require_tetrode_holdout_folds(read_output_manifest(extra_dir), rel(extra_dir))
     table = read_swr_table(inputs.event_table)
     epochs = event_table_epochs(table, analyzed_epoch_ids())
-    scores = read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, epochs)
     events = select_visit_context(table)
-    selected = select_events_in(scores, events["event_id"])
+    # panel f: the held-out tetrode run with its extra scores, over the
+    # selected events
+    extra = select_events_in(
+        read_complete_run(extra_dir, TETRODE_HOLDOUT_NAME, epochs), events["event_id"]
+    )
+    require_extra_columns(extra, rel(extra_dir))
+    windows = window_scores(extra)
     heldout = read_heldout_restriction(
         inputs.nonlocal_restriction_heldout_events,
         inputs.nonlocal_restriction,
@@ -735,7 +663,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     if refusal is not None:
         cause, rerun = refusal
         raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
-    # panel m: the run with the fourth decoder, read and refused as above
+    # panel l: the run with the fourth decoder, read and refused as above
     four = read_heldout_restriction(
         inputs.nonlocal_restriction_swr_allowed_heldout_events,
         inputs.nonlocal_restriction_swr_allowed,
@@ -749,31 +677,14 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     if refusal is not None:
         cause, rerun = refusal
         raise ValueError(f"{REFUSED_FOUR}: {cause}. Rerun {rerun}.")
-    windows = window_scores(selected)
-    # panel n: the held-out tetrode run with its extra scores, held out as the
-    # canonical run is, and the place-rate run, over the selected events
-    extra_dir = inputs.tetrode_holdout_extra
-    require_tetrode_holdout_folds(read_output_manifest(extra_dir), rel(extra_dir))
-    extra = select_events_in(
-        read_complete_run(extra_dir, TETRODE_HOLDOUT_NAME, epochs), events["event_id"]
-    )
-    require_extra_columns(extra, rel(extra_dir))
-    place_rate = select_events_in(
-        read_complete_run(inputs.content_place_rate, CONTENT_PLACE_RATE_NAME, epochs),
-        events["event_id"],
-    )
     return {
         "calibration": read_state_calibration(inputs.state_calibration_in_visits),
         "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "step_test": read_step_test(inputs.class_structure, inputs.event_table),
-        "hpd": hpd_distribution(events),
         "distance": content_distance_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
-        "tetrode": {
-            column: holdout_statistics(windows, "event", column)
-            for column in SPLIT_LABELS
-        },
+        "shared": shared_content_statistics(windows[windows["kind"] == "event"]),
         "participation": read_participation(
             inputs.event_participation, epochs, events["event_id"]
         ),
@@ -786,7 +697,6 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "four_decoders": swr_allowed_statistics(
             four.events, four.time_sums, four.bin_s
         ),
-        "low_rate": low_rate_statistics(window_scores(extra), place_rate),
         **read_frame_traces(events, workers),
     }
 
@@ -906,7 +816,7 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
     ValueError
         If the counts were not made over the analyses' subset from the current
         well visits and the decodes the event features run records, for the
-        analyzed epochs (``reported.events.checked_reference``, as Figure 2i).
+        analyzed epochs (``reported.events.checked_reference``, as Figure 2h).
     """
     counts = pd.read_parquet(folder / "counts.parquet")
     try:
@@ -1119,16 +1029,20 @@ def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
     ax.set_title("Timing against the SWR", fontsize=SMALL_SIZE, pad=3)
 
 
-def draw_heldout_tetrode(ax: Axes, statistics: dict) -> None:
-    """The held-out tetrode gain over local coding per spike, by group, over
-    all bins, the bins with a spike and the silent bins (``statistics``:
-    :func:`read_inputs`' ``tetrode``)."""
-    draw_split_gain(ax, statistics, TITLE)
-    rows = [table.loc[group] for table in statistics.values() for group in table.index]
-    low = min(min(float(np.min(r["animals"])), r["ci_low"]) for r in rows)
-    high = max(max(float(np.max(r["animals"])), r["ci_high"]) for r in rows)
-    label_gain_axis(ax, YLABEL, floor=min(-0.12, low - 0.08 * (high - low)))
-    ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
+def draw_shared_raw(ax: Axes, statistics: SharedContentStatistics) -> None:
+    """Panel f: the agreement and the width-matched shuffled-event reference
+    by width, for no-SWR and SWR events (``statistics``: :func:`read_inputs`'
+    ``shared``), by ``heldout_gain_panels.draw_width_series``; the reference
+    named once at the lower left, the groups at the top right, a dashed line
+    at zero, no place preferred."""
+    draw_width_series(ax, statistics.agreement, statistics.reference)
+    name_width_groups(ax, 0.98)
+    name_width_reference(ax, "lower left")
+    low, high = ax.get_ylim()
+    # room below the lowest reference for its name
+    ax.set_ylim(low - 0.3 * (high - low), high)
+    ax.set_ylabel(SHARED_RAW_YLABEL)
+    ax.set_title(SHARED_RAW_TITLE, fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
@@ -1237,7 +1151,7 @@ def draw_step_test(ax_share: Axes, ax_count: Axes, statistics: dict) -> None:
 
 
 def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
-    """The MUA panel, drawn as Figure 2i draws ripple power
+    """The MUA panel, drawn as Figure 2h draws ripple power
     (``signal_share_panels.draw_share_by_signal``): where the non-local time
     sits in MUA (top) and the share of immobile bins decoded non-local at each
     MUA level (bottom), with the MUA level of the reported values and the
@@ -1396,43 +1310,6 @@ def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
     axes[len(axes) // 2].set_xlabel("Time from event start (ms)", loc="left")
 
 
-def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
-    """The posterior-spread panel: for no-SWR and SWR events, the percent of
-    the class's events in each HPD coverage bin on a log axis, a thin line per
-    animal and their mean in bold in the class's color, the classes named in
-    their colors, and a dotted line at the tight cut
-    (``distribution``: :func:`read_inputs`' ``hpd``)."""
-    for group, color in GROUP_COLORS.items():
-        mine = distribution[distribution["group"] == group]
-        by_animal = mine.pivot(index="bin_low", columns="animal", values="percent")
-        high = mine.groupby("bin_low")["bin_high"].first()
-        center = np.sqrt(by_animal.index.to_numpy() * high.to_numpy())
-        ax.plot(center, by_animal.to_numpy(), color=color, lw=0.5, alpha=0.5)
-        ax.plot(center, by_animal.mean(axis=1).to_numpy(), color=color, lw=1.2)
-    ax.axvline(HPD_TIGHT_CM, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
-    ax.text(
-        HPD_TIGHT_CM / 1.08, 0.98, f"{HPD_TIGHT_CM:g} cm",
-        transform=ax.get_xaxis_transform(), ha="right", va="top",
-        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-    )  # fmt: skip
-    for k, (name, color) in enumerate(
-        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
-    ):
-        ax.text(
-            0.98, 0.98 - 0.1 * k, name, transform=ax.transAxes, ha="right",
-            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
-        )  # fmt: skip
-    ax.set_xscale("log")
-    ax.set_xlim(HPD_BIN_EDGES_CM[0], HPD_BIN_EDGES_CM[-1])
-    ax.set_xticks(HPD_TICKS_CM, [f"{t:g}" for t in HPD_TICKS_CM])
-    ax.xaxis.set_minor_locator(NullLocator())
-    top = distribution.groupby(["group", "bin_low"])["percent"].max().max()
-    ax.set_ylim(0, 1.35 * top)  # room for the names above the lines
-    ax.set_xlabel(HPD_XLABEL)
-    ax.set_ylabel(HPD_YLABEL)
-    ax.set_title("Posterior spread", fontsize=SMALL_SIZE, pad=3)
-
-
 def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
     """The distance panel: for no-SWR and SWR events, the percent of the
     class's events whose content lies within each distance of the animal (the
@@ -1490,7 +1367,7 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
 
 
 def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -> None:
-    """Panel m: Figure 2j's three axes with the fourth decoder (``statistics``:
+    """Panel l: Figure 2k's three axes with the fourth decoder (``statistics``:
     :func:`read_inputs`' ``four_decoders``), in
     ``restriction_totals.RESTRICTION_FIGURE_FAMILY`` per spike. First axis: the
     SWR-only, SWR-allowed and full decoders over the local-only decoder over
@@ -1546,105 +1423,25 @@ def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -
     ax_events.set_title(EVENTS_TITLE, fontsize=SMALL_SIZE, pad=3)
 
 
-LOW_RATE_TITLES = {
-    "gain_mark_per_spike": "Gain, mark part",
-    "mark_information_per_spike": "Mark information",
-}
-"""Panel n's small axes, by ``LOW_RATE_FIGURE_MEASURES``: each one's title."""
-LOW_RATE_X = {
-    ("no SWR", "low_rate"): 0.0,
-    ("SWR", "low_rate"): 1.0,
-    ("no SWR", "other"): 2.6,
-    ("SWR", "other"): 3.6,
-}
-"""Panel n's small axes: each group and place group's x position, the two
-groups side by side at each place group (their colors named on the left
-axis)."""
-PLACE_NAMES = {"low_rate": "Low-rate\nplaces", "other": "Other\nplaces"}
-LOW_RATE_SHADE = "#e6e6e6"
-"""The lowest tenth's shading on panel n's left axis."""
-
-
-def draw_low_rate(axes: Sequence[Axes], statistics: LowRateStatistics) -> None:
-    """Panel n (``statistics``: :func:`read_inputs`' ``low_rate``). Left: the
-    share of each group's events' places in each tenth of the place-rate rank, a thin
-    line per animal and the mean in bold in the group's color, chance dashed
-    and the lowest tenth shaded. Then one small axis per measure of
-    ``LOW_RATE_FIGURE_MEASURES``: the low-rate events (open dots) then the
-    others (filled), no-SWR and SWR events side by side in their colors, a
-    dot per animal and the mean with its interval, as panel f, and a dashed
-    zero line."""
-    ax_tenths, *ax_measures = axes
-    tenths = statistics.tenths
-    n_bins = len(tenths.index.get_level_values("rank_bin").unique())
-    centers = 100 * (np.arange(n_bins) + 0.5) / n_bins
-    ax_tenths.axvspan(0, 100 / n_bins, color=LOW_RATE_SHADE, lw=0, zorder=0)
-    ax_tenths.axhline(100 / n_bins, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-    for k, (group, color) in enumerate(GROUP_COLORS.items()):
-        mine = tenths.loc[group].sort_index()
-        animals = mine.drop(columns="animal_mean")
-        ax_tenths.plot(
-            centers, 100 * animals.to_numpy(), color=color, lw=0.5, alpha=0.5
-        )
-        ax_tenths.plot(centers, 100 * mine["animal_mean"], color=color, lw=1.2)
-        ax_tenths.text(
-            0.98, 0.98 - 0.22 * k, GROUP_NAMES[k], transform=ax_tenths.transAxes,
-            ha="right", va="top", fontsize=SMALL_SIZE,
-            color=readable_text_color(color),
-        )  # fmt: skip
-    ax_tenths.text(
-        100 / n_bins, 0.98, " low rate", transform=ax_tenths.get_xaxis_transform(),
-        ha="left", va="top", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-    )  # fmt: skip
-    ax_tenths.set_xlim(0, 100)
-    ax_tenths.set_xticks([0, 50, 100])
-    # room above the lines for the groups' names
-    ax_tenths.set_ylim(0, 1.45 * ax_tenths.get_ylim()[1])
-    ax_tenths.set_xlabel("Rate rank of the place (%)")
-    ax_tenths.set_ylabel("% of event\nplaces")
-    ax_tenths.set_title("Low-rate places", fontsize=SMALL_SIZE, pad=3)
-    for ax, column in zip(ax_measures, LOW_RATE_FIGURE_MEASURES, strict=True):
-        split = statistics.measures[column]
-        for (group, place), x in LOW_RATE_X.items():
-            draw_animal_gain(
-                ax, x, split.loc[(place, group)], GROUP_COLORS[group],
-                hollow=place == "low_rate",
-            )  # fmt: skip
-        ax.axhline(0, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-        ax.set_xlim(-0.5, max(LOW_RATE_X.values()) + 0.6)
-        places = {
-            place: np.mean([x for (_, p), x in LOW_RATE_X.items() if p == place])
-            + MEAN_OFFSET / 2
-            for place in PLACE_NAMES
-        }
-        ax.set_xticks(list(places.values()), list(PLACE_NAMES.values()))
-        ax.tick_params(axis="x", length=0)
-        ax.set_title(LOW_RATE_TITLES[column], fontsize=SMALL_SIZE, pad=3)
-        ax.yaxis.set_major_locator(MaxNLocator(3))
-    ax_measures[0].set_ylabel("Held-out score\n(nats/spike)")
-
-
 PANEL_GRIDS = {
     "nonlocal_mua": (2, 1),
     "rule_sweep": (2, 3),
     "step_test": (1, 2),
     "event_traces": (1, len(TRIGGERED_SIGNALS)),
     "four_decoders": (1, 3),
-    "low_rate": (1, 1 + len(LOW_RATE_FIGURE_MEASURES)),
 }
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
-PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35), "low_rate": (1.2, 1, 1)}
-"""The widths of a panel's columns, as shares (equal when not named): panel m's
-as Figure 2j's three axes."""
+PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35)}
+"""The widths of a panel's columns, as shares (equal when not named): panel l's
+as Figure 2k's three axes."""
 PANEL_COLUMN_GAPS = {
     "step_test": 0.6,
     "event_traces": 0.12,
     "four_decoders": 0.16,
-    "low_rate": 0.15,
 }
 """A panel's gap between its axes' columns, as a share of its frame's width,
 where :data:`GRID_GAP`'s is too small (the step panel's property names)."""
@@ -1698,19 +1495,17 @@ def generate_figure(statistics: dict) -> Figure:
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_event_traces(axes["event_traces"], statistics["event_traces"])
     draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
-    draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
+    draw_shared_raw(axes["shared_raw"][0], statistics["shared"])
     draw_participation(axes["participation"][0], statistics["participation"])
     draw_outside_swr_series(
         axes["outside_distance"][0], statistics["outside"], statistics["parts"]
     )
-    draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_content_distance(axes["content_distance"][0], statistics["distance"])
     draw_step_test(*axes["step_test"], statistics["step_test"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
     draw_four_decoders(axes["four_decoders"], statistics["four_decoders"])
-    draw_low_rate(axes["low_rate"], statistics["low_rate"])
     fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
     # panel; the rows' first panels share the left column and its letter edge
@@ -1745,7 +1540,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     fig = generate_figure(read_inputs(args.workers))
-    check_journal_limits(fig, max_height_cm=MAX_HEIGHT_CM)
+    check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
     save_figure(fig, "supp_figure02", base_dir=args.output_dir)
     plt.close("all")

@@ -54,7 +54,7 @@ WIDTH_BIN_LABELS = ("<25", "25–50", "50–100", "100–200", "≥200")
 
 WIDTH_COLUMN = "hpd_cm"
 """The ``tetrode_holdout.window_scores`` column the events are binned on: the
-95 % HPD length of the other tetrodes' position estimate (Figure 2h's x
+95 % HPD length of the other tetrodes' position estimate (Figure 2j's x
 axis)."""
 
 SHARED_CONTENT_COLUMNS = {
@@ -187,7 +187,7 @@ def agreement_by_width_statistics(
 
 
 class SharedContentStatistics(NamedTuple):
-    """Figure 2h's statistics (:func:`shared_content_statistics`), each
+    """Figure 2j's statistics (:func:`shared_content_statistics`), each
     :func:`agreement_by_width_statistics` of one of
     :data:`SHARED_CONTENT_COLUMNS`: the agreement over every event, the
     reference and the difference over the width-matched windows only
@@ -204,7 +204,7 @@ def shared_content_statistics(
     """The agreement over every event, and the width-matched shuffled-event
     reference and the agreement minus it (over the windows whose donor's
     estimate is in the same width bin, :func:`width_matched`), by width bin
-    and group, as the events summary and Figure 2h read them.
+    and group, as the events summary and Figure 2j read them.
 
     Parameters
     ----------

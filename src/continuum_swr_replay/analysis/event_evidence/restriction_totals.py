@@ -32,7 +32,7 @@ holds it; :func:`outside_swr_not_observed_counts` counts those left out. The
 sums over all immobile time keep them: they are immobile time, inside an SWR
 or not.
 
-**All immobile time** (:func:`epoch_immobile_gains`; Figure 2j draws each
+**All immobile time** (:func:`epoch_immobile_gains`; Figure 2k draws each
 decoder's gain over the local-only decoder and their paired difference
 ``full - swr`` per spike):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
@@ -48,7 +48,7 @@ over the ``immobile_outside_swr`` bins inside a well visit, where ``swr`` may
 not use the non-local states and ``full`` may, so ``full - swr`` is what the
 non-local states buy outside SWRs:
 
-- the gain per spike and per second (the second column of Figure 2j's second
+- the gain per spike and per second (the second column of Figure 2k's second
   axis);
 - the share in the given events with no SWR, and the share in the given events'
   time outside the SWR of those that overlap one: the events' summed
@@ -72,7 +72,7 @@ non-local states buy outside SWRs:
 :func:`inside_swr_gain_statistics`): the same ``full - swr`` per spike and per
 second over the ``immobile_in_swr`` bins inside a well visit, where the
 SWR-only decoder must use the non-local states and the full decoder may use
-any state (Figure 2j's second axis draws it per spike).
+any state (Figure 2k's second axis draws it per spike).
 
 **Parts of the time outside SWRs** (:func:`epoch_outside_swr_subset_gains`,
 :func:`outside_swr_subset_statistics`): the same gain, per spike and per
@@ -977,7 +977,7 @@ def outside_swr_statistics(
     time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame
 ) -> pd.DataFrame:
     """:func:`outside_swr_gain_statistics` over :func:`epoch_outside_swr_gains`,
-    indexed by ``family`` and ``measure``: the statistics Figure 2j, Figure 2's
+    indexed by ``family`` and ``measure``: the statistics Figure 2k, Figure 2's
     supplement and the events summary read of the immobile time outside SWRs."""
     return outside_swr_gain_statistics(
         epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -1066,29 +1066,29 @@ def _epoch_measure_statistics(
     return pd.DataFrame(parts)
 
 
-# --- Figure 2j ---------------------------------------------------------------
+# --- Figure 2k ---------------------------------------------------------------
 
 RESTRICTION_FIGURE_FAMILY = "filter"
-"""Figure 2j, the decoders compared, in one score family (the events summary's
+"""Figure 2k, the decoders compared, in one score family (the events summary's
 values of it carry the panel's tag; the other family's do not)."""
 RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
-"""Figure 2j's first axis: each decoder's gain over the local-only decoder per
+"""Figure 2k's first axis: each decoder's gain over the local-only decoder per
 spike of the immobile time inside a well visit, by its measure
 (:data:`IMMOBILE_MEASURES`), in drawing order (SWR-only, Full)."""
 RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
-"""Figure 2j's second axis, first column: the full decoder minus the SWR-only
+"""Figure 2k's second axis, first column: the full decoder minus the SWR-only
 decoder per spike of all the immobile time inside a well visit, each epoch's
 paired difference (:data:`IMMOBILE_MEASURES`)."""
 RESTRICTION_FIGURE_OUTSIDE_SWR = "gain_per_spike"
-"""Figure 2j's second axis, outside SWRs: the full decoder minus the SWR-only
+"""Figure 2k's second axis, outside SWRs: the full decoder minus the SWR-only
 decoder per spike of the immobile time outside SWRs inside a well visit
 (:data:`MEASURES`)."""
 RESTRICTION_FIGURE_INSIDE_SWR = "gain_per_spike"
-"""Figure 2j's second axis, inside SWRs: the full decoder minus the SWR-only
+"""Figure 2k's second axis, inside SWRs: the full decoder minus the SWR-only
 decoder per spike of the immobile time inside SWRs inside a well visit
 (:data:`SUBSET_MEASURES` of :func:`inside_swr_gain_statistics`)."""
 RESTRICTION_FIGURE_OUTSIDE_EVENTS = "outside_events_gain_per_spike"
-"""Figure 2j's third axis, second column: the full decoder minus the SWR-only
+"""Figure 2k's third axis, second column: the full decoder minus the SWR-only
 decoder per spike of the immobile time outside SWRs that no event detected from
 the held-out decode holds (:data:`MEASURES`)."""
 OUTSIDE_SWR_EVENT_WINDOWS = {
@@ -1105,12 +1105,12 @@ OUTSIDE_SWR_EVENT_WINDOW_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
 """The groups of :data:`OUTSIDE_SWR_EVENT_WINDOWS`, in order: events with no SWR, then
 the time outside the SWR of the events that overlap one."""
 RESTRICTION_FIGURE_EVENT_GROUP = SWR_LABELS[False]
-"""Figure 2j's third axis, first column: the group of
+"""Figure 2k's third axis, first column: the group of
 :data:`OUTSIDE_SWR_EVENT_WINDOWS` drawn, the held-out events with no SWR."""
 
 
 class RestrictionFigureStatistics(NamedTuple):
-    """Figure 2j's statistics (:func:`restriction_figure_statistics`), each
+    """Figure 2k's statistics (:func:`restriction_figure_statistics`), each
     indexed as the events summary reads it."""
 
     decoders: pd.DataFrame
@@ -1137,7 +1137,7 @@ class RestrictionFigureStatistics(NamedTuple):
 def restriction_figure_statistics(
     windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
 ) -> RestrictionFigureStatistics:
-    """Figure 2j's statistics, as the events summary computes them.
+    """Figure 2k's statistics, as the events summary computes them.
 
     Parameters
     ----------

@@ -6,7 +6,7 @@ by the level of a signal (the z-scored Kay consensus ripple power,
 non-local probability (Continuous plus Fragmented). The probability bins have
 the non-local events' threshold (``DEFAULT_NON_LOCAL_THRESHOLD``, 0.8) as an
 edge, so a bin decoded non-local (probability above 0.8) is a sum over the same
-table as every other count: Figure 2i's share of bins decoded non-local, the
+table as every other count: Figure 2h's share of bins decoded non-local, the
 share of non-local time below the SWR threshold, and their MUA counterparts on
 Figure 2's supplement cannot disagree.
 
@@ -225,7 +225,7 @@ def nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
 def animal_nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
     """Each animal's immobile time bins, and its non-local ones, by the level of
     ``signal``: ``event_statistics.animal_signal_counts`` of
-    :func:`nonlocal_counts`, the counts Figure 2i, its supplement and the events
+    :func:`nonlocal_counts`, the counts Figure 2h, its supplement and the events
     summary read.
 
     Parameters

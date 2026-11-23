@@ -161,8 +161,6 @@ the gain over local coding, its mark part, and the place information of the
 scored spikes' marks. The agreement minus the shuffled-event reference is not
 split by place group: low-rate events have narrow estimates, so their donors'
 widths would not match theirs (``shared_content``)."""
-LOW_RATE_FIGURE_MEASURES = LOW_RATE_MEASURES[1:]
-"""The scores Figure 2's supplement draws by place group, one axis each."""
 
 
 class LowRateStatistics(NamedTuple):

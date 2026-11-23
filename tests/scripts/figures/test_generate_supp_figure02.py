@@ -19,11 +19,12 @@ from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     OUTSIDE,
     _figure02_events,
-    _gain_statistics,
     _means_at,
     _measure_rows,
     _outside_rows,
     assert_spread_about,
+    assert_width_series,
+    shared_statistics,
 )
 
 TRIAL_FOLD_SETTINGS = {"n_folds": 5, "fold_design": "trials"}
@@ -114,29 +115,6 @@ def _distance() -> pd.DataFrame:
     )
 
     return content_distance_distribution(_distance_events())
-
-
-def _hpd() -> pd.DataFrame:
-    """``hpd_distribution`` of the HPD test's events."""
-    from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        hpd_distribution,
-    )
-    from tests.analysis.event_properties.test_event_statistics import _hpd_events
-
-    return hpd_distribution(_hpd_events())
-
-
-SPLIT = {
-    "gain_per_spike": ([0.52, 0.47, 0.25, 0.43, 0.46], [0.86, 0.8, 0.7, 0.75, 0.9]),
-    "spiking_gain_per_spike": ([0.3, 0.2, 0.1, 0.2, 0.25], [0.6, 0.5, 0.4, 0.5, 0.6]),
-    "silent_gain_per_spike": ([0.2, 0.25, 0.15, 0.2, 0.2], [0.25, 0.3, 0.3, 0.2, 0.3]),
-}
-"""Each part's animals, no SWR then SWR."""
-
-
-def _split_statistics() -> dict:
-    """``holdout_statistics`` of each part of the gain, by column."""
-    return {column: _gain_statistics(*groups) for column, groups in SPLIT.items()}
 
 
 EVIDENCE_SHARES = [0.25, 0.14, 0.26, 0.22, 0.12]
@@ -246,47 +224,21 @@ def _four_decoders():
     return swr_allowed_statistics(events, sums, bin_s)
 
 
-def _low_rate_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """The builder test's held-out tetrode windows with their extra scores,
-    and a place-rate run where each group and animal's narrowest event is a
-    low-rate event (rank 0.05) and the others are at rank 0.5."""
-    from tests.reported.test_reported_events_values import _extra_windows
-
-    windows = _extra_windows()
-    events = windows[windows["kind"] == "event"]
-    place_rate = events[["event_id", "animal", "epoch_id", "group"]].assign(
-        start_place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5),
-        end_place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5),
-    )
-    return windows, place_rate
-
-
-def _low_rate():
-    """``low_rate_statistics`` of :func:`_low_rate_inputs`."""
-    from continuum_swr_replay.analysis.event_properties.low_rate_places import (
-        low_rate_statistics,
-    )
-
-    return low_rate_statistics(*_low_rate_inputs())
-
-
 def _statistics() -> dict:
     return {
         "calibration": _calibration(),
         "sweep": _sweep(),
         "mua": _mua_counts(),
         "step_test": _step_test(),
-        "hpd": _hpd(),
         "distance": _distance(),
         "timing": _timing(),
-        "tetrode": _split_statistics(),
+        "shared": shared_statistics(),
         "participation": _participation(),
         "outside": _outside_rows(),
         "parts": _parts(),
         "no_spike": _no_spike_trace(),
         "event_traces": _event_traces(),
         "four_decoders": _four_decoders(),
-        "low_rate": _low_rate(),
     }
 
 
@@ -301,20 +253,17 @@ def drawn():
 
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     """In six rows, each a group the text cites in turn: the decoder (a, b),
-    the count is robust (c, d), the events are coordinated and specific (e to
-    h), ripple power and the held-out test (i, j), the animals agree and where
-    the content lies (k, l), the fourth decoder (m); each row's letters at one
-    height, the rows' first letters at one left edge, no heading."""
+    the count is robust (c, d), the events are coordinated (e to g), ripple
+    power and the held-out test (h, i), the animals agree and where the
+    content lies (j, k), the fourth decoder (l); each row's letters at one
+    height, the rows' first letters at one left edge, no heading; within the
+    common 20 cm height."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
+        "nonlocal_mua", "shared_raw", "participation", "step_test",
         "outside_distance", "event_traces", "content_distance", "four_decoders",
-        "low_rate",
     )  # fmt: skip
     fig = drawn
-    ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
-    assert ax_gain.get_title() == "Held-out tetrode"
-    assert ax_gain.get_ylabel() == "Held-out gain\nover local (nats/spike)"
     assert figure.panel_axes(fig, "no_spike_mua")[0].get_title() == "No-Spike state"
     assert (
         figure.panel_axes(fig, "boundary_timing")[0].get_title()
@@ -324,8 +273,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijklmn")
-    rows = ("ab", "cd", "efgh", "ij", "kl", "m", "n")
+    assert sorted(letters) == list("abcdefghijkl")
+    rows = ("ab", "cd", "efg", "hi", "jk", "l")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -334,46 +283,24 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     assert "Immobile, at wells" not in [
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
-    # above the common 20 cm until the lead chooses which panels stay
-    figure.check_journal_limits(fig, max_height_cm=figure.MAX_HEIGHT_CM)
-    assert figure.MAX_HEIGHT_CM == 22.5
+    figure.check_journal_limits(fig)
 
 
-def test_the_held_out_gain_panel_splits_the_gain_by_bins_with_and_without_spikes(drawn):
-    """For no-SWR then SWR events, three positions in the group's color (all
-    bins, the bins where the scored tetrode spiked, the silent bins): a dot per
-    animal, the mean with its interval beside them; the parts named so that a
-    reader needs no caption, the groups named over their positions, a dashed
-    zero line with its note."""
-    from matplotlib.colors import to_rgba
-
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    fig = drawn
-    (ax,) = figure.panel_axes(fig, "heldout_gain")
-    dots = [
-        c for c in ax.collections
-        if isinstance(c, matplotlib.collections.PathCollection)
-    ]  # fmt: skip
-    assert len(dots) == 6
-    for k, (_group, color) in enumerate(panels.GROUP_COLORS.items()):
-        for j, groups in enumerate(SPLIT.values()):
-            x = panels.split_x(k, j)
-            (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
-            np.testing.assert_allclose(mine.get_offsets()[:, 1], groups[k])
-            np.testing.assert_allclose(mine.get_facecolor()[0], to_rgba(color))
-            assert np.allclose(_means_at(ax, x), np.mean(groups[k]))
-    labels = [t.get_text() for t in ax.get_xticklabels()]
-    assert labels == 2 * list(panels.SPLIT_LABELS.values())
-    assert list(panels.SPLIT_LABELS.values()) == [
-        "All bins", "Bins with\na spike", "Silent\nbins",
-    ]  # fmt: skip
-    texts = [t.get_text() for t in ax.texts]
-    assert {"No SWR", "SWR", "no gain"} <= set(texts)
-    assert any(
-        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-        for line in ax.lines
-    )
+def test_the_raw_curves_panel_draws_the_agreement_and_the_reference(drawn):
+    """Panel f: Figure 2j's two curves, the agreement by width (dots, means and
+    a line per group) and the width-matched reference in open markers on a
+    dotted line, named once."""
+    (ax,) = figure.panel_axes(drawn, "shared_raw")
+    assert_width_series(ax)
+    references = [line for line in ax.lines if line.get_linestyle() == ":"]
+    assert len(references) == 2
+    for line in references:
+        assert line.get_marker() == "o" and line.get_markerfacecolor() == "white"
+    assert sorted(float(line.get_ydata()[0]) for line in references) == [-0.3, -0.15]
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+        "shuffled events, same width"
+    ]
+    assert ax.get_title() == figure.SHARED_RAW_TITLE
 
 
 def test_each_panels_values_carry_its_letter():
@@ -386,16 +313,13 @@ def test_each_panels_values_carry_its_letter():
         "rule_sweep": "rule_sweep",
         "boundary_timing": "boundary_timing",
         "nonlocal_mua": "nonlocal_mua",
-        "hpd": "hpd",
-        "tetrode_holdout": "heldout_gain",
-        "spike_rate": "heldout_gain",
+        "shared_content_raw": "shared_raw",
         "participation": "participation",
         "class_step": "step_test",
         "class_step_evidence": "step_test",
         "nonlocal_restriction_distance": "outside_distance",
         "content_distance": "content_distance",
         "nonlocal_restriction_swr_allowed": "four_decoders",
-        "low_rate": "low_rate",
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
@@ -547,40 +471,6 @@ def test_the_distance_panel_draws_the_content_distance_of_each_class(drawn):
     cuts = [line.get_xdata()[0] for line in ax.lines if line.get_linestyle() == ":"]
     assert cuts == [20.0, 100.0]
     assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
-
-
-def test_the_hpd_panel_draws_the_distribution_of_each_class(drawn):
-    """For each class, a thin line per animal and their mean in bold, in the
-    class's color, on a log x axis with the named ticks; a dotted line at the
-    tight cut; the classes named in their colors; a y axis from 0."""
-    from matplotlib.colors import to_rgba
-
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    distribution = _hpd()
-    fig = drawn
-    (ax,) = figure.panel_axes(fig, "hpd")
-    n_bins = len(figure.HPD_BIN_EDGES_CM) - 1
-    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
-    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
-    for group, color in panels.GROUP_COLORS.items():
-        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
-        mean = max(mine, key=lambda c: c.get_linewidth())
-        expected = (
-            distribution[distribution["group"] == group]
-            .pivot(index="bin_low", columns="animal", values="percent")
-            .mean(axis=1)
-        )
-        np.testing.assert_allclose(mean.get_ydata(), expected.to_numpy())
-    assert ax.get_xscale() == "log"
-    assert [t.get_text() for t in ax.get_xticklabels()] == [
-        "10", "25", "50", "100", "200", "400",
-    ]  # fmt: skip
-    (cut,) = [line for line in ax.lines if line.get_linestyle() == ":"]
-    np.testing.assert_allclose(cut.get_xdata(), figure.HPD_TIGHT_CM)
-    assert {"No SWR", "SWR", "50 cm"} <= {t.get_text() for t in ax.texts}
-    assert ax.get_ylim()[0] == 0
-    assert ax.get_title() == "Posterior spread"
 
 
 def test_the_step_panel_draws_each_animals_jump_and_the_counts(drawn):
@@ -804,7 +694,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijklmn"
+    assert FIGURES["S2"].panels == "abcdefghijkl"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -833,7 +723,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "analyzed_epoch_ids": lambda: ["e"],
         "read_complete_run": lambda folder, name, epochs: stored["scores"],
         "window_scores": lambda table: seen.setdefault("tetrode", table),
-        "holdout_statistics": lambda windows, kind, column: windows,
+        "shared_content_statistics": lambda windows: seen.setdefault("shared", windows),
         "read_participation": lambda folder, epochs, event_ids: seen.setdefault(
             "participation", event_ids
         ),
@@ -847,7 +737,6 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "no_spike": "trace",
             "event_traces": "traces",
         },
-        "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "content_distance_distribution": lambda events: seen.setdefault(
             "distance", events
         ),
@@ -856,9 +745,6 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_state_calibration": lambda folder: "calibration",
         "read_step_test": lambda folder, table: "steps",
         "require_extra_columns": lambda table, what: None,
-        "low_rate_statistics": lambda windows, place_rate: seen.setdefault(
-            "low_rate", (windows, place_rate)
-        ),
         "swr_allowed_statistics": lambda events, sums, bin_s: seen.setdefault(
             "four_decoders", (events, sums, bin_s)
         ),
@@ -877,10 +763,11 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
 def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visit(
     monkeypatch,
 ):
-    """The stored held-out tetrode run (held out in folds of whole trials)
-    scores every event; the figure, like the events summary, reads the rows
-    (every tetrode's) of the events that start inside a well visit, and the
-    held-out event run's events and time sums by the summary's reader."""
+    """The stored held-out tetrode run with its extra scores (held out in
+    folds of whole trials) scores every event; the figure, like the events
+    summary, reads the rows (every tetrode's) of the events that start inside a
+    well visit (panel f, the events alone), and the held-out event run's
+    events and time sums by the summary's reader."""
     inside = _figure02_events().assign(event_id=range(8))
     outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
     stored = {
@@ -893,31 +780,25 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     _patch_reading(monkeypatch, stored, seen)
     inputs = figure.read_inputs()
     assert list(seen["tetrode"]["event_id"]) == [0, 0, *range(1, 8)]
+    assert list(seen["shared"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
-    assert seen["hpd"]["event_id"].tolist() == list(range(8))
     assert seen["distance"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
         "calibration",
         "sweep",
         "mua",
         "step_test",
-        "hpd",
         "distance",
         "timing",
-        "tetrode",
+        "shared",
         "participation",
         "outside",
         "parts",
         "four_decoders",
-        "low_rate",
         "no_spike",
         "event_traces",
     ]
-    # panel n: the extra run's windows and the place-rate run, both over the
-    # selected events
-    windows, place_rate = seen["low_rate"]
-    assert list(place_rate["event_id"]) == [0, 0, *range(1, 8)]
     events, sums, bin_s = seen["four_decoders"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
 
@@ -935,7 +816,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
 def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     monkeypatch, notes, inputs_note, rerun
 ):
-    """Panel j is refused as Figure 2j is: from a restriction run off
+    """Panel i is refused as Figure 2k is: from a restriction run off
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {
@@ -950,7 +831,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "outside_swr_statistics", refuse)
-    with pytest.raises(ValueError, match="panel j is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel i is not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 
@@ -984,7 +865,7 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
 
 
 def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):
-    """Panel m is refused on the same grounds as panel j, from its own
+    """Panel l is refused on the same grounds as panel i, from its own
     held-out event run (read by the same reader from its own folders)."""
     stored = {
         "table": _figure02_events().assign(event_id=range(8)),
@@ -1001,13 +882,13 @@ def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch
         "read_heldout_restriction",
         lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
     )
-    with pytest.raises(ValueError, match="panel m is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel l is not drawn") as refused:
         figure.read_inputs()
     assert "detect_heldout_events" in str(refused.value)
 
 
-def test_the_four_decoder_panel_draws_figure_2js_axes_with_the_fourth(drawn):
-    """Panel m: the SWR-only, SWR-allowed (open dots) and full decoders over
+def test_the_four_decoder_panel_draws_figure_2ks_axes_with_the_fourth(drawn):
+    """Panel l: the SWR-only, SWR-allowed (open dots) and full decoders over
     the local-only decoder; at each time, the full minus the SWR-allowed
     decoder (filled) and the SWR-allowed minus the SWR-only decoder (open),
     named in a legend; and the full minus the SWR-allowed decoder in the
@@ -1071,48 +952,3 @@ def test_the_four_decoder_panel_draws_figure_2js_axes_with_the_fourth(drawn):
     assert ax_events.get_ylabel() == (
         "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"
     )
-
-
-def test_the_low_rate_panel_draws_the_tenths_and_each_measure_by_place(drawn):
-    """Panel n: each group's share in each tenth of the rank, a thin line per
-    animal and the mean in bold, chance dashed, the lowest tenth shaded; then
-    one axis per measure, the low-rate events in open dots and the others
-    filled, no-SWR and SWR side by side, each from ``low_rate_statistics``."""
-    from matplotlib.colors import to_rgba
-
-    statistics = _low_rate()
-    ax_tenths, *ax_measures = figure.panel_axes(drawn, "low_rate")
-    assert ax_tenths.get_title() == "Low-rate places"
-    for group, color in figure.GROUP_COLORS.items():
-        (mean,) = [
-            line for line in ax_tenths.lines
-            if line.get_linewidth() == 1.2
-            and to_rgba(line.get_color()) == to_rgba(color)
-        ]  # fmt: skip
-        np.testing.assert_allclose(
-            mean.get_ydata(), 100 * statistics.tenths.loc[group, "animal_mean"]
-        )
-    assert any(
-        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 10.0)
-        for line in ax_tenths.lines
-    )
-    assert len(ax_tenths.patches) == 1  # the lowest tenth's shading
-    assert [ax.get_title() for ax in ax_measures] == list(
-        figure.LOW_RATE_TITLES.values()
-    )
-    for ax, column in zip(ax_measures, figure.LOW_RATE_FIGURE_MEASURES, strict=True):
-        assert [t.get_text() for t in ax.get_xticklabels()] == [
-            "Low-rate\nplaces", "Other\nplaces",
-        ]  # fmt: skip
-        for (group, place), x in figure.LOW_RATE_X.items():
-            (dots,) = [
-                c for c in ax.collections
-                if isinstance(c, matplotlib.collections.PathCollection)
-                and np.allclose(c.get_offsets()[:, 0], x)
-            ]  # fmt: skip
-            row = statistics.measures[column].loc[(place, group)]
-            np.testing.assert_allclose(
-                sorted(dots.get_offsets()[:, 1]), sorted(row["animals"])
-            )
-            assert (len(dots.get_facecolors()) == 0) == (place == "low_rate")
-            assert np.allclose(_means_at(ax, x), row["estimate"])
