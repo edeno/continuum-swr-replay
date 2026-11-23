@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them, in six rows:
+the order the text cites them, in five rows:
 
 - the decoder on these recordings (a to d): its states calibrated by held-out
   spikes, MUA in the No-Spike state, how the immobile time is spread over
@@ -9,16 +9,13 @@ the order the text cites them, in six rows:
 - the count is robust (e, f): the share of events with no SWR at other
   settings of the event rule and of the SWR detector, and the timing of events
   against their SWRs;
-- the left-out tetrode (g to i): non-local time against MUA, and Figure 2j's
-  two comparisons looked at more closely (over the animal's place by bins
-  with and without a spike; over another event's place by width, with the
-  two fits it is the difference of);
-- ripple power and the held-out test (j, k): no step in the events'
-  properties at the SWR threshold, and the gain outside SWRs away from the
+- the held-out tests (g to i): non-local time against MUA, Figure 2j's
+  first comparison looked at more closely (over the animal's place, by bins
+  with and without a spike), and Figure 2k's gain outside SWRs away from the
   SWRs;
-- the animals agree, and the posterior's spread (l, m): Figure 2g's traces
+- the animals agree, and the posterior's spread (j, k): Figure 2g's traces
   animal by animal, and the distribution of the width of the decoded place;
-- a fourth decoder (n): Figure 2k's comparison with the SWR-allowed decoder.
+- a fourth decoder (l): Figure 2k's comparison with the SWR-allowed decoder.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -99,7 +96,7 @@ the order the text cites them, in six rows:
     e — Supports Figure 2d, the share of events with no SWR. The text cites
         this panel twice: its event-rule axes with the count of events (the
         share changes little with the rule), and its SWR-threshold axis with
-        the ripple-power panels (Figure 2i, panel j), because the share follows
+        the ripple-power panel (Figure 2i), because the share follows
         the threshold, as a threshold on one distribution must. The share of
         the immobile non-local events that start inside a well visit with no
         SWR, at each value of three settings swept one at a time (the others
@@ -162,7 +159,7 @@ the order the text cites them, in six rows:
         decoded non-local. The panel does not show that non-local detection is
         independent of population bursts: the decoder needs spikes, so the two
         go together. It poses the question that the held-out tetrode panels
-        (Figure 2j, and h and i here) answer: whether the spikes point
+        (Figure 2j, and h here) answer: whether the spikes point
         to the decoded place.
 
     h — Supports Figure 2j, its first comparison: the left-out tetrode's
@@ -183,54 +180,7 @@ the order the text cites them, in six rows:
         ``*_heldout_gain_per_spike``, ``*_heldout_spiking_gain_*`` and
         ``*_heldout_silent_gain_*`` values).
 
-    i — Supports Figure 2j, its second comparison, by the width of the decoded
-        place (the 95 % HPD length of the other tetrodes' position estimate,
-        the mean over the event's bins and left-out tetrodes;
-        ``shared_content.WIDTH_BINS_CM``). Left: the left-out tetrode's better
-        fit to the decoded place than to another event's decoded place of the
-        same group, fold and width bin, a dot per animal for no-SWR and SWR
-        events in their colors, beside them the animals' mean with its 95 %
-        interval, a thin line through each group's means and a dashed line at
-        zero, equal fit; above, a thin strip sharing the x axis: the percent of
-        each group's events in each width bin, the mean over animals of each
-        animal's share (the mean over its epochs), with the lowest and highest
-        animal. Right: the two fits it is the difference of, each over a
-        uniform place: to this event's decoded place (filled) and to another
-        event's of the same width (open markers on a dotted line). Against a
-        uniform place a wide estimate scores below zero even when nothing is
-        shared, and the other event's fit depends on its width, hence the
-        matching (``shared_content.shared_content_statistics``, by
-        ``heldout_gain_panels.draw_width_series`` and ``draw_width_shares``;
-        ``Processed-Data/event_tetrode_holdout_extra``; the events summary's
-        ``*_shared_content_*`` values).
-
-    j — Supports Figure 2i, which shows no step in non-local time at the SWR
-        threshold: at the SWR detector's threshold, does an event property
-        jump (two kinds of events) or change smoothly with ripple power (one
-        continuum)? The step test of the one-class-or-two analysis
-        (``class_or_continuum``, ``scripts/event_properties/measure_ripple_class_structure.py``):
-        per animal and property, ``y ~ s(criterion)`` against
-        ``y ~ s(criterion) + (criterion >= 2 z)`` on the events within 1.5 z
-        of the threshold (cubic B-spline, 8 knots; the Kay criterion, no
-        covariate: ``event_statistics.main_step_fits``). Left, spike evidence
-        per spike: each animal's jump as a share of its SWR minus no-SWR
-        difference over all its events, with its 95 % interval, a filled dot
-        when the animal has a step (the term's interval excludes 0 and it
-        lowers the held-out error), against two dashed lines, 0 (no jump: one
-        continuum) and 1 (the whole difference is a jump: two kinds). Right,
-        the animals with a step in each property
-        (``event_statistics.threshold_step_statistics``). The other properties
-        are drawn as counts, not shares: where a property's SWR minus no-SWR
-        difference is near zero (posterior peak, HPD coverage) the share is
-        unstable. ``Processed-Data/ripple_class_structure/step_fits.csv``,
-        refused when it was not made from the current event table and
-        spike-evidence run; the events summary's ``step_*`` values.
-        The dip test of the events' peak ripple power is a reported value for
-        the text (``ripple_peak_*``), not drawn: on a stored simulation it
-        rejects in none of the two-class samples planted at the observed
-        separation, so it has no power here.
-
-    k — Supports Figure 2k: its main result, the full decoder's gain over the
+    i — Supports Figure 2k: its main result, the full decoder's gain over the
         SWR-only decoder outside SWRs, looked at more closely. Every value is
         over the immobile bins inside a well visit, which runs from the
         animal's first nose-poke at a reward well to its last poke-out there.
@@ -254,7 +204,7 @@ the order the text cites them, in six rows:
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
-    l — Supports Figure 2g, whose lines are the mean over animals of these
+    j — Supports Figure 2g, whose lines are the mean over animals of these
         lines: the same signals around the same events' starts (ripple
         power, MUA, theta power, head speed; ``triggered_analysis.TRIGGERED_SIGNALS``
         over the window ``TRIGGERED_WINDOW_S``), a thin line per animal and
@@ -264,7 +214,7 @@ the order the text cites them, in six rows:
         read from every analyzed epoch's decode frame in panel b's pass). The
         animals agree.
 
-    m — Supports Figure 2's case that the no-SWR events are specific: how
+    k — Supports Figure 2's case that the no-SWR events are specific: how
         concentrated the decoded position is, no-SWR against SWR events. Each
         event's HPD coverage is the length of track (cm) that holds 95 % of
         the decoded probability, averaged over the event's bins
@@ -280,7 +230,7 @@ the order the text cites them, in six rows:
         differs by animal and is known only from each decode's environment.
         The pooled class medians (``hpd_median_*``) are for the text.
 
-    n — Supports Figure 2k against a permissive comparator: a fourth decoder,
+    l — Supports Figure 2k against a permissive comparator: a fourth decoder,
         SWR-allowed (every state inside SWRs, only the local states outside
         them; open dots, a variant of SWR-only), scored with the other three
         in one pass under the stored fold fits
@@ -298,12 +248,11 @@ the order the text cites them, in six rows:
         SWRs in the no-SWR events detected from that run's held-out decode.
         Each a dot per animal and the animals' mean with its 95 % interval
         (``restriction_totals.swr_allowed_statistics``; the events summary's
-        values tagged S2n).
+        values tagged S2l).
 
-Panel h reads the held-out tetrode run and panel i the run with its extra
-scores, over the epochs the events summary reads, and refuse a run not held
-out in folds of whole trials (i also one without the extra scores), as the
-summary does. Panel k reads the held-out event run
+Panel h reads the held-out tetrode run over the epochs the events summary
+reads, and refuses a run not held out in folds of whole trials, as the summary
+does. Panel i reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
 (``reported.events.read_heldout_restriction``) and refuses it, as Figure 2k
@@ -311,15 +260,15 @@ does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Its
-values are the events summary's ``restriction_outside_swr_*`` values. Panel n
+values are the events summary's ``restriction_outside_swr_*`` values. Panel l
 reads the held-out event run made from the run with the fourth decoder
 (``Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events``) by
-the same reader and refuses it on the same grounds. Panels f, j and m read the
-canonical event table (j with the stored output it names); a, c, e and g read
+the same reader and refuses it on the same grounds. Panels f and k read the
+canonical event table; a, c, e and g read
 their stored outputs, d the decoder-quality run's table
 (``Processed-Data/decoder_quality/calibration.parquet``) as the events summary
 reads it. Each output is refused, as the summary marks its values
-pending, when it was not made from the current event table (e and j), over the
+pending, when it was not made from the current event table (e), over the
 analyses' subset, or from the current well visits (a, c, e and g; g also from the
 decodes the event features run records, as Figure 2i). Panel b reads every
 analyzed epoch's decode frame (``Processed-Data``), which takes a few minutes;
@@ -386,16 +335,8 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     outside_swr_subset_statistics,
     swr_allowed_statistics,
 )
-from continuum_swr_replay.analysis.event_evidence.shared_content import (
-    SharedContentStatistics,
-    shared_content_statistics,
-)
-from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
-    SPIKE_EVIDENCE_METRICS,
-)
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
-    require_extra_columns,
     window_scores,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -405,9 +346,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
-    main_step_fits,
     nonlocal_below_threshold_statistics,
-    threshold_step_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     MUA_LEVEL_Z,
@@ -431,7 +370,6 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_medians
 from continuum_swr_replay.data_loaders.epoch_register import (
-    analyzed_animals,
     analyzed_decode_files,
     analyzed_epoch_ids,
     require_analyzed_epochs,
@@ -440,13 +378,9 @@ from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     TETRODE_HOLDOUT_NAME,
-    event_spike_evidence_dir,
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
-    OTHER_STEP_PROPERTIES,
-    STEP_KNOTS,
-    STEP_WINDOW_Z,
     checked_reference,
     default_inputs,
     event_table_staleness,
@@ -454,11 +388,10 @@ from continuum_swr_replay.reported.events import (
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
-    spike_evidence_staleness,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import rel
-from continuum_swr_replay.runs.io import files_sha256, read_complete_run, sha256_file
+from continuum_swr_replay.runs.io import read_complete_run, sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
@@ -470,16 +403,11 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
     SPLIT_LABELS,
-    WIDTH_XLABEL,
     animal_values,
     draw_decoder_gain_axis,
     draw_full_minus_swr_axis,
     draw_split_gain,
-    draw_width_series,
-    draw_width_shares,
     label_gain_axis,
-    name_width_groups,
-    name_width_reference,
 )
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
@@ -502,23 +430,12 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width, five rows (the module's docstring).
 WIDTH = 6.5
-HEIGHT = 7.65
+HEIGHT = 6.7
 LEFT_OUT_YLABEL = "Left-out tetrode:\nbetter fit (nats/spike)"
-"""The y label of the left-out tetrode's comparisons (panels h and i)."""
+"""The y label of the left-out tetrode's split (panel h)."""
 EQUAL_FIT = "equal fit"
 """The name of their dashed zero line."""
 SPLIT_TITLE = "Decoded place over\nanimal's place"
-WIDTH_TITLE = "Decoded place over\nanother event's place"
-RAW_TITLE = "Each fit over a uniform place"
-RAW_YLABEL = "Fit over a uniform\nplace (nats/spike)"
-RAW_TITLE_PAD = 21
-"""Panel i: the right axis' title above the fits' names (points)."""
-WIDTH_XLABEL_Y = -0.92
-"""Panel i: the height of the one x label under both axes (axes fraction of
-the right axis), below the slanted bin names."""
-WIDTH_STRIP_SHARE = 0.27
-"""Panel i: the share of strip of shares by width takes of its column's
-height, above the difference."""
 TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
 """The timing table's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
 TIMING_CORNERS = {
@@ -536,14 +453,6 @@ RANGE_DROP = 0.28
 (cell heights, down)."""
 TIMING_CMAP = "bone_r"
 """The timing table's colormap: sequential, the posteriors' (prints in gray)."""
-STEP_PROPERTIES = {
-    "evidence": "Spike evidence",
-    **{key: name[0].upper() + name[1:] for key, name in OTHER_STEP_PROPERTIES.items()},
-}
-"""The step panel's properties, top to bottom, by their word in
-``step_fits.csv``, with their names."""
-STEP_REFERENCES = {0.0: "one continuum", 1.0: "two kinds"}
-"""The step panel's reference shares and what each would mean."""
 CALIBRATION_COLORS = {
     "Local": STATE_COLORS["Local"],
     "Non-Local Continuous": STATE_COLORS["Continuous"],
@@ -597,7 +506,7 @@ SERIES_START = 1.3
 the parts are 1 apart."""
 LAYOUT = (
     (
-        (0.892, 0.955),
+        (0.859, 0.949),
         (
             ("state_calibration", 0.09, 0.17),
             ("no_spike_mua", 0.405, 0.15),
@@ -605,27 +514,32 @@ LAYOUT = (
             ("decoded_distance", 0.845, 0.145),
         ),
     ),
-    ((0.69, 0.8), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
     (
-        (0.505, 0.59),
+        (0.629, 0.755),
+        (
+            ("rule_sweep", 0.085, 0.47),
+            ("boundary_timing", 0.71, 0.27),
+        ),
+    ),
+    (
+        (0.410, 0.514),
         (
             ("nonlocal_mua", 0.075, 0.12),
-            ("left_out_split", 0.295, 0.16),
-            ("left_out_width", 0.535, 0.455),
+            ("left_out_split", 0.29, 0.17),
+            ("outside_distance", 0.6, 0.38),
         ),
     ),
     (
-        (0.315, 0.396),
+        (0.219, 0.286),
         (
-            ("step_test", 0.085, 0.42),
-            ("outside_distance", 0.66, 0.32),
+            ("event_traces", 0.085, 0.58),
+            ("hpd", 0.8, 0.185),
         ),
     ),
     (
-        (0.178, 0.237),
-        (("event_traces", 0.085, 0.58), ("hpd", 0.8, 0.185)),
+        (0.055, 0.129),
+        (("four_decoders", 0.11, 0.87),),
     ),
-    ((0.039, 0.105), (("four_decoders", 0.11, 0.87),)),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -638,7 +552,7 @@ ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT
 """Each row's frames' bottom and top and its panels, left to right."""
 FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
 """Each panel's frame's left edge and width (figure width)."""
-LETTER_HEIGHT = 0.0235
+LETTER_HEIGHT = 0.0268
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
@@ -658,20 +572,20 @@ FOUR_DECODER_TIMES = {
     "inside_swr": "inside_swr",
     "outside_swr": "outside_swr",
 }
-"""Panel n, second axis: each time of ``restriction_totals.CONTRAST_TIMES``, in
+"""Panel l, second axis: each time of ``restriction_totals.CONTRAST_TIMES``, in
 drawing order, by its label's key in ``DIFFERENCE_LABELS``."""
 FOUR_DECODER_DIFFERENCES = {
     "full_minus_swr_allowed_per_spike": ("Full \u2212 SWR-allowed", False),
     "swr_allowed_minus_swr_per_spike": ("SWR-allowed \u2212 SWR-only", True),
 }
-"""Panel n, second axis: each difference of
+"""Panel l, second axis: each difference of
 ``restriction_totals.SWR_ALLOWED_FIGURE_DIFFERENCES``, its name in the legend
 and whether its dots are open (the one against the SWR-only decoder, of which
 the SWR-allowed decoder is a variant)."""
 FOUR_DECODER_STEP = 0.75
-"""Panel n, second axis: the x distance between the two differences at one time."""
+"""Panel l, second axis: the x distance between the two differences at one time."""
 FOUR_DECODER_GROUP = 2.0
-"""Panel n, second axis: the x distance between one time and the next."""
+"""Panel l, second axis: the x distance between one time and the next."""
 FOUR_DECODER_YLABEL = "Held-out log score\ndifference\n(nats/spike)"
 FOUR_DECODER_EVENTS_YLABEL = (
     "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"
@@ -686,7 +600,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     -------
     dict
         In panel order: ``calibration`` (a): :func:`read_state_calibration`;
-        ``no_spike`` (b) and ``event_traces`` (l): :func:`read_frame_traces`;
+        ``no_spike`` (b) and ``event_traces`` (j): :func:`read_frame_traces`;
         ``probability`` (c): ``nonlocal_probability.animal_probability_distribution``
         of the stored counts; ``distance`` (d):
         ``quality_metrics.animal_distance_by_local_probability`` of the
@@ -696,17 +610,14 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         :func:`read_mua_counts`; ``split`` (h): by column of
         ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics`` of the
         events of the canonical held-out tetrode run that start inside a well
-        visit, indexed by group; ``shared`` (i): ``shared_content_statistics``
-        of those events of the held-out tetrode run with its extra scores (a
-        run not held out in folds of whole trials, or without the extra
-        scores, is refused, ``reported.events.require_tetrode_holdout_folds``);
-        ``step_test`` (j): :func:`read_step_test`; ``outside`` (k):
-        ``outside_swr_statistics``
+        visit, indexed by group (a run not held out in folds of whole trials is
+        refused, ``reported.events.require_tetrode_holdout_folds``);
+        ``outside`` (i): ``outside_swr_statistics``
         over the held-out event run, indexed by family and measure; ``parts``
-        (k): ``outside_swr_subset_statistics`` of the margins over its time
+        (i): ``outside_swr_subset_statistics`` of the margins over its time
         sums, indexed by subset, threshold, family and measure; ``hpd``
-        (m): the selected events' ``hpd_distribution``;
-        ``four_decoders`` (n): ``swr_allowed_statistics`` over the held-out
+        (k): the selected events' ``hpd_distribution``;
+        ``four_decoders`` (l): ``swr_allowed_statistics`` over the held-out
         event run made from the run with the fourth decoder.
 
     Raises
@@ -716,23 +627,16 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
-    extra_dir = inputs.tetrode_holdout_extra
-    require_tetrode_holdout_folds(read_output_manifest(extra_dir), rel(extra_dir))
-    table = read_swr_table(inputs.event_table)
-    epochs = event_table_epochs(table, analyzed_epoch_ids())
-    events = select_visit_context(table)
-    # panel i: the held-out tetrode run with its extra scores, over the
-    # selected events
-    extra = select_events_in(
-        read_complete_run(extra_dir, TETRODE_HOLDOUT_NAME, epochs), events["event_id"]
-    )
-    require_extra_columns(extra, rel(extra_dir))
-    windows = window_scores(extra)
-    # panel h: the canonical held-out tetrode run, over the selected events
+    # panel h: the canonical held-out tetrode run, refused before anything is
+    # read when it was not held out in folds of whole trials
     canonical_dir = inputs.tetrode_holdout
     require_tetrode_holdout_folds(
         read_output_manifest(canonical_dir), rel(canonical_dir)
     )
+    table = read_swr_table(inputs.event_table)
+    epochs = event_table_epochs(table, analyzed_epoch_ids())
+    events = select_visit_context(table)
+    # panel h's run over the selected events
     canonical = window_scores(
         select_events_in(
             read_complete_run(canonical_dir, TETRODE_HOLDOUT_NAME, epochs),
@@ -752,7 +656,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     if refusal is not None:
         cause, rerun = refusal
         raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
-    # panel n: the run with the fourth decoder, read and refused as above
+    # panel l: the run with the fourth decoder, read and refused as above
     four = read_heldout_restriction(
         inputs.nonlocal_restriction_swr_allowed_heldout_events,
         inputs.nonlocal_restriction_swr_allowed,
@@ -772,14 +676,12 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "distance": read_decoded_distance(inputs.decoder_quality),
         "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
-        "step_test": read_step_test(inputs.class_structure, inputs.event_table),
         "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
         "split": {
             column: holdout_statistics(canonical, "event", column)
             for column in SPLIT_LABELS
         },
-        "shared": shared_content_statistics(windows[windows["kind"] == "event"]),
         "outside": outside_swr_statistics(
             heldout.time_sums, heldout.bin_s, heldout.events
         ),
@@ -911,49 +813,6 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
             f"{error}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
         ) from error
     return animal_nonlocal_counts(counts, "mua")
-
-
-def read_step_test(folder: Path, event_table: Path) -> dict:
-    """The step panel's statistics from the one-class-or-two output, as the
-    events summary reads them: the main setting's fits
-    (``event_statistics.main_step_fits``) and the animals with a step per
-    property (``event_statistics.threshold_step_statistics``).
-
-    Returns
-    -------
-    dict
-        ``fits`` (one row per property and animal) and ``counts`` (indexed by
-        property).
-
-    Raises
-    ------
-    ValueError
-        If the output was not made from the current event table over the
-        analyses' subset, or from the current spike-evidence run.
-    """
-    _refuse_stale(
-        folder, "step_test",
-        "scripts/event_properties/measure_ripple_class_structure.py analyze",
-        event_table=event_table,
-    )  # fmt: skip
-    evidence = sorted(event_spike_evidence_dir().glob(f"*/{SPIKE_EVIDENCE_METRICS}"))
-    stale = spike_evidence_staleness(
-        read_output_manifest(folder), files_sha256(evidence), rel(folder)
-    )
-    if stale is not None:
-        raise ValueError(
-            f"Figure 2's supplement: panel {LETTERS['step_test']} is not drawn: "
-            f"{stale}. Rerun scripts/event_properties/measure_ripple_class_structure.py."
-        )
-    steps = pd.read_csv(folder / "step_fits.csv")
-    n_animals = len(analyzed_animals())
-    return {
-        "fits": main_step_fits(steps, STEP_KNOTS, STEP_WINDOW_Z, n_animals),
-        "counts": threshold_step_statistics(
-            steps, STEP_KNOTS, STEP_WINDOW_Z, n_animals
-        ),
-        "n_animals": n_animals,
-    }
 
 
 def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
@@ -1142,56 +1001,6 @@ def draw_left_out_split(ax: Axes, statistics: dict) -> None:
     ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
 
 
-def draw_left_out_width(
-    ax_share: Axes, ax: Axes, ax_raw: Axes, statistics: SharedContentStatistics
-) -> None:
-    """Panel i: Figure 2j's second comparison by width. Left, the left-out
-    tetrode's better fit to the decoded place than to another event's decoded
-    place of the same width bin, for no-SWR and SWR events, by the width of
-    the decoded place (``statistics.difference``, by
-    ``heldout_gain_panels.draw_width_series``), the groups named at the top
-    right and the dashed zero line :data:`EQUAL_FIT`; above it, the share of
-    each group's events in each width bin
-    (``heldout_gain_panels.draw_width_shares``). Right, the two fits it is the
-    difference of, each over a uniform place (``statistics.agreement`` filled,
-    ``statistics.reference`` open on a dotted line), named once at the lower
-    left."""
-    draw_width_series(ax, statistics.difference)
-    draw_width_shares(ax_share, ax, statistics.agreement)
-    name_width_groups(ax, 0.98, step=0.22)
-    name_equal_fit(ax)
-    low, high = ax.get_ylim()
-    ax.set_ylim(min(low, -0.3 * high), high)  # room above zero for its name
-    ax.set_ylabel(LEFT_OUT_YLABEL)
-    ax_share.set_title(WIDTH_TITLE, fontsize=SMALL_SIZE, pad=3)
-    draw_width_series(ax_raw, statistics.agreement, statistics.reference)
-    # the fits named above the axis, in the room of the strip on the left
-    name_width_reference(ax_raw, "lower left", (-0.22, 1.0))
-    ax_raw.set_ylabel(RAW_YLABEL)
-    ax_raw.set_title(RAW_TITLE, fontsize=SMALL_SIZE, pad=RAW_TITLE_PAD)
-    for each in (ax, ax_raw):  # the bins' names slanted, so that they part
-        plt.setp(
-            each.get_xticklabels(), rotation=35, ha="right", rotation_mode="anchor"
-        )
-    # the strip's top tick only, clear of the difference's top tick under it,
-    # its unit (percent of events) in the tick, at the right, clear of the
-    # difference's y label
-    top = ax_share.get_yticks()[-1]
-    ax_share.set_yticks([top], [f"{top:g} %"])
-    ax_share.yaxis.tick_right()
-    ax_share.spines[["left"]].set_visible(False)
-    ax_share.spines[["right"]].set_visible(True)
-    ax_share.set_ylabel("")
-    # one x label under both axes, which share the bins
-    ax.set_xlabel("")
-    ax_raw.set_xlabel("")
-    ax_raw.text(
-        (ax.get_position().x0 + ax_raw.get_position().x1) / 2, WIDTH_XLABEL_Y,
-        WIDTH_XLABEL.replace("\n", " "), ha="center", va="top",
-        transform=blended_transform_factory(ax_raw.figure.transFigure, ax_raw.transAxes),
-    )  # fmt: skip
-
-
 def draw_outside_swr_series(
     ax: Axes, outside: pd.DataFrame, parts: pd.DataFrame
 ) -> None:
@@ -1221,51 +1030,6 @@ def draw_outside_swr_series(
         va="top",
         fontsize=SMALL_SIZE, annotation_clip=False,
     )  # fmt: skip
-
-
-def draw_step_test(ax_share: Axes, ax_count: Axes, statistics: dict) -> None:
-    """The step panel (``statistics``: :func:`read_step_test`). Left, spike
-    evidence: each animal's jump at the threshold as a share of its SWR minus
-    no-SWR difference with its 95 % interval, filled when the animal has a
-    step, open when not, against dashed lines at 0 (one continuum) and 1 (two
-    kinds). Right, the animals with a step in each property, as bars."""
-    fits = statistics["fits"]
-    evidence = fits[fits["property"] == "evidence"].reset_index(drop=True)
-    x = np.arange(len(evidence))
-    for k, row in evidence.iterrows():
-        ax_share.errorbar(
-            x[k], row["step_share_overall"],
-            yerr=[[row["step_share_overall"] - row["share_overall_ci_low"]],
-                  [row["share_overall_ci_high"] - row["step_share_overall"]]],
-            fmt="o", ms=3.5, lw=0.8, capsize=0, color="black",
-            mfc="black" if row["has_step"] else "white",
-        )  # fmt: skip
-    for level, meaning in STEP_REFERENCES.items():
-        ax_share.axhline(level, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
-        # past the frame's right edge, clear of the animals' intervals
-        ax_share.text(
-            1.03, level, meaning, transform=ax_share.get_yaxis_transform(),
-            ha="left", va="center", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-        )  # fmt: skip
-    ax_share.set_xlim(-0.6, x[-1] + 0.6)
-    ax_share.set_xticks([])
-    ax_share.set_xlabel("Animals")
-    ax_share.set_ylim(-0.3, 1.2)
-    ax_share.set_yticks([0, 0.5, 1])
-    ax_share.set_ylabel("Jump at threshold\n(share of SWR −\nno-SWR difference)")
-    ax_share.set_title("Spike evidence", fontsize=SMALL_SIZE, pad=3)
-    counts = statistics["counts"]["n_animals_with_step"]
-    y = np.arange(len(STEP_PROPERTIES))[::-1]
-    ax_count.barh(
-        y, [counts[p] for p in STEP_PROPERTIES], height=0.65, color="#999999", lw=0
-    )
-    ax_count.set_yticks(y, list(STEP_PROPERTIES.values()))
-    ax_count.tick_params(axis="y", length=0)
-    ax_count.set_xlim(0, statistics["n_animals"])
-    ax_count.set_xticks(range(statistics["n_animals"] + 1))
-    ax_count.set_ylim(-0.6, len(STEP_PROPERTIES) - 0.4)
-    ax_count.set_xlabel("Animals with a step")
-    ax_count.set_title("Step at the SWR threshold", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
@@ -1551,7 +1315,7 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
 
 
 def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -> None:
-    """Panel n: three axes with the fourth decoder (``statistics``:
+    """Panel l: three axes with the fourth decoder (``statistics``:
     :func:`read_inputs`' ``four_decoders``), in
     ``restriction_totals.RESTRICTION_FIGURE_FAMILY`` per spike. First axis: the
     SWR-only, SWR-allowed and full decoders over the local-only decoder over
@@ -1610,10 +1374,8 @@ def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -
 PANEL_GRIDS = {
     "nonlocal_mua": (2, 1),
     "rule_sweep": (2, 3),
-    "step_test": (1, 2),
     "event_traces": (1, len(TRIGGERED_SIGNALS)),
     "four_decoders": (1, 3),
-    "left_out_width": (1, 2),
 }
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
@@ -1621,33 +1383,24 @@ PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
 PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35)}
-"""The widths of a panel's columns, as shares (equal when not named): panel n's
+"""The widths of a panel's columns, as shares (equal when not named): panel l's
 three axes."""
 PANEL_COLUMN_GAPS = {
-    "left_out_width": 0.3,
-    "step_test": 0.6,
     "event_traces": 0.12,
     "four_decoders": 0.16,
 }
 """A panel's gap between its axes' columns, as a share of its frame's width,
-where :data:`GRID_GAP`'s is too small (the step panel's property names)."""
-
-
-STRIP_PANELS = ("left_out_width",)
-"""The panels whose first axes carries a strip above it (:data:`WIDTH_STRIP_SHARE`
-of its height), added after the panel's grid; the panel's other axes are made
-as low as the first."""
+where :data:`GRID_GAP`'s is not the one wanted."""
 
 
 def _n_axes(panel: str) -> int:
     rows, columns = PANEL_GRIDS.get(panel, (1, 1))
-    return rows * columns + (panel in STRIP_PANELS)
+    return rows * columns
 
 
 def panel_axes(fig: Figure, panel: str) -> list[Axes]:
-    """A panel's axes of a figure :func:`generate_figure` made, in the order
-    they were added: row by row (several for a panel of :data:`PANEL_GRIDS`),
-    then a strip of :data:`STRIP_PANELS`."""
+    """A panel's axes of a figure :func:`generate_figure` made, row by row
+    (several for a panel of :data:`PANEL_GRIDS`)."""
     start = sum(_n_axes(p) for p in PANELS[: PANELS.index(panel)])
     return fig.axes[start : start + _n_axes(panel)]
 
@@ -1685,31 +1438,14 @@ def generate_figure(statistics: dict) -> Figure:
             for r in range(rows)
             for c in range(columns)
         ]
-        if panel in STRIP_PANELS:
-            first = axes[panel][0]
-            box = first.get_position()
-            strip = box.height * WIDTH_STRIP_SHARE
-            first.set_position(
-                (box.x0, box.y0, box.width, box.height - strip - GRID_GAP[0] * strip)
-            )
-            axes[panel].insert(
-                0, fig.add_axes((box.x0, box.y1 - strip, box.width, strip))
-            )
-            for other in axes[panel][2:]:  # the other axes as low as the first
-                other.set_position(
-                    (*other.get_position().p0[:1], box.y0, other.get_position().width,
-                     first.get_position().height)
-                )  # fmt: skip
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_event_traces(axes["event_traces"], statistics["event_traces"])
     draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
     draw_left_out_split(axes["left_out_split"][0], statistics["split"])
-    draw_left_out_width(*axes["left_out_width"], statistics["shared"])
     draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_outside_swr_series(
         axes["outside_distance"][0], statistics["outside"], statistics["parts"]
     )
-    draw_step_test(*axes["step_test"], statistics["step_test"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])

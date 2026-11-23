@@ -2049,7 +2049,7 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     assert events.TAGS["nonlocal_power"].figures == ("2i",)
     # Figure 2's supplement, panel by panel
     # (each panel's tag: test_generate_supp_figure02)
-    assert events.TAGS["shared_content"].figures == ("S2i",)
+    assert events.TAGS["shared_content"].figures == ()
     # panel e's detectors are the analysis layer's, whose found shares the
     # summary tags with the panel
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
@@ -2514,114 +2514,6 @@ def test_figure02_cache_is_keyed_on_the_event_table_it_reads(offline, tmp_path):
     write_table(_figure02_events().iloc[:3], table)
     after = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
     assert before != after
-
-
-# --------------------------------------------------------------------------
-# Figure 2h: shared content (was the supplement's panel h)
-# --------------------------------------------------------------------------
-
-SHARED = {
-    ("no SWR", 0): [0.3, 0.25, 0.35, 0.2, 0.4],
-    ("SWR", 0): [0.2, 0.25, 0.3, 0.15, 0.22],
-}
-"""Panel h's animals in the narrowest spread bin; each wider bin is 0.1 lower."""
-
-
-SHARE_OF_EVENTS = {
-    "no SWR": [0.12, 0.2, 0.33, 0.1, 0.25],
-    "SWR": [0.1, 0.3, 0.3, 0.1, 0.2],
-}
-"""Each group's mean share of its events in each width bin; the animals' range
-is 0.02 either side."""
-REFERENCE = {"no SWR": -0.15, "SWR": -0.3}
-"""Each group's shuffled-event reference in every width bin."""
-DIFFERENCE_SHIFT = 0.3
-"""The difference's animals are the agreement's plus this."""
-
-
-def _width_rows(shift: float = 0.0) -> pd.DataFrame:
-    """Each width bin and group's animals (``SHARED`` 0.1 lower per bin, plus
-    ``shift``), their mean and an interval of 0.05 either side, and the shares
-    of :data:`SHARE_OF_EVENTS`."""
-    from continuum_swr_replay.visualization.heldout_gain_panels import (
-        WIDTH_BIN_LABELS,
-    )
-
-    rows = []
-    for k, label in enumerate(WIDTH_BIN_LABELS):
-        for group in ("no SWR", "SWR"):
-            animals = np.asarray(SHARED[(group, 0)]) - 0.1 * k + shift
-            mean = float(animals.mean())
-            share = SHARE_OF_EVENTS[group][k]
-            rows.append(
-                {
-                    "width_bin": label, "group": group, "animals": animals,
-                    "animal_names": np.array(list("abcde")), "estimate": mean,
-                    "ci_low": mean - 0.05, "ci_high": mean + 0.05,
-                    "share_of_events_animal_mean": share,
-                    "share_of_events_animal_min": share - 0.02,
-                    "share_of_events_animal_max": share + 0.02,
-                }
-            )  # fmt: skip
-    return pd.DataFrame(rows).set_index(["width_bin", "group"])
-
-
-def shared_statistics():
-    """``shared_content_statistics``: the agreement (:func:`_width_rows`), the
-    reference's means (:data:`REFERENCE`) and the difference (the agreement's
-    animals plus :data:`DIFFERENCE_SHIFT`)."""
-    from continuum_swr_replay.analysis.event_evidence.shared_content import (
-        SharedContentStatistics,
-    )
-
-    agreement = _width_rows()
-    reference = agreement.assign(
-        estimate=[REFERENCE[group] for _, group in agreement.index]
-    )
-    return SharedContentStatistics(agreement, reference, _width_rows(DIFFERENCE_SHIFT))
-
-
-def assert_width_series(
-    ax, shift: float = 0.0, xlabel: str | None = None, named: bool = True
-) -> None:
-    """Each group's dots per width bin on its side of the bin, its means with
-    their intervals farther out joined by a thin line in the group's color (the
-    animals of :func:`_width_rows` with ``shift``), the bins' labels, the x
-    label (``xlabel``, by default ``WIDTH_XLABEL``), a dashed zero line and,
-    when ``named``, the groups' names."""
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    assert [t.get_text() for t in ax.get_xticklabels()] == list(panels.WIDTH_BIN_LABELS)
-    assert panels.WIDTH_BIN_LABELS == ("<25", "25–50", "50–100", "100–200", "≥200")
-    bins = np.arange(len(panels.WIDTH_BIN_LABELS))
-    for side, group in ((-1, "no SWR"), (1, "SWR")):
-        expected = [np.mean(SHARED[(group, 0)]) - 0.1 * k + shift for k in bins]
-        (series,) = [
-            line for line in ax.lines
-            if len(line.get_xdata()) == bins.size
-            and np.allclose(line.get_xdata(), panels.width_means_x(side))
-            and line.get_linestyle() == "-"
-        ]  # fmt: skip
-        np.testing.assert_allclose(series.get_ydata(), expected, atol=1e-12)
-        for k in bins:
-            (dots,) = [
-                c for c in ax.collections
-                if isinstance(c, matplotlib.collections.PathCollection)
-                and np.allclose(
-                    c.get_offsets()[:, 0], k + side * panels.WIDTH_OFFSET, atol=0.1
-                )
-            ]  # fmt: skip
-            np.testing.assert_allclose(
-                sorted(dots.get_offsets()[:, 1]),
-                sorted(np.asarray(SHARED[(group, 0)]) - 0.1 * k + shift),
-            )
-    assert any(
-        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-        for line in ax.lines
-    )
-    assert ax.get_xlabel() == (panels.WIDTH_XLABEL if xlabel is None else xlabel)
-    if named:
-        assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
 
 
 GAIN_SPLIT = {

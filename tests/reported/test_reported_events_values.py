@@ -1354,15 +1354,10 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
         ]
         == 3
     )
-    # the supplement's panel S2g draws the difference and the animals' shares,
-    # with the counts, and the agreement and the reference; the pooled share
-    # is for the text
+    # no figure draws them by width: they are for the text
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        if name.endswith("_share_of_events"):
-            assert value.figures == (), name
-        else:
-            assert value.figures == ("S2i",), name
+        assert value.figures == (), name
     # five bins, two groups: agreement and reference (three values each), the
     # difference (four), the share positive (three), the share pooled and by
     # animal (four), the epochs, the events and the reference's events
@@ -2014,7 +2009,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     interval and epoch counts of the gain inside SWRs; the SWR-only and full
     decoders of the same pass over all immobile time; and the full minus the
     SWR-allowed decoder in the held-out no-SWR events. Figure 2's supplement
-    (S2m) draws the filter family's gains per spike of
+    (S2l) draws the filter family's gains per spike of
     ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value with its counts."""
     sums, bin_s, events = _swr_allowed_inputs()
     values = _by_key(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
@@ -2105,7 +2100,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("S2n",) if name in drawn else ()), name
+        assert value.figures == (("S2l",) if name in drawn else ()), name
     # no key of the canonical builders is made again
     canonical_keys = set(canonical) | set(
         _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
@@ -2115,7 +2110,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
 
 
 def test_swr_allowed_statistics_are_the_tagged_values():
-    """Figure 2's supplement, panel m, draws the rows the S2m values are made
+    """Figure 2's supplement, panel l, draws the rows the S2l values are made
     from."""
     sums, bin_s, events = _swr_allowed_inputs()
     statistics = builder.restriction_totals.swr_allowed_statistics(events, sums, bin_s)

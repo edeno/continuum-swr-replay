@@ -302,8 +302,8 @@ TAGS = {
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
-    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("S2j",)),
-    "class_step_evidence": Tags(("2b.5",), ("S2j",)),
+    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
+    "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2g",)),
     "rule_sweep": Tags(("2a.5",), ("S2e",)),
@@ -319,11 +319,11 @@ TAGS = {
     "tetrode_holdout_extra_figure": Tags(("2c.3",), ("2j",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2k",)),
-    "shared_content": Tags(("2c.3",), ("S2i",)),
-    "shared_content_raw": Tags(("2c.3",), ("S2i",)),
+    "shared_content": Tags(("2c.3",)),
+    "shared_content_raw": Tags(("2c.3",)),
     "shared_content_text": Tags(("2c.3",)),
-    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2k",)),
-    "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2n",)),
+    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2i",)),
+    "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2l",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -335,7 +335,7 @@ TAGS = {
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
-    "hpd": Tags(("2d.5",), ("S2m",)),
+    "hpd": Tags(("2d.5",), ("S2k",)),
     "content_distance": Tags(("2d.1",), ("S3c",)),
     "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
@@ -2393,7 +2393,7 @@ _EXTRA_RUN = (
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2's supplement (S2i): during an event, do the tetrodes point to
+    """Question 2c.3: during an event, do the tetrodes point to
     the same remote place? Over the events of each SWR group by the width of
     the other tetrodes' position distribution in fixed bins
     (``shared_content.shared_content_statistics``, on ``windows`` of a run with
@@ -2403,11 +2403,9 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     ``shared_content.width_matched``), each with its interval, and the
     matched windows; the share of events whose agreement is above zero; and
     the share of the group's events in the bin, each animal's then their mean
-    with the lowest and highest animal, and pooled. Figure 2's supplement,
-    panel i, draws the difference and the animals' shares, with the counts, and
-    the agreement and the reference (S2i); the pooled share is for the text
-    (Figure 2j draws the difference over all widths, from
-    :func:`tetrode_holdout_extra_values`)."""
+    with the lowest and highest animal, and pooled. No figure draws these by
+    width (Figure 2j draws the difference over all widths, from
+    :func:`tetrode_holdout_extra_values`); they are for the text."""
     make = value_factory(shared_content_values, source, TAGS["shared_content"])
     make_raw = value_factory(shared_content_values, source, TAGS["shared_content_raw"])
     make_text = value_factory(
@@ -3839,7 +3837,7 @@ def restriction_outside_swr_part_values(
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
     spike in :data:`RESTRICTION_FIGURE_FAMILY` away from the SWRs are drawn on
-    Figure 2's supplement and carry its panel's tag (S2k); the gain at
+    Figure 2's supplement and carry its panel's tag (S2i); the gain at
     well-sampled places is for the text."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
@@ -3974,7 +3972,7 @@ def restriction_immobile_values(
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
     decoder captures. No panel of Figure 2 draws these (Figure 2's supplement,
-    panel n, draws the decoders over the local-only decoder of the run with
+    panel l, draws the decoders over the local-only decoder of the run with
     the fourth decoder)."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
@@ -4069,7 +4067,7 @@ def restriction_swr_allowed_values(
     (``windows``, those that start inside a well visit), with the events and
     those with a value. The values Figure 2's supplement draws on its
     fourth-decoder panel (``restriction_totals.SWR_ALLOWED_FIGURE_*``, in
-    :data:`RESTRICTION_FIGURE_FAMILY` per spike) carry its tag (S2n); the rest
+    :data:`RESTRICTION_FIGURE_FAMILY` per spike) carry its tag (S2l); the rest
     is for the text."""
     make_text = value_factory(
         restriction_swr_allowed_values, source, TAGS["nonlocal_restriction"]
@@ -4174,8 +4172,8 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     ripple power (the z-scored Kay consensus on the decode grid). The dip
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs. No figure draws these: the dip test has no power
-    at the observed separation (the analysis's simulation), so Figure 2's
-    supplement, panel S2j, draws the step test.
+    at the observed separation (the analysis's simulation); the step test
+    (:func:`class_step_values`) is for the text too.
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
     stats = event_statistics.peak_ripple_mode_statistics(
@@ -4614,8 +4612,8 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
 
     This is the value over the properties other than spike evidence, which are
     read from the event table and the event features run;
-    :func:`class_step_evidence_values` holds spike evidence's. Figure 2's
-    supplement, panel S2j, draws the animals with a step per property.
+    :func:`class_step_evidence_values` holds spike evidence's. No figure draws
+    them.
     """
     most, attaining = event_statistics.most_steps(
         _step_statistics(steps), list(OTHER_STEP_PROPERTIES)
@@ -4880,7 +4878,7 @@ def _class_median_values(
 
 
 def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.5 and the posterior-spread panel of Figure 2's supplement (S2m):
+    """Question 2d.5 and the posterior-spread panel of Figure 2's supplement (S2k):
     the share of each class's events with a tight posterior, HPD coverage below
     ``event_statistics.HPD_TIGHT_CM``
     (``event_statistics.hpd_tight_share_statistics``), the animals in which the
