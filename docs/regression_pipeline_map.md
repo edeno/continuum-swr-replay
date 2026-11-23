@@ -1478,11 +1478,35 @@ How three content estimators agree, fit on one shared event set per session.
 
 `se_ratio_column`, `estimator_rows`, `attach_delta_aic`, `unidentified_rows`, `identified_rows`, `n_unpaired_triples`, `wide_by_estimator`, `summarize_estimators`, `bootstrap_animals`, `n_fits_delta_aic_row_mismatch`, `ComparisonResult`, `shared_session_rows`, `drop_undefined_concentration`, `run_comparison`
 
+### `src/continuum_swr_replay/analysis/replay_models/content/role_content.py`
+
+Content on the nine arms by arm role: the cohort, the design and the fit.
+
+`RoleContentSettings`, `assign_roles`, `RoleContentCohort`, `role_content_cohort`, `session_rows`, `ContrastReference`, `design_rows`, `role_terms`, `role_design`, `model_estimands`, `estimand_contrasts`, `tested_coefficients`, `RoleContentFit`, `fit_role_content`, `fit_role_content_session`, `tested_coefficient_collinearity`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/role_content_scenarios.py`
+
+Planted truths for the role content models, as functions of a session's rows.
+
+`ShareNoise`, `Truth`, `ScenarioReference`, `expected_shares`, `planted_values`, `planted_target`, `arm_effects`, `recency_curve`, `reward_curve`, `leaving_curve`, `Scenario`, `role_content_scenarios`, `truth_from_data`, `spread_truths`, `thin_events`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/role_content_statistics.py`
+
+The declared content estimands of the role models, per session and summarized.
+
+`session_estimands`, `penalized_edf`, `penalized_edf_summary`, `estimand_summaries`, `role_shares`, `within_arm_slopes`, `current_share_by_time_until_leaving`
+
 ### `src/continuum_swr_replay/analysis/replay_models/content/session_fits.py`
 
 Fit the content rungs on every session of a cohort.
 
 `fit_model_per_session`, `fit_conditional_logit_robustness`, `resolve_concentration_cols`, `fit_contrast_session`, `fit_contrast_ladder`, `fit_n_categories`, `fit_content_ladder`, `patch_models_for_source`, `patch_switch_models_for_source`, `fit_patch_hierarchy`, `fit_patch_switch`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/uncertainty_scenarios.py`
+
+Planted truths for the uncertainty model: can the measures be told from recency?
+
+`uncertainty_scenarios`
 
 ### `src/continuum_swr_replay/analysis/replay_models/coupling/swr_power.py`
 
