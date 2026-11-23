@@ -566,6 +566,17 @@ def test_marks_without_place_information_carry_no_part_of_the_scores(recording, 
     )
     windows["group"] = "no SWR"
     _, per_window, _ = _score_extra(detector, recording, windows, marks=marks)
+    # the marks' own place information: near 0 here, positive with the
+    # simulated marks, below log(n_place_bins) either way
+    n_places = np.log(
+        detector.encoding_model_[ENCODING_KEY]["environment"].is_track_interior_.sum()
+    )
+    flat = per_window["mark_information_per_spike"].median()
+    named = informative["mark_information_per_spike"].median()
+    print(f"mark information: {flat:.3f} flat, {named:.3f} named, bound {n_places:.3f}")
+    assert abs(flat) < 0.1 * named
+    assert 0 < named < n_places
+    assert (informative["spike_information_per_spike"] > 0).all()
     for score in ("gain", "agreement"):
         mark = per_window[f"{score}_mark_per_spike"].abs().median()
         rate = per_window[f"{score}_rate_per_spike"].abs().median()
@@ -685,3 +696,38 @@ def test_donors_are_other_windows_of_the_group_and_fold_and_seeded(recording, ex
     donors = th.null_donors(keyed, folds, 0)
     expected = np.where(donors >= 0, keyed["window_id"].to_numpy()[donors], -1)
     np.testing.assert_array_equal(by_id["null_window_id"].to_numpy(), expected)
+
+
+def test_place_information_is_a_property_of_the_spike_and_its_encoding(
+    recording, extra
+):
+    """Scored with only the first four tetrodes (another decode, other
+    distributions), those tetrodes' spikes carry the same place information,
+    window by window, while their agreement changes."""
+    recording, detector = recording
+    scores, _, _, windows, is_missing, _ = extra
+    subset = copy.deepcopy(detector)
+    fewer, _, _ = _score_extra(
+        subset,
+        sim.Recording(
+            time=recording.time,
+            position=recording.position,
+            is_running=recording.is_running,
+            spike_times=recording.spike_times[:4],
+            marks=recording.marks[:4],
+            events=recording.events,
+            region_tetrode=recording.region_tetrode,
+        ),
+        windows,
+        is_missing=is_missing,
+    )
+    key = ["window_id", "tetrode"]
+    mine = scores[scores["tetrode"] < 4].set_index(key).sort_index()
+    theirs = fewer.set_index(key).sort_index()
+    same = mine["n_scored_bins"] == theirs["n_scored_bins"]
+    assert same.mean() > 0.95
+    for column in ("mark_information", "spike_information", "n_information_spikes"):
+        np.testing.assert_allclose(
+            theirs.loc[same, column], mine.loc[same, column], rtol=1e-6, atol=1e-9
+        )
+    assert not np.allclose(theirs["agreement"], mine["agreement"])

@@ -60,7 +60,9 @@ agreement (``gain_rate``, ``agreement_rate``), and the shuffled-window
 reference of the agreement (``agreement_null``, ``agreement_null_silent``,
 ``agreement_null_rate``, ``n_null_bins``, ``n_null_spikes``,
 ``spread_null_cm``, ``hpd_null_cm``, ``null_window_id``), its donors drawn
-with ``--null-seed``. The header's settings record ``extra_scores`` (the HPD
+with ``--null-seed``, and the place information of the scored tetrode's spikes
+(``mark_information``, ``spike_information``, ``n_information_spikes``;
+``tetrode_holdout.spike_information``). The header's settings record ``extra_scores`` (the HPD
 coverage, the seed and the donor rule), so such a run neither resumes nor
 gathers with the canonical one. It must be given an ``--output-dir`` other
 than the canonical folder.

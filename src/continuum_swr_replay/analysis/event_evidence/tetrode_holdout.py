@@ -666,6 +666,96 @@ def rate_terms(ground: NDArray, counts: NDArray) -> NDArray[np.float64]:
     return np.asarray(counts, dtype=np.float64)[:, None] * np.log(ground) - ground
 
 
+GROUND_FLOOR_FACTOR = 1.001
+"""A place is at the floor of a tetrode's ground intensity where its expected
+spikes are at most this many times the library's ``EPS`` (``EPS`` is stored in
+the encoding's float32, 1.0000000036e-15, so an exact comparison would miss
+it)."""
+
+INFORMATION_CHUNK_SPIKES = 20_000
+"""Spikes per batch of :func:`spike_information`."""
+
+
+def _information(log_weights: NDArray, n_places: NDArray) -> NDArray:
+    """``log(n_places) - H(q)``, ``q`` proportional to ``exp(log_weights)``
+    over each row's finite entries, nats."""
+    # a row without a finite entry is NaN (its spike is not counted)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        top = log_weights.max(axis=1, keepdims=True)
+        weights = np.exp(log_weights - top)
+        total = weights.sum(axis=1, keepdims=True)
+        q = weights / total
+        cross = np.where(q > 0, q * (log_weights - top), 0.0).sum(axis=1)
+        entropy = np.log(total[:, 0]) - cross
+        return np.log(n_places) - entropy
+
+
+def spike_information(
+    terms: FoldTerms, *, chunk_spikes: int = INFORMATION_CHUNK_SPIKES
+) -> dict[str, NDArray]:
+    """Each spike's place information, from its own terms under its bin's
+    fold's encoding (nothing of the other tetrodes or of the decode).
+
+    For spike i of tetrode k:
+
+    - ``mark``: ``q_i(x)`` proportional to ``exp(log_intensity[i, x] - log
+      ground[k, x])``, the conditional density of the mark given a spike at x,
+      normalized over place with equal weight per place bin;
+    - ``spike``: ``p_i(x)`` proportional to ``exp(log_intensity[i, x])``, the
+      whole per-spike term (rate map and mark together);
+
+    each as ``log(n) - H``, nats: 0 when the spike is equally likely at every
+    place (a mark of a cell with no place field), ``log(n)`` when it points to
+    one place bin.
+
+    The place bins are the scores' (the real place bins). Floors: where
+    tetrode k's ground intensity is at its floor (:data:`GROUND_FLOOR_FACTOR`
+    times ``EPS``: no training spike of the tetrode near the place), the
+    conditional mark density is 0 over 0 and its value there is the floors'
+    ratio, an arbitrary 1; such places are left out of ``q_i`` and of its
+    ``n``, which is the number of the tetrode's places above the floor in the
+    spike's fold. A spike whose tetrode has fewer than 2 such places has no
+    ``mark`` information and is not counted (``counted`` false; the window
+    sums keep the count of those counted). A log intensity at its floor
+    (``log EPS``) at a place above the ground floor gives that place a weight
+    of about 0, which is what it is. ``p_i`` is over every real place bin, the
+    log intensity's floor giving a weight of about 0.
+
+    Parameters
+    ----------
+    terms : FoldTerms
+    chunk_spikes : int
+
+    Returns
+    -------
+    dict
+        ``mark`` and ``spike`` (float64, shape (n_spikes,); NaN where not
+        counted), ``counted`` (bool, shape (n_spikes,)) and ``n_places``
+        (int, shape (n_folds, n_tetrodes): the places above the ground floor).
+    """
+    from non_local_detector.likelihoods.common import EPS
+
+    ground = np.asarray(terms.ground, dtype=np.float64)
+    above = ground > GROUND_FLOOR_FACTOR * EPS
+    n_places = above.sum(axis=2)
+    log_ground = np.log(ground)
+    fold = terms.block[terms.time_bin]
+    n_spikes, n_bins = terms.log_intensity.shape
+    mark = np.full(n_spikes, np.nan)
+    spike = np.full(n_spikes, np.nan)
+    counted = n_places[fold, terms.tetrode] >= 2
+    for start in range(0, n_spikes, chunk_spikes):
+        batch = slice(start, min(start + chunk_spikes, n_spikes))
+        f, k = fold[batch], terms.tetrode[batch]
+        intensity = terms.log_intensity[batch].astype(np.float64)
+        conditional = np.where(above[f, k], intensity - log_ground[f, k], -np.inf)
+        mark[batch] = _information(conditional, n_places[f, k])
+        spike[batch] = _information(intensity, np.full(intensity.shape[0], n_bins))
+    mark[~counted] = np.nan
+    spike[~counted] = np.nan
+    return {"mark": mark, "spike": spike, "counted": counted, "n_places": n_places}
+
+
 NULL_DONOR_RULE = (
     "each event window whose bins lie in one fold takes a donor event window of "
     "the same group and fold: the windows of a group and fold, in a random order "
@@ -936,7 +1026,17 @@ def holdout_scores(
       ``agreement_null_silent``, ``agreement_null_rate``, ``n_null_bins``,
       ``n_null_spikes``, the donor's ``spread_null_cm`` and ``hpd_null_cm``
       (means over the donor bins used) and ``null_window_id``; NaN (and -1)
-      for a window without a donor.
+      for a window without a donor;
+    - the place information of the scored tetrode's spikes
+      (:func:`spike_information`), event and control windows alike: summed
+      over its spikes in the window's scored bins, ``mark_information`` (of
+      the conditional mark density given a spike at each place) and
+      ``spike_information`` (of the whole per-spike term), with
+      ``n_information_spikes``, the spikes counted (the reader divides by
+      it). It is a property of each spike and its fold's encoding. The
+      record keeps ``information_places``, each fold's and tetrode's places
+      above the ground floor (the bound of ``mark_information`` per spike is
+      their log).
 
     Parameters
     ----------
@@ -1033,6 +1133,26 @@ def holdout_scores(
         null_window_id = np.where(
             has_donor, windows["window_id"].to_numpy()[np.maximum(donors, 0)], -1
         )
+        # each spike's place information, summed per scored row and tetrode
+        information = spike_information(terms)
+        record["information_places"] = information["n_places"].tolist()
+        position = np.searchsorted(rows, terms.time_bin)
+        in_rows = (position < rows.size) & (
+            rows[np.minimum(position, rows.size - 1)] == terms.time_bin
+        )
+        kept = in_rows & information["counted"]
+        row_information = {
+            name: np.zeros((rows.size, terms.n_tetrodes))
+            for name in ("mark", "spike", "counted")
+        }
+        for name in ("mark", "spike"):
+            np.add.at(
+                row_information[name],
+                (position[kept], terms.tetrode[kept]),
+                information[name][kept],
+            )
+        np.add.at(row_information["counted"], (position[kept], terms.tetrode[kept]), 1)
+        del information
 
     parts = []
     record["smooth_s"] = []
@@ -1090,6 +1210,15 @@ def holdout_scores(
                 "gain_rate": np.where(scored, population_rate - local_rate, 0.0),
                 "agreement_rate": np.where(scored, population_rate - uniform_rate, 0.0),
                 "hpd_cm": np.where(scored, hpd, 0.0),
+                "mark_information": np.where(
+                    scored, row_information["mark"][:, k], 0.0
+                ),
+                "spike_information": np.where(
+                    scored, row_information["spike"][:, k], 0.0
+                ),
+                "n_information_spikes": np.where(
+                    scored, row_information["counted"][:, k], 0.0
+                ),
             }
             null = _null_sums(
                 mine,
@@ -1138,6 +1267,11 @@ def holdout_scores(
                             "agreement_rate": sums["agreement_rate"],
                             "hpd_cm": sums["hpd_cm"]
                             / np.maximum(sums["n_scored_bins"], 1),
+                            "mark_information": sums["mark_information"],
+                            "spike_information": sums["spike_information"],
+                            "n_information_spikes": np.rint(
+                                sums["n_information_spikes"]
+                            ).astype(np.int64),
                             **{
                                 name: np.where(has_donor, values, np.nan)
                                 for name, values in null.items()
@@ -1219,6 +1353,9 @@ EXTRA_COLUMNS = (
     "spread_null_cm",
     "hpd_null_cm",
     "null_window_id",
+    "mark_information",
+    "spike_information",
+    "n_information_spikes",
 )
 """The columns :func:`holdout_scores` adds with ``extras`` (a run made with
 ``--extra-scores``); the canonical run's tables have none of them."""
@@ -1234,6 +1371,9 @@ _SUMMED_EXTRA = (
     "agreement_null_rate",
     "n_null_bins",
     "n_null_spikes",
+    "mark_information",
+    "spike_information",
+    "n_information_spikes",
 )
 """The per-tetrode sums of :data:`EXTRA_COLUMNS` :func:`window_scores` adds
 when the table has them."""
@@ -1286,6 +1426,8 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         ``null_window_id``, and per spike: ``gain_rate_per_spike``,
         ``gain_mark_per_spike``, ``agreement_rate_per_spike`` and
         ``agreement_mark_per_spike`` (each pair adds to its score per spike),
+        ``mark_information_per_spike`` and ``spike_information_per_spike``
+        (over ``n_information_spikes``),
         and ``agreement_null_per_spike`` (over the spikes of the bins the
         reference scored, ``n_null_spikes``). A canonical table gives the
         canonical columns only (:func:`require_extra_columns` refuses it where
@@ -1320,6 +1462,15 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         windows["agreement_mark_per_spike"] = (
             windows["agreement"] - windows["agreement_rate"]
         ) / spikes
+        informative = windows["n_information_spikes"].where(
+            windows["n_information_spikes"] > 0
+        )
+        windows["mark_information_per_spike"] = (
+            windows["mark_information"] / informative
+        )
+        windows["spike_information_per_spike"] = (
+            windows["spike_information"] / informative
+        )
         null_spikes = windows["n_null_spikes"].where(windows["n_null_spikes"] > 0)
         windows["agreement_null_per_spike"] = windows["agreement_null"] / null_spikes
     return windows

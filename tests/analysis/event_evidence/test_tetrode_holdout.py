@@ -470,6 +470,9 @@ def _extra_rows() -> pd.DataFrame:
             "spread_null_cm": [80.0, 100.0, np.nan, np.nan],
             "hpd_null_cm": [90.0, 110.0, np.nan, np.nan],
             "null_window_id": [1, 1, -1, -1],
+            "mark_information": [3.0, 1.0, 0.0, 0.0],
+            "spike_information": [4.0, 2.0, 0.0, 0.0],
+            "n_information_spikes": [3, 1, 0, 0],
         }
     )
     assert set(th.EXTRA_COLUMNS) <= set(rows.columns)
@@ -489,6 +492,9 @@ def test_window_scores_carry_the_extra_columns_when_the_table_has_them():
     assert event["hpd_cm"] == pytest.approx(40.0)
     assert event["hpd_null_cm"] == pytest.approx(100.0)
     assert event["null_window_id"] == 1
+    assert event["mark_information_per_spike"] == pytest.approx(1.0)
+    assert event["spike_information_per_spike"] == pytest.approx(1.5)
+    assert np.isnan(windows.loc[1, "mark_information_per_spike"])
     # no donor: the reference is NaN, not 0
     assert np.isnan(windows.loc[1, "agreement_null"])
     assert np.isnan(windows.loc[1, "agreement_null_per_spike"])
@@ -604,3 +610,41 @@ def test_null_pairs_match_bins_by_offset_and_wrap():
     assert (owner == 1).all()
     empty = th.null_pairs(windows, np.full(len(windows), -1), rows)
     assert all(part.size == 0 for part in empty)
+
+
+def test_spike_information_by_hand():
+    """One fold, two tetrodes, four place bins; tetrode 0's ground is at the
+    floor at bin 3, tetrode 1's at every bin but one. Spike 0 (tetrode 0) has
+    the same conditional mark density at bins 0-2: no mark information; spike
+    1 (tetrode 0) points to bin 1: about log 3; spike 2 is of tetrode 1, with
+    one place above the floor: not counted."""
+    from non_local_detector.likelihoods.common import EPS
+
+    floor = np.float32(EPS)  # as the encoding stores it
+    ground = np.array([[[0.1, 0.2, 0.4, floor], [0.1, floor, floor, floor]]])
+    log_ground = np.log(ground[0, 0])
+    log_intensity = np.array(
+        [
+            [*(np.log(0.5) + log_ground[:3]), np.log(EPS)],
+            [-60.0, np.log(0.3), -60.0, np.log(EPS)],
+            [0.0, 0.0, 0.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    terms = th.FoldTerms(
+        ground=ground,
+        log_intensity=log_intensity,
+        time_bin=np.array([0, 1, 1]),
+        tetrode=np.array([0, 0, 1]),
+        block=np.zeros(2, dtype=np.int64),
+    )
+    out = th.spike_information(terms, chunk_spikes=2)
+    np.testing.assert_array_equal(out["n_places"], [[3, 1]])
+    np.testing.assert_array_equal(out["counted"], [True, True, False])
+    assert abs(out["mark"][0]) < 1e-6
+    assert out["mark"][1] == pytest.approx(np.log(3), abs=1e-6)
+    assert np.isnan(out["mark"][2]) and np.isnan(out["spike"][2])
+    # the whole term of spike 0 follows the ground (0.1, 0.2, 0.4, ~0)
+    p = np.array([0.1, 0.2, 0.4]) / 0.7
+    assert out["spike"][0] == pytest.approx(np.log(4) + (p * np.log(p)).sum(), abs=1e-6)
+    assert 0 < out["mark"][1] <= np.log(3) + 1e-9
