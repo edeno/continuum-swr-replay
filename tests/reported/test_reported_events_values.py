@@ -866,6 +866,34 @@ def test_property_values_name_each_property_class_and_direction():
     assert values["extent_animals_in_direction"].value == 1
 
 
+def test_content_distance_values_are_each_class_share_by_distance_band():
+    """Per class and band (under 20 cm, 20 to 100 cm, 100 cm or more): the
+    share pooled over events with no figure, and the mean over animals of each
+    animal's share with the lowest and highest animal, tagged to the
+    supplement's distance panel; and the two cuts."""
+    from tests.analysis.event_properties.test_event_statistics import (
+        _distance_events,
+    )
+
+    values = _by_key(builder.content_distance_values(_distance_events(), "s"))
+    assert len(values) == 2 * 3 * 4 + 2
+    key = "content_distance_under_non_swr_fraction"
+    assert values[key].value == pytest.approx(1 / 6)
+    assert values[f"{key}_animal_mean"].value == pytest.approx(1 / 12)
+    assert values[f"{key}_animal_max"].value == pytest.approx(1 / 6)
+    assert values["content_distance_beyond_swr_fraction_animal_mean"].value == (
+        pytest.approx(3 / 8)
+    )
+    assert values["content_distance_between_swr_fraction_animal_min"].value == 0.0
+    assert values["content_distance_near_cm"].value == 20.0
+    assert values["content_distance_remote_cm"].value == 100.0
+    for name, value in values.items():
+        assert value.questions == ("2d.1",)
+        pooled = name.endswith("_fraction")
+        assert value.figures == (() if pooled else ("S2l",)), name
+    assert "under 20 cm from the animal" in values[key].description
+
+
 def test_hpd_tight_values_are_the_share_below_the_cut():
     """The share of each class's events below the cut with its interval, the
     animals whose no-SWR share is higher and the cut, from the panel's

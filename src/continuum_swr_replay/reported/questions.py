@@ -124,9 +124,10 @@ FIGURES: dict[str, Figure] = {
         "the timing of events against their SWRs; non-local time against MUA, the "
         "posterior's spread, the held-out tetrode gain and tetrode participation; the "
         "step test at the SWR threshold and the gain outside SWRs away from the SWRs; "
-        "the traces around event starts, animal by animal",
+        "the traces around event starts, animal by animal, and the distance of the "
+        "content from the animal",
         "scripts/figures/generate_supp_figure02.py",
-        "abcdefghijk",
+        "abcdefghijkl",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",
@@ -291,7 +292,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3e", "3f"),
+        figures=("3e", "3f", "S2l"),
     ),
     Question(
         "2d.2",

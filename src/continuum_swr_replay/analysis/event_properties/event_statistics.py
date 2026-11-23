@@ -30,6 +30,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
@@ -1225,10 +1226,10 @@ HPD_BIN_EDGES_CM = np.geomspace(5.0, 500.0, 25)
 event's coverage lies inside them."""
 
 
-def _hpd_table(events: pd.DataFrame) -> pd.DataFrame:
-    """The events with a coverage: ``animal``, ``epoch_id`` (one label per
-    session), ``group`` (``"no SWR"`` or ``"SWR"``) and ``hpd_coverage_cm``."""
-    known = events.dropna(subset=["hpd_coverage_cm"])
+def _class_table(events: pd.DataFrame, column: str) -> pd.DataFrame:
+    """The events with a value of ``column``: ``animal``, ``epoch_id`` (one
+    label per session), ``group`` (``"no SWR"`` or ``"SWR"``) and ``column``."""
+    known = events.dropna(subset=[column])
     return pd.DataFrame(
         {
             "animal": known["animal"].to_numpy(),
@@ -1237,9 +1238,34 @@ def _hpd_table(events: pd.DataFrame) -> pd.DataFrame:
             .agg("_".join, axis=1)
             .to_numpy(),
             "group": np.where(known["is_swr"].astype(bool), "SWR", "no SWR"),
-            "hpd_coverage_cm": known["hpd_coverage_cm"].to_numpy(dtype=float),
+            column: known[column].to_numpy(dtype=float),
         }
     )
+
+
+def _class_distribution(
+    events: pd.DataFrame, column: str, edges: np.ndarray
+) -> pd.DataFrame:
+    """Each animal's distribution of a per-event property, by class: one row
+    per animal, class and bin, with ``animal``, ``group``, ``bin_low``,
+    ``bin_high`` and ``percent`` (the percent of the animal's events of the
+    class in the bin; a bin holds its low edge and not its high one)."""
+    table = _class_table(events, column)
+    rows = []
+    for (animal, group), mine in table.groupby(["animal", "group"]):
+        counts, _ = np.histogram(mine[column], bins=edges)
+        rows.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "group": group,
+                    "bin_low": edges[:-1],
+                    "bin_high": edges[1:],
+                    "percent": 100 * counts / len(mine),
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True)
 
 
 def hpd_distribution(
@@ -1264,22 +1290,7 @@ def hpd_distribution(
         ``bin_high`` and ``percent`` (the percent of the animal's events of the
         class in the bin).
     """
-    table = _hpd_table(events)
-    rows = []
-    for (animal, group), mine in table.groupby(["animal", "group"]):
-        counts, _ = np.histogram(mine["hpd_coverage_cm"], bins=edges)
-        rows.append(
-            pd.DataFrame(
-                {
-                    "animal": animal,
-                    "group": group,
-                    "bin_low": edges[:-1],
-                    "bin_high": edges[1:],
-                    "percent": 100 * counts / len(mine),
-                }
-            )
-        )
-    return pd.concat(rows, ignore_index=True)
+    return _class_distribution(events, "hpd_coverage_cm", edges)
 
 
 def hpd_tight_share_statistics(
@@ -1313,7 +1324,7 @@ def hpd_tight_share_statistics(
         ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
         their SWR share.
     """
-    table = _hpd_table(events)
+    table = _class_table(events, "hpd_coverage_cm")
     shares = (
         table.assign(tight=table["hpd_coverage_cm"] < cut_cm)
         .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
@@ -1328,6 +1339,100 @@ def hpd_tight_share_statistics(
     }
     higher = by_group["no SWR"] > by_group["SWR"].reindex(by_group["no SWR"].index)
     return {"rows": rows, "n_animals_non_swr_higher": int(higher.sum())}
+
+
+DISTANCE_COLUMN = "mean_abs_ahead_behind_cm"
+"""The event table's distance of the content from the animal: the mean over the
+event's bins of the absolute distance (cm along the track) of the decoded place
+from the animal's."""
+
+DISTANCE_BIN_EDGES_CM = np.geomspace(2.0, 256.0, 22)
+"""The content-distance bins of the distance panel (cm), log-spaced (each
+about 1.26 times the last), so that content under 20 cm and content at 100 cm
+or more are both resolved: every event's distance lies inside them."""
+
+NEAR_CM = 20.0
+"""The distance under which an event's content counts as near the animal (cm)."""
+
+DISTANCE_BANDS_CM = {
+    "near": (0.0, NEAR_CM),
+    "middle": (NEAR_CM, REMOTE_CM),
+    "remote": (REMOTE_CM, np.inf),
+}
+"""The distance bands (cm), each closed on the left: under 20 cm, 20 to 100 cm,
+and 100 cm or more (``constants.REMOTE_CM``, the spike-evidence analysis's
+remote place)."""
+
+
+def content_distance_distribution(
+    events: pd.DataFrame, edges: np.ndarray = DISTANCE_BIN_EDGES_CM
+) -> pd.DataFrame:
+    """Each animal's distribution of the distance of the events' content from
+    the animal (:data:`DISTANCE_COLUMN`), by class, as
+    :func:`hpd_distribution` takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        :data:`DISTANCE_COLUMN` (an event without one is left out).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (cm).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent``.
+    """
+    return _class_distribution(events, DISTANCE_COLUMN, edges)
+
+
+def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
+    """The share of each class's events whose content lies in each distance
+    band from the animal (:data:`DISTANCE_BANDS_CM`).
+
+    An animal's share is the mean over its epochs of each epoch's share of its
+    events of the class (event -> epoch -> animal, as
+    :func:`overlap_class_animal_shares` takes it); an epoch with no event of
+    the class in a band has a share of 0 in it.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        As :func:`content_distance_distribution` takes them.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
+        of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
+        mean over animals of the animals' shares; ``animal_min`` and
+        ``animal_max``; ``share``, pooled over the class's events;
+        ``n_animals`` and ``n_events`` (the class's events).
+    """
+    table = _class_table(events, DISTANCE_COLUMN)
+    rows = []
+    for group in ("no SWR", "SWR"):
+        mine = table[table["group"] == group]
+        for band, (low, high) in DISTANCE_BANDS_CM.items():
+            inside = (mine[DISTANCE_COLUMN] >= low) & (mine[DISTANCE_COLUMN] < high)
+            per_animal = animal_session_values(
+                inside.astype(float), mine["animal"], mine["epoch_id"], "mean"
+            )
+            rows.append(
+                {
+                    "group": group,
+                    "band": band,
+                    "share_animal_mean": float(per_animal.mean()),
+                    "animal_min": float(per_animal.min()),
+                    "animal_max": float(per_animal.max()),
+                    "share": float(inside.mean()),
+                    "n_animals": len(per_animal),
+                    "n_events": len(mine),
+                }
+            )
+    return pd.DataFrame(rows).set_index(["group", "band"])
 
 
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:

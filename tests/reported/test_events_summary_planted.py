@@ -76,6 +76,7 @@ EVENT_BUILDERS = (
     "boundary_offset_values",
     "boundary_timing_values",
     "hpd_tight_values",
+    "content_distance_values",
     "state_composition_values",
     "property_values",
     "start_distance_values",

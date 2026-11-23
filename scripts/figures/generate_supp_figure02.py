@@ -13,7 +13,8 @@ the order the text cites them, in five rows:
 - ripple power and the held-out test (i, j): no step in the events'
   properties at the SWR threshold, and the gain outside SWRs away from the
   SWRs;
-- the animals agree (k): Figure 2g's traces animal by animal.
+- the animals agree, and where the content lies (k, l): Figure 2g's traces
+  animal by animal, and the distance of the content from the animal.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -252,6 +253,24 @@ the order the text cites them, in five rows:
         read from every analyzed epoch's decode frame in panel b's pass). The
         animals agree.
 
+    l — Supports Figure 2's case that the no-SWR events carry remote content,
+        as SWR events do: how far the content lies from the animal. Each
+        event's distance is the mean over its bins of the absolute distance
+        (cm along the track) of the decoded place from the animal's
+        (``mean_abs_ahead_behind_cm`` of the canonical event table). Its
+        cumulative distribution on a log axis, the percent of a class's events
+        whose content lies within each distance (the bins of
+        ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per
+        animal and their mean in bold
+        (``event_statistics.content_distance_distribution``, each animal's
+        distribution as panel g takes the HPD coverage), with dotted lines at
+        20 cm (near) and 100 cm (remote, ``constants.REMOTE_CM``): the heights
+        there are the shares under 20 cm and under 100 cm. The events summary
+        reports each class's share under 20 cm, 20 to 100 cm and 100 cm or
+        more (``event_statistics.content_distance_band_statistics``: the mean
+        over animals of each animal's share, the mean over its epochs of each
+        epoch's share; the ``content_distance_*`` values).
+
 Panel f reads the held-out tetrode run over the epochs the events summary
 reads and refuses a run not held out in folds of whole trials, as the summary
 does; panel h reads the participation run over the same epochs. Panel j reads the held-out event run
@@ -263,7 +282,7 @@ was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Its
 values are the events summary's ``restriction_outside_swr_*`` values. Panels d,
-g and i read the canonical event table (i with the stored output it names); a,
+g, i and l read the canonical event table (i with the stored output it names); a,
 c and e read their stored outputs. Each output is refused, as the summary marks
 its values pending, when it was not made from the current event table (c and
 i), over the analyses' subset, or from the current well visits (a, c and e; e
@@ -293,6 +312,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator, NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.detection.nonlocal_events import get_event_types
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
@@ -328,11 +348,14 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     window_scores,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    DISTANCE_BIN_EDGES_CM,
     HPD_BIN_EDGES_CM,
     HPD_TIGHT_CM,
+    NEAR_CM,
     TIMING_CLASSES,
     boundary_offsets,
     boundary_timing_statistics,
+    content_distance_distribution,
     hpd_distribution,
     main_step_fits,
     nonlocal_below_threshold_statistics,
@@ -489,6 +512,14 @@ HPD_XLABEL = "95 % HPD length (cm),\nmean over the event's bins"
 length of track that holds 95 % of the decoded probability."""
 HPD_YLABEL = "% of events"
 HPD_TICKS_CM = (10, 25, 50, 100, 200, 400)
+DISTANCE_XLABEL = "From the animal (cm)"
+"""The distance panel's x label, under its title "Content distance": each
+event's mean over its bins of the distance along the track of the decoded place
+from the animal's."""
+DISTANCE_YLABEL = "Events at most\nthis far (%)"
+"""The distance panel's y label: the percent of a class's events whose content
+lies at most that far from the animal."""
+DISTANCE_TICKS_CM = (5, 20, 50, 100, 200)
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
 """The participation panel: each group's Local-rest and event positions on the
 x axis."""
@@ -516,7 +547,10 @@ LAYOUT = (
         ),
     ),
     ((0.2, 0.31), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
-    ((0.04, 0.105), (("event_traces", 0.085, 0.6),)),
+    (
+        (0.04, 0.105),
+        (("event_traces", 0.085, 0.58), ("content_distance", 0.82, 0.17)),
+    ),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -560,7 +594,8 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         start inside a well visit, by column of ``SPLIT_LABELS``, each indexed
         by group (a held-out tetrode run not held out in folds of whole trials
         is refused, ``reported.events.require_tetrode_holdout_folds``); ``hpd``
-        (g): the selected events' ``hpd_distribution``; ``participation`` (h):
+        (g): the selected events' ``hpd_distribution``; ``distance`` (l): their
+        ``content_distance_distribution``; ``participation`` (h):
         :func:`read_participation`;
         ``step_test`` (i): :func:`read_step_test`; ``outside`` (j):
         ``outside_swr_statistics`` over the held-out event run, indexed by
@@ -603,6 +638,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "step_test": read_step_test(inputs.class_structure, inputs.event_table),
         "hpd": hpd_distribution(events),
+        "distance": content_distance_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
         "tetrode": {
             column: holdout_statistics(windows, "event", column)
@@ -1263,6 +1299,41 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
     ax.set_title("Posterior spread", fontsize=SMALL_SIZE, pad=3)
 
 
+def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
+    """The distance panel: for no-SWR and SWR events, the percent of the
+    class's events whose content lies within each distance of the animal (the
+    distribution's bins summed up to each bin's high edge) on a log axis, a
+    thin line per animal and their mean in bold in the class's color, the
+    classes named in their colors, and dotted lines at 20 cm (near) and
+    100 cm (remote), where the heights are the shares under 20 cm and under
+    100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
+        within = by_animal.cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    for cut in (NEAR_CM, REMOTE_CM):
+        ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+    for k, (name, color) in enumerate(
+        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
+    ):
+        ax.text(
+            0.02, 1.0 - 0.2 * k, name, transform=ax.transAxes, ha="left",
+            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
+        )  # fmt: skip
+    ax.set_xscale("log")
+    ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
+    ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlabel(DISTANCE_XLABEL)
+    ax.set_ylabel(DISTANCE_YLABEL)
+    ax.set_title("Content distance", fontsize=SMALL_SIZE, pad=3)
+
+
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     """The No-Spike panel: MUA around No-Spike starts (``trace``: :func:`read_frame_traces`' ``no_spike``),
     the animal-balanced median with its band as Figure 2g draws its rows, a dotted
@@ -1353,6 +1424,7 @@ def generate_figure(statistics: dict) -> Figure:
         axes["outside_distance"][0], statistics["outside"], statistics["parts"]
     )
     draw_hpd(axes["hpd"][0], statistics["hpd"])
+    draw_content_distance(axes["content_distance"][0], statistics["distance"])
     draw_step_test(*axes["step_test"], statistics["step_test"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])

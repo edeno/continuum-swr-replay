@@ -746,6 +746,40 @@ def test_hpd_distribution_gives_each_animals_percent_per_bin():
     assert len(table) == 2 * 2 * 2
 
 
+def _distance_events() -> pd.DataFrame:
+    """:func:`_hpd_events` with its values as the content's distance."""
+    return _hpd_events().rename(columns={"hpd_coverage_cm": stats.DISTANCE_COLUMN})
+
+
+def test_content_distance_distribution_gives_each_animals_percent_per_bin():
+    """As the HPD distribution: per animal and class, the percent of its
+    events in each bin."""
+    edges = np.array([5.0, 50.0, 500.0])
+    table = stats.content_distance_distribution(_distance_events(), edges)
+    expected = stats.hpd_distribution(_hpd_events(), edges)
+    pd.testing.assert_frame_equal(table, expected)
+    assert (stats.DISTANCE_BIN_EDGES_CM[[0, -1]] == (2.0, 256.0)).all()
+
+
+def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
+    """No SWR: a's epoch 1 holds 10, 20, 300 cm, its epoch 2 30; b's 300,
+    400. Under 20 cm: a (1/3 + 0) / 2, b 0, so the mean over animals is 1/12
+    (pooled, 1 of 6); 20 to 100 cm: a (1/3 + 1) / 2, b 0; 100 cm or more: a
+    (1/3 + 0) / 2, b 1. SWR: a's 400 and 20, 300; b's 10 (a NaN left out)."""
+    table = stats.content_distance_band_statistics(_distance_events())
+    assert list(table.index) == [
+        (group, band) for group in ("no SWR", "SWR") for band in stats.DISTANCE_BANDS_CM
+    ]
+    no_swr = table.loc["no SWR"]
+    np.testing.assert_allclose(no_swr["share_animal_mean"], [1 / 12, 1 / 3, 7 / 12])
+    np.testing.assert_allclose(no_swr["animal_min"], [0.0, 0.0, 1 / 6])
+    np.testing.assert_allclose(no_swr["animal_max"], [1 / 6, 2 / 3, 1.0])
+    np.testing.assert_allclose(no_swr["share"], [1 / 6, 2 / 6, 3 / 6])
+    swr = table.loc["SWR"]
+    np.testing.assert_allclose(swr["share_animal_mean"], [0.5, 1 / 8, 3 / 8])
+    assert (swr["n_events"] == 4).all() and (no_swr["n_animals"] == 2).all()
+
+
 def test_hpd_tight_share_statistics_reduce_each_epochs_share():
     """Each epoch's share of a class below the cut, each animal's median over
     its epochs, the mean over animals with its interval

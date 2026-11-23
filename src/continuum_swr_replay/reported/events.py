@@ -125,6 +125,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.decode_quality import quality_metrics
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
@@ -312,6 +313,8 @@ TAGS = {
     "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2g",)),
+    "content_distance": Tags(("2d.1",), ("S2l",)),
+    "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
 }
@@ -4264,6 +4267,83 @@ def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+#: Each distance band's word in a key and what it holds
+#: (``event_statistics.DISTANCE_BANDS_CM``).
+_DISTANCE_BANDS = {
+    "near": (
+        "under",
+        f"under {event_statistics.NEAR_CM:g} cm from the animal",
+    ),
+    "middle": (
+        "between",
+        f"{event_statistics.NEAR_CM:g} cm to under {REMOTE_CM:g} cm from the animal",
+    ),
+    "remote": ("beyond", f"{REMOTE_CM:g} cm or more from the animal"),
+}
+
+
+def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.1 and the distance panel of Figure 2's supplement (S2l): for
+    each class, the share of the events whose content lies under 20 cm, 20 to
+    100 cm, and 100 cm or more from the animal (the mean over the event's bins
+    of the absolute distance along the track of the decoded place from the
+    animal's; ``event_statistics.content_distance_band_statistics``): the mean
+    over animals of each animal's share with the lowest and highest animal,
+    tagged to the panel, and the share pooled over events (no figure draws
+    it)."""
+    make = value_factory(content_distance_values, source, TAGS["content_distance"])
+    table = event_statistics.content_distance_band_statistics(events)
+    values = []
+    for group, word, name in (
+        ("no SWR", "non_swr", "non-SWR"),
+        ("SWR", "swr", "SWR-overlapping"),
+    ):
+        for band, (band_word, where) in _DISTANCE_BANDS.items():
+            row = table.loc[(group, band)]
+            what = (
+                f"share of the immobile {name} non-local events whose content "
+                f"(the mean over the event's bins of the distance along the track "
+                f"of the decoded place from the animal's) lies {where}"
+            )
+            values += _animal_range_values(
+                make,
+                f"content_distance_{band_word}_{word}_fraction",
+                (row["share"], row["animal_min"], row["animal_max"]),
+                (
+                    f"{what}, pooled over events",
+                    f"lowest animal's {what} (an animal's share is the mean over "
+                    "its epochs of the epoch's share)",
+                    f"highest animal's {what} (the mean over its epochs)",
+                ),
+                animal_mean=(
+                    row["share_animal_mean"],
+                    f"{what}, the mean over animals of each animal's share (the "
+                    "mean over its epochs of the epoch's share)",
+                ),
+                pooled_tags=TAGS["content_distance_pooled"],
+            )
+    values += [
+        make(
+            "content_distance_near_cm",
+            event_statistics.NEAR_CM,
+            "quantity",
+            "int",
+            "the distance of the content from the animal under which it counts as near",
+            "cm",
+        ),
+        make(
+            "content_distance_remote_cm",
+            REMOTE_CM,
+            "quantity",
+            "int",
+            "the distance of the content from the animal at or beyond which it "
+            "counts as remote (the spike-evidence analysis's remote place)",
+            "cm",
+        ),
+    ]
+    return values
+
+
 def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2d.1–2d.6: the uncertainty of each property contrast, and
     the contrast at matched duration.
@@ -4612,6 +4692,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*over(boundary_offset_values(events, source), EVENTS_SUBSET))
     summary.add(*over(boundary_timing_values(events, source), EVENTS_SUBSET))
     summary.add(*over(hpd_tight_values(events, source), EVENTS_SUBSET))
+    summary.add(*over(content_distance_values(events, source), EVENTS_SUBSET))
     summary.add(*over(state_composition_values(events, source), EVENTS_SUBSET))
     summary.inputs.append(event_table_record)
     events_with_extras, extra_paths = with_start_and_rest_theta(

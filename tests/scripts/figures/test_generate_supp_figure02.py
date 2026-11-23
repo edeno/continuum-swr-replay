@@ -104,6 +104,18 @@ def _timing() -> pd.DataFrame:
     )  # fmt: skip
 
 
+def _distance() -> pd.DataFrame:
+    """``content_distance_distribution`` of the distance test's events."""
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        content_distance_distribution,
+    )
+    from tests.analysis.event_properties.test_event_statistics import (
+        _distance_events,
+    )
+
+    return content_distance_distribution(_distance_events())
+
+
 def _hpd() -> pd.DataFrame:
     """``hpd_distribution`` of the HPD test's events."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -230,6 +242,7 @@ def _statistics() -> dict:
         "mua": _mua_counts(),
         "step_test": _step_test(),
         "hpd": _hpd(),
+        "distance": _distance(),
         "timing": _timing(),
         "tetrode": _split_statistics(),
         "participation": _participation(),
@@ -250,14 +263,15 @@ def drawn():
 
 
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
-    """In four rows, each a group the text cites in turn: the decoder (a, b),
+    """In five rows, each a group the text cites in turn: the decoder (a, b),
     the count is robust (c, d), the events are coordinated and specific (e to
-    h), ripple power and the held-out test (i, j); each row's letters at one
-    height, the rows' first letters at one left edge, no heading."""
+    h), ripple power and the held-out test (i, j), the animals agree and where
+    the content lies (k, l); each row's letters at one height, the rows' first
+    letters at one left edge, no heading."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
         "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
-        "outside_distance", "event_traces",
+        "outside_distance", "event_traces", "content_distance",
     )  # fmt: skip
     fig = drawn
     ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
@@ -272,8 +286,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijk")
-    rows = ("ab", "cd", "efgh", "ij", "k")
+    assert sorted(letters) == list("abcdefghijkl")
+    rows = ("ab", "cd", "efgh", "ij", "kl")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -339,6 +353,7 @@ def test_each_panels_values_carry_its_letter():
         "class_step": "step_test",
         "class_step_evidence": "step_test",
         "nonlocal_restriction_distance": "outside_distance",
+        "content_distance": "content_distance",
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
@@ -458,6 +473,38 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn
     assert "↑ full better" in texts
     assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert ax.get_ylim()[0] < 0
+
+
+def test_the_distance_panel_draws_the_content_distance_of_each_class(drawn):
+    """For each class, the percent of events within each distance (the bins
+    summed), a thin line per animal and their mean in bold, in the class's
+    color, on a log x axis; dotted lines at 20 cm and 100 cm; the classes
+    named in their colors; a y axis from 0 to 100."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    distribution = _distance()
+    (ax,) = figure.panel_axes(drawn, "content_distance")
+    n_bins = len(figure.DISTANCE_BIN_EDGES_CM) - 1
+    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
+    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
+    for group, color in panels.GROUP_COLORS.items():
+        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
+        mean = max(mine, key=lambda c: c.get_linewidth())
+        within = (
+            distribution[distribution["group"] == group]
+            .pivot(index="bin_high", columns="animal", values="percent")
+            .cumsum()
+        )
+        np.testing.assert_allclose(mean.get_xdata(), within.index.to_numpy())
+        np.testing.assert_allclose(mean.get_ydata(), within.mean(axis=1).to_numpy())
+        assert (np.diff(mean.get_ydata()) >= 0).all()
+    assert ax.get_xscale() == "log"
+    assert ax.get_ylim() == (0, 100)
+    cuts = [line.get_xdata()[0] for line in ax.lines if line.get_linestyle() == ":"]
+    assert cuts == [20.0, 100.0]
+    assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
 
 
 def test_the_hpd_panel_draws_the_distribution_of_each_class(drawn):
@@ -715,7 +762,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijk"
+    assert FIGURES["S2"].panels == "abcdefghijkl"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -759,6 +806,9 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "event_traces": "traces",
         },
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
+        "content_distance_distribution": lambda events: seen.setdefault(
+            "distance", events
+        ),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
@@ -797,12 +847,14 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
+    assert seen["distance"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
         "calibration",
         "sweep",
         "mua",
         "step_test",
         "hpd",
+        "distance",
         "timing",
         "tetrode",
         "participation",
