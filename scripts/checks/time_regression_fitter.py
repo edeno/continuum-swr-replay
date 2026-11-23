@@ -31,10 +31,14 @@ variables and the process's CPU set, the first that many of ``--cores``; JAX's
 CPU thread pool follows the CPU set). A process builds the inputs (not timed),
 makes the first call (for a JAX fitter it compiles) and then ``--reps`` more;
 the report gives the first call, the median and range of the others, and the
-first less the median (the compile time, for JAX). Peak memory is the process's
-maximum resident set (``getrusage`` of the child, what ``/usr/bin/time -v``
-reports). The load average is recorded before and after each case: on a shared
-machine the times are under load and say so.
+first less the median. That difference is a compile time only for a JAX
+fitter; for the NumPy fitter it is warm-up and noise (caches, page faults).
+Peak memory is the whole process's maximum resident set (``getrusage`` of the
+child, what ``/usr/bin/time -v`` reports): the interpreter, the imports and the
+case's inputs are in it, not only the fitter's own arrays. The load average is
+recorded before and after each case: on a shared machine the times are under
+load and say so. The output's ``meta`` names the commit and whether a tracked
+file differed from it (``tree_modified``), so a time is tied to its code.
 
 Usage (from the repository root):
 
@@ -82,6 +86,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     log_penalty_from_prior_sd,
 )
 from continuum_swr_replay.runs.device import default_jax_platforms
+from continuum_swr_replay.runs.provenance import git_commit, git_dirty
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -526,14 +531,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(record), flush=True)
             records.append(record)
     meta = {
-        "commit": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True
-        ).stdout.strip(),
+        "commit": git_commit(REPO),
+        "tree_modified": git_dirty(REPO),
         "n_cpus": os.cpu_count(),
         "cost_sessions": args.cost_sessions,
         "reps": args.reps,
     }
     print(table(records))
+    print(f"commit {meta['commit']}, tree modified: {meta['tree_modified']}")
     if args.out:
         args.out.write_text(
             json.dumps({"meta": meta, "records": records}, indent=1) + "\n"
