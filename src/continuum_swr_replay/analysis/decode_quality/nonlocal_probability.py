@@ -18,9 +18,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    immobile_analyzed_bins,
-)
+from continuum_swr_replay.analysis.event_definition.analyzed_time import rest_bins
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
@@ -72,15 +70,7 @@ def probability_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.Dat
     ValueError
         If ``in_visit`` is not one bool per bin.
     """
-    in_visit = np.asarray(in_visit)
-    if in_visit.dtype != bool or in_visit.shape != (len(dot),):
-        raise ValueError(
-            f"in_visit must be one bool per bin, shape ({len(dot)},); got "
-            f"{in_visit.dtype} of shape {in_visit.shape}"
-        )
-    probability = nonlocal_probability(dot).to_numpy()[
-        immobile_analyzed_bins(dot) & in_visit
-    ]
+    probability = nonlocal_probability(dot).to_numpy()[rest_bins(dot, in_visit)]
     probability = probability[np.isfinite(probability)]
     # right-closed bins, the first closed on both sides
     index = np.clip(

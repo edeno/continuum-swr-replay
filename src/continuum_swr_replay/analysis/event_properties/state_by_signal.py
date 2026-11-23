@@ -18,13 +18,14 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    immobile_analyzed_bins,
-)
+from continuum_swr_replay.analysis.event_definition.analyzed_time import rest_bins
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
-from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import SIGNALS
+from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+    SIGNALS,
+    signal_bin_index,
+)
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
 STATE_THRESHOLD = float(DEFAULT_NON_LOCAL_THRESHOLD)
@@ -80,30 +81,17 @@ def state_signal_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.Da
     ValueError
         If ``in_visit`` is not one bool per bin.
     """
-    in_visit = np.asarray(in_visit)
-    if in_visit.dtype != bool or in_visit.shape != (len(dot),):
-        raise ValueError(
-            f"in_visit must be one bool per bin, shape ({len(dot)},); got "
-            f"{in_visit.dtype} of shape {in_visit.shape}"
-        )
-    rest = immobile_analyzed_bins(dot) & in_visit
+    rest = rest_bins(dot, in_visit)
     probability = nonlocal_probability(dot).to_numpy()[rest]
     state = state_classes(dot)[rest]
     n_states = len(STATE_CLASSES)
     which_state = pd.Categorical(state, categories=STATE_CLASSES).codes
     tables = []
     for name, (column, edges) in SIGNALS.items():
-        signal = dot[column].to_numpy(dtype=float)[rest]
-        keep = (
-            np.isfinite(signal)
-            & np.isfinite(probability)
-            & (signal >= edges[0])
-            & (signal <= edges[-1])
-        )
+        index = signal_bin_index(dot[column].to_numpy(dtype=float)[rest], edges)
+        keep = (index >= 0) & np.isfinite(probability)
         n_signal = edges.size - 1
-        which_signal = np.clip(
-            np.searchsorted(edges, signal[keep], side="right") - 1, 0, n_signal - 1
-        )
+        which_signal = index[keep]
         n_bins = np.bincount(
             which_signal * n_states + which_state[keep],
             minlength=n_signal * n_states,
