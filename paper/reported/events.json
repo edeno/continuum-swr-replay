@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "8730be292e05",
+ "commit": "cd7a5f06fc04",
  "code": {
-  "head": "8730be292e054fa3c603d0a2c5ed43945cefdd27",
+  "head": "cd7a5f06fc04e9d16a48996ec9955695976c8f47",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -367,8 +367,8 @@
     "code_sha256": "01d3e865719fda8aaab3c5bce868457728a62b25cfe5d150b422b7ccde36c9b0"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "c58dcb3f6b88ca5f9bdc19c6ab219108b3565df21b8818ffa451878db67a539e",
-    "code_sha256": "7288e9c32f234c45e1ec87d6f7a46d0d1cf764ebe4817aac0c696961299394fb"
+    "sha256": "1d5c40830d9f5b26e1781fc05410c813f50071bdfb39476da1e3e5923b307e63",
+    "code_sha256": "1639b552d3a1c60b857be3e0d7bfa6a0e04436da4779a3d18f782b63d77ea06d"
    },
    "src/continuum_swr_replay/analysis/event_properties/low_rate_places.py": {
     "sha256": "f6a05fce36280ae2c3af3de533ced0cf5bc007b927985340b5bddfeef91de70b",
@@ -389,6 +389,10 @@
    "src/continuum_swr_replay/analysis/event_properties/rule_sweep.py": {
     "sha256": "ccda7e3edc834a5f6295a29133e57c0108f5945f046cdacd395d1efb9507e581",
     "code_sha256": "64f9324391641ffd4adaeb3bd91bc67dcd92a9d496deccdcccaba4c9ffe7ef06"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/state_by_signal.py": {
+    "sha256": "28b5d3a815809064ca203d591eb83d878f401d847e75f45fdc97f7c598bf6417",
+    "code_sha256": "c0d84f318fea1026197286171ce04bce37b4a0a366706b04fafde8c88ece36a0"
    },
    "src/continuum_swr_replay/analysis/event_tables/__init__.py": {
     "sha256": "cbb29294c811a4b945fdd3aede000b0fcb85102d8258312c41bb98e099c3630a",
@@ -527,16 +531,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "4eb57e9d798ac83e0dea2d82c7205f789aeeea7302e5e201b2c520f6eb846eaa",
-    "code_sha256": "a32bf62a9e2f22cbe779aa4da43dfad08c22eb5f11b3c8e20eaf5c20898588d4"
+    "sha256": "cbc596c4c05b2969ca2c1c8b7b5c9aeb392f13cab7b735ff57c5ebf8f0cb79be",
+    "code_sha256": "9561aceb2e4f68459e2f3ac3c580c386d1a3583fcd54d6ae2cf488c0a42b8ce9"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "af270a072988b71a0ed631189cf6c3131f6824f6c808303a4f6476402e9c6311",
-    "code_sha256": "9df020c82fcc4a5c7aded72f8ac54ccf43724364956b993d3ca21d959d3b66ff"
+    "sha256": "7b0b383dcc9a91339b925955534bc7c64ea1eff005cb45a102c30cb2d6e05c2d",
+    "code_sha256": "bec0e76b96ae50f33b2687c8f351bfbb58a60e2a7148f95f5521e8a5c98eac24"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -838,6 +842,14 @@
   {
    "path": "Processed-Data/nonlocal_by_signal/manifest.json",
    "sha256": "1e44cac5f0f670649c3aa97ceb7e5324e618aa557e1e53a89ec09449604ee6b8"
+  },
+  {
+   "path": "Processed-Data/state_by_signal/counts.parquet",
+   "sha256": "20400012bb235170a5f7988abfbe835adebb7327c077627c9f25c1fc106ee590"
+  },
+  {
+   "path": "Processed-Data/state_by_signal/manifest.json",
+   "sha256": "a216c5c20e7d7859d661a66668272c2f90515e76bd1fd50ebd1d47712cd2b0b2"
   },
   {
    "path": "Processed-Data/nonlocal_probability/counts.parquet",
@@ -4341,6 +4353,48 @@
    "function": "nonlocal_mua_values",
    "pending": null
   },
+  "mua_local_share_at_detection_level": {
+   "value": 0.0015313705274587505,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "mua_local_share_at_detection_level_animal_max": {
+   "value": 0.003009727798675711,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "largest animal's share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "mua_local_share_at_detection_level_animal_min": {
+   "value": 0.0003153668951413313,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "smallest animal's share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
   "mua_median_non_swr": {
    "value": 0.8272136733345711,
    "kind": "quantity",
@@ -4441,6 +4495,48 @@
    "figures": [],
    "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py), with each epoch's well visits (the session cache's port experiences)",
    "function": "other_detector_values",
+   "pending": null
+  },
+  "mua_nonlocal_share_at_detection_level": {
+   "value": 0.3628419987409074,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "mua_nonlocal_share_at_detection_level_animal_max": {
+   "value": 0.45049674437743503,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "largest animal's share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "mua_nonlocal_share_at_detection_level_animal_min": {
+   "value": 0.2944017959722425,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "smallest animal's share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
    "pending": null
   },
   "mua_overlap_all_nonlocal_fraction": {
@@ -18473,6 +18569,48 @@
    "function": "brain_state_values",
    "pending": null
   },
+  "ripple_local_share_at_detection_level": {
+   "value": 0.004163524403162431,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "ripple_local_share_at_detection_level_animal_max": {
+   "value": 0.007645722013523996,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "largest animal's share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "ripple_local_share_at_detection_level_animal_min": {
+   "value": 0.0024949688009664388,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "smallest animal's share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
   "ripple_median_non_swr": {
    "value": 0.5489281409945505,
    "kind": "quantity",
@@ -18505,6 +18643,48 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
+   "pending": null
+  },
+  "ripple_nonlocal_share_at_detection_level": {
+   "value": 0.3062295867831425,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "ripple_nonlocal_share_at_detection_level_animal_max": {
+   "value": 0.34601580483964767,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "largest animal's share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
+   "pending": null
+  },
+  "ripple_nonlocal_share_at_detection_level_animal_min": {
+   "value": 0.24820028441960104,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "smallest animal's share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out)",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [],
+   "source": "Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)",
+   "function": "state_by_signal_values",
    "pending": null
   },
   "ripple_peak_animals_unimodal": {
@@ -25549,6 +25729,48 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
+   "pending": null
+  },
+  "timing_both_ends_differ_share_animal_max": {
+   "value": 0.0655328202359232,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_timing_values",
+   "pending": null
+  },
+  "timing_both_ends_differ_share_animal_mean": {
+   "value": 0.05310733232798661,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together), the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_timing_values",
+   "pending": null
+  },
+  "timing_both_ends_differ_share_animal_min": {
+   "value": 0.04398670406704585,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_timing_values",
    "pending": null
   },
   "timing_start_earlier_end_earlier_share": {

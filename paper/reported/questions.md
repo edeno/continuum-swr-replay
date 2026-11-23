@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `8730be292e05` | yes | 32 | 0 |
-| `detection.json` | `8730be292e05` | yes | 172 | 0 |
-| `events.json` | `8730be292e05` | yes | 1791 | 0 |
-| `behavior.json` | `8730be292e05` | yes | 922 | 0 |
-| `mpfc.json` | `8730be292e05` | yes | 604 | 0 |
+| `survey.json` | `cd7a5f06fc04` | yes | 32 | 0 |
+| `detection.json` | `cd7a5f06fc04` | yes | 172 | 0 |
+| `events.json` | `cd7a5f06fc04` | yes | 1806 | 0 |
+| `behavior.json` | `cd7a5f06fc04` | yes | 922 | 0 |
+| `mpfc.json` | `cd7a5f06fc04` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -845,7 +845,7 @@ Sources:
 
 ### 2b.4. How do non-local event starts and ends differ from those of the matched SWR?
 
-Status: computed. Figures: 2f, S2f. Values: 43.
+Status: computed. Figures: 2f, S2f. Values: 46.
 
 *Note:* Figure 2f draws each bound's offset; Figure 2's supplement, panel S2f, is the timing_* values: the share of events in each combination of start and end against the SWR's (earlier, together within 25 ms, later).
 
@@ -862,6 +862,9 @@ Sources:
 | `\EventsStartOffsetBeyondTwentyFiveMsFraction` | 20 % |  | share of SWR-overlapping events whose start differs from the matched SWR's start by more than 25 ms; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_offset_values` | 2f |
 | `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_offset_values` | 2f |
 | `\EventsSwrOverlappingEvents` | 31,465 |  | immobile non-local events overlapping an SWR; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_offset_values` | 2f |
+| `\EventsTimingBothEndsDifferShareAnimalMax` | 7 % |  | highest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` |  |
+| `\EventsTimingBothEndsDifferShareAnimalMean` | 5 % |  | share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together), the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` |  |
+| `\EventsTimingBothEndsDifferShareAnimalMin` | 4 |  | lowest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` |  |
 | `\EventsTimingStartEarlierEndEarlierShare` | 1 % |  | share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` |  |
 | `\EventsTimingStartEarlierEndEarlierShareAnimalMax` | 1 % |  | highest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` | S2f |
 | `\EventsTimingStartEarlierEndEarlierShareAnimalMean` | 1 % |  | share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.boundary_timing_values` | S2f |
@@ -901,17 +904,26 @@ Sources:
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 2g, 2i, S2g. Values: 25.
+Status: computed. Figures: 2g, 2i, S2g. Values: 37.
+
+*Note:* Figure 2i's top strip and that of Figure 2's supplement, panel S2g, draw the ripple power and the MUA of confident Local time against confident non-local time (each class's time over the signal). The ripple_* and mua_* values of state_by_signal give the share of each class at or above the detection level (*_nonlocal_share_at_detection_level, *_local_share_at_detection_level); they are for the text.
 
 Sources:
 
 - Processed-Data/nonlocal_by_signal (scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed epoch's decode)
 - Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
 - Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/state_by_signal (scripts/event_properties/measure_state_by_signal.py: each analyzed epoch's decode)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsMuaLevelZ` | 2 | z | the MUA level of the values below: 2 z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded tetrodes; the value of the MUA event detector's threshold, which z-scores its own smoothed rate); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.nonlocal_mua_values` | S2g |
+| `\EventsMuaLocalShareAtDetectionLevel` | 0.2 % |  | share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsMuaLocalShareAtDetectionLevelAnimalMax` | 0.3 % |  | largest animal's share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsMuaLocalShareAtDetectionLevelAnimalMin` | 0.0 % |  | smallest animal's share of the confident Local time (Local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsMuaNonlocalShareAtDetectionLevel` | 36 % |  | share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsMuaNonlocalShareAtDetectionLevelAnimalMax` | 45 % |  | largest animal's share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsMuaNonlocalShareAtDetectionLevelAnimalMin` | 29 |  | smallest animal's share of the confident non-local time (non-local probability above 0.8) with MUA at or above the MUA event threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
 | `\EventsNonlocalShareMuaAboveLevel` | 91 % |  | share of the immobile time bins with MUA at or above 2 z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded tetrodes; the value of the MUA event detector's threshold, which z-scores its own smoothed rate) that are decoded non-local (non-local probability above 0.8): mean over animals of each animal's share of its bins. Nearly all time above the MUA level is decoded non-local: the decoder needs spikes, so this does not show that non-local detection is independent of population bursts; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.nonlocal_mua_values` | S2g |
 | `\EventsNonlocalShareMuaAboveLevelAnimalMax` | 98 % |  | highest per-animal share; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.nonlocal_mua_values` | S2g |
 | `\EventsNonlocalShareMuaAboveLevelAnimalMin` | 86 % |  | lowest per-animal share of the bins with MUA at or above 2 z that are decoded non-local; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.nonlocal_mua_values` | S2g |
@@ -925,8 +937,14 @@ Sources:
 | `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against quiet rest in time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.brain_state_values` | 2g |
 | `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against quiet rest in time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.brain_state_values` | 2g |
 | `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against quiet rest in time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.brain_state_values` | 2g |
+| `\EventsRippleLocalShareAtDetectionLevel` | 0.4 % |  | share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsRippleLocalShareAtDetectionLevelAnimalMax` | 0.8 % |  | largest animal's share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsRippleLocalShareAtDetectionLevelAnimalMin` | 0.2 % |  | smallest animal's share of the confident Local time (Local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
 | `\EventsRippleMedianNonSwr` | 0.55 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against quiet rest in time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.brain_state_values` | 2g |
 | `\EventsRippleMedianSwr` | 2.36 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end), against quiet rest in time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.brain_state_values` | 2g |
+| `\EventsRippleNonlocalShareAtDetectionLevel` | 31 % |  | share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z): each epoch's share, each animal's mean over its epochs, the mean over animals; over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsRippleNonlocalShareAtDetectionLevelAnimalMax` | 35 % |  | largest animal's share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
+| `\EventsRippleNonlocalShareAtDetectionLevelAnimalMin` | 25 |  | smallest animal's share of the confident non-local time (non-local probability above 0.8) with ripple power at or above the SWR threshold (2 z) (the mean over its epochs); over the immobile time inside a well visit (from the first poke-in at a well to the final poke-out) | `events.state_by_signal_values` |  |
 | `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.class_distribution_values` |  |
 | `\EventsRipplePeakModeAnimalMax` | 2.06 | z | highest per-animal location of that mode; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.class_distribution_values` |  |
 | `\EventsRipplePeakModeAnimalMin` | 1.08 | z | lowest per-animal location of the main KDE mode of the events' peak ripple power; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end) | `events.class_distribution_values` |  |
@@ -4396,7 +4414,7 @@ without being called, is not listed.
 | `detection.state_evidence_values` | `reported/detection.py` | none |  |
 | `detection.sweep_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.sweep_grid_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_jump_pass_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_measures`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_pooled_timing_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_position_by_speed`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_position_statistics` |  |
 | `events.boundary_offset_values` | `reported/events.py` | `analysis.event_properties.event_statistics.boundary_offset_statistics`, `analysis.event_properties.event_statistics.boundary_offsets` |  |
-| `events.boundary_timing_values` | `reported/events.py` | `analysis.event_properties.event_statistics.boundary_offsets`, `analysis.event_properties.event_statistics.boundary_timing_statistics` |  |
+| `events.boundary_timing_values` | `reported/events.py` | `analysis.event_properties.event_statistics.boundary_both_ends_differ_statistics`, `analysis.event_properties.event_statistics.boundary_offsets`, `analysis.event_properties.event_statistics.boundary_timing_statistics` |  |
 | `events.brain_state_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.reference_medians` |  |
 | `events.calibration_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.animal_distance_by_local_probability` |  |
 | `events.class_distribution_values` | `reported/events.py` | `analysis.event_properties.event_statistics.peak_ripple_mode_statistics` |  |
@@ -4440,6 +4458,7 @@ without being called, is not listed.
 | `events.spike_evidence_values` | `reported/events.py` | `analysis.event_properties.event_statistics.spike_evidence_statistics` |  |
 | `events.spike_evidence_visit_values` | `reported/events.py` | none |  |
 | `events.start_distance_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
+| `events.state_by_signal_values` | `reported/events.py` | `analysis.event_properties.state_by_signal.detection_level_statistics` |  |
 | `events.state_calibration_values` | `reported/events.py` | none |  |
 | `events.state_composition_values` | `reported/events.py` | `analysis.event_properties.event_statistics.state_composition_statistics` |  |
 | `events.state_fraction_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.state_fraction_statistics` |  |
