@@ -123,9 +123,10 @@ FIGURES: dict[str, Figure] = {
         "The decoder's states and MUA in No-Spike; the event rule's sensitivity and "
         "the timing of events against their SWRs; non-local time against MUA, the "
         "posterior's spread, the held-out tetrode gain and tetrode participation; the "
-        "step test at the SWR threshold and the gain outside SWRs away from the SWRs",
+        "step test at the SWR threshold and the gain outside SWRs away from the SWRs; "
+        "the traces around event starts, animal by animal",
         "scripts/figures/generate_supp_figure02.py",
-        "abcdefghij",
+        "abcdefghijk",
     ),
     "S3": Figure(
         "Slow and fast gamma during SWR and no-SWR events",

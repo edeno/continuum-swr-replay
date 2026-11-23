@@ -28,7 +28,7 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 - [ ] **The No-Spike trace is computed in the figure script.** Panel b of Figure 2's
   supplement reads every analyzed epoch's decode frame on each render
-  (`generate_supp_figure02.read_no_spike_trace`, about 5 minutes with one process): a
+  (`generate_supp_figure02.read_frame_traces`, which also reads panel k's per-animal traces; about 5 minutes with one process): a
   per-epoch statistic with no stored output, so the panel has no staleness check and
   its numbers no summary key. Make it an analysis function with a runner and a stored
   output that the figure reads.

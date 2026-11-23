@@ -215,6 +215,7 @@ from continuum_swr_replay.analysis.event_evidence.shared_content import (
     agreement_by_spread_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_scores
+from continuum_swr_replay.analysis.event_properties import triggered_analysis
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
@@ -415,8 +416,8 @@ PARTIAL_SIDE = {"Starts before SWR": "start", "Ends after SWR": "end"}
 LOCAL_SWR_START_S = 1617036373.982971
 # Panel g: the triggered averages' window (``compute_triggered_average_curves``'s
 # window_sec; the curves span half of it either side of the start), seconds.
-TRIGGERED_WINDOW_S = 0.3
-TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed"]
+TRIGGERED_WINDOW_S = triggered_analysis.TRIGGERED_WINDOW_S
+TRIGGERED_SIGNALS = list(triggered_analysis.TRIGGERED_SIGNALS)
 # Panel e: the detectors, in the order drawn, and their labels.
 DETECTOR_LABELS = dict(
     zip(

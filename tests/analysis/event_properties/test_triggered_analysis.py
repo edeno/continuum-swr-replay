@@ -507,3 +507,29 @@ def test_window_quartiles_are_over_events_at_each_lag():
     np.testing.assert_allclose(quartiles["q25"], [2.0, 17.5])
     np.testing.assert_allclose(quartiles["median"], [3.0, 25.0])
     np.testing.assert_allclose(quartiles["q75"], [4.0, 32.5])
+
+
+def test_animal_window_medians_are_each_animals_median_over_its_events():
+    """Animal a's three events and b's one: a's median at each lag is the
+    middle of its three windows (a NaN left out), b's is its own window."""
+    import xarray as xr
+
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        animal_window_medians,
+    )
+
+    values = np.array([[1.0, 5.0], [2.0, np.nan], [3.0, 7.0], [10.0, 20.0]])[:, :, None]
+    index = pd.MultiIndex.from_tuples(
+        [("a", 1, "e", 1), ("a", 1, "e", 2), ("a", 2, "e", 1), ("b", 1, "e", 1)],
+        names=["animal", "day", "epoch", "non_local_event"],
+    )
+    windows = xr.DataArray(
+        values,
+        dims=("event", "time", "signal"),
+        coords={"event": index, "time": [-0.002, 0.0], "signal": ["MUA_zscore"]},
+    )
+    medians = animal_window_medians(windows, "MUA_zscore")
+    assert list(medians.columns) == ["a", "b"]
+    np.testing.assert_allclose(medians["a"], [2.0, 6.0])
+    np.testing.assert_allclose(medians["b"], [10.0, 20.0])
+    np.testing.assert_allclose(medians.index, [-0.002, 0.0])

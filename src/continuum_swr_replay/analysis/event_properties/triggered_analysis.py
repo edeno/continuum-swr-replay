@@ -310,32 +310,10 @@ def compute_triggered_average_curves(
 
     """
     signal_types = list(signals)
-    no_overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_no_overlap_SWR_event"],
-        event_col="non_local_event",
+    windows = triggered_windows(
+        data_over_time, event_types, signal_types, time_col, window_sec
     )
-    overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_overlap_SWR_event"],
-        event_col="non_local_event",
-    )
-    windows_no = get_signal_windows(
-        data=data_over_time,
-        event_times=no_overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
-    windows_ov = get_signal_windows(
-        data=data_over_time,
-        event_times=overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
+    windows_no, windows_ov = windows["no_overlap"], windows["overlap"]
     no_mean_all = windows_no.mean(dim="event")
     ov_mean_all = windows_ov.mean(dim="event")
 
@@ -367,6 +345,90 @@ def compute_triggered_average_curves(
         }
     return curves
 
+
+def triggered_windows(
+    data_over_time: pd.DataFrame,
+    event_types: dict,
+    signals: list[str],
+    time_col: str = "start_time",
+    window_sec: float = 2.0,
+) -> dict[str, xr.DataArray]:
+    """The signal windows around the immobile non-local events, by SWR overlap:
+    what :func:`compute_triggered_average_curves` reduces.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Per-timebin decode frames (one epoch's or the aggregated ones).
+    event_types : dict
+        Output of :func:`get_event_types` of the same frames.
+    signals : list of str
+        Signal columns, in order.
+    time_col : str
+        Alignment column (``"start_time"`` or ``"end_time"``).
+    window_sec : float
+        The window around each event, in seconds (half on each side).
+
+    Returns
+    -------
+    dict of str to xr.DataArray
+        ``"no_overlap"`` (events with no SWR) and ``"overlap"`` (events that
+        overlap one): :func:`get_signal_windows`' windows, dims ``(event,
+        time, signal)``, the event index carrying ``animal``, ``day``,
+        ``epoch`` and ``non_local_event``.
+    """
+    return {
+        key: get_signal_windows(
+            data=data_over_time,
+            event_times=get_event_start_end_times(
+                event_types[name], event_col="non_local_event"
+            ),
+            signal_cols=list(signals),
+            time_col=time_col,
+            window_sec=window_sec,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            event_id_col="non_local_event",
+        )
+        for key, name in (
+            ("no_overlap", "non_local_event_immobile_no_overlap_SWR_event"),
+            ("overlap", "non_local_event_immobile_overlap_SWR_event"),
+        )
+    }
+
+
+def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
+    """Each animal's median over its events of one signal's windows, at each
+    lag: the statistic of :func:`window_quartiles` taken per animal.
+
+    Parameters
+    ----------
+    windows : xr.DataArray, dims (event, time, signal)
+        :func:`get_signal_windows`' windows, the event index carrying
+        ``animal``.
+    signal : str
+        The signal.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_lags, n_animals)
+        Indexed by lag (s), a column per animal (sorted): the median over the
+        animal's events with a value at that lag (NaN where none has one).
+    """
+    values = windows.sel(signal=signal).values
+    animals = windows.indexes["event"].get_level_values("animal")
+    return pd.DataFrame(
+        {
+            animal: np.nanmedian(values[np.asarray(animals == animal)], axis=0)
+            for animal in sorted(set(animals))
+        },
+        index=windows["time"].values,
+    )
+
+
+#: Figure 2g's signals around event starts, in its rows' order, and its window
+#: (s, in all: half on each side), which Figure 2's supplement draws per animal.
+TRIGGERED_SIGNALS = ("SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed")
+TRIGGERED_WINDOW_S = 0.3
 
 #: The ``get_event_types`` entries :func:`compute_triggered_average_curves` reads:
 #: the immobile non-local events that do and do not overlap an SWR.

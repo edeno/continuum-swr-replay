@@ -198,6 +198,29 @@ def _calibration() -> pd.DataFrame:
     return _state_calibration()[0]
 
 
+TRACE_TIME = np.linspace(-0.15, 0.15, 151)
+
+
+def _event_traces() -> dict:
+    """Two animals' median traces per class and signal: SWR events at the
+    animal's level plus 1 after the start, no-SWR events plus 0.5."""
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        TRIGGERED_SIGNALS,
+    )
+
+    def medians(height: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {a: level + height * (TRACE_TIME > 0) for a, level in (("a", 0), ("b", 1))},
+            index=TRACE_TIME,
+        )
+
+    return {
+        "time": TRACE_TIME,
+        "overlap": {signal: medians(1.0) for signal in TRIGGERED_SIGNALS},
+        "no_overlap": {signal: medians(0.5) for signal in TRIGGERED_SIGNALS},
+    }
+
+
 def _statistics() -> dict:
     return {
         "calibration": _calibration(),
@@ -211,6 +234,7 @@ def _statistics() -> dict:
         "outside": _outside_rows(),
         "parts": _parts(),
         "no_spike": _no_spike_trace(),
+        "event_traces": _event_traces(),
     }
 
 
@@ -231,7 +255,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
         "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
-        "outside_distance",
+        "outside_distance", "event_traces",
     )  # fmt: skip
     fig = drawn
     ax_gain = figure.panel_axes(fig, "heldout_gain")[0]
@@ -246,8 +270,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghij")
-    rows = ("ab", "cd", "efgh", "ij")
+    assert sorted(letters) == list("abcdefghijk")
+    rows = ("ab", "cd", "efgh", "ij", "k")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -316,7 +340,7 @@ def test_each_panels_values_carry_its_letter():
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
-    assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua"}
+    assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua", "event_traces"}
 
 
 def test_the_timing_panel_draws_the_timing_table(drawn):
@@ -549,8 +573,8 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
         assert ax.get_shared_y_axes().joined(ax, shares[0])
         assert ax_count.get_shared_x_axes().joined(ax_count, ax)
     assert figure.SWEEP_SCALES["minimum_samples"] == pytest.approx(2.0, rel=1e-3)
-    assert shares[0].get_ylabel() == "Events with\nno SWR (%)"
-    assert counts[0].get_ylabel() == "Events\n(thousands)"
+    assert shares[0].get_ylabel() == "No SWR (%)"
+    assert counts[0].get_ylabel() == "Events\n(1000s)"
     # one heading over the event rule's two axes, one over the detector's; the
     # value used marked on all three
     assert "Event rule" in [t.get_text() for t in shares[0].texts]
@@ -651,7 +675,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
         )
 
     monkeypatch.setattr(figure, "get_signal_windows", windows)
-    trace = figure.read_no_spike_trace(workers=1)
+    trace = figure.read_frame_traces(workers=1)["no_spike"]
     assert read == paths
     assert visits == ["a1_02_r1_HPC", "a2_02_r1_HPC"]
     np.testing.assert_allclose(trace["median"], [2.0, 0.0])
@@ -660,9 +684,33 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
     assert trace["median_duration"] == pytest.approx(9 * 0.002)
 
 
+def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
+    """One axis per Figure 2g signal, a thin line per animal and class in the
+    class's color, the start dotted, the classes named."""
+    from matplotlib.colors import to_rgba
+
+    axes = figure.panel_axes(drawn, "event_traces")
+    traces = _event_traces()
+    assert [ax.get_title() for ax in axes] == list(figure.TRACE_LABELS.values())
+    for ax, signal in zip(axes, figure.TRIGGERED_SIGNALS, strict=True):
+        for kind, (_, color) in figure.TRACE_CLASSES.items():
+            mine = [
+                line for line in ax.lines
+                if len(line.get_xdata()) == TRACE_TIME.size
+                and to_rgba(line.get_color()) == to_rgba(color)
+            ]  # fmt: skip
+            assert len(mine) == 2
+            np.testing.assert_allclose(
+                np.column_stack([line.get_ydata() for line in mine]),
+                traces[kind][signal].to_numpy(),
+            )
+            np.testing.assert_allclose(mine[0].get_xdata(), 1000 * TRACE_TIME)
+    assert {"SWR", "No SWR"} <= {t.get_text() for t in axes[-1].texts}
+
+
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghij"
+    assert FIGURES["S2"].panels == "abcdefghijk"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -701,7 +749,10 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "outside_swr_statistics": lambda sums, bin_s, events: seen.setdefault(
             "restriction", (sums, bin_s, events)
         ),
-        "read_no_spike_trace": lambda workers: "trace",
+        "read_frame_traces": lambda events, workers: {
+            "no_spike": "trace",
+            "event_traces": "traces",
+        },
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
@@ -753,6 +804,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "outside",
         "parts",
         "no_spike",
+        "event_traces",
     ]
 
 

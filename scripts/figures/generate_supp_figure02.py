@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S2, the supplement to Figure 2, its panels in
-the order the text cites them, in four rows:
+the order the text cites them, in five rows:
 
 - the decoder on these recordings (a, b): its states calibrated by held-out
   spikes, and MUA in the No-Spike state;
@@ -12,7 +12,8 @@ the order the text cites them, in four rows:
   posterior's spread, and tetrode participation;
 - ripple power and the held-out test (i, j): no step in the events'
   properties at the SWR threshold, and the gain outside SWRs away from the
-  SWRs.
+  SWRs;
+- the animals agree (k): Figure 2g's traces animal by animal.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -237,6 +238,16 @@ the order the text cites them, in four rows:
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
+    k — Supports Figure 2g, whose lines are medians over events pooled over
+        the animals: the same signals around the same events' starts (ripple
+        power, MUA, theta power, head speed; ``triggered_analysis.TRIGGERED_SIGNALS``
+        over the window ``TRIGGERED_WINDOW_S``), a thin line per animal and
+        class (SWR, No SWR, in Figure 2g's colors), each the animal's median over
+        its events (``triggered_analysis.animal_window_medians`` of
+        ``triggered_analysis.triggered_windows``, the windows Figure 2g reduces;
+        read from every analyzed epoch's decode frame in panel b's pass). The
+        animals agree.
+
 Panel f reads the held-out tetrode run over the epochs the events summary
 reads and refuses a run not held out in folds of whole trials, as the summary
 does; panel h reads the participation run over the same epochs. Panel j reads the held-out event run
@@ -266,16 +277,19 @@ import string
 import warnings
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator, NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.detection.nonlocal_events import get_event_types
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
     read_swr_table,
@@ -329,7 +343,11 @@ from continuum_swr_replay.analysis.event_properties.rule_sweep import (
     sweep_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+    TRIGGERED_SIGNALS,
+    animal_window_medians,
     get_signal_windows,
+    triggered_windows,
+    triggering_events_in,
     window_quartiles,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
@@ -396,9 +414,9 @@ figure_utilities.set_figure_defaults(context="paper")
 set_publication_style()
 warnings.filterwarnings("ignore")
 
-# Inches: the full page width, four rows (the module's docstring).
+# Inches: the full page width, five rows (the module's docstring).
 WIDTH = 6.5
-HEIGHT = 7.6
+HEIGHT = 7.65
 
 TITLE = "Held-out tetrode"
 YLABEL = "Held-out gain\nover local (nats/spike)"
@@ -481,10 +499,10 @@ SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
 LAYOUT = (
-    ((0.81, 0.95), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
-    ((0.56, 0.7), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
+    ((0.855, 0.955), (("state_calibration", 0.12, 0.4), ("no_spike_mua", 0.71, 0.27))),
+    ((0.635, 0.75), (("rule_sweep", 0.085, 0.47), ("boundary_timing", 0.71, 0.27))),
     (
-        (0.31, 0.45),
+        (0.415, 0.53),
         (
             ("nonlocal_mua", 0.075, 0.13),
             ("heldout_gain", 0.305, 0.19),
@@ -492,7 +510,8 @@ LAYOUT = (
             ("participation", 0.835, 0.155),
         ),
     ),
-    ((0.06, 0.2), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
+    ((0.2, 0.31), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
+    ((0.04, 0.105), (("event_traces", 0.085, 0.6),)),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -529,7 +548,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     -------
     dict
         In panel order: ``calibration`` (a): :func:`read_state_calibration`;
-        ``no_spike`` (b): :func:`read_no_spike_trace`; ``sweep`` (c):
+        ``no_spike`` (b) and ``event_traces`` (k): :func:`read_frame_traces`; ``sweep`` (c):
         :func:`read_rule_sweep`; ``timing`` (d): the selected events'
         ``boundary_timing_statistics``; ``mua`` (e): :func:`read_mua_counts`;
         ``tetrode`` (f): the held-out tetrode statistics of the events that
@@ -595,7 +614,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "parts": outside_swr_subset_statistics(
             heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
         ).set_index(["subset", "threshold_s", "family", "measure"]),
-        "no_spike": read_no_spike_trace(workers),
+        **read_frame_traces(events, workers),
     }
 
 
@@ -770,10 +789,14 @@ def read_step_test(folder: Path, event_table: Path) -> dict:
     }
 
 
-def _no_spike_epoch(path: Path) -> dict:
-    """One epoch's part of :func:`read_no_spike_trace`: its MUA level outside
-    its No-Spike periods, and, when it has periods, its windows
-    ``(n_periods, n_lags)``, their lags, its animal and the periods' durations."""
+def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
+    """One epoch's part of :func:`read_frame_traces`: its MUA level outside
+    its No-Spike periods, and, when it has periods, their windows
+    ``(n_periods, n_lags)``, their lags, its animal and the periods'
+    durations; and, when ``keys`` (the selected events' ``animal``,
+    ``session_date``, ``epoch`` and ``non_local_event``) are given, the
+    windows of Figure 2g's signals around its selected events' starts
+    (``triggered_analysis.triggered_windows``, as Figure 2g reads them)."""
     frame = read_dot_with_swr_source(path)
     arrival, departure = well_visit_times(
         path.name.removesuffix(data_over_time_suffix())
@@ -784,6 +807,13 @@ def _no_spike_epoch(path: Path) -> dict:
             frame, periods, arrival, departure, NO_SPIKE_SIGNAL
         )
     }
+    if keys is not None:
+        epoch["event_windows"] = triggered_windows(
+            frame,
+            triggering_events_in(get_event_types(frame), keys),
+            list(TRIGGERED_SIGNALS),
+            window_sec=TRIGGER_WINDOW_S,
+        )
     if periods.empty:
         return epoch
     session = frame[["animal", "day", "epoch"]].iloc[0]
@@ -800,33 +830,51 @@ def _no_spike_epoch(path: Path) -> dict:
     }
 
 
-def read_no_spike_trace(workers: int = NO_SPIKE_WORKERS) -> dict:
-    """The No-Spike panel's trace: MUA around the start of every analyzed epoch's No-Spike
-    periods, in one pass over the decode frames (the SWR source's reader), read
-    by ``workers`` processes (1 reads them in this one), in the epochs' order.
+def read_frame_traces(
+    events: pd.DataFrame | None = None, workers: int = NO_SPIKE_WORKERS
+) -> dict:
+    """The traces read from every analyzed epoch's decode frame, in one pass
+    (the SWR source's reader), by ``workers`` processes (1 reads them in this
+    one), in the epochs' order.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, optional
+        The selected events (``animal``, ``session_date``, ``epoch``,
+        ``non_local_event``); when None, only the No-Spike trace is read.
+    workers : int, optional
 
     Returns
     -------
     dict
-        ``time`` (s from the start), ``q25``, ``median`` and ``q75`` over the
-        periods with a window (``triggered_analysis.window_quartiles``);
-        ``level``: the median over epochs of each epoch's MUA level outside its
-        periods; ``periods``: the periods with a window, by animal;
-        ``median_duration``: their median duration (s).
+        ``no_spike``, the No-Spike panel's trace: ``time`` (s from the
+        start), ``q25``, ``median`` and ``q75`` over the periods with a window
+        (``triggered_analysis.window_quartiles``); ``level``: the median over
+        epochs of each epoch's MUA level outside its periods; ``periods``: the
+        periods with a window, by animal; ``median_duration``: their median
+        duration (s). ``event_traces`` (None without ``events``): by SWR class
+        (``"overlap"``, ``"no_overlap"``), each signal's per-animal median
+        windows (``triggered_analysis.animal_window_medians``), with ``time``.
     """
     paths = analyzed_decode_files(
         processed_data_dir(), data_over_time_suffix(), require_all=True
     )
+    keys = (
+        None
+        if events is None
+        else events[["animal", "session_date", "epoch", "non_local_event"]]
+    )
+    read = partial(_frame_epoch, keys=keys)
     if workers == 1:
-        epochs = list(map(_no_spike_epoch, paths))
+        epochs = list(map(read, paths))
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            epochs = list(pool.map(_no_spike_epoch, paths))
+            epochs = list(pool.map(read, paths))
     with_periods = [epoch for epoch in epochs if "windows" in epoch]
     counts: dict = {}
     for epoch in with_periods:
         counts[epoch["animal"]] = counts.get(epoch["animal"], 0) + len(epoch["windows"])
-    return {
+    no_spike = {
         "time": with_periods[-1]["time"],
         **window_quartiles(np.concatenate([e["windows"] for e in with_periods])),
         "level": float(np.nanmedian([epoch["level"] for epoch in epochs])),
@@ -835,6 +883,19 @@ def read_no_spike_trace(workers: int = NO_SPIKE_WORKERS) -> dict:
             np.median(np.concatenate([e["durations"] for e in with_periods]))
         ),
     }
+    if events is None:
+        return {"no_spike": no_spike, "event_traces": None}
+    traces: dict = {}
+    for kind in ("overlap", "no_overlap"):
+        windows = xr.concat(
+            [epoch["event_windows"][kind] for epoch in epochs], dim="event"
+        )
+        traces[kind] = {
+            signal: animal_window_medians(windows, signal)
+            for signal in TRIGGERED_SIGNALS
+        }
+        traces["time"] = windows["time"].values
+    return {"no_spike": no_spike, "event_traces": traces}
 
 
 def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
@@ -1082,10 +1143,13 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
             ax_count.tick_params(labelleft=False)
     shares[0].set_ylim(0, 100)
     shares[0].set_yticks([0, 50, 100])
-    shares[0].set_ylabel("Events with\nno SWR (%)")
+    shares[0].set_ylabel("No SWR (%)")
     counts[0].set_ylim(0, 1.15 * sweep["n_events"].max() / 1000)
     counts[0].yaxis.set_major_locator(MaxNLocator(2))
-    counts[0].set_ylabel("Events\n(thousands)")
+    counts[0].set_ylabel("Events\n(1000s)")
+    # one left edge for the two rows' labels
+    for ax in (shares[0], counts[0]):
+        ax.yaxis.set_label_coords(-0.32, 0.5)
     for ax, setting in zip(shares, SWEEP_XLABELS, strict=True):
         ax.text(
             SWEEP_SCALES[setting] * RULE[setting], 3, " used", fontsize=SMALL_SIZE,
@@ -1105,6 +1169,49 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
             heading, (x, 1.0), xycoords="axes fraction", xytext=(0, 3),
             textcoords="offset points", ha="center", va="bottom", fontsize=SMALL_SIZE,
         )  # fmt: skip
+
+
+TRACE_LABELS = dict(
+    zip(
+        TRIGGERED_SIGNALS,
+        ("Ripple (z)", "MUA (z)", "Theta (z)", "Speed (cm/s)"),
+        strict=True,
+    )
+)
+"""The traces panel's name of each of Figure 2g's signals, as Figure 2g names
+them."""
+TRACE_CLASSES = {
+    "overlap": ("SWR", COLORS["SWR"]),
+    "no_overlap": ("No SWR", COLORS["No SWR"]),
+}
+"""The traces panel's classes, as Figure 2g draws them."""
+
+
+def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
+    """The traces panel: Figure 2g's signals around event starts, one axis per
+    signal, a thin line per animal and class (each animal's median over its
+    events, ``traces``: :func:`read_frame_traces`' ``event_traces``), the
+    classes in Figure 2g's colors and named past the last axis, a dotted line
+    at the start."""
+    t_ms = 1000 * np.asarray(traces["time"])
+    for ax, signal in zip(axes, TRIGGERED_SIGNALS, strict=True):
+        for kind, (_, color) in TRACE_CLASSES.items():
+            ax.plot(t_ms, traces[kind][signal].to_numpy(), color=color, lw=0.5)
+        ax.axvline(0, color="k", lw=0.5, ls=":")
+        ax.set_xlim(t_ms[0], t_ms[-1])
+        ax.set_xticks([-100, 0, 100])
+        ax.set_title(TRACE_LABELS[signal], fontsize=SMALL_SIZE, pad=3)
+        ax.yaxis.set_major_locator(MaxNLocator(3))
+    # the classes named past the last axis, clear of the lines
+    for k, (name, color) in enumerate(TRACE_CLASSES.values()):
+        axes[-1].text(
+            1.08, 0.75 - 0.2 * k, name, transform=axes[-1].transAxes, ha="left",
+            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
+        )  # fmt: skip
+    axes[0].set_ylabel("Each animal's\nmedian")
+    for ax in axes:
+        ax.set_xlabel("")
+    axes[len(axes) // 2].set_xlabel("Time from event start (ms)", loc="left")
 
 
 def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
@@ -1145,7 +1252,7 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
 
 
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
-    """The No-Spike panel: MUA around No-Spike starts (``trace``: :func:`read_no_spike_trace`),
+    """The No-Spike panel: MUA around No-Spike starts (``trace``: :func:`read_frame_traces`' ``no_spike``),
     the median with its interquartile band as Figure 2g draws its rows, a dotted
     line at the start and a dashed line at the level outside the periods."""
     t_ms = 1000 * np.asarray(trace["time"])
@@ -1165,13 +1272,18 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (2, 3), "step_test": (1, 2)}
+PANEL_GRIDS = {
+    "nonlocal_mua": (2, 1),
+    "rule_sweep": (2, 3),
+    "step_test": (1, 2),
+    "event_traces": (1, len(TRIGGERED_SIGNALS)),
+}
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
-PANEL_COLUMN_GAPS = {"step_test": 0.6}
+PANEL_COLUMN_GAPS = {"step_test": 0.6, "event_traces": 0.12}
 """A panel's gap between its axes' columns, as a share of its frame's width,
 where :data:`GRID_GAP`'s is too small (the step panel's property names)."""
 
@@ -1221,6 +1333,7 @@ def generate_figure(statistics: dict) -> Figure:
             for c in range(columns)
         ]
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
+    draw_event_traces(axes["event_traces"], statistics["event_traces"])
     draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
     draw_heldout_tetrode(axes["heldout_gain"][0], statistics["tetrode"])
     draw_participation(axes["participation"][0], statistics["participation"])
