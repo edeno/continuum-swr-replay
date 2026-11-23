@@ -99,13 +99,12 @@ sets per curve.
 from __future__ import annotations
 
 import argparse
-import multiprocessing
 import time
 from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 
-from continuum_swr_replay.runs.threads import pin_blas_threads
+from continuum_swr_replay.runs.threads import pin_blas_threads, pool_context
 
 pin_blas_threads()
 
@@ -504,9 +503,13 @@ def summarize(
     return pd.DataFrame(out)
 
 
-#: The cohort, set before the worker processes fork, so that it is not sent
-#: with every task.
+#: The cohort, set in each worker process once when it starts, so that it is not
+#: sent with every task.
 _COHORT: list[Session] = []
+
+
+def _set_cohort(sessions: list[Session]) -> None:
+    _COHORT[:] = sessions
 
 
 def _calibrate(target: float) -> tuple[float, float, float]:
@@ -534,7 +537,9 @@ def run(config: Config, workers: int = 1) -> pd.DataFrame:
     if workers == 1:
         calibration, rows = compute(lambda f, xs: list(map(f, xs)))
     else:
-        with multiprocessing.get_context("fork").Pool(workers) as pool:
+        with pool_context().Pool(
+            workers, initializer=_set_cohort, initargs=(_COHORT,)
+        ) as pool:
             calibration, rows = compute(partial(pool.map, chunksize=1))
     return summarize(rows, calibration, config, len(_COHORT))
 
