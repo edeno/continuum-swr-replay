@@ -785,10 +785,10 @@ def test_the_declared_penalty_recovers_a_planted_curve() -> None:
     3 s after arrival: at the log penalty that gives a median edf of 6
     (``calibration.log_penalty_for_edf``), every session's fit converges and
     records its penalty as fixed, and the animal-balanced Q1 contrast (the
-    curve 2 to 4 s after arrival less the first second) is the planted one to
-    0.15, 16 % of it: the penalty's shrinkage (about 5 % at 6 edf in the
-    stored check, ``scripts/checks/simulate_declared_penalty.py``) plus three
-    SDs of the estimate over data sets of this size."""
+    curve 2 to 4 s after arrival less the first second) is the planted one
+    less the penalty's shrinkage, to three SDs of the estimate over data sets
+    of this size. ``contrast_vector`` itself is tested exactly in
+    ``test_simulate_declared_penalty.py``."""
     config = sim.Config(days_per_animal=(2,) * 5, sessions_per_day=(3, 3))
     sessions = sim.cohort(config, seed=7)
     data = sim.simulate(sessions, "rise", np.random.default_rng(8))
@@ -827,4 +827,9 @@ def test_the_declared_penalty_recovers_a_planted_curve() -> None:
     )
     planted = sim.planted_contrast("rise")
     print(f"planted {planted:.4f}, estimate {per_animal.mean():.4f}")
-    assert per_animal.mean() == pytest.approx(planted, abs=0.15)
+    # Over 40 data sets of this cohort at this penalty (data seeds 100 to
+    # 139), the estimate less the planted value had mean -0.055 (the
+    # penalty's shrinkage) and SD 0.048: the bound is that mean to three SDs,
+    # -0.20 to +0.09. This seed's is +0.020; with the curve at 0 in place of
+    # the reference window (the mean over 0 to 1 s) it is +0.285.
+    assert per_animal.mean() - planted == pytest.approx(-0.055, abs=0.145)

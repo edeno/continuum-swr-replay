@@ -95,3 +95,21 @@ def test_the_table_on_a_tiny_cohort(tmp_path, monkeypatch) -> None:
     rise = table.iloc[0]
     assert rise["bias_share"] == pytest.approx(rise["bias"] / rise["planted"])
     pd.testing.assert_frame_equal(sim.run(TINY), table, check_like=True)
+
+
+def test_the_contrast_vector_gives_the_planted_contrast() -> None:
+    """The least-squares projection of the planted rise on the smooth's
+    basis (with an intercept, which the smooth's constraint leaves out), on a
+    0.01 s grid over the term's range: ``contrast_vector`` applied to it is
+    the planted contrast to 0.02. A contrast that lost its reference window
+    (the mean over 0 to 1 s) would be off by about 0.10."""
+    grid = np.arange(0.0, 20.0 + 1e-9, 0.01)
+    design = sim.design_at(pd.DataFrame({sim.COLUMN: grid, "exposure": 1.0}), 0.0)
+    columns = design.term_columns[sim.TERM]
+    X = design.build(pd.DataFrame({sim.COLUMN: grid, "exposure": 1.0})).X[:, columns]
+    basis = np.column_stack([np.ones(grid.size), X])
+    projected = np.linalg.lstsq(basis, sim.CURVES["rise"](grid), rcond=None)[0]
+    coef = np.zeros(len(design.coef_names))
+    coef[columns] = projected[1:]
+    planted = sim.planted_contrast("rise")
+    assert sim.contrast_vector(design) @ coef == pytest.approx(planted, abs=0.02)
