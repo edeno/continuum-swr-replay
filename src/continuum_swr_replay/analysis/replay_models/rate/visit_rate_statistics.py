@@ -16,11 +16,18 @@ The estimates are on the log scale (a log rate ratio).
 Model D's curve over lags 1 to 10 is described, not tested: per session with
 its simultaneous band (``bands.simultaneous_band``), and the animal-balanced
 curve across sessions with its band (``bands.across_session_band``).
+
+Q7a from a fit with the third clock (``f_m``) is the drop before leaving
+conditional on the time until the end of the immobile stretch: in a visit's
+last stretch the two clocks are equal, so part of a drop before leaving can
+move to ``f_m``. :func:`third_clock_q7a` sets Q7a of the fits with and
+without ``f_m`` side by side.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -37,13 +44,21 @@ from continuum_swr_replay.analysis.shared_statistics import estimand_summary
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..declared_tests import DIFFERENCE, KINDS
-from .visit_rate import LAGS, VisitRateFit, declared_contrasts, lag_curve_rows
+from .visit_rate import (
+    LAGS,
+    STRETCH,
+    VisitRateFit,
+    declared_contrasts,
+    lag_curve_rows,
+)
 
 __all__ = [
     "lag_curve_band",
     "lag_curves",
     "session_estimands",
     "summarize_estimands",
+    "third_clock_q7a",
+    "ThirdClockQ7a",
 ]
 
 
@@ -66,7 +81,8 @@ def session_estimands(fit: VisitRateFit) -> pd.DataFrame:
         One row per session and estimand: ``animal``, ``session_date``,
         ``epoch``, ``kind``, ``estimand_id``, ``estimate``, ``variance`` and
         ``se``; NaN for a session without a kept fit or with a coefficient
-        the contrast uses left out.
+        the contrast uses left out. With the third clock in the model, Q7a is
+        conditional on it (module docstring).
     """
     if fit.model != "A":
         raise ValueError(f"the declared estimands are model A's, not {fit.model}'s")
@@ -233,3 +249,86 @@ def lag_curve_band(
         n_draws=n_draws,
         seed=seed,
     )
+
+
+class ThirdClockQ7a(NamedTuple):
+    """Q7a of model A with and without the third clock (:func:`third_clock_q7a`).
+
+    Attributes
+    ----------
+    sessions : pd.DataFrame
+        One row per session: the session, ``kind``, ``with_stretch``,
+        ``without_stretch`` (Q7a of each fit) and ``difference`` (with less
+        without); NaN where either fit has no value.
+    summary : pd.DataFrame
+        One row per ``value`` (``with_stretch``, ``without_stretch``,
+        ``difference``): ``estimand_summary`` of the session values.
+    """
+
+    sessions: pd.DataFrame
+    summary: pd.DataFrame
+
+
+def third_clock_q7a(
+    with_stretch: VisitRateFit,
+    without_stretch: VisitRateFit,
+    *,
+    n_draws: int,
+    seed: int,
+) -> ThirdClockQ7a:
+    """Q7a of model A's fits with and without ``f_m``, per session and over
+    sessions, stored beside the third clock's rule.
+
+    The rule (``visit_rate.third_clock_decision``) reads the concurvity only;
+    the difference here shows how much of the drop before leaving moves to
+    ``f_m`` when it is in the model.
+
+    Parameters
+    ----------
+    with_stretch, without_stretch : VisitRateFit
+        Model A's fits of one kind, with and without the stretch clock, on
+        the same sessions.
+    n_draws, seed : int
+        The nested bootstrap's (``estimand_summary``).
+
+    Returns
+    -------
+    ThirdClockQ7a
+
+    Raises
+    ------
+    ValueError
+        If a fit is not model A's, the fits differ in kind or sessions, or
+        the stretch clock is not in the first fit alone.
+    """
+    if with_stretch.model != "A" or without_stretch.model != "A":
+        raise ValueError("Q7a is model A's")
+    if with_stretch.kind != without_stretch.kind:
+        raise ValueError("the two fits are of different kinds")
+    if not (
+        with_stretch.settings.include_stretch_clock
+        and not without_stretch.settings.include_stretch_clock
+    ):
+        raise ValueError(f"the first fit holds {STRETCH}, the second does not")
+    keys = list(SESSION_COLUMNS)
+    values = {}
+    for name, fit in (
+        ("with_stretch", with_stretch),
+        ("without_stretch", without_stretch),
+    ):
+        q7a = session_estimands(fit)
+        values[name] = q7a[q7a["estimand_id"] == "Q7a"].set_index(keys)["estimate"]
+    if not values["with_stretch"].index.equals(values["without_stretch"].index):
+        raise ValueError("the two fits are of different sessions")
+    sessions = pd.DataFrame(values)
+    sessions["difference"] = sessions["with_stretch"] - sessions["without_stretch"]
+    sessions = sessions.reset_index()
+    sessions.insert(len(keys), "kind", with_stretch.kind)
+    summary = [
+        {
+            "value": name,
+            **_summary(sessions.rename(columns={name: "estimate"}), n_draws, seed),
+        }
+        for name in ("with_stretch", "without_stretch", "difference")
+    ]
+    return ThirdClockQ7a(sessions, pd.DataFrame(summary))
