@@ -944,7 +944,7 @@ Run a model's scenario list through the simulation engine.
 
 The declared-penalty rule for a per-session smooth, in simulation.
 
-`Config`, `visit_bins`, `durations`, `cells`, `cohort`, `expected_counts`, `planted_contrast`, `scenarios`, `design_at`, `contrast_vector`, `model_at`, `calibrate`, `model_name`, `simulation`, `table`, `main`
+`Config`, `visit_bins`, `durations`, `cells`, `cohort`, `expected_counts`, `planted_contrast`, `scenarios`, `design_at`, `contrast_vector`, `model_at`, `calibrate`, `model_name`, `simulation`, `table`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 
