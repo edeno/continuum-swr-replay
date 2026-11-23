@@ -18,8 +18,7 @@ The animal values are ``event_statistics.animal_signal_levels`` with
 ``scripts/event_properties/measure_event_gamma.py``). This was Figure 3's last
 panel; ripple power, MUA, theta and head speed around the events are Figure 2's.
 
-c — How far the content lies from the animal, no-SWR against SWR events (was
-    a panel of Figure 2's supplement). Each event's distance is the mean over
+c — How far the content lies from the animal, no-SWR against SWR events. Each event's distance is the mean over
     its bins of the absolute distance (cm along the track) of the decoded
     place from the animal's (``mean_abs_ahead_behind_cm`` of the canonical
     event table). Its cumulative distribution on a log axis, the percent of a

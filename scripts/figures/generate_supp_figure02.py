@@ -1433,8 +1433,8 @@ PANEL_COLUMN_SHARES = {
     "boundary_timing": (1.15, 1.0),
     "four_decoders": (0.7, 1.6, 0.35),
 }
-"""The widths of a panel's columns, as shares (equal when not named): panel l's
-three axes."""
+"""The widths of a panel's columns, as shares (equal when not named): the
+timing panel's drawing and bars, and the fourth-decoder panel's three axes."""
 PANEL_COLUMN_GAPS = {
     "boundary_timing": 0.03,
     "event_traces": 0.12,

@@ -9,7 +9,9 @@ drawing is short:
   decoded from the other tetrodes, and the two places they must fit better
   than (the animal's place; the place decoded in another event);
 - :func:`draw_restriction_test`: a stretch of time with two SWRs and the two
-  decoders compared, the non-local states allowed only in SWRs or at any time.
+  decoders compared, the non-local states allowed only in SWRs or at any time;
+- :func:`draw_boundary_cases`: how an event's bounds sit against its SWR's,
+  one row per case (Figure 2's supplement, the timing panel).
 
 The drawings are schematic: their places, times and spikes are not data.
 """

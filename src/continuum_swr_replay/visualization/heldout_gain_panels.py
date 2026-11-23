@@ -177,7 +177,7 @@ def label_gain_axis(
 
 GAIN_FLOOR = 0.13
 """A gain axis' floor below zero, as a share of its top (Figure 2k, Figure 2's
-supplement, panels k and n)."""
+supplement, panels i and l)."""
 
 DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
 """The y label of an axis of the full decoder minus the SWR-only decoder."""
@@ -187,14 +187,14 @@ DIFFERENCE_LABELS = {
     "inside_swr": "Inside\nSWRs",
     "outside_swr": "Outside\nSWRs",
 }
-"""An axis of differences between decoders (Figure 2's supplement, panel n): over all the immobile time, over its bins inside SWRs and
+"""An axis of differences between decoders (Figure 2's supplement, panel l): over all the immobile time, over its bins inside SWRs and
 over its bins outside SWRs, left to right; horizontal, on two lines."""
 EVENTS_LABELS = {
     "in_events": "In no-SWR\nevents",
     "outside_events": "Outside\nevents",
 }
 """The axis of a difference outside SWRs in the held-out events (Figure 2's
-supplement, panel n, third axis): inside the no-SWR events detected
+supplement, panel l, third axis): inside the no-SWR events detected
 from the held-out decode and outside every held-out event, left to right."""
 EVENTS_TITLE = "Outside SWRs,\nheld-out events"
 
@@ -204,7 +204,7 @@ DECODER_STYLES = {
     "full_minus_none_per_spike": ("Full", COLORS["Non-Local"], False),
 }
 """Each decoder's gain over the local-only decoder (Figure 2's supplement,
-panel n, first axis), by its measure: its label, its dots' color and
+panel l, first axis), by its measure: its label, its dots' color and
 whether they are open. The SWR-only decoder in a neutral dark gray, the
 SWR-allowed decoder, a variant of it, in open dots of the same gray, the full
 decoder in the Non-Local state's green."""
@@ -264,7 +264,7 @@ def draw_full_minus_swr_axis(
     means when ``through_means``, a dashed line at zero, the y axis from
     :data:`GAIN_FLOOR` below zero (or ``top_scale`` times the lowest dot or
     bound, when lower) to ``top_scale`` times the highest dot or bound, ``ylabel`` (by default :data:`DIFFERENCE_YLABEL`) and, when ``cue``, :func:`full_better_cue`. ``hollow`` marks the columns drawn in open dots (none by default). The x axis is
-    the caller's (Figure 2k, Figure 2's supplement, panels k and n)."""
+    the caller's (Figure 2k, Figure 2's supplement, panels i and l)."""
     if hollow is None:
         hollow = [False] * len(xs)
     for x, row, open_dots in zip(xs, rows, hollow, strict=True):
