@@ -85,7 +85,9 @@ after a change to fitting code only, start at step 6.
       (Figure 2i and the MUA panel of its supplement), `scripts/event_properties/sweep_event_rule.py`
       (the event rule's sensitivity check; reads the event table) and
       `summarize_state_calibration_in_visits.py` (the state calibration inside the well visits, from
-      the stored windows of `run_state_evidence.py`);
+      the stored windows of `run_state_evidence.py`), and
+      `scripts/event_properties/measure_content_place_rate.py` (the rank of the tetrodes' summed rate
+      at each event's decoded place; reads the event table and the detectors);
    8. `reported/summarize.py --summary events`, then `reported/emit_reported_values.py`;
    9. `figures/generate_figure02.py` and `figures/generate_supp_figure02.py` (the second is not drawn
       by `figures/generate_all_figures.py`).
@@ -100,6 +102,7 @@ after a change to fitting code only, start at step 6.
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_nonlocal_by_signal.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/sweep_event_rule.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/summarize_state_calibration_in_visits.py
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_content_place_rate.py --workers 8
    ```
 
    With two workers on a card (`--workers-per-gpu 2`), the largest epochs can run out of GPU memory; run the

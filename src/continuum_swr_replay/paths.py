@@ -265,6 +265,12 @@ HELDOUT_TIME_SUMS_NAME = "heldout_time_sums"
 ``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``."""
 BIN_FACTS_NAME = "bin_facts"
 """The per-bin facts run's tables and records, in ``EVENT_BIN_FACTS_DIR``."""
+EVENT_CONTENT_PLACE_RATE_DIR = "event_content_place_rate"
+"""The rank, among the track's places, of the encoding model's summed ground
+intensity at each canonical non-local event's decoded place, under the
+processed-data root (``scripts/event_properties/measure_content_place_rate.py``)."""
+CONTENT_PLACE_RATE_NAME = "content_place_rate"
+"""The place-rate run's tables and records, in ``EVENT_CONTENT_PLACE_RATE_DIR``."""
 EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
 """Each epoch's non-local detector exposure inside the well visits, under the
 processed-data root (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""
