@@ -26,8 +26,14 @@ slice. For each session, in order:
    while the fit has no finite maximum along unpenalized columns only. A
    penalized simple term (a slope or a category with a fixed log penalty)
    always has a finite maximum, so it stays in the fit where the support rule
-   passes it, even with no event on one side. At the
-   session's first fit a design not identified, or a numerical failure, is an
+   passes it, even with no event on one side. An unpenalized simple term is
+   left out only where it has no finite maximum: a 0/1 slope or a level with
+   no event on a side. With few events on a side (a level whose events are
+   in one to four units), or for a continuous slope, it is fitted, with a
+   large standard error. So an unpenalized simple term is a baseline or a
+   nuisance term, whose value is not reported or tested; a tested
+   coefficient carries the penalty (:func:`.support.require_tested_penalized`).
+   At the session's first fit a design not identified, or a numerical failure, is an
    error that names the session. When a level is left out there, it is
    removed as in step 2 and the steps run again from step 2 on the rows then
    kept. A term leaves whole: when the refit leaves out part of the columns

@@ -17,8 +17,9 @@ package may import it.
   names of terms and coefficients, the standardization and the design check.
 - ``collinearity``: how well the other terms explain each term, on the
   information-weighted design (VIF, mgcv's concurvity).
-- ``support``: the support rule of an unpenalized column and the row rule for
-  an inactive level of a category.
+- ``support``: the support rule of a simple term, the row rule for an
+  inactive level of a category, and the guard that a tested coefficient
+  carries a penalty.
 - ``sessions``: the per-session fitting loop, with the handling of a session
   without a finite maximum.
 - ``calibration``: the declared log penalty of a per-session smooth, the one

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
@@ -16,10 +17,13 @@ from continuum_swr_replay.analysis.regression.support import (
     Support,
     binary_support,
     design_support,
+    require_tested_penalized,
     slope_support,
     terms_failing_share,
 )
 from continuum_swr_replay.analysis.regression.terms import (
+    Category,
+    Offset,
     Slope,
     Smooth,
     build_design,
@@ -186,3 +190,37 @@ def test_failing_share_rule() -> None:
     records.append(record("no finite maximum", False, False))
     assert MAX_FAILING_SHARE == 0.20
     assert terms_failing_share(records) == {"a": 0.21}
+
+
+def test_a_tested_coefficient_without_a_penalty_is_refused(rate_sessions) -> None:
+    """The guard of the convention "a tested coefficient carries the
+    penalty": given coefficient or term names, it passes when each has a
+    fixed penalty and raises one error that names every one without."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    pooled["g"] = np.where(pooled["well_visit_id"] % 2 == 0, "a", "b")
+    baseline = Category("g", ("a", "b"), reference="a", penalty="none")
+    design = build_design(
+        [
+            baseline,
+            Slope("last_rewarded", 0.5),
+            Slope("x", "none"),
+            Slope("time_until_s", 0.5, by=baseline, levels=("a", "b")),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+    )
+    require_tested_penalized(
+        design, ["last_rewarded", "time_until_s:g=a", "time_until_s:g=b"]
+    )
+    require_tested_penalized(design, [])
+    with pytest.raises(ValueError, match=r"'x', 'g\[b\]'") as error:
+        require_tested_penalized(design, ["last_rewarded", "x", "g[b]"])
+    assert "last_rewarded" not in str(error.value)
+    # A model term is checked on each of its coefficients.
+    with pytest.raises(ValueError, match=r"'g'"):
+        require_tested_penalized(design, ["g"])
+    with pytest.raises(ValueError, match=r"\(Intercept\)"):
+        require_tested_penalized(design, ["(Intercept)"])
+    with pytest.raises(ValueError, match="not a coefficient or term"):
+        require_tested_penalized(design, ["reward"])

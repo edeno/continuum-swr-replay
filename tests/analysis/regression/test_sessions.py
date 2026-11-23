@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from scripts.checks import simulate_declared_penalty as sim
 
-from .conftest import ROLE, by_session
+from .conftest import ROLE, by_session, rate_rows
 
 N_ARMS = 6
 
@@ -991,6 +991,46 @@ def test_an_unpenalized_side_without_events_is_left_out() -> None:
     assert record.support["flag"]["passes"]
     assert record.left_out == {"flag": Removed.NO_FINITE_MAXIMUM}
     assert np.isnan(record.coef[1]) and record.edf["flag"] == 0.0
+
+
+def test_an_unpenalized_level_with_one_event_is_fitted() -> None:
+    """A rate session with a level ``b`` on 10 of 60 visits and one event
+    there, the category unpenalized. The support rule counts rows, so the
+    level passes (the event-based rule, which counted units with an event,
+    left it out); its maximum is finite, so the refit keeps it. Its value
+    and standard error are those of the two-cell maximum likelihood:
+    ``log((y_b / e_b) / (y_a / e_a))`` and ``sqrt(1 / y_a + 1 / y_b)``."""
+    rows = rate_rows(0)
+    rows["g"] = np.where(rows["well_visit_id"] % 6 == 0, "b", "a")
+    on_b = rows["g"] == "b"
+    rows.loc[on_b, "count"] = 0.0
+    rows.loc[rows.index[on_b][0], "count"] = 1.0
+    design = build_design(
+        [Category("g", ("a", "b"), reference="a", penalty="none"), Offset("exposure")],
+        rows,
+        intercept=True,
+    )
+    (record,) = _fit(
+        design, by_session([rows]), Poisson(), response="count", unit="well_visit_id"
+    )
+    y_a, e_a = rows.loc[~on_b, ["count", "exposure"]].sum()
+    y_b, e_b = rows.loc[on_b, ["count", "exposure"]].sum()
+    assert record.status == "converged" and record.left_out == {}
+    assert record.support["g[b]"] == {
+        "n_low": 50,
+        "n_high": 10,
+        "passes": True,
+        "reason": "",
+        "size": None,
+    }
+    assert record.coef == pytest.approx(
+        [np.log(y_a / e_a), np.log((y_b / e_b) / (y_a / e_a))], abs=1e-8
+    )
+    assert np.sqrt(record.vcov[1][1]) == pytest.approx(
+        np.sqrt(1 / y_a + 1 / y_b), rel=1e-6
+    )
+    assert record.coef[1] == pytest.approx(-3.67, abs=0.005)
+    assert np.sqrt(record.vcov[1][1]) == pytest.approx(1.0, abs=0.005)
 
 
 def test_penalized_terms_record_their_edf(content_sessions) -> None:

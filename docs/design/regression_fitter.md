@@ -16,7 +16,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
 | `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
-| `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) |
+| `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
 | `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
 | `record.py` | the fit-row record and its parquet storage |
@@ -507,9 +507,20 @@ coefficient; a guard that reads the design only is the author's call that goes w
 Under the grouped softmax every candidate row belongs to an event, so the counts are the
 same as before (`test_support.py::test_softmax_counts_are_those_of_the_event_rule`, the
 records of two content sessions against the old rule's counts at commit `ec1ae69c`).
-Under the Poisson and the Bernoulli a side can have rows and no event. An unpenalized
-term then has no finite maximum and the refit leaves it out (below); a penalized term has
-a finite maximum and stays in the fit.
+Under the Poisson and the Bernoulli a side can have rows and few events or none. A
+penalized term always has a finite maximum and stays in the fit. An unpenalized term has
+no finite maximum only when it is a 0/1 slope or a level with no event on a side (under
+the Bernoulli, also with an event on every row of a side); the refit then leaves it out
+(below). In every other case it has a finite maximum and is fitted: a continuous slope, or
+a level whose events are in one to four units. The event-based rule left these out; this
+rule fits them, with a large standard error. A Poisson session with a level on 10 of 60
+visits and one event there, the category unpenalized, fits the level at -3.67 with a
+standard error of 1.0, the two-cell maximum likelihood
+(`test_sessions.py::test_an_unpenalized_level_with_one_event_is_fitted`). So an
+unpenalized simple term is a baseline or a nuisance term, whose value is not reported or
+tested. A tested coefficient must carry the penalty. `support.require_tested_penalized(design,
+tested)` raises an error that names every coefficient or term in `tested` without a fixed
+penalty; each model module calls it with the coefficients of its declared tests.
 
 A level that fails is removed with its rows, which are dropped and counted, not merged
 into the reference level: in simulation, merging inflated the belief variance's false

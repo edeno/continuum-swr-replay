@@ -1,8 +1,9 @@
 """The support rule: whether a session's design can estimate a simple term.
 
-Decided from the design before the fit, per column and session; no rule reads
-the response (the rule since 2026-11-23, with the weak penalty on simple
-terms: ``docs/design/regression_fitter.md``, "Support rule"). A *unit* is what the data hold independent replicates of (a visit for a rate
+Decided from the design before the fit, per column and session. No rule
+reads the response. This is the rule since 2026-11-23, with the weak penalty
+on simple terms (``docs/design/regression_fitter.md``, "The support rule"). A
+*unit* is what the data hold independent replicates of (a visit for a rate
 model, an event for a content model).
 
 - A level of a :class:`.terms.Category`: ``n_high`` counts the units with a
@@ -24,9 +25,19 @@ by the design check (:meth:`.terms.Design.small_terms`).
 
 Under the grouped softmax every candidate row belongs to an event, so the
 counts are those of the event-based rule this one replaces. Under the Poisson
-and the Bernoulli a side may have rows and no event: an unpenalized term then
-has no finite maximum, and the loop leaves it out by that rule
-(:mod:`.sessions`); a penalized term has a finite maximum and is fitted.
+and the Bernoulli a side may have rows and few events or none. A penalized
+term always has a finite maximum and is fitted. An unpenalized term has no
+finite maximum only when it is a 0/1 slope or a level with no event on a side
+(under the Bernoulli, also with an event on every row of a side); the refit
+then leaves it out (:mod:`.sessions`). In every other case it has a finite
+maximum and is fitted: a continuous slope, or a level whose events are in one
+to four units. The event-based rule left these out; this rule fits them, with
+a large standard error. For example, a level with 10 visits and one event,
+unpenalized, is fitted at -3.67 with a standard error of 1.0
+(``test_sessions.py::test_an_unpenalized_level_with_one_event_is_fitted``).
+So an unpenalized simple term is a baseline or a nuisance term, whose value
+is not reported or tested. A tested coefficient must carry the penalty;
+:func:`require_tested_penalized` checks it.
 
 A column that fails is made inactive in that session. When it is a level of a
 category, the session's rows of that level are dropped from its fit and
@@ -44,7 +55,7 @@ the sessions with a fit leaves the per-session model
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from enum import StrEnum
 from typing import NamedTuple, Protocol
 
@@ -61,6 +72,7 @@ __all__ = [
     "binary_support",
     "design_support",
     "level_support",
+    "require_tested_penalized",
     "slope_support",
     "terms_failing_share",
 ]
@@ -234,6 +246,55 @@ def design_support(
     for name, size in small.items():  # the smooths and lag functionals
         out[name] = Support(None, None, Removed.TOO_SMALL, size)
     return out
+
+
+def require_tested_penalized(design: Design, tested: Iterable[str]) -> None:
+    """Refuse a tested coefficient without a fixed penalty.
+
+    The convention: every coefficient that a model tests carries the weak
+    penalty; an unpenalized simple term is a baseline or a nuisance term
+    (module docstring). Each model module calls this with the coefficients
+    of its declared tests.
+
+    Parameters
+    ----------
+    design : Design
+    tested : iterable of str
+        The names that the model tests: a coefficient (``x``,
+        ``role[previous]``, ``s(clock_s).3``) or a term (``s(clock_s)``; a
+        category, ``role``, checked on each of its levels).
+
+    Raises
+    ------
+    ValueError
+        If a name is not a coefficient or a term of the design, or if a
+        name has no fixed penalty (on any of its coefficients, for a
+        term). The error names every such name.
+    """
+    unknown, unpenalized = [], []
+    for name in tested:
+        if name in design.by_name:
+            parts = [design.by_name[name]]
+        elif name in design.coef_names:
+            parts = [design.column_terms[design.coef_names.index(name)]]
+        else:
+            parts = [t for t in design.terms if t.term == name]
+        if not parts:
+            unknown.append(name)
+        elif any(t.block is None for t in parts):
+            unpenalized.append(name)
+    problems = []
+    if unknown:
+        problems.append(
+            f"not a coefficient or term of the design: {', '.join(map(repr, unknown))}"
+        )
+    if unpenalized:
+        problems.append(
+            "tested without a fixed penalty (a tested coefficient carries the "
+            f"weak penalty): {', '.join(map(repr, unpenalized))}"
+        )
+    if problems:
+        raise ValueError("; ".join(problems))
 
 
 class _Record(Protocol):
