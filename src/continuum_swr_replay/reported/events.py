@@ -747,32 +747,20 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
             f"non-local states, at {where}"
         )
         key = f"calibration_error_bin_{word}"
-        values += [
-            make(
-                key,
-                row["animal_mean"],
-                "quantity",
-                "sig2",
+        values += _animal_range_values(
+            make,
+            key,
+            (row["animal_mean"], row["animal_min"], row["animal_max"]),
+            (
                 f"mean over animals of each animal's median over its sessions of {what}",
-                "cm",
-            ),
-            make(
-                f"{key}_animal_min",
-                row["animal_min"],
-                "quantity",
-                "sig2",
                 f"smallest animal's value of that mean over sessions of {what}",
-                "cm",
-            ),
-            make(
-                f"{key}_animal_max",
-                row["animal_max"],
-                "quantity",
-                "sig2",
                 f"largest animal's value of that mean over sessions of {what}",
-                "cm",
             ),
-        ]
+            "sig2",
+            style="sig2",
+            kind="quantity",
+            unit="cm",
+        )
     return values
 
 
@@ -3110,20 +3098,24 @@ def _animal_range_values(
     *,
     animal_mean: tuple[float, str] | None = None,
     pooled_tags: Tags | None = None,
+    style: str = "pct",
+    kind: str = "fraction",
+    unit: str = "",
 ) -> list[Value]:
     """A share, then the lowest and the highest animal's (``{key}_animal_min``,
     ``{key}_animal_max``): ``shares`` and ``descriptions`` in that order, each
-    printed as a percent (the lowest in ``lowest_style``).
+    printed in ``style`` (a percent; the lowest in ``lowest_style``), of
+    ``kind`` and in ``unit``.
 
     With ``animal_mean`` (the mean over animals of the animals' shares and its
     description), ``{key}_animal_mean`` follows the share; ``pooled_tags``
     then replaces the share's tags (a pooled share that no panel draws)."""
     values = [
-        make(key_, share, "fraction", style, description)
-        for key_, share, style, description in zip(
+        make(key_, share, kind, style_, description, unit)
+        for key_, share, style_, description in zip(
             (key, f"{key}_animal_min", f"{key}_animal_max"),
             shares,
-            ("pct", lowest_style, "pct"),
+            (style, lowest_style, style),
             descriptions,
             strict=True,
         )
@@ -4400,18 +4392,18 @@ def state_by_signal_values(counts: pd.DataFrame, source: str) -> list[Value]:
             row = statistics.loc[measure]
             text = what.format(signal=name, level=f"{level_words} ({level:g} z)")
             key = f"{word}_{key_word}"
-            values += [
-                make(key, row["animal_mean"], "fraction", style, f"{text}: {reduction}"),
-                make(
-                    f"{key}_animal_min", row["animal_min"], "fraction",
-                    "pctnum" if style == "pct" else style,
+            values += _animal_range_values(
+                make,
+                key,
+                (row["animal_mean"], row["animal_min"], row["animal_max"]),
+                (
+                    f"{text}: {reduction}",
                     f"smallest animal's {text} (the mean over its epochs)",
-                ),
-                make(
-                    f"{key}_animal_max", row["animal_max"], "fraction", style,
                     f"largest animal's {text} (the mean over its epochs)",
                 ),
-            ]  # fmt: skip
+                "pctnum" if style == "pct" else style,
+                style=style,
+            )
     return values
 
 
