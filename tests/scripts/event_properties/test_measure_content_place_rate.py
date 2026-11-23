@@ -91,8 +91,6 @@ def test_every_event_of_the_epoch_is_ranked_over_the_real_places(run_inputs):
         "epoch_id",
         "animal",
         "group",
-        "place_rate_rank",
-        "place_rate_ratio",
         "start_place_rate_rank",
         "end_place_rate_rank",
     ]
@@ -102,8 +100,6 @@ def test_every_event_of_the_epoch_is_ranked_over_the_real_places(run_inputs):
     # 20 cm), rank 2/3; 41 cm -> 40 cm, rank 1
     np.testing.assert_allclose(table["start_place_rate_rank"], [1 / 3, 1, np.nan])
     np.testing.assert_allclose(table["end_place_rate_rank"], [2 / 3, np.nan, np.nan])
-    np.testing.assert_allclose(table["place_rate_rank"], [0.5, 1, np.nan])
-    np.testing.assert_allclose(table["place_rate_ratio"], [1.0, 1.6, np.nan])
 
     manifest = json.loads((folder / "manifest.json").read_text())
     record = manifest["epochs"][EPOCH]

@@ -15,8 +15,9 @@ nearest its replay start and end positions
 - ``{epoch_id}_content_place_rate.parquet``: one row per event of the table in
   the epoch, every visit context (the readers select the events,
   ``cohort_selection.select_events_in``): ``event_id``, ``epoch_id``,
-  ``animal``, ``group`` (``"SWR"`` or ``"no SWR"``), ``place_rate_rank``,
-  ``place_rate_ratio``, ``start_place_rate_rank`` and ``end_place_rate_rank``;
+  ``animal``, ``group`` (``"SWR"`` or ``"no SWR"``), ``start_place_rate_rank``
+  and ``end_place_rate_rank`` (the ranks of the places nearest its replay
+  start and end positions);
 - ``{epoch_id}_content_place_rate.json``: the epoch's record (events, real
   places, interior junction bins left out, events without a rank, the ground
   intensity's smallest, median and largest value over the real places, the
@@ -125,8 +126,6 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
             "epoch_id",
             "animal",
             "group",
-            "place_rate_rank",
-            "place_rate_ratio",
             *cpr.RANK_COLUMNS,
         ]
     ]
@@ -139,7 +138,9 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
             "n_interior_junction_bins": int(
                 (bins["edge_id"].to_numpy()[interior] < 0).sum()
             ),
-            "n_events_without_rank": int(table["place_rate_rank"].isna().sum()),
+            "n_events_without_rank": int(
+                table[list(cpr.RANK_COLUMNS)].isna().all(axis=1).sum()
+            ),
             "ground_intensity_min": float(rates.min()),
             "ground_intensity_median": float(np.median(rates)),
             "ground_intensity_max": float(rates.max()),
@@ -172,8 +173,8 @@ def main(argv: list[str] | None = None) -> None:
             "rank": "the number of places with a strictly lower rate, over "
             "n_places - 1 (tied places, equal as stored, take the lowest rank)",
             "event_place": "the place nearest each of "
-            f"{list(cpr.POSITION_COLUMNS)}; the event's rank and ratio are the "
-            "means over the positions present, the ratio over the median rate",
+            f"{list(cpr.POSITION_COLUMNS)}, each with its rank "
+            f"({list(cpr.RANK_COLUMNS)}); NaN where the position is missing",
         },
         "inputs": {"event_table": file_input(event_table)},
     }

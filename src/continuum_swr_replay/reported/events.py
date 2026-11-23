@@ -2327,6 +2327,17 @@ _REFERENCE_WORDS = (
     "place preference, summed over tetrodes and the bins scored and divided by "
     "their spikes; a window without a donor has none"
 )
+_UNMATCHED_DONOR = (
+    "the donor is any event window of the same group and fold, not matched for "
+    "the width of its estimate, so over all events the reference is a "
+    "permutation reference; it is lower the wider the donor's estimate"
+)
+_MATCHED_DONOR = (
+    "width-matched: only the windows whose donor's estimate (its 95 % HPD "
+    "length, as the event's width) falls in the same width bin, a random subset "
+    "of the bin's windows since the donor is drawn at random within the group "
+    "and fold; the reference depends on the donor's width, not the window's"
+)
 _EXTRA_RUN = (
     "the held-out tetrode run made again with its extra scores "
     "(score_tetrode_holdout.py --extra-scores --null-seed 0)"
@@ -2339,12 +2350,14 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     the other tetrodes' position distribution in fixed bins
     (``shared_content.shared_content_statistics``, on ``windows`` of a run with
     ``--extra-scores``): the held-out tetrode agreement per spike, its
-    shuffled-event reference and the agreement minus the reference event by
-    event, each with its interval; the share of events whose agreement is above
-    zero; and the share of the group's events in the bin, each animal's then
-    their mean with the lowest and highest animal, and pooled. The panel draws
-    the agreement, the reference and the animals' shares; the difference, the
-    pooled share and the reference's events are for the text."""
+    width-matched shuffled-event reference and the agreement minus it event by
+    event (over the windows whose donor's estimate is in the same width bin,
+    ``shared_content.width_matched``), each with its interval, and the
+    matched windows; the share of events whose agreement is above zero; and
+    the share of the group's events in the bin, each animal's then their mean
+    with the lowest and highest animal, and pooled. The panel draws the
+    agreement, the reference and the animals' shares; the difference, the
+    pooled share and the matched windows are for the text."""
     make = value_factory(shared_content_values, source, TAGS["shared_content"])
     make_text = value_factory(
         shared_content_values, source, TAGS["shared_content_text"]
@@ -2377,17 +2390,18 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                 make,
                 f"{key}_reference_per_spike",
                 reference,
-                f"{_REFERENCE_WORDS}, of the {where}; {_TETRODE_HELD_OUT}; "
+                f"{_REFERENCE_WORDS}, of the {where} whose donor's estimate is "
+                f"in the same width bin ({_MATCHED_DONOR}); {_TETRODE_HELD_OUT}; "
                 f"{_EXTRA_RUN}; {reduction}",
             )
             values += _interval_and_animals_positive(
                 make_text,
                 f"{key}_agreement_minus_reference_per_spike",
                 difference,
-                f"held-out tetrode agreement minus the shuffled-event reference, "
-                f"event by event, of the {where} that have a donor ({words}; "
-                f"{_REFERENCE_WORDS}); {_TETRODE_HELD_OUT}; {_EXTRA_RUN}; "
-                f"{reduction}",
+                "held-out tetrode agreement minus the shuffled-event reference, "
+                f"event by event, of the {where} whose donor's estimate is in the "
+                f"same width bin ({_MATCHED_DONOR}; {words}; {_REFERENCE_WORDS}); "
+                f"{_TETRODE_HELD_OUT}; {_EXTRA_RUN}; {reduction}",
             )
             values += [
                 make(
@@ -2460,11 +2474,12 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                     f"is {width}",
                 ),
                 make_text(
-                    f"{key}_reference_events",
+                    f"{key}_width_matched_events",
                     reference["n_scored"],
                     "count",
                     "count",
-                    "of those, events with a shuffled-event reference (a donor "
+                    "of those, events with a width-matched shuffled-event "
+                    "reference (a donor whose estimate is in the same width bin "
                     "and a spike in the bins it scored)",
                 ),
             ]
@@ -2492,11 +2507,14 @@ _EXTRA_MEASURES = {
         "agreement_mark_per_spike",
         "the part of the agreement that only the waveform marks give",
     ),
-    "agreement_reference": ("agreement_null_per_spike", _REFERENCE_WORDS),
+    "agreement_reference": (
+        "agreement_null_per_spike",
+        f"{_REFERENCE_WORDS}; {_UNMATCHED_DONOR}",
+    ),
     "agreement_minus_reference": (
         "agreement_minus_null_per_spike",
         "the agreement minus the shuffled-event reference, event by event (an "
-        "event without a donor has no value)",
+        f"event without a donor has no value); {_UNMATCHED_DONOR}",
     ),
     "mark_information": (
         "mark_information_per_spike",
@@ -2590,10 +2608,11 @@ _PLACES = {
     "other": ("other_place", "decoded elsewhere"),
 }
 _PLACE_RATE_WORDS = (
-    "an event's place-rate rank is the mean rank, among the track's real places "
-    "ordered by the encoding model's summed ground intensity (0 the lowest "
-    "rate), of the places nearest its replay start and end positions; a "
-    f"low-rate event's rank is below {LOW_RATE_RANK:g}"
+    "an event's two places are the track's real places nearest its replay start "
+    "and end positions, each ranked among the real places by the encoding "
+    "model's summed ground intensity (0 the lowest rate); a low-rate event has "
+    f"both places ranked below {LOW_RATE_RANK:g} (an event with one position is "
+    "judged on that one)"
 )
 
 
@@ -2655,7 +2674,7 @@ def low_rate_values(
                 row["n_events"],
                 "count",
                 "count",
-                f"{group} events with a place-rate rank",
+                f"{group} events with a ranked place",
             ),
         ]
         for k, tenth in enumerate(_TENTHS):
@@ -2665,10 +2684,12 @@ def low_rate_values(
                     statistics.tenths.loc[(group, k), "animal_mean"],
                     "fraction",
                     "pct",
-                    f"share of the {group} events whose place-rate rank is in the "
-                    f"{tenth} tenth from the lowest ({_PLACE_RATE_WORDS}): each "
-                    "epoch's share, each animal's mean over its epochs, then the "
-                    "mean over animals (chance 10 %)",
+                    f"share of the {group} events' places whose rank is in the "
+                    f"{tenth} tenth from the lowest ({_PLACE_RATE_WORDS}; each "
+                    "event counts its two places half each, its one place whole): "
+                    "each epoch's share, each animal's mean over its epochs, then "
+                    "the mean over animals; chance is the share of the track's "
+                    "places in the tenth, about 10 %",
                 )
             )
     outside = event_statistics.overlap_class_statistics(
@@ -3882,7 +3903,9 @@ def restriction_immobile_values(
 _CONTRAST_TIME_BINS = {
     "inside_swr": f"{_INSIDE_SWR_BINS} inside a well visit",
     "outside_swr": f"{_OUTSIDE_SWR_BINS} inside a well visit",
-    "immobile": "immobile bins inside a well visit (inside and outside SWRs)",
+    "immobile": "immobile bins inside a well visit (inside SWRs, outside SWRs, "
+    "and where SWR detection was not observed, which the sum outside SWRs "
+    "leaves out)",
 }
 _SWR_ALLOWED_RUN = (
     "every decoder scored in one pass under the stored fold fits "

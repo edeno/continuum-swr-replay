@@ -1273,6 +1273,7 @@ def _extra_windows() -> pd.DataFrame:
                             "agreement_rate_per_spike": agreement / 2,
                             "agreement_mark_per_spike": agreement / 2,
                             "agreement_null_per_spike": null,
+                            "hpd_null_cm": np.nan if np.isnan(null) else width,
                             "agreement_minus_null_per_spike": agreement - null,
                             "mark_information_per_spike": mark,
                             "spike_information_per_spike": spike,
@@ -1310,7 +1311,7 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
         assert numbers[key.format(bin_word, "share_of_events")] == pytest.approx(0.2)
     widest = "two_hundred_cm_or_more"
     assert numbers[key.format(widest, "events")] == 3
-    assert numbers[key.format(widest, "reference_events")] == 2
+    assert numbers[key.format(widest, "width_matched_events")] == 2
     assert (
         numbers[
             key.format("below_twenty_five_cm", "agreement_minus_reference_per_spike")
@@ -1322,7 +1323,8 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
     # difference, the pooled share and the reference's events are for the text
     text = {
         k for k in values
-        if "minus_reference" in k or k.endswith(("_share_of_events", "_reference_events"))
+        if "minus_reference" in k
+        or k.endswith(("_share_of_events", "_width_matched_events"))
     }  # fmt: skip
     for name, value in values.items():
         assert value.questions == ("2c.3",)
@@ -1389,7 +1391,8 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
     place_rate = pd.concat(
         [
             ranked[["event_id", "animal", "epoch_id", "group"]].assign(
-                place_rate_rank=np.where(ranked["hpd_cm"] == 10.0, 0.05, 0.5)
+                start_place_rate_rank=np.where(ranked["hpd_cm"] == 10.0, 0.05, 0.5),
+                end_place_rate_rank=np.where(ranked["hpd_cm"] == 10.0, 0.0, 0.5),
             ),
             pd.DataFrame(
                 {
@@ -1397,7 +1400,8 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
                     "animal": events["animal"],
                     "epoch_id": events["animal"] + events["epoch"],
                     "group": np.where(events["is_swr"], "SWR", "no SWR"),
-                    "place_rate_rank": [0.05, 0.05] + [0.5] * 11,
+                    "start_place_rate_rank": [0.05, 0.05] + [0.5] * 11,
+                    "end_place_rate_rank": [0.05, 0.05] + [0.5] * 11,
                 }
             ),
         ],
@@ -1422,15 +1426,8 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
         (0.5 + 0.4 + 0.5) / 3
     )
     assert numbers["nonlocal_events_without_low_rate"] == 11
-    # the low-rate events are the narrowest: agreement minus reference 0.6
-    assert numbers[
-        "non_swr_low_rate_heldout_agreement_minus_reference_per_spike"
-    ] == pytest.approx(0.6)
-    # the others: each animal's median over its four other events (0.4, 0.3,
-    # 0.2, 0.1; a's widest has no reference) is 0.25, but a's three: 0.3
-    assert numbers[
-        "non_swr_other_place_heldout_agreement_minus_reference_per_spike"
-    ] == pytest.approx((0.3 + 0.25 + 0.25) / 3)
+    # the agreement minus the reference is not split by place group
+    assert not [k for k in values if "_heldout_agreement" in k]
     assert numbers["swr_low_rate_heldout_gain_mark_per_spike"] == pytest.approx(0.21)
     assert numbers["swr_other_place_heldout_mark_information_per_spike"] == (
         pytest.approx(0.3)
@@ -1439,15 +1436,14 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
     drawn = {
         k for k in values
         if "_tenth_share" in k
-        or any(m in k for m in ("_heldout_gain_mark_", "_heldout_agreement_minus_",
-                                "_heldout_mark_information_"))
+        or any(m in k for m in ("_heldout_gain_mark_", "_heldout_mark_information_"))
     }  # fmt: skip
     for name, value in values.items():
         assert value.questions == ("2c.3",)
         assert value.figures == (("S2n",) if name in drawn else ()), name
     # two groups: five share values, ten tenths; the fraction and its events;
-    # four measures x two places x two groups x four, and the events scored
-    assert len(values) == 2 * (5 + 10) + 2 + 4 * 2 * 2 * 4 + 2 * 2
+    # three measures x two places x two groups x four, and the events scored
+    assert len(values) == 2 * (5 + 10) + 2 + 3 * 2 * 2 * 4 + 2 * 2
 
 
 def _restriction_windows() -> pd.DataFrame:

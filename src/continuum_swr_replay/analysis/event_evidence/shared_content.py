@@ -21,7 +21,14 @@ when nothing is shared, so each bin also carries the shuffled-event reference
 (``agreement_null_per_spike``: the window's spikes scored under another event
 window's estimate of the same group and fold) and the agreement minus that
 reference, event by event (``agreement_minus_null_per_spike``)
-(:func:`shared_content_statistics`).
+(:func:`shared_content_statistics`). The reference depends on the width of the
+donor's estimate, not the receiving window's, and the donor is drawn at random
+within the group and fold, so its width is unrelated to the window's. Within a
+width bin the reference is therefore read only over the windows whose donor's
+estimate falls in the same bin (``hpd_null_cm``, :func:`width_matched`): a
+random subset of the bin's windows, since the pairing is random, with a
+reference of the same width. The agreement itself is over all the bin's
+events.
 
 The events are grouped by width in fixed bins, :data:`WIDTH_BINS_CM`.
 """
@@ -65,6 +72,19 @@ def width_bins(width_cm: pd.Series) -> pd.Series:
     in (a categorical in the bins' order)."""
     return pd.cut(
         width_cm, list(WIDTH_BINS_CM), right=False, labels=list(WIDTH_BIN_LABELS)
+    )
+
+
+def width_matched(windows: pd.DataFrame) -> pd.Series:
+    """Whether each window's donor estimate (``hpd_null_cm``) falls in the same
+    width bin as the window's own (:data:`WIDTH_COLUMN`); False without a
+    donor."""
+    own = width_bins(windows[WIDTH_COLUMN])
+    donor = width_bins(windows["hpd_null_cm"])
+    return pd.Series(
+        (own.astype(object) == donor.astype(object)).to_numpy()
+        & donor.notna().to_numpy(),
+        index=windows.index,
     )
 
 
@@ -112,9 +132,10 @@ def agreement_by_width_statistics(
           ``share_of_events_animal_max`` and ``share_of_events_animals``: that
           share per epoch (of the epoch's scored events of the group), each
           animal's mean over its epochs
-          (``shared_statistics.animal_session_values(..., "mean")``), their
-          mean, the lowest and highest animal, and the animals' values (in
-          ``animal_names``' order).
+          (``shared_statistics.animal_session_values(..., "mean")``; an animal
+          of the group with no event in the bin counts 0), their mean, the
+          lowest and highest animal, and the animals' values
+          (``share_of_events_animal_names``' order).
     """
     scored = windows.dropna(subset=[column]).assign(
         width_bin=lambda t: width_bins(t[WIDTH_COLUMN])
@@ -138,12 +159,13 @@ def agreement_by_width_statistics(
                 "median",
             )
             everyone = scored[scored["group"] == group]
+            # every animal of the group: one with no event in the bin has 0
             shares = animal_session_values(
                 (everyone["width_bin"] == label).astype(float),
                 everyone["animal"],
                 everyone["epoch_id"],
                 "mean",
-            ).reindex(row["animal_names"])
+            )
             rows.append(
                 {
                     "width_bin": label,
@@ -158,6 +180,7 @@ def agreement_by_width_statistics(
                     "share_of_events_animal_min": float(shares.min()),
                     "share_of_events_animal_max": float(shares.max()),
                     "share_of_events_animals": shares.to_numpy(),
+                    "share_of_events_animal_names": shares.index.to_numpy(),
                 }
             )
     return pd.DataFrame(rows).set_index(["width_bin", "group"])
@@ -166,7 +189,9 @@ def agreement_by_width_statistics(
 class SharedContentStatistics(NamedTuple):
     """Figure 2h's statistics (:func:`shared_content_statistics`), each
     :func:`agreement_by_width_statistics` of one of
-    :data:`SHARED_CONTENT_COLUMNS`."""
+    :data:`SHARED_CONTENT_COLUMNS`: the agreement over every event, the
+    reference and the difference over the width-matched windows only
+    (their ``n_scored`` is the matched windows)."""
 
     agreement: pd.DataFrame
     reference: pd.DataFrame
@@ -176,21 +201,31 @@ class SharedContentStatistics(NamedTuple):
 def shared_content_statistics(
     windows: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
 ) -> SharedContentStatistics:
-    """The agreement, its shuffled-event reference (on the events with a
-    donor) and the agreement minus the reference, by width bin and group, as
-    the events summary and Figure 2h read them.
+    """The agreement over every event, and the width-matched shuffled-event
+    reference and the agreement minus it (over the windows whose donor's
+    estimate is in the same width bin, :func:`width_matched`), by width bin
+    and group, as the events summary and Figure 2h read them.
 
     Parameters
     ----------
     windows : pd.DataFrame
         ``tetrode_holdout.window_scores`` of a run with ``--extra-scores``, the
-        events only.
+        events only (with ``hpd_null_cm``).
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
     """
+    matched = windows[width_matched(windows)]
     return SharedContentStatistics(
+        agreement_by_width_statistics(
+            windows,
+            n_boot=n_boot,
+            seed=seed,
+            column=SHARED_CONTENT_COLUMNS["agreement"],
+        ),
         *(
-            agreement_by_width_statistics(windows, n_boot=n_boot, seed=seed, column=c)
-            for c in SHARED_CONTENT_COLUMNS.values()
-        )
+            agreement_by_width_statistics(
+                matched, n_boot=n_boot, seed=seed, column=SHARED_CONTENT_COLUMNS[name]
+            )
+            for name in ("reference", "difference")
+        ),
     )

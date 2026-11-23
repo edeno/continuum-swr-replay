@@ -47,9 +47,11 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         distribution; the event's value is the mean over its bins and left-out
         tetrodes). A dot per animal for no-SWR and SWR events in their colors,
         beside them the animals' mean with its 95 % interval, a thin line
-        through each group's means; the shuffled-event reference (the event's
-        spikes scored under another event's estimate of the same group and
-        fold) in open markers of the group's color on a dotted line; and a
+        through each group's means; the width-matched shuffled-event reference
+        (the event's spikes scored under another event's estimate of the same
+        group and fold, over the events whose donor's estimate is in the same
+        width bin, since the reference depends on the donor's width) in open
+        markers of the group's color on a dotted line; and a
         dashed line at zero, no place preferred
         (``shared_content.shared_content_statistics``). Above, a thin strip
         sharing the x axis: the percent of each group's events in each width
@@ -1252,7 +1254,7 @@ SHARE_BAR_WIDTH = 0.3
 """The width of each group's bar in panel h's strip (x units)."""
 SHARED_GROUP_NAMES = {"no SWR": "No SWR", "SWR": "SWR"}
 """Panel h's name of each group of ``GROUP_COLORS``."""
-SHARED_REFERENCE_NAME = "shuffled events"
+SHARED_REFERENCE_NAME = "shuffled events, same width"
 """Panel h's name of the shuffled-event reference, drawn in open markers."""
 
 

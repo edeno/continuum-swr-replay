@@ -16,25 +16,40 @@ from continuum_swr_replay.analysis.event_properties.low_rate_places import (
 
 
 def _place_rate() -> pd.DataFrame:
-    """Events 0 to 5: ranks 0.05, 0.5, 0.0, 0.95, 0.1 (at the cut: other)
-    and 0.2."""
+    """Events 0 to 6 by start and end place rank: (0.05, 0.0) low; (0.5,
+    0.5); (0.0, missing) low, judged on its one place; (0.95, 0.95); (0.1,
+    0.0), one place at the cut: other; (0.05, 0.2), one end only: other; and
+    6 without a place."""
     return pd.DataFrame(
-        {"event_id": range(6), "place_rate_rank": [0.05, 0.5, 0.0, 0.95, 0.1, 0.2]}
+        {
+            "event_id": range(7),
+            "start_place_rate_rank": [0.05, 0.5, 0.0, 0.95, 0.1, 0.05, np.nan],
+            "end_place_rate_rank": [0.0, 0.5, np.nan, 0.95, 0.0, 0.2, np.nan],
+        }
     )
 
 
 def test_the_place_groups_cut_below_the_low_rate_rank():
-    groups = place_groups(pd.Series([0, 1, 2, 3, 4, 5, 9]), _place_rate())
-    assert list(groups[:6]) == ["low_rate", "other", "low_rate", "other", "other", "other"]
-    # an event without a rank is in neither
-    assert pd.isna(groups.iloc[6])
+    groups = place_groups(pd.Series([0, 1, 2, 3, 4, 5, 6, 9]), _place_rate())
+    assert list(groups[:6]) == [
+        "low_rate",
+        "other",
+        "low_rate",
+        "other",
+        "other",
+        "other",
+    ]
+    # an event without a place, or not in the run, is in neither
+    assert pd.isna(groups.iloc[6]) and pd.isna(groups.iloc[7])
     with pytest.raises(ValueError, match="two rows"):
         place_groups(pd.Series([0]), pd.concat([_place_rate(), _place_rate()]))
 
 
 def test_the_events_outside_the_low_rate_group_keep_the_unranked():
-    events = pd.DataFrame({"event_id": [0, 1, 2, 3, 9]})
-    assert list(events_outside_low_rate(events, _place_rate())["event_id"]) == [1, 3, 9]
+    events = pd.DataFrame({"event_id": [0, 1, 2, 3, 6, 9]})
+    assert list(events_outside_low_rate(events, _place_rate())["event_id"]) == [
+        1, 3, 6, 9,
+    ]  # fmt: skip
 
 
 def _windows() -> pd.DataFrame:

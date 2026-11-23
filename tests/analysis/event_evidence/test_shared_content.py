@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.event_evidence.shared_content import (
     agreement_by_width_statistics,
     shared_content_statistics,
     width_bins,
+    width_matched,
 )
 
 
@@ -51,6 +52,9 @@ def _windows() -> pd.DataFrame:
     )
     windows["agreement_null_per_spike"] = windows["agreement_per_spike"] - 1.0
     windows.loc[0, "agreement_null_per_spike"] = np.nan
+    # every donor in its window's width bin (no donor: NaN)
+    windows["hpd_null_cm"] = windows["hpd_cm"]
+    windows.loc[0, "hpd_null_cm"] = np.nan
     windows["agreement_minus_null_per_spike"] = (
         windows["agreement_per_spike"] - windows["agreement_null_per_spike"]
     )
@@ -104,3 +108,63 @@ def test_the_reference_and_the_difference_are_over_the_events_with_a_donor():
     pd.testing.assert_frame_equal(
         stats.agreement, agreement_by_width_statistics(_windows(), n_boot=50, seed=1)
     )
+
+
+def test_an_animal_without_events_in_a_bin_counts_zero_in_its_share():
+    """Animal a has one narrow and one wide event, b two narrow ones: the wide
+    bin's mean share over animals is (1/2 + 0) / 2, its smallest 0."""
+    windows = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b"],
+            "epoch_id": ["a1", "a1", "b1", "b1"],
+            "group": "no SWR",
+            "hpd_cm": [10.0, 300.0, 10.0, 12.0],
+            "agreement_per_spike": [1.0, -1.0, 0.5, 0.2],
+        }
+    )
+    wide = agreement_by_width_statistics(windows, n_boot=20).loc[("≥200", "no SWR")]
+    assert wide["share_of_events_animal_mean"] == pytest.approx(0.25)
+    assert wide["share_of_events_animal_min"] == 0.0
+    assert wide["share_of_events_animal_max"] == pytest.approx(0.5)
+    assert wide["share_of_events_animal_names"].tolist() == ["a", "b"]
+    np.testing.assert_allclose(wide["share_of_events_animals"], [0.5, 0.0])
+
+
+def _donor_width_windows() -> pd.DataFrame:
+    """Narrow no-SWR events (10 cm) of animals a, b and c, each with agreement
+    0.5, half with a narrow donor (reference -0.5) and half with a wide donor
+    (300 cm, reference -0.1): the reference depends on the donor's width only,
+    as in the data."""
+    rows = []
+    for animal in "abc":
+        for donor, reference in ((10.0, -0.5), (300.0, -0.1)) * 2:
+            rows.append((animal, f"{animal}1", 10.0, donor, 0.5, reference))
+    windows = pd.DataFrame(
+        rows,
+        columns=[
+            "animal", "epoch_id", "hpd_cm", "hpd_null_cm", "agreement_per_spike",
+            "agreement_null_per_spike",
+        ],
+    ).assign(group="no SWR")  # fmt: skip
+    windows["agreement_minus_null_per_spike"] = (
+        windows["agreement_per_spike"] - windows["agreement_null_per_spike"]
+    )
+    return windows
+
+
+def test_the_reference_is_read_over_the_donors_of_the_same_width():
+    """Unmatched, the narrow bin's reference would mix narrow and wide donors
+    (each animal's median -0.3, the difference 0.8); matched it is the narrow
+    donors' -0.5 and the difference 1.0. The agreement is over every event."""
+    windows = _donor_width_windows()
+    assert width_matched(windows).tolist() == [True, False] * 6
+    stats = shared_content_statistics(windows, n_boot=20)
+    narrow = ("<25", "no SWR")
+    assert stats.reference.loc[narrow, "estimate"] == pytest.approx(-0.5)
+    assert stats.difference.loc[narrow, "estimate"] == pytest.approx(1.0)
+    assert stats.reference.loc[narrow, "n_scored"] == 6
+    assert stats.agreement.loc[narrow, "n_scored"] == 12
+    unmatched = agreement_by_width_statistics(
+        windows, n_boot=20, column="agreement_null_per_spike"
+    )
+    assert unmatched.loc[narrow, "estimate"] == pytest.approx(-0.3)

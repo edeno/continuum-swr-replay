@@ -13,11 +13,18 @@ low-rate place can be measured and reported apart.
 - A place's rank is the number of real places with a strictly lower ground
   intensity, scaled to 0 (lowest rate) to 1 (highest); tied places take the
   lowest rank of the tie (:func:`place_ranks`).
-- An event's ``place_rate_rank`` is the mean of the ranks of the nearest real
-  places to its replay start and end positions (one when the other is
-  missing); ``place_rate_ratio`` is the mean ground intensity there over the
-  median over real places (:func:`epoch_place_rates`).
-- An event is a low-rate event when its rank is below :data:`LOW_RATE_RANK`.
+- An event's two places are the nearest real places to its replay start and
+  end positions; each has its rank (:data:`RANK_COLUMNS`,
+  :func:`epoch_place_rates`). A mean of the two ranks is not used: it is
+  pulled toward the middle, and an event with one end at a low-rate place
+  would count by the accident of its other end.
+- An event is a low-rate event when both its places have a rank below
+  :data:`LOW_RATE_RANK` (an event with one position is judged on that one;
+  :func:`low_rate_events`).
+- The share of a group's places in each tenth of the rank counts each
+  event's two places, half an event each (:func:`rank_tenth_shares`), so the
+  share expected by chance in a tenth is the share of the track's places in
+  it, about 10 %.
 
 The shares are reduced by the project's one averaging rule: each epoch's share,
 then each animal's mean over its epochs
@@ -35,8 +42,8 @@ from continuum_swr_replay.analysis.shared_statistics import animal_session_value
 from continuum_swr_replay.columns import require_columns
 
 LOW_RATE_RANK = 0.10
-"""An event whose ``place_rate_rank`` is below this is a low-rate event: its
-decoded place is among the lowest-rate tenth of the track's real places."""
+"""An event whose places' ranks are both below this is a low-rate event: its
+decoded places are among the lowest-rate tenth of the track's real places."""
 
 N_RANK_BINS = 10
 """The equal bins of the rank (tenths) of :func:`rank_tenth_shares`."""
@@ -149,7 +156,7 @@ def nearest_places(positions_cm: ArrayLike, centers_cm: ArrayLike) -> NDArray[np
 def epoch_place_rates(
     events: pd.DataFrame, centers_cm: ArrayLike, rates: ArrayLike
 ) -> pd.DataFrame:
-    """One epoch's events, each with the rate rank and ratio of its decoded place.
+    """One epoch's events, each with the rate ranks of its two decoded places.
 
     Parameters
     ----------
@@ -162,56 +169,62 @@ def epoch_place_rates(
 
     Returns
     -------
-    pd.DataFrame, shape (n_events, 4)
-        Indexed as ``events``: :data:`RANK_COLUMNS` (each position's nearest
-        place's rank, :func:`place_ranks`), ``place_rate_rank`` (their mean,
-        over the positions present) and ``place_rate_ratio`` (the mean ground
-        intensity at those places over the median over the real places). All
-        NaN for an event without either position.
+    pd.DataFrame, shape (n_events, 2)
+        Indexed as ``events``: :data:`RANK_COLUMNS`, each position's nearest
+        place's rank (:func:`place_ranks`), NaN where the position is missing.
     """
     require_columns(events, list(POSITION_COLUMNS), "the events to rank")
-    rates = np.asarray(rates, dtype=float)
-    ranks = place_ranks(rates)
-    by_position = {}
-    ratios = []
+    ranks = place_ranks(np.asarray(rates, dtype=float))
+    out = {}
     for column, rank_column in zip(POSITION_COLUMNS, RANK_COLUMNS, strict=True):
         index = nearest_places(events[column].to_numpy(dtype=float), centers_cm)
-        present = index >= 0
-        by_position[rank_column] = np.where(present, ranks[index], np.nan)
-        ratios.append(np.where(present, rates[index], np.nan))
-    both = np.column_stack(list(by_position.values()))
-    has_one = np.isfinite(both).any(axis=1)
-    out = pd.DataFrame(by_position, index=events.index)
-    out["place_rate_rank"] = np.nan
-    out["place_rate_ratio"] = np.nan
-    out.loc[has_one, "place_rate_rank"] = np.nanmean(both[has_one], axis=1)
-    out.loc[has_one, "place_rate_ratio"] = np.nanmean(
-        np.column_stack(ratios)[has_one], axis=1
-    ) / np.median(rates)
-    return out
+        out[rank_column] = np.where(index >= 0, ranks[index], np.nan)
+    return pd.DataFrame(out, index=events.index)
 
 
-_TABLE_COLUMNS = ["animal", "epoch_id", "group", "place_rate_rank"]
+_TABLE_COLUMNS = ["animal", "epoch_id", "group", *RANK_COLUMNS]
+
+
+def low_rate_events(table: pd.DataFrame, cut: float = LOW_RATE_RANK) -> pd.Series:
+    """Whether each event is a low-rate event: every one of its places present
+    has a rank below ``cut`` (both, or the one when the other is missing).
+
+    Parameters
+    ----------
+    table : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with :data:`RANK_COLUMNS`.
+    cut : float, optional
+
+    Returns
+    -------
+    pd.Series of object, shape (n_events,)
+        True or False, or NaN for an event with no place (no rank).
+    """
+    require_columns(table, list(RANK_COLUMNS), "the place-rate table")
+    ranks = table[list(RANK_COLUMNS)]
+    low = ((ranks < cut) | ranks.isna()).all(axis=1)
+    return low.astype(object).where(ranks.notna().any(axis=1))
 
 
 def low_rate_share_statistics(
     table: pd.DataFrame, cut: float = LOW_RATE_RANK
 ) -> pd.DataFrame:
-    """For each group, the share of its events that are low-rate events.
+    """For each group, the share of its events that are low-rate events
+    (:func:`low_rate_events`).
 
-    An epoch's share is the fraction of its ranked events with
-    ``place_rate_rank < cut``; an animal's value is the mean over its epochs;
-    the estimate is the mean over animals. An event without a rank is left
-    out.
+    An epoch's share is the fraction of its ranked events (with at least one
+    place) that are low-rate events; an animal's value is the mean over its
+    epochs; the estimate is the mean over animals. An event without a place
+    is left out.
 
     Parameters
     ----------
     table : pd.DataFrame, shape (n_events, n_columns)
         One row per event: ``animal``, ``epoch_id``, ``group`` (``"SWR"`` or
-        ``"no SWR"``) and ``place_rate_rank``. The caller selects the events
+        ``"no SWR"``) and :data:`RANK_COLUMNS`. The caller selects the events
         (``cohort_selection.select_events_in``).
     cut : float, optional
-        The rank below which an event is a low-rate event.
+        The rank below which a place is a low-rate place.
 
     Returns
     -------
@@ -222,10 +235,11 @@ def low_rate_share_statistics(
         ``n_events`` (ranked) and ``n_low_rate_events``.
     """
     require_columns(table, _TABLE_COLUMNS, "the place-rate table")
-    ranked = table[table["place_rate_rank"].notna()]
+    low_all = low_rate_events(table, cut)
+    ranked = table[low_all.notna()]
     rows = {}
     for group, mine in ranked.groupby("group", sort=True):
-        low = (mine["place_rate_rank"] < cut).astype(float)
+        low = low_all[mine.index].astype(float)
         per_animal = animal_session_values(
             low, mine["animal"], mine["epoch_id"], "mean"
         )
@@ -244,13 +258,18 @@ def low_rate_share_statistics(
 
 
 def rank_tenth_shares(table: pd.DataFrame, n_bins: int = N_RANK_BINS) -> pd.DataFrame:
-    """For each group, the share of its events in each equal bin of the rank.
+    """For each group, the share of its events' places in each equal bin of
+    the rank.
 
-    The bins are ``[k / n_bins, (k + 1) / n_bins)``, the last closed at 1, so
-    with ten bins the first holds the low-rate events. Each epoch's shares,
-    each animal's mean over its epochs and the mean over animals, as
-    :func:`low_rate_share_statistics`; each animal's shares, and their mean,
-    sum to 1 over the bins.
+    The bins are ``[k / n_bins, (k + 1) / n_bins)``, the last closed at 1.
+    Each event counts its two places half each (its one place whole when the
+    other is missing; an event without a place is left out), so an event's
+    weight in a bin is the share of its places there, and the share expected
+    by chance in a bin is the share of the track's places in it (about one in
+    ``n_bins``). Each epoch's shares (the mean over its events of those
+    weights), each animal's mean over its epochs and the mean over animals,
+    as :func:`low_rate_share_statistics`; each animal's shares, and their
+    mean, sum to 1 over the bins.
 
     Parameters
     ----------
@@ -266,16 +285,21 @@ def rank_tenth_shares(table: pd.DataFrame, n_bins: int = N_RANK_BINS) -> pd.Data
         group has NaN in that group's rows and is left out of its mean.
     """
     require_columns(table, _TABLE_COLUMNS, "the place-rate table")
-    ranked = table[table["place_rate_rank"].notna()]
-    rank_bin = np.digitize(
-        ranked["place_rate_rank"].to_numpy(), np.arange(1, n_bins) / n_bins
-    )
+    ranks = table[list(RANK_COLUMNS)].to_numpy(dtype=float)
+    present = np.isfinite(ranks)
+    keep = present.any(axis=1)
+    ranked, ranks, present = table[keep], ranks[keep], present[keep]
+    rank_bin = np.digitize(np.nan_to_num(ranks), np.arange(1, n_bins) / n_bins)
+    n_present = present.sum(axis=1)
     parts = []
     for group, mine in ranked.groupby("group", sort=True):
-        mine_bin = rank_bin[(ranked["group"] == group).to_numpy()]
+        rows = (ranked["group"] == group).to_numpy()
         for k in range(n_bins):
+            weight = ((rank_bin[rows] == k) & present[rows]).sum(axis=1) / n_present[
+                rows
+            ]
             per_animal = animal_session_values(
-                pd.Series((mine_bin == k).astype(float), index=mine.index),
+                pd.Series(weight, index=mine.index),
                 mine["animal"],
                 mine["epoch_id"],
                 "mean",

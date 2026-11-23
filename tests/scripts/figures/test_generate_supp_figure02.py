@@ -255,7 +255,8 @@ def _low_rate_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
     windows = _extra_windows()
     events = windows[windows["kind"] == "event"]
     place_rate = events[["event_id", "animal", "epoch_id", "group"]].assign(
-        place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5)
+        start_place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5),
+        end_place_rate_rank=np.where(events["hpd_cm"] == 10.0, 0.05, 0.5),
     )
     return windows, place_rate
 

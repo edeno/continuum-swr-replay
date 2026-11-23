@@ -2611,7 +2611,9 @@ def test_figure02_shared_content_draws_the_agreement_by_width(offline):
         line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
         for line in ax.lines
     )
-    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["shuffled events"]
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+        "shuffled events, same width"
+    ]
     # a strip above, sharing the x axis: each group's mean share over animals
     # per bin as two narrow bars side by side in the groups' colors, with the
     # animals' range

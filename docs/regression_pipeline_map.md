@@ -212,7 +212,7 @@ The non-local restriction models summed over event windows.
 
 Shared content: during an event, do the tetrodes point to the same remote place?
 
-`width_bins`, `agreement_by_width_statistics`, `SharedContentStatistics`, `shared_content_statistics`
+`width_bins`, `width_matched`, `agreement_by_width_statistics`, `SharedContentStatistics`, `shared_content_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -254,7 +254,7 @@ Where non-local content sits: each content time bin's track distance to the anim
 
 How much the tetrodes fire, in the encoding model, at an event's decoded place.
 
-`real_places`, `place_ranks`, `nearest_places`, `epoch_place_rates`, `low_rate_share_statistics`, `rank_tenth_shares`
+`real_places`, `place_ranks`, `nearest_places`, `epoch_place_rates`, `low_rate_events`, `low_rate_share_statistics`, `rank_tenth_shares`
 
 ### `src/continuum_swr_replay/analysis/event_properties/event_analysis.py`
 

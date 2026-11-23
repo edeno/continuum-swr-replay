@@ -1,10 +1,9 @@
 """The held-out tetrode evidence of events decoded at low-rate places, and the
 place information of the scored spikes against the events' controls.
 
-An event is a low-rate event when its decoded place is among the lowest-rate
-tenth of the track's places in the encoding model
-(:mod:`.content_place_rate`: ``place_rate_rank`` below
-``LOW_RATE_RANK``). Where the summed rate is low, a bin without spikes is
+An event is a low-rate event when both its decoded places (start and end)
+are among the lowest-rate tenth of the track's places in the encoding model
+(:mod:`.content_place_rate`, ``low_rate_events``). Where the summed rate is low, a bin without spikes is
 itself evidence for the place, so these events may be carried by the absence
 of spikes more than by the waveform marks. This module splits the held-out
 tetrode scores (``tetrode_holdout.window_scores``) of the events by that group
@@ -23,39 +22,44 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.content_place_rate import (
-    LOW_RATE_RANK,
+    RANK_COLUMNS,
+    low_rate_events,
     low_rate_share_statistics,
     rank_tenth_shares,
 )
 from continuum_swr_replay.columns import require_columns
 
 PLACES = ("low_rate", "other")
-"""The two groups of events by their decoded place's rate rank: below
-``LOW_RATE_RANK`` and at or above it (an event without a rank is in neither)."""
+"""The two groups of events by their decoded places' rate ranks: low-rate
+events (``content_place_rate.low_rate_events``) and the rest (an event without
+a place is in neither)."""
 
 
 def place_groups(event_ids: pd.Series, place_rate: pd.DataFrame) -> pd.Series:
-    """Each event's group of :data:`PLACES` (NaN without a rank).
+    """Each event's group of :data:`PLACES` (NaN without a place).
 
     Parameters
     ----------
     event_ids : pd.Series
         The events' ids.
     place_rate : pd.DataFrame
-        The place-rate run's rows: ``event_id`` (unique) and ``place_rate_rank``.
+        The place-rate run's rows: ``event_id`` (unique) and
+        ``content_place_rate.RANK_COLUMNS``.
 
     Raises
     ------
     ValueError
         If an event id is in ``place_rate`` twice.
     """
-    require_columns(place_rate, ["event_id", "place_rate_rank"], "the place-rate run")
+    require_columns(place_rate, ["event_id", *RANK_COLUMNS], "the place-rate run")
     if place_rate["event_id"].duplicated().any():
         raise ValueError("an event has two rows in the place-rate run")
-    rank = event_ids.map(place_rate.set_index("event_id")["place_rate_rank"])
+    low = event_ids.map(
+        pd.Series(low_rate_events(place_rate).to_numpy(), index=place_rate["event_id"])
+    )
     group = pd.Series(pd.NA, index=event_ids.index, dtype="object")
-    group[rank < LOW_RATE_RANK] = "low_rate"
-    group[rank >= LOW_RATE_RANK] = "other"
+    group[low == True] = "low_rate"  # noqa: E712 (object: True, False or NaN)
+    group[low == False] = "other"  # noqa: E712
     return group
 
 
@@ -149,14 +153,14 @@ def event_minus_control(windows: pd.DataFrame, column: str) -> pd.DataFrame:
 LOW_RATE_MEASURES = (
     "gain_per_spike",
     "gain_mark_per_spike",
-    "agreement_minus_null_per_spike",
     "mark_information_per_spike",
 )
 """The held-out tetrode scores read by place group
 (``tetrode_holdout.window_scores``' columns of a run with ``--extra-scores``):
-the gain over local coding, its mark part, the agreement minus the
-shuffled-event reference, and the place information of the scored spikes'
-marks."""
+the gain over local coding, its mark part, and the place information of the
+scored spikes' marks. The agreement minus the shuffled-event reference is not
+split by place group: low-rate events have narrow estimates, so their donors'
+widths would not match theirs (``shared_content``)."""
 LOW_RATE_FIGURE_MEASURES = LOW_RATE_MEASURES[1:]
 """The scores Figure 2's supplement draws by place group, one axis each."""
 
@@ -186,7 +190,7 @@ def low_rate_statistics(
         selected events and their controls).
     place_rate : pd.DataFrame
         The place-rate run's rows of the selected events: ``event_id``,
-        ``animal``, ``epoch_id``, ``group`` and ``place_rate_rank``.
+        ``animal``, ``epoch_id``, ``group`` and ``content_place_rate.RANK_COLUMNS``.
     """
     return LowRateStatistics(
         low_rate_share_statistics(place_rate),

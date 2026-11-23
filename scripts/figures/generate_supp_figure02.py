@@ -284,9 +284,10 @@ the order the text cites them, in seven rows:
         spike of all the immobile time inside a well visit. Second axis: the
         full minus the SWR-allowed decoder (filled) and the SWR-allowed minus
         the SWR-only decoder (open) over all the immobile time, inside SWRs and
-        outside SWRs; outside SWRs the SWR-allowed and SWR-only decoders are
-        the same, inside SWRs they differ only in whether the local states are
-        allowed. Third axis: the full minus the SWR-allowed decoder outside
+        outside SWRs; outside SWRs the SWR-allowed and SWR-only decoders allow
+        the same states (their scores there differ by about 2e-5 nats per
+        spike, through what each carries out of the SWRs), inside SWRs they
+        differ only in whether the local states are allowed. Third axis: the full minus the SWR-allowed decoder outside
         SWRs in the no-SWR events detected from that run's held-out decode.
         Each a dot per animal and the animals' mean with its 95 % interval
         (``restriction_totals.swr_allowed_statistics``; the events summary's
@@ -294,21 +295,24 @@ the order the text cites them, in seven rows:
 
     n — Low-rate places: is the evidence of the no-SWR events carried by
         places where the tetrodes barely fire, so that silence itself points
-        there? Each event's place-rate rank is the rank, among the track's real
-        places ordered by the encoding model's summed ground intensity (0 the
-        lowest rate), of its decoded place
-        (``Processed-Data/event_content_place_rate``,
-        ``content_place_rate.rank_tenth_shares``); a low-rate event's rank is
-        below ``content_place_rate.LOW_RATE_RANK``. Left: the share of each
-        group's events in each tenth of the rank, a thin line per animal (each
-        animal's mean over its epochs) and their mean in bold in the group's
-        color, chance (10 %) dashed, the lowest tenth shaded. Right, one axis
+        there? An event's two places are the real places nearest its replay
+        start and end positions, each ranked among the track's real places by
+        the encoding model's summed ground intensity (0 the lowest rate;
+        ``Processed-Data/event_content_place_rate``); a low-rate event has
+        both places below ``content_place_rate.LOW_RATE_RANK``. Left: the share
+        of each group's events' places in each tenth of the rank (each event's
+        two places half each, ``content_place_rate.rank_tenth_shares``), a thin
+        line per animal (each animal's mean over its epochs) and their mean in
+        bold in the group's color, chance (the share of the track's places in
+        a tenth, about 10 %) dashed, the lowest tenth shaded. Right, one axis
         each, the held-out tetrode scores of the low-rate and the other events
         of each group (``low_rate_places.LOW_RATE_FIGURE_MEASURES``, from
         ``Processed-Data/event_tetrode_holdout_extra``): the part of the gain
-        over local coding that only the waveform marks give, the agreement
-        minus the shuffled-event reference, and the place information of the
-        scored spikes' marks; a dot per animal (open for the low-rate events)
+        over local coding that only the waveform marks give and the place
+        information of the scored spikes' marks (the agreement minus the
+        shuffled reference is not split by place: low-rate events have narrow
+        estimates and their donors' widths would not match); a dot per animal
+        (open for the low-rate events)
         and the animals' mean with its 95 % interval, as panel f
         (``low_rate_places.low_rate_statistics``; the values tagged S2n).
 
@@ -1544,7 +1548,6 @@ def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -
 
 LOW_RATE_TITLES = {
     "gain_mark_per_spike": "Gain, mark part",
-    "agreement_minus_null_per_spike": "Agreement \u2212 shuffled",
     "mark_information_per_spike": "Mark information",
 }
 """Panel n's small axes, by ``LOW_RATE_FIGURE_MEASURES``: each one's title."""
@@ -1564,7 +1567,7 @@ LOW_RATE_SHADE = "#e6e6e6"
 
 def draw_low_rate(axes: Sequence[Axes], statistics: LowRateStatistics) -> None:
     """Panel n (``statistics``: :func:`read_inputs`' ``low_rate``). Left: the
-    share of each group's events in each tenth of the place-rate rank, a thin
+    share of each group's events' places in each tenth of the place-rate rank, a thin
     line per animal and the mean in bold in the group's color, chance dashed
     and the lowest tenth shaded. Then one small axis per measure of
     ``LOW_RATE_FIGURE_MEASURES``: the low-rate events (open dots) then the
@@ -1597,7 +1600,7 @@ def draw_low_rate(axes: Sequence[Axes], statistics: LowRateStatistics) -> None:
     ax_tenths.set_xticks([0, 50, 100])
     # room above the lines for the groups' names
     ax_tenths.set_ylim(0, 1.45 * ax_tenths.get_ylim()[1])
-    ax_tenths.set_xlabel("Place-rate rank (%)")
+    ax_tenths.set_xlabel("Places' rate rank (%)")
     ax_tenths.set_ylabel("% of events")
     ax_tenths.set_title("Low-rate places", fontsize=SMALL_SIZE, pad=3)
     for ax, column in zip(ax_measures, LOW_RATE_FIGURE_MEASURES, strict=True):
@@ -1634,7 +1637,7 @@ PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
-PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35), "low_rate": (1.2, 1, 1, 1)}
+PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35), "low_rate": (1.2, 1, 1)}
 """The widths of a panel's columns, as shares (equal when not named): panel m's
 as Figure 2j's three axes."""
 PANEL_COLUMN_GAPS = {
