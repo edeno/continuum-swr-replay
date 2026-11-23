@@ -30,10 +30,12 @@ from continuum_swr_replay.analysis.regression.terms import (
     _refuse_small,
     _small_terms,
     build_design,
+    log_penalty_from_prior_sd,
+    prior_sd_from_log_penalty,
     standardization,
 )
 
-from .conftest import N_LAGS, ROLE, draw_response
+from .conftest import N_LAGS, ROLE, ROLES, draw_response
 
 LAGS = tuple(range(1, N_LAGS + 1))
 LAG_COLUMNS = tuple(f"lag_{lag}" for lag in LAGS)
@@ -42,8 +44,8 @@ LAG_COLUMNS = tuple(f"lag_{lag}" for lag in LAGS)
 def _rate_terms(penalty: float | str = 2.0) -> list:
     return [
         Smooth("time_since_s", 0.0, 20.0, 12, penalty),
-        Slope("last_rewarded"),
-        Slope("x"),
+        Slope("last_rewarded", "none"),
+        Slope("x", "none"),
         LinearFunctional(LAG_COLUMNS, LAGS, 0.0, float(np.log(10)), 8, penalty),
         Offset("exposure"),
     ]
@@ -52,7 +54,9 @@ def _rate_terms(penalty: float | str = 2.0) -> list:
 def _content_terms() -> list:
     return [
         ROLE,
-        Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
+        Slope(
+            "reward_fraction", "none", by=ROLE, levels=("current", "previous", "other")
+        ),
         Smooth("clock_s", 0.0, 20.0, 8, 4.0, by=ROLE, levels=("current",)),
     ]
 
@@ -66,6 +70,104 @@ def test_smooth_penalty_is_required() -> None:
         Smooth("x", 0.0, 1.0, 8, "reml")
     with pytest.raises(ValueError, match="outside the bounds"):
         Smooth("x", 0.0, 1.0, 8, 50.0)
+
+
+def test_simple_term_penalty_is_required() -> None:
+    """A slope and a category take their penalty as a smooth does: no
+    default, ``"none"`` or a log penalty in the bounds."""
+    with pytest.raises(TypeError):
+        Slope("x")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        Category("g", ("a", "b"), reference="a")  # type: ignore[call-arg]
+    for bad in ("reml", True):
+        with pytest.raises(ValueError, match="penalty"):
+            Slope("x", bad)
+        with pytest.raises(ValueError, match="penalty"):
+            Category("g", ("a", "b"), reference="a", penalty=bad)
+    with pytest.raises(ValueError, match="outside the bounds"):
+        Slope("x", -11.0)
+
+
+def test_prior_sd_and_log_penalty() -> None:
+    """A Normal prior of SD ``s`` on a coefficient is the log penalty
+    ``log(1 / s**2)``, and back; an SD that is not positive and finite is
+    refused."""
+    for sd in (0.5, 1.0, 2.0, 4.0):
+        rho = log_penalty_from_prior_sd(sd)
+        assert rho == pytest.approx(np.log(1.0 / sd**2), abs=1e-15)
+        assert prior_sd_from_log_penalty(rho) == pytest.approx(sd, rel=1e-15)
+    assert log_penalty_from_prior_sd(1.0) == 0.0
+    for bad in (0.0, -1.0, np.inf, np.nan):
+        with pytest.raises(ValueError, match="prior SD"):
+            log_penalty_from_prior_sd(bad)
+
+
+def test_penalized_simple_terms_get_identity_blocks(content_sessions) -> None:
+    """A penalized slope, a penalized slope by a category (one block per
+    level) and a penalized category (one block per coded level) each get the
+    identity on their own column at their log penalty, in column order; an
+    unpenalized simple term has no block; the record names every term's
+    penalty."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    pooled["noise"] = np.random.default_rng(0).normal(size=len(pooled))
+    role = Category("role", ROLES, reference="other", penalty=-1.0)
+    design = build_design(
+        [
+            role,
+            Slope("reward_fraction", -2.0, by=role, levels=("current", "previous")),
+            Slope("clock_s", 0.5),
+            Slope("noise", "none"),
+            Smooth("clock_s", 0.0, 20.0, 8, 4.0, by=role, levels=("current",)),
+        ],
+        pooled,
+        intercept=False,
+    )
+    penalized = [
+        "role[current]",
+        "role[previous]",
+        "role[trunk]",
+        "reward_fraction:role=current",
+        "reward_fraction:role=previous",
+        "clock_s",
+    ]
+    assert [t.name for t in design.terms if t.block is not None] == [
+        *penalized,
+        "s(clock_s):role=current",
+    ]
+    assert design.by_name["noise"].block is None
+    for k, name in enumerate(penalized):
+        block = design.blocks[design.by_name[name].block]
+        assert design.by_name[name].block == k
+        np.testing.assert_array_equal(block.columns, design.by_name[name].columns)
+        np.testing.assert_array_equal(block.S, np.eye(1))
+    np.testing.assert_array_equal(
+        design.log_penalties, [-1.0, -1.0, -1.0, -2.0, -2.0, 0.5, 4.0]
+    )
+    assert design.log_penalty_record() == {
+        "role": {"set": "fixed", "log_penalty": -1.0},
+        "reward_fraction:role=current": {"set": "fixed", "log_penalty": -2.0},
+        "reward_fraction:role=previous": {"set": "fixed", "log_penalty": -2.0},
+        "clock_s": {"set": "fixed", "log_penalty": 0.5},
+        "noise": {"set": "none", "log_penalty": None},
+        "s(clock_s):role=current": {"set": "fixed", "log_penalty": 4.0},
+    }
+
+
+def test_the_penalty_acts_in_the_reported_unit(content_sessions) -> None:
+    """A penalized continuous slope reads its covariate per pooled SD, so the
+    penalty is on the coefficient per SD: the covariate given in units 1000
+    times larger builds the same columns, to rounding."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    terms = [
+        Slope("clock_s", 0.0),
+        Slope("clock_s", 0.0, by=ROLE, levels=("current",)),
+    ]
+    X, _ = build_design(terms, pooled, intercept=False).session(pooled)
+    big = pooled.assign(clock_s=pooled["clock_s"] * 1000.0)
+    X_big, _ = build_design(terms, big, intercept=False).session(big)
+    np.testing.assert_allclose(X_big, X, rtol=1e-12, atol=1e-13)
+    clock = pooled["clock_s"].to_numpy()
+    np.testing.assert_allclose(X[:, 0], clock / np.std(clock), rtol=1e-14)
 
 
 def test_fixed_knots_and_pooled_constraint(rate_sessions) -> None:
@@ -175,8 +277,10 @@ def test_standardization_ddof0_and_centering(content_sessions) -> None:
     assert np.all(X[~current, j] == 0.0)
 
     rate = pd.concat([pd.DataFrame({"r": [0.0, 1.0, 1.0, 0.0], "x": values})])
-    by = Category("r", (0.0, 1.0), reference=0.0)
-    built = build_design([Slope("r"), Slope("x", by=by)], rate, intercept=True)
+    by = Category("r", (0.0, 1.0), reference=0.0, penalty="none")
+    built = build_design(
+        [Slope("r", "none"), Slope("x", "none", by=by)], rate, intercept=True
+    )
     assert built.coef_names == ("(Intercept)", "r", "x:r=0.0", "x:r=1.0")
     X, _ = built.session(rate)
     np.testing.assert_array_equal(X[:, 1], rate["r"])  # 0/1: as it is
@@ -192,8 +296,8 @@ def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
     design = build_design(
         [
             ROLE,
-            Slope("reward_fraction", by=ROLE, levels=("current",)),
-            Slope("reward_fraction", by=ROLE, levels=("previous", "other")),
+            Slope("reward_fraction", "none", by=ROLE, levels=("current",)),
+            Slope("reward_fraction", "none", by=ROLE, levels=("previous", "other")),
         ],
         pooled,
         intercept=False,
@@ -210,7 +314,11 @@ def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
         np.testing.assert_allclose(X[rows, j], expected)
 
     both = build_design(
-        [ROLE, Slope("clock_s"), Slope("clock_s", by=ROLE, levels=("current",))],
+        [
+            ROLE,
+            Slope("clock_s", "none"),
+            Slope("clock_s", "none", by=ROLE, levels=("current",)),
+        ],
         pooled,
         intercept=False,
     )
@@ -373,7 +481,7 @@ def test_a_missing_category_value_is_a_missing_row(content_sessions) -> None:
     rows.loc[5, "role"] = np.nan
     np.testing.assert_array_equal(np.flatnonzero(design.missing_rows(rows)), [0, 5])
     by_only = build_design(
-        [Slope("clock_s", by=ROLE)],
+        [Slope("clock_s", "none", by=ROLE)],
         pooled,
         intercept=False,
     )
@@ -412,7 +520,7 @@ def test_a_missing_level_is_not_the_reference(content_sessions) -> None:
     (NaN in the level columns), not a row of the reference level (zeros)."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     design = build_design(
-        [ROLE, Slope("clock_s")],
+        [ROLE, Slope("clock_s", "none")],
         pooled,
         intercept=False,
     )
@@ -432,8 +540,8 @@ def test_a_slope_is_measured_after_its_standardization(rate_sessions) -> None:
     of the covariate on another level, and when its spread lies on rows
     missing for another term. Both are refused, naming the term."""
     pooled = pd.concat(rate_sessions.values(), ignore_index=True)
-    by = Category("last_rewarded", (0.0, 1.0), reference=0.0)
-    for terms in ([Slope("x")], [by, Slope("x", by=by)]):
+    by = Category("last_rewarded", (0.0, 1.0), reference=0.0, penalty="none")
+    for terms in ([Slope("x", "none")], [by, Slope("x", "none", by=by)]):
         tiny = pooled.assign(x=pooled["x"] * 1e-6)
         X, _ = build_design(terms, pooled, intercept=True).session(pooled)
         X_tiny, _ = build_design(terms, tiny, intercept=True).session(tiny)
@@ -444,8 +552,12 @@ def test_a_slope_is_measured_after_its_standardization(rate_sessions) -> None:
     spread = 5.0 + 100.0 * np.where(np.arange(400) % 2 == 0, 1.0, -1.0)
     x = np.where(level == "a", 5.0 + 1e-4 * rng.normal(size=400), spread)
     rows = pd.DataFrame({"g": level, "x": x})
-    g = Category("g", ("a", "b"), reference="a")
-    shared = [g, Slope("x", by=g, levels=("a",)), Slope("x", by=g, levels=("b",))]
+    g = Category("g", ("a", "b"), reference="a", penalty="none")
+    shared = [
+        g,
+        Slope("x", "none", by=g, levels=("a",)),
+        Slope("x", "none", by=g, levels=("b",)),
+    ]
     with pytest.raises(ValueError, match=re.escape("x:g=a (")):
         build_design(shared, rows, intercept=True)
 
@@ -456,5 +568,10 @@ def test_a_slope_is_measured_after_its_standardization(rate_sessions) -> None:
     rows = pd.DataFrame({"z": z, "h": h})
     with pytest.raises(ValueError, match=re.escape("z (")):
         build_design(
-            [Category("h", ("u", "v"), reference="u"), Slope("z")], rows, intercept=True
+            [
+                Category("h", ("u", "v"), reference="u", penalty="none"),
+                Slope("z", "none"),
+            ],
+            rows,
+            intercept=True,
         )

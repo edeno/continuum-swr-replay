@@ -582,7 +582,7 @@ The per-session fitting loop: one design, every session fitted alone.
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
-The support rule: whether a session's data can estimate an unpenalized term.
+The support rule: whether a session's design can estimate a simple term.
 
 `Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
 
@@ -590,7 +590,7 @@ The support rule: whether a session's data can estimate an unpenalized term.
 
 Model terms and the design they build, the same for every session.
 
-`Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+`log_penalty_from_prior_sd`, `prior_sd_from_log_penalty`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 

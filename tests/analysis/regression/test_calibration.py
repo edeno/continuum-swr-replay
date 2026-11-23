@@ -25,7 +25,7 @@ def _design(pooled: pd.DataFrame, penalty: float | str = 2.0):
     return build_design(
         [
             Smooth("time_since_s", 0.0, 20.0, 12, penalty),
-            Slope("x"),
+            Slope("x", "none"),
             Offset("exposure"),
         ],
         pooled,

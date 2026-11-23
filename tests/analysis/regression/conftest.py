@@ -24,7 +24,7 @@ from scripts.checks.compare_regression_to_mgcv import bins_of
 N_LAGS = 10
 ROLES = ("current", "previous", "other", "trunk")
 #: The content rows' role category, the "other" leaf arm its reference.
-ROLE = Category("role", ROLES, reference="other")
+ROLE = Category("role", ROLES, reference="other", penalty="none")
 
 
 def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:

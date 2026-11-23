@@ -61,7 +61,10 @@ class NoFit(StrEnum):
 
 
 _WORDS = {
-    Removed.SUPPORT: f"fewer than MIN_UNITS = {MIN_UNITS} units with an event",
+    Removed.SUPPORT: (
+        f"fewer than MIN_UNITS = {MIN_UNITS} units with a row on a side of the "
+        "column (a level: of the level)"
+    ),
     Removed.TOO_SMALL: (
         f"largest absolute value below SMALLEST_COLUMN_SIZE = "
         f"{SMALLEST_COLUMN_SIZE:g} in the session"
@@ -131,11 +134,14 @@ class FitRecord:
     vcov : list of list of float
         ``(H + S)^-1``; NaN rows and columns as ``coef``.
     log_penalty : dict
-        Smooth term -> ``{"set": "fixed" or "none", "log_penalty": value or
-        None}``.
+        Term -> ``{"set": "fixed" or "none", "log_penalty": value or None}``,
+        for every term (:meth:`.terms.Design.log_penalty_record`).
     edf : dict
         Term -> effective degrees of freedom (an unpenalized term: its active
-        columns; a term left out: 0); empty for a session without a fit.
+        columns; a term left out: 0); a level of a penalized category also by
+        its coefficient name. A penalized simple coefficient's is between 0
+        (the penalty decides) and 1 (the data decide). Empty for a session
+        without a fit.
     status : str
         The last fit's ``NewtonFit.status``; only "converged" is a kept fit.
         "not fitted" when no fit was tried: no rows, or no events, left to

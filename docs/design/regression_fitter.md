@@ -180,7 +180,7 @@ The fit at the upper bound, 20, is obtainable, and the score there is within its
 few `1e-8` of the limit. The measurements behind this, and the rules it replaced, are in
 [the fitter's history](../../.claude/docs/reviews/2026-11-21-regression-fitter-history.md).
 
-A session may lack support for an unpenalized term (a 0/1 term none of its rows has):
+A session may lack support for a term (a 0/1 term none of its rows has):
 `SessionData.active`, a boolean mask over the columns, marks the columns the session
 estimates. Its fit, score and derivatives are those of its design built without the
 inactive columns, and their coefficients and covariance rows and columns are NaN. A
@@ -404,9 +404,42 @@ A built design describes each term once, as a `DesignTerm`: its kind (intercept,
 covariate, its penalty block and, for a level, the terms that leave a session with it.
 The support rule, the design check and the per-session loop read these descriptions.
 
-A smooth's penalty is required: `"none"` or a fixed log penalty. No penalty is chosen
-from the data in a per-session fit: the rule for a smooth term there is open with the
-lead.
+Every term but the offset takes a required penalty: `"none"` or a fixed log penalty. No
+penalty is chosen from the data in a per-session fit. A smooth's penalty is its
+second-order difference penalty. A slope's and a category's is the identity on each of
+its columns, each column its own penalty block: one block for a slope, one for each
+level of a slope by a category, one for each coded level of a category. It enters
+`Design.blocks`, `Design.log_penalties` and `Design.log_penalty_record()` as a smooth's
+does; the record names every term's penalty, `"none"` included. A category used only as
+the `by` of another term is not a term, and its penalty is not read.
+
+A fixed log penalty `rho` on a simple coefficient is a Normal prior of mean 0 and SD
+`exp(-rho / 2)`: the fit minimizes `-l + exp(rho) b**2 / 2`
+(`terms.log_penalty_from_prior_sd` and `terms.prior_sd_from_log_penalty`). The
+coefficient is in the unit the convention reports: a 0/1 column enters as it is (a step
+from 0 to 1), and a continuous column enters divided by its pooled SD (centered first
+when it is by a category), so its coefficient is per pooled SD and the prior SD is too.
+A covariate given in units 1000 times larger builds the same column
+(`test_terms.py::test_the_penalty_acts_in_the_reported_unit`). Under the Gaussian the
+penalty is on the scale of the residual sum of squares, so the prior SD is in units of
+the residual SD.
+
+Each record holds the edf of each penalized simple coefficient (`edf`; a level of a
+penalized category by its coefficient name as well as in its category's sum). Near 1 the
+data decide the value; near 0 the penalty does.
+
+Measured results, two cells (an intercept, one penalized 0/1 column, an offset; 20
+visits; `test_sessions.py`):
+
+- The fit equals a one-dimensional root of the penalized score equations to 1e-8, with
+  counts on both sides and with no event on one side.
+- At the weakest log penalty, -10, the estimate equals the plain maximum likelihood value
+  to 1e-4 and its edf is 1 to 1e-4; from -10 to 10 the estimate falls toward zero and its
+  edf falls, monotonically.
+- The intercept, the coefficient and its edf equal mgcv 1.9-4's
+  `gam(..., paraPen = list(flag = list(diag(1), sp = exp(rho))))` at the same fixed
+  strength to 1e-8, in four cases (`test_a_penalized_binary_slope_matches_mgcv`; mgcv's
+  `sp b**2` on the deviance is the fitter's `exp(rho) b**2 / 2` on the log-likelihood).
 
 ## Standardization
 
@@ -457,12 +490,25 @@ mgcv's "para" term keeps the intercept, so it is not compared.
 
 ## The support rule
 
-`support.py` decides from the rows, before the fit, whether a session can estimate an
-unpenalized term: a level of a category passes on the units with an event on its rows, a
-0/1 slope and a continuous slope when both of their sides reach `MIN_UNITS = 5` units with
-an event. The rule, the units and what a row holding an event is are in its docstring. A
-term that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit leaves
-the per-session model (`terms_failing_share`).
+`support.py` decides from the design, before the fit, whether a session can estimate a
+simple term (a level, a 0/1 slope, a continuous slope), penalized or not. No rule reads
+the event counts before a fit. A level of a category passes when `MIN_UNITS = 5` units
+have a row of the level. A 0/1 slope passes when 5 units have a row where it is 1 and 5
+have a row where it is 0. A continuous slope passes when 5 units have a row above the
+median of its rows and 5 have a row below it; a constant column fails. The units and the
+rule are in the module docstring. A term that fails in more than `MAX_FAILING_SHARE`
+(20 %) of the sessions with a fit leaves the per-session model (`terms_failing_share`).
+A smooth and a lag functional have no counts; every term is judged by the design check.
+
+The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
+side. The lead chose a weak penalty on each simple tested coefficient in place of a
+support rule on the events (design, section 9, twenty-second and twenty-third rounds).
+Under the grouped softmax every candidate row belongs to an event, so the counts are the
+same as before (`test_support.py::test_softmax_counts_are_those_of_the_event_rule`, the
+records of two content sessions against the old rule's counts at commit `ec1ae69c`).
+Under the Poisson and the Bernoulli a side can have rows and no event. An unpenalized
+term then has no finite maximum and the refit leaves it out (below); a penalized term has
+a finite maximum and stays in the fit.
 
 A level that fails is removed with its rows, which are dropped and counted, not merged
 into the reference level: in simulation, merging inflated the belief variance's false

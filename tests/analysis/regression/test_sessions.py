@@ -1,12 +1,15 @@
-"""The per-session fitting loop: support, sessions without a finite maximum, records."""
+"""The per-session fitting loop: support, penalized simple terms, sessions
+without a finite maximum, records."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.optimize import brentq
 
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
+from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax, Poisson
 from continuum_swr_replay.analysis.regression.record import NoFit
@@ -20,6 +23,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     Slope,
     Smooth,
     build_design,
+    log_penalty_from_prior_sd,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from scripts.checks import simulate_declared_penalty as sim
@@ -84,7 +88,7 @@ def _rate_design(pooled: pd.DataFrame, *categories: Category):
     """The small rate design: ``categories``, a slope of ``x`` and the
     exposure's offset, with an intercept."""
     return build_design(
-        [*categories, Slope("x"), Offset("exposure")], pooled, intercept=True
+        [*categories, Slope("x", "none"), Offset("exposure")], pooled, intercept=True
     )
 
 
@@ -98,7 +102,7 @@ def test_a_separated_session_is_kept_with_its_terms_missing() -> None:
     )
     pooled = pd.concat(sessions.values(), ignore_index=True)
     design = build_design(
-        [Smooth("clock", 0.0, 5.0, 10, 2.0), Slope("a"), Slope("b")],
+        [Smooth("clock", 0.0, 5.0, 10, 2.0), Slope("a", "none"), Slope("b", "none")],
         pooled,
         intercept=False,
     )
@@ -151,7 +155,12 @@ def _role_design(pooled: pd.DataFrame):
     return build_design(
         [
             ROLE,
-            Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
+            Slope(
+                "reward_fraction",
+                "none",
+                by=ROLE,
+                levels=("current", "previous", "other"),
+            ),
             Smooth("clock_s", 0.0, 20.0, 8, 4.0),
         ],
         pooled,
@@ -232,8 +241,8 @@ def test_rate_sessions_are_fitted_and_recorded(rate_sessions) -> None:
     design = build_design(
         [
             Smooth("time_since_s", 0.0, 20.0, 12, 2.0),
-            Slope("last_rewarded"),
-            Slope("x"),
+            Slope("last_rewarded", "none"),
+            Slope("x", "none"),
             Offset("exposure"),
         ],
         pooled,
@@ -259,7 +268,9 @@ def test_rate_sessions_are_fitted_and_recorded(rate_sessions) -> None:
             "estimate",
         }
         assert record.log_penalty == {
-            "s(time_since_s)": {"set": "fixed", "log_penalty": 2.0}
+            "s(time_since_s)": {"set": "fixed", "log_penalty": 2.0},
+            "last_rewarded": {"set": "none", "log_penalty": None},
+            "x": {"set": "none", "log_penalty": None},
         }
         assert set(record.standardization) == {"x"}
         assert record.cohort_counts["rows_missing_values"] == 0
@@ -275,7 +286,9 @@ def test_a_design_not_identified_at_the_first_fit_names_the_session(
         sessions[key] = rows.assign(x_copy=rows["x"])
     pooled = pd.concat(sessions.values(), ignore_index=True)
     design = build_design(
-        [Slope("x"), Slope("x_copy"), Offset("exposure")], pooled, intercept=True
+        [Slope("x", "none"), Slope("x_copy", "none"), Offset("exposure")],
+        pooled,
+        intercept=True,
     )
     with pytest.raises(
         ValueError, match=r"session sim/20260000/02_r1: .*not identified"
@@ -341,7 +354,7 @@ def test_a_level_passes_on_its_own_count(rate_sessions) -> None:
         keys[1]: _grouped_rate(frames[1], np.arange(0, 200, 2)),
     }
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    grp = Category("grp", ("a", "b"), reference="a")
+    grp = Category("grp", ("a", "b"), reference="a", penalty="none")
     design = _rate_design(pooled, grp)
     record = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")[
         0
@@ -369,7 +382,7 @@ def test_support_is_counted_again_on_the_rows_kept(content_sessions) -> None:
     sessions = by_session(frames)
     pooled = pd.concat(sessions.values(), ignore_index=True)
     design = build_design(
-        [ROLE, Slope("flag"), Smooth("clock_s", 0.0, 20.0, 8, 4.0)],
+        [ROLE, Slope("flag", "none"), Smooth("clock_s", 0.0, 20.0, 8, 4.0)],
         pooled,
         intercept=False,
     )
@@ -398,14 +411,16 @@ def test_a_session_left_without_events_by_the_row_rule_is_not_fitted(
     thin.loc[thin["grp"] == "a", "count"] = 0.0
     sessions = {keys[0]: thin, keys[1]: _grouped_rate(frames[1], np.arange(0, 200, 2))}
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    grp = Category("grp", ("a", "b"), reference="a")
+    grp = Category("grp", ("a", "b"), reference="a", penalty="none")
     design = _rate_design(pooled, grp)
     first, second = _fit(
         design, sessions, Poisson(), response="count", unit="well_visit_id"
     )
     assert first.status == "not fitted" and first.no_fit == NoFit.NO_EVENTS
-    # The slope has its events on the level's rows only, so it fails too.
-    assert first.left_out == {"grp[b]": Removed.SUPPORT, "x": Removed.SUPPORT}
+    # The support rule reads rows, not events: x has the rows of many visits
+    # on each side of its median on the rows kept, so it passes.
+    assert first.left_out == {"grp[b]": Removed.SUPPORT}
+    assert first.support["x"]["passes"]
     assert second.status == "converged"
 
 
@@ -421,7 +436,12 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
     design = build_design(
         [
             ROLE,
-            Slope("reward_fraction", by=ROLE, levels=("current", "previous", "other")),
+            Slope(
+                "reward_fraction",
+                "none",
+                by=ROLE,
+                levels=("current", "previous", "other"),
+            ),
         ],
         pooled,
         intercept=False,
@@ -458,7 +478,7 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     first = sessions[keys[0]]
     sessions[keys[0]] = first.assign(grp=np.where(first["well_visit_id"] % 2, "b", "c"))
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    grp = Category("grp", ("a", "b", "c"), reference="a")
+    grp = Category("grp", ("a", "b", "c"), reference="a", penalty="none")
     design = _rate_design(pooled, grp)
     message = (
         r"session sim/20260000/02_r1: at its first fit its design is not identified"
@@ -525,10 +545,10 @@ def test_a_term_is_judged_once_on_the_final_rows(category_first: bool) -> None:
     dropped level keeps the counts that made it fail, and the result does not
     depend on the order of the terms."""
     rows = _median_case()
-    cat = Category("cat", ("A", "B", "C"), reference="A")
-    terms = [cat, Slope("x"), Offset("exposure")]
+    cat = Category("cat", ("A", "B", "C"), reference="A", penalty="none")
+    terms = [cat, Slope("x", "none"), Offset("exposure")]
     if not category_first:
-        terms = [Slope("x"), Offset("exposure"), cat]
+        terms = [Slope("x", "none"), Offset("exposure"), cat]
     design = build_design(terms, rows, intercept=True)
     (record,) = _fit(
         design, {("sim", "1", "02_r1"): rows}, Poisson(), response="count", unit="visit"
@@ -573,8 +593,8 @@ def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
     other = frame.assign(count=np.random.default_rng(2).poisson(0.2, len(frame)) * 1.0)
     design = build_design(
         [
-            Category("cat", ("A", "B", "C"), reference="A"),
-            Slope("x"),
+            Category("cat", ("A", "B", "C"), reference="A", penalty="none"),
+            Slope("x", "none"),
             Offset("exposure"),
         ],
         frame,
@@ -701,7 +721,9 @@ def test_a_missing_unit_id_is_refused(family, rate_sessions, content_sessions) -
             k: r.assign(y=(r["count"] > 0) * 1.0) for k, r in rate_sessions.items()
         }
         unit, response = "well_visit_id", "count" if family == "poisson" else "y"
-        terms = [Slope("x")] + ([Offset("exposure")] if family == "poisson" else [])
+        terms = [Slope("x", "none")] + (
+            [Offset("exposure")] if family == "poisson" else []
+        )
         design = build_design(
             terms, pd.concat(sessions.values(), ignore_index=True), intercept=True
         )
@@ -739,7 +761,9 @@ def test_a_fit_not_kept_records_what_the_refit_left_out(monkeypatch) -> None:
 
     monkeypatch.setattr(loop, "refit_session", scripted)
     frame = _empty_reference_rows()
-    design = _rate_design(frame, Category("cat", ("A", "B", "C"), reference="A"))
+    design = _rate_design(
+        frame, Category("cat", ("A", "B", "C"), reference="A", penalty="none")
+    )
     assert design.coef_names[3] == "x"
     (record,) = _fit(
         design,
@@ -766,9 +790,11 @@ def test_a_term_that_is_not_a_level_drops_no_rows(rate_sessions) -> None:
         rows = _grouped_rate(rows, np.arange(0, 200, 2))
         sessions[key] = rows.assign(flag=rows["well_visit_id"].isin([0, 1]) * 1.0)
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    grp = Category("grp", ("a", "b"), reference="a")
+    grp = Category("grp", ("a", "b"), reference="a", penalty="none")
     design = build_design(
-        [grp, Slope("flag"), Slope("x"), Offset("exposure")], pooled, intercept=True
+        [grp, Slope("flag", "none"), Slope("x", "none"), Offset("exposure")],
+        pooled,
+        intercept=True,
     )
     record = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")[
         0
@@ -833,3 +859,237 @@ def test_the_declared_penalty_recovers_a_planted_curve() -> None:
     # -0.20 to +0.09. This seed's is +0.020; with the curve at 0 in place of
     # the reference window (the mean over 0 to 1 s) it is +0.285.
     assert per_animal.mean() - planted == pytest.approx(-0.055, abs=0.145)
+
+
+def _two_cells(n_low: tuple[float, float], n_high: tuple[float, float]) -> dict:
+    """A rate session of 20 visits, one row each: visits 0-9 with ``flag`` 0,
+    10-19 with ``flag`` 1. ``n_low`` and ``n_high`` are each side's (events,
+    exposure), spread over its visits; the likelihood sees only the totals,
+    so the fit is that of two cells."""
+    events = np.zeros(20)
+    events[0], events[10] = n_low[0], n_high[0]
+    exposure = np.r_[np.full(10, n_low[1] / 10), np.full(10, n_high[1] / 10)]
+    rows = pd.DataFrame(
+        {
+            "visit": np.arange(20),
+            "flag": (np.arange(20) >= 10) * 1.0,
+            "exposure": exposure,
+            "count": events,
+        }
+    )
+    return {("sim", "1", "02_r1"): rows}
+
+
+def _two_cell_fit(sessions: dict, penalty) -> object:
+    rows = next(iter(sessions.values()))
+    design = build_design(
+        [Slope("flag", penalty), Offset("exposure")], rows, intercept=True
+    )
+    (record,) = _fit(design, sessions, Poisson(), response="count", unit="visit")
+    return record
+
+
+def _penalized_two_cells(y0: float, e0: float, y1: float, e1: float, lam: float):
+    """The two-cell model's penalized maximum, solved in one dimension.
+
+    The score equations of ``-l + lam b**2 / 2`` with ``l`` the Poisson
+    log-likelihood of the cells (``exp(a)`` on the 0 side, ``exp(a + b)`` on
+    the 1 side) are ``y0 + y1 = e0 exp(a) + e1 exp(a + b)`` and ``y1 = e1
+    exp(a + b) + lam b``. So ``e0 exp(a) = y0 + lam b``, and ``b`` is the root
+    of ``g(b) = y1 - lam b - e1 exp(b) (y0 + lam b) / e0``, with
+    ``y0 + lam b > 0``."""
+
+    def g(b: float) -> float:
+        return y1 - lam * b - e1 * np.exp(b) * (y0 + lam * b) / e0
+
+    lo = -y0 / lam * (1 - 1e-12) if y0 > 0 else 1e-300
+    lo = max(lo, -60.0)
+    b = brentq(g, lo, 60.0, xtol=1e-14, rtol=1e-15)
+    return np.log((y0 + lam * b) / e0), b
+
+
+@pytest.mark.parametrize(
+    "cells",
+    [
+        ((30.0, 12.0), (18.0, 5.0)),
+        ((30.0, 12.0), (0.0, 5.0)),
+        ((0.0, 12.0), (9.0, 5.0)),
+    ],
+    ids=["counts", "no_event_on_1", "no_event_on_0"],
+)
+def test_a_penalized_binary_slope_is_the_penalized_maximum(cells) -> None:
+    """Two cells, an intercept and one penalized 0/1 coefficient: the fit
+    equals the root of the penalized score equations to 1e-8, for ordinary
+    counts and for no event on one side (a finite value, the term in the
+    fit; the support rule reads rows, so it passes)."""
+    (y0, e0), (y1, e1) = cells
+    for rho in (-2.0, 0.0, 1.5):
+        record = _two_cell_fit(_two_cells(*cells), rho)
+        a, b = _penalized_two_cells(y0, e0, y1, e1, np.exp(rho))
+        assert record.status == "converged" and record.left_out == {}
+        assert record.support["flag"]["passes"]
+        assert record.coef == pytest.approx([a, b], abs=1e-8)
+        assert record.log_penalty == {"flag": {"set": "fixed", "log_penalty": rho}}
+        assert 0.0 < record.edf["flag"] < 1.0
+
+
+#: mgcv 1.9-4 (R 4.5.3, the ``csr-mgcv`` environment) on the two-cell data of
+#: :func:`_two_cells`: ``gam(y ~ flag + offset(log(e)), family = poisson,
+#: paraPen = list(flag = list(diag(1), sp = exp(rho))),
+#: control = gam.control(epsilon = 1e-14))``. mgcv's penalty on the deviance,
+#: ``sp b**2``, is the fitter's ``exp(rho) b**2 / 2`` on the log-likelihood.
+#: (cells, rho) -> (intercept, flag, edf of flag), as mgcv printed them.
+MGCV_PARAPEN = {
+    ("counts", -2.0): (0.917914817698, 0.360306342817, 0.9881004000),
+    ("counts", 1.5): (0.954357044809, 0.259724286112, 0.7092165189),
+    ("no_event_on_1", 0.0): (0.852710720856, -1.848028978946, 0.6342607833),
+    ("no_event_on_0", 1.5): (-1.024568629085, 0.961114260769, 0.3338322237),
+}
+TWO_CELLS = {
+    "counts": ((30.0, 12.0), (18.0, 5.0)),
+    "no_event_on_1": ((30.0, 12.0), (0.0, 5.0)),
+    "no_event_on_0": ((0.0, 12.0), (9.0, 5.0)),
+}
+
+
+@pytest.mark.parametrize("case", list(MGCV_PARAPEN), ids=str)
+def test_a_penalized_binary_slope_matches_mgcv(case) -> None:
+    """Outside check: the intercept, the penalized 0/1 coefficient and its
+    edf equal mgcv's ``paraPen`` fit at the same fixed strength, to 1e-8."""
+    cells, rho = case
+    record = _two_cell_fit(_two_cells(*TWO_CELLS[cells]), rho)
+    a, b, edf = MGCV_PARAPEN[case]
+    assert record.coef == pytest.approx([a, b], abs=1e-8)
+    assert record.edf["flag"] == pytest.approx(edf, abs=1e-8)
+
+
+def test_the_penalty_moves_the_estimate_toward_zero() -> None:
+    """At the weakest log penalty allowed the estimate is the plain maximum
+    likelihood ``log((y1 / e1) / (y0 / e0))``; a stronger penalty moves it
+    toward zero, monotonically, and lowers its edf."""
+    cells = ((30.0, 12.0), (18.0, 5.0))
+    plain = np.log((18.0 / 5.0) / (30.0 / 12.0))
+    weakest = _two_cell_fit(_two_cells(*cells), LOG_PENALTY_BOUNDS[0])
+    assert weakest.coef[1] == pytest.approx(plain, abs=1e-4)
+    assert weakest.edf["flag"] == pytest.approx(1.0, abs=1e-4)
+    path = [
+        _two_cell_fit(_two_cells(*cells), rho)
+        for rho in (LOG_PENALTY_BOUNDS[0], -4.0, -1.0, 0.0, 2.0, 5.0, 10.0)
+    ]
+    b = np.array([r.coef[1] for r in path])
+    edf = np.array([r.edf["flag"] for r in path])
+    assert (b > 0).all() and (np.diff(b) < 0).all() and b[-1] < 1e-3
+    assert (np.diff(edf) < 0).all()
+
+
+def test_an_unpenalized_side_without_events_is_left_out() -> None:
+    """The same session with the 0/1 term unpenalized: it passes the support
+    rule (rows on both sides), but no event on one side means no finite
+    maximum along it, and the existing rule leaves it out."""
+    record = _two_cell_fit(_two_cells((30.0, 12.0), (0.0, 5.0)), "none")
+    assert record.status == "converged"
+    assert record.support["flag"]["passes"]
+    assert record.left_out == {"flag": Removed.NO_FINITE_MAXIMUM}
+    assert np.isnan(record.coef[1]) and record.edf["flag"] == 0.0
+
+
+def test_penalized_terms_record_their_edf(content_sessions) -> None:
+    """A penalized slope, a penalized slope by a category and a penalized
+    category: each penalized coefficient's edf is in the record, between 0
+    and 1; the category's term sums its levels'."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    role = Category("role", ROLE.levels, reference="other", penalty=0.0)
+    design = build_design(
+        [
+            role,
+            Slope("reward_fraction", 0.0, by=role, levels=("current", "previous")),
+            Slope("clock_s", 0.0),
+        ],
+        pooled,
+        intercept=False,
+    )
+    records = _fit(
+        design, content_sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )
+    for record in records:
+        assert record.status == "converged" and record.left_out == {}
+        names = [
+            "role[current]",
+            "role[previous]",
+            "role[trunk]",
+            "reward_fraction:role=current",
+            "reward_fraction:role=previous",
+            "clock_s",
+        ]
+        for name in names:
+            assert 0.0 < record.edf[name] < 1.0, name
+        assert record.edf["role"] == pytest.approx(
+            sum(
+                record.edf[f"role[{level}]"]
+                for level in ("current", "previous", "trunk")
+            )
+        )
+
+
+def test_every_sparse_session_has_its_penalized_term() -> None:
+    """Six simulated rate sessions in which the 0/1 term is 1 on 6 of 60
+    visits and has few events there (none in some sessions): with a weak
+    penalty every session has a finite value for the term, and none leaves
+    it out for support."""
+    rng = np.random.default_rng(3)
+    frames = []
+    for seed in range(6):
+        visit = np.repeat(np.arange(60), 10)
+        flag = (visit < 6) * 1.0
+        exposure = np.full(visit.size, 0.05)
+        rate = np.exp(np.log(2.0) + 0.5 * flag)
+        count = rng.poisson(rate * exposure).astype(float)
+        if seed in (1, 4):
+            count[flag == 1] = 0.0
+        frames.append(
+            pd.DataFrame(
+                {
+                    "animal": "sim",
+                    "session_date": f"2026{seed:04d}",
+                    "epoch": "02_r1",
+                    "visit": visit,
+                    "flag": flag,
+                    "exposure": exposure,
+                    "count": count,
+                }
+            )
+        )
+    sessions = by_session(frames)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [Slope("flag", log_penalty_from_prior_sd(2.0)), Offset("exposure")],
+        pooled,
+        intercept=True,
+    )
+    records = _fit(design, sessions, Poisson(), response="count", unit="visit")
+    for record in records:
+        assert record.status == "converged"
+        assert record.left_out == {}
+        assert record.support["flag"] == {
+            "n_low": 54,
+            "n_high": 6,
+            "passes": True,
+            "reason": "",
+            "size": None,
+        }
+        assert np.isfinite(record.coef[1])
+    assert any(f.loc[f["flag"] == 1, "count"].sum() == 0 for f in frames)
+
+
+def test_a_penalized_term_without_rows_on_a_side_fails_its_support() -> None:
+    """The support rule holds for a penalized term too: a 0/1 term with rows
+    of 3 visits on its 1 side fails it, is inactive in the fit (its block is
+    not fitted), and the session's fit converges."""
+    sessions = _two_cells((30.0, 12.0), (18.0, 5.0))
+    rows = next(iter(sessions.values()))
+    rows["flag"] = (rows["visit"] >= 17) * 1.0
+    record = _two_cell_fit(sessions, 0.0)
+    assert record.status == "converged"
+    assert record.left_out == {"flag": Removed.SUPPORT}
+    assert record.support["flag"]["n_high"] == 3
+    assert np.isnan(record.coef[1]) and record.edf["flag"] == 0.0
