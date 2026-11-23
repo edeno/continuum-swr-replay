@@ -584,7 +584,7 @@ The per-session fitting loop: one design, every session fitted alone.
 
 The support rule: whether a session's design can estimate a simple term.
 
-`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
+`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`, `terms_failing_share`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 
