@@ -10,8 +10,9 @@ low-rate place can be measured and reported apart.
 - A place is a real place bin of the decode's environment: a track-interior
   bin (the bins the ground intensity is given at) that is not a junction
   placeholder (``edge_id`` -1; the development guide, "Junction place bins").
-- A place's rank is its position among the real places ordered by ground
-  intensity, scaled to 0 (lowest rate) to 1 (highest) (:func:`place_ranks`).
+- A place's rank is the number of real places with a strictly lower ground
+  intensity, scaled to 0 (lowest rate) to 1 (highest); tied places take the
+  lowest rank of the tie (:func:`place_ranks`).
 - An event's ``place_rate_rank`` is the mean of the ranks of the nearest real
   places to its replay start and end positions (one when the other is
   missing); ``place_rate_ratio`` is the mean ground intensity there over the
@@ -101,8 +102,12 @@ def real_places(
 def place_ranks(rates: ArrayLike) -> NDArray[np.float64]:
     """Each place's rank by rate, 0 (lowest) to 1 (highest).
 
-    The places are ordered by rate (equal rates in place order) and the
-    ``i``-th place gets ``i / (n_places - 1)``.
+    A place's rank is the number of places with a strictly lower rate, over
+    ``n_places - 1``. Tied places (rates equal as stored, no tolerance) all take
+    the lowest rank of the tie: a place where the encoding model has no rate
+    (an unvisited patch, rate near 0 at many places) is a lowest-rate place,
+    whatever its position on the track, so its rank does not depend on the
+    order of the places.
 
     Parameters
     ----------
@@ -114,10 +119,8 @@ def place_ranks(rates: ArrayLike) -> NDArray[np.float64]:
     ranks : np.ndarray, shape (n_places,)
     """
     rates = np.asarray(rates, dtype=float)
-    order = np.argsort(rates, kind="stable")
-    ranks = np.empty(rates.size)
-    ranks[order] = np.arange(rates.size) / (rates.size - 1)
-    return ranks
+    n_lower = np.searchsorted(np.sort(rates), rates, side="left")
+    return n_lower / (rates.size - 1)
 
 
 def nearest_places(positions_cm: ArrayLike, centers_cm: ArrayLike) -> NDArray[np.int64]:

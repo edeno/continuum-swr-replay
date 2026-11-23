@@ -169,8 +169,8 @@ def main(argv: list[str] | None = None) -> None:
         "settings": {
             "places": "the environment's track-interior place bins with "
             "edge_id >= 0; summed_ground_process_intensity at each",
-            "rank": "position among the places ordered by rate (ties in place "
-            "order), over n_places - 1",
+            "rank": "the number of places with a strictly lower rate, over "
+            "n_places - 1 (tied places, equal as stored, take the lowest rank)",
             "event_place": "the place nearest each of "
             f"{list(cpr.POSITION_COLUMNS)}; the event's rank and ratio are the "
             "means over the positions present, the ratio over the median rate",
