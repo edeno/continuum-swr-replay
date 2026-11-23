@@ -436,17 +436,25 @@ def test_the_timing_panel_draws_a_row_per_case_with_its_drawing(drawn):
     # each row's name, then the two bars' names over the drawings
     assert names == [*(name for name, _, _ in figure.TIMING_CASES), "SWR", "event"]
     assert names[0] == "Same start and end"
+    # one bound apart, each case beside its opposite; then both apart
+    assert names[1:5] == [
+        "Starts later",
+        "Starts earlier",
+        "Ends earlier",
+        "Ends later",
+    ]
     assert names[5:9] == [
+        "Shorter at both ends",
         "Longer at both ends",
         "Starts and ends later",
-        "Shorter at both ends",
         "Starts and ends earlier",
     ]
     widths = [bar.get_width() for bar in ax.patches]
-    # together-together 70, ends later 15, starts later 10, the other six 5
-    np.testing.assert_allclose(widths, [70, 15, 10, 5, 5, 5, 5, 5, 5])
+    # together-together 70, starts later 10, ends later 15, the other six 5
+    np.testing.assert_allclose(widths, [70, 10, 5, 5, 15, 5, 5, 5, 5])
     texts = [t.get_text() for t in ax.texts]
-    assert texts[:9] == ["70%", "15%", "10%", *(["5%"] * 6)]
+    assert texts[:9] == ["70%", "10%", "5%", "5%", "15%", "5%", "5%", "5%", "5%"]
+    assert ax.get_xlim() == (0.0, 80.0)  # the largest animal's 71 and room
     assert figure.TIMING_NOTE in texts
     dots = [
         c for c in ax.collections

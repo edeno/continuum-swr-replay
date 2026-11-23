@@ -1041,7 +1041,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
 def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4 and Figure 2's supplement, panel S2f: the share of
     SWR-overlapping events in each of the nine combinations of their start and
-    end against their matched SWR's (earlier, together within 25 ms, later;
+    end against their matched SWR's (earlier, together within 10 ms, later;
     ``event_statistics.boundary_timing_statistics``): the mean over animals of
     each animal's share, with the lowest and highest animal, and the share
     pooled over events (no figure draws it); and the share whose start and end

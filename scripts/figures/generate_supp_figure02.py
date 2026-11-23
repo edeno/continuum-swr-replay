@@ -122,18 +122,18 @@ the order the text cites them, in five rows:
         ``rule_sweep_*`` values).
 
     f — Supports Figure 2f, which shows that a good share of the events start
-        or end more than 25 ms from their SWR without saying which way. Each
+        or end more than 10 ms from their SWR without saying which way. Each
         SWR-overlapping event of the canonical event table that starts inside
         a well visit, against its matched SWR (the pairs and offsets of Figure
         2f, ``event_statistics.boundary_offsets``: event minus SWR, so a
         positive start offset is an event that starts later than its SWR, a
         positive end offset one that ends later), classed by its start
-        (earlier, within 25 ms, later) and its end (the same), 25 ms being the
-        tolerance of the events summary's ``*_beyond_twenty_five_ms_fraction``
+        (earlier, within 10 ms, later) and its end (the same), 10 ms being the
+        tolerance of the events summary's ``*_beyond_ten_ms_fraction``
         values (``event_statistics.TIMING_TOLERANCE``; "same" in the panel).
-        Nine rows, the largest share first (:data:`TIMING_CASES`): the five
-        combinations with at least one bound the same, then the four with both
-        apart, each with its own drawing. Each row: its name and a small drawing of the case (the
+        Nine rows (:data:`TIMING_CASES`): the same start and end, the four
+        combinations with one bound apart, then the four with both apart, each
+        with its own drawing and each beside its opposite. Each row: its name and a small drawing of the case (the
         SWR as a bar in the SWR color, the event under it in the non-local
         color, longer or shorter at the bound that differs;
         ``evidence_drawings.draw_boundary_cases``), a bar of the mean over
@@ -348,6 +348,8 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     HPD_BIN_EDGES_CM,
     HPD_TIGHT_CM,
+    OFFSET_TAILS_S,
+    TIMING_TOLERANCE,
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
@@ -447,20 +449,20 @@ EQUAL_FIT = "equal fit"
 SPLIT_TITLE = "Decoded place over\nanimal's place"
 TIMING_CASES = (
     ("Same start and end", "together", "together"),
-    ("Ends later", "together", "later"),
     ("Starts later", "later", "together"),
     ("Starts earlier", "earlier", "together"),
     ("Ends earlier", "together", "earlier"),
+    ("Ends later", "together", "later"),
+    ("Shorter at both ends", "later", "earlier"),
     ("Longer at both ends", "earlier", "later"),
     ("Starts and ends later", "later", "later"),
-    ("Shorter at both ends", "later", "earlier"),
     ("Starts and ends earlier", "earlier", "earlier"),
 )
-"""Panel f's rows, top to bottom (the largest share first): each case's name
-and the start and end class its drawing shows
-(``event_statistics.TIMING_CLASSES``): the five cases with a bound together,
-then the four in which both bounds differ, each with its own drawing."""
-TIMING_NOTE = "same: within 25 ms"
+"""Panel f's rows, top to bottom: each case's name and the start and end class
+its drawing shows (``event_statistics.TIMING_CLASSES``): the same start and
+end, the four cases with one bound apart, then the four with both apart; each
+case beside its opposite (a fixed order, not sorted by share)."""
+TIMING_NOTE = f"same: within {1000 * OFFSET_TAILS_S[TIMING_TOLERANCE]:g} ms"
 """Panel f's note of what "same" means (the tolerance of
 ``event_statistics.TIMING_TOLERANCE``)."""
 TIMING_BAR_COLOR = "#bbbbbb"
@@ -992,15 +994,18 @@ def draw_boundary_timing(ax_cases: Axes, ax: Axes, timing: pd.DataFrame) -> None
             animals, np.full(animals.size, k), s=5, color="black", lw=0, zorder=2
         )
         ax.text(
-            max(mean, animals.max()) + 3, k,
+            max(mean, animals.max()) + 1.5, k,
             f"{format_number(mean / 100, 'pctnum')}%", ha="left",
             va="center", fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax.set_ylim(len(rows) - 0.5, -0.5)
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
-    ax.set_xlim(0, 80)
-    ax.set_xticks([0, 25, 50, 75])
+    # room for the largest animal's dot and the percent written after it
+    largest = max(100 * float(np.max(row["animals"])) for row in rows)
+    upper = 10 * np.ceil((largest + 8) / 10)
+    ax.set_xlim(0, upper)
+    ax.set_xticks(np.arange(0, upper + 1, 10 if upper <= 50 else 25))
     ax.set_xlabel("% of overlapping pairs")
     ax.text(
         1.0, 1.0, TIMING_NOTE, transform=ax.transAxes, ha="right", va="bottom",

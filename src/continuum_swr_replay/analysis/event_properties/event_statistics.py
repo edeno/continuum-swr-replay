@@ -293,7 +293,7 @@ def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     return offsets
 
 
-OFFSET_TAILS_S = {"twenty_five_ms": 0.025, "fifty_ms": 0.050}
+OFFSET_TAILS_S = {"ten_ms": 0.010, "fifty_ms": 0.050}
 """How far (s) an event's bound may sit from its SWR's before it counts in the
 tail (:func:`boundary_offset_statistics`), by the name its statistic carries."""
 
@@ -335,10 +335,13 @@ def _offset_us(offset_s: pd.Series) -> pd.Series:
     return np.round(1e6 * offset_s)
 
 
-TIMING_TOLERANCE = "twenty_five_ms"
+TIMING_TOLERANCE = "ten_ms"
 """The :data:`OFFSET_TAILS_S` tolerance within which an event's bound is
-together with its SWR's (:func:`boundary_timing_statistics`): the same 25 ms
-as the ``*_beyond_twenty_five_ms_fraction`` statistics."""
+together with its SWR's (:func:`boundary_timing_statistics`): the same 10 ms
+as the ``*_beyond_ten_ms_fraction`` statistics. About the resolution of the
+two bounds (the SWR detectors smooth ripple power with a Gaussian of 4 ms
+standard deviation; the decode has 2 ms bins). The shares depend on it, with
+no plateau: a wider tolerance calls more pairs together."""
 TIMING_CLASSES = ("earlier", "together", "later")
 """How an event's bound sits against its SWR's, in order."""
 

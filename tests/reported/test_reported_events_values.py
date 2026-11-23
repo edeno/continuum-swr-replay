@@ -52,7 +52,7 @@ def _events() -> pd.DataFrame:
         ("a", "e2", "swr_contained", 0.01, -0.01),
         ("b", "e1", "non_swr", NAN, NAN),
         ("b", "e1", "non_swr", NAN, NAN),
-        ("b", "e1", "swr_partial", 0.02, -0.02),
+        ("b", "e1", "swr_partial", 0.005, -0.005),
         ("b", "e1", "swr_partial", 0.03, -0.03),
         ("b", "e1", "swr_partial", 0.05, -0.04),
         ("c", "e1", "non_swr", NAN, NAN),
@@ -250,15 +250,15 @@ def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range
 def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
     values = _by_key(builder.boundary_offset_values(_events(), "s"))
     assert values["swr_overlapping_events"].value == 6
-    # starts 10, 20, 30, 50, 60, 300 ms; ends -50, -40, -30, -20, -10, 900 ms
+    # starts 5, 10, 30, 50, 60, 300 ms; ends -50, -40, -30, -10, -5, 900 ms
     assert values["start_offset_median_ms"].value == pytest.approx(40.0)
-    assert values["end_offset_median_ms"].value == pytest.approx(-25.0)
+    assert values["end_offset_median_ms"].value == pytest.approx(-20.0)
     assert values["start_offset_median_ms"].unit == "ms"
-    # starts beyond 25 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
-    assert values["start_offset_beyond_twenty_five_ms_fraction"].value == 4 / 6
+    # starts beyond 10 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
+    assert values["start_offset_beyond_ten_ms_fraction"].value == 4 / 6
     assert values["start_offset_beyond_fifty_ms_fraction"].value == 2 / 6
-    # ends beyond 25 ms: -50, -40, -30, 900; beyond 50: 900
-    assert values["end_offset_beyond_twenty_five_ms_fraction"].value == 4 / 6
+    # ends beyond 10 ms: -50, -40, -30, 900; beyond 50: 900
+    assert values["end_offset_beyond_ten_ms_fraction"].value == 4 / 6
     assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
 
 
@@ -298,7 +298,7 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
         drawn = not key.endswith("_share") and "both_ends" not in key
         assert value.figures == (("S2f",) if drawn else ()), key
     assert {v.questions for v in values.values()} == {("2b.4",)}
-    assert "more than 25 ms later than the matched SWR's start" in (
+    assert "more than 10 ms later than the matched SWR's start" in (
         values["timing_start_later_end_earlier_share"].description
     )
 

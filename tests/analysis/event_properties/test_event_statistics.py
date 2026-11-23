@@ -141,9 +141,9 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert result["start_offset_median_s"] == pytest.approx(0.015)
     assert result["end_offset_median_s"] == pytest.approx(0.04)
     # |start| 0.02, 0.01, 0.05, 0.04 and |end| 0.02, 0.05, 0.10, 0.20 s: beyond
-    # 25 ms, 2 and 3 of 4; beyond 50 ms (strictly), 0 and 2 of 4
-    assert result["start_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(2 / 4)
-    assert result["end_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(3 / 4)
+    # 10 ms (strictly), 3 and 4 of 4; beyond 50 ms (strictly), 0 and 2 of 4
+    assert result["start_offset_beyond_ten_ms_fraction"] == pytest.approx(3 / 4)
+    assert result["end_offset_beyond_ten_ms_fraction"] == pytest.approx(4 / 4)
     assert result["start_offset_beyond_fifty_ms_fraction"] == pytest.approx(0)
     assert result["end_offset_beyond_fifty_ms_fraction"] == pytest.approx(2 / 4)
     # events none of which overlaps an SWR: no row, and the two columns
@@ -153,12 +153,12 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
 
 
 def test_boundary_timing_classes_each_bound_against_the_tolerance():
-    """Event minus SWR, ms: below -25 earlier, above +25 later, within (the
+    """Event minus SWR, ms: below -10 earlier, above +10 later, within (the
     edges included) together."""
     offsets = pd.DataFrame(
         {
-            "start_offset_s": [-0.030, -0.025, 0.0, 0.025, 0.026],
-            "end_offset_s": [0.030, 0.025, -0.0251, 0.0, -0.025],
+            "start_offset_s": [-0.012, -0.010, 0.0, 0.010, 0.011],
+            "end_offset_s": [0.012, 0.010, -0.0101, 0.0, -0.010],
         }
     )
     classes = stats.boundary_timing_classes(offsets)
@@ -168,7 +168,7 @@ def test_boundary_timing_classes_each_bound_against_the_tolerance():
     assert classes["end"].tolist() == [
         "later", "together", "earlier", "together", "together",
     ]  # fmt: skip
-    assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.025
+    assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.010
 
 
 def test_boundary_timing_statistics_take_each_animal_over_its_epochs():

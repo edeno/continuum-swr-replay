@@ -267,7 +267,7 @@ QUESTIONS: tuple[Question, ...] = (
         "2b.4",
         "How do non-local event starts and ends differ from those of the matched SWR?",
         figures=("2f", "S2f"),
-        note="Figure 2f draws each bound's offset; Figure 2's supplement, panel S2f, is the timing_* values: the share of events in each combination of start and end against the SWR's (earlier, together within 25 ms, later).",
+        note="Figure 2f draws each bound's offset; Figure 2's supplement, panel S2f, is the timing_* values: the share of events in each combination of start and end against the SWR's (earlier, together within 10 ms, later).",
     ),
     Question(
         "2b.5",
