@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """The declared-penalty rule for a per-session smooth, in simulation.
 
 Every number this script writes is a simulation number.
@@ -95,7 +94,7 @@ is a child spawned from it (``regression.simulation.bootstrap_seeds``).
 
     python scripts/checks/run_simulations.py --model declared_penalty --output-dir OUT
     python scripts/checks/run_simulations.py --model declared_penalty --quick
-    python scripts/checks/simulate_declared_penalty.py --output-dir OUT --workers 16
+    python scripts/checks/run_simulations.py --model declared_penalty --workers 6
 
 ``--quick`` runs a cohort of 5 animals of 1 day of 2 sessions and 2 data sets
 per curve; its table is the fixed-seed fixture
@@ -104,10 +103,8 @@ per curve; its table is the fixed-seed fixture
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
@@ -459,15 +456,3 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(out)
-
-
-def main(argv: list[str] | None = None) -> None:
-    """``run_simulations.py --model declared_penalty`` with ``argv``."""
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.checks import run_simulations
-
-    run_simulations.main(["--model", "declared_penalty", *(argv or [])])
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])

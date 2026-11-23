@@ -126,7 +126,9 @@ def test_the_table_on_a_tiny_cohort(tmp_path, monkeypatch) -> None:
     columns of the table, the declared penalty's median edf at its target,
     every fit converged, and the same table on a second run."""
     monkeypatch.setattr(sim, "TARGETS", (6.0,))
-    sim.main(["--output-dir", str(tmp_path), "--quick"])
+    run_simulations.main(
+        ["--model", "declared_penalty", "--output-dir", str(tmp_path), "--quick"]
+    )
     table = read_table(tmp_path / "declared_penalty.parquet")
 
     assert list(table.columns) == COLUMNS
