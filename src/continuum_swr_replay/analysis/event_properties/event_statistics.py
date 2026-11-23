@@ -1043,6 +1043,52 @@ def nonlocal_share_above_statistics(
     }
 
 
+def main_step_fits(
+    steps: pd.DataFrame, n_knots: int, window_z: float, n_animals: int
+) -> pd.DataFrame:
+    """The step fits of the main setting: the Kay criterion, no covariate,
+    ``n_knots`` knots and a window of ``window_z`` around the threshold.
+
+    Parameters
+    ----------
+    steps : pd.DataFrame, shape (n_fits, n_columns)
+        The one-class-or-two analysis's step fits (as
+        :func:`threshold_step_statistics` takes them).
+    n_knots : int
+        The spline's knots in the main setting.
+    window_z : float
+        The half-width of the main setting's window around the threshold, z.
+    n_animals : int
+        The animals every property must have one fit for.
+
+    Returns
+    -------
+    fits : pd.DataFrame, shape (n_properties * n_animals, n_columns)
+        The rows of ``steps`` in the main setting, sorted by property and
+        animal: one per property and animal.
+
+    Raises
+    ------
+    ValueError
+        If a property does not have one fit for each of ``n_animals`` animals
+        in the main setting.
+    """
+    main = steps[
+        (steps.n_knots == n_knots)
+        & (steps.power == "criterion")
+        & np.isclose(steps.window_z, window_z)
+        & (steps.covariate == "none")
+    ]
+    fits = main.groupby("property").agg(
+        n_fits=("animal", "size"), n_animals_fitted=("animal", "nunique")
+    )
+    if not (fits == n_animals).all(axis=None):
+        raise ValueError(
+            f"not every property has one fit for each of {n_animals} animals:\n{fits}"
+        )
+    return main.sort_values(["property", "animal"])
+
+
 def threshold_step_statistics(
     steps: pd.DataFrame, n_knots: int, window_z: float, n_animals: int
 ) -> pd.DataFrame:
@@ -1066,7 +1112,7 @@ def threshold_step_statistics(
     Returns
     -------
     statistics : pd.DataFrame, shape (n_properties, 3)
-        Indexed by property, for the main setting (the Kay criterion, no
+        Indexed by property, over :func:`main_step_fits` (the Kay criterion, no
         covariate), each of ``n_animals`` animals: ``n_animals_with_step``;
         ``n_animals_same_sign``, the animals whose step points the way of their
         SWR minus non-SWR difference (a positive share); and
@@ -1079,25 +1125,12 @@ def threshold_step_statistics(
         If a property does not have one fit for each of ``n_animals`` animals
         in the main setting.
     """
-    main = steps[
-        (steps.n_knots == n_knots)
-        & (steps.power == "criterion")
-        & np.isclose(steps.window_z, window_z)
-        & (steps.covariate == "none")
-    ]
-    by_property = main.groupby("property").agg(
+    main = main_step_fits(steps, n_knots, window_z, n_animals)
+    return main.groupby("property").agg(
         n_animals_with_step=("has_step", "sum"),
-        n_fits=("has_step", "size"),
-        n_animals_fitted=("animal", "nunique"),
         n_animals_same_sign=("step_share_overall", lambda share: (share > 0).sum()),
         step_share_median=("step_share_overall", "median"),
     )
-    fits = by_property[["n_fits", "n_animals_fitted"]]
-    if not (fits == n_animals).all(axis=None):
-        raise ValueError(
-            f"not every property has one fit for each of {n_animals} animals:\n{fits}"
-        )
-    return by_property.drop(columns=fits.columns)
 
 
 def most_steps(

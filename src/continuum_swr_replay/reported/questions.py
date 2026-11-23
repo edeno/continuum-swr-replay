@@ -123,7 +123,7 @@ FIGURES: dict[str, Figure] = {
         "The decoder's states and MUA in No-Spike; the event rule's sensitivity and "
         "the timing of events against their SWRs; non-local time against MUA, the "
         "posterior's spread, the held-out tetrode gain and tetrode participation; the "
-        "events' peak ripple power and the gain outside SWRs away from the SWRs",
+        "step test at the SWR threshold and the gain outside SWRs away from the SWRs",
         "scripts/figures/generate_supp_figure02.py",
         "abcdefghij",
     ),
@@ -295,12 +295,12 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3d",),
+        figures=("3d", "S2i"),
     ),
     Question(
         "2d.3",
         "How does spatial extent differ between SWR and non-SWR events?",
-        figures=("3c",),
+        figures=("3c", "S2i"),
     ),
     Question(
         "2d.4",
@@ -309,13 +309,13 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.5",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
-        figures=("S2g",),
+        figures=("S2g", "S2i"),
         note="Figure 2's supplement, panel S2g, draws the distribution of the events' HPD coverage by class, with the share of events with a tight posterior (the hpd_tight_* values); the pooled class medians (hpd_median_*) are for the text.",
     ),
     Question(
         "2d.6",
         "How does event duration differ between SWR and non-SWR events?",
-        figures=("3a",),
+        figures=("3a", "S2i"),
     ),
     Question(
         "2d.8",

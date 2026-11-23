@@ -280,9 +280,9 @@ TAGS = {
     "theta": Tags(("2d.8",), ("2g",)),
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
-    "class_distribution": Tags(("2b.5",), ("S2i",)),
-    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
-    "class_step_evidence": Tags(("2b.5",)),
+    "class_distribution": Tags(("2b.5",)),
+    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("S2i",)),
+    "class_step_evidence": Tags(("2b.5",), ("S2i",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
     "rule_sweep": Tags(("2a.5",), ("S2c",)),
@@ -3328,7 +3328,7 @@ def restriction_immobile_values(
 
 #: The properties of the step test (``class_or_continuum.STEP_PROPERTIES``)
 #: other than spike evidence, by their word in ``step_fits.csv``.
-_OTHER_STEP_PROPERTIES = {
+OTHER_STEP_PROPERTIES = {
     "duration": "duration",
     "extent": "spatial extent",
     "speed": "replay speed",
@@ -3349,7 +3349,9 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     Per animal, Hartigan's dip test and the KDE's main mode of the event's peak
     ripple power (the z-scored Kay consensus on the decode grid). The dip
     p-values, the other power measures and the simulation checks stay in the
-    analysis's CSV outputs.
+    analysis's CSV outputs. No figure draws these: the dip test has no power
+    at the observed separation (the analysis's simulation), so Figure 2's
+    supplement, panel S2i, draws the step test.
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
     stats = event_statistics.peak_ripple_mode_statistics(
@@ -3738,13 +3740,14 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
 
     This is the value over the properties other than spike evidence, which are
     read from the event table and the event features run;
-    :func:`class_step_evidence_values` holds spike evidence's.
+    :func:`class_step_evidence_values` holds spike evidence's. Figure 2's
+    supplement, panel S2i, draws the animals with a step per property.
     """
     most, attaining = event_statistics.most_steps(
-        _step_statistics(steps), list(_OTHER_STEP_PROPERTIES)
+        _step_statistics(steps), list(OTHER_STEP_PROPERTIES)
     )
     # the note names the property (or properties) that attain the maximum
-    attained = ", ".join(_OTHER_STEP_PROPERTIES[p] for p in attaining)
+    attained = ", ".join(OTHER_STEP_PROPERTIES[p] for p in attaining)
     make = value_factory(class_step_values, source, TAGS["class_step"])
     return [
         make(

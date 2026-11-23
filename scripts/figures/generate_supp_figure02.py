@@ -10,8 +10,9 @@ the order the text cites them, in four rows:
 - the events are coordinated and specific (e to h): non-local time against
   MUA, the held-out tetrode gain split by bins with and without spikes, the
   posterior's spread, and tetrode participation;
-- ripple power and the held-out test (i, j): the events' peak ripple power has
-  one mode, and the gain outside SWRs away from the SWRs.
+- ripple power and the held-out test (i, j): no step in the events'
+  properties at the SWR threshold, and the gain outside SWRs away from the
+  SWRs.
 
     a — Supports Figure 2a: on these recordings the decoder's states mean
         what they claim. Random 10-bin immobile windows that start inside a
@@ -184,18 +185,30 @@ the order the text cites them, in four rows:
         summary's participation values). Was Figure 2h.
 
     i — Supports Figure 2i, which shows no step in non-local time at the SWR
-        threshold: the events' peak ripple power (the maximum of the z-scored
-        Kay consensus over the event's rows) has one mode. Each animal's
-        density of it, a thin line per animal and their mean in bold (as
-        Figure 2i draws its animals), is the Gaussian KDE (Silverman's
-        bandwidth) whose main mode the one-class-or-two analysis reports
-        (``class_or_continuum.peak_power_densities``), read from -2 to 12 z
-        (a thin tail lies beyond); a dashed line at the SWR threshold; and the
-        dip test's result (``event_statistics.peak_ripple_mode_statistics``;
-        ``Processed-Data/ripple_class_structure``, its per-event ``criterion``
-        files and ``distribution.csv``; the events summary's ``ripple_peak_*``
-        values). The distribution is not split by SWR label: the label is set
-        from this power, so a split would show the threshold, not two kinds.
+        threshold: at the SWR detector's threshold, does an event property
+        jump (two kinds of events) or change smoothly with ripple power (one
+        continuum)? The step test of the one-class-or-two analysis
+        (``class_or_continuum``, ``scripts/event_properties/measure_ripple_class_structure.py``):
+        per animal and property, ``y ~ s(criterion)`` against
+        ``y ~ s(criterion) + (criterion >= 2 z)`` on the events within 1.5 z
+        of the threshold (cubic B-spline, 8 knots; the Kay criterion, no
+        covariate: ``event_statistics.main_step_fits``). Left, spike evidence
+        per spike: each animal's jump as a share of its SWR minus no-SWR
+        difference over all its events, with its 95 % interval, a filled dot
+        when the animal has a step (the term's interval excludes 0 and it
+        lowers the held-out error), against two dashed lines, 0 (no jump: one
+        continuum) and 1 (the whole difference is a jump: two kinds). Right,
+        the animals with a step in each property
+        (``event_statistics.threshold_step_statistics``). The other properties
+        are drawn as counts, not shares: where a property's SWR minus no-SWR
+        difference is near zero (posterior peak, HPD coverage) the share is
+        unstable. ``Processed-Data/ripple_class_structure/step_fits.csv``,
+        refused when it was not made from the current event table and
+        spike-evidence run; the events summary's ``step_*`` values.
+        The dip test of the events' peak ripple power is a reported value for
+        the text (``ripple_peak_*``), not drawn: on a stored simulation it
+        rejects in none of the two-class samples planted at the observed
+        separation, so it has no power here.
 
     j — Supports Figure 2j: its main result, the full decoder's gain over the
         SWR-only decoder outside SWRs, looked at more closely. Every value is
@@ -286,13 +299,12 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     outside_swr_statistics,
     outside_swr_subset_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
+    SPIKE_EVIDENCE_METRICS,
+)
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
-)
-from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
-    KAY_ZSCORE_THRESHOLD,
-    peak_power_densities,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     HPD_BIN_EDGES_CM,
@@ -301,8 +313,9 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
+    main_step_fits,
     nonlocal_below_threshold_statistics,
-    peak_ripple_mode_statistics,
+    threshold_step_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     MUA_LEVEL_Z,
@@ -330,9 +343,13 @@ from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.paths import (
     PARTICIPATION_NAME,
     TETRODE_HOLDOUT_NAME,
+    event_spike_evidence_dir,
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
+    OTHER_STEP_PROPERTIES,
+    STEP_KNOTS,
+    STEP_WINDOW_Z,
     checked_reference,
     default_inputs,
     event_table_staleness,
@@ -340,10 +357,11 @@ from continuum_swr_replay.reported.events import (
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
+    spike_evidence_staleness,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import rel
-from continuum_swr_replay.runs.io import read_complete_run, sha256_file
+from continuum_swr_replay.runs.io import files_sha256, read_complete_run, sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
@@ -397,9 +415,14 @@ RANGE_DROP = 0.28
 (cell heights, down)."""
 TIMING_CMAP = "bone_r"
 """The timing table's colormap: sequential, the posteriors' (prints in gray)."""
-RIPPLE_GRID_Z = np.linspace(-2.0, 12.0, 281)
-"""Where the ripple panel reads each animal's density of the events' peak power
-(z): past 12 z lies a thin tail."""
+STEP_PROPERTIES = {
+    "evidence": "Spike evidence",
+    **{key: name[0].upper() + name[1:] for key, name in OTHER_STEP_PROPERTIES.items()},
+}
+"""The step panel's properties, top to bottom, by their word in
+``step_fits.csv``, with their names."""
+STEP_REFERENCES = {0.0: "one continuum", 1.0: "two kinds"}
+"""The step panel's reference shares and what each would mean."""
 CALIBRATION_COLORS = {
     "Local": STATE_COLORS["Local"],
     "Non-Local Continuous": STATE_COLORS["Continuous"],
@@ -456,7 +479,7 @@ LAYOUT = (
             ("participation", 0.835, 0.155),
         ),
     ),
-    ((0.06, 0.2), (("ripple_modes", 0.085, 0.3), ("outside_distance", 0.55, 0.36))),
+    ((0.06, 0.2), (("step_test", 0.085, 0.42), ("outside_distance", 0.66, 0.32))),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
@@ -502,7 +525,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         is refused, ``reported.events.require_tetrode_holdout_folds``); ``hpd``
         (g): the selected events' ``hpd_distribution``; ``participation`` (h):
         :func:`read_participation`;
-        ``ripple_modes`` (i): :func:`read_ripple_modes`; ``outside`` (j):
+        ``step_test`` (i): :func:`read_step_test`; ``outside`` (j):
         ``outside_swr_statistics`` over the held-out event run, indexed by
         family and measure; ``parts`` (j): ``outside_swr_subset_statistics`` of
         the margins over its time sums, indexed by subset, threshold, family
@@ -541,9 +564,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "calibration": read_state_calibration(inputs.state_calibration_in_visits),
         "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
-        "ripple_modes": read_ripple_modes(
-            events, inputs.class_structure, inputs.event_table
-        ),
+        "step_test": read_step_test(inputs.class_structure, inputs.event_table),
         "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(
             boundary_offsets(events), events["animal"]
@@ -693,46 +714,44 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
     return animal_nonlocal_counts(counts, "mua")
 
 
-def read_ripple_modes(events: pd.DataFrame, folder: Path, event_table: Path) -> dict:
-    """The ripple panel's statistics from the one-class-or-two output: each
-    animal's density of the selected events' peak ripple power
-    (``class_or_continuum.peak_power_densities``, the KDE whose modes the
-    output's ``distribution.csv`` reports) and the one-mode statistic of the
-    events summary (``event_statistics.peak_ripple_mode_statistics``).
+def read_step_test(folder: Path, event_table: Path) -> dict:
+    """The step panel's statistics from the one-class-or-two output, as the
+    events summary reads them: the main setting's fits
+    (``event_statistics.main_step_fits``) and the animals with a step per
+    property (``event_statistics.threshold_step_statistics``).
 
     Returns
     -------
     dict
-        ``densities`` (indexed by :data:`RIPPLE_GRID_Z`, a column per animal),
-        ``modes`` and ``n_animals``.
+        ``fits`` (one row per property and animal) and ``counts`` (indexed by
+        property).
 
     Raises
     ------
     ValueError
-        If the output is not current, or a selected event has no peak power.
+        If the output was not made from the current event table over the
+        analyses' subset, or from the current spike-evidence run.
     """
     _refuse_stale(
-        folder, "ripple_modes",
+        folder, "step_test",
         "scripts/event_properties/measure_ripple_class_structure.py analyze",
         event_table=event_table,
     )  # fmt: skip
-    peaks = pd.concat(
-        pd.read_parquet(path, columns=["event_id", "ripple_z_max"])
-        for path in sorted((folder / "criterion").glob("*.parquet"))
+    evidence = sorted(event_spike_evidence_dir().glob(f"*/{SPIKE_EVIDENCE_METRICS}"))
+    stale = spike_evidence_staleness(
+        read_output_manifest(folder), files_sha256(evidence), rel(folder)
     )
-    events = events[["event_id", "animal"]].merge(
-        peaks, on="event_id", how="left", validate="1:1"
-    )
-    if events["ripple_z_max"].isna().any():
+    if stale is not None:
         raise ValueError(
-            f"Figure 2's supplement: {int(events['ripple_z_max'].isna().sum())} "
-            f"selected events have no peak ripple power in {rel(folder)}/criterion"
+            f"Figure 2's supplement: panel {LETTERS['step_test']} is not drawn: "
+            f"{stale}. Rerun scripts/event_properties/measure_ripple_class_structure.py."
         )
+    steps = pd.read_csv(folder / "step_fits.csv")
     n_animals = len(analyzed_animals())
     return {
-        "densities": peak_power_densities(events, RIPPLE_GRID_Z),
-        "modes": peak_ripple_mode_statistics(
-            pd.read_csv(folder / "distribution.csv"), n_animals
+        "fits": main_step_fits(steps, STEP_KNOTS, STEP_WINDOW_Z, n_animals),
+        "counts": threshold_step_statistics(
+            steps, STEP_KNOTS, STEP_WINDOW_Z, n_animals
         ),
         "n_animals": n_animals,
     }
@@ -916,34 +935,49 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
-def draw_ripple_modes(ax: Axes, statistics: dict) -> None:
-    """The ripple panel: each animal's density of the events' peak ripple power
-    as a thin line, their mean in bold (as Figure 2i draws its animals), a
-    dashed line at the SWR threshold and the one-mode result. Not split by SWR
-    label: the label is set from this power (``statistics``:
-    :func:`read_ripple_modes`)."""
-    densities = statistics["densities"]
-    grid = densities.index.to_numpy()
-    ax.plot(grid, densities.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax.plot(grid, densities.mean(axis=1).to_numpy(), color="k", lw=1.0)
-    ax.axvline(KAY_ZSCORE_THRESHOLD, color=COLORS["SWR"], lw=0.8, ls="--")
-    ax.text(
-        KAY_ZSCORE_THRESHOLD + 0.3, 0.97, "SWR\nthreshold", transform=ax.get_xaxis_transform(),
-        ha="left", va="top", fontsize=SMALL_SIZE, color=readable_text_color(COLORS["SWR"]),
-    )  # fmt: skip
-    modes = statistics["modes"]
-    ax.text(
-        0.98, 0.72,
-        f"one mode in {modes['n_animals_unimodal']} of {statistics['n_animals']}\n"
-        "animals (dip test)",
-        transform=ax.transAxes, ha="right", va="top", fontsize=SMALL_SIZE,
-    )  # fmt: skip
-    ax.set_xlim(grid[0], grid[-1])
-    ax.set_ylim(0, 1.4 * float(densities.to_numpy().max()))  # room for the notes
-    ax.set_xticks([0, 5, 10])
-    ax.set_xlabel("Event peak ripple power (z)")
-    ax.set_ylabel("Density (per z)")
-    ax.set_title("One mode", fontsize=SMALL_SIZE, pad=3)
+def draw_step_test(ax_share: Axes, ax_count: Axes, statistics: dict) -> None:
+    """The step panel (``statistics``: :func:`read_step_test`). Left, spike
+    evidence: each animal's jump at the threshold as a share of its SWR minus
+    no-SWR difference with its 95 % interval, filled when the animal has a
+    step, open when not, against dashed lines at 0 (one continuum) and 1 (two
+    kinds). Right, the animals with a step in each property, as bars."""
+    fits = statistics["fits"]
+    evidence = fits[fits["property"] == "evidence"].reset_index(drop=True)
+    x = np.arange(len(evidence))
+    for k, row in evidence.iterrows():
+        ax_share.errorbar(
+            x[k], row["step_share_overall"],
+            yerr=[[row["step_share_overall"] - row["share_overall_ci_low"]],
+                  [row["share_overall_ci_high"] - row["step_share_overall"]]],
+            fmt="o", ms=3.5, lw=0.8, capsize=0, color="black",
+            mfc="black" if row["has_step"] else "white",
+        )  # fmt: skip
+    for level, meaning in STEP_REFERENCES.items():
+        ax_share.axhline(level, color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=1)
+        # past the frame's right edge, clear of the animals' intervals
+        ax_share.text(
+            1.03, level, meaning, transform=ax_share.get_yaxis_transform(),
+            ha="left", va="center", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+        )  # fmt: skip
+    ax_share.set_xlim(-0.6, x[-1] + 0.6)
+    ax_share.set_xticks([])
+    ax_share.set_xlabel("Animals")
+    ax_share.set_ylim(-0.3, 1.2)
+    ax_share.set_yticks([0, 0.5, 1])
+    ax_share.set_ylabel("Jump at threshold\n(share of SWR −\nno-SWR difference)")
+    ax_share.set_title("Spike evidence", fontsize=SMALL_SIZE, pad=3)
+    counts = statistics["counts"]["n_animals_with_step"]
+    y = np.arange(len(STEP_PROPERTIES))[::-1]
+    ax_count.barh(
+        y, [counts[p] for p in STEP_PROPERTIES], height=0.65, color="#999999", lw=0
+    )
+    ax_count.set_yticks(y, list(STEP_PROPERTIES.values()))
+    ax_count.tick_params(axis="y", length=0)
+    ax_count.set_xlim(0, statistics["n_animals"])
+    ax_count.set_xticks(range(statistics["n_animals"] + 1))
+    ax_count.set_ylim(-0.6, len(STEP_PROPERTIES) - 0.4)
+    ax_count.set_xlabel("Animals with a step")
+    ax_count.set_title("Step at the SWR threshold", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
@@ -1096,12 +1130,15 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3)}
+PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3), "step_test": (1, 2)}
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES: dict[str, tuple[float, ...]] = {}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
+PANEL_COLUMN_GAPS = {"step_test": 0.6}
+"""A panel's gap between its axes' columns, as a share of its frame's width,
+where :data:`GRID_GAP`'s is too small (the step panel's property names)."""
 
 
 def _n_axes(panel: str) -> int:
@@ -1134,11 +1171,12 @@ def generate_figure(statistics: dict) -> Figure:
             - np.concatenate([[0.0], np.cumsum(heights[:-1])])
             - np.arange(rows) * GRID_GAP[0] * (top - bottom)
         )
-        across = width * (1 - GRID_GAP[1] * (columns - 1)) / columns
+        gap = PANEL_COLUMN_GAPS.get(panel, GRID_GAP[1])
+        across = width * (1 - gap * (columns - 1)) / columns
         axes[panel] = [
             fig.add_axes(
                 (
-                    left + c * (across + GRID_GAP[1] * width),
+                    left + c * (across + gap * width),
                     tops[r] - heights[r],
                     across,
                     heights[r],
@@ -1155,7 +1193,7 @@ def generate_figure(statistics: dict) -> Figure:
         axes["outside_distance"][0], statistics["outside"], statistics["parts"]
     )
     draw_hpd(axes["hpd"][0], statistics["hpd"])
-    draw_ripple_modes(axes["ripple_modes"][0], statistics["ripple_modes"])
+    draw_step_test(*axes["step_test"], statistics["step_test"])
     draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])

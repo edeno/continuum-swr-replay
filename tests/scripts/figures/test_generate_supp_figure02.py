@@ -125,25 +125,35 @@ def _split_statistics() -> dict:
     return {column: _gain_statistics(*groups) for column, groups in SPLIT.items()}
 
 
-RIPPLE_GRID = np.linspace(-2.0, 12.0, 141)
+EVIDENCE_SHARES = [0.25, 0.14, 0.26, 0.22, 0.12]
+"""Each animal's jump in spike evidence as a share of its difference."""
+EVIDENCE_STEP = [True, False, True, True, False]
+STEP_COUNTS = {"evidence": 3, "extent": 1, "spikes": 1, "breadth": 1}
+"""The animals with a step, by property (0 for the rest)."""
 
 
-def _ripple_modes() -> dict:
-    """Two animals' peak-power densities (normal, modes 1 and 2 z) and the one
-    mode statistic: one mode in 5 of 5 animals."""
-    densities = pd.DataFrame(
+def _step_test() -> dict:
+    """:func:`read_step_test`'s statistics: the main setting's fits of spike
+    evidence (intervals 0.15 either side) and every property's count."""
+    fits = pd.DataFrame(
         {
-            animal: np.exp(-0.5 * (RIPPLE_GRID - mode) ** 2) / np.sqrt(2 * np.pi)
-            for animal, mode in (("a", 1.0), ("b", 2.0))
-        },
-        index=RIPPLE_GRID,
+            "property": "evidence",
+            "animal": list("abcde"),
+            "step_share_overall": EVIDENCE_SHARES,
+            "share_overall_ci_low": np.asarray(EVIDENCE_SHARES) - 0.15,
+            "share_overall_ci_high": np.asarray(EVIDENCE_SHARES) + 0.15,
+            "has_step": EVIDENCE_STEP,
+        }
     )
-    return {
-        "densities": densities,
-        "modes": {"n_animals_unimodal": 5, "mode_animal_min": 1.0,
-                  "mode_animal_max": 2.0},
-        "n_animals": 5,
-    }  # fmt: skip
+    counts = pd.DataFrame(
+        {
+            "n_animals_with_step": [
+                STEP_COUNTS.get(p, 0) for p in figure.STEP_PROPERTIES
+            ]
+        },
+        index=list(figure.STEP_PROPERTIES),
+    )
+    return {"fits": fits, "counts": counts, "n_animals": 5}
 
 
 def _mua_counts() -> pd.DataFrame:
@@ -193,7 +203,7 @@ def _statistics() -> dict:
         "calibration": _calibration(),
         "sweep": _sweep(),
         "mua": _mua_counts(),
-        "ripple_modes": _ripple_modes(),
+        "step_test": _step_test(),
         "hpd": _hpd(),
         "timing": _timing(),
         "tetrode": _split_statistics(),
@@ -220,7 +230,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     height, the rows' first letters at one left edge, no heading."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "heldout_gain", "hpd", "participation", "ripple_modes",
+        "nonlocal_mua", "heldout_gain", "hpd", "participation", "step_test",
         "outside_distance",
     )  # fmt: skip
     fig = drawn
@@ -300,7 +310,8 @@ def test_each_panels_values_carry_its_letter():
         "tetrode_holdout": "heldout_gain",
         "spike_rate": "heldout_gain",
         "participation": "participation",
-        "class_distribution": "ripple_modes",
+        "class_step": "step_test",
+        "class_step_evidence": "step_test",
         "nonlocal_restriction_distance": "outside_distance",
     }
     for tag, panel in panels.items():
@@ -455,25 +466,31 @@ def test_the_hpd_panel_draws_the_distribution_of_each_class(drawn):
     assert ax.get_title() == "Posterior spread"
 
 
-def test_the_ripple_panel_draws_one_line_per_animal_and_the_one_mode_note(drawn):
-    """Each animal's density of the events' peak ripple power as a thin line,
-    their mean in bold, a dashed line at the SWR threshold, the one-mode
-    result read from the statistics, and no split by SWR label."""
-    fig = drawn
-    (ax,) = figure.panel_axes(fig, "ripple_modes")
-    densities = _ripple_modes()["densities"]
-    curves = [line for line in ax.lines if len(line.get_xdata()) == RIPPLE_GRID.size]
-    assert len(curves) == 3  # two animals and their mean
-    np.testing.assert_allclose(
-        curves[-1].get_ydata(), densities.mean(axis=1).to_numpy()
+def test_the_step_panel_draws_each_animals_jump_and_the_counts(drawn):
+    """Left, spike evidence: each animal's jump as a share of its difference
+    with its interval, filled when it has a step, against dashed lines at 0
+    (one continuum) and 1 (two kinds); right, the animals with a step per
+    property as bars."""
+    from matplotlib.colors import to_rgba
+
+    ax_share, ax_count = figure.panel_axes(drawn, "step_test")
+    points = [
+        line for line in ax_share.lines if line.get_marker() == "o"
+    ]  # fmt: skip
+    np.testing.assert_allclose([p.get_ydata()[0] for p in points], EVIDENCE_SHARES)
+    filled = [to_rgba(p.get_markerfacecolor()) == to_rgba("black") for p in points]
+    assert filled == EVIDENCE_STEP
+    references = [
+        line.get_ydata()[0] for line in ax_share.lines if line.get_linestyle() == "--"
+    ]
+    assert sorted(references) == [0.0, 1.0]
+    assert {"one continuum", "two kinds"} <= {t.get_text() for t in ax_share.texts}
+    widths = [bar.get_width() for bar in ax_count.patches]
+    assert widths == [STEP_COUNTS.get(p, 0) for p in figure.STEP_PROPERTIES]
+    assert [t.get_text() for t in ax_count.get_yticklabels()] == list(
+        figure.STEP_PROPERTIES.values()
     )
-    assert curves[-1].get_linewidth() > curves[0].get_linewidth()
-    (threshold,) = [line for line in ax.lines if line.get_linestyle() == "--"]
-    np.testing.assert_allclose(threshold.get_xdata(), figure.KAY_ZSCORE_THRESHOLD)
-    texts = [t.get_text() for t in ax.texts]
-    assert "one mode in 5 of 5\nanimals (dip test)" in texts
-    assert not ax.collections  # no band, no stacked label
-    assert ax.get_xlabel() == "Event peak ripple power (z)"
+    assert ax_count.get_xlim() == (0, 5)
 
 
 def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
@@ -675,9 +692,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
-        "read_ripple_modes": lambda events, folder, table: seen.setdefault(
-            "ripple", events
-        ),
+        "read_step_test": lambda folder, table: "steps",
         "outside_swr_subset_statistics": lambda sums, bin_s, subsets: pd.DataFrame(
             {
                 "subset": ["beyond_swr_margin"],
@@ -712,12 +727,11 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
-    assert seen["ripple"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
         "calibration",
         "sweep",
         "mua",
-        "ripple_modes",
+        "step_test",
         "hpd",
         "timing",
         "tetrode",

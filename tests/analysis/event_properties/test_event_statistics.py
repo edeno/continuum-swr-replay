@@ -609,6 +609,16 @@ def test_threshold_step_statistics_use_the_main_setting_only():
         stats.threshold_step_statistics(_steps(), n_knots=8, window_z=1.5, n_animals=5)
 
 
+def test_main_step_fits_are_the_main_settings_rows_one_per_animal():
+    fits = stats.main_step_fits(_steps(), n_knots=8, window_z=1.5, n_animals=3)
+    assert len(fits) == 9
+    assert (fits["step_share_overall"] != 9.0).all()
+    assert list(fits["property"].unique()) == ["duration", "evidence", "speed"]
+    evidence = fits[fits["property"] == "evidence"]
+    assert list(evidence["animal"]) == [0, 1, 2]
+    assert list(evidence["step_share_overall"]) == [0.5, -0.1, 0.3]
+
+
 def test_threshold_step_statistics_refuse_an_animal_fitted_twice():
     steps = _steps()
     # duration: animal 0 twice and animal 2 not at all, still three fits

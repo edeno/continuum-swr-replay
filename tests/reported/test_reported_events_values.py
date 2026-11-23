@@ -726,7 +726,7 @@ def step_fits() -> pd.DataFrame:
     with_step = {"duration": 1, "extent": 3, "speed": 3, "evidence": 2}
     evidence_shares = [0.5, -0.1, 0.3, 0.2, 0.9]
     rows = []
-    for prop in [*builder._OTHER_STEP_PROPERTIES, "evidence"]:
+    for prop in [*builder.OTHER_STEP_PROPERTIES, "evidence"]:
         for i, animal in enumerate(animals):
             share = evidence_shares[i] if prop == "evidence" else -1.0
             rows.append((prop, animal, i < with_step.get(prop, 0), share))
