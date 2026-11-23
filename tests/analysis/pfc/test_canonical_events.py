@@ -50,6 +50,13 @@ def event_table_path(tmp_path):
             "event_end_s": [30.5, 10.5, 20.5, 40.5, 50.5],
             "is_swr": [True, False, True, False, True],
             "occupancy_state": ["at_well", "at_well", "in_transit", "mixed", "at_well"],
+            "visit_context": [
+                "in_visit",
+                "in_visit",
+                "track_leaf_arm",
+                "spans_visit_end",
+                "in_visit",
+            ],
             "peak_nonlocal_prob": [0.9, 0.95, 0.85, 0.99, 0.91],
         }
     )
@@ -88,6 +95,7 @@ class TestLoadSessionCanonicalEvents:
         np.testing.assert_allclose(events.end_time.to_numpy(), [10.5, 20.5, 30.5])
         assert list(events.is_swr) == [False, True, True]
         assert list(events.occupancy_state) == ["at_well", "in_transit", "at_well"]
+        assert list(events.visit_context) == ["in_visit", "track_leaf_arm", "in_visit"]
         assert list(events.index) == [0, 1, 2]
 
     def test_the_shipped_columns_are_exactly_what_the_glm_is_keyed_on(
@@ -105,6 +113,7 @@ class TestLoadSessionCanonicalEvents:
             "end_time",
             "is_swr",
             "occupancy_state",
+            "visit_context",
         ]
 
     def test_the_hash_is_of_the_table_that_was_read(self, event_table_path):

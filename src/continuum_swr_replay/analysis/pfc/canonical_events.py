@@ -89,6 +89,7 @@ _EVENT_COLUMNS = (
     "event_end_s",
     "is_swr",
     "occupancy_state",
+    "visit_context",
 )
 
 
@@ -115,7 +116,8 @@ def load_session_canonical_events(
     events : pandas.DataFrame
         The session's events, sorted by ``start_time``, with a fresh integer
         index. Columns ``event_id``, ``start_time``, ``end_time``, ``is_swr``,
-        ``occupancy_state``. ``start_time`` / ``end_time`` are absolute seconds
+        ``occupancy_state``, ``visit_context`` (the well-visit label
+        ``event_sets.build_visit_event_sets`` selects on). ``start_time`` / ``end_time`` are absolute seconds
         on ``position_info.index``'s clock.
     sha256 : str
         Hash of the table that was read, for the run's provenance sidecar.
