@@ -24,14 +24,18 @@ place, with the values allowed; :class:`VisitRateSettings` holds one choice of
 each, and the model builds and fits for every allowed choice. The defaults
 are the declared form (the coefficient form of the reward effect, Q1's
 declared reference window, all in-visit bins, the third clock in the first
-fit); the log penalties are provisional values until calibrated.
+fit). The log penalties of the module (:data:`CLOCK_LOG_PENALTIES`) are
+provisional: :func:`fit_visit_rate` refuses them unless the caller says the
+fit is a test or a simulation; a real fit carries calibrated penalties
+(:class:`CalibratedPenalty`).
 
 The cohort step (:func:`cohort_rows`): ``visit_timebins`` of a session and
 kind -> ``select_visit_context`` (the only filter of the bins) -> the bins
 beyond the time range, if one is set, dropped and counted -> the rows with a
 missing covariate dropped and counted -> model D also drops the bins without
-ten known outcomes, counted. The counts are added to every record's
-``cohort_counts``. The two clocks that count down reference the future
+ten known outcomes, and every bin of a session whose outcomes cannot
+identify the lag curve (:func:`model_d_rows`), counted. The counts are added
+to every record's ``cohort_counts``. The two clocks that count down reference the future
 (``covariate_timing.FUTURE_REFERENCING``): this model describes; it does not
 predict.
 
@@ -41,6 +45,15 @@ at least ``collinearity.MAX_EXPLAINED`` (0.8) in more than
 ``MAX_FAILING_SHARE`` (20 %) of the sessions with a fit, A is refit without
 ``f_m``, and the time-until-movement curve is reported only from the
 model-free curves. Both fits are stored.
+
+The rule does not see everything the third clock does to Q7a. In a visit's
+last immobile stretch the stretch clock equals the leaving clock, so with
+``f_m`` in the model part of a drop before leaving can move to ``f_m`` while
+the concurvity stays below 0.8. Q7a read from a fit with ``f_m`` is therefore
+the drop before leaving conditional on the time until the end of the stretch,
+not the whole drop. ``visit_rate_statistics.third_clock_q7a`` compares Q7a of
+the fits with and without ``f_m``, per session and summarized; it is stored
+beside the rule's decision.
 """
 
 from __future__ import annotations
@@ -112,6 +125,8 @@ __all__ = [
     "ThirdClockDecision",
     "VisitRateFit",
     "VisitRateSettings",
+    "CalibratedPenalty",
+    "PROVISIONAL_USES",
     "build_visit_rate_design",
     "calibrate_log_penalty",
     "cohort_rows",
@@ -120,6 +135,7 @@ __all__ = [
     "fit_visit_rate",
     "fit_visit_rate_session",
     "lag_curve_rows",
+    "model_d_rows",
     "model_terms",
     "require_declared_penalized",
     "tested_terms",
@@ -153,7 +169,7 @@ MODEL_NAMES: dict[str, str] = {"A": "visit_rate_A", "D": "visit_rate_D"}
 #: from model A.
 RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q7a")
 
-# --- The bases (calls of the design, "Smooth terms and bases") -------------
+# --- The bases -------------------------------------------------------------
 
 #: Each clock's range and knot spacing (s). Beyond its range a clock is
 #: clamped (the curve is flat there).
@@ -183,10 +199,10 @@ REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
 
 # --- OPEN (lead): the settings of the model's form --------------------------
 #
-# Each setting below is an open question of the lead (design, "Open after the
-# twenty-third round", b and g). None is decided here; the model builds and
-# fits for each allowed value. The defaults are the declared form and do not
-# decide anything: no real fit is run on them.
+# Each setting below is an open question of the project lead. None is decided
+# here; the model builds and fits for each allowed value. The defaults are the
+# declared form and decide nothing: no real fit runs on the provisional
+# penalties.
 
 #: OPEN (lead): the prior SD of the weak penalty on every simple tested
 #: coefficient, in its reported unit (here a 0/1 step on the log rate); the
@@ -204,17 +220,15 @@ WEAK_PRIOR_SDS: tuple[float, ...] = (1.0, 2.0, 4.0)
 CLOCK_PENALTY_SETTINGS: tuple[str, ...] = ("declared", "stiffer", "looser")
 
 #: OPEN (lead): the log penalty of each curve, per kind and setting.
-#: PROVISIONAL, NOT CALIBRATED on this model's real rows; replace each value by
-#: :func:`calibrate_log_penalty`'s, with its target, commit and rows, before
-#: the first real fit. Where the values come from: the clocks of time since
-#: arrival and time until leaving are those the realistic simulation
-#: prototype found on one simulated data set of model A (the same bases) at a
-#: median edf of 6 ("declared") and 10 ("looser"); "stiffer" is the declared
-#: value plus the same step in log penalty. The stretch clock (no prototype
-#: value) takes the leaving clock's values (the same knot spacing). Model D's
-#: lag curve has no prior value: 2, with 4 and 0 either side. The rewarded
-#: arrival curve of the time-varying reward form takes the arrival clock's
-#: value.
+#: PROVISIONAL (:data:`CLOCK_LOG_PENALTIES_ARE_PROVISIONAL`): copied from a
+#: prototype on another design, not calibrated on this model's rows. A real
+#: fit takes each curve's penalty from :func:`calibrate_log_penalty`, carried
+#: by ``VisitRateSettings.calibrated_penalties`` with its target and rows;
+#: :func:`fit_visit_rate` refuses these values unless the fit is a test or a
+#: simulation. The stretch clock takes the leaving clock's values (the same
+#: knot spacing); model D's lag curve is 2, with 4 and 0 either side; the
+#: rewarded arrival curve of the time-varying reward form takes the arrival
+#: clock's value.
 CLOCK_LOG_PENALTIES: dict[str, dict[str, dict[str, float]]] = {
     "SWR": {
         "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, STRETCH: 3.0718, LAG_TERM: 2.0},
@@ -228,24 +242,71 @@ CLOCK_LOG_PENALTIES: dict[str, dict[str, dict[str, float]]] = {
     },
 }
 
+#: Every value of :data:`CLOCK_LOG_PENALTIES` is provisional.
+CLOCK_LOG_PENALTIES_ARE_PROVISIONAL = True
+
+#: The uses that may fit on provisional penalties (:func:`fit_visit_rate`'s
+#: ``allow_provisional``).
+PROVISIONAL_USES: tuple[str, ...] = ("test", "simulation")
+
 #: OPEN (lead): the time range of the model. None models every in-visit bin
 #: (the default); a cap keeps only the bins whose time since arrival is below
-#: it (candidate 10 s), and the arrival clock's range ends at the cap.
+#: it (candidate 10 s), and the arrival clock's range ends at the cap. The
+#: bins beyond the cap leave the model on both clocks, so Q7a is then read
+#: only from the visits, or the parts of visits, that end before the cap: a
+#: visit longer than the cap plus 2 s gives no bin to Q7a's windows. The
+#: cohort counts say how many bins, events and visits of the last 2 s before
+#: leaving the cap removes (:func:`cohort_rows`).
 TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 
 #: OPEN (lead): the form of the reward effect. ``"coefficient"`` (the
-#: default, the declared Q2): one coefficient. ``"time_varying"``: the same
-#: coefficient and a second arrival curve for the rows after a reward (a
-#: smooth ``by`` the last outcome, sum-to-zero on those rows), so the effect
-#: may change with time since arrival; its coefficient is then the effect
-#: averaged over the rewarded rows' arrival times. An option to build and
-#: test, not the declared test.
+#: default, the declared Q2): one coefficient, and one arrival curve for both
+#: outcomes. ``"time_varying"``: the same coefficient and a second arrival
+#: curve for the rows after a reward (a smooth ``by`` the last outcome,
+#: sum-to-zero over the rewarded rows of the design), so the effect may change
+#: with time since arrival. The form changes the meaning of Q1 as well as of
+#: Q2. Under the coefficient form, where the effect changes with time, the one
+#: arrival curve holds the part of the effect the coefficient cannot (in
+#: proportion to the rewarded share of the events at each time since arrival),
+#: and so does the leaving curve; under the time-varying form the arrival
+#: curve is the curve after an omission, and Q2 is the effect averaged over
+#: the design's rewarded rows (one weight per row). That average reads the
+#: curve after an omission at the rewarded rows' arrival times; where no
+#: omission row has that time, the curve there is the penalty's
+#: extrapolation. ``visit_rate_scenarios`` gives the truth of each form. An
+#: option to build and test, not the declared test.
 REWARD_FORMS: tuple[str, ...] = ("coefficient", "time_varying")
 
 #: OPEN (lead): the reference window of Q1 (s since arrival). ``(0, 1)`` is
 #: the declared one (``declared_tests``, the default); ``(1, 2)`` the
-#: alternative (SWR events almost never start in the first second).
+#: alternative, for a kind whose events rarely start in the first second.
 Q1_REFERENCE_WINDOWS: tuple[tuple[float, float], ...] = ((0.0, 1.0), (1.0, 2.0))
+
+
+@dataclass(frozen=True)
+class CalibratedPenalty:
+    """A curve's log penalty found by calibration, with how it was found.
+
+    Attributes
+    ----------
+    log_penalty : float
+        The value (:func:`calibrate_log_penalty`'s ``log_penalty``).
+    target_edf : float
+        The median edf over sessions it was calibrated to.
+    rows : mapping
+        The rows it was found on, JSON-ready: at least the tables read and
+        their hashes, the commit and the numbers of sessions and rows.
+    """
+
+    log_penalty: float
+    target_edf: float
+    rows: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        if not (np.isfinite(self.log_penalty) and np.isfinite(self.target_edf)):
+            raise ValueError("a calibrated penalty needs a finite value and target")
+        if not self.rows:
+            raise ValueError("a calibrated penalty needs the record of its rows")
 
 
 @dataclass(frozen=True)
@@ -260,18 +321,28 @@ class VisitRateSettings:
     clock_penalty : {"declared", "stiffer", "looser"}
         Which of :data:`CLOCK_LOG_PENALTIES` the curves take.
     max_time_since_arrival_s : float or None
-        :data:`TIME_RANGE_CAPS_S`.
+        :data:`TIME_RANGE_CAPS_S`. With a cap, Q7a is read only from the
+        visits that end before it (see there).
     reward_form : {"coefficient", "time_varying"}
-        :data:`REWARD_FORMS`.
+        :data:`REWARD_FORMS`. The time-varying form changes what Q1 means (the
+        arrival curve becomes the curve after an omission) as well as Q2.
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
     include_stretch_clock : bool
         Whether model A and D hold ``f_m``; the third clock's rule
         (:func:`third_clock_decision`) decides it after the first fit, which
-        holds it.
+        holds it. With ``f_m``, Q7a is conditional on the third clock (module
+        docstring).
     log_penalties : mapping of str to float or None
         Curve column (or :data:`LAG_TERM`) -> a log penalty in place of the
-        table's, for the calibration and the tests; None uses the table.
+        table's, for the calibration and the tests; None uses the table. A
+        value given here has no record and is provisional.
+    calibrated_penalties : mapping of (kind, curve) to CalibratedPenalty or None
+        Calibrated log penalties with their record, which a real fit needs
+        for every curve of the model; ``log_penalties`` takes precedence. A
+        calibrated value is used at every ``clock_penalty`` setting (which
+        chooses only among the provisional values): a stiffer or looser fit
+        passes its own calibrated values.
     """
 
     weak_prior_sd: float = 2.0
@@ -281,6 +352,7 @@ class VisitRateSettings:
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
     include_stretch_clock: bool = True
     log_penalties: Mapping[str, float] | None = None
+    calibrated_penalties: Mapping[tuple[str, str], CalibratedPenalty] | None = None
 
     def __post_init__(self) -> None:
         if not (np.isfinite(self.weak_prior_sd) and self.weak_prior_sd > 0):
@@ -312,7 +384,26 @@ class VisitRateSettings:
         """The log penalty of one curve (a clock column or :data:`LAG_TERM`)."""
         if self.log_penalties is not None and curve in self.log_penalties:
             return float(self.log_penalties[curve])
-        return CLOCK_LOG_PENALTIES[_kind(kind)][self.clock_penalty][curve]
+        calibrated = self.calibrated_penalties or {}
+        if (_kind(kind), curve) in calibrated:
+            return float(calibrated[(kind, curve)].log_penalty)
+        return CLOCK_LOG_PENALTIES[kind][self.clock_penalty][curve]
+
+    def curves(self, model: str) -> tuple[str, ...]:
+        """The curves of a model whose log penalty this setting gives: the
+        clocks and, for model D, :data:`LAG_TERM`."""
+        return (*self.clocks(), *((LAG_TERM,) if _model(model) == "D" else ()))
+
+    def provisional_curves(self, model: str, kind: str) -> tuple[str, ...]:
+        """The model's curves whose log penalty has no calibration record:
+        from :data:`CLOCK_LOG_PENALTIES` or from ``log_penalties``."""
+        calibrated = self.calibrated_penalties or {}
+        overridden = self.log_penalties or {}
+        return tuple(
+            curve
+            for curve in self.curves(model)
+            if curve in overridden or (_kind(kind), curve) not in calibrated
+        )
 
     def clocks(self) -> tuple[str, ...]:
         """The clock columns the model holds, in order."""
@@ -589,6 +680,62 @@ def _counted(rows: pd.DataFrame, name: str) -> dict[str, int]:
     return {f"bins_{name}": len(rows), f"events_{name}": int(rows[RESPONSE].sum())}
 
 
+#: The end of Q7a's windows: the time before leaving the estimand reads (s).
+_Q7A_SPAN_S = max(
+    hi for _, hi in (estimand("Q7a").contrast.first, estimand("Q7a").contrast.second)
+)
+
+
+def _lag_curve_identified(rows: pd.DataFrame) -> bool:
+    """Whether the rows' outcomes identify the lag curve's unpenalized part.
+
+    The lag curve's penalty leaves a constant and a line in log lag
+    unpenalized; on a row they give ``sum_l r_l`` and ``sum_l r_l log l``.
+    With the intercept, these three columns must have full rank. They do not
+    when every outcome of the session is the same (each lag column constant),
+    and then the fitter refuses the session's design.
+    """
+    lags = rows[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float)
+    columns = np.column_stack(
+        [np.ones(len(lags)), lags.sum(axis=1), lags @ np.log(np.asarray(LAGS))]
+    )
+    return len(lags) > 0 and np.linalg.matrix_rank(columns) == columns.shape[1]
+
+
+def model_d_rows(rows_a: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Model D's rows of one session, from model A's.
+
+    Model D keeps the bins with ten known outcomes. When those bins' outcomes
+    cannot identify the lag curve (every outcome the same, for one), the
+    session has no model D rows: its fit is recorded as not fitted, and the
+    other sessions are fitted.
+
+    Parameters
+    ----------
+    rows_a : pd.DataFrame
+        One session's rows of model A.
+
+    Returns
+    -------
+    rows : pd.DataFrame
+        Model D's rows.
+    counts : dict of str to int
+        ``bins_``/``events_`` ``without_ten_lags`` (of model A's rows),
+        ``lag_curve_not_identified`` (the rows with ten known outcomes left
+        out for that reason; 0 or all of them) and ``D``.
+    """
+    without = ~rows_a[list(REWARD_LAG_COLUMNS)].notna().all(axis=1).to_numpy()
+    counts = _counted(rows_a.loc[without], "without_ten_lags")
+    rows_d = rows_a.loc[~without].reset_index(drop=True)
+    not_identified = not rows_d.empty and not _lag_curve_identified(rows_d)
+    counts |= _counted(
+        rows_d if not_identified else rows_d.iloc[:0], "lag_curve_not_identified"
+    )
+    if not_identified:
+        rows_d = rows_d.iloc[:0]
+    return rows_d, counts | _counted(rows_d, "D")
+
+
 def cohort_rows(
     stop_table: pd.DataFrame,
     events: pd.DataFrame,
@@ -630,9 +777,15 @@ def cohort_rows(
         ``events_selected`` plus these);
         the bins and their event starts at each step, ``bins_<step>`` and
         ``events_<step>``: ``selected`` (by ``select_visit_context``), then
-        dropped ``beyond_time_range``, dropped ``missing_any`` (a missing
-        covariate; ``bins_missing`` counts each column's), model ``A``'s,
-        dropped ``without_ten_lags`` (of model A's), and model ``D``'s.
+        dropped ``beyond_time_range`` (time since arrival at or beyond the
+        cap; a missing time since arrival is a missing covariate, not beyond
+        the cap), dropped ``missing_any`` (a missing covariate;
+        ``bins_missing`` counts each column's), model ``A``'s, dropped
+        ``without_ten_lags`` (of model A's), dropped
+        ``lag_curve_not_identified`` (:func:`model_d_rows`), and model
+        ``D``'s; and, of the bins beyond the cap, those in the last 2 s before
+        leaving (Q7a's windows), ``bins_``, ``events_`` and
+        ``visits_beyond_time_range_before_leaving``.
     """
     _kind(kind)
     bins = visit_timebins(
@@ -667,9 +820,16 @@ def cohort_rows(
     beyond = (
         np.zeros(len(selected), dtype=bool)
         if cap is None
-        else ~(selected[ARRIVAL].to_numpy(dtype=float) < cap)
+        else selected[ARRIVAL].to_numpy(dtype=float) >= cap
     )
     counts |= _counted(selected.loc[beyond], "beyond_time_range")
+    before_leaving = selected.loc[
+        beyond & (selected[LEAVING].to_numpy(dtype=float) <= _Q7A_SPAN_S)
+    ]
+    counts |= _counted(before_leaving, "beyond_time_range_before_leaving")
+    counts["visits_beyond_time_range_before_leaving"] = int(
+        before_leaving[UNIT].nunique()
+    )
     in_range = selected.loc[~beyond].reset_index(drop=True)
     read = [EXPOSURE, *settings.clocks(), REWARD]
     missing = in_range[read].isna()
@@ -677,10 +837,8 @@ def cohort_rows(
     any_missing = missing.any(axis=1).to_numpy()
     counts |= _counted(in_range.loc[any_missing], "missing_any")
     rows_a = in_range.loc[~any_missing].reset_index(drop=True)
-    without = ~rows_a[list(REWARD_LAG_COLUMNS)].notna().all(axis=1).to_numpy()
-    counts |= _counted(rows_a.loc[without], "without_ten_lags")
-    rows_d = rows_a.loc[~without].reset_index(drop=True)
-    counts |= _counted(rows_a, "A") | _counted(rows_d, "D")
+    rows_d, counts_d = model_d_rows(rows_a)
+    counts |= _counted(rows_a, "A") | counts_d
     return CohortRows(kind, {"A": rows_a, "D": rows_d}, counts)
 
 
@@ -728,13 +886,17 @@ def fit_visit_rate(
     kind: str,
     settings: VisitRateSettings,
     table_sha256: Mapping[str, str] | None = None,
+    allow_provisional: Literal["test", "simulation"] | None = None,
 ) -> VisitRateFit:
     """Fit model A or D of one kind in every session given.
 
     The design is built on the pooled rows of the sessions given
     (:func:`build_visit_rate_design`), then every session is fitted alone at
     the declared log penalties by ``sessions.fit_sessions``. No penalty is
-    chosen from the data and nothing is selected.
+    chosen from the data and nothing is selected. A curve whose log penalty
+    has no calibration record (``VisitRateSettings.provisional_curves``) is
+    refused unless ``allow_provisional`` says the fit is a test or a
+    simulation.
 
     Parameters
     ----------
@@ -746,13 +908,34 @@ def fit_visit_rate(
         The settings the rows were made with.
     table_sha256 : mapping of str to str, optional
         The tables the rows were read from -> their hashes; recorded.
+    allow_provisional : {"test", "simulation"} or None
+        Set only for a test or a simulation: it allows provisional log
+        penalties. None (a real fit) requires calibrated ones.
 
     Returns
     -------
     VisitRateFit
+
+    Raises
+    ------
+    ValueError
+        If a curve's log penalty is provisional and ``allow_provisional`` is
+        None, or ``allow_provisional`` is not one of :data:`PROVISIONAL_USES`.
     """
     _model(model)
-    sessions = _session_rows(cohort, model, _kind(kind))
+    if allow_provisional is not None and allow_provisional not in PROVISIONAL_USES:
+        raise ValueError(
+            f"allow_provisional {allow_provisional!r} not in {PROVISIONAL_USES}"
+        )
+    provisional = settings.provisional_curves(model, _kind(kind))
+    if provisional and allow_provisional is None:
+        raise ValueError(
+            f"model {model}, {kind}: the log penalties of {list(provisional)} are "
+            "provisional (no calibration record); calibrate them "
+            "(calibrate_log_penalty, VisitRateSettings.calibrated_penalties) or "
+            "pass allow_provisional='test' or 'simulation'"
+        )
+    sessions = _session_rows(cohort, model, kind)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
     records = fit_sessions(
@@ -779,6 +962,7 @@ def fit_visit_rate_session(
     model: str,
     settings: VisitRateSettings,
     table_sha256: Mapping[str, str] | None = None,
+    allow_provisional: Literal["test", "simulation"] | None = None,
 ) -> VisitRateFit:
     """Fit model A or D in one session (:func:`fit_visit_rate` of that
     session alone: its design's constraints are this session's rows')."""
@@ -788,6 +972,7 @@ def fit_visit_rate_session(
         kind=rows.kind,
         settings=settings,
         table_sha256=table_sha256,
+        allow_provisional=allow_provisional,
     )
 
 
@@ -857,7 +1042,14 @@ class ThirdClockDecision(NamedTuple):
 
 def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
     """The third clock's rule (module docstring) on model A's records with
-    ``f_m``.
+    ``f_m``: keep ``f_m`` when the share of sessions in which it or ``f_u`` is
+    not separable is at most ``MAX_FAILING_SHARE`` (a share of exactly 20 %
+    keeps it).
+
+    The rule reads the concurvity only. A drop before leaving can move in
+    part to ``f_m`` while the concurvity stays below the threshold, so the
+    decision is stored with ``visit_rate_statistics.third_clock_q7a``, Q7a
+    with and without ``f_m``.
 
     Raises
     ------
