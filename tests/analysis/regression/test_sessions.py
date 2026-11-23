@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
+from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax, Poisson
 from continuum_swr_replay.analysis.regression.record import NoFit
 from continuum_swr_replay.analysis.regression.reml import SessionData, fit_at_penalties
@@ -19,6 +21,8 @@ from continuum_swr_replay.analysis.regression.terms import (
     Smooth,
     build_design,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
+from scripts.checks import simulate_declared_penalty as sim
 
 from .conftest import ROLE, by_session
 
@@ -772,3 +776,55 @@ def test_a_term_that_is_not_a_level_drops_no_rows(rate_sessions) -> None:
     assert record.left_out == {"flag": Removed.SUPPORT}
     assert record.cohort_counts["rows_dropped"] == {}
     assert record.n_rows == len(sessions[keys[0]])
+
+
+@pytest.mark.slow
+def test_the_declared_penalty_recovers_a_planted_curve() -> None:
+    """30 simulated sessions (5 animals of 2 days of 3 sessions, about 120
+    events each, real-sized visit bins) with a threefold rise over the first
+    3 s after arrival: at the log penalty that gives a median edf of 6
+    (``calibration.log_penalty_for_edf``), every session's fit converges and
+    records its penalty as fixed, and the animal-balanced Q1 contrast (the
+    curve 2 to 4 s after arrival less the first second) is the planted one to
+    0.15, 16 % of it: the penalty's shrinkage (about 5 % at 6 edf in the
+    stored check, ``scripts/checks/simulate_declared_penalty.py``) plus three
+    SDs of the estimate over data sets of this size."""
+    config = sim.Config(days_per_animal=(2,) * 5, sessions_per_day=(3, 3))
+    sessions = sim.cohort(config, seed=7)
+    data = sim.simulate(sessions, "rise", np.random.default_rng(8))
+    assert len(data) == 30
+    pooled = pd.concat(data.values(), ignore_index=True)
+    found = log_penalty_for_edf(
+        sim.design_at(pooled, 0.0),
+        data,
+        Poisson(),
+        term=sim.TERM,
+        target_edf=6.0,
+        response="count",
+        unit="cell",
+    )
+    design = sim.design_at(pooled, found.log_penalty)
+    records = _fit(design, data, Poisson(), response="count", unit="cell")
+
+    assert all(r.status == "converged" for r in records)
+    assert all(
+        r.log_penalty == {sim.TERM: {"set": "fixed", "log_penalty": found.log_penalty}}
+        for r in records
+    )
+    assert np.median([r.edf[sim.TERM] for r in records]) == pytest.approx(6.0, abs=0.01)
+    c = sim.contrast_vector(design)
+    estimates = pd.Series(
+        [
+            evaluate_contrast(c, np.array(r.coef), np.array(r.vcov)).estimate
+            for r in records
+        ]
+    )
+    per_animal = animal_day_session_values(
+        estimates,
+        pd.Series([s.animal for s in sessions]),
+        pd.Series([s.day for s in sessions]),
+        pd.Series([s.key[2] for s in sessions]),
+    )
+    planted = sim.planted_contrast("rise")
+    print(f"planted {planted:.4f}, estimate {per_animal.mean():.4f}")
+    assert per_animal.mean() == pytest.approx(planted, abs=0.15)

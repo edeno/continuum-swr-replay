@@ -514,6 +514,12 @@ Simultaneous bands for a curve on a fixed grid.
 
 `Band`, `simultaneous_band`, `across_session_band`
 
+### `src/continuum_swr_replay/analysis/regression/calibration.py`
+
+The declared log penalty of a smooth term: the one that gives a target edf.
+
+`EdfCalibration`, `log_penalty_for_edf`
+
 ### `src/continuum_swr_replay/analysis/regression/collinearity.py`
 
 How well the other terms of a fit explain each term, on what the likelihood sees.
@@ -921,6 +927,12 @@ Objective AST mutation check for value-critical builder logic.
 Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
+
+### `scripts/checks/simulate_declared_penalty.py`
+
+The declared-penalty rule for a per-session smooth, in simulation.
+
+`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `run_data_set`, `calibrate`, `summarize`, `run`, `main`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 
