@@ -2,8 +2,9 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#content-design)
 
-Branch: `role-content-models` from master after Phases 2c and 3 (the JAX fitter and Phase 2b's
-simulation engine on master). CPU only. Can run beside Phase 5a.
+Branch: `role-content-models` from master after Phases 2b and 3 (the simulation engine on master). It
+runs on the present fitter, beside Phase 5a and beside Phase 2c, the JAX port (Figure 4 does not wait
+for the port; lead, twenty-third round). CPU only.
 
 **Inputs to read first:**
 

@@ -37,12 +37,12 @@ As of 2026-11-23 (branch `regression-declared-penalty`, from master 07c52783):
 | Phase | State | Commit |
 |---|---|---|
 | 1, the shared fitter | done; interface differs from the plan's sketch (the "as built" note at the top of [phase-1-shared-fitter.md](phase-1-shared-fitter.md)) | merged 6e54eda8, cleaned up 98fe5c06 |
-| 2, the convention's tools | done on master; the declared-penalty parts (the calibration function, its recovery test, the stored check) on `regression-declared-penalty`, pushed, not merged; the weak penalty on simple terms and the support rule on the design on `weak-penalty` (from `regression-declared-penalty`), pushed, not merged | master 492dffb4; branch b47faec9, 39a51d3a, 86ad3fc5; `weak-penalty` aa8f8425 |
+| 2, the convention's tools | done on master, with the declared-penalty parts (the calibration function, its recovery test, the stored check; merged 2026-11-23 with the lead's "merge"); the weak penalty on simple terms and the support rule on the design on `weak-penalty`, pushed, in review, not merged | master 492dffb4 and ec1ae69c; `weak-penalty` aa8f8425 |
 | 3, the well visit in the tables | done; the 13 canonical tables published | d14ff888 |
 | 4, Figures 2 and 3 on the common subset | done, except 20 held-out tetrode values in `paper/reported/events.json` that were pending on 2026-11-21 until another session's rerun ended (not checked again on 2026-11-23); the fold task waits for `swr-trial-folds` | 5dc74fc6 |
 | 2b, the simulation engine | **next** | |
 | 2c, one JAX fitter | after 2b, in parallel with 5a; its entry condition is met (twenty-third round) | |
-| 5a to 12 | not started; 5a, 6a and 8 wait for 2b and 2c | |
+| 5a to 12 | not started; 5a and 6a wait for 2b only and run on the present fitter beside 2c (Figure 4 does not wait for the port; lead, twenty-third round); 8 waits for 2c | |
 
 **What is done next, in order** (design, twenty-third round: the author's recommendation, and the lead,
 2026-11-23, 13:21: "ok"): the port goes ahead without blocking Figure 4.
@@ -152,19 +152,20 @@ reward-fraction smooth, and the trial number defined as the number of visits arr
 | [12](phase-12-legacy-sweep.md) | final sweep: cross-cutting leftovers, the ASK list answered, five audits proving nothing replaced is left | 10, 11 | S to M, deletions and audits |
 
 ```
-1 ──> 2 ──> 2b ──┬──> 5a ──> 5b      (5a beside 2c, twenty-third round)
-                 └──> 2c ──┬──> 6a ──┬──> 6b
-                           │   (5a + 6a) ──> 7 ──┐
-                           └──> 8             ├──> 9 ──> 10 ──┬──> 11
+1 ──> 2 ──> 2b ──┬──> 5a ──> 5b      (5a and 6a beside 2c, twenty-third round)
+                 ├──> 6a ──────────┬──> 6b
+                 │   (5a + 6a) ──> 7 ──┐
+                 └──> 2c ──> 8        ├──> 9 ──> 10 ──┬──> 11
 3 ─────────────────────> (5a, 6a, 8)          │               └──> 12
 C3 ──> 3, 4;  other session's merge ──> 4         5a, 6a ──┘
-2c runs in parallel with 5a, on its own branch (twenty-third round); it replaces the solver at the end
+2c runs in parallel with the Figure 4 chain (5a, 5b, 6a, 6b, 7, 9, 10), on its own branch (twenty-third round);
+it replaces the solver at the end, and every fit is then rerun once to confirm that it is equal
 5a's real fits wait for open question b and the penalty width (g); 6a's for the uncertainty-measure gate
 ```
 
 Parallel tracks: Phases 1, 3 and 4 can run at the same time (1 reads no table; 3 and 4 touch different
-files). Phase 5a runs beside 2c once 2b and 3 are in (twenty-third round); Phases 6a and 8 can run in
-parallel once 2c and 3 are in. Phase 8 is independent of the
+files). Phases 5a and 6a run beside 2c once 2b and 3 are in (twenty-third round); Phase 8 runs once 2c and 3
+are in. Phase 8 is independent of the
 Figure 4 chain and can be scheduled around GPU availability.
 
 **The GPU check (design section 6, check 6).** The design lists check 6 (single precision on the GPU
