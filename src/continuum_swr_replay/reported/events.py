@@ -117,7 +117,7 @@ medians, a mean of its epochs' means).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -5463,6 +5463,35 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         """Why a time-masked output is not over the subset and the current visits."""
         return time_mask_staleness(read_output_manifest(folder), epoch_ids, rel(folder))
 
+    def add_counts(
+        folder: Path,
+        made_by: str,
+        builders: Sequence[Callable[[pd.DataFrame, str], list[Value]]],
+        subset: str,
+        *notes: str | None,
+    ) -> None:
+        """The values of a per-epoch counts run (``counts.parquet`` in
+        ``folder``, of every analyzed epoch): each builder's, pending on
+        ``notes`` and on the run not being over the subset and the current
+        visits, over ``subset``; and the run's files as inputs."""
+        counts = pd.read_parquet(folder / "counts.parquet")
+        require_analyzed_epochs(counts["epoch_id"], str(folder / "counts.parquet"))
+        for builder_values in builders:
+            summary.add(
+                *over(
+                    pend(
+                        builder_values(counts, f"{rel(folder)} ({made_by})"),
+                        *notes,
+                        off_time_mask(folder, counts["epoch_id"].unique()),
+                    ),
+                    subset,
+                )
+            )
+        summary.inputs += [
+            file_record(folder / name, ROOT_DIR)
+            for name in ("counts.parquet", "manifest.json")
+        ]
+
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*visit_context_values(table, source))
     summary.add(*over(event_cohort_values(events, source), EVENTS_SUBSET))
@@ -5798,17 +5827,26 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     participation_paths = ok_table_paths(inputs.event_participation, PARTICIPATION_NAME)
     participation_sha256 = files_sha256(participation_paths)
 
-    def participation_off_subset() -> str | None:
-        """Why the participation run's controls are not Local rest inside the
-        current well visits, or None: its settings record no subset or another,
-        or it read other visits than the current session cache's."""
-        manifest = read_output_manifest(inputs.event_participation)
-        what = rel(inputs.event_participation)
-        notes = [
-            subset_staleness(manifest.get("settings", {}), what),
-            session_cache_staleness(manifest, analyzed, what),
-        ]
-        return "; ".join(note for note in notes if note) or None
+    # why the participation run's controls are not Local rest inside the
+    # current well visits, or None: its settings record no subset or another,
+    # or it read other visits than the current session cache's (read once)
+    participation_manifest = read_output_manifest(inputs.event_participation)
+    participation_off = (
+        "; ".join(
+            note
+            for note in (
+                subset_staleness(
+                    participation_manifest.get("settings", {}),
+                    rel(inputs.event_participation),
+                ),
+                session_cache_staleness(
+                    participation_manifest, analyzed, rel(inputs.event_participation)
+                ),
+            )
+            if note
+        )
+        or None
+    )
 
     def participation_staleness(folder: Path) -> str | None:
         """Why a run made from the participation tables is stale, or None."""
@@ -5830,7 +5868,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "(scripts/event_evidence/measure_event_participation.py)",
                 ),
                 stale(inputs.event_participation),
-                participation_off_subset(),
+                participation_off,
             ),
             CONTROL_SUBSET,
         )
@@ -5860,7 +5898,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 ),
                 stale(inputs.tetrode_holdout),
                 participation_staleness(inputs.tetrode_holdout),
-                participation_off_subset(),
+                participation_off,
             ),
             CONTROL_SUBSET,
         )
@@ -5887,7 +5925,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             pend(
                 tetrode_holdout_extra_values(extra_windows, extra_source),
                 *extra_stale,
-                participation_off_subset(),
+                participation_off,
             ),
             CONTROL_SUBSET,
         )
@@ -6013,7 +6051,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     window_values = restriction_window_values(
         restriction_windows_table, restriction_source
     )
-    window_stale = (*restriction_stale, participation_off_subset())
+    window_stale = (*restriction_stale, participation_off)
     summary.add(
         *over(pend(window_values.windows, *window_stale), CANONICAL_WINDOWS_SUBSET)
     )
@@ -6268,93 +6306,35 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
 
-    folder = inputs.nonlocal_by_signal
-    signal_counts = pd.read_parquet(folder / "counts.parquet")
-    require_analyzed_epochs(signal_counts["epoch_id"], str(folder / "counts.parquet"))
-    counts_source = (
-        f"{rel(folder)} (scripts/event_properties/measure_nonlocal_by_signal.py: "
-        "each analyzed epoch's decode)"
+    add_counts(
+        inputs.nonlocal_by_signal,
+        "scripts/event_properties/measure_nonlocal_by_signal.py: each analyzed "
+        "epoch's decode",
+        (nonlocal_power_values, nonlocal_mua_values),
+        f"the immobile {TIME_SUBSET}",
     )
-    for builder_values in (nonlocal_power_values, nonlocal_mua_values):
-        summary.add(
-            *over(
-                pend(
-                    builder_values(signal_counts, counts_source),
-                    off_time_mask(folder, signal_counts["epoch_id"]),
-                ),
-                f"the immobile {TIME_SUBSET}",
-            )
-        )
-    summary.inputs += [
-        file_record(folder / name, ROOT_DIR)
-        for name in ("counts.parquet", "manifest.json")
-    ]
-
-    folder = inputs.state_by_signal
-    state_counts = pd.read_parquet(folder / "counts.parquet")
-    require_analyzed_epochs(state_counts["epoch_id"], str(folder / "counts.parquet"))
-    summary.add(
-        *over(
-            pend(
-                state_by_signal_values(
-                    state_counts,
-                    f"{rel(folder)} (scripts/event_properties/measure_state_by_signal.py: "
-                    "each analyzed epoch's decode)",
-                ),
-                off_time_mask(folder, state_counts["epoch_id"].unique()),
-            ),
-            f"the immobile {TIME_SUBSET}",
-        )
+    add_counts(
+        inputs.state_by_signal,
+        "scripts/event_properties/measure_state_by_signal.py: each analyzed "
+        "epoch's decode",
+        (state_by_signal_values,),
+        f"the immobile {TIME_SUBSET}",
     )
-    summary.inputs += [
-        file_record(folder / name, ROOT_DIR)
-        for name in ("counts.parquet", "manifest.json")
-    ]
-
-    folder = inputs.nonlocal_probability
-    probability_counts = pd.read_parquet(folder / "counts.parquet")
-    require_analyzed_epochs(
-        probability_counts["epoch_id"], str(folder / "counts.parquet")
+    add_counts(
+        inputs.nonlocal_probability,
+        "scripts/decoding/measure_nonlocal_probability.py: each analyzed epoch's "
+        "decode",
+        (nonlocal_probability_values,),
+        f"the immobile {TIME_SUBSET}",
     )
-    summary.add(
-        *over(
-            pend(
-                nonlocal_probability_values(
-                    probability_counts,
-                    f"{rel(folder)} (scripts/decoding/measure_nonlocal_probability.py: "
-                    "each analyzed epoch's decode)",
-                ),
-                off_time_mask(folder, probability_counts["epoch_id"].unique()),
-            ),
-            f"the immobile {TIME_SUBSET}",
-        )
+    add_counts(
+        inputs.event_rule_sweep,
+        "scripts/event_properties/sweep_event_rule.py: each analyzed epoch's "
+        "decode, detected again at each setting",
+        (rule_sweep_values,),
+        EVENTS_SUBSET,
+        stale(inputs.event_rule_sweep),
     )
-    summary.inputs += [
-        file_record(folder / name, ROOT_DIR)
-        for name in ("counts.parquet", "manifest.json")
-    ]
-
-    folder = inputs.event_rule_sweep
-    sweep_counts = pd.read_parquet(folder / "counts.parquet")
-    require_analyzed_epochs(sweep_counts["epoch_id"], str(folder / "counts.parquet"))
-    summary.add(
-        *over(
-            pend(
-                rule_sweep_values(
-                    sweep_counts,
-                    f"{rel(folder)} (scripts/event_properties/sweep_event_rule.py: "
-                    "each analyzed epoch's decode, detected again at each setting)",
-                ),
-                stale(folder),
-                off_time_mask(folder, sweep_counts["epoch_id"].unique()),
-            ),
-            EVENTS_SUBSET,
-        )
-    )
-    summary.inputs += [
-        file_record(folder / name, ROOT_DIR)
-        for name in ("counts.parquet", "manifest.json")
-    ]
 
     folder = inputs.state_calibration_in_visits
     calibration_epochs = list(read_output_manifest(folder)["epochs"])
