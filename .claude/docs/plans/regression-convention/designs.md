@@ -162,7 +162,9 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   those with a row where it is 0; the term passes when both counts are at least 5. As built:
   `support.binary_support`. A session with no event on one side passes; a penalized term is then fitted
   with a finite value, and an unpenalized one has no finite maximum and is left out by that rule
-  (sixteenth round).
+  (sixteenth round). An unpenalized level with events in one to four units, or an unpenalized continuous
+  slope, has a finite maximum and is fitted with a large standard error (the event-based rule left it
+  out), so an unpenalized simple term is a baseline or nuisance term whose value is not reported or tested.
 - A continuous slope (over the rows of its level for a slope by a role): count the units with a row above
   and below the median of those rows (ties to neither); pass when both are at least 5. A constant column
   fails.
@@ -177,6 +179,9 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   The SD is one declared number for all models; **its value is open** (design, "Open after the
   twenty-third round", g; a simulation with SD 1, 2 and 4 is running). Each family's simulation checks the
   penalty before the family's fit is used.
+- The guard (**call**, the author's, not the lead's words): each model module calls
+  `support.require_tested_penalized(design, tested)` with the coefficients of its declared tests; it
+  raises an error that names every tested coefficient or term without a fixed penalty.
 - A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
   `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
   that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.

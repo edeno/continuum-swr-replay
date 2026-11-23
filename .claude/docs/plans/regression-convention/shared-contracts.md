@@ -181,8 +181,14 @@ The design's section 4. In short, with the phase that implements each piece:
 > step; one pooled SD of a continuous covariate), so the log penalty is `log(1 / SD^2)`
 > (`terms.log_penalty_from_prior_sd`). **The SD's value is open** (`OPEN (lead): penalty width`; a
 > simulation with SD 1, 2 and 4 is running). A penalized coefficient always has a finite maximum, so a
-> session with no event on one side of it keeps it; an unpenalized term there is left out by the
-> no-finite-maximum rule. Built on branch `weak-penalty`, aa8f8425.
+> session with no event on one side of it keeps it. An unpenalized term has no finite maximum only as a
+> 0/1 slope or a level with no event on a side, and the no-finite-maximum rule leaves it out there; with
+> few events on a side (a level whose events are in one to four units), or as a continuous slope, it is
+> fitted with a large standard error. So an unpenalized simple term is a baseline or nuisance term whose
+> value is not reported or tested. Built on branch `weak-penalty`, aa8f8425. The guard (**call**, the
+> author's, not the lead's words): each model module calls `regression/support.py:require_tested_penalized(design,
+> tested)` with the coefficients of its declared tests; it raises an error that names every one without a
+> fixed penalty.
 
 Numerical constants, each in one home; change a value only there:
 
