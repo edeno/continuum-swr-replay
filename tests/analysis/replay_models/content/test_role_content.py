@@ -88,6 +88,21 @@ def _pooled(fit) -> pd.DataFrame:
     )
 
 
+def _assert_recovered(pooled, planted, spread) -> None:
+    """Each estimand's pooled estimate within its simulation tolerance of the
+    planted value: 4 times ``spread`` (the SD of the pooled estimate measured
+    over replicate draws) or 20 % of the planted value, whichever is larger.
+
+    The model's own standard error is not the tolerance: under the share
+    response (each event one categorical draw) it is about ten times the
+    spread measured here, wide enough to pass a slope set to 0.
+    """
+    for eid, sd in spread.items():
+        est = pooled.loc[eid, "estimate"]
+        tol = max(4.0 * sd, 0.2 * abs(planted[eid]))
+        assert abs(est - planted[eid]) < tol, (eid, est, planted[eid], tol)
+
+
 # ---------------------------------------------------------------------------
 # The cohort step
 # ---------------------------------------------------------------------------
@@ -341,9 +356,11 @@ def test_planted_role_levels_and_opposite_slopes_are_recovered(big_cohort) -> No
     fit = _fit(big_cohort, sessions, "role_content")
     pooled = _pooled(fit)
     planted = sc.planted_values(truth, reference)
-    for eid in ("Q3a", "Q3b", "Q4b", "Q4a", "Q7b"):
-        est, se = pooled.loc[eid]
-        assert abs(est - planted[eid]) < 3 * se, (eid, est, se, planted[eid])
+    # Simulation tolerance: the SD of the pooled estimate over 8 replicate
+    # draws (seeds 100 to 107) was 0.0036, 0.0067, 0.016, 0.019 and 0.026; the
+    # model's pooled SE was 0.038, 0.063, 0.13, 0.19 and 0.18.
+    spread = {"Q3a": 0.004, "Q3b": 0.007, "Q4b": 0.017, "Q4a": 0.02, "Q7b": 0.026}
+    _assert_recovered(pooled, planted, spread)
     record = fit.records[0]
     beta = dict(zip(record.coef_names, record.coef, strict=True))
     assert beta["value:role=current"] < -0.1
@@ -396,10 +413,24 @@ def test_curves_are_recovered(big_cohort) -> None:
     )
     sessions, reference = _simulate(big_cohort, truth, seed=1)
     planted = sc.planted_values(truth, reference)
-    pooled = pd.concat([_pooled(_fit(big_cohort, sessions, m)) for m in rc.MODELS])
-    for eid in ("Q4a", "Q7b", "Q5a", "Q3a", "Q5b-var"):
-        est, se = pooled.loc[eid]
-        assert abs(est - planted[eid]) < 3.5 * se, (eid, est, se, planted[eid])
+    # The reward-fraction smooth at log penalty -4: at the placeholder 0 its
+    # penalty shrinks this S-shaped curve toward a line, and Q4a came back at
+    # 0.74 of its planted value (mean of 8 draws, seeds 100 to 107), at -4 at
+    # 1.01 (the smooth penalties are open).
+    settings = rc.RoleContentSettings(
+        smooth_log_penalties={
+            **rc.DEFAULT_SMOOTH_LOG_PENALTIES,
+            rc.REWARD_FRACTION: -4.0,
+        }
+    )
+    pooled = pd.concat(
+        [_pooled(_fit(big_cohort, sessions, m, settings=settings)) for m in rc.MODELS]
+    )
+    pooled = pooled[~pooled.index.duplicated()]
+    # Simulation tolerance: the SD over 8 replicate draws (seeds 100 to 107)
+    # was 0.031, 0.035, 0.045, 0.0063 and 0.014.
+    spread = {"Q4a": 0.031, "Q7b": 0.035, "Q5a": 0.045, "Q3a": 0.007, "Q5b-var": 0.014}
+    _assert_recovered(pooled, planted, spread)
     assert planted["Q4a"] > 0.3 and planted["Q7b"] > 0.3 and planted["Q5a"] > 0.5
 
 
@@ -413,9 +444,10 @@ def test_belief_variance_and_sample_count_recovered_in_one_model(big_cohort) -> 
     sessions, reference = _simulate(big_cohort, truth, seed=2)
     pooled = _pooled(_fit(big_cohort, sessions, "role_content_uncertainty"))
     planted = sc.planted_values(truth, reference)
-    for eid in ("Q5b-var", "Q5b-n", "Q5a"):
-        est, se = pooled.loc[eid]
-        assert abs(est - planted[eid]) < 3.5 * se, (eid, est, se, planted[eid])
+    # Simulation tolerance: the SD over 8 replicate draws (seeds 100 to 107)
+    # was 0.013, 0.016 and 0.030.
+    spread = {"Q5b-var": 0.014, "Q5b-n": 0.017, "Q5a": 0.031}
+    _assert_recovered(pooled, planted, spread)
 
 
 def test_length_adjusted_at_reference(big_cohort) -> None:
@@ -425,10 +457,10 @@ def test_length_adjusted_at_reference(big_cohort) -> None:
         arm=sc.arm_effects(), role={"current": 0.8}, length={"current": 0.8}
     )
     sessions, reference = _simulate(big_cohort, truth, seed=4)
-    est, se = _pooled(
-        _fit(big_cohort, sessions, "role_content", "length_adjusted")
-    ).loc["Q3a"]
-    assert abs(est - 0.8) < 3 * se
+    pooled = _pooled(_fit(big_cohort, sessions, "role_content", "length_adjusted"))
+    # Simulation tolerance: the SD over 8 replicate draws (seeds 100 to 107)
+    # was 0.0042.
+    _assert_recovered(pooled, {"Q3a": 0.8}, {"Q3a": 0.005})
     assert np.isnan(sc.planted_values(truth, reference)["Q3a"])
     assert sc.planted_values(truth, reference, "length_adjusted")["Q3a"] == 0.8
 
