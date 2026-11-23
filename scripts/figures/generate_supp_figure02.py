@@ -65,12 +65,15 @@ the order the text cites them, in four rows:
         SWR, at each value of three settings swept one at a time (the others
         at the values the paper uses). Two are settings of the event rule
         (heading "Event rule"): the non-local probability an event stays
-        strictly above (0.5 to 0.95) and the minimum run length (7, the rule's
-        15 ms, to 25 samples of 2 ms). The third is the SWR detector's
+        strictly above (0.5 to 0.95) and the minimum run length, drawn as the
+        shortest event it keeps (n samples of 2 ms: 14 ms, the rule's 7
+        samples or 15 ms, to 100 ms, 50 samples). The third is the SWR detector's
         threshold (heading "SWR detector", 0 to 6 z). A thin line per animal
         (the mean over its epochs of each epoch's share) and the share pooled
         over events in bold; the value the paper uses is dotted and marked
-        "used" on every axis. About a third of the events have no SWR even at
+        "used" on every axis. Under each axis, the events detected at each
+        value (thousands; flat under the SWR threshold, which relabels the
+        rule's events). About a third of the events have no SWR even at
         1 z. The events are detected again from the stored decode by the rule
         itself and labeled as the canonical table labels them; at the rule's
         settings they are the canonical events. The SWRs are not detected
@@ -270,7 +273,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.ticker import NullLocator
+from matplotlib.ticker import MaxNLocator, NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
@@ -340,6 +343,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     require_analyzed_epochs,
 )
 from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     PARTICIPATION_NAME,
     TETRODE_HOLDOUT_NAME,
@@ -438,16 +442,25 @@ CALIBRATION_DODGE = 0.025
 """How far apart the states' points sit at each probability bin (x units)."""
 SWEEP_XLABELS = {
     "probability_threshold": "Non-local\nprobability",
-    "minimum_samples": "Minimum\nsamples",
+    "minimum_samples": "Minimum\nduration (ms)",
     "swr_threshold_z": "SWR\nthreshold (z)",
 }
 """The sweep panel's x label of each swept setting."""
+SWEEP_SCALES = {
+    "probability_threshold": 1.0,
+    "minimum_samples": 1000 * DECODE_SAMPLE_S,
+    "swr_threshold_z": 1.0,
+}
+"""What each setting's value is multiplied by on the sweep panel's x axis: the
+minimum run length in samples is drawn as the shortest event it keeps, in ms
+(n samples of 2 ms; the rule's 7 samples, its 15 ms, is a shortest event of
+14 ms)."""
 SWEEP_TICKS = {
     "probability_threshold": (0.5, 0.8, 0.95),
-    "minimum_samples": (7, 15, 25),
+    "minimum_samples": (14, 50, 100),
     "swr_threshold_z": (0, 2, 4, 6),
 }
-"""The sweep panel's x ticks: the value used and the ends."""
+"""The sweep panel's x ticks, in its drawn units: the value used and the ends."""
 HPD_XLABEL = "95 % HPD length (cm),\nmean over the event's bins"
 """The posterior-spread panel's x label: each event's mean over its bins of the
 length of track that holds 95 % of the decoded probability."""
@@ -1031,40 +1044,62 @@ def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
 
 
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
-    """The sweep panel: the share of events with no SWR at each value of each
-    swept setting (one axis each, sharing the y axis), a thin line per animal
-    and the pooled share in bold with its dots, and on every axis the value the
-    paper uses dotted and marked "used". The first two axes are settings of
-    the event rule, under one heading; the third is the SWR detector's
-    threshold (``sweep``: :func:`read_inputs`' ``sweep``)."""
-    for ax, (setting, xlabel) in zip(axes, SWEEP_XLABELS.items(), strict=True):
+    """The sweep panel: on the top row, the share of events with no SWR at each
+    value of each swept setting (one axis each, sharing the y axis), a thin
+    line per animal and the pooled share in bold with its dots, and on every
+    axis the value the paper uses dotted and marked "used"; on the bottom row,
+    under each, the events detected at each value (thousands, summed over the
+    epochs; flat on the SWR threshold's axis, which relabels the rule's
+    events). The first two columns are settings of the event rule, under one
+    heading; the third is the SWR detector's threshold (``sweep``:
+    :func:`read_inputs`' ``sweep``)."""
+    n = len(SWEEP_XLABELS)
+    shares, counts = axes[:n], axes[n:]
+    for ax, ax_count, (setting, xlabel) in zip(
+        shares, counts, SWEEP_XLABELS.items(), strict=True
+    ):
         mine = sweep[sweep["setting"] == setting]
-        x = mine["value"].to_numpy()
+        x = SWEEP_SCALES[setting] * mine["value"].to_numpy()
+        used = SWEEP_SCALES[setting] * RULE[setting]
         animals = pd.DataFrame(
             [animal_values(row, "animals") for _, row in mine.iterrows()]
         )
         ax.plot(x, 100 * animals.to_numpy(), color="k", lw=0.5, alpha=0.5)
         ax.plot(x, 100 * mine["no_swr_fraction"].to_numpy(), color="k", lw=1.0,
                 marker="o", ms=2)  # fmt: skip
-        ax.axvline(RULE[setting], color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
-        ax.set_xticks(SWEEP_TICKS[setting])
-        ax.set_xlabel(xlabel)
-        if ax is not axes[0]:
-            ax.sharey(axes[0])
+        ax_count.plot(x, mine["n_events"].to_numpy() / 1000, color="k", lw=1.0,
+                      marker="o", ms=2)  # fmt: skip
+        for a in (ax, ax_count):
+            a.axvline(used, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+        ax_count.sharex(ax)
+        ax.tick_params(labelbottom=False)
+        ax_count.set_xticks(SWEEP_TICKS[setting])
+        ax_count.set_xlabel(xlabel)
+        if ax is not shares[0]:
+            ax.sharey(shares[0])
             ax.tick_params(labelleft=False)
-    axes[0].set_ylim(0, 100)
-    axes[0].set_yticks([0, 50, 100])
-    axes[0].set_ylabel("Events with\nno SWR (%)")
-    for ax, setting in zip(axes, SWEEP_XLABELS, strict=True):
+            ax_count.sharey(counts[0])
+            ax_count.tick_params(labelleft=False)
+    shares[0].set_ylim(0, 100)
+    shares[0].set_yticks([0, 50, 100])
+    shares[0].set_ylabel("Events with\nno SWR (%)")
+    counts[0].set_ylim(0, 1.15 * sweep["n_events"].max() / 1000)
+    counts[0].yaxis.set_major_locator(MaxNLocator(2))
+    counts[0].set_ylabel("Events\n(thousands)")
+    for ax, setting in zip(shares, SWEEP_XLABELS, strict=True):
         ax.text(
-            RULE[setting], 3, " used", fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-            ha="left", va="bottom",
+            SWEEP_SCALES[setting] * RULE[setting], 3, " used", fontsize=SMALL_SIZE,
+            color=REFERENCE_COLOR, ha="left", va="bottom",
         )  # fmt: skip
     # one heading over the event rule's two axes, another over the detector's
-    first, second = axes[0].get_position(), axes[1].get_position()
+    first, second = shares[0].get_position(), shares[1].get_position()
     for ax, heading, x in (
-        (axes[0], "Event rule", ((first.x0 + second.x1) / 2 - first.x0) / first.width),
-        (axes[2], "SWR detector", 0.5),
+        (
+            shares[0],
+            "Event rule",
+            ((first.x0 + second.x1) / 2 - first.x0) / first.width,
+        ),
+        (shares[2], "SWR detector", 0.5),
     ):
         ax.annotate(
             heading, (x, 1.0), xycoords="axes fraction", xytext=(0, 3),
@@ -1130,9 +1165,9 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     ax.set_title("No-Spike state", fontsize=SMALL_SIZE, pad=3)
 
 
-PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (1, 3), "step_test": (1, 2)}
+PANEL_GRIDS = {"nonlocal_mua": (2, 1), "rule_sweep": (2, 3), "step_test": (1, 2)}
 """The panels drawn on several axes in their frame: rows and columns."""
-PANEL_ROW_SHARES: dict[str, tuple[float, ...]] = {}
+PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""

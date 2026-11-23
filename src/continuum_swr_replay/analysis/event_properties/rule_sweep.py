@@ -60,8 +60,9 @@ from continuum_swr_replay.parameters import (
 
 PROBABILITY_THRESHOLDS = (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
 """The non-local probabilities an event stays strictly above."""
-MINIMUM_SAMPLES = (7, 10, 15, 25)
-"""The minimum run lengths, in 2 ms decode samples (7 is the rule's 15 ms)."""
+MINIMUM_SAMPLES = (7, 10, 15, 25, 38, 50)
+"""The minimum run lengths, in 2 ms decode samples: 7 is the rule's 15 ms, whose
+shortest event lasts 14 ms (7 samples of 2 ms); 25 and 50 are 50 and 100 ms."""
 SWR_THRESHOLDS_Z = tuple(float(z) for z in np.arange(0.0, 6.01, 0.5))
 """The SWR thresholds, z of the Kay consensus ripple power: 0 to 6 z in steps
 of 0.5, so that the series spans the events' peak ripple power it is drawn
@@ -228,7 +229,26 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
         its epochs with an event of each epoch's share, as
         ``event_statistics.overlap_class_animal_shares`` takes it),
         ``animal_min`` and ``animal_max``.
+
+    Raises
+    ------
+    ValueError
+        If a value of :data:`SETTINGS` has no row (counts made with other
+        settings).
     """
+    missing = [
+        f"{setting} {value:g}"
+        for setting, values in SETTINGS.items()
+        for value in values
+        if not (
+            (counts["setting"] == setting) & np.isclose(counts["value"], value)
+        ).any()
+    ]
+    if missing:
+        raise ValueError(
+            f"the sweep's counts have no rows at {missing}: they were made with "
+            "other settings. Rerun scripts/event_properties/sweep_event_rule.py"
+        )
     rows = []
     rule_events = int(rule_rows(counts, "probability_threshold")["n_events"].sum())
     for setting, values in SETTINGS.items():

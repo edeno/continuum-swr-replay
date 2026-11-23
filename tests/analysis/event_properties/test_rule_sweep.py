@@ -49,7 +49,7 @@ def test_epoch_counts_detect_again_at_each_setting_and_count_those_in_a_visit(
     )
     raw = pd.DataFrame({"SWR_zscore": 0.0}, index=np.arange(0, 60, 0.002))
     counts = sweep.epoch_sweep_counts(raw, np.array([0.0]), np.array([10.0]))
-    assert len(calls) == len(set(calls)) == 6 + 3  # the rule detected once
+    assert len(calls) == len(set(calls)) == 6 + 5  # the rule detected once
     by_value = counts.set_index(["setting", "value"])
     assert by_value.loc[("probability_threshold", 0.5), "n_events"] == 5
     assert by_value.loc[("probability_threshold", 0.8), "n_events"] == 8
@@ -115,3 +115,14 @@ def test_sweep_statistics_pool_the_events_and_average_each_animals_epochs():
     longest = stats.loc[("minimum_samples", 25.0)]
     np.testing.assert_allclose(longest["animals"], [0.5, 10 / 16])
     assert sweep.criterion_agreement(_counts()) == pytest.approx(37 / 40)
+
+
+def test_sweep_statistics_refuse_counts_made_with_other_settings():
+    """Counts without a row at a swept value (made before it was swept) are
+    refused, naming the value and the runner, not read as no events."""
+    counts = _counts()
+    old = counts[
+        ~((counts["setting"] == "minimum_samples") & (counts["value"] == 50.0))
+    ]
+    with pytest.raises(ValueError, match="minimum_samples 50.*sweep_event_rule"):
+        sweep.sweep_statistics(old)

@@ -515,7 +515,8 @@ def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
 def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
     """Three small axes sharing the y axis, one per swept setting: a thin line
     per animal and the pooled share in bold, in percent, the rule's value
-    marked by a dotted line."""
+    marked by a dotted line; under each, the events at each value in
+    thousands; the minimum run length drawn in ms (2 ms a sample)."""
     from continuum_swr_replay.analysis.event_properties.rule_sweep import (
         RULE,
         SETTINGS,
@@ -524,26 +525,39 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
     sweep = _sweep()
     fig = drawn
     axes = figure.panel_axes(fig, "rule_sweep")
-    assert len(axes) == 3
-    for ax, (setting, values) in zip(axes, SETTINGS.items(), strict=True):
+    assert len(axes) == 6
+    shares, counts = axes[:3], axes[3:]
+    for ax, ax_count, (setting, values) in zip(
+        shares, counts, SETTINGS.items(), strict=True
+    ):
         mine = sweep[sweep["setting"] == setting]
+        scale = figure.SWEEP_SCALES[setting]
         lines = [line for line in ax.lines if len(line.get_xdata()) == len(values)]
         assert len(lines) == 2 + 1  # two animals and the pooled share
-        np.testing.assert_allclose(lines[-1].get_xdata(), values)
+        np.testing.assert_allclose(lines[-1].get_xdata(), scale * np.asarray(values))
         np.testing.assert_allclose(
             lines[-1].get_ydata(), 100 * mine["no_swr_fraction"].to_numpy()
         )
+        (count,) = [
+            line for line in ax_count.lines if len(line.get_xdata()) == len(values)
+        ]
+        np.testing.assert_allclose(
+            count.get_ydata(), mine["n_events"].to_numpy() / 1000
+        )
         (rule,) = [line for line in ax.lines if line.get_linestyle() == ":"]
-        np.testing.assert_allclose(rule.get_xdata(), RULE[setting])
-        assert ax.get_shared_y_axes().joined(ax, axes[0])
-    assert axes[0].get_ylabel() == "Events with\nno SWR (%)"
+        np.testing.assert_allclose(rule.get_xdata(), scale * RULE[setting])
+        assert ax.get_shared_y_axes().joined(ax, shares[0])
+        assert ax_count.get_shared_x_axes().joined(ax_count, ax)
+    assert figure.SWEEP_SCALES["minimum_samples"] == pytest.approx(2.0, rel=1e-3)
+    assert shares[0].get_ylabel() == "Events with\nno SWR (%)"
+    assert counts[0].get_ylabel() == "Events\n(thousands)"
     # one heading over the event rule's two axes, one over the detector's; the
     # value used marked on all three
-    assert "Event rule" in [t.get_text() for t in axes[0].texts]
-    assert "SWR detector" in [t.get_text() for t in axes[2].texts]
-    for ax in axes:
+    assert "Event rule" in [t.get_text() for t in shares[0].texts]
+    assert "SWR detector" in [t.get_text() for t in shares[2].texts]
+    for ax in shares:
         assert " used" in [t.get_text() for t in ax.texts]
-    assert [ax.get_xlabel() for ax in axes] == list(figure.SWEEP_XLABELS.values())
+    assert [ax.get_xlabel() for ax in counts] == list(figure.SWEEP_XLABELS.values())
 
 
 def test_the_calibration_panel_draws_each_states_evidence_by_its_probability(drawn):

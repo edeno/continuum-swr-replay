@@ -3518,11 +3518,13 @@ _SWEEP_SETTINGS = {
     ),
     "minimum_samples": (
         "minimum_samples",
-        "the event rule's minimum run length (2 ms decode samples)",
+        "the event rule's minimum run length (2 ms decode samples; 7 samples, "
+        "the rule's 15 ms, is a shortest event of 14 ms, and n samples one of "
+        "2n ms)",
         dict(
             zip(
                 rule_sweep.MINIMUM_SAMPLES,
-                ("seven", "ten", "fifteen", "twenty_five"),
+                ("seven", "ten", "fifteen", "twenty_five", "thirty_eight", "fifty"),
                 strict=True,
             )
         ),
@@ -3587,6 +3589,13 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"the events detected again {at}, as a multiple of the rule's",
+            ),
+            make(
+                f"{key}_events",
+                row.n_events,
+                "count",
+                "count",
+                f"the events detected again {at}, summed over the analyzed epochs",
             ),
         ]
     values.append(
