@@ -69,3 +69,22 @@ def test_the_rule_reads_floats_with_its_tolerance_and_the_rest_exactly() -> None
     assert reference.plain(float("nan")) == "NaN"
     assert reference.differences(reference.plain([float("nan"), 1.0]), [0.0, 1.0])
     assert reference.differences({"a": 1.0}, {"a": 1.0, "b": 2.0})
+
+
+def test_the_rule_wants_a_float_for_a_float_and_an_int_for_an_int() -> None:
+    """An int does not match a float reference, nor a float an int one, alone
+    or inside a list: a fitter that returned a count as a float, or a
+    coefficient as an int, would differ in kind from the reference."""
+    for actual, stored in [
+        (3, 3.0),
+        (3.0, 3),
+        ([1, 2], [1.0, 2.0]),
+        ([1.0, 2.0], [1, 2]),
+        ([[1.0, 2], [3.0, 4.0]], [[1.0, 2.0], [3.0, 4.0]]),
+        ([[1.0, 2.0], [3.0, 4.0]], [[1.0, 2], [3.0, 4.0]]),
+        ({"n": [0.0]}, {"n": [0]}),
+        (True, 1.0),
+        (1.0, True),
+    ]:
+        assert reference.differences(actual, stored), (actual, stored)
+    assert_matches_reference([3, [1, 2], 0.0], [3, [1, 2], 0.0])

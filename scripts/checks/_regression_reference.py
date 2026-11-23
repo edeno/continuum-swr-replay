@@ -24,7 +24,8 @@ groups, one stored file each (:data:`GROUPS`):
 
 The rule (:func:`differences`): a float ``a`` matches its reference ``b`` when
 ``|a - b| <= ATOL + RTOL |b|``; an int, a bool, a string or None must be
-equal, of the same type. A float that is not finite is stored as a string
+equal, of the same type. A float reference needs a float and an int reference
+an int, alone or in a list: ``3`` does not match ``3.0``, nor ``3.0`` ``3``. A float that is not finite is stored as a string
 (:func:`plain`), so NaN must be NaN and an infinity the same infinity.
 So statuses, reasons, step counts, the columns left out and every count are
 exact. A dict must have the same keys and a list the same length.
@@ -195,7 +196,7 @@ def differences(actual: object, reference: object, where: str = "") -> list[str]
             f"{a[worst]!r} against {b[worst]!r} (ratio {ratio[worst]:.3g})"
         ]
     if _is_float(reference):
-        if not (_is_float(actual) or type(actual) is int):
+        if not _is_float(actual):
             return [f"{where}: {actual!r}, reference float {reference!r}"]
         if _floats_differ(np.array(float(actual)), np.array(reference)):
             ratio = abs(actual - reference) / (ATOL + RTOL * abs(reference))
