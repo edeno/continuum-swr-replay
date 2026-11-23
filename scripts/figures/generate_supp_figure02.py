@@ -1371,7 +1371,10 @@ def draw_decoded_distance(
     ax.plot(centers, statistics["animal_mean"].to_numpy(), color="black", lw=1.2)
     ax.set_xlim(0, 1)
     ax.set_xticks([0, 0.5, 1], ["0", "0.5", "1"])
-    ax.set_ylim(0, None)
+    # a log axis: the lowest bin of one animal is far above every other value
+    ax.set_yscale("log")
+    ax.set_yticks([3, 10, 30, 100], ["3", "10", "30", "100"])
+    ax.minorticks_off()
     ax.set_xlabel("Local probability")
     ax.set_ylabel("Distance from\nthe animal (cm)")
     ax.set_title(

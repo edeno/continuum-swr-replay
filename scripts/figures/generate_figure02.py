@@ -1276,8 +1276,11 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
     ax.set_yticks([0, 50, 100])
     ax.set_xlim(-0.5, 3.9)
     ticks = [x for pair in REST_EVENT_X.values() for x in pair]
-    # horizontal, on two lines, so that they do not hang into the next row
-    ax.set_xticks(ticks, ["Local\nrest", "No\nSWR", "Local\nrest", "SWR"])
+    # horizontal, on short lines, so that they do not hang into the next row;
+    # "matched": each rest window has its event's duration, so the two rest
+    # columns differ as the two kinds of event differ in duration
+    rest = "Matched\nlocal\nrest"
+    ax.set_xticks(ticks, [rest, "No\nSWR", rest, "SWR"])
     ax.set_title("Participation", fontsize=SMALL_SIZE, pad=3)
 
 

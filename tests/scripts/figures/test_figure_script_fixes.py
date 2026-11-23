@@ -2689,7 +2689,7 @@ def test_figure02_participation_panel_joins_each_animals_rest_to_its_events(offl
         assert len(pairs) == 5
     assert ax.get_ylabel() == "Tetrodes active (%)"
     assert [t.get_text() for t in ax.get_xticklabels()] == [
-        "Local\nrest", "No\nSWR", "Local\nrest", "SWR",
+        "Matched\nlocal\nrest", "No\nSWR", "Matched\nlocal\nrest", "SWR",
     ]  # fmt: skip
     plt.close(fig)
 
