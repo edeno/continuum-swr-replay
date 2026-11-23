@@ -1600,8 +1600,8 @@ def draw_low_rate(axes: Sequence[Axes], statistics: LowRateStatistics) -> None:
     ax_tenths.set_xticks([0, 50, 100])
     # room above the lines for the groups' names
     ax_tenths.set_ylim(0, 1.45 * ax_tenths.get_ylim()[1])
-    ax_tenths.set_xlabel("Places' rate rank (%)")
-    ax_tenths.set_ylabel("% of places")
+    ax_tenths.set_xlabel("Rate rank of the place (%)")
+    ax_tenths.set_ylabel("% of event\nplaces")
     ax_tenths.set_title("Low-rate places", fontsize=SMALL_SIZE, pad=3)
     for ax, column in zip(ax_measures, LOW_RATE_FIGURE_MEASURES, strict=True):
         split = statistics.measures[column]
