@@ -438,3 +438,169 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
         "n_groups": 8,
         "trial_bin_share": pytest.approx(0.9),
     }
+
+
+def _extra_rows() -> pd.DataFrame:
+    """:func:`test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes`'
+    rows with the extra columns: window 0 has donor window 1, window 1 (a
+    control) none."""
+    rows = pd.DataFrame(
+        {
+            "epoch_id": "e1",
+            "animal": "a",
+            "window_id": [0, 0, 1, 1],
+            "event_id": [7, 7, 7, 7],
+            "kind": ["event", "event", "control", "control"],
+            "group": "no SWR",
+            "gain": [3.0, 1.0, 0.5, -0.5],
+            "gain_silent": [-1.0, 0.0, 0.0, 0.0],
+            "agreement": [1.0, 1.0, 0.0, 0.0],
+            "agreement_silent": [0.0, 0.0, 0.0, 0.0],
+            "n_spikes": [3, 1, 0, 0],
+            "spread_cm": [40.0, 60.0, 5.0, 7.0],
+            "nonlocal_prob": [0.9, 1.0, 0.0, 0.0],
+            "gain_rate": [2.0, 0.0, 0.5, -0.5],
+            "agreement_rate": [0.5, -0.5, 0.0, 0.0],
+            "hpd_cm": [30.0, 50.0, 4.0, 6.0],
+            "agreement_null": [-1.0, -2.0, np.nan, np.nan],
+            "agreement_null_silent": [0.0, -0.5, np.nan, np.nan],
+            "agreement_null_rate": [-1.0, -1.0, np.nan, np.nan],
+            "n_null_bins": [10, 10, 0, 0],
+            "n_null_spikes": [2, 1, 0, 0],
+            "spread_null_cm": [80.0, 100.0, np.nan, np.nan],
+            "hpd_null_cm": [90.0, 110.0, np.nan, np.nan],
+            "null_window_id": [1, 1, -1, -1],
+        }
+    )
+    assert set(th.EXTRA_COLUMNS) <= set(rows.columns)
+    return rows
+
+
+def test_window_scores_carry_the_extra_columns_when_the_table_has_them():
+    windows = th.window_scores(_extra_rows()).set_index("window_id")
+    event = windows.loc[0]
+    # rate part 2 of the gain 4, mark part 2, over 4 spikes
+    assert event["gain_rate_per_spike"] == pytest.approx(0.5)
+    assert event["gain_mark_per_spike"] == pytest.approx(0.5)
+    assert event["agreement_rate_per_spike"] == pytest.approx(0.0)
+    assert event["agreement_mark_per_spike"] == pytest.approx(0.5)
+    assert event["agreement_null"] == -3.0 and event["n_null_spikes"] == 3
+    assert event["agreement_null_per_spike"] == pytest.approx(-1.0)
+    assert event["hpd_cm"] == pytest.approx(40.0)
+    assert event["hpd_null_cm"] == pytest.approx(100.0)
+    assert event["null_window_id"] == 1
+    # no donor: the reference is NaN, not 0
+    assert np.isnan(windows.loc[1, "agreement_null"])
+    assert np.isnan(windows.loc[1, "agreement_null_per_spike"])
+    # a canonical table gives the canonical columns, the same values
+    canonical = _extra_rows().drop(columns=list(th.EXTRA_COLUMNS))
+    plain = th.window_scores(canonical)
+    pd.testing.assert_frame_equal(
+        plain, th.window_scores(_extra_rows())[list(plain.columns)]
+    )
+    assert "hpd_cm" not in plain.columns
+    with pytest.raises(ValueError, match="--extra-scores"):
+        th.require_extra_columns(canonical, "the HPD bins")
+    th.require_extra_columns(_extra_rows(), "the HPD bins")
+
+
+def test_the_mark_part_is_the_marks_score_given_the_count():
+    """``log sum exp(l) w - log sum exp(r) w = log sum exp(m) w'``, ``w'``
+    proportional to ``exp(r) w``: the mark part is the predictive score of the
+    marks under the weights updated by the count."""
+    rng = np.random.default_rng(0)
+    ground = rng.uniform(0.001, 0.2, (6, 5))
+    counts = np.array([0, 1, 2, 0, 3, 1])
+    marks = rng.normal(0, 2, (6, 5)) * (counts[:, None] > 0)
+    rate = th.rate_terms(ground, counts)
+    np.testing.assert_allclose(rate, counts[:, None] * np.log(ground) - ground)
+    total = rate + marks
+    weights = rng.dirichlet(np.ones(5), size=6)
+    mark_part = th.predictive_log_score(total, weights) - th.predictive_log_score(
+        rate, weights
+    )
+    updated = np.exp(rate) * weights
+    updated /= updated.sum(axis=1, keepdims=True)
+    np.testing.assert_allclose(mark_part, th.predictive_log_score(marks, updated))
+    # silent bins: the rate term is the bin term, the mark part exactly 0
+    silent = counts == 0
+    np.testing.assert_array_equal(rate[silent], -ground[silent])
+    assert (mark_part[silent] == 0).all()
+
+
+def _environment(interior):
+    from types import SimpleNamespace
+
+    interior = np.asarray(interior, dtype=bool)
+    return SimpleNamespace(
+        is_track_interior_=interior,
+        place_bin_centers_=2.0 * np.arange(interior.size)[:, None],
+    )
+
+
+def test_hpd_lengths_by_hand():
+    """Four real bins of 2 cm and a junction placeholder: the 95 % set of
+    (0.6, 0.3, 0.06, 0.04) is its three largest bins, 6 cm; a point mass is one
+    bin; a uniform distribution all four (8 cm); a row with a NaN is NaN."""
+    environment = _environment([True, True, False, True, True])
+    distribution = np.array(
+        [
+            [0.04, 0.6, 0.3, 0.06],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.25, 0.25, 0.25, 0.25],
+            [np.nan] * 4,
+        ]
+    )
+    widths = th.hpd_lengths(distribution, environment, chunk_rows=2)
+    np.testing.assert_allclose(widths[:3], [6.0, 2.0, 8.0])
+    assert np.isnan(widths[3])
+
+
+def _donor_windows() -> tuple[pd.DataFrame, np.ndarray]:
+    """Windows over 100 bins in two folds (bins 0-49 fold 0, 50-99 fold 1):
+    three no-SWR events in fold 0, one in fold 1, two SWR events in fold 1, an
+    event across the folds, and a control in fold 0."""
+    folds = np.repeat([0, 1], 50)
+    windows = pd.DataFrame(
+        {
+            "window_id": np.arange(8),
+            "kind": ["event"] * 7 + ["control"],
+            "group": ["no SWR"] * 3 + ["no SWR", "SWR", "SWR", "no SWR", "no SWR"],
+            "s": [0, 10, 20, 60, 70, 80, 45, 30],
+            "e": [4, 17, 22, 64, 72, 89, 54, 34],
+        }
+    )
+    return windows, folds
+
+
+def test_donors_stay_in_group_and_fold_and_are_never_the_window_itself():
+    windows, folds = _donor_windows()
+    donors = th.null_donors(windows, folds, seed=3)
+    # the three no-SWR events of fold 0 give to each other, a cycle
+    assert sorted(donors[:3]) == [0, 1, 2] and all(donors[:3] != [0, 1, 2])
+    # the two SWR events of fold 1 swap
+    assert list(donors[4:6]) == [5, 4]
+    # alone in its group and fold, across the folds, a control: no donor
+    assert donors[3] == -1 and donors[6] == -1 and donors[7] == -1
+    for w, d in enumerate(donors):
+        if d >= 0:
+            assert d != w
+            assert windows["group"][d] == windows["group"][w]
+            assert folds[windows["s"][d]] == folds[windows["s"][w]]
+    # the same seed, the same donors; another seed may differ
+    np.testing.assert_array_equal(donors, th.null_donors(windows, folds, seed=3))
+    seeds = {tuple(th.null_donors(windows, folds, seed=s)[:3]) for s in range(20)}
+    assert len(seeds) == 2  # the two cycles of three
+
+
+def test_null_pairs_match_bins_by_offset_and_wrap():
+    windows, folds = _donor_windows()
+    donors = np.full(len(windows), -1)
+    donors[1] = 2  # window 1 (8 bins) takes window 2 (3 bins)
+    rows = th.window_rows(windows["s"].to_numpy(), windows["e"].to_numpy())
+    receiver, donor, owner = th.null_pairs(windows, donors, rows)
+    np.testing.assert_array_equal(rows[receiver], np.arange(10, 18))
+    np.testing.assert_array_equal(rows[donor], [20, 21, 22, 20, 21, 22, 20, 21])
+    assert (owner == 1).all()
+    empty = th.null_pairs(windows, np.full(len(windows), -1), rows)
+    assert all(part.size == 0 for part in empty)

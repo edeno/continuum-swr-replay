@@ -53,6 +53,18 @@ record written so far, and the last host to finish gathers them all. A re-run
 (another host, more memory per worker) runs only the epochs without an ``ok``
 record of the same settings and inputs.
 
+With ``--extra-scores`` (``tetrode_holdout.holdout_scores`` with ``extras``),
+each row also has ``tetrode_holdout.EXTRA_COLUMNS``: the 95 % HPD length of the
+other tetrodes' distribution (``hpd_cm``), the rate parts of the gain and the
+agreement (``gain_rate``, ``agreement_rate``), and the shuffled-window
+reference of the agreement (``agreement_null``, ``agreement_null_silent``,
+``agreement_null_rate``, ``n_null_bins``, ``n_null_spikes``,
+``spread_null_cm``, ``hpd_null_cm``, ``null_window_id``), its donors drawn
+with ``--null-seed``. The header's settings record ``extra_scores`` (the HPD
+coverage, the seed and the donor rule), so such a run neither resumes nor
+gathers with the canonical one. It must be given an ``--output-dir`` other
+than the canonical folder.
+
 Usage::
 
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
@@ -60,6 +72,9 @@ Usage::
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
         --gpus 1 4 5 --workers-per-gpu 2 --shards 0 1 --n-shards 5
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --gather
+    uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
+        --extra-scores --output-dir Processed-Data/event_tetrode_holdout_extra \\
+        --epochs wilbur20210329_02_r1_HPC --gpus 1
 """
 
 from __future__ import annotations
@@ -123,8 +138,13 @@ def run_epoch(
     event_table: Path,
     data_dir: Path,
     output: Path,
+    extras: dict | None = None,
 ) -> dict:
-    """Score one epoch and write its table; return its status record."""
+    """Score one epoch and write its table; return its status record.
+
+    ``extras`` (the header's ``extra_scores``) asks for
+    ``tetrode_holdout.EXTRA_COLUMNS``, the reference's donors drawn with its
+    ``null_seed``."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
     epoch = epoch_inputs(epoch_id, data_dir, trials=True)
@@ -159,6 +179,9 @@ def run_epoch(
         folds=folds,
         margin_bins=margin_bins,
         log=log,
+        **(
+            {} if extras is None else {"extras": True, "null_seed": extras["null_seed"]}
+        ),
     )
     columns = windows.set_index("window_id")[["event_id", "kind", "group"]]
     table = scores.join(columns, on="window_id").assign(
@@ -184,16 +207,45 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
+    parser.add_argument(
+        "--extra-scores",
+        action="store_true",
+        help="add the HPD length, the rate parts and the shuffled-window "
+        "reference (tetrode_holdout.EXTRA_COLUMNS); needs --output-dir",
+    )
+    parser.add_argument(
+        "--null-seed",
+        type=int,
+        default=0,
+        help="with --extra-scores, the seed of the reference's donors",
+    )
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
-    output = args.output_dir or data_dir / EVENT_TETRODE_HOLDOUT_DIR
+    canonical = data_dir / EVENT_TETRODE_HOLDOUT_DIR
+    output = args.output_dir or canonical
+    extras = None
+    if args.extra_scores:
+        if args.output_dir is None or output.resolve() == canonical.resolve():
+            parser.error(
+                "--extra-scores writes a new run: give an --output-dir other than "
+                f"the canonical {canonical}"
+            )
+        extras = {
+            "hpd_coverage": th.HPD_COVERAGE,
+            "null_seed": args.null_seed,
+            "null_donor_rule": th.NULL_DONOR_RULE,
+        }
     event_table = event_table_path(data_dir)
     participation_dir = data_dir / EVENT_PARTICIPATION_DIR
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"n_folds": N_FOLDS, **th.fold_settings()},
+        "settings": {
+            "n_folds": N_FOLDS,
+            **th.fold_settings(),
+            **({} if extras is None else {"extra_scores": extras}),
+        },
         "inputs": {
             "event_table": file_input(event_table),
             "event_participation": participation_input(data_dir),
@@ -207,7 +259,9 @@ def main(argv: list[str] | None = None) -> None:
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
-        task_args=(event_table, data_dir, output),
+        task_args=(event_table, data_dir, output)
+        if extras is None
+        else (event_table, data_dir, output, extras),
         output=output,
         name=TETRODE_HOLDOUT_NAME,
         header=header,
