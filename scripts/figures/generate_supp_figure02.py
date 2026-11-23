@@ -1096,12 +1096,12 @@ def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
 
 
 def name_equal_fit(ax: Axes) -> None:
-    """:data:`EQUAL_FIT` just above the dashed zero line at the axis' left,
+    """:data:`EQUAL_FIT` just under the dashed zero line at the axis' left,
     in the reference gray."""
     ax.annotate(
         EQUAL_FIT, (0.02, 0.0),
         xycoords=blended_transform_factory(ax.transAxes, ax.transData),
-        xytext=(0, 1), textcoords="offset points", ha="left", va="bottom",
+        xytext=(0, -2), textcoords="offset points", ha="left", va="top",
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
 

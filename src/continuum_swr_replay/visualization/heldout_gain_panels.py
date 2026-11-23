@@ -115,8 +115,8 @@ def draw_animal_gain(
 
 SPLIT_LABELS = {
     "gain_per_spike": "All bins",
-    "spiking_gain_per_spike": "Bins with\na spike",
-    "silent_gain_per_spike": "Silent\nbins",
+    "spiking_gain_per_spike": "With a spike",
+    "silent_gain_per_spike": "Silent",
 }
 """The held-out tetrode gain and its two parts, by ``tetrode_holdout.window_scores``
 column: over every bin, over the bins where the scored tetrode spiked, and over

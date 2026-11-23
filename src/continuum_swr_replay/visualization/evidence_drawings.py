@@ -38,11 +38,11 @@ OTHER_PLACE_COLOR = "#777777"
 """The place decoded in another event: a neutral gray."""
 
 LEFT_OUT_TEXTS = {
-    "decoded": "Decoded place (other\ntetrodes, this event)",
-    "spikes": "Left-out tetrode's\nspikes",
+    "decoded": "Decoded place\n(other tetrodes)",
+    "spikes": "Left-out\ntetrode's spikes",
     "must": "It must fit better than:",
-    "animal": "1  the animal's place",
-    "other": "2  the place decoded\n    in another event",
+    "animal": "1  animal's place",
+    "other": "2  another event's\n    decoded place",
 }
 """The texts of :func:`draw_left_out_test`, by what they name."""
 

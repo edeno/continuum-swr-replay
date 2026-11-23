@@ -1149,9 +1149,9 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
-LEFT_OUT_WIDTHS = (1.65, 1.0)
+LEFT_OUT_WIDTHS = (1.45, 1.0)
 """Panel i's drawing and axis, in proportion within its cell."""
-LEFT_OUT_WSPACE = 0.6
+LEFT_OUT_WSPACE = 0.75
 
 
 def restriction_refusal(cause: str, rerun: str) -> str:
@@ -1181,13 +1181,16 @@ BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghij", strict=True))
 BOTTOM_WIDTHS = {
     "traces": 1.0,
     "ripple_power": 1.0,
-    "left_out": 1.6,
-    "decoder_comparison": 1.0,
+    "left_out": 1.45,
+    "decoder_comparison": 1.2,
 }
 """Each bottom panel's cell width, in proportion within its row; the decoder
 comparison's drawing and two axes are then placed in its space by
 :func:`fit_axes_in_row`."""
-BOTTOM_WSPACE = 0.55
+BOTTOM_WSPACE = {"traces": 0.36, "left_out": 0.55}
+"""The gap between the panels of each bottom row, by the row's first panel, as
+a share of the mean panel width: the first row's two panels have short y
+labels and need less."""
 DECODER_AXES_WIDTHS = (0.8, 0.8, 0.85)
 """The decoder comparison's frame widths, in proportion: its drawing, the full
 minus the SWR-only decoder by time (inside and outside SWRs), and that
@@ -1228,22 +1231,22 @@ HEADING_OFFSET_PT = 10
 axes' titles."""
 FIT_YLABEL = "Better fit to the\ndecoded place\n(nats/spike)"
 FIT_GROUPS = {
-    "animal": "1  the\nanimal's\nplace",
-    "other": "2  another\nevent's\nplace",
+    "animal": "1  animal's\nplace",
+    "other": "2  another\nevent's place",
 }
 """Panel i's x groups: what the decoded place's fit is compared with."""
 FIT_X = {
     ("animal", "no SWR"): 0.0,
     ("animal", "SWR"): 0.7,
-    ("other", "no SWR"): 1.9,
-    ("other", "SWR"): 2.6,
+    ("other", "no SWR"): 2.2,
+    ("other", "SWR"): 2.9,
 }
 """Panel i: each comparison and group's x position."""
 EQUAL_FIT = "equal fit"
 """Panels i and j's name of their zero line."""
 DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
 DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
-"""Panel j's first axis, "By time"."""
+"""Panel j's first axis, "All still time"."""
 DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime"}
 """Panel j's second axis, "Outside SWRs"."""
 
@@ -1321,7 +1324,7 @@ def draw_decoder_need(
     (``evidence_drawings.draw_restriction_test``). Then two axes of how much
     better the decoder with the non-local states at any time predicts the
     spikes than the one with them only in SWRs (the full minus the SWR-only
-    decoder per spike, held-out score): "By time", over the immobile bins
+    decoder per spike, held-out score): "All still time", over the immobile bins
     inside SWRs and outside SWRs inside a well visit
     (``restriction_totals.inside_swr_gain_statistics``,
     ``outside_swr_gain_statistics``); "Outside SWRs", over the bins outside
@@ -1346,7 +1349,7 @@ def draw_decoder_need(
                     (family, RESTRICTION_FIGURE_OUTSIDE_SWR)
                 ],
             },
-            "By time",
+            "All still time",
         ),
         (
             ax_outside,
@@ -1371,8 +1374,17 @@ def draw_decoder_need(
     ax_time.set_ylabel(DECODER_YLABEL)
 
 
+TRACES_WSPACE = 0.32
+"""Panel g: the gap between its two columns of strips, as a share of a strip's
+width."""
+TRACES_CENTER = 1 + TRACES_WSPACE / 2
+"""The middle of panel g, in the left column's axes coordinates: where the
+legend and the x label are centered."""
+
+
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
-    """Panel g: ripple power, MUA, theta and head speed around event starts.
+    """Panel g: ripple power, MUA, theta and head speed around event starts, in
+    two rows of two strips (ripple and MUA above theta and speed).
 
     Every row is animal-balanced: the line is the mean over animals of each
     animal's median over its events, the band the mean over animals of each
@@ -1425,33 +1437,38 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     ):
         ax.axvline(0, color="k", lw=0.5, ls=":")
         ax.set_xlim(t_ms[0], t_ms[-1])
+        # on white, so that the event-start line does not run through the name
         ax.text(
             0.03, 1.0, label, transform=ax.transAxes, ha="left", va="top",
-            fontsize=SMALL_SIZE,
+            fontsize=SMALL_SIZE, zorder=5,
+            bbox={"fc": "white", "ec": "none", "pad": 0.4},
         )  # fmt: skip
-    for ax in axes[:-1]:
+    for ax in (ax_rip, ax_mua):
         ax.tick_params(labelbottom=False)
+    ax_speed.set_xticks([-100, 0, 100])
     # two centered rows, each narrower than the axes, so the legend stays clear
     # of the row's panel letters: the dashed line just above the axes, the two
     # event classes above it
     style = {
         "frameon": False, "loc": "lower center", "handlelength": 0.8,
-        "handletextpad": 0.4, "columnspacing": 0.8, "borderaxespad": 0.1,
+        "handletextpad": 0.4, "columnspacing": 0.8, "borderaxespad": 0.5,
         "borderpad": 0.0,
     }  # fmt: skip
     reference = ax_rip.legend(
         [plt.Line2D([], [], color=C_REFERENCE, ls="--", lw=0.6)],
-        ["between events"], bbox_to_anchor=(0.5, 1.0), **style,
+        ["between events"], bbox_to_anchor=(TRACES_CENTER, 1.0), **style,
     )  # fmt: skip
     row = 1.3 * reference.get_texts()[0].get_fontsize() / 72  # one row, inches
     axes_height = ax_rip.get_position().height * ax_rip.figure.get_figheight()
     handles, labels = ax_rip.get_legend_handles_labels()
     ax_rip.legend(
-        handles, labels, ncol=2, bbox_to_anchor=(0.5, 1.0 + row / axes_height),
+        handles, labels, ncol=2,
+        bbox_to_anchor=(TRACES_CENTER, 1.0 + row / axes_height),
         **style,
     )  # fmt: skip
     ax_rip.add_artist(reference)
-    ax_speed.set_xlabel("Time from event start (ms)")
+    # one label under the two columns, centered between them
+    ax_theta.set_xlabel("Time from event start (ms)", x=TRACES_CENTER)
 
 
 def draw_detector_bars(
@@ -1786,14 +1803,17 @@ def generate_figure(
             1,
             len(row),
             width_ratios=[BOTTOM_WIDTHS[p] for p in row],
-            wspace=BOTTOM_WSPACE,
+            wspace=BOTTOM_WSPACE[row[0]],
         )
         cells.update(zip(row, grid, strict=True))
-    triggered = cells["traces"].subgridspec(4, 1, hspace=0.2)
-    ax_ripple = fig.add_subplot(triggered[0])
+    triggered = cells["traces"].subgridspec(2, 2, hspace=0.3, wspace=TRACES_WSPACE)
+    ax_ripple = fig.add_subplot(triggered[0, 0])
     triggered_axes = [
         ax_ripple,
-        *(fig.add_subplot(triggered[r], sharex=ax_ripple) for r in (1, 2, 3)),
+        *(
+            fig.add_subplot(triggered[r, c], sharex=ax_ripple)
+            for r, c in ((0, 1), (1, 0), (1, 1))
+        ),
     ]
     draw_triggered(triggered_axes, inputs["triggered_curves"], reference)
     left_out_grid = cells["left_out"].subgridspec(
