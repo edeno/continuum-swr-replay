@@ -1269,7 +1269,7 @@ def draw_shared_content(
     animals' mean with its 95 % interval in black farther out, a thin line
     through the group's means; at the same place the reference's mean in an
     open marker of the group's color joined by a dotted line, named once
-    (:data:`SHARED_REFERENCE_NAME`); the groups named at the top right, a
+    (:data:`SHARED_REFERENCE_NAME`); the groups named at the bottom right, a
     dashed line at zero and, above it at the right, which way means shared
     content. Above, a thin strip sharing the x axis: each group's percent of
     its events in each bin, the mean over animals of each animal's share
@@ -1315,6 +1315,9 @@ def draw_shared_content(
             color="black", lw=0.5,
         )  # fmt: skip
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
+    # room below the lowest reference for its name and the groups' names
+    low, high = ax.get_ylim()
+    ax.set_ylim(low - 0.3 * (high - low), high)
     # above the zero line at the right, over the widest bin, whose values are
     # all below zero
     ax.annotate(
@@ -1325,14 +1328,14 @@ def draw_shared_content(
     )  # fmt: skip
     for k, (group, color) in enumerate(GROUP_COLORS.items()):
         ax.text(
-            0.99, 0.97 - 0.14 * k, SHARED_GROUP_NAMES[group], ha="right", va="top",
+            0.99, 0.17 - 0.14 * k, SHARED_GROUP_NAMES[group], ha="right", va="bottom",
             transform=ax.transAxes, fontsize=SMALL_SIZE,
             color=readable_text_color(color),
         )  # fmt: skip
     ax.legend(
         [plt.Line2D([], [], ls=":", lw=0.5, marker="o", ms=2.5, mfc="white", mew=0.6,
                 color=C_REFERENCE)],
-        [SHARED_REFERENCE_NAME], loc="upper center", frameon=False,
+        [SHARED_REFERENCE_NAME], loc="lower center", frameon=False,
         fontsize=SMALL_SIZE, handlelength=1.5, handletextpad=0.3, borderaxespad=0.2,
     )  # fmt: skip
     ax_share.sharex(ax)
