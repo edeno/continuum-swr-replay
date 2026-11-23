@@ -106,6 +106,17 @@ after a change to fitting code only, start at step 6.
    same command again with `--workers-per-gpu 1`. Each runner reruns only the epochs whose record is not `ok`.
    Steps 3 and 6 read another per-bin facts run with `--bin-facts-dir` (and another restriction run with
    `--restriction-dir`); with `--output-dir`, a trial of the CPU steps writes nothing under the data root.
+
+   The fourth restriction decoder (SWR-allowed: every state inside SWRs, only the local states outside
+   them), compared with the other three in the events summary and in panel m of Figure 2's supplement,
+   is scored after step 6 in three runs of its own: all four decoders scored again under step 1's stored
+   fold fits (no EM), then steps 3 and 6 on that run, each into its own folder:
+
+   ```bash
+   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit Processed-Data/event_nonlocal_restriction --gpus 1 2 4 5
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/detect_heldout_events.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_windows
+   ```
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
    `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.

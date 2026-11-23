@@ -213,6 +213,22 @@ held-out state probabilities, the restriction scores summed over each, which
 events of it and of the canonical table share a bin, and each epoch's time sums
 with those events' windows, under the processed-data root
 (``scripts/event_evidence/detect_heldout_events.py``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR = (
+    "event_nonlocal_restriction_swr_allowed_heldout_events"
+)
+"""The held-out events and time sums of
+``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``, made from the restriction run
+with the fourth model (``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), so they
+carry its columns, under the processed-data root
+(``scripts/event_evidence/detect_heldout_events.py --restriction-dir``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_WINDOWS_DIR = (
+    "event_nonlocal_restriction_swr_allowed_windows"
+)
+"""The window sums of ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``, made from the
+restriction run with the fourth model
+(``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), under the processed-data root
+(``scripts/event_evidence/sum_nonlocal_restriction_windows.py
+--restriction-dir``)."""
 EVENT_BIN_FACTS_DIR = "event_bin_facts"
 """Each analyzed epoch's per-decode-bin facts, under the processed-data root: the
 spikes of every tetrode in the bin and whether it is inside a well visit
