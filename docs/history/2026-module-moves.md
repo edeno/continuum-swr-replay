@@ -825,3 +825,19 @@ non-local probability, so that every count is a sum over one table.
 | `draw_share_by_power` in `scripts/figures/generate_figure02.py` | `visualization.signal_share_panels.draw_share_by_signal`, which Figure 2's supplement draws MUA with |
 | `reported.events.EventsInputs.nonlocal_by_ripple_power` | `EventsInputs.nonlocal_by_signal` |
 | `scripts/exploratory/_trunk_zscore_timebin.py` (marked temporary) | removed |
+
+## The declared-penalty check on the simulation engine, 2026-11-23
+
+The declared-penalty check became a scenario list of the simulation engine
+(`analysis/regression/simulation.py`), run by `scripts/checks/run_simulations.py`. Its
+own drawing, fitting and reduction code was removed. In `scripts/checks/simulate_declared_penalty.py`:
+
+| Old place | New place |
+|---|---|
+| `Session` (removed: replaced) | `cohort` returns each session's rows by key |
+| `simulate` (removed: replaced) | `expected_counts` (the scenario's expected outcome); `regression.simulation.draw_data_set` draws |
+| `fit_contrasts`, `summarize_data_set`, `run_data_set`, `run` (removed: replaced) | `regression.simulation.run` |
+| `data_seed`, `bootstrap_seeds` (removed: replaced) | `regression.simulation.data_seed`, `regression.simulation.bootstrap_seeds` |
+| `summarize` (removed: replaced) | `table`, from the engine's tables |
+| `report` (removed: replaced) | the runner prints the table and its warnings (`run_simulations.warnings`) |
+| `OUTPUT_NAME` (removed: replaced) | the runner writes `<model>.parquet` |

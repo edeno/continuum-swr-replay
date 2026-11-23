@@ -548,7 +548,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
@@ -579,6 +579,12 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 The per-session fitting loop: one design, every session fitted alone.
 
 `fit_sessions`
+
+### `src/continuum_swr_replay/analysis/regression/simulation.py`
+
+The simulation engine: a planted truth drawn on a model's own rows, fitted by the real code.
+
+`Model`, `InsideScenario`, `OutsideScenario`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `draw_data_set`, `run`, `summarize`
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
@@ -928,11 +934,17 @@ Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
 
+### `scripts/checks/run_simulations.py`
+
+Run a model's scenario list through the simulation engine.
+
+`output_dir`, `run`, `warnings`, `main`
+
 ### `scripts/checks/simulate_declared_penalty.py`
 
 The declared-penalty rule for a per-session smooth, in simulation.
 
-`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `data_seed`, `bootstrap_seeds`, `run_data_set`, `calibrate`, `summarize`, `run`, `report`, `main`
+`Config`, `visit_bins`, `durations`, `cells`, `cohort`, `expected_counts`, `planted_contrast`, `scenarios`, `design_at`, `contrast_vector`, `model_at`, `calibrate`, `model_name`, `simulation`, `table`, `main`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 
