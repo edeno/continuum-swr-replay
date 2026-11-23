@@ -149,6 +149,10 @@ RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 NONLOCAL_BY_SIGNAL_DIR = "nonlocal_by_signal"
 """Each epoch's immobile time bins by ripple power, by MUA and by non-local
 probability (``scripts/event_properties/measure_nonlocal_by_signal.py``)."""
+STATE_BY_SIGNAL_DIR = "state_by_signal"
+"""Each epoch's immobile time bins inside the well visits by ripple power and
+by MUA and by decoder state class
+(``scripts/event_properties/measure_state_by_signal.py``)."""
 NONLOCAL_PROBABILITY_DIR = "nonlocal_probability"
 """Each epoch's immobile time bins inside the well visits by non-local
 probability, in 50 equal bins
