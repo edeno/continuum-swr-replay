@@ -31,8 +31,8 @@ carries ``:role=<level>``. The rate models' clocks are
 ``time_until_visit_end_s`` (until the final poke-out); recency is
 ``log_trials_since_last_visit``, a smooth on the other-leaf rows only (the
 current arm is always 1 trial since its last visit and the previous arm 2, so
-on their rows a recency curve is their role level); the last outcome is ``last_outcome_rewarded``
-(0/1).
+on their rows a recency curve is their role level); the last outcome is
+``last_outcome_rewarded`` (0/1).
 
 Models: ``visit_rate_A`` (the visit rate with the smooths of both clocks and
 the last outcome, 0/1); ``role_content`` (content on nine arms by arm role:
