@@ -84,14 +84,6 @@ def _timing() -> pd.DataFrame:
     )  # fmt: skip
 
 
-TIMING_BOTH = {
-    "share_animal_mean": 0.2, "animal_min": 0.19, "animal_max": 0.21,
-    "n_events": 200, "animals": np.array([0.19, 0.2, 0.21]),
-    "animal_names": np.array(list("abc")),
-}  # fmt: skip
-"""``boundary_both_ends_differ_statistics``: the four corner cells together."""
-
-
 def _mua_states() -> pd.DataFrame:
     """``state_distribution`` of MUA: Local time all at -1 z, non-local time
     all at 3 z, for two animals."""
@@ -236,7 +228,6 @@ def _statistics() -> dict:
         "mua_states": _mua_states(),
         "hpd": _hpd(),
         "timing": _timing(),
-        "timing_both": TIMING_BOTH,
         "probability": _probability(),
         "distance": _decoded_distance(),
         "split": {
@@ -435,26 +426,33 @@ def test_the_decoded_place_panel_draws_each_animals_distance_and_their_mean(draw
 
 
 def test_the_timing_panel_draws_a_row_per_case_with_its_drawing(drawn):
-    """Panel f: six rows, largest first, each named beside a drawing of the
-    case; a bar of the mean over animals with a dot per animal and the percent
-    at its end; the four corner cells together in the last row; the note of
-    what "same" means."""
+    """Panel f: nine rows, each named beside a drawing of the case (the five
+    with a bound the same, then the four with both bounds apart); a bar of the
+    mean over animals with a dot per animal and the percent at its end; the
+    two bars of a drawing named over the drawings; the note of what "same"
+    means."""
     ax_cases, ax = figure.panel_axes(drawn, "boundary_timing")
     names = [t.get_text() for t in ax_cases.texts]
-    assert names == [name for name, _, _ in figure.TIMING_CASES]
-    assert names[0] == "Same start and end" and names[-1] == "Both ends differ"
+    # each row's name, then the two bars' names over the drawings
+    assert names == [*(name for name, _, _ in figure.TIMING_CASES), "SWR", "event"]
+    assert names[0] == "Same start and end"
+    assert names[5:9] == [
+        "Longer at both ends",
+        "Starts and ends later",
+        "Shorter at both ends",
+        "Starts and ends earlier",
+    ]
     widths = [bar.get_width() for bar in ax.patches]
-    # together-together 70, ends later 15, starts later 10, starts earlier 5,
-    # ends earlier 5, both ends differ 20 (the corner cells' own statistic)
-    np.testing.assert_allclose(widths, [70, 15, 10, 5, 5, 20])
+    # together-together 70, ends later 15, starts later 10, the other six 5
+    np.testing.assert_allclose(widths, [70, 15, 10, 5, 5, 5, 5, 5, 5])
     texts = [t.get_text() for t in ax.texts]
-    assert texts[:6] == ["70%", "15%", "10%", "5%", "5%", "20%"]
+    assert texts[:9] == ["70%", "15%", "10%", *(["5%"] * 6)]
     assert figure.TIMING_NOTE in texts
     dots = [
         c for c in ax.collections
         if isinstance(c, matplotlib.collections.PathCollection)
     ]  # fmt: skip
-    assert len(dots) == 6
+    assert len(dots) == 9
     np.testing.assert_allclose(sorted(dots[0].get_offsets()[:, 0]), [69, 70, 71])
     assert ax.get_xlabel() == "% of overlapping pairs"
     assert ax_cases.get_title(loc="left") == "Event against its SWR"
@@ -515,9 +513,19 @@ def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
     below = 17 * 2 / (17 * 2 + 33 * 10)
     texts = [t.get_text() for t in ax_spread.texts]
     assert f"{round(100 * below)}% below\n2 z" in texts
-    assert {"Local", "Non-local"} <= set(texts)
     assert ax_share.get_xlabel() == "MUA (z)"
-    assert ax_spread.get_title() == "MUA by state"
+    from matplotlib.offsetbox import AnchoredOffsetbox
+
+    from continuum_swr_replay.visualization import signal_share_panels
+
+    (title,) = [a for a in ax_spread.artists if isinstance(a, AnchoredOffsetbox)]
+    words = title.get_child().get_children()
+    assert [w.get_text() for w in words] == ["Local", "and", "non-local", "time"]
+    for word, (_, state) in zip(words, signal_share_panels.STRIP_TITLE, strict=True):
+        if state is not None:  # a class's name takes its curve's color
+            assert word._text.get_color() == signal_share_panels.readable_text_color(
+                signal_share_panels.STATE_STYLES[state][1]
+            )
 
 
 def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
@@ -794,7 +802,6 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "mua_states",
         "hpd",
         "timing",
-        "timing_both",
         "split",
         "outside",
         "parts",

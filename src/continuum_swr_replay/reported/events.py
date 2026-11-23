@@ -297,7 +297,7 @@ TAGS = {
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
     "boundary_timing": Tags(("2b.4",), ("S2f",)),
-    "boundary_timing_corners": Tags(("2b.4",)),
+    "boundary_timing_both": Tags(("2b.4",)),
     "boundary_timing_pooled": Tags(("2b.4",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
     "mua": Tags(("2d.8",), ("2g",)),
@@ -1047,12 +1047,11 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     pooled over events (no figure draws it); and the share whose start and end
     both differ (the four corner combinations together,
     ``event_statistics.boundary_both_ends_differ_statistics``). The panel draws
-    the five combinations with at least one bound together and the share with
-    both apart, which carry its tag; the four corner combinations one by one
-    are for the text."""
+    the nine combinations, a row each, which carry its tag; the share with both
+    bounds apart is for the text."""
     make = value_factory(boundary_timing_values, source, TAGS["boundary_timing"])
-    make_corner = value_factory(
-        boundary_timing_values, source, TAGS["boundary_timing_corners"]
+    make_both = value_factory(
+        boundary_timing_values, source, TAGS["boundary_timing_both"]
     )
     offsets = event_statistics.boundary_offsets(events)
     table = event_statistics.boundary_timing_statistics(offsets, events)
@@ -1071,9 +1070,8 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             f"SWR-overlapping events that start {words[start]} the matched SWR's "
             f"start and end {words[end]} its end"
         )
-        corner = "together" not in (start, end)
         values += _animal_range_values(
-            make_corner if corner else make,
+            make,
             f"{key}_share",
             (row["share"], row["animal_min"], row["animal_max"]),
             (
@@ -1097,7 +1095,7 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     )
     key = "timing_both_ends_differ_share"
     values += [
-        make(
+        make_both(
             f"{key}_animal_mean",
             both["share_animal_mean"],
             "fraction",
@@ -1105,14 +1103,14 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             f"share of the {what}, the mean over animals of each animal's share "
             "(the mean over its epochs of the epoch's share)",
         ),
-        make(
+        make_both(
             f"{key}_animal_min",
             both["animal_min"],
             "fraction",
             "pctnum",
             f"lowest animal's share of the {what} (the mean over its epochs)",
         ),
-        make(
+        make_both(
             f"{key}_animal_max",
             both["animal_max"],
             "fraction",

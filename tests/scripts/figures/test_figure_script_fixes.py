@@ -1310,7 +1310,6 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
     assert formatted(value) == "44 %"
     texts = [t.get_text() for t in ax_spread.texts]
     assert "44% below\nthreshold" in texts
-    assert {"Local", "Non-local"} <= set(texts)
     # the top strip: the two classes' means and the threshold; the bottom: the
     # animals, their mean and the threshold
     assert len(ax_spread.lines) == 3
@@ -1320,7 +1319,18 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
     assert nonlocal_.get_xdata()[np.argmax(nonlocal_.get_ydata())] == pytest.approx(
         3.125
     )
-    assert ax_spread.get_title() == "Ripple power by state"
+    from matplotlib.offsetbox import AnchoredOffsetbox
+
+    from continuum_swr_replay.visualization import signal_share_panels
+
+    (title,) = [a for a in ax_spread.artists if isinstance(a, AnchoredOffsetbox)]
+    words = title.get_child().get_children()
+    assert [w.get_text() for w in words] == ["Local", "and", "non-local", "time"]
+    for word, (_, state) in zip(words, signal_share_panels.STRIP_TITLE, strict=True):
+        if state is not None:  # a class's name takes its curve's color
+            assert word._text.get_color() == signal_share_panels.readable_text_color(
+                signal_share_panels.STATE_STYLES[state][1]
+            )
     for ax in (ax_spread, ax_share):
         assert ax.get_xlim() == (-2.0, 10.0)
     plt.close(fig)

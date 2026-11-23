@@ -19,11 +19,12 @@ from __future__ import annotations
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
+from matplotlib.transforms import blended_transform_factory
 
 from continuum_swr_replay.visualization.inventory_examples import (
     ANIMAL_POSITION_COLOR,
 )
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
 
 STRIP_LEFT, STRIP_RIGHT = 6.5, 10.0
@@ -164,6 +165,8 @@ def draw_restriction_test(ax: Axes) -> None:
         )
 
 
+BOUNDARY_KEY = ("SWR", "event")
+"""The names of a case drawing's two bars, written over the drawings."""
 BOUNDARY_SWR = (7.4, 9.2)
 """The drawn SWR's start and end (data units of :func:`draw_boundary_cases`)."""
 BOUNDARY_SHIFT = 0.7
@@ -216,6 +219,17 @@ def draw_boundary_cases(
             )
         )  # fmt: skip
         ax.text(name_x, k, name, fontsize=SMALL_SIZE, ha="left", va="center")
+    # the two bars named in their colors, over the drawings
+    middle = sum(BOUNDARY_SWR) / 2
+    for name, color, side, shift in (
+        (BOUNDARY_KEY[0], COLORS["SWR"], "right", -0.12),
+        (BOUNDARY_KEY[1], COLORS["Non-Local"], "left", 0.12),
+    ):
+        ax.text(
+            middle + shift, 1.0, name, ha=side, va="bottom", fontsize=SMALL_SIZE,
+            color=readable_text_color(color),
+            transform=blended_transform_factory(ax.transData, ax.transAxes),
+        )  # fmt: skip
     ax.set_xlim(0, 10)
     ax.set_ylim(len(cases) - 0.5, -0.5)
     ax.axis("off")

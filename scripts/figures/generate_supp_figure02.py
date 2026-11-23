@@ -131,18 +131,16 @@ the order the text cites them, in five rows:
         (earlier, within 25 ms, later) and its end (the same), 25 ms being the
         tolerance of the events summary's ``*_beyond_twenty_five_ms_fraction``
         values (``event_statistics.TIMING_TOLERANCE``; "same" in the panel).
-        Six rows, the largest share first (:data:`TIMING_CASES`): the five
+        Nine rows, the largest share first (:data:`TIMING_CASES`): the five
         combinations with at least one bound the same, then the four with both
-        apart together. Each row: its name and a small drawing of the case (the
+        apart, each with its own drawing. Each row: its name and a small drawing of the case (the
         SWR as a bar in the SWR color, the event under it in the non-local
         color, longer or shorter at the bound that differs;
         ``evidence_drawings.draw_boundary_cases``), a bar of the mean over
         animals of each animal's share of its pairs (the mean over its epochs
         of each epoch's share), a dot per animal, and the percent at the bar's
-        end (``event_statistics.boundary_timing_statistics`` and
-        ``boundary_both_ends_differ_statistics``; the events summary's
-        ``timing_*_share_animal_*`` values of the drawn cases and
-        ``timing_both_ends_differ_share_animal_*``).
+        end (``event_statistics.boundary_timing_statistics``; the events
+        summary's ``timing_start_*_end_*_share_animal_*`` values).
 
     g — Supports Figure 2g and i, on population activity and the events:
         where the non-local time sits in MUA (the z-scored multiunit rate of
@@ -350,7 +348,6 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     HPD_BIN_EDGES_CM,
     HPD_TIGHT_CM,
-    boundary_both_ends_differ_statistics,
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
@@ -454,12 +451,15 @@ TIMING_CASES = (
     ("Starts later", "later", "together"),
     ("Starts earlier", "earlier", "together"),
     ("Ends earlier", "together", "earlier"),
-    ("Both ends differ", "later", "later"),
+    ("Longer at both ends", "earlier", "later"),
+    ("Starts and ends later", "later", "later"),
+    ("Shorter at both ends", "later", "earlier"),
+    ("Starts and ends earlier", "earlier", "earlier"),
 )
 """Panel f's rows, top to bottom (the largest share first): each case's name
-and the start and end class its drawing shows (``event_statistics.TIMING_CLASSES``).
-The last row is the four corner combinations together, drawn as one offset
-pair; its share is ``boundary_both_ends_differ_statistics``'."""
+and the start and end class its drawing shows
+(``event_statistics.TIMING_CLASSES``): the five cases with a bound together,
+then the four in which both bounds differ, each with its own drawing."""
 TIMING_NOTE = "same: within 25 ms"
 """Panel f's note of what "same" means (the tolerance of
 ``event_statistics.TIMING_TOLERANCE``)."""
@@ -706,9 +706,6 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "mua_states": read_mua_states(inputs.state_by_signal),
         "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
-        "timing_both": boundary_both_ends_differ_statistics(
-            boundary_offsets(events), events
-        ),
         "split": {
             column: holdout_statistics(canonical, "event", column)
             for column in SPLIT_LABELS
@@ -977,19 +974,16 @@ def read_frame_traces(
     return {"no_spike": no_spike, "event_traces": traces}
 
 
-def draw_boundary_timing(
-    ax_cases: Axes, ax: Axes, timing: pd.DataFrame, both: dict
-) -> None:
+def draw_boundary_timing(ax_cases: Axes, ax: Axes, timing: pd.DataFrame) -> None:
     """Panel f: each SWR-overlapping event against its matched SWR, one row per
     case of :data:`TIMING_CASES` (the largest share first). At the left the
     case's name and a small drawing of it
     (``evidence_drawings.draw_boundary_cases``); at the right a bar of the mean
     over animals of each animal's share with a dot per animal, and the percent
     at the bar's end (``timing``: ``boundary_timing_statistics``, a row per
-    start and end class; ``both``: ``boundary_both_ends_differ_statistics``,
-    the last row). A note in gray says what "same" means."""
+    start and end class). A note in gray says what "same" means."""
     draw_boundary_cases(ax_cases, list(TIMING_CASES))
-    rows = [timing.loc[(start, end)] for _, start, end in TIMING_CASES[:-1]] + [both]
+    rows = [timing.loc[(start, end)] for _, start, end in TIMING_CASES]
     for k, row in enumerate(rows):
         mean = 100 * row["share_animal_mean"]
         ax.barh(k, mean, height=0.55, color=TIMING_BAR_COLOR, lw=0, zorder=1)
@@ -998,7 +992,8 @@ def draw_boundary_timing(
             animals, np.full(animals.size, k), s=5, color="black", lw=0, zorder=2
         )
         ax.text(
-            max(mean, animals.max()) + 3, k, f"{mean:.0f}%", ha="left",
+            max(mean, animals.max()) + 3, k,
+            f"{format_number(mean / 100, 'pctnum')}%", ha="left",
             va="center", fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax.set_ylim(len(rows) - 0.5, -0.5)
@@ -1090,7 +1085,7 @@ def draw_nonlocal_mua(
         threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
         shade_color=COLORS["All Events"], xlabel="MUA (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
-        f"below\n{MUA_LEVEL_Z:g} z", states=states, title="MUA by state",
+        f"below\n{MUA_LEVEL_Z:g} z", states=states,
     )  # fmt: skip
     ax_share.set_xticks([0, 5, 10])
 
@@ -1515,9 +1510,7 @@ def generate_figure(statistics: dict) -> Figure:
         ]
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_event_traces(axes["event_traces"], statistics["event_traces"])
-    draw_boundary_timing(
-        *axes["boundary_timing"], statistics["timing"], statistics["timing_both"]
-    )
+    draw_boundary_timing(*axes["boundary_timing"], statistics["timing"])
     draw_left_out_split(axes["left_out_split"][0], statistics["split"])
     draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_outside_swr_series(

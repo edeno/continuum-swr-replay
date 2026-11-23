@@ -101,7 +101,10 @@ def test_the_boundary_cases_draw_each_rows_swr_and_event():
     ]
     fig, ax = plt.subplots()
     evidence_drawings.draw_boundary_cases(ax, cases)
-    assert [t.get_text() for t in ax.texts] == [name for name, _, _ in cases]
+    assert [t.get_text() for t in ax.texts] == [
+        *(name for name, _, _ in cases),
+        *evidence_drawings.BOUNDARY_KEY,
+    ]
     swrs = _filled(ax, COLORS["SWR"])
     events = _filled(ax, COLORS["Non-Local"])
     assert len(swrs) == len(events) == 3

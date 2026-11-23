@@ -292,12 +292,10 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_max"
     ].value == pytest.approx(2 / 3)
-    # the panel draws the animals' mean and range of the five combinations with
-    # a bound together and of both apart; the pooled share and the four corner
-    # combinations one by one no figure
+    # the panel draws the animals' mean and range of the nine combinations; the
+    # pooled shares and the share with both bounds apart no figure
     for key, value in values.items():
-        corner = "together" not in key and "both_ends" not in key
-        drawn = not key.endswith("_share") and not corner
+        drawn = not key.endswith("_share") and "both_ends" not in key
         assert value.figures == (("S2f",) if drawn else ()), key
     assert {v.questions for v in values.values()} == {("2b.4",)}
     assert "more than 25 ms later than the matched SWR's start" in (

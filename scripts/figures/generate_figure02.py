@@ -1717,7 +1717,7 @@ def draw_share_by_power(
         threshold_label="SWR\nthreshold", threshold_color=C_SWR, shade_color=C_QUIET,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
-        "below\nthreshold", states=states, title="Ripple power by state",
+        "below\nthreshold", states=states,
     )  # fmt: skip
     ax_share.set_xticks([0, 5, 10])
 
