@@ -1428,8 +1428,10 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         ``agreement_mark_per_spike`` (each pair adds to its score per spike),
         ``mark_information_per_spike`` and ``spike_information_per_spike``
         (over ``n_information_spikes``),
-        and ``agreement_null_per_spike`` (over the spikes of the bins the
-        reference scored, ``n_null_spikes``). A canonical table gives the
+        ``agreement_null_per_spike`` (over the spikes of the bins the
+        reference scored, ``n_null_spikes``) and
+        ``agreement_minus_null_per_spike`` (the agreement per spike minus the
+        reference's, NaN without a donor). A canonical table gives the
         canonical columns only (:func:`require_extra_columns` refuses it where
         they are needed).
     """
@@ -1473,6 +1475,9 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
         )
         null_spikes = windows["n_null_spikes"].where(windows["n_null_spikes"] > 0)
         windows["agreement_null_per_spike"] = windows["agreement_null"] / null_spikes
+        windows["agreement_minus_null_per_spike"] = (
+            windows["agreement_per_spike"] - windows["agreement_null_per_spike"]
+        )
     return windows
 
 

@@ -42,6 +42,7 @@ from continuum_swr_replay.paths import (
     CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
+    EVENT_CONTENT_PLACE_RATE_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -54,6 +55,7 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
@@ -89,6 +91,8 @@ EVENT_BUILDERS = (
     "likelihood_advantage_values",
     "tetrode_holdout_values",
     "shared_content_values",
+    "tetrode_holdout_extra_values",
+    "low_rate_values",
     "content_occupancy_values",
 )
 #: The restriction builders, by the argument holding the canonical windows
@@ -291,6 +295,8 @@ class _Run:
             EVENT_PARTICIPATION_DIR,
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             EVENT_TETRODE_HOLDOUT_DIR,
+            EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+            EVENT_CONTENT_PLACE_RATE_DIR,
             EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
             EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
@@ -313,10 +319,8 @@ class _Run:
                 "epochs": _restriction_records(),
             }
         # the held-out tetrode run is held out in folds of whole trials
-        self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
-            "n_folds": 5,
-            "fold_design": "trials",
-        }
+        for folder in (EVENT_TETRODE_HOLDOUT_DIR, EVENT_TETRODE_HOLDOUT_EXTRA_DIR):
+            self.manifests[folder]["settings"] = {"n_folds": 5, "fold_design": "trials"}
         for folder, (key, value) in (changes or {}).items():
             if value is None:
                 self.manifests[folder].pop(key)
@@ -381,6 +385,8 @@ class _Run:
             event_participation=root / EVENT_PARTICIPATION_DIR,
             likelihood_advantage=root / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             tetrode_holdout=root / EVENT_TETRODE_HOLDOUT_DIR,
+            tetrode_holdout_extra=root / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+            content_place_rate=root / EVENT_CONTENT_PLACE_RATE_DIR,
             nonlocal_restriction=root / EVENT_NONLOCAL_RESTRICTION_DIR,
             nonlocal_restriction_windows=root / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             nonlocal_restriction_heldout_events=root
@@ -511,6 +517,11 @@ class _Run:
             builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
         )
         monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
+        # the planted run's rows have no extra columns; the check is the
+        # held-out tetrode module's own (tested there)
+        monkeypatch.setattr(
+            builder.tetrode_holdout, "require_extra_columns", lambda table, what: None
+        )
 
     def summarize(self) -> dict:
         builder.summarize(self.inputs(), "by")
@@ -536,8 +547,13 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "likelihood_advantage_values",
         "tetrode_holdout_values",
         "shared_content_values",
+        "tetrode_holdout_extra_values",
+        "low_rate_values",
     ):
         assert len(seen[name][0]) == 2 * 13, name
+    # the low-rate values: the selected events and the extra run's windows
+    assert len(seen["low_rate_values"][1]) == 13
+    assert len(seen["low_rate_values"][2]) == 2 * 13
     # the restriction windows too; the time sums and the time steps are whole
     for name, at in RESTRICTION_BUILDERS.items():
         if at is not None:
@@ -648,7 +664,15 @@ RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES | SWR_ALLOWED_VAL
 }
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
 #: The values against the participation run's Local-rest controls
-CONTROL_VALUES = {"participation", "tetrode_holdout", "restriction_window", AFTER_VISIT}
+CONTROL_VALUES = {
+    "participation",
+    "tetrode_holdout",
+    "tetrode_holdout_extra",
+    "restriction_window",
+    AFTER_VISIT,
+}
+#: The values that read the held-out tetrode run with its extra scores
+EXTRA_VALUES = {"shared_content", "tetrode_holdout_extra", "low_rate"}
 
 #: (folder, (manifest key, value or None to drop it)) -> the values made pending
 PENDING_CASES = [
@@ -735,13 +759,20 @@ PENDING_CASES = [
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_table", {"sha256": "old"}),
-        {"tetrode_holdout", "shared_content"},
+        {"tetrode_holdout"},
     ),
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_participation", {"sha256": "old"}),
-        {"tetrode_holdout", "shared_content"},
+        {"tetrode_holdout"},
     ),
+    (EVENT_TETRODE_HOLDOUT_EXTRA_DIR, ("event_table", {"sha256": "old"}), EXTRA_VALUES),
+    (
+        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+        ("event_participation", {"sha256": "old"}),
+        EXTRA_VALUES,
+    ),
+    (EVENT_CONTENT_PLACE_RATE_DIR, ("event_table", {"sha256": "old"}), {"low_rate"}),
     ("state_evidence", ("subset", None), {"heldout_by_swr"}),
     ("state_evidence", ("session_cache", _other_cache()), {"heldout_by_swr"}),
     *(

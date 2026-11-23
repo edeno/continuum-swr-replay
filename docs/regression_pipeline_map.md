@@ -212,7 +212,7 @@ The non-local restriction models summed over event windows.
 
 Shared content: during an event, do the tetrodes point to the same remote place?
 
-`spread_bins`, `agreement_by_spread_statistics`
+`width_bins`, `agreement_by_width_statistics`, `SharedContentStatistics`, `shared_content_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -273,6 +273,12 @@ Summary statistics of the immobile non-local events.
 Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
 `band_power`, `stretch_band_power`, `recorded_mask`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `matched_level`, `epoch_gamma`
+
+### `src/continuum_swr_replay/analysis/event_properties/low_rate_places.py`
+
+The held-out tetrode evidence of events decoded at low-rate places, and the place information of the scored spikes against the events' controls.
+
+`place_groups`, `events_outside_low_rate`, `low_rate_split_statistics`, `event_minus_control`, `LowRateStatistics`, `low_rate_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/nonlocal_by_signal.py`
 

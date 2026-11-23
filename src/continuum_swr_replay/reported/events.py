@@ -183,11 +183,15 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import TRIAL_D
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
+    low_rate_places,
     nonlocal_by_signal,
     rule_sweep,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
+)
+from continuum_swr_replay.analysis.event_properties.content_place_rate import (
+    LOW_RATE_RANK,
 )
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
@@ -209,8 +213,10 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CANONICAL_EVENTS_FOUND_NAME,
     CONTENT_ALONG_ARMS_DIR,
+    CONTENT_PLACE_RATE_NAME,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
+    EVENT_CONTENT_PLACE_RATE_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -223,6 +229,7 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     EXPOSURE_IN_VISITS_DIR,
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
@@ -307,6 +314,8 @@ TAGS = {
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
     "shared_content": Tags(("2c.3",), ("2h",)),
+    "shared_content_text": Tags(("2c.3",)),
+    "low_rate": Tags(("2c.3",), ("S2n",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2j",)),
     "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2m",)),
     "spike": Tags(("2d.9", "2c.3")),
@@ -430,6 +439,8 @@ class EventsInputs:
     event_participation: Path
     likelihood_advantage: Path
     tetrode_holdout: Path
+    tetrode_holdout_extra: Path
+    content_place_rate: Path
     nonlocal_restriction: Path
     nonlocal_restriction_windows: Path
     nonlocal_restriction_heldout_events: Path
@@ -464,6 +475,8 @@ def default_inputs() -> EventsInputs:
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
         likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
         tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
+        tetrode_holdout_extra=processed_data_dir() / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+        content_place_rate=processed_data_dir() / EVENT_CONTENT_PLACE_RATE_DIR,
         nonlocal_restriction=processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR,
         nonlocal_restriction_windows=processed_data_dir()
         / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
@@ -2287,49 +2300,70 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-#: Each spread bin's word in a key (which holds no digit) and its range in words,
-#: in the bins' order (``shared_content.SPREAD_BIN_LABELS``).
-_SPREAD_BINS = dict(
+#: Each width bin's word in a key (which holds no digit) and its range in words,
+#: in the bins' order (``shared_content.WIDTH_BIN_LABELS``).
+_WIDTH_BINS = dict(
     zip(
-        shared_content.SPREAD_BIN_LABELS,
+        shared_content.WIDTH_BIN_LABELS,
         (
             ("below_twenty_five_cm", "under 25 cm"),
             ("twenty_five_to_fifty_cm", "25 to 50 cm"),
             ("fifty_to_hundred_cm", "50 to 100 cm"),
-            ("hundred_cm_or_more", "100 cm or more"),
+            ("hundred_to_two_hundred_cm", "100 to 200 cm"),
+            ("two_hundred_cm_or_more", "200 cm or more"),
         ),
         strict=True,
     )
 )
-_SPREAD_WORDS = (
-    "the event's spread: the mean over its left-out tetrodes of the mean over the "
-    "window's scored bins of the effective width of the other tetrodes' position "
-    "distribution (exp(entropy) place bins times the place-bin size); the bins' "
-    "edges (25, 50 and 100 cm) were fixed before the result was seen, after an "
-    "earlier look in thirds of spread"
+_WIDTH_WORDS = (
+    "the event's width: the mean over its left-out tetrodes of the mean over the "
+    "window's scored bins of the 95 % HPD length of the other tetrodes' position "
+    "distribution"
+)
+_REFERENCE_WORDS = (
+    "the shuffled-event reference: the window's spikes scored under the other "
+    "tetrodes' position distribution of another event window of the same group "
+    "and fold (bins matched by offset from the window's start), minus under no "
+    "place preference, summed over tetrodes and the bins scored and divided by "
+    "their spikes; a window without a donor has none"
+)
+_EXTRA_RUN = (
+    "the held-out tetrode run made again with its extra scores "
+    "(score_tetrode_holdout.py --extra-scores --null-seed 0)"
 )
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2h: during an event, do
-    the tetrodes point to the same remote place? The held-out tetrode agreement
-    per spike of the events of each SWR group, by the spread of the other
-    tetrodes' position distribution in fixed bins
-    (``shared_content.agreement_by_spread_statistics``): its estimate and
-    interval, the share of events above zero with the lowest and highest
-    animal, the share of the group's events in the bin, the epochs and the
-    events. Every value carries the panel's tag."""
+    """Question 2c.3 and Figure 2h: during an event, do the tetrodes point to
+    the same remote place? Over the events of each SWR group by the width of
+    the other tetrodes' position distribution in fixed bins
+    (``shared_content.shared_content_statistics``, on ``windows`` of a run with
+    ``--extra-scores``): the held-out tetrode agreement per spike, its
+    shuffled-event reference and the agreement minus the reference event by
+    event, each with its interval; the share of events whose agreement is above
+    zero; and the share of the group's events in the bin, each animal's then
+    their mean with the lowest and highest animal, and pooled. The panel draws
+    the agreement, the reference and the animals' shares; the difference, the
+    pooled share and the reference's events are for the text."""
     make = value_factory(shared_content_values, source, TAGS["shared_content"])
-    statistics = shared_content.agreement_by_spread_statistics(
+    make_text = value_factory(
+        shared_content_values, source, TAGS["shared_content_text"]
+    )
+    statistics = shared_content.shared_content_statistics(
         windows[windows["kind"] == "event"]
     )
     _, words = _TETRODE_MEASURES["agreement"]
+    reduction = (
+        "mean over animals of each animal's median over epochs of each epoch's median"
+    )
     values = []
-    for label, (bin_word, spread) in _SPREAD_BINS.items():
+    for label, (bin_word, width) in _WIDTH_BINS.items():
         for word, group in _RUN_GROUPS.items():
-            row = statistics.loc[(label, group)]
+            row = statistics.agreement.loc[(label, group)]
+            reference = statistics.reference.loc[(label, group)]
+            difference = statistics.difference.loc[(label, group)]
             key = f"{word}_shared_content_{bin_word}"
-            where = f"{group} events whose spread is {spread} ({_SPREAD_WORDS})"
+            where = f"{group} events whose width is {width} ({_WIDTH_WORDS})"
             values += _per_spike_interval(
                 make,
                 f"{key}_agreement_per_spike",
@@ -2337,8 +2371,23 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                 f"held-out tetrode agreement of the {where}: {words}, summed over "
                 "tetrodes and bins and divided by the event's spikes; above zero "
                 "only when the left-out tetrode's activity is where the other "
-                f"tetrodes point; {_TETRODE_HELD_OUT}; mean over animals of each "
-                "animal's median over epochs of each epoch's median",
+                f"tetrodes point; {_TETRODE_HELD_OUT}; {_EXTRA_RUN}; {reduction}",
+            )
+            values += _per_spike_interval(
+                make,
+                f"{key}_reference_per_spike",
+                reference,
+                f"{_REFERENCE_WORDS}, of the {where}; {_TETRODE_HELD_OUT}; "
+                f"{_EXTRA_RUN}; {reduction}",
+            )
+            values += _interval_and_animals_positive(
+                make_text,
+                f"{key}_agreement_minus_reference_per_spike",
+                difference,
+                f"held-out tetrode agreement minus the shuffled-event reference, "
+                f"event by event, of the {where} that have a donor ({words}; "
+                f"{_REFERENCE_WORDS}); {_TETRODE_HELD_OUT}; {_EXTRA_RUN}; "
+                f"{reduction}",
             )
             values += [
                 make(
@@ -2364,30 +2413,325 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                     "pct",
                     "highest of the animals' values of that share",
                 ),
-                make(
+                make_text(
                     f"{key}_share_of_events",
                     row["share_of_events"],
                     "fraction",
                     "pct",
                     f"share of the {group} events with a held-out score per spike "
-                    f"whose spread is {spread}, pooled over every event",
+                    f"whose width is {width}, pooled over every event",
+                ),
+                make(
+                    f"{key}_share_of_events_animal_mean",
+                    row["share_of_events_animal_mean"],
+                    "fraction",
+                    "pct",
+                    f"share of the {group} events with a held-out score per spike "
+                    f"whose width is {width}: each epoch's share, each animal's mean "
+                    "over its epochs, then the mean over animals",
+                ),
+                make(
+                    f"{key}_share_of_events_animal_min",
+                    row["share_of_events_animal_min"],
+                    "fraction",
+                    "pctnum",
+                    "lowest of the animals' values of that share",
+                ),
+                make(
+                    f"{key}_share_of_events_animal_max",
+                    row["share_of_events_animal_max"],
+                    "fraction",
+                    "pct",
+                    "highest of the animals' values of that share",
                 ),
                 make(
                     f"{key}_epochs",
                     row["n_epochs"],
                     "count",
                     "count",
-                    f"epochs with {group} events whose spread is {spread}",
+                    f"epochs with {group} events whose width is {width}",
                 ),
                 make(
                     f"{key}_events",
                     row["n_scored"],
                     "count",
                     "count",
-                    f"{group} events with a held-out score per spike whose spread "
-                    f"is {spread}",
+                    f"{group} events with a held-out score per spike whose width "
+                    f"is {width}",
+                ),
+                make_text(
+                    f"{key}_reference_events",
+                    reference["n_scored"],
+                    "count",
+                    "count",
+                    "of those, events with a shuffled-event reference (a donor "
+                    "and a spike in the bins it scored)",
                 ),
             ]
+    return values
+
+
+#: Each measure of the held-out tetrode run with its extra scores: its column
+#: of ``tetrode_holdout.window_scores`` and the score in words.
+_EXTRA_MEASURES = {
+    "gain_rate": (
+        "gain_rate_per_spike",
+        "the part of the gain over local coding that the firing-rate term gives "
+        "(the expected spikes and the spike count, not the waveform marks)",
+    ),
+    "gain_mark": (
+        "gain_mark_per_spike",
+        "the part of the gain over local coding that only the waveform marks "
+        "give (the gain minus its firing-rate part)",
+    ),
+    "agreement_rate": (
+        "agreement_rate_per_spike",
+        "the part of the agreement that the firing-rate term gives",
+    ),
+    "agreement_mark": (
+        "agreement_mark_per_spike",
+        "the part of the agreement that only the waveform marks give",
+    ),
+    "agreement_reference": ("agreement_null_per_spike", _REFERENCE_WORDS),
+    "agreement_minus_reference": (
+        "agreement_minus_null_per_spike",
+        "the agreement minus the shuffled-event reference, event by event (an "
+        "event without a donor has no value)",
+    ),
+    "mark_information": (
+        "mark_information_per_spike",
+        "the place information of the scored spikes' marks: for each spike, log "
+        "of the places minus the entropy of the conditional density of its mark "
+        "over place (the rate map divided out), under its fold's encoding, "
+        "summed over the window's spikes and divided by the spikes counted",
+    ),
+    "spike_information": (
+        "spike_information_per_spike",
+        "the place information of the scored spikes: for each spike, log of the "
+        "places minus the entropy of its whole per-spike term over place (rate "
+        "map and mark together), under its fold's encoding, summed over the "
+        "window's spikes and divided by the spikes counted",
+    ),
+}
+
+
+def tetrode_holdout_extra_values(windows: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.3: what the held-out tetrode evidence of the events is made
+    of, from the run with its extra scores (``windows``,
+    ``tetrode_holdout.window_scores``): the gain over local coding and the
+    agreement each split into their firing-rate and mark parts, the agreement's
+    shuffled-event reference and the agreement minus it, and the place
+    information of the scored spikes in the events, in their Local-rest
+    controls and the event minus its control
+    (``low_rate_places.event_minus_control``), by group, with the statistic of
+    the neighboring held-out tetrode values. No figure draws these."""
+    make = value_factory(
+        tetrode_holdout_extra_values, source, TAGS["tetrode_holdout_text"]
+    )
+    reduction = (
+        "mean over animals of each animal's median over epochs of each epoch's median"
+    )
+    values = []
+    for name in (
+        "gain_rate",
+        "gain_mark",
+        "agreement_rate",
+        "agreement_mark",
+        "agreement_reference",
+        "agreement_minus_reference",
+        "mark_information",
+        "spike_information",
+    ):
+        column, words = _EXTRA_MEASURES[name]
+        kinds = [("event", "events", "")]
+        if name.endswith("information"):
+            kinds.append(("control", "Local-rest controls", "control_"))
+        for kind, label, prefix in kinds:
+            statistics = tetrode_holdout.holdout_statistics(windows, kind, column)
+            for word, group in _RUN_GROUPS.items():
+                description = (
+                    f"held-out tetrode score of {group} {label}: {words}; "
+                    f"{_TETRODE_HELD_OUT}; {_EXTRA_RUN}; {reduction}"
+                )
+                key = f"{word}_heldout_{prefix}{name}_per_spike"
+                row = statistics.loc[group]
+                if name == "agreement_minus_reference":
+                    values += _interval_and_animals_positive(
+                        make, key, row, description
+                    )
+                else:
+                    values += _per_spike_interval(make, key, row, description)
+        if name.endswith("information"):
+            paired = low_rate_places.event_minus_control(windows, column)
+            statistics = tetrode_holdout.holdout_statistics(
+                paired, "event", f"{column}_minus_control"
+            )
+            for word, group in _RUN_GROUPS.items():
+                values += _interval_and_animals_positive(
+                    make,
+                    f"{word}_heldout_{name}_minus_control_per_spike",
+                    statistics.loc[group],
+                    f"{words}, in each {group} event minus in its Local-rest "
+                    f"control (paired on the event); {_TETRODE_HELD_OUT}; "
+                    f"{_EXTRA_RUN}; {reduction}",
+                )
+    return values
+
+
+#: The tenths of the place-rate rank, by their word in a key (which holds no
+#: digit), lowest first.
+_TENTHS = (
+    "first", "second", "third", "fourth", "fifth",
+    "sixth", "seventh", "eighth", "ninth", "tenth",
+)  # fmt: skip
+#: Each place group of ``low_rate_places.PLACES``: its word in a key and in text.
+_PLACES = {
+    "low_rate": ("low_rate", "decoded at a low-rate place"),
+    "other": ("other_place", "decoded elsewhere"),
+}
+_PLACE_RATE_WORDS = (
+    "an event's place-rate rank is the mean rank, among the track's real places "
+    "ordered by the encoding model's summed ground intensity (0 the lowest "
+    "rate), of the places nearest its replay start and end positions; a "
+    f"low-rate event's rank is below {LOW_RATE_RANK:g}"
+)
+
+
+def low_rate_values(
+    place_rate: pd.DataFrame,
+    events: pd.DataFrame,
+    windows: pd.DataFrame,
+    source: str,
+) -> list[Value]:
+    """Question 2c.3: the events decoded at low-rate places
+    (``low_rate_places.low_rate_statistics``). The share of each group's events
+    that are low-rate events, each animal's then their mean, with the lowest
+    and highest animal and the counts; the mean share in each tenth of the
+    rank (drawn on Figure 2's supplement, S2n); the share of events with no SWR
+    without the low-rate events (``event_statistics.overlap_class_statistics``
+    of ``low_rate_places.events_outside_low_rate``); and the held-out tetrode
+    scores of ``low_rate_places.LOW_RATE_MEASURES`` for low-rate and other
+    events of each group (``windows``, a run with ``--extra-scores``), those of
+    ``LOW_RATE_FIGURE_MEASURES`` drawn on S2n."""
+    make_text = value_factory(low_rate_values, source, TAGS["tetrode_holdout_text"])
+    make_figure = value_factory(low_rate_values, source, TAGS["low_rate"])
+    statistics = low_rate_places.low_rate_statistics(windows, place_rate)
+    values = []
+    for word, group in _RUN_GROUPS.items():
+        row = statistics.shares.loc[group]
+        share = f"share of the {group} events that are low-rate events ({_PLACE_RATE_WORDS})"
+        values += [
+            make_text(
+                f"{word}_low_rate_share_animal_mean",
+                row["share_animal_mean"],
+                "fraction",
+                "pct",
+                f"{share}: each epoch's share, each animal's mean over its epochs, "
+                "then the mean over animals",
+            ),
+            make_text(
+                f"{word}_low_rate_share_animal_min",
+                row["share_animal_min"],
+                "fraction",
+                "pctnum",
+                "lowest of the animals' values of that share",
+            ),
+            make_text(
+                f"{word}_low_rate_share_animal_max",
+                row["share_animal_max"],
+                "fraction",
+                "pct",
+                "highest of the animals' values of that share",
+            ),
+            make_text(
+                f"{word}_low_rate_events",
+                row["n_low_rate_events"],
+                "count",
+                "count",
+                f"{group} low-rate events",
+            ),
+            make_text(
+                f"{word}_place_rate_ranked_events",
+                row["n_events"],
+                "count",
+                "count",
+                f"{group} events with a place-rate rank",
+            ),
+        ]
+        for k, tenth in enumerate(_TENTHS):
+            values.append(
+                make_figure(
+                    f"{word}_place_rate_{tenth}_tenth_share",
+                    statistics.tenths.loc[(group, k), "animal_mean"],
+                    "fraction",
+                    "pct",
+                    f"share of the {group} events whose place-rate rank is in the "
+                    f"{tenth} tenth from the lowest ({_PLACE_RATE_WORDS}): each "
+                    "epoch's share, each animal's mean over its epochs, then the "
+                    "mean over animals (chance 10 %)",
+                )
+            )
+    outside = event_statistics.overlap_class_statistics(
+        low_rate_places.events_outside_low_rate(events, place_rate)
+    )
+    values += [
+        make_text(
+            "non_swr_fraction_animal_mean_without_low_rate",
+            outside["non_swr_fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events overlapping no SWR, the mean over "
+            "animals of each animal's share (the mean over its epochs of the "
+            "epoch's share), over the events that are not low-rate events "
+            f"({_PLACE_RATE_WORDS})",
+        ),
+        make_text(
+            "nonlocal_events_without_low_rate",
+            outside["n_events"],
+            "count",
+            "count",
+            "immobile non-local events that are not low-rate events",
+        ),
+    ]
+    reduction = (
+        "mean over animals of each animal's median over epochs of each epoch's median"
+    )
+    names = {column: name for name, (column, _) in _EXTRA_MEASURES.items()}
+    names["gain_per_spike"] = "gain"
+    for column in low_rate_places.LOW_RATE_MEASURES:
+        name = names[column]
+        words = (
+            _TETRODE_MEASURES["gain"][1] if name == "gain" else _EXTRA_MEASURES[name][1]
+        )
+        make = (
+            make_figure
+            if column in low_rate_places.LOW_RATE_FIGURE_MEASURES
+            else make_text
+        )
+        split = statistics.measures[column]
+        for place, (place_word, place_words) in _PLACES.items():
+            for word, group in _RUN_GROUPS.items():
+                row = split.loc[(place, group)]
+                key = f"{word}_{place_word}_heldout_{name}_per_spike"
+                values += _interval_and_animals_positive(
+                    make,
+                    key,
+                    row,
+                    f"held-out tetrode score of the {group} events {place_words} "
+                    f"({_PLACE_RATE_WORDS}): {words}; {_TETRODE_HELD_OUT}; "
+                    f"{_EXTRA_RUN}; {reduction}",
+                )
+                if name == "gain":
+                    values.append(
+                        make_text(
+                            f"{word}_{place_word}_heldout_events_scored",
+                            row["n_scored"],
+                            "count",
+                            "count",
+                            f"{group} events {place_words} with a held-out score "
+                            "per spike",
+                        )
+                    )
     return values
 
 
@@ -5128,6 +5472,25 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),
         selected,
     )
+    # the held-out tetrode run with its extra scores (Figure 2h, the parts of
+    # the evidence and the low-rate events): held out as the canonical run is,
+    # and with the extra columns
+    require_tetrode_holdout_folds(
+        read_output_manifest(inputs.tetrode_holdout_extra),
+        rel(inputs.tetrode_holdout_extra),
+    )
+    extra_table = select_events_in(
+        read_complete_run(inputs.tetrode_holdout_extra, TETRODE_HOLDOUT_NAME, analyzed),
+        selected,
+    )
+    tetrode_holdout.require_extra_columns(
+        extra_table, rel(inputs.tetrode_holdout_extra)
+    )
+    # the place-rate run: every event of the table, read over the selected ones
+    place_rate_table = select_events_in(
+        read_complete_run(inputs.content_place_rate, CONTENT_PLACE_RATE_NAME, analyzed),
+        selected,
+    )
     participation_paths = ok_table_paths(inputs.event_participation, PARTICIPATION_NAME)
     participation_sha256 = files_sha256(participation_paths)
 
@@ -5198,17 +5561,47 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             CONTROL_SUBSET,
         )
     )
-    # the shared content: the events alone, by the spread of the others' estimate
+    extra_windows = tetrode_holdout.window_scores(extra_table)
+    extra_source = (
+        f"{rel(inputs.tetrode_holdout_extra)} "
+        "(scripts/event_evidence/score_tetrode_holdout.py --extra-scores)"
+    )
+    extra_stale = (
+        stale(inputs.tetrode_holdout_extra),
+        participation_staleness(inputs.tetrode_holdout_extra),
+    )
+    # the shared content: the events alone, by the width of the others' estimate
+    summary.add(
+        *over(
+            pend(shared_content_values(extra_windows, extra_source), *extra_stale),
+            EVENTS_SUBSET,
+        )
+    )
+    # the parts of the evidence: the events and their controls
     summary.add(
         *over(
             pend(
-                shared_content_values(
-                    holdout_windows,
-                    f"{rel(inputs.tetrode_holdout)} "
-                    "(scripts/event_evidence/score_tetrode_holdout.py)",
+                tetrode_holdout_extra_values(extra_windows, extra_source),
+                *extra_stale,
+                participation_off_subset(),
+            ),
+            CONTROL_SUBSET,
+        )
+    )
+    # the events at low-rate places: the place-rate run and the extra run
+    summary.add(
+        *over(
+            pend(
+                low_rate_values(
+                    place_rate_table,
+                    events,
+                    extra_windows,
+                    f"{rel(inputs.content_place_rate)} "
+                    "(scripts/event_properties/measure_content_place_rate.py) and "
+                    f"{extra_source}",
                 ),
-                stale(inputs.tetrode_holdout),
-                participation_staleness(inputs.tetrode_holdout),
+                stale(inputs.content_place_rate),
+                *extra_stale,
             ),
             EVENTS_SUBSET,
         )
@@ -5220,6 +5613,18 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             ROOT_DIR,
         ),
         file_record(inputs.tetrode_holdout / "manifest.json", ROOT_DIR),
+        files_record(
+            f"*_{TETRODE_HOLDOUT_NAME}.parquet",
+            ok_table_paths(inputs.tetrode_holdout_extra, TETRODE_HOLDOUT_NAME),
+            ROOT_DIR,
+        ),
+        file_record(inputs.tetrode_holdout_extra / "manifest.json", ROOT_DIR),
+        files_record(
+            f"*_{CONTENT_PLACE_RATE_NAME}.parquet",
+            ok_table_paths(inputs.content_place_rate, CONTENT_PLACE_RATE_NAME),
+            ROOT_DIR,
+        ),
+        file_record(inputs.content_place_rate / "manifest.json", ROOT_DIR),
         files_record(f"*_{PARTICIPATION_NAME}.parquet", participation_paths, ROOT_DIR),
         file_record(inputs.event_participation / "manifest.json", ROOT_DIR),
         files_record(
