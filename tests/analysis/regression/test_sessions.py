@@ -1202,6 +1202,95 @@ def test_a_penalized_category_edf_is_the_sum_of_its_levels() -> None:
         assert 0.5 < by_name["g[b]"] < 0.99
 
 
+def _penalized_poisson_by_hand(X, y, log_offset, lam) -> np.ndarray:
+    """The maximum of ``l - sum(lam b**2) / 2`` (Poisson with a log offset)
+    by plain Newton steps, written here apart from the fitter."""
+    b = np.zeros(X.shape[1])
+    for _ in range(100):
+        mu = np.exp(X @ b + log_offset)
+        step = np.linalg.solve(
+            X.T @ (mu[:, None] * X) + np.diag(lam), X.T @ (y - mu) - lam * b
+        )
+        b += step
+        if np.abs(step).max() < 1e-14:
+            break
+    return b
+
+
+def test_a_penalized_level_that_fails_support_leaves_with_its_dependents() -> None:
+    """A penalized category ``g`` whose level ``c`` has rows of only 3 visits
+    in one session, with penalized slopes by ``g`` (one on ``b`` and ``c``,
+    one on ``a`` and ``c``) and two penalized plain slopes. In that session
+    the level fails support, its rows are dropped and the slopes for ``c``
+    leave with it (edf 0, coefficient NaN). The rest of the fit equals a
+    penalized Poisson fit made here without ``c``'s rows and columns, each
+    column at its declared log penalty, to 1e-8: the blocks of the dropped
+    columns are removed and the other log penalties stay aligned."""
+    frames = [rate_rows(seed) for seed in range(3)]
+    for frame in frames:
+        visit = frame["well_visit_id"]
+        frame["g"] = np.select([visit % 3 == 0, visit % 3 == 1], ["a", "b"], "c")
+    first = frames[0]
+    first["g"] = np.where(first["well_visit_id"] % 2 == 0, "a", "b")
+    first.loc[first["well_visit_id"].isin([2, 14, 26]), "g"] = "c"
+    sessions = by_session(frames)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    rho = {
+        "g[b]": 0.7,
+        "g[c]": 0.7,
+        "x": 1.3,
+        "last_rewarded:g=b": -0.4,
+        "last_rewarded:g=c": -0.4,
+        "time_since_s:g=a": 2.0,
+        "time_since_s:g=c": 2.0,
+        "time_until_s": 0.5,
+    }
+    g = Category("g", ("a", "b", "c"), reference="a", penalty=0.7)
+    design = build_design(
+        [
+            g,
+            Slope("x", 1.3),
+            Slope("last_rewarded", -0.4, by=g, levels=("b", "c")),
+            Slope("time_since_s", 2.0, by=g, levels=("a", "c")),
+            Slope("time_until_s", 0.5),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+    )
+    records = _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
+    record = records[0]
+    first = next(iter(sessions.values()))
+    on_c = (first["g"] == "c").to_numpy()
+    assert record.status == "converged"
+    assert record.support["g[c]"]["n_high"] == 3
+    assert record.left_out == {
+        "g[c]": Removed.SUPPORT,
+        "last_rewarded:g=c": Removed.WITH_LEVEL,
+        "time_since_s:g=c": Removed.WITH_LEVEL,
+    }
+    assert record.cohort_counts["rows_dropped"] == {"g[c]": int(on_c.sum())}
+    assert record.n_rows == int((~on_c).sum())
+    for name in record.left_out:
+        assert record.edf[name] == 0.0
+        assert np.isnan(record.coef[record.coef_names.index(name)])
+    assert record.edf["g"] == pytest.approx(record.edf["g[b]"])
+    j_c = record.coef_names.index("g[c]")
+    assert all(np.isfinite(r.coef[j_c]) for r in records[1:])  # c on 20 visits
+
+    X, _ = design.session(first)
+    keep = [j for j, n in enumerate(design.coef_names) if n not in record.left_out]
+    names = [design.coef_names[j] for j in keep]
+    lam = np.array([0.0 if n == "(Intercept)" else np.exp(rho[n]) for n in names])
+    b = _penalized_poisson_by_hand(
+        X[~on_c][:, keep],
+        first["count"].to_numpy()[~on_c],
+        np.log(first["exposure"].to_numpy()[~on_c]),
+        lam,
+    )
+    assert np.abs(np.array(record.coef)[keep] - b).max() < 1e-8
+
+
 def test_every_sparse_session_has_its_penalized_term() -> None:
     """Six simulated rate sessions in which the 0/1 term is 1 on 6 of 60
     visits and has few events there (none in some sessions): with a weak
