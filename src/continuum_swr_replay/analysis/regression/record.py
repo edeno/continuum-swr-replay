@@ -141,7 +141,10 @@ class FitRecord:
         columns; a term left out: 0); a level of a penalized category also by
         its coefficient name. A penalized simple coefficient's is between 0
         (the penalty decides) and 1 (the data decide). Empty for a session
-        without a fit.
+        without a fit. For a penalized category, the category's entry is the
+        sum of its levels' entries, so a total over all entries counts those
+        levels twice: sum the model terms only (the entries that are not a
+        level's coefficient name).
     status : str
         The last fit's ``NewtonFit.status``; only "converged" is a kept fit.
         "not fitted" when no fit was tried: no rows, or no events, left to

@@ -11,7 +11,11 @@ from scipy.optimize import brentq
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
-from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax, Poisson
+from continuum_swr_replay.analysis.regression.likelihoods import (
+    Gaussian,
+    GroupedSoftmax,
+    Poisson,
+)
 from continuum_swr_replay.analysis.regression.record import NoFit
 from continuum_swr_replay.analysis.regression.reml import SessionData, fit_at_penalties
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
@@ -1035,8 +1039,11 @@ def test_an_unpenalized_level_with_one_event_is_fitted() -> None:
 
 def test_penalized_terms_record_their_edf(content_sessions) -> None:
     """A penalized slope, a penalized slope by a category and a penalized
-    category: each penalized coefficient's edf is in the record, between 0
-    and 1; the category's term sums its levels'."""
+    category under the grouped softmax: each penalized coefficient's edf is
+    in the record and equals ``[(H + S)^-1 H]_jj``, with the information
+    ``H = sum_g X_g' (diag(p_g) - p_g p_g') X_g`` (each event's shares sum
+    to one) computed here from the record's coefficients and ``S = I`` (every
+    log penalty 0), to 1e-8; the category's term sums its levels'."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     role = Category("role", ROLE.levels, reference="other", penalty=0.0)
     design = build_design(
@@ -1051,8 +1058,21 @@ def test_penalized_terms_record_their_edf(content_sessions) -> None:
     records = _fit(
         design, content_sessions, GroupedSoftmax(), response="share", unit="event_id"
     )
-    for record in records:
+    for rows, record in zip(content_sessions.values(), records, strict=True):
         assert record.status == "converged" and record.left_out == {}
+        X, _ = design.session(rows)
+        assert X.shape == (record.n_rows, len(design.coef_names))
+        assert np.isfinite(X).all()
+        eta = X @ np.array(record.coef)
+        H = np.zeros((X.shape[1], X.shape[1]))
+        for event in np.unique(rows["event_id"]):
+            on = (rows["event_id"] == event).to_numpy()
+            p = np.exp(eta[on] - eta[on].max())
+            p /= p.sum()
+            n = rows.loc[on, "share"].sum()
+            H += n * X[on].T @ (np.diag(p) - np.outer(p, p)) @ X[on]
+        influence = np.diag(np.linalg.solve(H + np.eye(X.shape[1]), H))
+        by_name = dict(zip(record.coef_names, influence, strict=True))
         names = [
             "role[current]",
             "role[previous]",
@@ -1061,14 +1081,125 @@ def test_penalized_terms_record_their_edf(content_sessions) -> None:
             "reward_fraction:role=previous",
             "clock_s",
         ]
+        assert set(record.coef_names) == set(names)
         for name in names:
-            assert 0.0 < record.edf[name] < 1.0, name
+            assert record.edf[name] == pytest.approx(by_name[name], abs=1e-8), name
         assert record.edf["role"] == pytest.approx(
             sum(
                 record.edf[f"role[{level}]"]
                 for level in ("current", "previous", "trunk")
             )
         )
+
+
+def _gaussian_sessions() -> dict:
+    """Two rate sessions with a Gaussian response, a three-level category
+    ``g`` (by visit) and ``x_big``, a covariate of mean near 100 and SD near
+    50."""
+    rng = np.random.default_rng(1)
+    frames = []
+    for seed in range(2):
+        rows = rate_rows(seed)
+        visit = rows["well_visit_id"]
+        rows["g"] = np.select([visit % 3 == 0, visit % 3 == 1], ["a", "b"], "c")
+        rows["x_big"] = 50.0 * rows["x"] + 100.0
+        rows["y"] = rng.normal(size=len(rows)) + 0.3 * rows["x"]
+        frames.append(rows)
+    return by_session(frames)
+
+
+#: The log penalties of the Gaussian checks: the category's levels, the
+#: plain slope of ``x_big``, the slope of ``x`` by ``g`` and the 0/1 slope.
+RHO_G, RHO_BIG, RHO_BY, RHO_01 = 3.0, 1.3, -0.4, 2.0
+
+
+def _gaussian_fit(sessions: dict):
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    g = Category("g", ("a", "b", "c"), reference="a", penalty=RHO_G)
+    design = build_design(
+        [
+            g,
+            Slope("x_big", RHO_BIG),
+            Slope("x", RHO_BY, by=g, levels=("b", "c")),
+            Slope("last_rewarded", RHO_01),
+        ],
+        pooled,
+        intercept=True,
+    )
+    records = _fit(design, sessions, Gaussian(), response="y", unit="well_visit_id")
+    return pooled, records
+
+
+def _ridge_by_hand(rows: pd.DataFrame, pooled: pd.DataFrame):
+    """The design built by hand in the reported unit, and its penalty:
+    ``x_big`` divided by its pooled SD (not centered); ``x`` by ``g``
+    centered at its pooled mean over the rows of levels b and c and divided
+    by their pooled SD (ddof 0); the 0/1 slope as it is."""
+    on_bc = pooled["g"].isin(["b", "c"])
+    mean_x, sd_x = pooled.loc[on_bc, "x"].mean(), pooled.loc[on_bc, "x"].std(ddof=0)
+    is_b = (rows["g"] == "b").to_numpy(float)
+    is_c = (rows["g"] == "c").to_numpy(float)
+    centered = (rows["x"].to_numpy() - mean_x) / sd_x
+    X = np.column_stack(
+        [
+            np.ones(len(rows)),
+            is_b,
+            is_c,
+            rows["x_big"].to_numpy() / pooled["x_big"].std(ddof=0),
+            is_b * centered,
+            is_c * centered,
+            rows["last_rewarded"].to_numpy(),
+        ]
+    )
+    lam = np.exp([-np.inf, RHO_G, RHO_G, RHO_BIG, RHO_BY, RHO_BY, RHO_01])
+    return X, np.diag(lam)
+
+
+def test_a_gaussian_penalized_fit_is_the_ridge_solution() -> None:
+    """The penalty acts in the reported unit: under the Gaussian, a penalized
+    category, a penalized slope of a covariate far from mean 0 and SD 1, a
+    penalized slope by the category and a penalized 0/1 slope equal the
+    ridge solution ``(X'X + diag(exp(rho))) b = X'y`` with ``X`` built by
+    hand (pooled SD, by-category centering), to 1e-10."""
+    sessions = _gaussian_sessions()
+    pooled, records = _gaussian_fit(sessions)
+    assert pooled["x_big"].mean() > 50 and pooled["x_big"].std(ddof=0) > 40
+    for rows, record in zip(sessions.values(), records, strict=True):
+        X, S = _ridge_by_hand(rows, pooled)
+        b = np.linalg.solve(X.T @ X + S, X.T @ rows["y"].to_numpy())
+        assert record.status == "converged" and record.left_out == {}
+        assert record.coef_names == [
+            "(Intercept)",
+            "g[b]",
+            "g[c]",
+            "x_big",
+            "x:g=b",
+            "x:g=c",
+            "last_rewarded",
+        ]
+        assert np.abs(np.array(record.coef) - b).max() < 1e-10
+
+
+def test_a_penalized_category_edf_is_the_sum_of_its_levels() -> None:
+    """The record's ``edf`` holds each level of a penalized category by its
+    coefficient name and their sum by the category's name (a total over all
+    entries would count the levels twice). Each level's edf, computed from
+    the fit alone, is the diagonal element of the influence of the penalized
+    information, ``[(X'X + S)^-1 X'X]_jj`` under the Gaussian; the
+    category's is the sum of its levels', to 1e-10."""
+    sessions = _gaussian_sessions()
+    pooled, records = _gaussian_fit(sessions)
+    for rows, record in zip(sessions.values(), records, strict=True):
+        X, S = _ridge_by_hand(rows, pooled)
+        gram = X.T @ X
+        influence = np.diag(np.linalg.solve(gram + S, gram))
+        by_name = dict(zip(record.coef_names, influence, strict=True))
+        for name in ("g[b]", "g[c]", "x_big", "x:g=b", "x:g=c", "last_rewarded"):
+            assert record.edf[name] == pytest.approx(by_name[name], abs=1e-10)
+        assert record.edf["g"] == pytest.approx(
+            by_name["g[b]"] + by_name["g[c]"], abs=1e-10
+        )
+        assert 0.5 < by_name["g[b]"] < 0.99
 
 
 def test_every_sparse_session_has_its_penalized_term() -> None:

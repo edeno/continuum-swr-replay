@@ -406,7 +406,9 @@ def _edf(
 ) -> dict[str, float]:
     """Model term -> edf: the sum over its design terms of a penalized one's
     edf from the fit and an unpenalized one's active columns. A level of a
-    penalized category has its own entry too, by its coefficient name."""
+    penalized category has its own entry too, by its coefficient name, and
+    the category's entry is the sum of those: a total over all entries
+    counts the levels twice."""
     penalized = dict(zip(block_terms, fit.edf.tolist(), strict=True))
     part = {
         t.name: penalized.get(t.name, float(active[t.columns].sum()))

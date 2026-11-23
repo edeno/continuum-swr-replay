@@ -422,11 +422,21 @@ when it is by a category), so its coefficient is per pooled SD and the prior SD 
 A covariate given in units 1000 times larger builds the same column
 (`test_terms.py::test_the_penalty_acts_in_the_reported_unit`). Under the Gaussian the
 penalty is on the scale of the residual sum of squares, so the prior SD is in units of
-the residual SD.
+the residual SD. There a penalized category, a penalized slope of a covariate of mean near 100 and SD
+near 50, a penalized slope by the category and a penalized 0/1 slope equal the ridge
+solution `(X'X + diag(exp(rho))) b = X'y`, with `X` built by hand with the pooled SD and
+the by-category centering, to 1e-10
+(`test_sessions.py::test_a_gaussian_penalized_fit_is_the_ridge_solution`).
 
 Each record holds the edf of each penalized simple coefficient (`edf`; a level of a
 penalized category by its coefficient name as well as in its category's sum). Near 1 the
-data decide the value; near 0 the penalty does.
+data decide the value; near 0 the penalty does. The category's entry is the sum of its
+levels' entries, so a total over all the entries counts those levels twice; a total sums
+the model terms only. For one coefficient with a 1x1 penalty the edf is the diagonal
+element `[(H + S)^-1 H]_jj` of the influence of the penalized information: in a Gaussian
+case and a grouped-softmax case the records equal it computed from the fit alone
+(`test_sessions.py::test_a_penalized_category_edf_is_the_sum_of_its_levels`,
+`test_penalized_terms_record_their_edf`).
 
 Measured results, two cells (an intercept, one penalized 0/1 column, an offset; 20
 visits; `test_sessions.py`):
