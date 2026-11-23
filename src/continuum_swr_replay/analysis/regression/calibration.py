@@ -1,0 +1,172 @@
+"""The declared log penalty of a smooth term: the one that gives a target edf.
+
+A per-session smooth term is fitted at one fixed log penalty, declared in the
+model and the same in every session; no penalty is chosen from the data for a
+per-session fit. :func:`log_penalty_for_edf` finds that value once, on the
+model's sessions: the log penalty at which the median over sessions of the
+term's effective degrees of freedom (edf) equals a target, every other
+penalty held at its declared value. The caller writes the value into the
+model's term as a constant.
+
+Each session is fitted by :func:`.sessions.fit_sessions`, the loop the model
+itself uses (its support rule, its rows and its refits), and the edf is the
+one its records hold. The median is over the sessions with a kept fit in which
+the term is fitted. It is searched by bisection on the log penalty inside
+``LOG_PENALTY_BOUNDS``, assuming that the median edf falls as the penalty
+rises; the search is deterministic.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import replace
+from typing import NamedTuple
+
+import numpy as np
+import pandas as pd
+
+from .constants import CALIBRATION_LOG_PENALTY_TOL, LOG_PENALTY_BOUNDS
+from .likelihoods import Likelihood
+from .newton import CONVERGED
+from .sessions import SessionKey, fit_sessions
+from .terms import Design
+
+__all__ = ["EdfCalibration", "log_penalty_for_edf"]
+
+
+class EdfCalibration(NamedTuple):
+    """The log penalty that gives the target median edf.
+
+    Attributes
+    ----------
+    log_penalty : float
+        The middle of the bisection's last bracket, narrower than
+        ``CALIBRATION_LOG_PENALTY_TOL``.
+    median_edf : float
+        The median over sessions of the term's edf at ``log_penalty``.
+    edf : pd.Series, shape (n_sessions,)
+        Each session's edf of the term at ``log_penalty``, indexed by the
+        session keys in the order given; NaN for a session without a kept
+        fit or in which the term is not fitted.
+    """
+
+    log_penalty: float
+    median_edf: float
+    edf: pd.Series
+
+
+def _term_edf(
+    design: Design,
+    sessions: Mapping[SessionKey, pd.DataFrame],
+    lik: Likelihood,
+    term: str,
+    response: str,
+    unit: str,
+) -> pd.Series:
+    """Each session's edf of ``term`` at the design's log penalties; NaN where
+    the fit is not kept or the term is not fitted."""
+    names = [design.coef_names[j] for j in design.by_name[term].columns]
+    records = fit_sessions(
+        design,
+        sessions,
+        lik,
+        model="calibration",
+        kind="calibration",
+        response=response,
+        unit=unit,
+        table_sha256={},
+    )
+    edf = [
+        r.edf[term]
+        if r.status == CONVERGED and not any(n in r.left_out for n in names)
+        else np.nan
+        for r in records
+    ]
+    return pd.Series(edf, index=pd.Index(list(sessions)), dtype=float, name=term)
+
+
+def log_penalty_for_edf(
+    design: Design,
+    sessions: Mapping[SessionKey, pd.DataFrame],
+    lik: Likelihood,
+    *,
+    term: str,
+    target_edf: float,
+    response: str,
+    unit: str,
+) -> EdfCalibration:
+    """The log penalty of ``term`` at which its median edf over sessions is
+    ``target_edf`` (module docstring).
+
+    Parameters
+    ----------
+    design : Design
+        The model's design, built on the pooled rows of ``sessions``. Its
+        other penalties are held at their declared values; the value
+        declared for ``term`` is not used.
+    sessions : mapping of (animal, session_date, epoch) to pd.DataFrame
+        Each session's rows, as :func:`.sessions.fit_sessions` takes them.
+    lik : Likelihood
+    term : str
+        The name of a term with a fixed penalty (a smooth, or a lag
+        functional), as :class:`.terms.DesignTerm` names it.
+    target_edf : float
+        The term's edf counts its penalty's null space (for a constrained
+        P-spline, the line).
+    response, unit : str
+        As :func:`.sessions.fit_sessions` takes them.
+
+    Returns
+    -------
+    EdfCalibration
+
+    Raises
+    ------
+    ValueError
+        If ``term`` is not a term of the design or has no fixed penalty; if
+        no session has a kept fit with the term at a bound; if the target is
+        not between the median edf at the upper bound and at the lower bound
+        of ``LOG_PENALTY_BOUNDS`` (it cannot be reached inside them).
+    """
+    if term not in design.by_name:
+        raise ValueError(f"{term!r} is not a term of the design")
+    block = design.by_name[term].block
+    if block is None:
+        raise ValueError(f"{term!r} has no fixed penalty to calibrate")
+
+    def at(log_penalty: float) -> pd.Series:
+        # The fit reads Design.log_penalties; this design's log_penalty_record
+        # still names the declared value, but its records are not kept.
+        log_penalties = design.log_penalties.copy()
+        log_penalties[block] = log_penalty
+        edf = _term_edf(
+            replace(design, log_penalties=log_penalties),
+            sessions,
+            lik,
+            term,
+            response,
+            unit,
+        )
+        if edf.isna().all():
+            raise ValueError(
+                f"no session has a kept fit with {term!r} at log penalty {log_penalty}"
+            )
+        return edf
+
+    lo, hi = LOG_PENALTY_BOUNDS
+    loosest, stiffest = np.nanmedian(at(lo)), np.nanmedian(at(hi))
+    if not stiffest <= target_edf <= loosest:
+        raise ValueError(
+            f"a median edf of {target_edf} for {term!r} cannot be reached inside "
+            f"the log penalty bounds [{lo}, {hi}]: the median edf there runs from "
+            f"{loosest:.4g} to {stiffest:.4g}"
+        )
+    while hi - lo > CALIBRATION_LOG_PENALTY_TOL:
+        middle = 0.5 * (lo + hi)
+        if np.nanmedian(at(middle)) > target_edf:
+            lo = middle
+        else:
+            hi = middle
+    log_penalty = 0.5 * (lo + hi)
+    edf = at(log_penalty)
+    return EdfCalibration(log_penalty, float(np.nanmedian(edf)), edf)

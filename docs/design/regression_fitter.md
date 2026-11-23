@@ -18,6 +18,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
+| `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
 | `record.py` | the fit-row record and its parquet storage |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |

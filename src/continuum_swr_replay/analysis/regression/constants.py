@@ -61,6 +61,11 @@ PENALTY_ROUNDING_TOL = 1e-10
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 
+# The declared log penalty of a per-session smooth (``calibration``) is found by
+# bisection inside LOG_PENALTY_BOUNDS until the bracket is narrower than
+# CALIBRATION_LOG_PENALTY_TOL: 15 halvings of the bounds' 30 units.
+CALIBRATION_LOG_PENALTY_TOL = 1e-3
+
 # REML penalty selection. The search starts from the best point of a grid over
 # the log penalties (the score can have two optima): every integer in the
 # bounds for one term; the product of REML_GRID_POINTS for two or three; for

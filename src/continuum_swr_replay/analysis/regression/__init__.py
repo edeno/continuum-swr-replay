@@ -21,6 +21,8 @@ package may import it.
   an inactive level of a category.
 - ``sessions``: the per-session fitting loop, with the handling of a session
   without a finite maximum.
+- ``calibration``: the declared log penalty of a per-session smooth, the one
+  at which its median edf over the sessions is a target.
 - ``record``: the fit-row record and its parquet storage.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
