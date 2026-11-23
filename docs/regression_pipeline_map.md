@@ -556,6 +556,12 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 `NewtonFit`, `running_away_columns`, `penalized_newton`
 
+### `src/continuum_swr_replay/analysis/regression/padding.py`
+
+Rows padded to a few bucket sizes, so that a jitted kernel compiles once per bucket rather than once per session.
+
+`bucket_size`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
+
 ### `src/continuum_swr_replay/analysis/regression/pspline.py`
 
 Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
@@ -573,6 +579,12 @@ The fit-row record: one row per (model, kind, session) of every stored fit.
 Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
 
 `FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `RefitEnd`, `SessionRefit`, `refit_session`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+
+### `src/continuum_swr_replay/analysis/regression/runtime.py`
+
+How the fitter's JAX code runs: float64 for each call, one device, float64 kernels, and a log of the programs traced.
+
+`require_device`, `in_float64`, `CompileLog`, `float64_kernel`
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 

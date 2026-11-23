@@ -88,7 +88,9 @@ The sub-phases are the port design's Phases 0 and 2 to 6. Its Phase 1 (the simul
    iteration and "evaluate at beta" kernels; the fixed-penalty summary (score, `A^-1`, edf, `log|A|`), the
    profiled Gaussian, and `collinearity`'s public weights (`lik.weighted_design`). Remove the NumPy
    formulas these replace (the likelihood bodies, `_newton_system`, `_objective`, `_covariance_and_edf`,
-   the score in `_reml_in_basis`).
+   the score in `_reml_in_basis`). Run the padding tests (`tests/analysis/regression/test_padding.py`)
+   again against these kernels, the guard for a softmax group with no rows included; every quantity
+   that depends on the number of rows uses `n_real`, not the padded count.
 - **Sub-phase 4: The REML derivatives in JAX**: one jitted kernel per family for the gradient and Hessian in the log
    penalties; the `cho_solve` loops of `_reml_in_basis` and `_gaussian_profiled` removed. The outer
    search stays in Python.
