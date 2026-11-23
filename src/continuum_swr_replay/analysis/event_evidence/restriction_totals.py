@@ -363,15 +363,13 @@ def _chosen_time(time_sums: pd.DataFrame, rows: np.ndarray) -> pd.DataFrame:
     )
 
 
-def _epoch_gain_frame(
+def _epoch_header(
     time_sums: pd.DataFrame, bin_s: pd.Series, total: pd.DataFrame
 ) -> pd.DataFrame:
     """Each epoch's chosen bins (``total``, :func:`_chosen_time`'s rows):
-    ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``, and for
-    each family ``full_minus_swr`` (nats), ``gain_per_spike`` and ``gain_per_s``
-    (NaN without spikes or bins)."""
+    ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``."""
     animals = time_sums.groupby("epoch_id")["animal"].first()
-    out = pd.DataFrame(
+    return pd.DataFrame(
         {
             "epoch_id": total.index,
             "animal": animals.reindex(total.index).to_numpy(),
@@ -381,6 +379,16 @@ def _epoch_gain_frame(
             * bin_s.reindex(total.index).to_numpy(dtype=float),
         }
     )
+
+
+def _epoch_gain_frame(
+    time_sums: pd.DataFrame, bin_s: pd.Series, total: pd.DataFrame
+) -> pd.DataFrame:
+    """Each epoch's chosen bins (``total``, :func:`_chosen_time`'s rows):
+    ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``, and for
+    each family ``full_minus_swr`` (nats), ``gain_per_spike`` and ``gain_per_s``
+    (NaN without spikes or bins)."""
+    out = _epoch_header(time_sums, bin_s, total)
     for suffix in FAMILY_SUFFIX.values():
         gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
         out[f"full_minus_swr{suffix}"] = gain
@@ -567,18 +575,8 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
     total = _chosen_time(
         time_sums, time_sums["category"].isin([IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR])
     )
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
-    spikes = total["n_spikes"].to_numpy()
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": spikes,
-            "seconds": seconds,
-        }
-    )
+    out = _epoch_header(time_sums, bin_s, total)
+    spikes, seconds = out["n_spikes"].to_numpy(), out["seconds"].to_numpy()
     for suffix in FAMILY_SUFFIX.values():
         gains = {
             contrast: (total[f"{a}{suffix}"] - total[f"{b}{suffix}"]).to_numpy()
@@ -701,18 +699,8 @@ def epoch_contrast_gains(
     if time not in rows:
         raise ValueError(f"time {time!r} is not one of {CONTRAST_TIMES}")
     total = _chosen_time(time_sums, np.asarray(rows[time]))
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
-    spikes = total["n_spikes"].to_numpy()
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": spikes,
-            "seconds": seconds,
-        }
-    )
+    out = _epoch_header(time_sums, bin_s, total)
+    spikes, seconds = out["n_spikes"].to_numpy(), out["seconds"].to_numpy()
     for contrast in chosen:
         a, b = ALL_CONTRASTS[contrast]
         for suffix in FAMILY_SUFFIX.values():
