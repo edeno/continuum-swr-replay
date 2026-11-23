@@ -283,7 +283,7 @@ import argparse
 import logging
 import string
 import warnings
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
@@ -430,7 +430,7 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width, five rows (the module's docstring).
 WIDTH = 6.5
-HEIGHT = 6.7
+HEIGHT = 6.8
 LEFT_OUT_YLABEL = "Left-out tetrode:\nbetter fit (nats/spike)"
 """The y label of the left-out tetrode's split (panel h)."""
 EQUAL_FIT = "equal fit"
@@ -506,45 +506,47 @@ SERIES_START = 1.3
 the parts are 1 apart."""
 LAYOUT = (
     (
-        (0.859, 0.949),
+        (0.861, 0.950),
         (
-            ("state_calibration", 0.09, 0.17),
-            ("no_spike_mua", 0.405, 0.15),
+            ("state_calibration", 0.09, 0.145),
+            ("no_spike_mua", 0.375, 0.17),
             ("nonlocal_probability", 0.625, 0.13),
             ("decoded_distance", 0.845, 0.145),
         ),
     ),
     (
-        (0.629, 0.755),
+        (0.634, 0.759),
         (
-            ("rule_sweep", 0.085, 0.47),
-            ("boundary_timing", 0.71, 0.27),
+            ("rule_sweep", 0.085, 0.445),
+            ("boundary_timing", 0.652, 0.328),
         ),
     ),
     (
-        (0.410, 0.514),
+        (0.399, 0.509),
         (
-            ("nonlocal_mua", 0.075, 0.12),
-            ("left_out_split", 0.29, 0.17),
-            ("outside_distance", 0.6, 0.38),
+            ("nonlocal_mua", 0.075, 0.215),
+            ("left_out_split", 0.39, 0.155),
+            ("outside_distance", 0.662, 0.318),
         ),
     ),
     (
-        (0.219, 0.286),
+        (0.230, 0.297),
         (
             ("event_traces", 0.085, 0.58),
-            ("hpd", 0.8, 0.185),
+            ("hpd", 0.823, 0.162),
         ),
     ),
     (
-        (0.055, 0.129),
+        (0.054, 0.127),
         (("four_decoders", 0.11, 0.87),),
     ),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
 height), then its panels left to right, each with its frame's left edge and
 width (figure width). Read in this order the panels are in the order the text
-cites them, so their letters follow from it."""
+cites them, so their letters follow from it. A panel of :data:`LETTER_COLUMNS`
+keeps its frame's right edge; its left edge is then set so that its drawing
+starts at its column's (:func:`align_columns`)."""
 PANELS = tuple(panel for _, row in LAYOUT for panel, _, _ in row)
 """The panels in the order the text cites them."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
@@ -552,6 +554,18 @@ ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT
 """Each row's frames' bottom and top and its panels, left to right."""
 FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
 """Each panel's frame's left edge and width (figure width)."""
+LETTER_COLUMNS = (
+    (None, tuple(row[0][0] for _, row in LAYOUT)),
+    (0.322, ("no_spike_mua", "left_out_split")),
+    (0.570, ("nonlocal_probability", "boundary_timing", "outside_distance")),
+    (0.774, ("decoded_distance", "hpd")),
+)
+"""The panels whose letters share a left edge (convention 10), with where their
+drawing starts (figure width; ``None``: at the leftmost of the column's
+panels): the rows' first panels, then three columns set by the first row's
+panels b, c and d."""
+ALIGN_PASSES = 3
+"""The passes of :func:`align_columns`."""
 LETTER_HEIGHT = 0.0268
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
@@ -1047,6 +1061,7 @@ def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> 
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
         f"below\n{MUA_LEVEL_Z:g} z",
     )  # fmt: skip
+    ax_share.set_xticks([0, 5, 10])
 
 
 def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
@@ -1405,6 +1420,30 @@ def panel_axes(fig: Figure, panel: str) -> list[Axes]:
     return fig.axes[start : start + _n_axes(panel)]
 
 
+def align_columns(fig: Figure, axes: Mapping[str, Sequence[Axes]]) -> None:
+    """Start each panel of a letter column (:data:`LETTER_COLUMNS`) at the
+    column's left edge: the panel's axes are scaled sideways about its frame's
+    right edge until what it draws (the y label and tick labels included)
+    starts there, so that the panels of a column, and their letters, line up."""
+    for target, column in LETTER_COLUMNS:
+        starts = {panel: drawn_extent(fig, axes[panel]).x0 for panel in column}
+        edge = min(starts.values()) if target is None else target
+        for panel in column:
+            boxes = [ax.get_position() for ax in axes[panel]]
+            right = max(box.x1 for box in boxes)
+            left = min(box.x0 for box in boxes)
+            scale = (right - left + starts[panel] - edge) / (right - left)
+            for ax, box in zip(axes[panel], boxes, strict=True):
+                ax.set_position(
+                    (
+                        right - (right - box.x0) * scale,
+                        box.y0,
+                        box.width * scale,
+                        box.height,
+                    )
+                )
+
+
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
     order and laid out by :data:`LAYOUT`."""
@@ -1455,15 +1494,20 @@ def generate_figure(statistics: dict) -> Figure:
     draw_decoded_distance(axes["decoded_distance"][0], *statistics["distance"])
     draw_four_decoders(axes["four_decoders"], statistics["four_decoders"])
     fig.draw_without_rendering()
+    # a few passes: a label set in its axes' coordinates moves as its axes widen
+    for _ in range(ALIGN_PASSES):
+        align_columns(fig, axes)
+        fig.draw_without_rendering()
     # convention 10: a row's letters at one height, just above its highest
-    # panel; the rows' first panels share the left column and its letter edge
+    # panel; a column's letters at one left edge, its leftmost panel's
     extent = {
         panel: drawn_extent(fig, panel_list) for panel, panel_list in axes.items()
     }
     left = {panel: max(e.x0 - 0.004, 0.0) for panel, e in extent.items()}
-    column = min(left[row[0]] for _, row in ROWS)
+    for _, column in LETTER_COLUMNS:
+        edge = min(left[panel] for panel in column)
+        left.update(dict.fromkeys(column, edge))
     for _, row in ROWS:
-        left[row[0]] = column
         top = max(extent[panel].y1 for panel in row) + LETTER_HEIGHT
         for panel in row:
             letter_panel(fig, LETTERS[panel], left[panel], top)

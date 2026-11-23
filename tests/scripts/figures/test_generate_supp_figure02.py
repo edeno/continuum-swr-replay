@@ -232,9 +232,10 @@ def drawn():
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     """In five rows, each a group the text cites in turn: the decoder (a to d),
     the count is robust (e, f), the held-out tests (g to i), the animals agree
-    and the posterior's spread (j, k), the fourth decoder (l); each row's letters at one height, the rows'
-    first letters at one left edge, no heading; within the common 20 cm
-    height."""
+    and the posterior's spread (j, k), the fourth decoder (l); each row's
+    letters at one height; the letters in four columns, each at one left edge
+    (the rows' first letters; b, h; c, f, i; d, k), where the column's panels'
+    drawings start; no heading; within the common 20 cm height."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "nonlocal_probability",
         "decoded_distance", "rule_sweep", "boundary_timing", "nonlocal_mua",
@@ -256,7 +257,18 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
     assert heights == sorted(heights, reverse=True)
-    assert len({letters[row[0]][0] for row in rows}) == 1
+    columns = ("aegjl", "bh", "cfi", "dk")
+    for column in columns:
+        assert len({letters[k][0] for k in column}) == 1, column
+    edges = [letters[column[0]][0] for column in columns]
+    assert edges == sorted(edges)
+    by_letter = {figure.LETTERS[panel]: panel for panel in figure.PANELS}
+    for column in columns:  # each panel's drawing starts at its column's edge
+        starts = [
+            figure.drawn_extent(fig, figure.panel_axes(fig, by_letter[k])).x0
+            for k in column
+        ]
+        np.testing.assert_allclose(starts, starts[0], atol=1e-3)
     assert "Immobile, at wells" not in [
         t.get_text() for ax in fig.axes for t in ax.texts
     ]
