@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "cd7a5f06fc04",
+ "commit": "fff07b7ef70c",
  "code": {
-  "head": "cd7a5f06fc04e9d16a48996ec9955695976c8f47",
+  "head": "fff07b7ef70c3afe0847441a38ccf5085eee4d23",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -367,8 +367,8 @@
     "code_sha256": "01d3e865719fda8aaab3c5bce868457728a62b25cfe5d150b422b7ccde36c9b0"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "1d5c40830d9f5b26e1781fc05410c813f50071bdfb39476da1e3e5923b307e63",
-    "code_sha256": "1639b552d3a1c60b857be3e0d7bfa6a0e04436da4779a3d18f782b63d77ea06d"
+    "sha256": "60faaaf2cdfe8e32b88173f178d5cbc462f5dc1ed8aa2323c98e104f3e8de318",
+    "code_sha256": "4a7882a50c7d1853d44cc3dfce20999e8557a78ec44ede997e9372d4c6650d82"
    },
    "src/continuum_swr_replay/analysis/event_properties/low_rate_places.py": {
     "sha256": "f6a05fce36280ae2c3af3de533ced0cf5bc007b927985340b5bddfeef91de70b",
@@ -539,7 +539,7 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "7b0b383dcc9a91339b925955534bc7c64ea1eff005cb45a102c30cb2d6e05c2d",
+    "sha256": "82259435bf69673679d624a241692d11e74b00870e627d2a689b3c40def63246",
     "code_sha256": "bec0e76b96ae50f33b2687c8f351bfbb58a60e2a7148f95f5521e8a5c98eac24"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
@@ -2401,12 +2401,12 @@
    "function": "boundary_offset_values",
    "pending": null
   },
-  "end_offset_beyond_twenty_five_ms_fraction": {
-   "value": 0.2352137295407596,
+  "end_offset_beyond_ten_ms_fraction": {
+   "value": 0.4841887811854441,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of SWR-overlapping events whose end differs from the matched SWR's end by more than 25 ms; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of SWR-overlapping events whose end differs from the matched SWR's end by more than 10 ms; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -21601,12 +21601,12 @@
    "function": "boundary_offset_values",
    "pending": null
   },
-  "start_offset_beyond_twenty_five_ms_fraction": {
-   "value": 0.20108056570792945,
+  "start_offset_beyond_ten_ms_fraction": {
+   "value": 0.43448275862068964,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of SWR-overlapping events whose start differs from the matched SWR's start by more than 25 ms; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of SWR-overlapping events whose start differs from the matched SWR's start by more than 10 ms; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25732,11 +25732,11 @@
    "pending": null
   },
   "timing_both_ends_differ_share_animal_max": {
-   "value": 0.0655328202359232,
+   "value": 0.25741588217143,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 10 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25746,11 +25746,11 @@
    "pending": null
   },
   "timing_both_ends_differ_share_animal_mean": {
-   "value": 0.05310733232798661,
+   "value": 0.22682142361961616,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together), the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 10 ms (the four corner combinations together), the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25760,11 +25760,11 @@
    "pending": null
   },
   "timing_both_ends_differ_share_animal_min": {
-   "value": 0.04398670406704585,
+   "value": 0.20039150134418354,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 25 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events whose start and end both differ from the matched SWR's by more than 10 ms (the four corner combinations together) (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25774,11 +25774,11 @@
    "pending": null
   },
   "timing_start_earlier_end_earlier_share": {
-   "value": 0.005085015096138567,
+   "value": 0.027808676307007785,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25788,11 +25788,11 @@
    "pending": null
   },
   "timing_start_earlier_end_earlier_share_animal_max": {
-   "value": 0.006620963267514104,
+   "value": 0.03398049174226663,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25804,11 +25804,11 @@
    "pending": null
   },
   "timing_start_earlier_end_earlier_share_animal_mean": {
-   "value": 0.005156518209594084,
+   "value": 0.030459532009703895,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25820,11 +25820,11 @@
    "pending": null
   },
   "timing_start_earlier_end_earlier_share_animal_min": {
-   "value": 0.0037840761037546077,
+   "value": 0.025416700443350124,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25836,11 +25836,11 @@
    "pending": null
   },
   "timing_start_earlier_end_later_share": {
-   "value": 0.01620848561894168,
+   "value": 0.03216272048307643,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25850,11 +25850,11 @@
    "pending": null
   },
   "timing_start_earlier_end_later_share_animal_max": {
-   "value": 0.028634933219329382,
+   "value": 0.05480137341537737,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25866,11 +25866,11 @@
    "pending": null
   },
   "timing_start_earlier_end_later_share_animal_mean": {
-   "value": 0.019440879440103927,
+   "value": 0.038386549768956266,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25882,11 +25882,11 @@
    "pending": null
   },
   "timing_start_earlier_end_later_share_animal_min": {
-   "value": 0.012283437241409574,
+   "value": 0.01930628243585115,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end more than 25 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end more than 10 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25898,11 +25898,11 @@
    "pending": null
   },
   "timing_start_earlier_end_together_share": {
-   "value": 0.06149690131892579,
+   "value": 0.0646750357540124,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end within 25 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end within 10 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25912,11 +25912,11 @@
    "pending": null
   },
   "timing_start_earlier_end_together_share_animal_max": {
-   "value": 0.08475142126238629,
+   "value": 0.089811237605635,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end within 25 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end within 10 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25928,11 +25928,11 @@
    "pending": null
   },
   "timing_start_earlier_end_together_share_animal_mean": {
-   "value": 0.06945033792564441,
+   "value": 0.07198046549636057,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end within 25 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end within 10 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25944,11 +25944,11 @@
    "pending": null
   },
   "timing_start_earlier_end_together_share_animal_min": {
-   "value": 0.049933863971959806,
+   "value": 0.05495422236264582,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms earlier than the matched SWR's start and end within 25 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms earlier than the matched SWR's start and end within 10 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25960,11 +25960,11 @@
    "pending": null
   },
   "timing_start_later_end_earlier_share": {
-   "value": 0.012394724296837757,
+   "value": 0.09556650246305419,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25974,11 +25974,11 @@
    "pending": null
   },
   "timing_start_later_end_earlier_share_animal_max": {
-   "value": 0.015041515257037676,
+   "value": 0.12097236692244456,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -25990,11 +25990,11 @@
    "pending": null
   },
   "timing_start_later_end_earlier_share_animal_mean": {
-   "value": 0.009226133532165061,
+   "value": 0.08921369016373111,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26006,11 +26006,11 @@
    "pending": null
   },
   "timing_start_later_end_earlier_share_animal_min": {
-   "value": 0.005636909785221939,
+   "value": 0.05978276121769623,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26022,11 +26022,11 @@
    "pending": null
   },
   "timing_start_later_end_later_share": {
-   "value": 0.018051803591291913,
+   "value": 0.061719370729381856,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26036,11 +26036,11 @@
    "pending": null
   },
   "timing_start_later_end_later_share_animal_max": {
-   "value": 0.025805836808677846,
+   "value": 0.10186689786203058,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26052,11 +26052,11 @@
    "pending": null
   },
   "timing_start_later_end_later_share_animal_mean": {
-   "value": 0.019283801146123537,
+   "value": 0.0687616516772249,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26068,11 +26068,11 @@
    "pending": null
   },
   "timing_start_later_end_later_share_animal_min": {
-   "value": 0.014771074314812192,
+   "value": 0.0529331992640626,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end more than 25 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end more than 10 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26084,11 +26084,11 @@
    "pending": null
   },
   "timing_start_later_end_together_share": {
-   "value": 0.08784363578579374,
+   "value": 0.152550452884157,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end within 25 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end within 10 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26098,11 +26098,11 @@
    "pending": null
   },
   "timing_start_later_end_together_share_animal_max": {
-   "value": 0.0978280659969565,
+   "value": 0.16102530187484188,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end within 25 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end within 10 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26114,11 +26114,11 @@
    "pending": null
   },
   "timing_start_later_end_together_share_animal_mean": {
-   "value": 0.08669807294491179,
+   "value": 0.15279263377994695,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end within 25 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end within 10 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26130,11 +26130,11 @@
    "pending": null
   },
   "timing_start_later_end_together_share_animal_min": {
-   "value": 0.07797540157656248,
+   "value": 0.14563803657316168,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start more than 25 ms later than the matched SWR's start and end within 25 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start more than 10 ms later than the matched SWR's start and end within 10 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26146,11 +26146,11 @@
    "pending": null
   },
   "timing_start_together_end_earlier_share": {
-   "value": 0.059971396790084223,
+   "value": 0.14895916097250914,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms earlier than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26160,11 +26160,11 @@
    "pending": null
   },
   "timing_start_together_end_earlier_share_animal_max": {
-   "value": 0.07653875626195492,
+   "value": 0.2023896533018108,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms earlier than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26176,11 +26176,11 @@
    "pending": null
   },
   "timing_start_together_end_earlier_share_animal_mean": {
-   "value": 0.05553757751645418,
+   "value": 0.14144835203722325,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms earlier than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26192,11 +26192,11 @@
    "pending": null
   },
   "timing_start_together_end_earlier_share_animal_min": {
-   "value": 0.032606620298659184,
+   "value": 0.08782810070109684,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms earlier than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26208,11 +26208,11 @@
    "pending": null
   },
   "timing_start_together_end_later_share": {
-   "value": 0.12350230414746544,
+   "value": 0.11797235023041475,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms later than its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26222,11 +26222,11 @@
    "pending": null
   },
   "timing_start_together_end_later_share_animal_max": {
-   "value": 0.1758013994166442,
+   "value": 0.1547339548329384,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms later than its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26238,11 +26238,11 @@
    "pending": null
   },
   "timing_start_together_end_later_share_animal_mean": {
-   "value": 0.13386671445882486,
+   "value": 0.12389321708312892,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms later than its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26254,11 +26254,11 @@
    "pending": null
   },
   "timing_start_together_end_later_share_animal_min": {
-   "value": 0.09110718605379148,
+   "value": 0.08413286154830132,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end more than 25 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end more than 10 ms later than its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26270,11 +26270,11 @@
    "pending": null
   },
   "timing_start_together_end_together_share": {
-   "value": 0.6154457333545209,
+   "value": 0.29858573017638645,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end within 25 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end within 10 ms of its end, pooled over every SWR-overlapping event; over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26284,11 +26284,11 @@
    "pending": null
   },
   "timing_start_together_end_together_share_animal_max": {
-   "value": 0.6364298278905747,
+   "value": 0.3169471044853051,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end within 25 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "highest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end within 10 ms of its end (the mean over its epochs); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26300,11 +26300,11 @@
    "pending": null
   },
   "timing_start_together_end_together_share_animal_mean": {
-   "value": 0.6013399648261781,
+   "value": 0.28306390798372416,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end within 25 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end within 10 ms of its end, the mean over animals of each animal's share (the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
@@ -26316,11 +26316,11 @@
    "pending": null
   },
   "timing_start_together_end_together_share_animal_min": {
-   "value": 0.5572790649102606,
+   "value": 0.2491855228140579,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest animal's share of the SWR-overlapping events that start within 25 ms of the matched SWR's start and end within 25 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
+   "description": "lowest animal's share of the SWR-overlapping events that start within 10 ms of the matched SWR's start and end within 10 ms of its end (an animal's share is the mean over its epochs of the epoch's share); over the immobile non-local events that start inside a well visit (from the first poke-in at a well to the final poke-out; visit_context in_visit or spans_visit_end)",
    "questions": [
     "2b.4"
    ],
