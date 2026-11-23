@@ -34,9 +34,21 @@ def test_real_places_refuse_a_ground_intensity_not_over_the_interior():
         real_places([1, 2, 3], [0, 1, 2], [True, True, False], [0, 0, 0])
 
 
-def test_place_ranks_scale_the_rate_order_to_0_and_1_ties_in_place_order():
+def test_place_ranks_count_the_places_with_a_lower_rate():
     np.testing.assert_allclose(
-        place_ranks([5.0, 1.0, 3.0, 1.0, 9.0]), [0.75, 0, 0.5, 0.25, 1]
+        place_ranks([5.0, 1.0, 3.0, 2.0, 9.0]), [0.75, 0, 0.5, 0.25, 1]
+    )
+
+
+def test_tied_places_take_the_lowest_rank_of_the_tie_wherever_they_are():
+    """Rates 0, 2, 0, 0, 7, 2 over five gaps: three places at 0 have none
+    below (0), the two at 2 have three below (3/5), 7 has five (1)."""
+    np.testing.assert_allclose(
+        place_ranks([0.0, 2.0, 0.0, 0.0, 7.0, 2.0]), [0, 0.6, 0, 0, 1, 0.6]
+    )
+    # equal as stored only: a rate one ulp above another is not tied with it
+    np.testing.assert_allclose(
+        place_ranks([1.0, np.nextafter(1.0, 2.0), 1.0]), [0, 1, 0]
     )
 
 
