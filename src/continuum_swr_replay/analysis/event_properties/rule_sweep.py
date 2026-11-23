@@ -228,7 +228,8 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
         ``animals`` and ``animal_names`` (each animal's share, the mean over
         its epochs with an event of each epoch's share, as
         ``event_statistics.overlap_class_animal_shares`` takes it),
-        ``animal_min`` and ``animal_max``.
+        ``no_swr_fraction_animal_mean`` (the mean over animals of those
+        shares, the panel's bold line), ``animal_min`` and ``animal_max``.
 
     Raises
     ------
@@ -274,6 +275,7 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
                     "no_swr_fraction": mine["n_no_swr"].sum() / n_events,
                     "animals": animals.to_numpy(),
                     "animal_names": animals.index.to_numpy(),
+                    "no_swr_fraction_animal_mean": float(animals.mean()),
                     "animal_min": float(animals.min()),
                     "animal_max": float(animals.max()),
                 }

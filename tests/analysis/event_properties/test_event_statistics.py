@@ -88,6 +88,11 @@ def test_overlap_class_statistics_take_an_animal_s_share_over_its_epochs():
     # a: the mean of 1 and 0.2 is 0.6 (pooled, 2 of 6 would be 1/3); b: 1/3
     assert result["non_swr_fraction_animal_min"] == pytest.approx(1 / 3)
     assert result["non_swr_fraction_animal_max"] == pytest.approx(0.6)
+    # Figure 2d's bars, the mean over animals: non-SWR (0.6 + 1/3) / 2, partial
+    # (0.4 + 0) / 2, contained (0 + 2/3) / 2; they add to 1
+    assert result["non_swr_fraction_animal_mean"] == pytest.approx((0.6 + 1 / 3) / 2)
+    assert result["swr_partial_fraction_animal_mean"] == pytest.approx(0.2)
+    assert result["swr_contained_fraction_animal_mean"] == pytest.approx(1 / 3)
     # a's shares: non-SWR 0.6, partial 0.4, contained 0 (pooled, its 4 partial
     # events would outnumber its 2 non-SWR ones)
     assert result["n_animals_non_swr_plurality"] == 1
@@ -166,9 +171,12 @@ def test_boundary_timing_classes_each_bound_against_the_tolerance():
     assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.025
 
 
-def test_boundary_timing_statistics_pool_the_events_and_range_the_animals():
-    """Animal a: (earlier, later), (together, together), (together, together);
-    b: (earlier, later). Pooled over 4 events; a's shares 1/3 and 2/3, b's 1."""
+def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
+    """Animal a: epoch 1 (earlier, later) and (together, together), epoch 2
+    (together, together); b: (earlier, later). Pooled over 4 events. a's
+    shares are the mean over its epochs: (earlier, later) (1/2 + 0) / 2 = 1/4,
+    (together, together) (1/2 + 1) / 2 = 3/4; b's 1 and 0. The cell is the
+    mean over animals."""
     offsets = pd.DataFrame(
         {
             "start_offset_s": [-0.05, 0.0, 0.01, -0.04],
@@ -176,19 +184,29 @@ def test_boundary_timing_statistics_pool_the_events_and_range_the_animals():
         },
         index=[10, 11, 12, 13],
     )
-    animal = pd.Series(["a", "a", "a", "b", "c"], index=[10, 11, 12, 13, 99])
-    table = stats.boundary_timing_statistics(offsets, animal)
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "c"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e1", "e1"],
+        },
+        index=[10, 11, 12, 13, 99],
+    )
+    table = stats.boundary_timing_statistics(offsets, events)
     assert len(table) == 9
     assert list(table.index.get_level_values("start")[:3]) == ["earlier"] * 3
     assert table["share"].sum() == pytest.approx(1.0)
+    assert table["share_animal_mean"].sum() == pytest.approx(1.0)
     wide = table.loc[("earlier", "later")]
     assert wide["share"] == pytest.approx(0.5) and wide["n_events"] == 2
-    assert wide["animal_min"] == pytest.approx(1 / 3)
+    assert wide["animal_min"] == pytest.approx(1 / 4)
     assert wide["animal_max"] == pytest.approx(1.0)
+    assert wide["share_animal_mean"] == pytest.approx((1 / 4 + 1) / 2)
     together = table.loc[("together", "together")]
     assert together["share"] == pytest.approx(0.5)
     assert together["animal_min"] == 0.0
-    assert together["animal_max"] == pytest.approx(2 / 3)
+    assert together["animal_max"] == pytest.approx(3 / 4)
+    assert together["share_animal_mean"] == pytest.approx(3 / 8)
     empty = table.loc[("later", "earlier")]
     assert empty["share"] == 0.0 and empty["animal_max"] == 0.0
 

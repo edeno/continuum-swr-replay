@@ -41,11 +41,14 @@ the order the text cites them, in five rows:
 
     b — Supports Figure 2a, where the No-Spike state first appears. Multiunit
         activity (``MUA_zscore``, as Figure 2g draws it) around
-        the start of No-Spike periods: the median over periods with the
-        interquartile band, a dotted line at the start and a dashed line at the
-        MUA level of immobile time outside the periods
-        (``no_spike_periods.level_outside_periods``, each epoch's median, then
-        the median over epochs; Figure 2g's "between events" level is outside
+        the start of No-Spike periods, animal-balanced as Figure 2g: the mean
+        over animals of each animal's median over its periods, with the mean
+        over animals of each animal's quartiles as the band
+        (``triggered_analysis.animal_balanced_quartiles``), a dotted line at
+        the start and a dashed line at the MUA level of immobile time outside
+        the periods (``no_spike_periods.level_outside_periods``, each epoch's
+        median, then each animal's median over its epochs, then the mean over
+        animals; Figure 2g's "between events" level is outside
         every non-local, SWR and MUA event, which does not carry over). A
         period is the non-local events' rule applied to the No-Spike state
         (``no_spike_periods.no_spike_periods``: P(No-Spike) strictly above 0.8
@@ -70,8 +73,8 @@ the order the text cites them, in five rows:
         shortest event it keeps (n samples of 2 ms: 14 ms, the rule's 7
         samples or 15 ms, to 100 ms, 50 samples). The third is the SWR detector's
         threshold (heading "SWR detector", 0 to 6 z). A thin line per animal
-        (the mean over its epochs of each epoch's share) and the share pooled
-        over events in bold; the value the paper uses is dotted and marked
+        (the mean over its epochs of each epoch's share) and their mean over
+        animals in bold; the value the paper uses is dotted and marked
         "used" on every axis. Under each axis, the events detected at each
         value (thousands; flat under the SWR threshold, which relabels the
         rule's events). About a third of the events have no SWR even at
@@ -94,11 +97,12 @@ the order the text cites them, in five rows:
         positive end offset one that ends later), classed by its start
         (earlier, within 25 ms, later) and its end (the same), 25 ms being the
         tolerance of the events summary's ``*_beyond_twenty_five_ms_fraction``
-        values (``event_statistics.TIMING_TOLERANCE``). Each cell is the share
-        of the pairs in it, pooled over every pair as Figure 2c and d pool,
+        values (``event_statistics.TIMING_TOLERANCE``). Each cell is the mean
+        over animals of each animal's share of its pairs in it (the mean over
+        its epochs of each epoch's share), as Figure 2c and d take their bars,
         with the lowest and highest animal's share under it in small type
         (``event_statistics.boundary_timing_statistics``; the events summary's
-        ``timing_*`` values). The four corner cells are named, as the event
+        ``timing_*_share_animal_*`` values). The four corner cells are named, as the event
         and its SWR overlap there with neither bound together: start and end
         earlier, the event leads; start earlier and end later, it contains the
         SWR; start later and end earlier, it is inside the SWR; start and end
@@ -238,8 +242,8 @@ the order the text cites them, in five rows:
         from how the events are defined, so they describe where the gain sits
         and do not test the events.
 
-    k — Supports Figure 2g, whose lines are medians over events pooled over
-        the animals: the same signals around the same events' starts (ripple
+    k — Supports Figure 2g, whose lines are the mean over animals of these
+        lines: the same signals around the same events' starts (ripple
         power, MUA, theta power, head speed; ``triggered_analysis.TRIGGERED_SIGNALS``
         over the window ``TRIGGERED_WINDOW_S``), a thin line per animal and
         class (SWR, No SWR, in Figure 2g's colors), each the animal's median over
@@ -344,16 +348,17 @@ from continuum_swr_replay.analysis.event_properties.rule_sweep import (
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     TRIGGERED_SIGNALS,
+    animal_balanced_quartiles,
     animal_window_medians,
     get_signal_windows,
     triggered_windows,
     triggering_events_in,
-    window_quartiles,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
     well_visit_times,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_medians
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_decode_files,
@@ -598,9 +603,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
         "step_test": read_step_test(inputs.class_structure, inputs.event_table),
         "hpd": hpd_distribution(events),
-        "timing": boundary_timing_statistics(
-            boundary_offsets(events), events["animal"]
-        ),
+        "timing": boundary_timing_statistics(boundary_offsets(events), events),
         "tetrode": {
             column: holdout_statistics(windows, "event", column)
             for column in SPLIT_LABELS
@@ -802,10 +805,12 @@ def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
         path.name.removesuffix(data_over_time_suffix())
     )
     periods = no_spike_periods(frame, arrival, departure)
+    session = frame[["animal", "day", "epoch"]].iloc[0]
     epoch = {
         "level": level_outside_periods(
             frame, periods, arrival, departure, NO_SPIKE_SIGNAL
-        )
+        ),
+        "animal": session["animal"],
     }
     if keys is not None:
         epoch["event_windows"] = triggered_windows(
@@ -816,7 +821,6 @@ def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
         )
     if periods.empty:
         return epoch
-    session = frame[["animal", "day", "epoch"]].iloc[0]
     windows = get_signal_windows(
         frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
         window_sec=TRIGGER_WINDOW_S,
@@ -825,7 +829,6 @@ def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
         **epoch,
         "windows": windows.sel(signal=NO_SPIKE_SIGNAL).values,
         "time": windows["time"].values,
-        "animal": session["animal"],
         "durations": periods["duration"].to_numpy(),
     }
 
@@ -848,8 +851,9 @@ def read_frame_traces(
     -------
     dict
         ``no_spike``, the No-Spike panel's trace: ``time`` (s from the
-        start), ``q25``, ``median`` and ``q75`` over the periods with a window
-        (``triggered_analysis.window_quartiles``); ``level``: the median over
+        start), ``q25``, ``median`` and ``q75``, animal-balanced over the
+        periods with a window (``triggered_analysis.animal_balanced_quartiles``);
+        ``level``: the mean over animals of each animal's median over its
         epochs of each epoch's MUA level outside its periods; ``periods``: the
         periods with a window, by animal; ``median_duration``: their median
         duration (s). ``event_traces`` (None without ``events``): by SWR class
@@ -874,10 +878,16 @@ def read_frame_traces(
     counts: dict = {}
     for epoch in with_periods:
         counts[epoch["animal"]] = counts.get(epoch["animal"], 0) + len(epoch["windows"])
+    levels = pd.Series([epoch["level"] for epoch in epochs])
     no_spike = {
         "time": with_periods[-1]["time"],
-        **window_quartiles(np.concatenate([e["windows"] for e in with_periods])),
-        "level": float(np.nanmedian([epoch["level"] for epoch in epochs])),
+        **animal_balanced_quartiles(
+            np.concatenate([e["windows"] for e in with_periods]),
+            np.concatenate([[e["animal"]] * len(e["windows"]) for e in with_periods]),
+        ),
+        "level": float(
+            animal_medians(levels, pd.Series([e["animal"] for e in epochs])).mean()
+        ),
         "periods": pd.Series(counts, name="periods"),
         "median_duration": float(
             np.median(np.concatenate([e["durations"] for e in with_periods]))
@@ -901,16 +911,17 @@ def read_frame_traces(
 def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
     """The timing table: the share of SWR-overlapping events in each combination of
     start (rows) and end (columns) against the matched SWR's, as a heat map
-    with the percent in each cell, the animals' range (in percent) under it
+    with the mean over animals' percent in each cell, the animals' range (in
+    percent) under it
     and the corner cells' names (:data:`TIMING_CORNERS`) above it, in black
     or white, whichever reads against the cell (``timing``: :func:`read_inputs`'
     ``timing``)."""
     n = len(TIMING_CLASSES)
-    shares = timing["share"].to_numpy().reshape(n, n)
+    shares = timing["share_animal_mean"].to_numpy().reshape(n, n)
     cmap = plt.get_cmap(TIMING_CMAP)
     ax.imshow(100 * shares, cmap=cmap, vmin=0, vmax=100, aspect="auto")
     for (row, column), cell in zip(np.ndindex(n, n), timing.itertuples(), strict=True):
-        red, green, blue, _ = cmap(cell.share)
+        red, green, blue, _ = cmap(cell.share_animal_mean)
         color = "white" if 0.299 * red + 0.587 * green + 0.114 * blue < 0.5 else "black"
         if cell.Index in TIMING_CORNERS:
             ax.text(
@@ -919,7 +930,8 @@ def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
                 style="italic",
             )  # fmt: skip
         ax.text(
-            column, row + SHARE_DROP, f"{100 * cell.share:.0f}%", ha="center",
+            column, row + SHARE_DROP, f"{100 * cell.share_animal_mean:.0f}%",
+            ha="center",
             va="center", fontsize=SMALL_SIZE, color=color,
         )  # fmt: skip
         ax.text(
@@ -1107,7 +1119,7 @@ def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
 def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
     """The sweep panel: on the top row, the share of events with no SWR at each
     value of each swept setting (one axis each, sharing the y axis), a thin
-    line per animal and the pooled share in bold with its dots, and on every
+    line per animal and their mean over animals in bold with its dots, and on every
     axis the value the paper uses dotted and marked "used"; on the bottom row,
     under each, the events detected at each value (thousands, summed over the
     epochs; flat on the SWR threshold's axis, which relabels the rule's
@@ -1126,7 +1138,7 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
             [animal_values(row, "animals") for _, row in mine.iterrows()]
         )
         ax.plot(x, 100 * animals.to_numpy(), color="k", lw=0.5, alpha=0.5)
-        ax.plot(x, 100 * mine["no_swr_fraction"].to_numpy(), color="k", lw=1.0,
+        ax.plot(x, 100 * mine["no_swr_fraction_animal_mean"].to_numpy(), color="k", lw=1.0,
                 marker="o", ms=2)  # fmt: skip
         ax_count.plot(x, mine["n_events"].to_numpy() / 1000, color="k", lw=1.0,
                       marker="o", ms=2)  # fmt: skip
@@ -1253,7 +1265,7 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
 
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     """The No-Spike panel: MUA around No-Spike starts (``trace``: :func:`read_frame_traces`' ``no_spike``),
-    the median with its interquartile band as Figure 2g draws its rows, a dotted
+    the animal-balanced median with its band as Figure 2g draws its rows, a dotted
     line at the start and a dashed line at the level outside the periods."""
     t_ms = 1000 * np.asarray(trace["time"])
     ax.fill_between(

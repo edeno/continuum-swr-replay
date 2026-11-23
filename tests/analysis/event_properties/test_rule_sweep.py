@@ -105,6 +105,7 @@ def test_sweep_statistics_pool_the_events_and_average_each_animals_epochs():
     assert rule["no_swr_fraction"] == pytest.approx(20 / 40)
     # a: mean of 0.5 and 0.3; b: 0.6
     np.testing.assert_allclose(rule["animals"], [0.4, 0.6])
+    assert rule["no_swr_fraction_animal_mean"] == pytest.approx(0.5)
     assert list(rule["animal_names"]) == ["a", "b"]
     assert (rule["animal_min"], rule["animal_max"]) == pytest.approx((0.4, 0.6))
     high = stats.loc[("probability_threshold", 0.9)]
@@ -114,6 +115,7 @@ def test_sweep_statistics_pool_the_events_and_average_each_animals_epochs():
     # a's e2 has no event at 25 samples: a's share is e1's alone
     longest = stats.loc[("minimum_samples", 25.0)]
     np.testing.assert_allclose(longest["animals"], [0.5, 10 / 16])
+    assert longest["no_swr_fraction_animal_mean"] == pytest.approx((0.5 + 10 / 16) / 2)
     assert sweep.criterion_agreement(_counts()) == pytest.approx(37 / 40)
 
 

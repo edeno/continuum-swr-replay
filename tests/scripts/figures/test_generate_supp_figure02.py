@@ -83,8 +83,9 @@ def _participation() -> pd.DataFrame:
 
 
 def _timing() -> pd.DataFrame:
-    """``boundary_timing_statistics``' nine cells: shares 0.05 to 0.7 (the
-    middle cell the largest), each animal range 0.01 either side."""
+    """``boundary_timing_statistics``' nine cells: the animals' mean shares
+    0.05 to 0.7 (the middle cell the largest), each animal range 0.01 either
+    side, the pooled shares (not drawn) a little off."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
         TIMING_CLASSES,
     )
@@ -95,8 +96,9 @@ def _timing() -> pd.DataFrame:
     )
     return pd.DataFrame(
         {
-            "share": shares, "animal_min": shares - 0.01,
-            "animal_max": shares + 0.01, "n_events": (1000 * shares).astype(int),
+            "share_animal_mean": shares, "animal_min": shares - 0.01,
+            "animal_max": shares + 0.01, "share": shares[::-1],
+            "n_events": (1000 * shares).astype(int),
         },
         index=cells,
     )  # fmt: skip
@@ -344,14 +346,16 @@ def test_each_panels_values_carry_its_letter():
 
 
 def test_the_timing_panel_draws_the_timing_table(drawn):
-    """The nine shares as a 3 by 3 heat map (rows the start, columns the end),
-    each cell's percent and its animals' range, white on the dark cell and
-    black on the pale ones, and the labels."""
+    """The nine shares (the mean over animals, not the pooled share) as a 3
+    by 3 heat map (rows the start, columns the end), each cell's percent and
+    its animals' range, white on the dark cell and black on the pale ones, and
+    the labels."""
     fig = drawn
     (ax,) = figure.panel_axes(fig, "boundary_timing")
     (image,) = ax.images
     np.testing.assert_allclose(
-        image.get_array(), 100 * _timing()["share"].to_numpy().reshape(3, 3)
+        image.get_array(),
+        100 * _timing()["share_animal_mean"].to_numpy().reshape(3, 3),
     )
     texts = {t.get_text(): t for t in ax.texts}
     assert texts["70%"].get_position() == pytest.approx((1, 1 + figure.SHARE_DROP))
@@ -538,7 +542,7 @@ def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
 
 def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
     """Three small axes sharing the y axis, one per swept setting: a thin line
-    per animal and the pooled share in bold, in percent, the rule's value
+    per animal and their mean over animals in bold, in percent, the rule's value
     marked by a dotted line; under each, the events at each value in
     thousands; the minimum run length drawn in ms (2 ms a sample)."""
     from continuum_swr_replay.analysis.event_properties.rule_sweep import (
@@ -557,10 +561,11 @@ def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
         mine = sweep[sweep["setting"] == setting]
         scale = figure.SWEEP_SCALES[setting]
         lines = [line for line in ax.lines if len(line.get_xdata()) == len(values)]
-        assert len(lines) == 2 + 1  # two animals and the pooled share
+        assert len(lines) == 2 + 1  # two animals and their mean
         np.testing.assert_allclose(lines[-1].get_xdata(), scale * np.asarray(values))
         np.testing.assert_allclose(
-            lines[-1].get_ydata(), 100 * mine["no_swr_fraction"].to_numpy()
+            lines[-1].get_ydata(),
+            100 * mine["no_swr_fraction_animal_mean"].to_numpy(),
         )
         (count,) = [
             line for line in ax_count.lines if len(line.get_xdata()) == len(values)

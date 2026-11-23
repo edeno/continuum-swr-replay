@@ -11,20 +11,25 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         its SWR, one that ends after it, two with no SWR (a trajectory and a
         stationary event), and an SWR whose content is Local; the ripple
         traces carry panel a's dashed SWR threshold.
-    c — The SWRs by content (bars pooled over SWRs, dots one per animal): with a
-        non-local event, mostly Local, or other. The decoder finds the replay
-        SWRs are known for.
+    c — The SWRs by content: with a non-local event, mostly Local, or other.
+        A dot per animal (its share, the mean over its epochs of each epoch's
+        share), the bar and its percent the mean of the dots; the count is
+        every SWR. The decoder finds the replay SWRs are known for.
     d — The non-local events by SWR overlap (bars and animal dots as in c): most
         events have no SWR.
     e — For each SWR definition, MUA and the Widloski detector, c's and d's
         questions: the share of its own events that overlap a non-local event,
-        and the share of non-local events its events overlap.
+        and the share of non-local events its events overlap (bars and animal
+        dots as in c).
     f — Each SWR-overlapping event's start and end minus its SWR's: the percent
         of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
         outlines the animals.
     g — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
-        power and head speed, each the median and interquartile range over
-        events, with the epochs' level between events, theta's running level and
+        power and head speed, each animal-balanced: the line the mean over
+        animals of each animal's median over its events (the lines of Figure
+        2's supplement, panel k), the band the mean over animals of each
+        animal's quartiles (a spread over events, every animal weighted the
+        same), with the epochs' level between events, theta's running level and
         the immobility threshold. Both kinds of event come with a rise in MUA
         that is not due to movement or theta: the animal is still and theta
         stays at its level between events, far below running.
@@ -324,7 +329,9 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 #     counts (then ``Processed-Data/nonlocal_by_ripple_power``).
 # 15: i's averages and c and e's comparison are over the events that start
 #     inside a well visit.
-FIGURE02_CACHE_VERSION = 15
+# 16: g's quartiles are animal-balanced (the mean over animals of each
+#     animal's quartiles).
+FIGURE02_CACHE_VERSION = 16
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -1078,16 +1085,18 @@ def draw_class_bars(
     title: str,
     xlabel: str,
 ) -> None:
-    """Classes as horizontal bars, top to bottom: the pooled share as a bar with
-    its percent in a column past the axis's 100, each animal's share as a dot.
+    """Classes as horizontal bars, top to bottom: the mean over animals as a bar
+    with its percent in a column past the axis's 100, each animal's share as a
+    dot.
 
-    ``rows`` are (label, pooled share, the animals' shares, color, bold label).
+    ``rows`` are (label, the mean over animals, the animals' shares, color,
+    bold label).
     """
     n_rows = len(rows)
-    for i, (_, pooled, animals, color, _) in enumerate(rows):
+    for i, (_, share, animals, color, _) in enumerate(rows):
         y = n_rows - 1 - i
         ax.barh(
-            y, 100 * pooled, color=color, height=0.65, linewidth=0.5,
+            y, 100 * share, color=color, height=0.65, linewidth=0.5,
             edgecolor="#777777" if color == C_OTHER else "none",
         )  # fmt: skip
         ax.scatter(
@@ -1095,7 +1104,7 @@ def draw_class_bars(
             s=3, color="k", lw=0, zorder=3,
         )  # fmt: skip
         ax.text(
-            1.0, y, f"{format_number(pooled, 'pctnum')}%",
+            1.0, y, f"{format_number(share, 'pctnum')}%",
             transform=ax.get_yaxis_transform(), ha="right", va="center",
             fontsize=SMALL_SIZE, fontweight="bold" if rows[i][4] else "normal",
         )  # fmt: skip
@@ -1116,13 +1125,14 @@ def draw_class_bars(
 def draw_events_bars(ax: Axes, classes: dict, animals: pd.DataFrame) -> None:
     """Panel d: the non-local events by SWR overlap.
 
-    Bars pool the events (``overlap_class_statistics``); dots are the animals
-    (``overlap_class_animal_shares``).
+    Dots are the animals (``overlap_class_animal_shares``), bars their mean
+    (``overlap_class_statistics``' ``*_fraction_animal_mean``); the count is
+    every event.
     """
     rows = [
         (
             CLASS_LABELS[c],
-            classes[f"{c}_fraction"],
+            classes[f"{c}_fraction_animal_mean"],
             animals[c],
             CLASS_COLORS[c],
             c == "non_swr",
@@ -1137,11 +1147,11 @@ def draw_events_bars(ax: Axes, classes: dict, animals: pd.DataFrame) -> None:
 def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     """Panel c: the SWRs by content.
 
-    Bars pool Kay's SWRs (``other_detector_statistics``); dots are the animals
-    (``content_class_animal_shares``).
+    Dots are the animals (``content_class_animal_shares``), bars their mean
+    (``other_detector_statistics``' ``*_animal_mean``); the count is every SWR.
     """
-    no_nonlocal = kay["no_nonlocal_fraction"]
-    mostly_local = kay["mostly_local_fraction"]
+    no_nonlocal = kay["no_nonlocal_fraction_animal_mean"]
+    mostly_local = kay["mostly_local_fraction_animal_mean"]
     rows = [
         ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, True),
         ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, False),
@@ -1436,9 +1446,11 @@ def draw_heldout_event_gain(ax: Axes, statistics: RestrictionFigureStatistics) -
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
     """Panel g: ripple power, MUA, theta and head speed around event starts.
 
-    Every row is the median over events with the interquartile band, so the
-    spread over events is seen, not only the center, and the line is the
-    statistic the text quotes: ripple and MUA rise at the start, theta stays at
+    Every row is animal-balanced: the line is the mean over animals of each
+    animal's median over its events, the band the mean over animals of each
+    animal's quartiles (``triggered_analysis.animal_balanced_quartiles``), so
+    the spread over events is seen, not only the center: ripple and MUA rise
+    at the start, theta stays at
     its level between events, far below running, and the animal is still. The
     dashed "between events" line is the epochs' median in immobile bins outside
     every non-local, SWR and MUA event (``reference_medians``).
@@ -1517,7 +1529,8 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
 def draw_detector_bars(
     ax: Axes, shares: pd.DataFrame, n_rows: int, xlabel: str, show_labels: bool
 ) -> None:
-    """One bar per detector (pooled share) with a dot per animal, top to bottom.
+    """One bar per detector (the mean over animals) with a dot per animal, top
+    to bottom.
 
     The SWR definitions other than Kay's are drawn faded.
     """
@@ -1525,7 +1538,7 @@ def draw_detector_bars(
         y = n_rows - 1 - i
         faded = detector in SWR_DEFINITIONS and detector != "kay"
         ax.barh(
-            y, 100 * row["pooled"], color=detector_color(detector), height=0.65,
+            y, 100 * row["animal_mean"], color=detector_color(detector), height=0.65,
             alpha=0.55 if faded else 1.0,
         )  # fmt: skip
         animals = 100 * row["animals"]
@@ -1551,7 +1564,7 @@ def draw_detector_overlap(
 ) -> None:
     """Panel e: what each detector's events contain, and what it catches.
 
-    Bars pool all events; dots are animals (for the caption).
+    Dots are animals; bars are their mean.
 
     Left, panel c's question for every detector: the share of its own events
     that overlap a non-local event; right, panel d's: the share of non-local

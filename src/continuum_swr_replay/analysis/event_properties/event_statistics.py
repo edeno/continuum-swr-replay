@@ -147,6 +147,9 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
         - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
           lying inside an SWR and overlapping one in part, pooled the same way.
+        - ``non_swr_fraction_animal_mean``, ``swr_contained_fraction_animal_mean``,
+          ``swr_partial_fraction_animal_mean``: the mean over animals of each
+          animal's own share of the class (Figure 2d's bars).
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -185,6 +188,10 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "non_swr_fraction": counts["non_swr"] / counts["total"],
         "swr_contained_fraction": counts["swr_contained"] / counts["total"],
         "swr_partial_fraction": counts["swr_partial"] / counts["total"],
+        **{
+            f"{overlap_class}_fraction_animal_mean": shares[overlap_class].mean()
+            for overlap_class in OVERLAP_CLASSES
+        },
         "non_swr_fraction_animal_min": non_swr.min(),
         "non_swr_fraction_animal_max": non_swr.max(),
         "n_animals": len(shares),
@@ -369,7 +376,7 @@ def boundary_timing_classes(offsets: pd.DataFrame) -> pd.DataFrame:
 
 
 def boundary_timing_statistics(
-    offsets: pd.DataFrame, animal: pd.Series
+    offsets: pd.DataFrame, events: pd.DataFrame
 ) -> pd.DataFrame:
     """The share of SWR-overlapping events in each of the nine combinations of
     their start and end against their SWR's (:func:`boundary_timing_classes`).
@@ -378,36 +385,45 @@ def boundary_timing_statistics(
     ----------
     offsets : pd.DataFrame, shape (n_overlapping_events, 2)
         :func:`boundary_offsets`.
-    animal : pd.Series
-        Each event's animal, indexed as ``offsets`` (or a superset of it).
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
 
     Returns
     -------
-    pd.DataFrame, shape (9, 4)
+    pd.DataFrame, shape (9, 5)
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
-        order): ``share``, pooled over every event, as panels c and d pool;
-        ``animal_min`` and ``animal_max``, the lowest and highest of each
-        animal's share over its own events; ``n_events``, the events in the
-        cell.
+        order): ``share_animal_mean``, the mean over animals of each animal's
+        share (the panel's cell); ``animal_min`` and ``animal_max``, the lowest
+        and highest animal's share; ``share``, pooled over every event;
+        ``n_events``, the events in the cell. An animal's share of a cell is
+        the mean over its epochs of each epoch's share of its pairs (event ->
+        epoch -> animal, as :func:`overlap_class_animal_shares` takes it); an
+        epoch with no pair in a cell has a share of 0 in it.
     """
     classes = boundary_timing_classes(offsets)
+    sessions = events.loc[classes.index]
     cells = pd.MultiIndex.from_product(
         [TIMING_CLASSES, TIMING_CLASSES], names=["start", "end"]
     )
     counts = classes.value_counts(["start", "end"]).reindex(cells, fill_value=0)
-    per_animal = (
-        classes.assign(animal=animal.loc[classes.index])
-        .groupby("animal")
-        .value_counts(["start", "end"], normalize=True)
-        .unstack("animal")
-        .reindex(cells, fill_value=0.0)
-        .fillna(0.0)
-    )
+    per_animal = pd.DataFrame(
+        {
+            (start, end): animal_session_values(
+                ((classes["start"] == start) & (classes["end"] == end)).astype(float),
+                sessions["animal"],
+                sessions[_WITHIN_ANIMAL],
+                "mean",
+            )
+            for start, end in cells
+        }
+    ).T.set_axis(cells)
     return pd.DataFrame(
         {
-            "share": counts / counts.sum(),
+            "share_animal_mean": per_animal.mean(axis=1),
             "animal_min": per_animal.min(axis=1),
             "animal_max": per_animal.max(axis=1),
+            "share": counts / counts.sum(),
             "n_events": counts,
         }
     )

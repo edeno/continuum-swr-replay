@@ -90,6 +90,10 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
         "non_swr_fraction": pytest.approx(7 / 13),
         "swr_contained_fraction": pytest.approx(2 / 13),
         "swr_partial_fraction": pytest.approx(4 / 13),
+        # Figure 2d's bars: the mean over animals of each animal's shares
+        "non_swr_fraction_animal_mean": pytest.approx(0.55),
+        "swr_contained_fraction_animal_mean": pytest.approx(1 / 6),
+        "swr_partial_fraction_animal_mean": pytest.approx(0.85 / 3),
         "non_swr_fraction_animal_min": pytest.approx(0.4),
         "non_swr_fraction_animal_max": pytest.approx(0.75),
         "animals": 3,
@@ -201,9 +205,15 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     """The six SWR-overlapping events: a (together, together); b (together,
     together), (later, earlier) twice; c (later, earlier), (later, later)."""
     values = _by_key(builder.boundary_timing_values(_events(), "s"))
-    assert len(values) == 9 * 3
+    assert len(values) == 9 * 4
     shares = {k: v.value for k, v in values.items() if k.endswith("_share")}
     assert sum(shares.values()) == pytest.approx(1.0)
+    means = {k: v.value for k, v in values.items() if k.endswith("_animal_mean")}
+    assert sum(means.values()) == pytest.approx(1.0)
+    # later-earlier, the mean over animals: (0 + 2/3 + 1/2) / 3
+    assert values[
+        "timing_start_later_end_earlier_share_animal_mean"
+    ].value == pytest.approx(7 / 18)
     assert values["timing_start_together_end_together_share"].value == 2 / 6
     assert values["timing_start_later_end_earlier_share"].value == 3 / 6
     assert values["timing_start_later_end_later_share"].value == 1 / 6
@@ -212,9 +222,9 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_max"
     ].value == pytest.approx(2 / 3)
-    assert {v.figures for v in values.values()} == {
-        builder.TAGS["boundary_timing"].figures
-    }
+    # the panel draws the animals' mean and range; the pooled share no figure
+    for key, value in values.items():
+        assert value.figures == (() if key.endswith("_share") else ("S2d",))
     assert {v.questions for v in values.values()} == {("2b.4",)}
     assert "more than 25 ms later than the matched SWR's start" in (
         values["timing_start_later_end_earlier_share"].description
@@ -270,38 +280,57 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
     for k, detector in enumerate(detectors):
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
         expected[key] = (2 + k % 2) / 4
+        expected[f"{key}_animal_mean"] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_min"] = min(0.75, k % 2)
         expected[f"{key}_animal_max"] = max(0.75, k % 2)
     assert {k: v.value for k, v in values.items()} == pytest.approx(expected)
     assert "nonlocal_events_found_by_widloski_fraction" in values
-    # the criteria-only Widloski inventory is a value for the text, untagged
+    # the criteria-only Widloski inventory is a value for the text, untagged,
+    # and so is every pooled share: the panel draws the animals' mean
     text = "nonlocal_events_found_by_widloski_criteria_fraction"
     for key, value in values.items():
         assert value.questions == ("2b.3",)
-        assert value.figures == (() if key.startswith(text) else ("2e",))
+        untagged = key.startswith(text) or key.endswith("_fraction")
+        assert value.figures == (() if untagged else ("2e",))
         assert value.kind == "fraction"
         assert value.function == "nonlocal_found_values"
 
 
 def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
-    """For the criteria-only Widloski inventory, the share of its events that
-    overlap a non-local event (pooled, lowest and highest animal), the
-    statistic of Figure 2e's left bars, for the text."""
+    """The statistic of Figure 2e's left bars: for each detector the panel
+    draws, the mean over animals of each animal's share of its events that
+    overlap a non-local event and the lowest and highest animal, tagged to
+    the panel; for the criteria-only Widloski inventory, also pooled, for the
+    text."""
+    from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
+
+    detectors = (*nonlocal_comparison.FIGURE_DETECTORS, "memoryless_criteria")
     events = pd.DataFrame(
         {
-            "animal": ["a", "a", "a", "b"],
-            "day": [1, 1, 2, 1],
+            "animal": ["a", "a", "a", "b"] * len(detectors),
+            "day": [1, 1, 2, 1] * len(detectors),
             "epoch": "02_r1",
-            "detector": "memoryless_criteria",
-            "matched": [True, False, True, False],
+            "detector": np.repeat(detectors, 4),
+            "matched": [True, False, True, False] * len(detectors),
         }
     )
     values = _by_key(builder.detections_with_nonlocal_values(events, "s"))
     key = "widloski_criteria_with_nonlocal_fraction"
-    assert {k: v.value for k, v in values.items()} == pytest.approx(
-        {key: 0.5, f"{key}_animal_min": 0.0, f"{key}_animal_max": 0.75}
+    # a: the mean of its epochs' 1/2 and 1; b: 0
+    assert {k: v.value for k, v in values.items() if k.startswith(key)} == (
+        pytest.approx(
+            {
+                key: 0.5,
+                f"{key}_animal_mean": 0.375,
+                f"{key}_animal_min": 0.0,
+                f"{key}_animal_max": 0.75,
+            }
+        )
     )
-    assert {v.figures for v in values.values()} == {()}
+    assert values["kay_with_nonlocal_fraction_animal_mean"].value == 0.375
+    assert "kay_with_nonlocal_fraction" not in values
+    for name, value in values.items():
+        assert value.figures == (() if name.startswith(key) else ("2e",))
 
 
 def test_other_detector_values_name_each_detector_and_each_state():
@@ -317,7 +346,9 @@ def test_other_detector_values_name_each_detector_and_each_state():
         "no_nonlocal_fraction": 0.75,
         "no_nonlocal_fraction_animal_min": 0.0,
         "no_nonlocal_fraction_animal_max": 1.0,
+        "no_nonlocal_fraction_animal_mean": 0.5,
         "mostly_local_fraction": 0.5,
+        "mostly_local_fraction_animal_mean": pytest.approx(1 / 3),
         "no_nonlocal_mostly_local_fraction": pytest.approx(2 / 3),
         "no_nonlocal_mostly_no_spike_fraction": pytest.approx(1 / 3),
         "no_nonlocal_mixed_fraction": 0.0,
@@ -339,8 +370,12 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert "yu_no_nonlocal_fraction_animal_min" not in numbers
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
-    # the main detector's mostly-Local share is Figure 2d's
-    assert values["kay_mostly_local_fraction"].figures == ("2c",)
+    # Figure 2c draws the main detector's animal means; its pooled shares no
+    # figure
+    assert values["kay_mostly_local_fraction_animal_mean"].figures == ("2c",)
+    assert values["kay_no_nonlocal_fraction_animal_mean"].figures == ("2c",)
+    assert values["kay_mostly_local_fraction"].figures == ()
+    assert values["kay_no_nonlocal_fraction"].figures == ()
 
 
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
@@ -681,13 +716,17 @@ def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check()
     ].value == pytest.approx(0.5)
     assert values["rule_sweep_swr_criterion_agreement"].value == pytest.approx(37 / 40)
     n_values = sum(len(v) for v in rule_sweep.SETTINGS.values())
-    # per value: the share, its two animal bounds, events against the rule's
-    # and the events
-    assert len(values) == 5 * n_values + 1
+    assert values[
+        "rule_sweep_minimum_samples_twenty_five_no_swr_fraction_animal_mean"
+    ].value == pytest.approx((0.5 + 10 / 16) / 2)
+    # per value: the share, the animals' mean, its two animal bounds, events
+    # against the rule's and the events
+    assert len(values) == 6 * n_values + 1
     assert not any(c.isdigit() for k in values for c in k)
-    for value in values.values():
+    for key, value in values.items():
         assert value.questions == ("2a.5",)
-        assert value.figures == builder.TAGS["rule_sweep"].figures
+        pooled = key.endswith("_no_swr_fraction")
+        assert value.figures == (() if pooled else builder.TAGS["rule_sweep"].figures)
 
 
 def _state_calibration() -> tuple[pd.DataFrame, pd.DataFrame]:

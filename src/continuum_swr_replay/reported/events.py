@@ -267,6 +267,7 @@ TAGS = {
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
     "state_fractions_immobile": Tags(("2a.6",), ("2a",)),
     "cohort": Tags(("2b.2",), ("2d",)),
+    "cohort_pooled": Tags(("2b.2",)),
     "visit_context": Tags(("2b.2",)),
     "left_out": Tags(("2b.2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
@@ -275,6 +276,7 @@ TAGS = {
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
     "boundary_timing": Tags(("2b.4",), ("S2d",)),
+    "boundary_timing_pooled": Tags(("2b.4",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
     "mua": Tags(("2d.8",), ("2g",)),
     "theta": Tags(("2d.8",), ("2g",)),
@@ -286,6 +288,7 @@ TAGS = {
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
     "rule_sweep": Tags(("2a.5",), ("S2c",)),
+    "rule_sweep_pooled": Tags(("2a.5",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
     "participation": Tags(("2d.9",), ("S2h",)),
     "spike_rate": Tags(("2d.9",), ("S2f",)),
@@ -759,7 +762,18 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["non_swr_fraction"],
             "fraction",
             "pct",
-            "share of immobile non-local events overlapping no SWR, pooled over animals",
+            "share of immobile non-local events overlapping no SWR, pooled over "
+            "every event (no figure draws it)",
+            tags=TAGS["cohort_pooled"],
+        ),
+        make(
+            "non_swr_fraction_animal_mean",
+            stats["non_swr_fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events overlapping no SWR, the mean over "
+            "animals of each animal's share (an animal's share is the mean over its "
+            "epochs of the epoch's share; Figure 2d's bar)",
         ),
         make(
             "swr_contained_fraction",
@@ -767,7 +781,17 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             "fraction",
             "pct",
             "share of immobile non-local events lying inside an SWR, pooled over "
-            "animals",
+            "every event (no figure draws it)",
+            tags=TAGS["cohort_pooled"],
+        ),
+        make(
+            "swr_contained_fraction_animal_mean",
+            stats["swr_contained_fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events lying inside an SWR, the mean over "
+            "animals of each animal's share (the mean over its epochs; Figure 2d's "
+            "bar)",
         ),
         make(
             "swr_partial_fraction",
@@ -775,7 +799,17 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             "fraction",
             "pct",
             "share of immobile non-local events partly overlapping an SWR, pooled "
-            "over animals",
+            "over every event (no figure draws it)",
+            tags=TAGS["cohort_pooled"],
+        ),
+        make(
+            "swr_partial_fraction_animal_mean",
+            stats["swr_partial_fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events partly overlapping an SWR, the mean "
+            "over animals of each animal's share (the mean over its epochs; Figure "
+            "2d's bar)",
         ),
         make(
             "non_swr_fraction_animal_min",
@@ -934,11 +968,12 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4 and Figure 2's supplement, panel S2d: the share of
     SWR-overlapping events in each of the nine combinations of their start and
     end against their matched SWR's (earlier, together within 25 ms, later;
-    ``event_statistics.boundary_timing_statistics``), pooled over events, with
-    the lowest and highest animal."""
+    ``event_statistics.boundary_timing_statistics``): the mean over animals of
+    each animal's share (the panel's cell), with the lowest and highest
+    animal, and the share pooled over events (no figure draws it)."""
     make = value_factory(boundary_timing_values, source, TAGS["boundary_timing"])
     table = event_statistics.boundary_timing_statistics(
-        event_statistics.boundary_offsets(events), events["animal"]
+        event_statistics.boundary_offsets(events), events
     )
     tolerance_ms = (
         1000 * event_statistics.OFFSET_TAILS_S[event_statistics.TIMING_TOLERANCE]
@@ -961,9 +996,16 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             (row["share"], row["animal_min"], row["animal_max"]),
             (
                 f"share of the {what}, pooled over every SWR-overlapping event",
-                f"lowest animal's share of the {what}, over its own events",
-                f"highest animal's share of the {what}, over its own events",
+                f"lowest animal's share of the {what} (an animal's share is the "
+                "mean over its epochs of the epoch's share)",
+                f"highest animal's share of the {what} (the mean over its epochs)",
             ),
+            animal_mean=(
+                row["share_animal_mean"],
+                f"share of the {what}, the mean over animals of each animal's "
+                "share (the mean over its epochs of the epoch's share)",
+            ),
+            pooled_tags=TAGS["boundary_timing_pooled"],
         )
     return values
 
@@ -999,7 +1041,9 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 stats["no_nonlocal_fraction"],
                 "fraction",
                 "pct",
-                f"share of {detector} events that overlap no non-local event",
+                f"share of {detector} events that overlap no non-local event, pooled "
+                "over events",
+                tags=TAGS["other_detectors"] if main else None,
             ),
             make(
                 f"{word}_mostly_local_fraction",
@@ -1007,8 +1051,8 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event and have "
-                "Local above 0.8 in more than half their rows",
-                tags=TAGS["swr_content"] if main else None,
+                "Local above 0.8 in more than half their rows, pooled over events",
+                tags=TAGS["other_detectors"] if main else None,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_local_fraction",
@@ -1094,6 +1138,27 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
         if main:
             values += [
                 make(
+                    f"{word}_no_nonlocal_fraction_animal_mean",
+                    stats["no_nonlocal_fraction_animal_mean"],
+                    "fraction",
+                    "pct",
+                    f"share of {detector} events that overlap no non-local event, the "
+                    "mean over animals of each animal's share (the mean over its "
+                    "epochs of the epoch's share; Figure 2c's bar is 1 minus it)",
+                    tags=TAGS["swr_content"],
+                ),
+                make(
+                    f"{word}_mostly_local_fraction_animal_mean",
+                    stats["mostly_local_fraction_animal_mean"],
+                    "fraction",
+                    "pct",
+                    f"share of {detector} events that overlap no non-local event and "
+                    "have Local above 0.8 in more than half their rows, the mean over "
+                    "animals of each animal's share (the mean over its epochs; Figure "
+                    "2c's bar)",
+                    tags=TAGS["swr_content"],
+                ),
+                make(
                     f"{word}_no_nonlocal_fraction_animal_min",
                     stats["no_nonlocal_fraction_animal_min"],
                     "fraction",
@@ -1124,8 +1189,9 @@ TEXT_FOUND_DETECTORS = ("memoryless_criteria",)
 def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.3 and Figure 2e's right bars: for each detector the panel
     draws (``nonlocal_comparison.FIGURE_DETECTORS``), the share of the
-    selected non-local events that overlap one of its events, pooled over
-    events, and the lowest and highest animal's share
+    selected non-local events that overlap one of its events: the mean over
+    animals of each animal's share (the panel's bar), the lowest and highest
+    animal's share, and the share pooled over events (no figure draws it)
     (``nonlocal_comparison.nonlocal_events_overlapped``, which the figure
     draws); and the same, for the text and with no figure, for
     :data:`TEXT_FOUND_DETECTORS`.
@@ -1165,16 +1231,26 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
                 f"highest per-animal share of the non-local events that a {detector} "
                 "event overlaps (the mean over the animal's epochs)",
             ),
+            animal_mean=(
+                row["animal_mean"],
+                f"share of the non-local events that a {detector} event overlaps, "
+                "the mean over animals of each animal's share (the mean over its "
+                "epochs of the epoch's share)",
+            ),
+            pooled_tags=TAGS["other_detectors"],
         )
     return values
 
 
 def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.3, for the text: for each of :data:`TEXT_FOUND_DETECTORS`,
-    the share of its events that overlap a non-local event, pooled over events,
-    and the lowest and highest animal's share
-    (``nonlocal_comparison.events_overlapping_nonlocal``, the statistic of
-    Figure 2e's left bars, which do not draw these detectors).
+    """Question 2b.3: the share of a detector's events that overlap a non-local
+    event (``nonlocal_comparison.events_overlapping_nonlocal``). For each
+    detector Figure 2e's left bars draw (``nonlocal_comparison.FIGURE_DETECTORS``),
+    tagged to the panel: the mean over animals of each animal's share (the
+    bar), and the lowest and highest animal's (the pooled share is 1 minus
+    ``{word}_no_nonlocal_fraction``). For each of :data:`TEXT_FOUND_DETECTORS`,
+    for the text: the share pooled over events, the mean over animals and the
+    lowest and highest animal's.
 
     Parameters
     ----------
@@ -1185,8 +1261,43 @@ def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[V
     make = value_factory(
         detections_with_nonlocal_values, source, TAGS["other_detectors"]
     )
+    make_figure = value_factory(
+        detections_with_nonlocal_values, source, TAGS["nonlocal_found"]
+    )
     words = {detector: word for word, detector in DETECTORS.items()}
     values = []
+    figure_shares = nonlocal_comparison.events_overlapping_nonlocal(
+        events, nonlocal_comparison.FIGURE_DETECTORS
+    )
+    for detector, row in figure_shares.iterrows():
+        key = f"{words[detector]}_with_nonlocal_fraction"
+        values += [
+            make_figure(
+                f"{key}_animal_mean",
+                row["animal_mean"],
+                "fraction",
+                "pct",
+                f"share of the {detector} events that overlap a non-local event, the "
+                "mean over animals of each animal's share (an animal's share is the "
+                "mean over its epochs of the epoch's share)",
+            ),
+            make_figure(
+                f"{key}_animal_min",
+                float(np.min(row["animals"])),
+                "fraction",
+                "pctnum",
+                f"lowest per-animal share of the {detector} events that overlap a "
+                "non-local event (the mean over the animal's epochs)",
+            ),
+            make_figure(
+                f"{key}_animal_max",
+                float(np.max(row["animals"])),
+                "fraction",
+                "pct",
+                f"highest per-animal share of the {detector} events that overlap a "
+                "non-local event (the mean over the animal's epochs)",
+            ),
+        ]
     shares = nonlocal_comparison.events_overlapping_nonlocal(
         events, TEXT_FOUND_DETECTORS
     )
@@ -1207,6 +1318,12 @@ def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[V
                 "the epoch's share)",
                 f"highest per-animal share of the {detector} events that overlap a "
                 "non-local event (the mean over the animal's epochs)",
+            ),
+            animal_mean=(
+                row["animal_mean"],
+                f"share of the {detector} events that overlap a non-local event, the "
+                "mean over animals of each animal's share (the mean over its epochs "
+                "of the epoch's share)",
             ),
         )
     return values
@@ -2397,11 +2514,18 @@ def _animal_range_values(
     shares: tuple[float, float, float],
     descriptions: tuple[str, str, str],
     lowest_style: str = "pctnum",
+    *,
+    animal_mean: tuple[float, str] | None = None,
+    pooled_tags: Tags | None = None,
 ) -> list[Value]:
     """A share, then the lowest and the highest animal's (``{key}_animal_min``,
     ``{key}_animal_max``): ``shares`` and ``descriptions`` in that order, each
-    printed as a percent (the lowest in ``lowest_style``)."""
-    return [
+    printed as a percent (the lowest in ``lowest_style``).
+
+    With ``animal_mean`` (the mean over animals of the animals' shares and its
+    description), ``{key}_animal_mean`` follows the share; ``pooled_tags``
+    then replaces the share's tags (a pooled share that no panel draws)."""
+    values = [
         make(key_, share, "fraction", style, description)
         for key_, share, style, description in zip(
             (key, f"{key}_animal_min", f"{key}_animal_max"),
@@ -2410,6 +2534,17 @@ def _animal_range_values(
             descriptions,
             strict=True,
         )
+    ]
+    if animal_mean is None:
+        return values
+    values[0] = make(
+        key, shares[0], "fraction", "pct", descriptions[0], tags=pooled_tags
+    )
+    mean, description = animal_mean
+    return [
+        values[0],
+        make(f"{key}_animal_mean", mean, "fraction", "pct", description),
+        *values[1:],
     ]
 
 
@@ -3635,6 +3770,13 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
                     "mean over its epochs of the epoch's share)",
                     "highest per-animal share",
                 ),
+                animal_mean=(
+                    row.no_swr_fraction_animal_mean,
+                    f"share of the events detected again {at} that overlap no SWR, "
+                    "the mean over animals of each animal's share (the mean over its "
+                    "epochs of the epoch's share; the panel's bold line)",
+                ),
+                pooled_tags=TAGS["rule_sweep_pooled"],
             ),
             make(
                 f"{key}_events_vs_rule",

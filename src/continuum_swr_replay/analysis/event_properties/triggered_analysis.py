@@ -304,9 +304,13 @@ def compute_triggered_average_curves(
     -------
     dict
         ``{signal: {"time", "no_overlap_mean", "no_overlap_sem",
-        "overlap_mean", "overlap_sem", and for each class the quartiles over
-        events "{class}_q25", "{class}_median", "{class}_q75"}}`` with
-        numpy-array values (a lag where no event has a value is NaN).
+        "overlap_mean", "overlap_sem", and for each class the animal-balanced
+        quartiles "{class}_q25", "{class}_median", "{class}_q75"}}`` with
+        numpy-array values. The mean and SEM are over every event; each
+        quartile is the mean over animals of each animal's quartile over its
+        events (:func:`animal_balanced_quartiles`), so the median is the mean
+        of :func:`animal_window_medians`' lines. A lag where no event has a
+        value is NaN.
 
     """
     signal_types = list(signals)
@@ -323,8 +327,9 @@ def compute_triggered_average_curves(
         quartiles = {
             f"{name}_{label}": values
             for name, windows in (("no_overlap", windows_no), ("overlap", windows_ov))
-            for label, values in window_quartiles(
-                windows.sel(signal=signal_type).values
+            for label, values in animal_balanced_quartiles(
+                windows.sel(signal=signal_type).values,
+                windows.indexes["event"].get_level_values("animal"),
             ).items()
         }
         curves[signal_type] = {
@@ -398,7 +403,7 @@ def triggered_windows(
 
 def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
     """Each animal's median over its events of one signal's windows, at each
-    lag: the statistic of :func:`window_quartiles` taken per animal.
+    lag (:func:`animal_quartiles`' median).
 
     Parameters
     ----------
@@ -414,15 +419,10 @@ def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
         Indexed by lag (s), a column per animal (sorted): the median over the
         animal's events with a value at that lag (NaN where none has one).
     """
-    values = windows.sel(signal=signal).values
-    animals = windows.indexes["event"].get_level_values("animal")
-    return pd.DataFrame(
-        {
-            animal: np.nanmedian(values[np.asarray(animals == animal)], axis=0)
-            for animal in sorted(set(animals))
-        },
-        index=windows["time"].values,
-    )
+    return animal_quartiles(
+        windows.sel(signal=signal).values,
+        windows.indexes["event"].get_level_values("animal"),
+    )["median"].set_axis(windows["time"].values)
 
 
 #: Figure 2g's signals around event starts, in its rows' order, and its window
@@ -489,23 +489,66 @@ def triggering_events_in(event_types: dict, events: pd.DataFrame) -> dict:
     return kept
 
 
-def window_quartiles(windows: np.ndarray) -> dict[str, np.ndarray]:
-    """The quartiles over events of event-triggered windows, at each lag, as
-    :func:`compute_triggered_average_curves` gives them for its classes.
+QUARTILES = (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+"""The quartiles a triggered trace draws, by name."""
+
+
+def animal_quartiles(
+    windows: np.ndarray, animals: np.ndarray | pd.Index
+) -> dict[str, pd.DataFrame]:
+    """Each animal's quartiles over its events of event-triggered windows, at
+    each lag.
 
     Parameters
     ----------
     windows : np.ndarray, shape (n_events, n_lags)
         One signal's windows (``get_signal_windows``), NaN where a window has
         no value.
+    animals : array_like, shape (n_events,)
+        Each window's animal.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame
+        ``q25``, ``median`` and ``q75``, each shape (n_lags, n_animals), a
+        column per animal (sorted): the quartile over the animal's events with
+        a value at that lag (NaN where none has one).
+    """
+    animals = np.asarray(animals)
+    names = sorted(set(animals))
+    return {
+        label: pd.DataFrame(
+            {
+                name: np.nanquantile(windows[animals == name], q, axis=0)
+                for name in names
+            }
+        )
+        for label, q in QUARTILES
+    }
+
+
+def animal_balanced_quartiles(
+    windows: np.ndarray, animals: np.ndarray | pd.Index
+) -> dict[str, np.ndarray]:
+    """The animal-balanced quartiles of event-triggered windows, at each lag:
+    the mean over animals of each animal's quartile over its events
+    (:func:`animal_quartiles`). The band between ``q25`` and ``q75`` stays a
+    spread over events, with every animal weighted the same.
+
+    Parameters
+    ----------
+    windows : np.ndarray, shape (n_events, n_lags)
+        One signal's windows, NaN where a window has no value.
+    animals : array_like, shape (n_events,)
+        Each window's animal.
 
     Returns
     -------
     dict
-        ``q25``, ``median`` and ``q75``, each shape (n_lags,); NaN at a lag where
-        no event has a value.
+        ``q25``, ``median`` and ``q75``, each shape (n_lags,): the mean over
+        the animals with a value at that lag; NaN where no animal has one.
     """
     return {
-        label: np.nanquantile(windows, q, axis=0)
-        for label, q in (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+        label: table.mean(axis=1).to_numpy()
+        for label, table in animal_quartiles(windows, animals).items()
     }

@@ -334,20 +334,23 @@ Widloski detector."""
 def _matched_shares(
     events: pd.DataFrame, by: str, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
-    """Each detector's share of its events matched: pooled over events, and per
+    """Each detector's share of its events matched: pooled over events, per
     animal as the mean over the animal's epochs of each epoch's share (event ->
-    epoch -> animal), as :func:`content_class_animal_shares` takes it."""
+    epoch -> animal), as :func:`content_class_animal_shares` takes it, and the
+    mean over animals of the animals' shares."""
     shares = {}
     for detector in detectors:
         mine = events[events[by] == detector]
+        animals = animal_session_values(
+            mine["matched"].astype(float),
+            mine["animal"],
+            mine[["day", "epoch"]],
+            "mean",
+        )
         shares[detector] = {
             "pooled": mine["matched"].mean(),
-            "animals": animal_session_values(
-                mine["matched"].astype(float),
-                mine["animal"],
-                mine[["day", "epoch"]],
-                "mean",
-            ).to_numpy(),
+            "animal_mean": animals.mean(),
+            "animals": animals.to_numpy(),
         }
     return pd.DataFrame.from_dict(shares, orient="index").rename_axis("detector")
 
@@ -367,10 +370,12 @@ def nonlocal_events_overlapped(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 2)
+    overlap : pd.DataFrame, shape (n_detectors, 3)
         Indexed by detector: ``pooled``, the matched non-local events over the
-        eligible ones, and ``animals``, each animal's mean over its epochs of
-        the epoch's share (an array, in the animals' sorted order).
+        eligible ones; ``animals``, each animal's mean over its epochs of the
+        epoch's share (an array, in the animals' sorted order); and
+        ``animal_mean``, the mean over animals of those shares (Figure 2e's
+        bars).
     """
     return _matched_shares(memberships, "other_detector", detectors)
 
@@ -393,9 +398,9 @@ def events_overlapping_nonlocal(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 2)
-        Indexed by detector: ``pooled`` and ``animals``, as for
-        :func:`nonlocal_events_overlapped`.
+    overlap : pd.DataFrame, shape (n_detectors, 3)
+        Indexed by detector: ``pooled``, ``animals`` and ``animal_mean``, as
+        for :func:`nonlocal_events_overlapped`.
     """
     return _matched_shares(events, "detector", detectors)
 
@@ -463,7 +468,7 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    statistics : pd.DataFrame, shape (n_detectors, 15)
+    statistics : pd.DataFrame, shape (n_detectors, 17)
         Indexed by detector. "Mostly" a state is more than half the event's
         rows.
 
@@ -472,10 +477,13 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
           pooled, and ``no_nonlocal_fraction_animal_min`` and
           ``..._animal_max``, the lowest and highest of the animals' own
           shares, each event -> epoch -> animal: the mean over the animal's
-          epochs of each epoch's share.
+          epochs of each epoch's share; ``no_nonlocal_fraction_animal_mean``,
+          the mean over animals of the animals' own shares.
         - ``mostly_local_fraction``: the events overlapping no non-local event
           that are mostly Local, as a share of all its compared events (an
-          event without state shares is not mostly Local).
+          event without state shares is not mostly Local), and
+          ``mostly_local_fraction_animal_mean``, the mean over animals of the
+          animals' own shares (:func:`content_class_animal_shares`).
         - Of the events overlapping no non-local event:
           ``no_nonlocal_mostly_local_fraction``,
           ``no_nonlocal_mostly_no_spike_fraction`` and
@@ -495,13 +503,16 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
         overlapping = mine[mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         mostly_local = alone[local] > 0.5
         mostly_no_spike = alone[no_spike] > 0.5
-        matched_by_animal = content_class_animal_shares(mine, detector)["with_nonlocal"]
+        by_animal = content_class_animal_shares(mine, detector)
+        matched_by_animal = by_animal["with_nonlocal"]
         rows[detector] = {
             "n_events": len(mine),
             "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),
             "no_nonlocal_fraction_animal_min": 1 - matched_by_animal.max(),
             "no_nonlocal_fraction_animal_max": 1 - matched_by_animal.min(),
+            "no_nonlocal_fraction_animal_mean": 1 - matched_by_animal.mean(),
             "mostly_local_fraction": mostly_local.sum() / len(mine),
+            "mostly_local_fraction_animal_mean": by_animal["mostly_local"].mean(),
             "no_nonlocal_mostly_local_fraction": mostly_local.mean(),
             "no_nonlocal_mostly_no_spike_fraction": mostly_no_spike.mean(),
             "no_nonlocal_mixed_fraction": (~mostly_local & ~mostly_no_spike).mean(),

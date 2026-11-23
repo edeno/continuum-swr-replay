@@ -367,9 +367,10 @@ def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
 
 
 def test_figure02_panel_d_prints_the_digits_of_the_events_summary(offline):
-    """The percents beside the bars are rounded by the summary's rule (a half
-    rounds away from zero: 12.5 % is 13), the title gives the count, and each
-    animal is one dot per bar."""
+    """The bars are the mean over animals of the animals' dots, their percents
+    rounded by the summary's rule (a half rounds away from zero: 12.5 % is
+    13), the title gives the count of every event, and each animal is one dot
+    per bar."""
     import matplotlib.pyplot as plt
 
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -390,8 +391,12 @@ def test_figure02_panel_d_prints_the_digits_of_the_events_summary(offline):
     assert labels == ["No SWR", "Partly in SWR", "Inside SWR"]  # bottom to top
     assert ax.get_title(loc="right") == "Non-local events (n = 8)"
     assert all(len(dots.get_offsets()) == len(animals) for dots in ax.collections)
+    widths = [bar.get_width() for bar in ax.patches]  # top to bottom
+    np.testing.assert_allclose(
+        widths, 100 * animals[list(figure02.CLASS_ORDER)].mean().to_numpy()
+    )
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
-    assert formatted(cohort["non_swr_fraction"]) == "63 %"
+    assert formatted(cohort["non_swr_fraction_animal_mean"]) == "63 %"
     plt.close(fig)
 
 
