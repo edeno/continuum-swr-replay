@@ -152,25 +152,31 @@ models' searches).
 
 ## Support rule
 
-Decided from the data before the fit, per unpenalized declared term and session (design 4.3):
+Decided from the design before the fit, per simple term (a 0/1 term, a slope, a level) and session,
+penalized or not. No rule reads the event counts before a fit. This rule replaces the design's 4.3 rule
+on events (design, section 9, twenty-second round: the lead chose a weak penalty on the reward coefficient,
+13:00, "I think weak penalty", and on every simple tested coefficient, 13:02, "yes"; the guard on the
+design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
 
-- A 0/1 term (rate: last outcome rewarded): count the units (visits) with the term 1 that hold at least one
-  event of the kind, and those with the term 0 that do; the term passes when both counts are at least 5.
-  As built: `support.binary_support`.
-  **OPEN (lead): reward-term support.** On the real tables this rule fails in 86 % of the SWR sessions
-  and 42 % of the No SWR sessions (counts of the input tables, not results), over the 20 % limit below, so
-  the reward term would leave the per-session model and Q2 would have no per-session answer. The author
-  proposed to count visits with at-risk time on each side instead: all 242 sessions pass; a session with
-  no event after an omission then has no finite maximum (12.8 % of SWR sessions) and is reported with the
-  term missing (lead, 2026-11-21). Simulation with the plain fit: bias +0.05 to +0.10 on the log scale,
-  and the project's interval covered the planted value in 0.975 to 1.00 of data sets; the planned rule gave
-  -0.23 at a threefold effect. The lead has not said yes to the changed rule in words. Ask at
-  [Phase 5a](phase-5a-rate-models.md), before the first real fit.
-- A continuous slope restricted to an arm role (content): among the role's candidate rows of events of the
-  kind, count events with the covariate above and below the session median of those rows (ties to neither);
-  pass when both are at least 5 and the covariate is not constant within the role.
-- A role category (content: previous arm, next arm): pass when at least 5 events of the kind have a
-  candidate in the role.
+- A 0/1 term (rate: last outcome rewarded): count the units (visits) with a row where the term is 1, and
+  those with a row where it is 0; the term passes when both counts are at least 5. As built:
+  `support.binary_support`. A session with no event on one side passes; a penalized term is then fitted
+  with a finite value, and an unpenalized one has no finite maximum and is left out by that rule
+  (sixteenth round).
+- A continuous slope (over the rows of its level for a slope by a role): count the units with a row above
+  and below the median of those rows (ties to neither); pass when both are at least 5. A constant column
+  fails.
+- A level of a category (content: previous arm, next arm): pass when at least 5 units have a row of the
+  level.
+- Under the grouped softmax every candidate row belongs to an event, so the counts there are those of the
+  event-based rule (a test against that rule's counts).
+- The weak penalty (**call**, the twenty-second round): each simple tested coefficient has a fixed log
+  penalty, a Normal prior of mean 0 on the coefficient in the reported unit (a 0/1 step; one pooled SD),
+  `rho = log(1 / SD^2)` (`terms.log_penalty_from_prior_sd`). Baselines are not penalized (the intercept, the
+  arm effects, other nuisance categories). Each record holds the edf of each penalized simple coefficient.
+  The SD is one declared number for all models; **its value is open** (design, "Open after the
+  twenty-third round", g; a simulation with SD 1, 2 and 4 is running). Each family's simulation checks the
+  penalty before the family's fit is used.
 - A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
   `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
   that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.
@@ -190,9 +196,9 @@ Decided from the data before the fit, per unpenalized declared term and session 
 - The minimum count (5) is defined in `analysis/regression/support.py`, the module that reads it; the
   fitter's `constants.py` does not hold it.
 
-Smooth terms carry their declared penalty and have no support rule; their basis check and edf are
-recorded. A smooth declared with `penalty="none"` is a term of several unpenalized columns: it leaves a
-session whole when the refit leaves part of it out (as built, `sessions.py`).
+Smooth terms carry their declared penalty and have no support counts (like every term they are judged by
+the design check); their basis check and edf are recorded. A smooth declared with `penalty="none"` is a
+term of several unpenalized columns: it leaves a session whole when the refit leaves part of it out (as built, `sessions.py`).
 
 ## Collinearity measures
 

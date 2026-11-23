@@ -40,18 +40,24 @@ rest of the old event-source suite.
 - **Q6, content and the next arm** (in `role_content.py`): one more role, `next`, for the arm of the next
   trial's well when it is neither current nor previous (`is_next_arm`, `candidate_arm.py:192`); the
   estimand is the `next` role minus `other_leaf`, per kind and difference, length-adjusted and unadjusted;
-  support rule on the role (events with such a candidate). Fit with Phase 6a's runner as an added model.
+  support rule on the role, read from the design (events with a candidate row in the role). The role
+  level is a simple tested coefficient at the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`), checked by the
+  family's simulation before use. Fit with Phase 6a's runner as an added model.
 - **Choice** (`analysis/replay_models/choice/visit_choice.py`, new): one row per (visit, candidate next
   arm), the grouped softmax over the candidates of `build_choice_dataset` (reuse its candidate set and
   behavioral covariates), covariates at pooled SD, plus each kind's in-visit content share on the candidate
   (the mean over the visit's selected events; a visit with no event of the kind gets 0 and a no-event
   indicator, counted). Estimand: the content slope per kind and its difference (not in the declared family;
-  Q6's declared member is the content model above). Support rule; records.
+  Q6's declared member is the content model above). The content slopes have the declared weak penalty,
+  checked by the family's simulation before use; the behavioral covariates are baselines (**call**: not
+  penalized). Support rule on the design; records.
 - **Stay or leave** (`analysis/replay_models/choice/visit_stay_leave.py`, new; per L7): one row per visit,
   Bernoulli `is_stay` (the next trial stays in the patch) on the omitted outcome, each role's in-visit
   content share per kind, and their products (the continuous factor centered at a pooled reference; the 0/1
-  factor not), through the shared fitter with the Newton decrement rule. Report the share of sessions that
-  converge and pass support, beside the baseline count, so the lead can decide whether it stays in the paper.
+  factor not), through the shared fitter with the Newton decrement rule. The tested content slopes and
+  their products have the declared weak penalty, checked by the family's simulation before use. Report
+  the share of sessions that converge and pass support (on the design), beside the baseline count, so the
+  lead can decide whether it stays in the paper.
   The pooled GEE (`stay_leave.py:534`) is not moved: the session to day to animal reduction replaces its
   inference, and a pooled model is stage 3. It is removed by this phase's retire task.
 - **Ripple power** (`analysis/replay_models/coupling/visit_swr_power.py`, new): the Gaussian likelihood per
@@ -105,7 +111,7 @@ rest of the old event-source suite.
 | `tests/analysis/replay_models/content/test_role_content.py::test_next_role_only_when_distinct` | the next role is set only when the next arm is neither current nor previous; the support count matches a hand count |
 | `test_role_content.py::test_next_role_null_when_next_equals_previous` | simulated content tied to the previous arm and choices that repeat it: the next-role estimate is within 2 SE of 0 |
 | `tests/analysis/replay_models/choice/test_visit_choice.py::test_planted_content_slope` | a planted content effect on choice is recovered; with behavior that predicts the choice and no content effect, the slope is null at the nominal rate |
-| `test_visit_stay_leave.py::test_converges_on_separable_free_data` | per-session fits converge by the decrement rule on simulated visits; a separated session fails support, not the fit |
+| `test_visit_stay_leave.py::test_converges_on_separable_free_data` | per-session fits converge by the decrement rule on simulated visits; a separated session keeps a finite value for each penalized term (the support rule reads the design), and an unpenalized term there is left out by the no-finite-maximum rule |
 | `tests/analysis/replay_models/coupling/test_visit_swr_power.py::test_gaussian_reml_and_gate` | the Gaussian fit equals penalized least squares at the declared penalty; post-outcome predictors see only post-outcome events |
 
 ## Fixtures

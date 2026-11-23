@@ -15,6 +15,19 @@ parts are built on branch `regression-declared-penalty` (pushed, not merged on 2
   the stored check `scripts/checks/simulate_declared_penalty.py` (with
   `tests/scripts/checks/test_simulate_declared_penalty.py`).
 
+The weak penalty on simple terms and the support rule on the design are built on branch `weak-penalty`
+(from `regression-declared-penalty`; pushed, not merged), by the lead's decisions of 2026-11-23 (design,
+twenty-second round: 13:00, "I think weak penalty"; 13:02, "yes" to the same weak penalty on every simple
+tested coefficient):
+
+- aa8f8425: `terms.Slope` and `terms.Category` take a required `penalty` (`"none"` or a fixed log
+  penalty), the identity on each column as its own block; `terms.log_penalty_from_prior_sd` and
+  `prior_sd_from_log_penalty`; each record's edf of each penalized simple coefficient; the support rule
+  counts units with rows on each side, not units with events (`support.py`; the argument `has_event` is
+  removed). Tests: two cells against a root of the penalized score equations and against mgcv `paraPen`
+  at a fixed `sp`, both to 1e-8; the penalty path; the blocks and edf; the grouped softmax counts
+  unchanged; sparse sessions.
+
 The smooth-term rule is decided (design, seventeenth round; the author's reading of the lead's "For
 decision 2, I think I would prefer the penalized splines" and "I want to stick with one fit per session
 for now", 2026-11-22, told to the lead and not objected to): a per-session smooth term is the cubic
@@ -96,15 +109,16 @@ reported is decided (lead, 2026-11-21: with those terms missing).
   `concurvity(full = TRUE)` to `scripts/checks/compare_regression_to_mgcv.R` and its fixtures (it does not
   print it today).
 - **Support rule** (`analysis/regression/support.py`, new): the three cases of
-  [designs.md#support-rule](designs.md#support-rule), evaluated before the fit from the rows; a
+  [designs.md#support-rule](designs.md#support-rule), evaluated before the fit from the design (units with
+  a row on each side; never the events; built aa8f8425, which replaced the first rule on events); a
   `terms_failing_share(records)` that applies the 20 % rule over sessions (the value of the fitter's
   `MAX_FAILING_SHARE`, imported, not copied). The minimum of 5 units each side is a constant defined in
   this module (new). A term that fails is made inactive in that session (`SessionData.active`); when it is
   a 0/1 role column, the session's rows with that role are dropped from its fit and counted in the
   record's `cohort_counts`, not merged into the reference role (found by simulation: merging inflated the
   belief variance's false positives, to 20 % in one case; scratch `proto_uncertainty_measures/REPORT.md`).
-  A smooth term carries its declared penalty and has no support rule of its own (designs.md, "Support
-  rule"). A support rule per grid point for curves averaged over sessions is an idea, not decided
+  The rule holds for every simple term, penalized or not. A smooth term carries its declared penalty and
+  has no support counts (designs.md, "Support rule"). A support rule per grid point for curves averaged over sessions is an idea, not decided
   (`OPEN (lead): grid-point support`).
 - **Sessions without a finite maximum** (in `sessions.py`, below). Under the smooth-term rule the
   models are fitted at declared penalties or with none, so the fitter's search does not run, and
@@ -208,8 +222,12 @@ reported is decided (lead, 2026-11-21: with those terms missing).
 | `test_collinearity.py::test_single_column_equals_r2` | for one column, observed = worst = estimate = R² of an OLS of the weighted column on the rest; VIF = 1/(1 - R²) |
 | `test_collinearity.py::test_matches_mgcv_concurvity` | on the Phase 1 fixtures with two smooths, observed, worst and estimate equal mgcv's `concurvity(full = TRUE)` (add those numbers to the fixture outputs) to 1e-4 |
 | `test_collinearity.py::test_softmax_weighting` | for a grouped design, the weighted cross-product equals the softmax information |
-| `test_support.py::test_binary_term_counts` | hand-built visits: counts of units with events on each side and the pass flag |
-| `test_support.py::test_role_slope_counts_and_constant` | a role slope constant within the role fails; median split counts are right |
+| `test_support.py::test_binary_term_counts_rows_not_events` (rewritten, aa8f8425) | hand-built visits: counts of units with a row on each side and the pass flag |
+| `test_support.py::test_role_slope_counts_and_constant` | a slope constant on its rows fails; median split counts are right |
+| `test_support.py::test_softmax_counts_are_those_of_the_event_rule` (aa8f8425) | under the grouped softmax the support records equal the event-based rule's counts at ec1ae69c |
+| `test_terms.py::test_penalized_simple_terms_get_identity_blocks` (aa8f8425) | a penalized slope, slope by a category and category get the identity block on each column at their log penalty; the record names every term's penalty |
+| `test_sessions.py::test_a_penalized_binary_slope_is_the_penalized_maximum`, `::test_a_penalized_binary_slope_matches_mgcv` (aa8f8425) | two cells: the fit equals a 1-D root of the penalized score equations and mgcv `paraPen` at a fixed `sp`, to 1e-8, with and without events on one side |
+| `test_sessions.py::test_every_sparse_session_has_its_penalized_term` (aa8f8425) | sessions with a sparse side, some with no event there: each has a finite value for the penalized term, none left out for support |
 | `test_support.py::test_failing_share_rule` | a term failing in 21 % of sessions is flagged, 20 % is not |
 | `test_record.py::test_round_trip` | a record written and read back is identical, JSON columns included |
 | `test_sessions.py::test_the_declared_penalty_recovers_a_planted_curve` (built, 86ad3fc5) | 30 simulated sessions with a threefold rise after arrival: at the log penalty that gives a median edf of 6 (`log_penalty_for_edf`), every session's fit converges and records its penalty as fixed, and the animal-balanced Q1 contrast is the planted one to 0.15 |

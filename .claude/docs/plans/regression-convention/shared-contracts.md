@@ -149,7 +149,7 @@ The design's section 4. In short, with the phase that implements each piece:
 |---|---|---|
 | 1. Data | Unit is the well visit (first poke-in to last poke-out); the events are those that start inside a visit (C3); at-risk time is immobile in-visit time less time inside an ongoing event of the outcome's kind; three clocks per bin (time since arrival = first poke-in, time until leaving = until the last poke-out, time until the next movement of any size); whole visit modeled | Phase 3 |
 | 2. Design | Clocks, trials since last visit and peri-event lags are cubic P-spline smooths (second-order difference penalty) at one fixed log penalty per term, declared in the model and the same in every session (the smooth-term rule below); arm role (current, previous, other leaf, trunk) is a category with a separate slope per role; kind is a category with separate terms per kind; one pooled standardization (population SD, ddof = 0) stored with the fit; a continuous factor in an interaction is centered at a fixed pooled reference, a 0/1 factor is not; reward history by model A (last outcome, 0/1) and model D (penalized smooth over the last ten outcomes, log lag) | Phases 2, 5a, 6a |
-| 3. Fit | Plain penalized maximum likelihood by the shared fitter (no bias-reduced fit: lead, 2026-11-23), one fit for each session (design, fourteenth and seventeenth rounds), each smooth at its declared penalty (no penalty chosen from the data for a per-session smooth); Newton decrement convergence in float64, on the CPU and on the GPU (lead, 2026-11-23); a data-based support rule per unpenalized term and session, stored; a session without a finite maximum handled by one rule (Phase 2) | Phases 1, 2 |
+| 3. Fit | Plain penalized maximum likelihood by the shared fitter (no bias-reduced fit: lead, 2026-11-23), one fit for each session (design, fourteenth and seventeenth rounds), each smooth at its declared penalty (no penalty chosen from the data for a per-session smooth); Newton decrement convergence in float64, on the CPU and on the GPU (lead, 2026-11-23); a weak penalty on every simple tested coefficient (the weak-penalty rule below); a support rule per simple term and session that reads the design only (units with a row on each side), never the events, stored; a session without a finite maximum handled by one rule (Phase 2) | Phases 1, 2 |
 | 4. Folds | Five folds of whole trials balanced by destination well, long stays cut into pieces (one function); used to compare designs and check over-fitting only; held-out claims summed over sessions | Phase 2 |
 | 5. Inference | Session to recording day to animal; animal-balanced estimate with the nested bootstrap interval (t-corrected); animals with the estimate's sign; recording-day-level test; one declared family with FDR; simultaneous bands for curves | Phases 2, 9 |
 | 6. Report | Rate effects as rate ratios, content effects as ratios of shares, each with an interval; every fit carries the record of C7; each statistic lives in `analysis/` and the figure calls the function the summary reads | every family phase |
@@ -168,6 +168,21 @@ The design's section 4. In short, with the phase that implements each piece:
 > does not carry from one model to another (simulation: the same target gave different penalties and
 > biases of opposite sign in two designs). The mPFC kernels and the history kernels are open at their
 > phases (`OPEN (lead): mPFC and history penalties`, Phases 8 and 11).
+
+> **The weak-penalty rule** (design, twenty-second round). The lead, 2026-11-23, 13:00, on the reward
+> coefficient of the rate model: "I think weak penalty". At 13:02, asked whether the same weak penalty
+> applies to every simple tested coefficient in every model, with a simulation check for each family
+> before use: "yes". The author's calls that go with it (**call**, each): baselines are not penalized (the
+> intercept, the arm effects, other nuisance categories; Greenland and Mansournia 2015, Statistics in
+> Medicine 34:3133, doi 10.1002/sim.6537); the support rule reads the design only ("No rule reads the event
+> counts before a fit"): a term is absent in a session when its column does not vary enough there (fewer
+> than 5 units with a row on a side); each fit records the edf of each penalized simple coefficient; the
+> width is one declared Normal prior SD for all models, on the coefficient in the reported unit (a 0/1
+> step; one pooled SD of a continuous covariate), so the log penalty is `log(1 / SD^2)`
+> (`terms.log_penalty_from_prior_sd`). **The SD's value is open** (`OPEN (lead): penalty width`; a
+> simulation with SD 1, 2 and 4 is running). A penalized coefficient always has a finite maximum, so a
+> session with no event on one side of it keeps it; an unpenalized term there is left out by the
+> no-finite-maximum rule. Built on branch `weak-penalty`, aa8f8425.
 
 Numerical constants, each in one home; change a value only there:
 
@@ -212,12 +227,12 @@ written by one function (new, `analysis/regression/record.py`, Phase 2):
 | `n_rows`, `n_units`, `n_events` | what the likelihood saw (units: visits, events or units) |
 | `cohort_counts` | JSON: `count_visit_context` output (added by the caller) and the rows removed from the session's fit, by cause (a missing value; a level's rows dropped; an event with no response; an event emptied by dropped rows) |
 | `coef`, `vcov` | JSON arrays with `coef_names`; `vcov` is the Bayesian covariance `(H + S)^-1` |
-| `log_penalty` | JSON: term -> `{"set": "fixed", "log_penalty": value}` or `{"set": "none", "log_penalty": null}` (as built, `terms.Design.log_penalty_record`). A per-session smooth has a fixed declared value, the same in every session; how it was set (the target median edf, the calibration's rows and commit) is stated with the model in `docs/regression_models.md`. No value is selected by REML for a per-session smooth |
-| `edf` | JSON: term -> effective degrees of freedom |
+| `log_penalty` | JSON: term -> `{"set": "fixed", "log_penalty": value}` or `{"set": "none", "log_penalty": null}`, for every term: smooths, lag functionals, slopes (each level's for a slope by a category) and categories (as built, `terms.Design.log_penalty_record`; the simple terms since aa8f8425). A per-session smooth has a fixed declared value, the same in every session; how it was set (the target median edf, the calibration's rows and commit) is stated with the model in `docs/regression_models.md`. No value is selected by REML for a per-session smooth |
+| `edf` | JSON: term -> effective degrees of freedom; a level of a penalized category also by its coefficient name. A penalized simple coefficient's edf is between 0 (the penalty decides) and 1 (the data decide) |
 | `status`, `newton_decrement`, `n_iter` | the convergence measure of C5 rule 3: the fit's `NewtonFit.status` (one of the six statuses of `newton.FitStatus`; only "converged" is a fit), or `not fitted` when no fit was tried |
 | `left_out` | JSON: coefficient name -> why it is inactive in this session, a code of `support.Removed` (`support`, `too_small`, `with_level`, `no_finite_maximum`); its `coef` and `vcov` entries are NaN |
 | `left_out_round` | JSON: coefficient name -> the refit round in which it left, for `no_finite_maximum` |
-| `support` | JSON: coefficient name (a column of an unpenalized term; a smooth term's name when the term is too small in the session) -> {`n_low`, `n_high`, `passes`, `reason` (a `Removed` code, or empty), `size`} from the support rule, counted on the rows the fit used |
+| `support` | JSON: coefficient name (a column of a simple term, penalized or not; a smooth term's name when the term is too small in the session) -> {`n_low`, `n_high`, `passes`, `reason` (a `Removed` code, or empty), `size`} from the support rule: units with a row on each side (a level: with a row of the level), counted on the rows the fit used |
 | `collinearity` | JSON: term -> {`r2`, `vif`} or {`observed`, `worst`, `estimate`} |
 | `basis` | JSON: term -> {`kind`, `knots`, `degree`, `range`, `constraint`, `clamp`} |
 | `standardization` | JSON: covariate -> {`sd`, `ddof`: 0, `reference`} |

@@ -2,8 +2,10 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#rate-design)
 
-Branch: `visit-rate-models` from master after Phases 2c and 3 (the JAX fitter and the simulation engine
-of Phase 2b are on master). CPU only.
+Branch: `visit-rate-models` from master after Phases 2b and 3 (the simulation engine of Phase 2b and the
+weak-penalty change are on master). It runs in parallel with Phase 2c, the JAX port, on its own branch
+(design, twenty-third round: the lead, 2026-11-23, 13:21, "ok" to the order). When the port replaces the
+solver, this phase's fits are rerun once to confirm equality. CPU only.
 
 **Inputs to read first:**
 
@@ -24,8 +26,8 @@ of Phase 2b are on master). CPU only.
   are summarized (to know what changes).
 - `src/continuum_swr_replay/reported/questions.py:320-358` (Part 3 questions), `reported/behavior/common.py:20-35`
   (`TAGS`), `reported/behavior/__init__.py:132` (`summarize`), `reported/values.py` (`value_factory`, `pend`).
-- The design, section 9, seventeenth to twenty-first rounds and "Open after the twenty-first round" (a
-  and b).
+- The design, section 9, seventeenth to twenty-third rounds and "Open after the twenty-third round" (b
+  and g).
 - Scratch: `S/proto_rate_realistic/` (model A on the real bins with planted curves shaped like the real
   ones; its `REPORT.md` when it is written), `S/proto_rate_smoothing/REPORT.md` and its follow-up section,
   `S/proto_rate_smoothing/firth_check/model_form_diagnostics.py` and `outcome_curves/` (diagnostics on the
@@ -49,15 +51,22 @@ of Phase 2b are on master). CPU only.
   those events, against the lead's "rate and content models should analyze the same events" (C4). Ask
   before the first real fit whether that stands, or whether the content model leaves them out too; state
   the answer in `docs/regression_models.md`.
-- **OPEN (lead): reward-term support** (design, "Open after the twenty-first round", a). The planned rule
-  for the 0/1 term (5 visits with an event on each side, `support.binary_support`) fails in 86 % of the
-  real SWR sessions and 42 % of the No SWR sessions (counts of the input tables, not results), over the
-  20 % limit, so the term would leave the per-session model and Q2 would have no per-session answer. The
-  author proposed to count visits with at-risk time on each side (all 242 sessions pass; a session with
-  no event after an omission then has no finite maximum, 12.8 % of SWR sessions, and is reported with the
-  term missing). Simulation with the plain fit: bias +0.05 to +0.10 on the log scale; the project's
-  interval covered the planted value in 0.975 to 1.00 of data sets; the planned rule gave -0.23 at a
-  threefold effect. The lead has not said yes in words. Ask before the first real fit.
+- **The reward term** (decided; design, twenty-second round). The lead, 2026-11-23, 13:00, among five
+  options for the reward coefficient: "I think weak penalty"; at 13:02, "yes" to the same weak penalty on
+  every simple tested coefficient, with a simulation check for each family before use. So
+  `Slope("last_outcome_rewarded", <the declared weak log penalty>)`. The support rule reads the design
+  only (**call**): the term passes in a session with at least 5 visits with a row where it is 1 and 5 with
+  a row where it is 0 (`support.binary_support`, built aa8f8425); a session with no event after an
+  omission keeps the term, with a finite, shrunk value. The edf of the coefficient in each record says how
+  much the penalty decided. The event-based rule it replaces failed in 86 % of the real SWR sessions and
+  42 % of the No SWR sessions (counts of the input tables, not results). Before the first real fit, the
+  rate scenario list (Phase 2b's engine) checks the penalty: the reward ratio's bias and the interval's
+  coverage under the null and a planted effect, at the declared width and at the widths of the
+  sensitivity analysis.
+- **OPEN (lead): penalty width** (design, "Open after the twenty-third round", g). The one declared prior
+  SD of the weak penalty, in the reported unit (here a 0/1 step on the log rate); the log penalty is
+  `log(1 / SD^2)` (`terms.log_penalty_from_prior_sd`). A simulation with SD 1, 2 and 4 is running. Ask
+  before the first real fit; the fit is also reported over the strength (a sensitivity analysis).
 - **OPEN (lead): rate model form** (b). Diagnostics on the real bins (pooled; not results): omission
   visits have a median of 0.9 s against 5.4 s; SWR events almost never start in the first second after
   arrival after either outcome (none in 93 % of sessions), so Q1's reference window `[0, 1] s` is empty
@@ -80,7 +89,7 @@ ASK-1, the ContFrag event sources; C14.
   (`visit_clock_curves.parquet`). These are the comparison, not targets.
 - **Model specs** (`analysis/replay_models/rate/visit_rate.py`, new): the two models of
   [designs.md#rate-design](designs.md#rate-design), per kind (`swr`, `no_swr`), as term lists:
-  - A: `Offset(log exposure) + Smooth(s, 0, 20) + Smooth(u, 0, 3) [+ Smooth(m, 0, 1.5)] + Slope(last_outcome_rewarded)` (a 0/1 column, not centered);
+  - A: `Offset(log exposure) + Smooth(s, 0, 20) + Smooth(u, 0, 3) [+ Smooth(m, 0, 1.5)] + Slope(last_outcome_rewarded, <weak log penalty>)` (a 0/1 column, not centered; the weak penalty of the twenty-second round);
   - D: the same smooths + `LinearFunctional(lag_1..lag_10, log lags, 0, log 10)`.
   Each `Smooth` term and model D's functional is a P-spline at one declared fixed log penalty, the same
   in every session (design, seventeenth round). Each value is found once on this model's own real bins,
@@ -98,9 +107,9 @@ ASK-1, the ContFrag event sources; C14.
   (counted). Store `count_visit_context` and the drop counts in each record.
 - **Fit** through `analysis/regression/sessions.py`: the plain penalized fit (no bias-reduced fit; lead,
   2026-11-23: "I don't want to use firth") of each session at the declared penalties; no penalty is
-  chosen from the data, and no selection runs. The support rule for the 0/1 term as the lead answers
-  `OPEN (lead): reward-term support`; sessions without a finite maximum reported with those terms missing
-  (lead, 2026-11-21); collinearity measures; records.
+  chosen from the data, and no selection runs. The 0/1 term at the declared weak penalty, with the support
+  rule on the design (above); sessions without a finite maximum reported with those terms missing
+  (lead, 2026-11-21); collinearity measures; records with each penalized coefficient's edf.
 - **Storage order of the design** (in the design builder, `visit_rate.py`): store each session's design in
   column (Fortran) order if a timing confirms it. A reviewer measured one weighted Gram product (`X' W X`, 82
   % of an evaluation's time in `docs/design/regression_fitter.md`, "Cost") at 7.0 ms with the design in column
@@ -228,8 +237,8 @@ reusing the Phase 3 synthetic helpers. Real data only in the runner's smoke test
 
 ## Exit criteria
 
-The lead has answered questions a and b, and the model's form and the reward term's support rule follow
-the answers; the scenario list shows model A's reward term null under the counting rule alone and unbiased
+The lead has answered questions b and g, and the model's form and the width of the weak penalty follow
+the answers; the scenario list has checked the weak penalty on the reward term before the real fit; the scenario list shows model A's reward term null under the counting rule alone and unbiased
 under a planted effect (on the realistic scenarios too), at the declared penalties; the full-cohort fits are stored with records; the new values are in the behavior summary; the third
 clock's fate is decided by the written rule and stated in the PR.
 

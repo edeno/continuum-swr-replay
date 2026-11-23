@@ -121,6 +121,10 @@ identifiability test" below), since scratch is not kept.
   median, stored). One uncertainty model: the main design plus, on the leaf roles, the belief variance,
   the sample count (Phase 3's column) and the trial number in the epoch (Phase 3's `n_visits_arrived`), each
   a pooled-SD slope per role, with the recency curve fitted as the gate decides.
+  Each simple tested coefficient (a role level that a declared test reads, a role slope, the uncertainty
+  slopes) has the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`). The arm fixed effects and other nuisance
+  categories are baselines and are not penalized (**call**). The nine-arm scenario list below checks the
+  penalty before the fit is used.
 - **Nine-arm simulation first** (design 4.2: "the nine-arm design goes through the same simulations
   before it is used"): a scenario list for the simulation package (Phase 2b),
   `replay_models/content/role_content_scenarios.py` (new; scenarios from `S/proto_content/sim_lib.py`),
@@ -150,7 +154,9 @@ identifiability test" below), since scratch is not kept.
   record; each source is one stream, without an SWR and No SWR split, call). Their values are a
   supplementary comparison (Phase 7 builds the comparison values), not members of the declared family.
 - **Fit** through `analysis/regression/sessions.py` with the grouped softmax: support rule per role slope
-  and role category (a role column made inactive drops that role's rows from the session's fit, Phase 2);
+  and role category, read from the design (units with a row on each side; under the softmax the same
+  counts as the events with a candidate row; a role column made inactive drops that role's rows from the
+  session's fit, Phase 2);
   sessions without a finite maximum handled by Phase 2's rule (the simulated content model had 4 of 242
   such sessions; simulation); collinearity per term (recency against uncertainty is the known concern,
   design 2.3); records. The plain penalized fit at the declared penalties (no bias-reduced fit; lead,

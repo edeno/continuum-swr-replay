@@ -8,7 +8,7 @@ Figure 4 chain (5a to 7, 9, 10).
 **Inputs to read first:**
 
 - The design, sections 4.3 to 4.5, 5 ("the mPFC unit models are the GPU case"), 6 (check 6, changed by the
-  twenty-first round of section 9), section 9's seventeenth to twenty-first rounds, and section
+  twenty-first round of section 9), section 9's seventeenth to twenty-third rounds, and section
   7's row for the mPFC models (what changes: the penalty by REML shared over the units of a session, trial
   folds, the shared convergence and support rules, population statements reduced session to day to animal;
   what stays: the peri-event design, the matched-control draws and the per-unit test).
@@ -86,8 +86,12 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   held-out bins. The matched-control draws and the per-unit empirical p keep their definitions; only the
   folds they use change.
 - **Shared convergence and support**: the Newton decrement rule replaces the absolute-change rule of the
-  batched IRLS; a unit with too few spikes on each side of an event kind (support rule) is recorded, not
-  fit for that term.
+  batched IRLS. The support rule reads the design, never the spike counts (design, twenty-second round,
+  **call**): a term is absent for a unit when its column does not vary enough on the unit's rows (fewer
+  than `MIN_UNITS` of the design's units, the visits, with a row on a side), recorded, not fit. A simple
+  tested coefficient has the declared weak penalty (the lead, 2026-11-23, 13:02, "yes"; width `OPEN (lead): penalty width`), checked
+  by the family's simulation before use; how it sits beside the kernels' penalties is part of
+  `OPEN (lead): mPFC and history penalties`.
 - **Population statements**: each population number (called fractions, best-model fractions, peak
   modulation) becomes a per-session value reduced session to day to animal with `estimand_summary`
   (`population_statistics.py` functions take the reduction; the BH reference stays as a reference).

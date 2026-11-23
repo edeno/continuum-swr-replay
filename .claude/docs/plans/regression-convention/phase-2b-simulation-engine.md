@@ -14,7 +14,7 @@ lead did not object (design, twenty-first round). It is the port design's Phase 
 
 **Inputs to read first:**
 
-- The design, section 6 (check 5: known truth), and section 9, the seventeenth to twenty-first rounds.
+- The design, section 6 (check 5: known truth), and section 9, the seventeenth to twenty-third rounds.
 - [jax-fitter-design.md](jax-fitter-design.md), sections 9 and 12 (Phase 1): why the draws must not
   depend on the fitter.
 - `src/continuum_swr_replay/analysis/regression/`: `likelihoods.py` (the four families), `sessions.py`
@@ -99,8 +99,10 @@ the whole pipeline of bias and coverage (port design, section 9).
 - Any scenario list but the rate model's first one. Each family phase writes its own.
 - The realistic rate scenarios themselves (Phase 5a turns them into the list).
 - Any change to the fitter. The engine runs on the present NumPy fitter.
-- A decision on the open questions (`OPEN (lead): reward-term support`, `OPEN (lead): rate model form`).
-  The engine reports what a scenario gives; it does not choose a rule.
+- A decision on the open questions (`OPEN (lead): rate model form`, `OPEN (lead): penalty width`). The
+  engine reports what a scenario gives; it does not choose a rule. (The reward term's rule is decided: a
+  weak penalty, and a support rule on the design; design, twenty-second round. The engine runs it, and
+  each family's scenario list checks the penalty before the family's fit is used.)
 
 ## Verification and runtime
 

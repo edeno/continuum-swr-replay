@@ -4,13 +4,15 @@
 6e54eda8, cleaned up in 98fe5c06); Phase 2, the convention's tools (492dffb4); Phase 3, the well visit in
 the tables (d14ff888; the 13 tables published); Phase 4, Figures 2 and 3 on the common subset (5dc74fc6).
 The declared-penalty parts of Phase 2 are on branch `regression-declared-penalty` (b47faec9, 39a51d3a,
-86ad3fc5; pushed, not merged). The lead decided the smooth-term rule (a P-spline at one declared fixed
-penalty per term), a plain penalized fit with no bias reduction, the regression model for the rate
-questions, a simulation package, one JAX fitter for every family, float64 on CPU and GPU, and the port's
-acceptance rule (design, seventeenth to twenty-first rounds; [overview.md](overview.md#status)). Next:
-Phase 2b, the simulation engine; then Phase 2c, the JAX fitter, whose entry condition is a workload
-timing shown to the lead; then Phase 5a and the rest. Open questions a, b, d, e and f are listed in the
-overview.
+86ad3fc5; pushed, not merged); the weak penalty on simple terms and the support rule on the design are on
+branch `weak-penalty` (aa8f8425; pushed, not merged). The lead decided the smooth-term rule (a P-spline at
+one declared fixed penalty per term), a plain penalized fit with no bias reduction, the regression model
+for the rate questions, a simulation package, one JAX fitter for every family, float64 on CPU and GPU, the
+port's acceptance rule, a weak penalty on every simple tested coefficient, and the order of the port
+(design, seventeenth to twenty-third rounds; [overview.md](overview.md#status)). Next: Phase 2b, the
+simulation engine; then, in parallel on separate branches, Phase 5a and Phase 2c, the JAX port; the port
+then replaces the solver and every fit is rerun once to confirm equality. Open questions b, e, f and g
+(the width of the weak penalty) are listed in the overview.
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the

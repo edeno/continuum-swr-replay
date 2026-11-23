@@ -3,7 +3,10 @@
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [JAX fitter design](jax-fitter-design.md)
 
 Branches: one per sub-phase below (`regression-jax-0` to `regression-jax-6`), each from master after the
-one before. Phase 2b first (the author's call; the lead did not object).
+one before. Phase 2b first (the author's call; the lead did not object). The port runs in parallel with
+[Phase 5a](phase-5a-rate-models.md), on its own branches, and does not block Figure 4 (design,
+twenty-third round). At its end the port replaces the solver, and every fit is rerun once to confirm
+equality.
 
 **Status:** not started. The full port design is [jax-fitter-design.md](jax-fitter-design.md) (a copy of
 `.claude/research/2026-11-20-regression-prototypes/jax_fitter/DESIGN.md`; read all of it). This file lists
@@ -21,11 +24,22 @@ the work in the plan's form; the design holds the reasons, the measurements and 
 - The acceptance rule (2026-11-23, 12:32, "ok"): the JAX fitter matches the stored NumPy outputs within
   1e-9 relative, with every status, column left out and count exactly equal. Bit-for-bit equality is not
   required (XLA's products cannot give it). The tolerances per output are those of the port design's
-  section 9.
+  section 9. (**call**, twenty-third round) The rule has an absolute floor: a value `b` matches when the
+  difference is at most `1e-11 + 1e-9 |b|` (the port design's `beta` tolerance, `rtol=1e-9, atol=1e-11`),
+  with the statuses and counts exactly equal. The prototype had one coefficient near zero (about 4e-4) at
+  a relative difference of 5.4e-9 ([jax-fitter-timing.md](jax-fitter-timing.md)). The author told the
+  lead, and the lead did not object.
 
-**Entry condition: OPEN (lead): CPU speed of the port.** The lead, on whether a slower fit on the CPU is
-acceptable: "depends on how much time things take". The first task below measures whole workloads and
-goes to the lead. No later sub-phase starts before the lead has seen that table and answered.
+**Entry condition: met.** The lead, 12:34: "I think I would in general prefer one fitter, but if there's a
+good reason not to, then that's fine". The whole workloads were timed with the present fitter and a JAX
+prototype, under load ([jax-fitter-timing.md](jax-fitter-timing.md)): per whole rate fit 0.349 s
+(NumPy), 0.727 s (JAX on CPU), 0.102 s (one A100). The lead asked "what do you recommend?"; the author
+recommended that the port go ahead without blocking Figure 4, in the order of the overview's Status; the
+lead, 13:21: "ok" (design, twenty-third round). The open question on the port's CPU speed is closed.
+
+**Reference outputs are captured after the weak-penalty change.** The NumPy fixtures of sub-phase 0
+(task 2) are written from a fitter that has the weak penalty on simple terms and the support rule on the
+design (branch `weak-penalty`, aa8f8425), so that the port is checked against the rules it will run.
 
 **Inputs to read first:**
 
@@ -52,18 +66,14 @@ The sub-phases are the port design's Phases 0 and 2 to 6. Its Phase 1 (the simul
 
 - **Sub-phase 0: Measure whole workloads, then capture behavior** (the entry condition, then the port design's
    Phase 0; no change to results).
-   1. Time these workloads with the present NumPy fitter and with a JAX prototype of one fit at fixed
-      penalties (the prototype of the port design's appendix B, extended to the four families): the real
-      rate fit over all sessions (model A, both kinds); one penalty calibration (`log_penalty_for_edf`);
-      one simulation sweep of Phase 2b (the declared-penalty check); the content fit over all sessions;
-      the three mPFC baseline sessions of [Phase 8](phase-8-mpfc.md). Each on one CPU thread, on several
-      threads, and on one free GPU (read `nvidia-smi` on zephyr and breeze first, and tell the other
-      session; C11). Report wall time, compile time apart, and peak memory (`/usr/bin/time -v`), the
-      median of 5 where a run is short; label a run made under load. Write the table into the PR and send
-      it to the lead. Stop here until the lead answers.
+   1. Done (2026-11-23): the whole workloads were timed with the present fitter and a JAX prototype, and
+      the lead answered (above; [jax-fitter-timing.md](jax-fitter-timing.md)). Copy the table into the
+      sub-phase's PR.
    2. Write `scripts/checks/write_regression_reference.py` and commit the fixtures of the port design's
       section 9 (`tests/analysis/regression/data/numpy_reference/*.json`, each with the commit and the
-      command), with the fixed-seed fixture of Phase 2b.
+      command), with the fixed-seed fixture of Phase 2b. Capture them after the weak-penalty change is
+      merged (above), and include a design with a penalized slope, a penalized slope by a category and a
+      penalized category.
    3. Add `tests/analysis/regression/test_reference_fixtures.py`, which compares the fitter with the
       fixtures at the section 9 tolerances. It passes on NumPy.
    4. Write `scripts/checks/time_regression_fitter.py` (the port design's section 10) and record its
@@ -105,7 +115,7 @@ units if [Phase 8](phase-8-mpfc.md) keeps it) is built in Phase 8, on this fitte
 
 | Sub-phase | Gate |
 | --- | --- |
-| 0 | the workload table shown to the lead and answered; the full regression suite; `test_reference_fixtures.py` passes on NumPy |
+| 0 | the full regression suite; `test_reference_fixtures.py` passes on NumPy, on fixtures captured after the weak-penalty change |
 | 2 | the float64 scope tests (the flag unchanged after a fit in a thread; arrays still float32 in the caller; a raw kernel with the flag off raises; the same coefficients with the caller's flag on or off), the device guard test, the padding tests (padded equals unpadded to 1e-12 for each family, a softmax with an empty dump group included), a repository test that no script calls `get_context("fork")` |
 | 3 | `test_reference_fixtures.py` with exact discrete fields; all of `tests/analysis/regression`; `test_likelihoods.py::test_hand_derivatives_equal_autodiff` (1e-12 relative); a compile-count test (10 row counts give at most the number of buckets); a test that a patched rule constant (`MAX_STEP_HALVINGS`) takes effect after the first compile; the Phase 2b fixed-seed fixture; the real slice in the PR; benchmarks 1 to 3 and 5 |
 | 4 | the mgcv and neurospatial fixtures; the finite-difference tests; the REML fixtures; `test_simulation.py` (slow); benchmark 4 on CPU |
@@ -125,9 +135,9 @@ units if [Phase 8](phase-8-mpfc.md) keeps it) is built in Phase 8, on this fitte
 ## Verification and runtime
 
 Each sub-phase records `time_regression_fitter.py`'s numbers in its PR. No speed claim is made without
-them (the port design's section 10). On 2026-11-23, under load on one core: one rate-sized fit took 0.41 s
-in JAX against 0.26 s in NumPy, plus 0.6 s to compile each new shape (measurement; GPU and several
-threads not measured).
+them (the port design's section 10). On 2026-11-23, under load: one whole rate fit took 0.349 s in NumPy,
+0.727 s in JAX on one CPU core and 0.102 s on one A100; compile 15.5 s per process
+([jax-fitter-timing.md](jax-fitter-timing.md)).
 
 ## Rebuilt
 
@@ -136,7 +146,7 @@ The fixtures under `tests/analysis/regression/data/numpy_reference/`; "Cost" in
 
 ## Exit criteria
 
-The lead has answered on the workload table; every sub-phase's gate passes; no NumPy numerical path is
+Every sub-phase's gate passes; no NumPy numerical path is
 left in the three solver modules; the GPU check passes on one card; the public interface is unchanged.
 
 ## Review

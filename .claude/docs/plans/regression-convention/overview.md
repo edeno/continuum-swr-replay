@@ -37,19 +37,25 @@ As of 2026-11-23 (branch `regression-declared-penalty`, from master 07c52783):
 | Phase | State | Commit |
 |---|---|---|
 | 1, the shared fitter | done; interface differs from the plan's sketch (the "as built" note at the top of [phase-1-shared-fitter.md](phase-1-shared-fitter.md)) | merged 6e54eda8, cleaned up 98fe5c06 |
-| 2, the convention's tools | done on master; the declared-penalty parts (the calibration function, its recovery test, the stored check) on `regression-declared-penalty`, pushed, not merged | master 492dffb4; branch b47faec9, 39a51d3a, 86ad3fc5 |
+| 2, the convention's tools | done on master; the declared-penalty parts (the calibration function, its recovery test, the stored check) on `regression-declared-penalty`, pushed, not merged; the weak penalty on simple terms and the support rule on the design on `weak-penalty` (from `regression-declared-penalty`), pushed, not merged | master 492dffb4; branch b47faec9, 39a51d3a, 86ad3fc5; `weak-penalty` aa8f8425 |
 | 3, the well visit in the tables | done; the 13 canonical tables published | d14ff888 |
 | 4, Figures 2 and 3 on the common subset | done, except 20 held-out tetrode values in `paper/reported/events.json` that were pending on 2026-11-21 until another session's rerun ended (not checked again on 2026-11-23); the fold task waits for `swr-trial-folds` | 5dc74fc6 |
 | 2b, the simulation engine | **next** | |
-| 2c, one JAX fitter | after 2b; its entry condition is a workload timing shown to the lead | |
+| 2c, one JAX fitter | after 2b, in parallel with 5a; its entry condition is met (twenty-third round) | |
 | 5a to 12 | not started; 5a, 6a and 8 wait for 2b and 2c | |
 
-**What is done next, in order:** merge `regression-declared-penalty` (after the phase-boundary review
-and the lead's yes); [Phase 2b](phase-2b-simulation-engine.md), the simulation engine on the present
-fitter; [Phase 2c](phase-2c-jax-fitter.md), the JAX fitter, after the lead has seen its workload timing;
-then Phase 5a and the rest. The order of 2b before 2c is the author's call (the same seeds then give the
-same data before and after the port); the lead was told it and did not object (design, twenty-first
-round).
+**What is done next, in order** (design, twenty-third round: the author's recommendation, and the lead,
+2026-11-23, 13:21: "ok"): the port goes ahead without blocking Figure 4.
+
+1. The weak-penalty change in the present fitter (built: `weak-penalty`, aa8f8425).
+2. [Phase 2b](phase-2b-simulation-engine.md), the simulation engine on the present fitter.
+3. In parallel, on separate branches: [Phase 5a](phase-5a-rate-models.md), the rate model, and
+   [Phase 2c](phase-2c-jax-fitter.md), the JAX port.
+4. The port replaces the solver, and every fit is rerun once to confirm equality.
+
+Merging `regression-declared-penalty` and `weak-penalty` waits for the phase-boundary review and the
+lead's yes. The order of 2b before 2c is the author's call (the same seeds then give the same data before
+and after the port); the lead was told it and did not object (design, twenty-first round).
 
 **Decided** (design, section 9, the rounds named):
 
@@ -77,26 +83,47 @@ round).
    on the GPU, scoped to each public call of the fitter; the single-precision GPU path and the old check
    6 are dropped; the GPU check is GPU float64 against CPU float64.
 7. **The port's acceptance rule** (twenty-first round). The lead, 2026-11-23, "ok": the JAX fitter matches
-   the stored NumPy outputs within 1e-9 relative, with the statuses and counts exactly equal.
+   the stored NumPy outputs within 1e-9 relative, with the statuses and counts exactly equal. (**call**,
+   twenty-third round) It has an absolute floor: a value `b` matches when the difference is at most
+   `1e-11 + 1e-9 |b|`; the author told the lead, and the lead did not object.
 8. Kept as decided before (sixteenth round): a session whose simple terms have no finite maximum is
    reported with those terms missing (lead, 2026-11-21).
+9. **A weak penalty on the reward coefficient** (twenty-second round). At 13:00 the author listed five
+   options for the reward coefficient of the rate model (the event-based support rule; a lower minimum;
+   counting visits with at-risk time; a weak penalty on the coefficient; one coefficient for several
+   sessions). The lead, 2026-11-23, 13:00: "I think weak penalty".
+10. **The same weak penalty on every simple tested coefficient in every model** (twenty-second round).
+    Asked at 13:02 "For consistency, should the same weak penalty apply to every simple tested
+    coefficient in every model? I recommend yes, with a simulation check for each family before use.",
+    the lead: "yes". The author's calls that go with it (**call**, each; [C5](shared-contracts.md#c5-the-convention),
+    "The weak-penalty rule"): baselines are not penalized (the intercept, the arm effects, other nuisance
+    categories; Greenland and Mansournia 2015); the support rule reads the design only, never the outcome
+    ("No rule reads the event counts before a fit"); each fit records the edf of each penalized simple
+    coefficient; the width is one declared prior SD for all models, in the reported unit, log penalty
+    `log(1 / SD^2)`. Built: `weak-penalty`, aa8f8425.
+11. **The JAX port goes ahead without blocking Figure 4** (twenty-third round). The lead, 12:34: "I think I
+    would in general prefer one fitter, but if there's a good reason not to, then that's fine". After the
+    workload timing ([jax-fitter-timing.md](jax-fitter-timing.md)) the lead asked "what do you
+    recommend?"; the author recommended the order above; the lead, 13:21: "ok". The open question on the
+    port's CPU speed is closed, and the entry condition of Phase 2c is met.
 
-**Open** (each with its evidence in the design, "Open after the twenty-first round"; a phase that
+**Open** (each with its evidence in the design, "Open after the twenty-third round"; a phase that
 depends on one names it with `OPEN (lead): <name>`):
 
-- a. `OPEN (lead): reward-term support`: the planned 0/1 support rule fails in 86 % of the real SWR
-  sessions and 42 % of the No SWR sessions (input-table counts); the author's rule (visits with at-risk
-  time) is not yet accepted in words. Phase 5a.
+- a. Decided (items 9 and 10 above): a weak penalty on the reward coefficient; the support rule reads the
+  design.
 - b. `OPEN (lead): rate model form`: a declared time range, a reward effect that may change with time
   since arrival, Q1's reference window (empty for SWR events), each clock's penalty. A realistic
   simulation is running (scratch `proto_rate_realistic/`). Phase 5a.
 - c. Decided (item 6 above).
-- d. `OPEN (lead): CPU speed of the port`: the lead, "depends on how much time things take". Phase 2c's
-  entry condition.
+- d. Decided (item 11 above).
 - e. `OPEN (lead): mPFC and history penalties`: a penalty chosen over the units of one session, or the
   declared-penalty rule. Phases 8 and 11.
 - f. `OPEN (lead): grid-point support`: a support rule per grid point for curves averaged over sessions
   (an author's idea; not built). Phases 9 and 10.
+- g. `OPEN (lead): penalty width`: the one declared prior SD of the weak penalty (in the reported unit). Not
+  chosen; a simulation with SD 1, 2 and 4 is running. Every phase with a penalized simple term (5a, 5b,
+  6a, 7, 8, 11) reads it; each family's simulation checks the penalty before use.
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
 on a stop's first sample, which the rate design does not count (about 0.2 % of the No SWR events, none of
@@ -110,10 +137,10 @@ reward-fraction smooth, and the trial number defined as the number of visits arr
 | [1](phase-1-shared-fitter.md) (done) | `analysis/regression/` core: likelihoods, penalized Newton, exact REML derivatives, pooled REML, grid start; checks 1 to 5; mgcv script; older all-bins history model deleted | nothing (no table) | L, ~1,800 |
 | [2](phase-2-convention-tools.md) (done) | bases, collinearity, support rule, fit-row record, folds, bands, day-level reduction, declared-test list; the declared penalty by a target edf | 1 | M, ~1,100 |
 | [2b](phase-2b-simulation-engine.md) | the simulation engine (draws on each likelihood, `regression/simulation.py`, one runner), the rate model's first scenario list; the declared-penalty check moved onto it | 2 | M, ~700 |
-| [2c](phase-2c-jax-fitter.md) | one JAX fitter for every family (fixtures, plumbing, fixed-penalty fit, REML derivatives, GPU check); the NumPy solver removed | 2b; the lead's answer on the workload timing | L, ~1,500 added, ~1,000 removed |
+| [2c](phase-2c-jax-fitter.md) | one JAX fitter for every family (fixtures, plumbing, fixed-penalty fit, REML derivatives, GPU check); the NumPy solver removed | 2b (the lead's answer on the workload timing: given, twenty-third round) | L, ~1,500 added, ~1,000 removed |
 | [3](phase-3-visit-tables.md) (done) | visit clocks and stop-end kinds in the stop and event tables, two new uncertainty covariates, the visit at-risk bin design; one table rebuild; the same columns in the ContFrag tables; the dense stop time-bin table and table-side legacy removed (compatibility branches, re-exports, one-time table scripts) | precondition C3 (code independent of 1 and 2) | M, ~900 added, ~800 removed + a rebuild |
 | [4](phase-4-figures-2-3-common-subset.md) (done) | Figures 2, 3 and `events.json` on the common subset; the duplicate fold function removed | C3; the other session's branch on master | M, ~500 + producer re-runs |
-| [5a](phase-5a-rate-models.md) | visit rate model, models A and D, Q1, Q2, Q7a values; the per-bin ladder, its plotters, values and docs removed | 2c, 3; open questions a and b | L, ~1,300 added, ~5,000 removed |
+| [5a](phase-5a-rate-models.md) | visit rate model, models A and D, Q1, Q2, Q7a values; the per-bin ladder, its plotters, values and docs removed | 2b, 3 (in parallel with 2c); open questions b and g | L, ~1,300 added, ~5,000 removed |
 | [5b](phase-5b-rate-families-moved.md) | per-visit total reward effect, SWR-contrast covariates, uncertainty rate model, on the convention; the three old families removed | 5a | M, ~700 added, ~3,500 removed |
 | [6a](phase-6a-content-models.md) | nine-arm content by role, smooth recency, one uncertainty model (belief variance and sample count with the trial number, after the simulation gate), smooth reward fraction, Q3, Q4, Q5, Q7b values, the ContFrag sources; the content ladders removed | 2c, 3 | L, ~1,500 added, ~8,000 removed |
 | [6b](phase-6b-content-robustness.md) | count and Dirichlet-multinomial estimators on the new design; within-arm comparison, old estimator paths and the per-term gate removed | 6a | M, ~600 added, ~2,500 removed |
@@ -125,18 +152,19 @@ reward-fraction smooth, and the trial number defined as the number of visits arr
 | [12](phase-12-legacy-sweep.md) | final sweep: cross-cutting leftovers, the ASK list answered, five audits proving nothing replaced is left | 10, 11 | S to M, deletions and audits |
 
 ```
-1 ──> 2 ──> 2b ──> 2c ──┬──> 5a ──> 5b
-                        ├──> 6a ──┬──> 6b
-                        │   (5a + 6a) ──> 7 ──┐
-                        └──> 8                ├──> 9 ──> 10 ──┬──> 11
+1 ──> 2 ──> 2b ──┬──> 5a ──> 5b      (5a beside 2c, twenty-third round)
+                 └──> 2c ──┬──> 6a ──┬──> 6b
+                           │   (5a + 6a) ──> 7 ──┐
+                           └──> 8             ├──> 9 ──> 10 ──┬──> 11
 3 ─────────────────────> (5a, 6a, 8)          │               └──> 12
 C3 ──> 3, 4;  other session's merge ──> 4         5a, 6a ──┘
-2c starts after the lead has seen its workload timing (open question d)
-5a's real fits wait for open questions a and b; 6a's for the uncertainty-measure gate
+2c runs in parallel with 5a, on its own branch (twenty-third round); it replaces the solver at the end
+5a's real fits wait for open question b and the penalty width (g); 6a's for the uncertainty-measure gate
 ```
 
 Parallel tracks: Phases 1, 3 and 4 can run at the same time (1 reads no table; 3 and 4 touch different
-files). Phases 5a, 6a and 8 can run in parallel once 2c and 3 are in. Phase 8 is independent of the
+files). Phase 5a runs beside 2c once 2b and 3 are in (twenty-third round); Phases 6a and 8 can run in
+parallel once 2c and 3 are in. Phase 8 is independent of the
 Figure 4 chain and can be scheduled around GPU availability.
 
 **The GPU check (design section 6, check 6).** The design lists check 6 (single precision on the GPU
@@ -244,7 +272,7 @@ runs it last; that is not a blocker for any phase before it.
 | The table rebuild of Phase 3 changes files the other session reads, and its summing step refuses until its runs record the new event table (design, eighth round) | build into a staging root (`--output-dir`), check parity, message the other session before swapping the files in, and swap once |
 | A declared estimand fails the support or collinearity rule in many sessions | the rule is applied before any coefficient is read; the phase stops and reports to the lead; no silent pooling |
 | Pooled REML is slow (every evaluation refits every session) | measured on synthetic sessions of the real size: one selection over 242 sessions took 6.3 min (`docs/design/regression_fitter.md`, "Cost"); prepare each session once per search before the real searches (`TODO.md`); parallelize over sessions only if measured above a few seconds. Under the smooth-term rule the per-session smooth terms are fitted without a search, so this risk applies only to a search that remains (the mPFC units if open question e keeps REML there, Phase 8); the calibration of a declared penalty fits every session about 18 times per term |
-| The JAX fitter is slower on one CPU core than the NumPy one (measured under load: 0.41 s against 0.26 s for one rate-sized fit, plus 0.6 s to compile each new shape) | Phase 2c's entry condition: whole workloads timed on one thread, several threads and one GPU, shown to the lead before the port (open question d); row buckets bound the compiles |
+| The JAX fitter is slower on one CPU core than the NumPy one (measured under load: 0.727 s against 0.349 s for one whole rate fit; [jax-fitter-timing.md](jax-fitter-timing.md)) | the lead saw the whole-workload timing and accepted the order of the twenty-third round; the port does not block Figure 4; row buckets bound the compiles |
 | The simulations drift from the real fits | one engine runs the real fit, tests and reduction and replaces only the outcome column (Phase 2b); its fixed-seed outputs are a fixture of the port |
 | The fractional softmax response is a quasi-likelihood, so Laplace REML is approximate for content | check against mgcv on the same fractional design (mgcv `multinom` does not take fractions; compare with the count response and the shared fitter's own simulation coverage); report coverage from simulation |
 | A cited value is removed by mistake | each retire task lists the macros `paper/*.tex` cites from the values it removes (none of behavior, mpfc or events were cited on 2026-11-20) and asks the lead at that phase's boundary; `tests/reported/test_manuscript_macros.py` fails on a cited macro that no longer exists |
@@ -283,7 +311,7 @@ Settled by the lead on 2026-11-20 (18:51 and 18:58), with the lead's words. The 
 
 Still open, for the lead, by Phase 12 at the latest: ASK-2 and ASK-5 to ASK-12
 ([legacy-inventory.md#ask-list](legacy-inventory.md#ask-list)), and the confirmation of L7 at Phase 7.
-Decided since, and open now: [Status](#status) (the design's seventeenth to twenty-first rounds).
+Decided since, and open now: [Status](#status) (the design's seventeenth to twenty-third rounds).
 
 ## Things in the design that are unclear or contradict each other
 
@@ -307,7 +335,8 @@ Decided since, and open now: [Status](#status) (the design's seventeenth to twen
   round keeps one fit per session, and the simulation shows the REML choice makes a per-session curve a
   line at few events; the seventeenth round replaces it by a declared fixed penalty per term.
 - Section 4.3's support rule for a term (units with events on each side) would remove the reward term
-  from the per-session rate model on the real tables; open question a.
+  from the per-session rate model on the real tables. The twenty-second round replaces it: a weak penalty
+  on every simple tested coefficient, and a support rule on the design only.
 - Contract C4 says rate and content analyze the same events; as built, the rate design does not count an
   event with no at-risk time before its start (28 events start on a stop's first sample). A question for
   the lead at Phase 5a.

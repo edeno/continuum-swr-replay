@@ -40,14 +40,17 @@ even as a literature check (C6, C14). If a per-stop number is ever wanted, it is
   from `paper/reported/behavior.json` and the stored fits' session values for the same covariates.
 - **Total reward effect** (`analysis/replay_models/rate/visit_total_rate.py`, new): one row per visit (L6),
   the count of the kind's events that start inside the visit (C3) after the outcome is known, offset `log` of the at-risk seconds after the outcome is known, and the visit's own
-  outcome (rewarded, 0/1). Poisson through the shared fitter, no smooth, support rule on the 0/1 term (the rule the lead settles
-  at Phase 5a, `OPEN (lead): reward-term support`). The
+  outcome (rewarded, 0/1). Poisson through the shared fitter, no smooth, the 0/1 term at the declared weak
+  penalty with the support rule on the design (design, twenty-second round: the lead, 2026-11-23, "I think
+  weak penalty", and "yes" to the same weak penalty on every simple tested coefficient; the width is
+  `OPEN (lead): penalty width`). The family's simulation checks the penalty before use. The
   estimand: the log rate ratio, rewarded against omitted, "per second of in-visit at-risk time" (total),
   reported beside Phase 5a's Q2 ("at fixed time before leaving", direct), each named (C6). It is not a
   member of the declared family (L1).
 - **SWR-contrast covariates** (`analysis/replay_models/rate/visit_rate_covariates.py`, new): each covariate
   of `_BLOCKS` other than BASE and REWXTIME, added one at a time to model A as a pooled-SD slope per kind
-  (C5 rule 2), with its kind difference. A post-outcome covariate (per `covariate_timing.py`) enters only on
+  (C5 rule 2), with its kind difference. Each slope is a simple tested coefficient at the declared weak
+  penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`); the scenario list below checks the penalty before use. A post-outcome covariate (per `covariate_timing.py`) enters only on
   bins at or after `outcome_known_time_s` (the cohort step restricts and counts; the fitter drops nothing).
   REWXTIME is replaced by nothing: its question (does the reward effect change over the visit) is answered
   by adding a by-outcome smooth of `s` to model A (call; state it in the docs).
@@ -55,8 +58,8 @@ even as a literature check (C6, C14). If a per-stop number is ever wanted, it is
   this model's own bins by a target median edf and checked by its scenario list (design, seventeenth
   round). Whether model A itself gets this form is `OPEN (lead): rate model form` (Phase 5a); follow the
   lead's answer there.
-- **Uncertainty rate model**: the `MU_UNCERTAINTY_COVARIATES` added to model A as pooled-SD slopes, one model
-  with all of them as now, with the collinearity record; a covariate over the threshold is reported only
+- **Uncertainty rate model**: the `MU_UNCERTAINTY_COVARIATES` added to model A as pooled-SD slopes at the
+  declared weak penalty, checked by its scenario list before use, one model with all of them as now, with the collinearity record; a covariate over the threshold is reported only
   jointly with its partner (C5).
 - **A scenario list for the simulation package (Phase 2b)** (`replay_models/rate/visit_rate_covariates_scenarios.py`,
   new; run by Phase 2b's runner): one planted slope per covariate over the real design; the fit must
