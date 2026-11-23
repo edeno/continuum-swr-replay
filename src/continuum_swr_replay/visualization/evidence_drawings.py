@@ -26,7 +26,11 @@ from matplotlib.transforms import blended_transform_factory
 from continuum_swr_replay.visualization.inventory_examples import (
     ANIMAL_POSITION_COLOR,
 )
-from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.palettes import (
+    COLORS,
+    REFERENCE_COLOR,
+    readable_text_color,
+)
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
 
 STRIP_LEFT, STRIP_RIGHT = 6.5, 10.0
@@ -37,8 +41,6 @@ ROWS_LEFT = 0.0
 sit above them."""
 STRIP_HEIGHT = 1.0
 """A strip's height (data units)."""
-OTHER_PLACE_COLOR = "#777777"
-"""The place decoded in another event: a neutral gray."""
 
 LEFT_OUT_TEXTS = {
     "decoded": "Decoded place\n(other tetrodes)",
@@ -123,7 +125,7 @@ def draw_left_out_test(ax: Axes) -> None:
     )  # fmt: skip
     _name(ax, 3.4, texts["animal"])
     _strip(ax, 0.4)
-    _blob(ax, 0.4, 7.6, OTHER_PLACE_COLOR, sigma=0.25)
+    _blob(ax, 0.4, 7.6, REFERENCE_COLOR, sigma=0.25)
     _name(ax, 0.9, texts["other"])
 
 

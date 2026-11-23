@@ -75,8 +75,9 @@ from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
     REFERENCE_COLOR,
+    name_groups,
 )
-from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
@@ -96,10 +97,6 @@ warnings.filterwarnings("ignore")
 # Inches: the full page width.
 WIDTH = 6.5
 HEIGHT = 2.3
-PANEL_WIDTHS = (1.0, 1.0, 1.0)
-"""The frames' widths, in proportion: slow gamma, fast gamma, content distance."""
-GROUP_NAMES = ("No SWR", "SWR")
-"""The classes' names on the distance panel, in ``GROUP_COLORS``' order."""
 
 # The two kinds of event, named and colored as in Figures 2 and 3.
 KINDS = ((False, "No SWR", COLORS["No SWR"]), (True, "SWR", COLORS["SWR"]))
@@ -157,7 +154,7 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
             x = 3.7 * k + np.arange(3)
             values = levels.loc[is_swr, ["rest", "event", "running"]]
             for _, row in values.iterrows():
-                ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
+                ax.plot(x, row.to_numpy(), color=ANIMAL_LINE_COLOR, lw=0.5, zorder=1)
             for i, dot_color in enumerate((C_REST, color, C_RUN)):
                 ax.scatter(
                     np.full(len(values), x[i]), values.iloc[:, i], s=9,
@@ -199,13 +196,7 @@ def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
         ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
     for cut in (NEAR_CM, REMOTE_CM):
         ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
-    for k, (name, color) in enumerate(
-        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
-    ):
-        ax.text(
-            0.02, 1.0 - 0.1 * k, name, transform=ax.transAxes, ha="left",
-            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
-        )  # fmt: skip
+    name_groups(ax, 0.02, 1.0, 0.1, "left")
     ax.set_xscale("log")
     ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
     ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
@@ -219,9 +210,7 @@ def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
 
 def generate_figure(inputs: dict):
     """Build the figure from :func:`read_inputs`."""
-    fig, axes = plt.subplots(
-        1, 3, figsize=(WIDTH, HEIGHT), gridspec_kw={"width_ratios": PANEL_WIDTHS}
-    )
+    fig, axes = plt.subplots(1, 3, figsize=(WIDTH, HEIGHT))
     fig.subplots_adjust(left=0.09, right=0.99, top=0.76, bottom=0.2, wspace=0.45)
     draw_gamma(axes[:2], inputs["events"], inputs["reference"])
     draw_content_distance(axes[2], inputs["distance"])

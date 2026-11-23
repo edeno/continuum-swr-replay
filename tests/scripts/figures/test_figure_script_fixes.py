@@ -1812,15 +1812,11 @@ def test_figure02_letters_share_a_row_height_from_the_named_parts(offline):
     }
     grid[0, 2].set_title("a title\nof two lines")
     fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    extent = {
-        name: figure02.panel_extent(fig, renderer, axes)
-        for name, axes in panels.items()
-    }
+    extent = {name: figure02.drawn_extent(fig, axes) for name, axes in panels.items()}
     rows, columns = ["abc", "def"], ["ad", "be", "c", "f"]
-    plain = figure02.place_letters(fig, renderer, panels, rows, columns)
+    plain = figure02.place_letters(fig, panels, rows, columns)
     named = figure02.place_letters(
-        fig, renderer, panels, rows, columns, heights={"c": [], "d": 0.3}
+        fig, panels, rows, columns, heights={"c": [], "d": 0.3}
     )
     # by default the title of c sets its row's height
     assert {plain[n][1] for n in "abc"} == {extent["c"].y1 + 0.002}
@@ -2253,7 +2249,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     for name, value in {
         "parse_nwb_filename": lambda name: ("a", "d1"),
         "example_windows": lambda *args: {},
-        "checked_reference": lambda reference, folder, name: reference,
+        "read_checked": lambda folder, name, file="counts.parquet": None,
         "reference_medians": lambda *args: None,
         "animal_nonlocal_counts": lambda *args: None,
         "state_distribution": lambda *args: None,

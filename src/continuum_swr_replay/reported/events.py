@@ -3257,6 +3257,12 @@ def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.Da
     return reference
 
 
+def read_checked(folder: Path, name: str, file: str = "counts.parquet") -> pd.DataFrame:
+    """A per-epoch measurement's table (``file`` in ``folder``), refused as
+    :func:`checked_reference` refuses it (``name`` says what it is)."""
+    return checked_reference(pd.read_parquet(folder / file), folder, name)
+
+
 def restriction_input_staleness(
     manifest: dict,
     decode_sha256: Mapping[str, str],

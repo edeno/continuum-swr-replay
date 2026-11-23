@@ -173,11 +173,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from matplotlib.axes import Axes
-from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.text import Annotation
 from matplotlib.ticker import NullLocator
-from matplotlib.transforms import Bbox, blended_transform_factory
 from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -288,8 +287,8 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.events import (
-    checked_reference,
     heldout_restriction_refusal,
+    read_checked,
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
@@ -309,15 +308,22 @@ from continuum_swr_replay.visualization.evidence_drawings import (
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
+    EQUAL_FIT,
     GROUP_COLORS,
     REFERENCE_COLOR,
-    WIDTH_GROUP_NAMES,
     animal_values,
     draw_animal_gain,
     draw_full_minus_swr_axis,
+    draw_zero_line,
+    name_groups,
+    name_zero_line,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
-from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.palettes import (
+    ANIMAL_LINE_COLOR,
+    COLORS,
+    readable_text_color,
+)
 from continuum_swr_replay.visualization.plots import (
     plot_linear_track_graph_strip,
     plot_ripple_consensus_trace_zscore,
@@ -334,6 +340,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     PANEL_LETTER_SIZE,
     SMALL_SIZE,
     check_journal_limits,
+    drawn_extent,
 )
 
 # The render cache's version, part of its file name. The name also carries the
@@ -1225,8 +1232,6 @@ LEFT_OUT_WSPACE = 0.75
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
 """The participation panel: each group's Local-rest and event positions on the
 x axis."""
-PAIR_COLOR = "#999999"
-"""A line joining one animal's two values (the participation panel)."""
 
 
 def read_participation(
@@ -1274,7 +1279,7 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
             for kind in ("control", "event")
         )
         for animal in event.index.intersection(rest.index):  # paired by animal
-            ax.plot(x, (rest[animal], event[animal]), color=PAIR_COLOR, lw=0.5,
+            ax.plot(x, (rest[animal], event[animal]), color=ANIMAL_LINE_COLOR, lw=0.5,
                     zorder=1)  # fmt: skip
         ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=COLORS["Local"], lw=0,
                    zorder=2)  # fmt: skip
@@ -1392,8 +1397,6 @@ FIT_X = {
     ("other", "SWR"): 2.9,
 }
 """Panel j: each comparison and group's x position."""
-EQUAL_FIT = "equal fit"
-"""Panels j and k's name of their zero line."""
 DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
 DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
 """Panel k's first axis, "All immobility time"."""
@@ -1401,47 +1404,30 @@ DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime
 """Panel k's second axis, "Outside SWRs"."""
 
 
-def draw_heading(ax: Axes, text: str) -> None:
+def draw_heading(ax: Axes, text: str) -> Annotation:
     """A panel's heading, :data:`HEADING_OFFSET_PT` above ``ax``'s top; it is
     centered over the panel once the panel's axes are placed
     (:func:`center_heading`)."""
-    ax.annotate(
+    return ax.annotate(
         text, (0.0, 1.0), xycoords="axes fraction",
         xytext=(0, HEADING_OFFSET_PT), textcoords="offset points",
         ha="left", va="bottom", fontsize=SMALL_SIZE + 1,
     )  # fmt: skip
 
 
-def center_heading(
-    fig: Figure, axes: Sequence[Axes], left: float, right: float
-) -> None:
-    """Center a panel's heading (:func:`draw_heading`, on its first axes)
-    between ``left`` and ``right`` (figure coordinates). The heading stays in
-    its axes' coordinates: a text in figure coordinates moves when the figure
-    is saved cropped to its ink."""
-    heading = next(
-        text
-        for text in axes[0].texts
-        if text.get_text() in (LEFT_OUT_HEADING, DECODER_HEADING)
-    )
-    box = axes[0].get_position()
+def center_heading(heading: Annotation, left: float, right: float) -> None:
+    """Center a panel's heading (:func:`draw_heading`) between ``left`` and
+    ``right`` (figure coordinates). The heading stays in its axes' coordinates:
+    a text in figure coordinates moves when the figure is saved cropped to its
+    ink."""
+    box = heading.axes.get_position()
     heading.xy = (((left + right) / 2 - box.x0) / box.width, 1.0)
     heading.set_ha("center")
 
 
-def name_zero(ax: Axes, text: str = EQUAL_FIT) -> None:
-    """The dashed zero line's name, in gray, just above it at the axis' left."""
-    ax.annotate(
-        text, (0.02, 0.0),
-        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
-        xytext=(0, 1), textcoords="offset points", ha="left", va="bottom",
-        fontsize=SMALL_SIZE, color=C_REFERENCE,
-    )  # fmt: skip
-
-
 def draw_left_out_fit(
     ax_drawing: Axes, ax: Axes, statistics: dict[str, pd.DataFrame]
-) -> None:
+) -> Annotation:
     """Panel j: do the spikes of a left-out tetrode point to the decoded place?
 
     Left, the test as a drawing (``evidence_drawings.draw_left_out_test``).
@@ -1456,13 +1442,13 @@ def draw_left_out_fit(
     :data:`EQUAL_FIT`. The heading (:data:`LEFT_OUT_HEADING`) sits over the
     drawing."""
     draw_left_out_test(ax_drawing)
-    draw_heading(ax_drawing, LEFT_OUT_HEADING)
+    heading = draw_heading(ax_drawing, LEFT_OUT_HEADING)
     for (comparison, group), x in FIT_X.items():
         draw_animal_gain(
             ax, x, statistics[comparison].loc[group], GROUP_COLORS[group], spread=True
         )
-    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    name_zero(ax)
+    draw_zero_line(ax)
+    name_zero_line(ax, EQUAL_FIT, 0.02, offset_pt=1)
     centers = [
         np.mean([x for (c, _), x in FIT_X.items() if c == comparison]) + 0.12
         for comparison in FIT_GROUPS
@@ -1471,13 +1457,9 @@ def draw_left_out_fit(
     ax.set_xlim(-0.4, max(FIT_X.values()) + 0.6)
     low, high = ax.get_ylim()
     ax.set_ylim(min(low, -0.12 * high), high * 1.15)
-    for k, (group, color) in enumerate(GROUP_COLORS.items()):
-        ax.text(
-            0.99, 0.99 - 0.1 * k, WIDTH_GROUP_NAMES[group], ha="right", va="top",
-            transform=ax.transAxes, fontsize=SMALL_SIZE,
-            color=readable_text_color(color),
-        )  # fmt: skip
+    name_groups(ax, 0.99, 0.99, 0.1, "right")
     ax.set_ylabel(FIT_YLABEL)
+    return heading
 
 
 def draw_decoder_need(
@@ -1485,7 +1467,7 @@ def draw_decoder_need(
     ax_time: Axes,
     ax_outside: Axes,
     statistics: RestrictionFigureStatistics,
-) -> None:
+) -> Annotation:
     """Panel k: does the decoder need non-local states outside SWRs?
 
     Left, the two decoders as a drawing
@@ -1504,7 +1486,7 @@ def draw_decoder_need(
     second axis on its own scale (about ten times the first's). The heading
     (:data:`DECODER_HEADING`) sits over the drawing."""
     draw_restriction_test(ax_drawing)
-    draw_heading(ax_drawing, DECODER_HEADING)
+    heading = draw_heading(ax_drawing, DECODER_HEADING)
     family = RESTRICTION_FIGURE_FAMILY
     for ax, rows, title in (
         (
@@ -1535,11 +1517,12 @@ def draw_decoder_need(
         draw_full_minus_swr_axis(
             ax, xs, list(rows.values()), 1.08, ylabel="", cue=False
         )
-        name_zero(ax)
+        name_zero_line(ax, EQUAL_FIT, 0.02, offset_pt=1)
         ax.set_xlim(-0.45, xs[-1] + 0.6)
         ax.set_xticks(xs, [labels[name] for name in rows])
         ax.set_title(title, fontsize=SMALL_SIZE, pad=3)
     ax_time.set_ylabel(DECODER_YLABEL)
+    return heading
 
 
 TRACES_WSPACE = 0.32
@@ -1713,12 +1696,11 @@ def draw_share_by_power(
     below = nonlocal_below_threshold_statistics(counts, KAY_ZSCORE_THRESHOLD)
     draw_share_by_signal(
         ax_spread, ax_share, counts, threshold=KAY_ZSCORE_THRESHOLD,
-        threshold_label="SWR\nthreshold", threshold_color=C_SWR, shade_color=C_QUIET,
+        threshold_label="SWR\nthreshold", threshold_color=C_SWR,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
         "below\nthreshold", states=states,
     )  # fmt: skip
-    ax_share.set_xticks([0, 5, 10])
 
 
 OFFSET_BINS_MS = np.arange(-100, 101, 5)
@@ -1762,20 +1744,8 @@ def draw_offsets(
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
-def panel_extent(fig: Figure, renderer: RendererBase, axes: Sequence[Axes]) -> Bbox:
-    """The drawn extent of a panel's axes (labels, titles and legends included),
-    in figure coordinates."""
-    return Bbox.union(
-        [
-            ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
-            for ax in axes
-        ]
-    )
-
-
 def place_letters(
     fig: Figure,
-    renderer: RendererBase,
     panels: Mapping[str, Sequence[Axes]],
     rows: Sequence[str],
     columns: Sequence[str],
@@ -1798,7 +1768,7 @@ def place_letters(
     y = {}
     for row in rows:
         tops = [
-            panel_extent(fig, renderer, axes).y1
+            drawn_extent(fig, axes).y1
             for axes in (heights.get(name, panels[name]) for name in row)
             if not isinstance(axes, Real) and len(axes) > 0
         ]
@@ -1809,7 +1779,7 @@ def place_letters(
             )
     x = {
         name: max(
-            min(panel_extent(fig, renderer, panels[n]).x0 for n in column) - 0.004,
+            min(drawn_extent(fig, panels[n]).x0 for n in column) - 0.004,
             0.0,
         )
         for column in columns
@@ -1869,28 +1839,20 @@ def generate_figure(
     )
 
     reference = reference_medians(
-        checked_reference(
-            pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
+        read_checked(
             data_dir / BRAIN_STATE_REFERENCE_DIR,
             "brain-state reference",
+            "reference.parquet",
         ),
         ["ripple", "mua", "theta"],
     )
     power_counts = animal_nonlocal_counts(
-        checked_reference(
-            pd.read_parquet(data_dir / NONLOCAL_BY_SIGNAL_DIR / "counts.parquet"),
-            data_dir / NONLOCAL_BY_SIGNAL_DIR,
-            "counts by signal",
-        ),
+        read_checked(data_dir / NONLOCAL_BY_SIGNAL_DIR, "counts by signal"),
         "ripple_power",
     )
     # the Local and non-local time by ripple power, for the top strip
     power_states = state_distribution(
-        checked_reference(
-            pd.read_parquet(data_dir / STATE_BY_SIGNAL_DIR / "counts.parquet"),
-            data_dir / STATE_BY_SIGNAL_DIR,
-            "counts by signal and state",
-        ),
+        read_checked(data_dir / STATE_BY_SIGNAL_DIR, "counts by signal and state"),
         "ripple_power",
     )
     # every analyzed epoch with an event: an epoch with none has no table
@@ -2007,7 +1969,9 @@ def generate_figure(
     )
     ax_left_out_drawing = fig.add_subplot(left_out_grid[0])
     ax_left_out = fig.add_subplot(left_out_grid[1])
-    draw_left_out_fit(ax_left_out_drawing, ax_left_out, left_out_fit)
+    headings = {
+        "left_out": draw_left_out_fit(ax_left_out_drawing, ax_left_out, left_out_fit)
+    }
     ax_participation = fig.add_subplot(cells["participation"])
     draw_participation(ax_participation, participation)
     power_grid = cells["ripple_power"].subgridspec(
@@ -2022,7 +1986,9 @@ def generate_figure(
     ax_decoder_drawing, ax_time, ax_outside = (
         fig.add_subplot(decoder_grid[k]) for k in range(3)
     )
-    draw_decoder_need(ax_decoder_drawing, ax_time, ax_outside, restriction)
+    headings["decoder_comparison"] = draw_decoder_need(
+        ax_decoder_drawing, ax_time, ax_outside, restriction
+    )
     bottom_axes = {
         "traces": triggered_axes,
         "participation": [ax_participation],
@@ -2046,8 +2012,8 @@ def generate_figure(
     # the figure's right
     starts = {
         "c": x_left + 0.004,
-        "e": panel_extent(fig, renderer, [ax_e, ax_e2]).x0,
-        "f": panel_extent(fig, renderer, [ax_f1, ax_f2]).x0,
+        "e": drawn_extent(fig, [ax_e, ax_e2]).x0,
+        "f": drawn_extent(fig, [ax_f1, ax_f2]).x0,
     }
     fitters = {
         "traces": lambda left, right: fit_grid_in_column(
@@ -2073,8 +2039,8 @@ def generate_figure(
         rights = [left - COLUMN_GAP for left in lefts[1:]] + [BOTTOM_RIGHT]
         for panel, left, right in zip(row, lefts, rights, strict=True):
             fitters[panel](left, right)
-            if panel in ("left_out", "decoder_comparison"):
-                center_heading(fig, bottom_axes[panel], left, right)
+            if panel in headings:
+                center_heading(headings[panel], left, right)
     fit_track_to_height(fig, ax_a, x_left)
     # panel a's example fills the space the track drawing leaves: its labels
     # start a gap after the drawing, and its right edge stays
@@ -2084,14 +2050,13 @@ def generate_figure(
         ax.get_position().x0 - ax.get_tightbbox(renderer).transformed(to_figure).x0
         for ax in decode_axes
     )
-    decode_left = panel_extent(fig, renderer, [ax_a]).x1 + OVERVIEW_GAP + labels
+    decode_left = drawn_extent(fig, [ax_a]).x1 + OVERVIEW_GAP + labels
     for ax in decode_axes:
         box = ax.get_position()
         ax.set_position((decode_left, box.y0, box.x1 - decode_left, box.height))
     fig.canvas.draw()
     positions = place_letters(
         fig,
-        renderer,
         {
             "a": [ax_a],
             "b": [ax_b],

@@ -302,7 +302,6 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator, NullLocator
-from matplotlib.transforms import blended_transform_factory
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.decode_quality.nonlocal_probability import (
@@ -391,10 +390,10 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
-    checked_reference,
     default_inputs,
     event_table_staleness,
     heldout_restriction_refusal,
+    read_checked,
     read_heldout_restriction,
     require_tetrode_holdout_folds,
     restriction_inputs_note,
@@ -407,6 +406,7 @@ from continuum_swr_replay.visualization.evidence_drawings import draw_boundary_c
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_LABELS,
+    EQUAL_FIT,
     EVENTS_LABELS,
     EVENTS_TITLE,
     GROUP_COLORS,
@@ -418,9 +418,16 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     draw_decoder_gain_axis,
     draw_full_minus_swr_axis,
     draw_split_gain,
+    gain_range,
     label_gain_axis,
+    name_groups,
+    name_zero_line,
 )
-from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
+from continuum_swr_replay.visualization.palettes import (
+    ANIMAL_LINE_COLOR,
+    COLORS,
+    readable_text_color,
+)
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
@@ -444,8 +451,6 @@ WIDTH = 6.5
 HEIGHT = 6.8
 LEFT_OUT_YLABEL = "Left-out tetrode:\nbetter fit (nats/spike)"
 """The y label of the left-out tetrode's split (panel h)."""
-EQUAL_FIT = "equal fit"
-"""The name of their dashed zero line."""
 SPLIT_TITLE = "Decoded place over\nanimal's place"
 TIMING_CASES = (
     ("Same start and end", "together", "together"),
@@ -500,9 +505,6 @@ SWEEP_TICKS = {
     "swr_threshold_z": (0, 2, 4, 6),
 }
 """The sweep panel's x ticks, in its drawn units: the value used and the ends."""
-ANIMAL_LINE_COLOR = "#999999"
-"""An animal's thin line on panels c and d, beside the mean over animals in
-black."""
 HPD_XLABEL = "95 % HPD length (cm)"
 """The posterior-spread panel's x label: each event's mean over its bins of the
 length of track that holds 95 % of the decoded probability (on one line, clear
@@ -592,8 +594,6 @@ NO_SPIKE_COLOR = COLORS["No-Spike"]
 NO_SPIKE_WORKERS = 4
 """The processes that read the decode frames for the No-Spike panel by
 default: each holds one frame at a time."""
-GROUP_NAMES = ("No SWR", "SWR")
-"""The groups' names on the panels, in ``GROUP_COLORS``' order."""
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
 REFUSED_FOUR = f"Figure 2's supplement: panel {LETTERS['four_decoders']} is not drawn"
 FOUR_DECODER_TIMES = {
@@ -782,9 +782,8 @@ def read_mua_states(folder: Path) -> pd.DataFrame:
     """The MUA panel's top strip: ``state_by_signal.state_distribution`` of the
     stored counts by MUA and decoder state, refused as :func:`read_mua_counts`
     refuses its counts."""
-    counts = pd.read_parquet(folder / "counts.parquet")
     try:
-        checked_reference(counts, folder, "counts by signal and state")
+        counts = read_checked(folder, "counts by signal and state")
     except ValueError as error:
         raise ValueError(
             f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
@@ -849,9 +848,8 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
         well visits and the decodes the event features run records, for the
         analyzed epochs (``reported.events.checked_reference``, as Figure 2i).
     """
-    counts = pd.read_parquet(folder / "counts.parquet")
     try:
-        checked_reference(counts, folder, "counts by signal")
+        counts = read_checked(folder, "counts by signal")
     except ValueError as error:
         raise ValueError(
             f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
@@ -1014,17 +1012,6 @@ def draw_boundary_timing(ax_cases: Axes, ax: Axes, timing: pd.DataFrame) -> None
     ax_cases.set_title("Event against its SWR", fontsize=SMALL_SIZE, pad=3, loc="left")
 
 
-def name_equal_fit(ax: Axes) -> None:
-    """:data:`EQUAL_FIT` just under the dashed zero line at the axis' left,
-    in the reference gray."""
-    ax.annotate(
-        EQUAL_FIT, (0.02, 0.0),
-        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
-        xytext=(0, -2), textcoords="offset points", ha="left", va="top",
-        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
-    )  # fmt: skip
-
-
 def draw_left_out_split(ax: Axes, statistics: dict) -> None:
     """Panel h: Figure 2j's first comparison, the left-out tetrode's better
     fit to the decoded place than to the animal's place (the gain over local
@@ -1033,13 +1020,11 @@ def draw_left_out_split(ax: Axes, statistics: dict) -> None:
     ``split``), drawn by ``heldout_gain_panels.draw_split_gain``; the dashed
     zero line named :data:`EQUAL_FIT`."""
     draw_split_gain(ax, statistics, SPLIT_TITLE)
-    rows = [table.loc[group] for table in statistics.values() for group in table.index]
-    low = min(min(float(np.min(r["animals"])), r["ci_low"]) for r in rows)
-    high = max(max(float(np.max(r["animals"])), r["ci_high"]) for r in rows)
-    label_gain_axis(
-        ax, LEFT_OUT_YLABEL, "", floor=min(-0.12, low - 0.08 * (high - low))
+    low, high = gain_range(
+        table.loc[group] for table in statistics.values() for group in table.index
     )
-    name_equal_fit(ax)
+    label_gain_axis(ax, LEFT_OUT_YLABEL, min(-0.12, low - 0.08 * (high - low)))
+    name_zero_line(ax, EQUAL_FIT, 0.02, offset_pt=-2, va="top")
     ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
 
 
@@ -1088,11 +1073,10 @@ def draw_nonlocal_mua(
     draw_share_by_signal(
         ax_spread, ax_share, counts, threshold=MUA_LEVEL_Z,
         threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
-        shade_color=COLORS["All Events"], xlabel="MUA (z)",
+        xlabel="MUA (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
         f"below\n{MUA_LEVEL_Z:g} z", states=states,
     )  # fmt: skip
-    ax_share.set_xticks([0, 5, 10])
 
 
 def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
@@ -1321,13 +1305,7 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
         transform=ax.get_xaxis_transform(), ha="right", va="top",
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
-    for k, (name, color) in enumerate(
-        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
-    ):
-        ax.text(
-            0.84, 0.98 - 0.17 * k, name, transform=ax.transAxes, ha="right",
-            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
-        )  # fmt: skip
+    name_groups(ax, 0.84, 0.98, 0.17, "right")
     ax.set_xscale("log")
     ax.set_xlim(HPD_BIN_EDGES_CM[0], HPD_BIN_EDGES_CM[-1])
     ax.set_xticks(HPD_TICKS_CM, [f"{t:g}" for t in HPD_TICKS_CM])

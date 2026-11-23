@@ -62,6 +62,10 @@ def draw_strip_title(ax: Axes) -> None:
     )
 
 
+SHADE_COLOR = COLORS["All Events"]
+"""The non-local curve's part below the threshold, shaded."""
+
+
 def draw_share_by_signal(
     ax_spread: Axes,
     ax_share: Axes,
@@ -70,7 +74,6 @@ def draw_share_by_signal(
     threshold: float,
     threshold_label: str,
     threshold_color: str,
-    shade_color: str,
     xlabel: str,
     below_note: str,
     states: pd.DataFrame,
@@ -95,7 +98,7 @@ def draw_share_by_signal(
         (the bottom axis).
     threshold : float
         z; an edge of the signal's bins.
-    threshold_label, threshold_color, shade_color, xlabel : str
+    threshold_label, threshold_color, xlabel : str
     below_note : str
         The share below the threshold, in words.
     states : pd.DataFrame
@@ -123,7 +126,7 @@ def draw_share_by_signal(
         ax_spread.plot(middle, mean.to_numpy(), color=color, lw=1.0)
         if state == "non_local":
             ax_spread.fill_between(
-                middle, mean.to_numpy(), where=middle < threshold, color=shade_color,
+                middle, mean.to_numpy(), where=middle < threshold, color=SHADE_COLOR,
                 lw=0,
             )  # fmt: skip
     for ax in (ax_spread, ax_share):
@@ -145,4 +148,5 @@ def draw_share_by_signal(
     ax_share.set_ylim(0, 102)
     ax_share.set_yticks([0, 50, 100])
     ax_share.set_xlabel(xlabel)
+    ax_share.set_xticks([0, 5, 10])
     ax_share.set_ylabel("% of bins\nnon-local")
