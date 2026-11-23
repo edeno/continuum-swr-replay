@@ -29,7 +29,9 @@ own coefficient (``role[current]``); a smooth or a slope fitted for one role
 carries ``:role=<level>``. The rate models' clocks are
 ``time_since_visit_start_s`` (since the first poke-in) and
 ``time_until_visit_end_s`` (until the final poke-out); recency is
-``log_trials_since_last_visit``; the last outcome is ``last_outcome_rewarded``
+``log_trials_since_last_visit``, a smooth on the other-leaf rows only (the
+current arm is always 1 trial since its last visit and the previous arm 2, so
+on their rows a recency curve is their role level); the last outcome is ``last_outcome_rewarded``
 (0/1).
 
 Models: ``visit_rate_A`` (the visit rate with the smooths of both clocks and
@@ -159,7 +161,7 @@ class Estimand:
 
 _ARRIVAL = "s(time_since_visit_start_s)"
 _LEAVING = "s(time_until_visit_end_s)"
-_RECENCY = "s(log_trials_since_last_visit)"
+_RECENCY = "s(log_trials_since_last_visit):role=other_leaf"
 
 ESTIMANDS: tuple[Estimand, ...] = (
     Estimand(
