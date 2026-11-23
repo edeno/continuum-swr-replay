@@ -54,6 +54,7 @@ __all__ = [
     "GroupedSoftmax",
     "Likelihood",
     "Poisson",
+    "draw",
     "group_starts",
 ]
 
@@ -393,3 +394,68 @@ class GroupedSoftmax:
     ) -> np.ndarray:
         """``G d = p (d - p'd)`` per group, shape ``(n_rows,)``."""
         return p * (d - np.repeat(np.add.reduceat(p * d, starts), sizes))
+
+
+def draw(
+    lik: Likelihood,
+    eta: np.ndarray,
+    aux: object,
+    rng: np.random.Generator,
+    *,
+    n_trials: int = 1,
+) -> np.ndarray:
+    """Outcomes drawn from a family at the linear predictor ``eta``.
+
+    The draws use only ``rng``, a NumPy generator, and none of the fitter's
+    code, so the same seed gives the same outcomes whatever the fitter's
+    solver is. ``aux`` is the family's, as for its other methods:
+
+    - Poisson: counts of mean ``exp(eta + aux)``, ``aux`` the offset.
+    - Bernoulli: 0/1 with probability ``expit(eta)``; ``aux`` unused.
+    - Gaussian: ``eta`` plus Normal noise of variance ``aux``, the scale.
+    - Grouped softmax: ``aux`` the sorted group id of each row. Each group
+      takes ``n_trials`` independent choices of one row, each row chosen
+      with probability ``softmax(eta)`` within its group (the Gumbel-max
+      draw), and its outcome is the share of the choices that fell on it.
+      The shares of a group sum to one, as the content response does, and
+      their mean is the softmax. With ``n_trials = 1`` it is one
+      multinomial draw: one row of each group has share 1.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    eta : np.ndarray, shape (n_rows,)
+    aux : object
+    rng : np.random.Generator
+    n_trials : int
+        The choices per group under the grouped softmax; not read otherwise.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+        Float outcomes.
+
+    Raises
+    ------
+    ValueError
+        If the family has no draw (named by ``lik.name``), or ``n_trials`` is
+        below one under the grouped softmax.
+    """
+    eta = np.asarray(eta, dtype=float)
+    if lik.name == "poisson":
+        return rng.poisson(np.exp(eta + np.asarray(aux, dtype=float))).astype(float)
+    if lik.name == "bernoulli":
+        return (rng.random(eta.size) < expit(eta)).astype(float)
+    if lik.name == "gaussian":
+        return eta + np.sqrt(aux) * rng.standard_normal(eta.size)
+    if lik.name == "grouped_softmax":
+        if n_trials < 1:
+            raise ValueError(f"n_trials must be at least one, not {n_trials}")
+        starts = group_starts(aux)
+        sizes = np.diff(starts, append=eta.size)
+        chosen = np.zeros(eta.size)
+        for _ in range(n_trials):
+            noisy = eta + rng.gumbel(size=eta.size)
+            chosen += noisy == np.repeat(np.maximum.reduceat(noisy, starts), sizes)
+        return chosen / n_trials
+    raise ValueError(f"no draw for the likelihood {lik.name!r}")

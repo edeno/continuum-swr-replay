@@ -1,4 +1,5 @@
-"""The likelihoods' derivatives against central finite differences.
+"""The likelihoods' derivatives against central finite differences, and
+their draws.
 
 Each level is checked against a finite difference of the level below it, and
 the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
@@ -6,6 +7,7 @@ the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
 coefficient gradient ``X' score_eta(X beta)`` in ``beta``; ``dinformation`` is
 the derivative of ``information`` along a direction of ``eta``; and
 ``d2information`` the derivative of ``dinformation`` along a second one.
+The draws (``draw``) have the family's mean.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Gaussian,
     GroupedSoftmax,
     Poisson,
+    draw,
 )
 
 TOLERANCE = 1e-6
@@ -158,3 +161,53 @@ def test_softmax_is_invariant_to_a_constant_within_each_group() -> None:
     lik, X, y, groups, eta = _case("softmax_fractions")
     shift = np.array([3.0, -1.0, 0.5, 20.0])[groups]
     assert np.isclose(lik.loglik(eta + shift, y, groups), lik.loglik(eta, y, groups))
+
+
+N_DRAWS = 20_000
+
+
+@pytest.mark.parametrize(
+    "name", ["poisson", "bernoulli", "gaussian", "softmax_one", "softmax_shares"]
+)
+def test_draws_have_the_family_mean(name: str) -> None:
+    """At a fixed ``eta``, the mean of 20,000 draws of each row is the
+    family's mean within 4 standard errors (the draws' SD over sqrt(20,000)):
+    ``exp(eta + offset)``, ``expit(eta)``, ``eta``, and the softmax within each
+    group. A share draw sums to one in every group."""
+    rng = np.random.default_rng(11)
+    eta = np.array([-1.2, 0.3, 0.9, -0.4, 1.5, 0.0, -2.0])
+    groups = np.array([0, 0, 0, 1, 1, 2, 2])
+    if name == "poisson":
+        lik, aux, n_trials = Poisson(), np.log([0.5, 1.0, 2.0, 3.0, 0.2, 1.0, 4.0]), 1
+        mean = np.exp(eta + aux)
+    elif name == "bernoulli":
+        lik, aux, n_trials = Bernoulli(), None, 1
+        mean = 1.0 / (1.0 + np.exp(-eta))
+    elif name == "gaussian":
+        lik, aux, n_trials = Gaussian(), 0.7, 1
+        mean = eta
+    else:
+        lik, aux = GroupedSoftmax(), groups
+        n_trials = 1 if name == "softmax_one" else 5
+        weight = np.exp(eta)
+        mean = weight / np.bincount(groups, weights=weight)[groups]
+    draws = np.stack(
+        [draw(lik, eta, aux, rng, n_trials=n_trials) for _ in range(N_DRAWS)]
+    )
+    assert draws.shape == (N_DRAWS, eta.size)
+    se = draws.std(axis=0, ddof=1) / np.sqrt(N_DRAWS)
+    assert np.all(np.abs(draws.mean(axis=0) - mean) < 4.0 * se)
+    if isinstance(lik, GroupedSoftmax):
+        totals = np.stack([np.bincount(groups, weights=row) for row in draws])
+        np.testing.assert_allclose(totals, 1.0, rtol=0, atol=1e-12)
+        assert set(np.unique(draws * n_trials)) <= set(range(n_trials + 1))
+
+
+def test_a_draw_refuses_an_unknown_family() -> None:
+    """A likelihood without a draw is refused by name."""
+
+    class Other:
+        name = "other"
+
+    with pytest.raises(ValueError, match="no draw for the likelihood 'other'"):
+        draw(Other(), np.zeros(2), None, np.random.default_rng(0))
