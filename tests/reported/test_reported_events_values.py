@@ -252,7 +252,7 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
     figure draws with; tagged with question 2b.3 and panel 2e."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
-    detectors = nonlocal_comparison.FIGURE_DETECTORS
+    detectors = (*nonlocal_comparison.FIGURE_DETECTORS, *builder.TEXT_FOUND_DETECTORS)
     rows = []
     for k, detector in enumerate(detectors):
         # animal a: 1 of 2 events matched in epoch 1, 1 of 1 in epoch 2 (0.75);
@@ -274,11 +274,34 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
         expected[f"{key}_animal_max"] = max(0.75, k % 2)
     assert {k: v.value for k, v in values.items()} == pytest.approx(expected)
     assert "nonlocal_events_found_by_widloski_fraction" in values
-    for value in values.values():
+    # the criteria-only Widloski inventory is a value for the text, untagged
+    text = "nonlocal_events_found_by_widloski_criteria_fraction"
+    for key, value in values.items():
         assert value.questions == ("2b.3",)
-        assert value.figures == ("2e",)
+        assert value.figures == (() if key.startswith(text) else ("2e",))
         assert value.kind == "fraction"
         assert value.function == "nonlocal_found_values"
+
+
+def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
+    """For the criteria-only Widloski inventory, the share of its events that
+    overlap a non-local event (pooled, lowest and highest animal), the
+    statistic of Figure 2e's left bars, for the text."""
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b"],
+            "day": [1, 1, 2, 1],
+            "epoch": "02_r1",
+            "detector": "memoryless_criteria",
+            "matched": [True, False, True, False],
+        }
+    )
+    values = _by_key(builder.detections_with_nonlocal_values(events, "s"))
+    key = "widloski_criteria_with_nonlocal_fraction"
+    assert {k: v.value for k, v in values.items()} == pytest.approx(
+        {key: 0.5, f"{key}_animal_min": 0.0, f"{key}_animal_max": 0.75}
+    )
+    assert {v.figures for v in values.values()} == {()}
 
 
 def test_other_detector_values_name_each_detector_and_each_state():

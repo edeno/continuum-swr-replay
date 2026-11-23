@@ -117,6 +117,7 @@ OTHER_BUILDERS = (
     "property_interval_values",
     "gamma_db_values",
     "other_detector_values",
+    "detections_with_nonlocal_values",
     "nonlocal_found_values",
     "detector_visit_values",
     "spike_evidence_values",

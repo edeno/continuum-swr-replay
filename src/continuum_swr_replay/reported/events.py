@@ -1114,13 +1114,21 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+#: The detectors whose share of the non-local events found is a value for the
+#: text, beside Figure 2e's: the Widloski detector's criteria-only inventory
+#: (its candidate windows before the shuffle test), which asks whether the
+#: Widloski detector finds few non-local events because of its shuffle test.
+TEXT_FOUND_DETECTORS = ("memoryless_criteria",)
+
+
 def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.3 and Figure 2e's right bars: for each detector the panel
     draws (``nonlocal_comparison.FIGURE_DETECTORS``), the share of the
     selected non-local events that overlap one of its events, pooled over
     events, and the lowest and highest animal's share
     (``nonlocal_comparison.nonlocal_events_overlapped``, which the figure
-    draws).
+    draws); and the same, for the text and with no figure, for
+    :data:`TEXT_FOUND_DETECTORS`.
 
     Parameters
     ----------
@@ -1129,13 +1137,15 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
         non-local events.
     source : str
     """
-    make = value_factory(nonlocal_found_values, source, TAGS["nonlocal_found"])
+    make_figure = value_factory(nonlocal_found_values, source, TAGS["nonlocal_found"])
+    make_text = value_factory(nonlocal_found_values, source, TAGS["other_detectors"])
     words = {detector: word for word, detector in DETECTORS.items()}
     overlap = nonlocal_comparison.nonlocal_events_overlapped(
-        memberships, nonlocal_comparison.FIGURE_DETECTORS
+        memberships, (*nonlocal_comparison.FIGURE_DETECTORS, *TEXT_FOUND_DETECTORS)
     )
     values = []
     for detector, row in overlap.iterrows():
+        make = make_text if detector in TEXT_FOUND_DETECTORS else make_figure
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
         values += _animal_range_values(
             make,
@@ -1154,6 +1164,49 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
                 "the epoch's share)",
                 f"highest per-animal share of the non-local events that a {detector} "
                 "event overlaps (the mean over the animal's epochs)",
+            ),
+        )
+    return values
+
+
+def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.3, for the text: for each of :data:`TEXT_FOUND_DETECTORS`,
+    the share of its events that overlap a non-local event, pooled over events,
+    and the lowest and highest animal's share
+    (``nonlocal_comparison.events_overlapping_nonlocal``, the statistic of
+    Figure 2e's left bars, which do not draw these detectors).
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        ``nonlocal_comparison.read_comparison``'s ``others``.
+    source : str
+    """
+    make = value_factory(
+        detections_with_nonlocal_values, source, TAGS["other_detectors"]
+    )
+    words = {detector: word for word, detector in DETECTORS.items()}
+    values = []
+    shares = nonlocal_comparison.events_overlapping_nonlocal(
+        events, TEXT_FOUND_DETECTORS
+    )
+    for detector, row in shares.iterrows():
+        values += _animal_range_values(
+            make,
+            f"{words[detector]}_with_nonlocal_fraction",
+            (
+                row["pooled"],
+                float(np.min(row["animals"])),
+                float(np.max(row["animals"])),
+            ),
+            (
+                f"share of the {detector} events that overlap a non-local event, "
+                "pooled over events",
+                f"lowest per-animal share of the {detector} events that overlap a "
+                "non-local event (an animal's share is the mean over its epochs of "
+                "the epoch's share)",
+                f"highest per-animal share of the {detector} events that overlap a "
+                "non-local event (the mean over the animal's epochs)",
             ),
         )
     return values
@@ -4547,6 +4600,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         "epoch's well visits (the session cache's port experiences)"
     )
     summary.add(*over(other_detector_values(others, detector_source), DETECTOR_SUBSET))
+    summary.add(
+        *over(detections_with_nonlocal_values(others, detector_source), DETECTOR_SUBSET)
+    )
     summary.add(
         *over(
             nonlocal_found_values(
