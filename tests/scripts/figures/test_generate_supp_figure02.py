@@ -417,7 +417,7 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn
     texts = [t.get_text() for t in ax.texts]
     assert "at least this far from\nany SWR (ms)" in texts
     assert "↑ full better" in texts
-    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-forced\n(nats/spike)"
+    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert ax.get_ylim()[0] < 0
 
 

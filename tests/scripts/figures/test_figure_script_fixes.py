@@ -1918,7 +1918,7 @@ def _has_zero_line(ax) -> bool:
 
 def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline):
     """Panel j's first axis: each decoder's gain over the local-only decoder,
-    the SWR-forced decoder's dots dark gray and the full decoder's green, spread
+    the SWR-only decoder's dots dark gray and the full decoder's green, spread
     about the column, the mean with its interval beside them, and the dashed
     zero line labeled "local-only"."""
     import matplotlib.pyplot as plt
@@ -1938,14 +1938,14 @@ def test_figure02_decoder_comparison_first_axis_draws_each_decoders_gain(offline
         np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
         assert np.allclose(_means_at(ax, x), np.mean(values))
     assert _has_zero_line(ax)
-    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-\nforced", "Full"]
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-\nonly", "Full"]
     assert [t.get_text() for t in ax.texts] == ["local-only"]
     assert ax.get_ylabel() == "Held-out log score\nover local-only\n(nats/spike)"
     plt.close(fig)
 
 
-def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_forced(offline):
-    """Panel j's second axis: the full minus the SWR-forced decoder over all
+def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_only(offline):
+    """Panel j's second axis: the full minus the SWR-only decoder over all
     immobility (the paired difference), inside SWRs and outside SWRs (the main
     result, its label in bold), dark gray dots spread about each column, the
     mean with its interval beside them, and the dashed zero line with "full
@@ -1976,13 +1976,13 @@ def test_figure02_decoder_comparison_second_axis_draws_full_minus_swr_forced(off
     assert [t.get_fontweight() for t in labels] == ["normal", "normal", "bold"]
     # horizontal, so that they do not hang below panel h's labels
     assert {t.get_rotation() for t in labels} == {0.0}
-    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-forced\n(nats/spike)"
+    assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert [t.get_text() for t in ax.texts] == ["↑ full better"]
     plt.close(fig)
 
 
 def test_figure02_decoder_comparison_third_axis_draws_the_heldout_events(offline):
-    """Panel j's third axis: the full minus the SWR-forced decoder outside SWRs
+    """Panel j's third axis: the full minus the SWR-only decoder outside SWRs
     in the no-SWR held-out events and outside every held-out event, on its own
     scale, with the zero line."""
     import matplotlib.pyplot as plt

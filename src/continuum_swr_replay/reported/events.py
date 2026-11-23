@@ -54,7 +54,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   curve, summarized by ``analysis.decode_quality.quality_metrics``;
 - the non-local restriction run (``Processed-Data/event_nonlocal_restriction``,
   from ``scripts/event_evidence/score_nonlocal_restriction.py``): each epoch's
-  per-bin scores of the local-only, SWR-forced and full decoders, each fold's bins
+  per-bin scores of the local-only, SWR-only and full decoders, each fold's bins
   under the whole decoder fit on the other folds (a run of the earlier design,
   which held out only the encodings, is refused, :func:`require_fold_fit`),
   summed over the windows of the canonical events and their Local-rest
@@ -2208,9 +2208,8 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
 #: in words.
 _RESTRICTION_MODELS = {
     "none": "the local-only decoder (Local and No-Spike states at every bin)",
-    "swr": "the SWR-forced decoder (in SWR bins only the non-local states are "
-    "allowed, so the decode is forced non-local there; elsewhere only the local "
-    "states)",
+    "swr": "the SWR-only decoder (only the non-local states in SWR bins, only the "
+    "local states elsewhere)",
     "full": "the full decoder (every state at every bin)",
 }
 #: The two score families (``nonlocal_restriction.FAMILY_SUFFIX``), in words.
@@ -2251,7 +2250,7 @@ _RESTRICTION_UNITS = (
 #: Each group's bins outside SWRs, in words.
 _OUTSIDE_SWR_WHERE = {
     SWR_LABELS[False]: "over each of the events with no SWR (its bins outside "
-    "SWRs: all but a few inside an SWR the SWR-forced decoder used)",
+    "SWRs: all but a few inside an SWR the SWR-only decoder used)",
     SWR_LABELS[True]: "over the bins outside the SWR of each of the events that "
     "overlap an SWR",
 }
@@ -2269,7 +2268,7 @@ _EPOCH_REDUCTION = (
 )
 #: Each SWR group's word in a key (the inverse of ``_RUN_GROUPS``).
 _GROUP_WORDS = {group: word for word, group in _RUN_GROUPS.items()}
-#: The full decoder's score minus the SWR-forced decoder's, in words.
+#: The full decoder's score minus the SWR-only decoder's, in words.
 _FULL_MINUS_SWR = (
     f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
 )
@@ -2306,7 +2305,7 @@ def _full_minus_swr_values(
     epochs: str,
     positive: str = "epochs whose gain per second is above zero",
 ) -> list[Value]:
-    """The full minus the SWR-forced decoder over ``time``, per ``unit`` (an entry
+    """The full minus the SWR-only decoder over ``time``, per ``unit`` (an entry
     of ``_RESTRICTION_UNITS``): :func:`_interval_and_animals_positive`, and per
     second also the epochs whose value is above zero (``positive``) and the
     epochs with a value (``epochs``, what they have)."""
@@ -2675,7 +2674,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
     """Question 2c.3: the three restriction decoders compared per spike over the
     canonical events of ``windows`` (those that start inside a well visit,
     ``cohort_selection.select_events_in``) and their Local-rest controls, in
-    both score families, and the full decoder against the SWR-forced decoder per
+    both score families, and the full decoder against the SWR-only decoder per
     spike and per second over the events' bins outside SWRs. No figure draws
     these, so none carries a figure's tag. Every key starts ``restriction_canonical_``, and the summary adds
     :data:`CANONICAL_WINDOWS_SUBSET` to every description."""
@@ -2806,7 +2805,7 @@ def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValue
 
 
 def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3: the full decoder minus the SWR-forced decoder per spike
+    """Question 2c.3: the full decoder minus the SWR-only decoder per spike
     over the bins outside SWRs of the events detected from the held-out decode
     (``windows``, those that start inside a well visit), events with no SWR and
     events that overlap one, in :data:`RESTRICTION_FIGURE_FAMILY`
@@ -2962,7 +2961,7 @@ class OutsideSwrValues(NamedTuple):
 def restriction_outside_swr_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame, source: str
 ) -> OutsideSwrValues:
-    """Question 2c.3: the full decoder against the SWR-forced decoder over the
+    """Question 2c.3: the full decoder against the SWR-only decoder over the
     immobile time outside SWRs inside a well visit (time chosen by speed, ripple
     detection and the well visits, not by the decoder), per spike and per
     second, the share of it in the events of ``windows`` (the events detected
@@ -3056,7 +3055,7 @@ def restriction_outside_swr_values(
                 f"add to 1: the share of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
                 "inside a well visit that lies outside those events (no value when "
                 "the gain summed over those bins is not positive), as a fraction of "
-                "1, below 0 when the full decoder does worse than the SWR-forced "
+                "1, below 0 when the full decoder does worse than the SWR-only "
                 f"decoder there. Over the cohort: {_EPOCH_REDUCTION}",
             ),
             make_text(
@@ -3112,7 +3111,7 @@ _OUTSIDE_SWR_PARTS = {
 def restriction_outside_swr_part_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, source: str
 ) -> list[Value]:
-    """Question 2c.3: the full decoder against the SWR-forced decoder over parts
+    """Question 2c.3: the full decoder against the SWR-only decoder over parts
     of the immobile time outside SWRs inside a well visit
     (``restriction_totals.outside_swr_subset_statistics``): away from the SWRs
     (farther than a margin from every bin of the scoring mask) and where the
@@ -3204,7 +3203,7 @@ def restriction_outside_swr_part_values(
 
 
 _INSIDE_SWR_BINS = (
-    "immobile bins inside SWRs (inside an SWR of the source, where the SWR-forced "
+    "immobile bins inside SWRs (inside an SWR of the source, where the SWR-only "
     "decoder must use the non-local states and the full decoder may use any state)"
 )
 
@@ -3212,7 +3211,7 @@ _INSIDE_SWR_BINS = (
 def restriction_inside_swr_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, source: str
 ) -> list[Value]:
-    """Question 2c.3: the full decoder against the SWR-forced decoder over the
+    """Question 2c.3: the full decoder against the SWR-only decoder over the
     immobile time inside SWRs inside a well visit, per spike and per second,
     with the statistic, interval and epoch counts of the gain outside SWRs
     (``restriction_totals.inside_swr_gain_statistics``). The gain per spike in
@@ -3252,10 +3251,10 @@ def restriction_inside_swr_values(
 def restriction_immobile_values(
     time_sums: pd.DataFrame, bin_s: pd.Series, source: str
 ) -> list[Value]:
-    """Question 2c.3: the SWR-forced and full decoders against the local-only
+    """Question 2c.3: the SWR-only and full decoders against the local-only
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
-    their difference, and the share of the full decoder's gain the SWR-forced
+    their difference, and the share of the full decoder's gain the SWR-only
     decoder captures. The gains per spike over the local-only decoder and
     their paired difference in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on
     Figure 2j and carry that panel's tag, with the epoch counts; the share

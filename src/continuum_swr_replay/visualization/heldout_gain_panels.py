@@ -1,7 +1,7 @@
 """The held-out gain panels: a held-out gain per animal and its mean.
 
 Figure 2j (each decoder's gain over the local-only decoder, and the full
-decoder's over the SWR-forced decoder) and Figure 2's supplement
+decoder's over the SWR-only decoder) and Figure 2's supplement
 (``scripts/figures/generate_supp_figure02.py``: the held-out tetrode gain over
 local coding per spike; the full decoder's gain outside SWRs by distance from
 the SWRs) draw each value the
@@ -46,7 +46,7 @@ group's dots are spread so that each shows (:func:`spread_offsets`)."""
 
 NEUTRAL_DOTS = "#444444"
 """A dark gray for dots that need no class's color (Figure 2j's differences,
-the SWR-forced decoder)."""
+the SWR-only decoder)."""
 
 
 def spread_offsets(values: np.ndarray, step: float = DOT_SPREAD) -> np.ndarray:
@@ -162,8 +162,8 @@ GAIN_FLOOR = 0.13
 """A gain axis' floor below zero, as a share of its top (Figure 2j, Figure 2's
 supplement, panel j)."""
 
-DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-forced\n(nats/spike)"
-"""The y label of an axis of the full decoder minus the SWR-forced decoder."""
+DIFFERENCE_YLABEL = "Held-out log score,\nfull \u2212 SWR-only\n(nats/spike)"
+"""The y label of an axis of the full decoder minus the SWR-only decoder."""
 
 
 def full_better_cue(ax: Axes) -> None:
@@ -184,7 +184,7 @@ def draw_full_minus_swr_axis(
     *,
     through_means: bool = False,
 ) -> None:
-    """An axis of the full decoder minus the SWR-forced decoder: at each of ``xs``
+    """An axis of the full decoder minus the SWR-only decoder: at each of ``xs``
     a dot per animal (spread sideways, :data:`NEUTRAL_DOTS`) and the animals'
     mean with its interval (``rows``, statistics rows), a thin line through the
     means when ``through_means``, a dashed line at zero, the y axis from

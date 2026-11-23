@@ -67,7 +67,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         each bin, the whole decoder (place fields, state transitions, initial
         conditions) fit on folds of whole trials and each fold scored under the
         fit that did not see it: the local-only decoder (Local and No-Spike
-        states only), the SWR-forced decoder (inside SWRs only the non-local
+        states only), the SWR-only decoder (inside SWRs only the non-local
         states are allowed, so it is forced non-local there; outside them only
         the local states) and the full decoder (every state everywhere). Every
         value is over the immobile bins inside a well visit, which runs from
@@ -75,12 +75,12 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         there. Unless named otherwise, each value is per epoch, summed over its
         bins and divided by the spikes in them; a dot per animal is the median
         over its epochs.
-        First axis: the SWR-forced and the full decoder's gain over the
+        First axis: the SWR-only and the full decoder's gain over the
         local-only decoder over every immobile bin, a dot per animal (dark
         gray, the Non-Local state's green), the animals' mean with its 95 %
         interval and a dashed line at zero, the local-only decoder
         (``restriction_totals.immobile_gain_statistics``). Second axis, the
-        full minus the SWR-forced decoder: over every immobile bin ("All
+        full minus the SWR-only decoder: over every immobile bin ("All
         immobility", each epoch's paired difference, the same statistic), over
         the immobile bins inside SWRs ("Inside SWRs",
         ``restriction_totals.inside_swr_gain_statistics``: below zero, forcing
@@ -1150,11 +1150,11 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 
 
 DECODER_STYLES = {
-    "swr_minus_none_per_spike": ("SWR-\nforced", NEUTRAL_DOTS),
+    "swr_minus_none_per_spike": ("SWR-\nonly", NEUTRAL_DOTS),
     "full_minus_none_per_spike": ("Full", C_NL),
 }
 """Panel j, first axis: each decoder's label and dot color, by its measure: the
-SWR-forced decoder in a neutral dark gray, the full decoder in the Non-Local
+SWR-only decoder in a neutral dark gray, the full decoder in the Non-Local
 state's green. A decoder added to ``RESTRICTION_FIGURE_DECODERS`` needs only an
 entry here."""
 DECODER_X = {measure: float(k) for k, measure in enumerate(RESTRICTION_FIGURE_DECODERS)}
@@ -1167,7 +1167,7 @@ DIFFERENCE_LABELS = {
     "inside_swr": "Inside\nSWRs",
     "outside_swr": "Outside\nSWRs",
 }
-"""Panel j, second axis: the full minus the SWR-forced decoder over all the
+"""Panel j, second axis: the full minus the SWR-only decoder over all the
 immobile time, over its bins inside SWRs and over its bins outside SWRs, left
 to right; horizontal, on two lines; the main result, outside SWRs, in bold (as
 panels c and d mark their key class)."""
@@ -1176,7 +1176,7 @@ EVENTS_LABELS = {
     "in_events": "In no-SWR\nevents",
     "outside_events": "Outside\nevents",
 }
-"""Panel j, third axis: the full minus the SWR-forced decoder outside SWRs,
+"""Panel j, third axis: the full minus the SWR-only decoder outside SWRs,
 inside the no-SWR events detected from the held-out decode and outside every
 held-out event, left to right."""
 EVENTS_X = {name: float(k) for k, name in enumerate(EVENTS_LABELS)}
@@ -1219,7 +1219,7 @@ comparison's three axes are then placed in its space by
 BOTTOM_WSPACE = 0.55
 DECODER_AXES_WIDTHS = (0.6, 1.2, 0.6)
 """The decoder comparison's three axes' frame widths, in proportion: the
-decoders over the local-only decoder, the full minus the SWR-forced decoder,
+decoders over the local-only decoder, the full minus the SWR-only decoder,
 and that difference in and outside the held-out events
 (:func:`fit_axes_in_row`)."""
 DECODER_AXES_WSPACE = 1.0
@@ -1328,7 +1328,7 @@ def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> N
 
 
 def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel j, first axis: the SWR-forced and full decoders' gains over the
+    """Panel j, first axis: the SWR-only and full decoders' gains over the
     local-only decoder per spike of the immobile time inside a well visit.
 
     For each decoder (:data:`DECODER_STYLES`), a dot per animal (the median
@@ -1367,7 +1367,7 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
 
 
 def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
-    """Panel j, second axis: the full decoder minus the SWR-forced decoder per
+    """Panel j, second axis: the full decoder minus the SWR-only decoder per
     spike, over all the immobile time inside a well visit (each epoch's paired
     difference, ``restriction_totals.immobile_gain_statistics``'
     :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DIFFERENCE`),
@@ -1381,7 +1381,7 @@ def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> No
     in a neutral dark gray and the animals' mean with its 95 % interval, with
     a dashed line at zero, where the two decoders predict the spikes equally
     well, and which way the full decoder is better. The main result, outside
-    SWRs, has its label in bold. Inside SWRs the SWR-forced decoder must be
+    SWRs, has its label in bold. Inside SWRs the SWR-only decoder must be
     non-local and the full decoder need not, so a value below zero there says
     that forcing the non-local states inside SWRs predicts those spikes
     better.
@@ -1402,7 +1402,7 @@ def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> No
 
 def draw_heldout_event_gain(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
     """Panel j, third axis: where the gain outside SWRs sits. The full decoder
-    minus the SWR-forced decoder per spike over the bins outside SWRs of the
+    minus the SWR-only decoder per spike over the bins outside SWRs of the
     no-SWR events detected from the held-out decode
     (``RestrictionFigureStatistics.events``, group
     :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_EVENT_GROUP`:
