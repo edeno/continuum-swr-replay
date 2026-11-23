@@ -58,10 +58,10 @@ rest of the old event-source suite.
   in-visit event of the kind, the `PREDICTORS` of `swr_power.py:46` at pooled SD (replacing the per-session
   z-score), `time_since_stop_start_s` replaced by a smooth of time since visit start and a smooth of time
   until leaving (Phase 3's event clocks), the post-outcome gate of `swr_power.py:56` kept for post-outcome
-  predictors (the cohort step restricts and counts). REML with the profiled scale.
-  WAITS FOR THE LEAD (smooth-term rule): the two clock smooths take the per-session smooth-term rule; if no
-  penalty is chosen from the data, the Gaussian fit is at the declared freedom and its scale is still
-  profiled.
+  predictors (the cohort step restricts and counts). The two clock smooths are P-splines at declared
+  fixed log penalties (design, seventeenth round), each set on this model's own events by a target median
+  edf and checked by its scenario list (Phase 2b); no penalty is chosen from the data. The Gaussian scale
+  is still profiled.
 - **Event-source comparison (supplementary)** (`analysis/replay_models/event_source_comparison.py`, new;
   ASK-1, ASK-3): reads the stored rate (5a) and content (6a) fits of the three event sources (non-local,
   ContFrag SWR, ContFrag MUA) and reports, per source, the declared estimands that apply to a single stream
@@ -106,7 +106,7 @@ rest of the old event-source suite.
 | `test_role_content.py::test_next_role_null_when_next_equals_previous` | simulated content tied to the previous arm and choices that repeat it: the next-role estimate is within 2 SE of 0 |
 | `tests/analysis/replay_models/choice/test_visit_choice.py::test_planted_content_slope` | a planted content effect on choice is recovered; with behavior that predicts the choice and no content effect, the slope is null at the nominal rate |
 | `test_visit_stay_leave.py::test_converges_on_separable_free_data` | per-session fits converge by the decrement rule on simulated visits; a separated session fails support, not the fit |
-| `tests/analysis/replay_models/coupling/test_visit_swr_power.py::test_gaussian_reml_and_gate` | the Gaussian fit equals penalized least squares at the selected penalty; post-outcome predictors see only post-outcome events |
+| `tests/analysis/replay_models/coupling/test_visit_swr_power.py::test_gaussian_reml_and_gate` | the Gaussian fit equals penalized least squares at the declared penalty; post-outcome predictors see only post-outcome events |
 
 ## Fixtures
 

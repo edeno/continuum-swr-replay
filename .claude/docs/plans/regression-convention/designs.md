@@ -15,7 +15,7 @@ interface summary, and the code is the truth for it.
 - [Session to day to animal](#session-to-day-to-animal)
 - [Rate design on the visit](#rate-design)
 - [Content design](#content-design)
-- [JAX batch twin](#jax-batch-twin)
+- [One JAX fitter](#one-jax-fitter)
 
 ## The shared fitter (built)
 
@@ -24,6 +24,12 @@ in the code, `src/continuum_swr_replay/analysis/regression/` (each module's docs
 and in `docs/design/regression_fitter.md` (the rules with their measurements, the agreement with mgcv,
 neurospatial and the current fitters, and the cost). This section says only what a caller passes in and
 gets back. It does not repeat the internals; read them there.
+
+> The solver moves to JAX (lead, 2026-11-23: "I would prefer a jax fitter for all models"; design,
+> twentieth round). The interface below does not change; the NumPy solver underneath is replaced and
+> removed in [Phase 2c](phase-2c-jax-fitter.md) ([jax-fitter-design.md](jax-fitter-design.md)). The per-session
+> loop (`sessions.fit_sessions`) and the calibration (`calibration.log_penalty_for_edf`) are built on top
+> of these entry points and keep their signatures too.
 
 **Likelihoods** (`likelihoods.py`): `Poisson` (aux: the offset `log(exposure)` per row), `Bernoulli` (aux
 None; 0/1 outcomes only), `Gaussian` (aux: the scale in `penalized_newton`; None in the REML functions,
@@ -104,14 +110,17 @@ models' searches).
 
 ## Smooth terms and bases
 
-> WAITS FOR THE LEAD (smooth-term rule): the basis and the penalty of a per-session smooth term. Option A:
-> a natural cubic spline of 4 columns, knots from the pooled data, no penalty (the author's
-> recommendation, checked at 3, 4 and 5 columns); option B: the P-spline below with one fixed weak penalty
-> per term. Under either, no penalty is chosen from the data for a per-session smooth term with few
-> events (simulation: a penalty chosen by REML makes each session's curve a line at about 140 events, and
-> the belief-variance test is then wrong). Depends on it: which basis this section prescribes (option A
-> needs a natural-spline basis the package does not have), the initial basis sizes, the basis check, and
-> model D's penalty.
+> The smooth-term rule (design, seventeenth round; the author's reading of the lead's 2026-11-22 answers,
+> told to the lead and not objected to): a per-session smooth term is the P-spline below with **one fixed
+> log penalty per term**, declared in the model and the same in every session. No penalty is chosen from
+> the data for a per-session smooth term (simulation: a penalty chosen by REML makes each session's curve
+> a line at about 140 events, and the belief-variance test is then wrong). No natural-spline basis is
+> added. The value of each declared penalty is set per model, on that model's own real rows, by a target
+> median edf over the sessions (`calibration.log_penalty_for_edf`), checked by a simulation on those rows
+> (the model's scenario list, [Phase 2b](phase-2b-simulation-engine.md)), and the fit is reported also at a
+> stiffer and a looser value. A target does not carry from one model to another (simulation: the same
+> target gave different penalties and biases of opposite sign in two designs). Model D's lag curve takes
+> the same rule.
 
 - Cubic B-spline on equally spaced knots over a fixed range `[lo, hi]` per term (the knots are the same
   for every session), with a second-order difference penalty `P = D2' D2`. Beyond `hi` the clock is clamped
@@ -133,7 +142,13 @@ models' searches).
   smooth for a 0.05 s change); time until next movement `[0, 1.5] s`, 0.1 s apart; log trials since last
   visit `[log 1, log 200]`, 10 basis functions; model D lags 8 basis functions over `[0, log 10]`.
 - Basis check: after the fit, a term whose edf exceeds 0.8 times its basis dimension is refit with twice
-  the basis functions; the rule and both sizes are recorded in `basis` of the fit record.
+  the basis functions; the rule and both sizes are recorded in `basis` of the fit record. With a declared
+  penalty the edf follows from the penalty and the data, so the check also tells when a target is too
+  loose for the basis.
+- A curve averaged over sessions is read only where the sessions have rows. A support rule per grid point
+  is an idea of the author (simulation: few sessions have bins near the 20 s end of the arrival clock, and
+  the average curve is far off there); it is not built and not decided (`OPEN (lead): grid-point
+  support`).
 
 ## Support rule
 
@@ -141,6 +156,16 @@ Decided from the data before the fit, per unpenalized declared term and session 
 
 - A 0/1 term (rate: last outcome rewarded): count the units (visits) with the term 1 that hold at least one
   event of the kind, and those with the term 0 that do; the term passes when both counts are at least 5.
+  As built: `support.binary_support`.
+  **OPEN (lead): reward-term support.** On the real tables this rule fails in 86 % of the SWR sessions
+  and 42 % of the No SWR sessions (counts of the input tables, not results), over the 20 % limit below, so
+  the reward term would leave the per-session model and Q2 would have no per-session answer. The author
+  proposed to count visits with at-risk time on each side instead: all 242 sessions pass; a session with
+  no event after an omission then has no finite maximum (12.8 % of SWR sessions) and is reported with the
+  term missing (lead, 2026-11-21). Simulation with the plain fit: bias +0.05 to +0.10 on the log scale,
+  and the project's interval covered the planted value in 0.975 to 1.00 of data sets; the planned rule gave
+  -0.23 at a threefold effect. The lead has not said yes to the changed rule in words. Ask at
+  [Phase 5a](phase-5a-rate-models.md), before the first real fit.
 - A continuous slope restricted to an arm role (content): among the role's candidate rows of events of the
   kind, count events with the covariate above and below the session median of those rows (ties to neither);
   pass when both are at least 5 and the covariate is not constant within the role.
@@ -165,11 +190,9 @@ Decided from the data before the fit, per unpenalized declared term and session 
 - The minimum count (5) is defined in `analysis/regression/support.py`, the module that reads it; the
   fitter's `constants.py` does not hold it.
 
-Smooth terms carry a penalty and have no support rule; their basis check and edf are recorded.
-
-> WAITS FOR THE LEAD (smooth-term rule): under option A (a natural spline with no penalty) a smooth term
-> is an unpenalized set of columns, and whether it then needs a support rule (enough events across its
-> range in each session) depends on the decision.
+Smooth terms carry their declared penalty and have no support rule; their basis check and edf are
+recorded. A smooth declared with `penalty="none"` is a term of several unpenalized columns: it leaves a
+session whole when the refit leaves part of it out (as built, `sessions.py`).
 
 ## Collinearity measures
 
@@ -295,9 +318,9 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   then a linear functional of the smooth: `f(m + sd/2) - f(m - sd/2)`, `m` and `sd` the pooled mean and SD
   of the fraction on current-arm rows (call), so it stays a change per pooled SD with an exact variance.
   That reading of Q4a is a call to confirm with the lead at [Phase 6a](phase-6a-content-models.md).
-- WAITS FOR THE LEAD (smooth-term rule): the reward-fraction smooth per role, the recency smooth and the
-  current role's smooth of `u` are per-session smooth terms; their basis and penalty (above, "Smooth terms
-  and bases") follow the decision.
+- The reward-fraction smooth per role, the recency smooth and the current role's smooth of `u` are
+  per-session smooth terms: P-splines at declared fixed log penalties, each set on the content model's own
+  rows by a target median edf and a simulation (above, "Smooth terms and bases").
 - Recency: a smooth of `log(trials since last visit)` on leaf rows, not centered within the event (lead:
   absolute recency), with the never-visited indicator; recency is clamped at 200 trials. The shipped
   within-event centering (`behavior/covariates/history/visit_recency.py:23`) is not used.
@@ -326,9 +349,9 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
     makes each session's recency curve a straight line at about 140 events of a kind, and the
     belief-variance test is then wrong (61 % and 68 % false positives). The design stays one fit for each
     session (fourteenth round).
-  - WAITS FOR THE LEAD (smooth-term rule): how the recency curve of this model is fitted (a natural spline
-    of 4 columns with no penalty, or a P-spline with a fixed weak penalty). Either is stated before the
-    first real fit.
+  - The recency curve of this model is a P-spline at a declared fixed log penalty, weak enough that the
+    belief-variance test keeps its size in the simulation on the real rows (the gate of Phase 6a). The
+    value is stated before the first real fit, with a stiffer and a looser value beside it.
   - The recency curve the paper shows is read from this model, the one that holds the belief variance, the
     sample count and the trial number: read from the model without them, the curve absorbs a true
     belief-variance effect or a drift (simulation, bias 0.3 to 0.9). Its supported range in the
@@ -342,13 +365,10 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
 - Q6 (Phase 7): one more role, `next`, for the arm of the next trial's well when it is neither current nor
   previous (call: when the next arm is the current or previous arm, the event adds nothing to this term).
 
-## JAX batch twin
+## One JAX fitter
 
-For the mPFC unit models only (Phase 8): the same objective, Newton rule and pooled REML (over a session's
-units) as the NumPy reference, vectorized over units with `jax.vmap` and run in float64 on CPU for tests and
-in float32 on the GPU (design 5, check 6). Read for method, not imported:
-`/cumulus/edeno/neurospatial/src/neurospatial/encoding/_glm_jax.py:215-459` (`_newton_loop_jax`,
-`_reml_score_jax`, `select_penalty_by_reml_jax`) and this repository's `analysis/pfc/batched_glm.py:460-640`
-(`_sweep`, `_solve`, `_parameter_covariance`). Known pitfalls with the pinned library stack are in the project
-memory: float32 drift in marginals, A100 matmul precision (set `jax.default_matmul_precision("highest")` for
-the check).
+The JAX twin for the mPFC models only is dropped. There is one fitter, in JAX, for every family (lead,
+2026-11-23: "I would prefer a jax fitter for all models"), in float64 on the CPU and on the GPU (lead,
+2026-11-23: "sure"). The port of the shared fitter is [Phase 2c](phase-2c-jax-fitter.md); its design is
+[jax-fitter-design.md](jax-fitter-design.md). The mPFC models get one more entry point on that fitter's
+kernels, the units of one session batched on a shared design, built in [Phase 8](phase-8-mpfc.md).

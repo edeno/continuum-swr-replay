@@ -5,10 +5,22 @@
 Branch: `regression-convention-tools` from master after Phase 1. Reads no canonical table except one
 real-data smoke test.
 
-**Status:** next. Phase 1 is on master (6e54eda8, 98fe5c06), so this phase can start. One of its parts
-waits for a question open with the lead: the freedom of a smooth term (the terms task and every line marked
-`WAITS FOR THE LEAD (smooth-term rule)`). How a session without a finite maximum is reported is decided
-(lead, 2026-11-21: with those terms missing). Build the rest first.
+**Status:** done. The tools are on master (merged with 492dffb4, 2026-11-21). The declared-penalty
+parts are built on branch `regression-declared-penalty` (pushed, not merged on 2026-11-23):
+
+- b47faec9 and 39a51d3a: `analysis/regression/calibration.py:log_penalty_for_edf`, the declared log
+  penalty of a per-session smooth, found by its median edf over sessions (with
+  `tests/analysis/regression/test_calibration.py`);
+- 86ad3fc5: the recovery test `test_sessions.py::test_the_declared_penalty_recovers_a_planted_curve` and
+  the stored check `scripts/checks/simulate_declared_penalty.py` (with
+  `tests/scripts/checks/test_simulate_declared_penalty.py`).
+
+The smooth-term rule is decided (design, seventeenth round; the author's reading of the lead's "For
+decision 2, I think I would prefer the penalized splines" and "I want to stick with one fit per session
+for now", 2026-11-22, told to the lead and not objected to): a per-session smooth term is the cubic
+P-spline at one fixed log penalty per term, declared in the model and the same in every session; no
+penalty is chosen from the data for a per-session smooth term. How a session without a finite maximum is
+reported is decided (lead, 2026-11-21: with those terms missing).
 
 **Inputs to read first:**
 
@@ -29,7 +41,7 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
   (`MAX_UNIDENTIFIED_SHARE`, `MIN_SESSIONS_PER_TERM`): the current per-term gate's constants.
 - Branch `swr-trial-folds`: `git show swr-trial-folds:src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py`
   lines 109-372 (`time_blocks`, `trial_segments`, `task_segment_starts`, `capped_groups`, `trial_folds`).
-- Scratch: `S/proto_basic/check_aggregation.py` (shared against per-session penalty),
+- Scratch: `S/proto_basic/check_aggregation.py` (shared against per-session penalty; history only, the declared-penalty check replaced it),
   `S/verify_rate/s5_inference.py` (`infer`), `S/verify_uncertainty/s07_inference.py`.
 
 **Contracts referenced:** [C5](shared-contracts.md#c5-the-convention), [C7](shared-contracts.md#c7-the-fit-row-record),
@@ -42,16 +54,15 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
 
 ## Tasks
 
-- WAITS FOR THE LEAD (smooth-term rule): the `Smooth` term below, its `penalty` argument (`"reml"` as the
-  default assumes a penalty chosen from the data, which the per-session design does not use for smooth
-  terms with few events), and whether a natural cubic spline basis (option A: 4 columns, knots from the
-  pooled data, no penalty) must be added beside `pspline.PSplineBasis`, or a fixed weak penalty per term
-  declared (option B). Build the term vocabulary so that either fits; settle the default with the lead.
+- **The smooth-term rule** (design, seventeenth round). A `Smooth` term is a cubic P-spline
+  (`pspline.PSplineBasis`) with a required `penalty`: one fixed log penalty, declared in the model and the
+  same in every session, or `"none"`. There is no `"reml"` option for a per-session term, and no
+  natural-spline basis is added. As built (`terms.py`): `penalty` is required, `"none"` or a fixed log
+  penalty inside `LOG_PENALTY_BOUNDS`.
 - **Terms and design assembly** (`analysis/regression/terms.py`, new). A small, explicit term vocabulary:
-  `Smooth(column, lo, hi, n_basis, clamp=True, by=None, penalty="reml")` (`by`: one smooth per level of a
-  category column such as the arm role, each with its own penalty; `penalty`: `"reml"`, `"none"` for an
-  unpenalized B-spline of the same basis, or a fixed log-lambda held from another fit, as the uncertainty
-  model may need), `LinearFunctional(lag_columns, lags, lo, hi, n_basis)` (model D),
+  `Smooth(column, lo, hi, n_basis, clamp=True, by=None, penalty=<required>)` (`by`: one smooth per level
+  of a category column such as the arm role, each with its own penalty; `penalty`: the declared fixed log
+  penalty, or `"none"` for an unpenalized B-spline of the same basis), `LinearFunctional(lag_columns, lags, lo, hi, n_basis)` (model D),
   `Category(column, levels, reference)`, `Slope(column, by=None)` (a slope, optionally one per level of a
   category column such as the arm role), `Offset(column)`. A `Design` built from a list of terms
   and pooled reference rows holds the fixed knots, the pooled sum-to-zero constraints, the penalty blocks,
@@ -92,10 +103,11 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
   a 0/1 role column, the session's rows with that role are dropped from its fit and counted in the
   record's `cohort_counts`, not merged into the reference role (found by simulation: merging inflated the
   belief variance's false positives, to 20 % in one case; scratch `proto_uncertainty_measures/REPORT.md`).
-  WAITS FOR THE LEAD (smooth-term rule): whether a smooth term fitted without a penalty (option A) needs a
-  support rule of its own.
-- **Sessions without a finite maximum** (in `sessions.py`, below). Under either smooth-term option the
-  models are fitted at given penalties or with none, so the fitter's search does not run, and
+  A smooth term carries its declared penalty and has no support rule of its own (designs.md, "Support
+  rule"). A support rule per grid point for curves averaged over sessions is an idea, not decided
+  (`OPEN (lead): grid-point support`).
+- **Sessions without a finite maximum** (in `sessions.py`, below). Under the smooth-term rule the
+  models are fitted at declared penalties or with none, so the fitter's search does not run, and
   `reml.fit_at_penalties` raises at the first session whose fit has no finite maximum. Today only
   `reml.select_penalties` handles such a session (it sets it aside and refits it at the chosen penalties
   with the running-away unpenalized columns inactive, at most `REFIT_MAX_ROUNDS` rounds; `reml._refit`).
@@ -134,10 +146,9 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
 - **Per-session fitting loop** (`analysis/regression/sessions.py`, new): given one `Design`, a mapping
   session -> rows, a likelihood and the kind, run the design check, support, the per-session fits,
   the handling of sessions without a finite maximum (task above), collinearity, and return the records. No
-  task knowledge here. WAITS FOR THE LEAD (smooth-term rule): the plan had the loop choose the penalties
-  by pooled REML (`reml.select_penalties` over all sessions) and fit at them; under either option the
-  per-session smooth terms are fitted at a declared penalty or with none (`reml.fit_at_penalties`), and
-  `select_penalties` is kept for the families that still choose a penalty from the data.
+  task knowledge here. The loop fits each session at the design's declared log penalties
+  (`reml.refit_session`); it chooses no penalty. `reml.select_penalties` stays in the package for a
+  family that may still choose a penalty from the data (`OPEN (lead): mPFC and history penalties`).
 - **Linear functionals of a fit** (`analysis/regression/contrasts.py`, new): the estimate and exact
   variance of `c' beta` for a curve contrast (the mean of a smooth over one range minus over another, on a
   grid) and for a coefficient difference; used for every scalar estimand of C8.
@@ -159,14 +170,20 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
   [C8](shared-contracts.md#c8-the-declared-family-of-tests) (twelve estimands, 36 tests; settled), each entry with its question,
   estimand id, model, and contrast definition (range pairs or coefficient names). One tuple; nothing else
   hard-codes the count.
-- **Stored analysis: shared against per-session penalty** (`scripts/checks/simulate_shared_penalty.py`,
-  new; adapted from `S/proto_basic/check_aggregation.py`): simulated sessions of the real size, curve
-  recovery error with a shared penalty against per-session penalties; writes
-  `Processed-Data/replay_content/models_convention/simulations/shared_penalty.parquet`.
-  WAITS FOR THE LEAD (smooth-term rule): this compares two penalties chosen from the data, neither of which
-  the per-session design now uses for smooth terms with few events; after the decision, replace it by a stored
-  check of the chosen rule (the averaged per-session curve against the planted one, and the belief-variance
-  test's size), or drop it.
+- **The declared penalty, found by a target edf** (built, b47faec9, 39a51d3a):
+  `analysis/regression/calibration.py:log_penalty_for_edf(design, sessions, lik, *, term, target_edf,
+  response, unit)` bisects the log penalty of one fixed-penalty term inside `LOG_PENALTY_BOUNDS` until the
+  median edf over sessions (from the records of `fit_sessions`, the loop the model uses) is the target,
+  the other penalties held. Each model phase calls it on that model's own real rows, writes the value
+  into the term as a constant, and reports the fit also at a stiffer and a looser value. A target does
+  not carry from one model to another (design, seventeenth round; simulation).
+- **Stored check of the declared-penalty rule** (built, 86ad3fc5; replaces the planned
+  shared-against-per-session check): `scripts/checks/simulate_declared_penalty.py` simulates the real
+  cohort's shape (5 animals, 45 days, 256 sessions of real-sized visit bins and event numbers), declares
+  the arrival smooth's log penalty at a median edf of 4, 6 and 8 on one data set, and writes, per target
+  and curve (a planted threefold rise, a flat curve), the bias, SD, rejections over animals and interval
+  coverage of the animal-balanced Q1 contrast, to `declared_penalty.parquet` in `--output-dir`. It moves
+  onto the simulation engine in [Phase 2b](phase-2b-simulation-engine.md).
 - **Docs**: extend `docs/design/regression_fitter.md` with the term vocabulary, the design check, the
   collinearity and support rules (with the row rule for an inactive role column), the handling of sessions
   without a finite maximum outside the search, the fold rule and its use, and the band construction.
@@ -195,7 +212,9 @@ waits for a question open with the lead: the freedom of a smooth term (the terms
 | `test_support.py::test_role_slope_counts_and_constant` | a role slope constant within the role fails; median split counts are right |
 | `test_support.py::test_failing_share_rule` | a term failing in 21 % of sessions is flagged, 20 % is not |
 | `test_record.py::test_round_trip` | a record written and read back is identical, JSON columns included |
-| `test_sessions.py::test_shared_penalty_recovers_planted_curve` | 30 simulated sessions with one planted smooth: the shared penalty is selected once, every session's fit converges, the animal-balanced curve covers the truth. WAITS FOR THE LEAD (smooth-term rule): rewritten for the chosen rule (the curve fitted per session at the declared freedom, then averaged) |
+| `test_sessions.py::test_the_declared_penalty_recovers_a_planted_curve` (built, 86ad3fc5) | 30 simulated sessions with a threefold rise after arrival: at the log penalty that gives a median edf of 6 (`log_penalty_for_edf`), every session's fit converges and records its penalty as fixed, and the animal-balanced Q1 contrast is the planted one to 0.15 |
+| `test_calibration.py` (built, b47faec9) | the found log penalty gives the target median edf; the edf falls as the penalty rises; deterministic; the other penalties are held; a target out of reach, or a term without a fixed penalty, is refused |
+| `tests/scripts/checks/test_simulate_declared_penalty.py` (built, 86ad3fc5) | the summed bins fit as the bins on one session; the planted contrast; the table on a tiny cohort |
 | `test_sessions.py::test_a_separated_session_is_kept_with_its_terms_missing` | a session without a finite maximum at a given penalty is fitted with its running-away columns left out and recorded so; the others are unchanged |
 | `test_sessions.py::test_an_inactive_role_drops_its_rows` | a 0/1 role column made inactive drops that role's rows from the session's fit, with the count recorded |
 | `test_terms.py::test_tiny_column_is_refused` | a column scaled by 1e-4 is refused before the fit (unrefused, the fit stops at the step limit); one scaled by 1e-2 is accepted |
@@ -217,20 +236,20 @@ fixtures extended with concurvity numbers.
 - Smoke test on one real session: build a two-smooth design from the visit bins
   (`replay_models/visit_design.py:visit_timebins`, Phase 3, on master) and run the per-session loop on that
   one session; record time. This is a smoke test of the tools, not a model.
-- The stored simulation runs in minutes on CPU; record its wall time.
+- The stored check runs in minutes on CPU with `--workers`; record its wall time.
 
 ## Rebuilt
 
-`Processed-Data/replay_content/models_convention/simulations/shared_penalty.parquet` only. Nothing in
-`paper/reported/`.
+`declared_penalty.parquet` of the stored check, in the `--output-dir` given (on 2026-11-23 the author's
+run wrote it to a scratch folder only; Phase 2b stores it under
+`models_convention/simulations/`). Nothing in `paper/reported/`.
 
 ## Exit criteria
 
-The validation slice passes; the simulation output exists and shows the shared penalty no worse than
-per-session penalties (state the numbers in the PR from the stored file;
-WAITS FOR THE LEAD (smooth-term rule): or the stored check of the chosen rule that replaces it); the declared
-list matches the lead's decisions (twelve estimands, 36 tests); the parts that wait for the lead are done to
-the lead's answers, or listed in the PR as open.
+The validation slice passes (done on master, 492dffb4, and on `regression-declared-penalty`); the
+stored check of the declared-penalty rule runs and its numbers are stated in the PR from its output file;
+the declared list matches the lead's decisions (twelve estimands, 36 tests); the branch
+`regression-declared-penalty` is merged after the phase-boundary review and the lead's approval.
 
 ## Review
 

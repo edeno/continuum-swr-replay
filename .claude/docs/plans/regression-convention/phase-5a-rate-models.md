@@ -2,14 +2,16 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#rate-design)
 
-Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
+Branch: `visit-rate-models` from master after Phases 2c and 3 (the JAX fitter and the simulation engine
+of Phase 2b are on master). CPU only.
 
 **Inputs to read first:**
 
 - The design, sections 2.1, 2.4, 2.5, 2.7, 3 (Q1, Q2, Q7), 4.1 to 4.7, and decision 3 (both forms of the
   reward effect).
 - Phase 2's `analysis/regression/` (`terms.py`, `sessions.py`, `contrasts.py`, `collinearity.py`,
-  `support.py`, `record.py`, `declared_tests.py`), the fitter's interface
+  `support.py`, `record.py`, `calibration.py`, `declared_tests.py`), Phase 2b's `simulation.py` and the rate
+  model's first scenario list (`replay_models/rate/visit_rate_scenarios.py`), the fitter's interface
   ([designs.md#the-shared-fitter-built](designs.md#the-shared-fitter-built), `docs/design/regression_fitter.md`)
   and Phase 3's `analysis/replay_models/visit_design.py`
   (`visit_timebins(stop_table, events, port_experiences, *, kind, ...)`, on master since d14ff888).
@@ -22,7 +24,12 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
   are summarized (to know what changes).
 - `src/continuum_swr_replay/reported/questions.py:320-358` (Part 3 questions), `reported/behavior/common.py:20-35`
   (`TAGS`), `reported/behavior/__init__.py:132` (`summarize`), `reported/values.py` (`value_factory`, `pend`).
-- Scratch: `S/proto_rate/proto_core.py` (`simulate`, `calibrate_b0`, `bin_events`, `design_proposed`),
+- The design, section 9, seventeenth to twenty-first rounds and "Open after the twenty-first round" (a
+  and b).
+- Scratch: `S/proto_rate_realistic/` (model A on the real bins with planted curves shaped like the real
+  ones; its `REPORT.md` when it is written), `S/proto_rate_smoothing/REPORT.md` and its follow-up section,
+  `S/proto_rate_smoothing/firth_check/model_form_diagnostics.py` and `outcome_curves/` (diagnostics on the
+  real bins, not results), `S/proto_rate/proto_core.py` (`simulate`, `calibrate_b0`, `bin_events`, `design_proposed`),
   `S/proto_rate/p2_m7r_try.py`, `p3_run.py`, `log_full_null.txt`, `S/verify_rate/s4_model_free_cells.py`,
   `s7_cells_tte.py`, `S/my_checks/three_clock_overlap.py`.
 
@@ -42,8 +49,25 @@ Branch: `visit-rate-models` from master after Phases 2 and 3. CPU only.
   those events, against the lead's "rate and content models should analyze the same events" (C4). Ask
   before the first real fit whether that stands, or whether the content model leaves them out too; state
   the answer in `docs/regression_models.md`.
-- WAITS FOR THE LEAD (smooth-term rule): the freedom of `f_s`, `f_u`, `f_m` and model D's lag curve in a
-  per-session fit (below).
+- **OPEN (lead): reward-term support** (design, "Open after the twenty-first round", a). The planned rule
+  for the 0/1 term (5 visits with an event on each side, `support.binary_support`) fails in 86 % of the
+  real SWR sessions and 42 % of the No SWR sessions (counts of the input tables, not results), over the
+  20 % limit, so the term would leave the per-session model and Q2 would have no per-session answer. The
+  author proposed to count visits with at-risk time on each side (all 242 sessions pass; a session with
+  no event after an omission then has no finite maximum, 12.8 % of SWR sessions, and is reported with the
+  term missing). Simulation with the plain fit: bias +0.05 to +0.10 on the log scale; the project's
+  interval covered the planted value in 0.975 to 1.00 of data sets; the planned rule gave -0.23 at a
+  threefold effect. The lead has not said yes in words. Ask before the first real fit.
+- **OPEN (lead): rate model form** (b). Diagnostics on the real bins (pooled; not results): omission
+  visits have a median of 0.9 s against 5.4 s; SWR events almost never start in the first second after
+  arrival after either outcome (none in 93 % of sessions), so Q1's reference window `[0, 1] s` is empty
+  for SWR events; the reward ratio at the same time since arrival is about 2 to 3 from 1 to 6 s and about
+  1 beyond 10 s, so it is not constant; visits longer than 10 s are 705 of 44,435, ten sessions hold 72 %
+  of that time, and it holds 56 % of the SWR events after an omission; the two clocks add from 2 s on but
+  not between 1 and 2 s. Open: whether the model covers a declared time range; whether the reward effect
+  may change with time since arrival; Q1's reference window; the value of each clock's penalty. The
+  realistic simulation (scratch `proto_rate_realistic/`) is the evidence to bring. Ask before the first
+  real fit; nothing of the model's form changes before the lead answers.
 
 **Decisions this phase applies** (settled 2026-11-20): L1, the declared family of twelve estimands and 36
 tests (C8), committed in `declared_tests.py` before the first real fit of this phase; L4, the event set (C3);
@@ -58,10 +82,13 @@ ASK-1, the ContFrag event sources; C14.
   [designs.md#rate-design](designs.md#rate-design), per kind (`swr`, `no_swr`), as term lists:
   - A: `Offset(log exposure) + Smooth(s, 0, 20) + Smooth(u, 0, 3) [+ Smooth(m, 0, 1.5)] + Slope(last_outcome_rewarded)` (a 0/1 column, not centered);
   - D: the same smooths + `LinearFunctional(lag_1..lag_10, log lags, 0, log 10)`.
-  WAITS FOR THE LEAD (smooth-term rule): these `Smooth` terms and model D's functional assume a P-spline
-  whose penalty is chosen by REML. Under option A each is a natural cubic spline of 4 columns with no
-  penalty; under option B a P-spline at a fixed weak penalty. The ranges stay; the basis sizes and model
-  D's penalty follow the decision.
+  Each `Smooth` term and model D's functional is a P-spline at one declared fixed log penalty, the same
+  in every session (design, seventeenth round). Each value is found once on this model's own real bins,
+  per kind, by `calibration.log_penalty_for_edf` at a target median edf, checked by the scenario list
+  below, and written into the module as a constant with the target, the commit and the rows it was found
+  on. Do not reuse a target from another model or from `simulate_declared_penalty.py` (simulation: the
+  same target gave different penalties and biases of opposite sign in two designs). The ranges stay.
+  The fit is also reported at a stiffer and a looser value (one step of the target each way; call).
   The rule for the third clock is written in the module before any fit: fit A with `f_m`; if the
   concurvity `estimate` of `f_m` or `f_u` is at least 0.8 in more than 20 % of sessions, refit without `f_m`
   and report the time-until-movement curve only from the model-free curves (Figure 4c second half). Store
@@ -69,11 +96,11 @@ ASK-1, the ContFrag event sources; C14.
 - **Cohort step** (in the same module): `visit_timebins` per session -> `select_visit_context` -> drop
   rows with a missing covariate (counted per kind) -> D additionally keeps bins with ten known lags
   (counted). Store `count_visit_context` and the drop counts in each record.
-- **Fit** through `analysis/regression/sessions.py`: support rule for the 0/1 term; per-session fits;
-  sessions without a finite maximum handled by Phase 2's rule; collinearity measures; records.
-  WAITS FOR THE LEAD (smooth-term rule): the plan had one pooled REML selection per (model, kind) and
-  per-session fits at the shared penalties; under either option the smooth terms are fitted at a declared
-  penalty or with none, so no selection runs here.
+- **Fit** through `analysis/regression/sessions.py`: the plain penalized fit (no bias-reduced fit; lead,
+  2026-11-23: "I don't want to use firth") of each session at the declared penalties; no penalty is
+  chosen from the data, and no selection runs. The support rule for the 0/1 term as the lead answers
+  `OPEN (lead): reward-term support`; sessions without a finite maximum reported with those terms missing
+  (lead, 2026-11-21); collinearity measures; records.
 - **Storage order of the design** (in the design builder, `visit_rate.py`): store each session's design in
   column (Fortran) order if a timing confirms it. A reviewer measured one weighted Gram product (`X' W X`, 82
   % of an evaluation's time in `docs/design/regression_fitter.md`, "Cost") at 7.0 ms with the design in column
@@ -92,15 +119,23 @@ ASK-1, the ContFrag event sources; C14.
     time before leaving;
   - Q7a: mean of `f_u` over `[0, 0.25] s` minus mean over `[1, 2] s`;
   - model D: the curve over lags 1 to 10 with its band (described, not tested).
-- **Simulations** (stored analysis `scripts/replay_models/rate/simulate_visit_rate.py`, new, from
-  `S/proto_rate/proto_core.py`): event starts drawn on the real visits' at-risk time of every session from a
+- **A scenario list for the simulation package (Phase 2b)** (`replay_models/rate/visit_rate_scenarios.py`,
+  extended; run by Phase 2b's runner, which replaces only the outcome column of the real bins and runs the
+  real fit, tests and reduction). First the realistic scenarios of `S/proto_rate_realistic/`, with curves
+  shaped like the real ones: no reward effect; a constant effect; a fading effect (the ratio falling to 1
+  with time since arrival); an effect taken from the data (the model-free ratio by time since arrival);
+  an effect that differs between sessions and between animals; a later onset after an omission than after
+  a reward. Each is run at the declared penalties and at the stiffer and looser values, on all bins and
+  on a declared time range if `OPEN (lead): rate model form` asks for one. Then the scenarios of the
+  earlier plan: event starts drawn on the real visits' at-risk time of every session from a
   known rate `exp(b0 + f_s + f_u + beta * rewarded)`, with the event definition's counting rule (a candidate
   that starts in a stop and runs into movement is not an event, at every stop end, small movements and the
   last one; an event that crosses the final poke-out while immobile is counted, as the event set has it). Scenarios: (a) no reward effect; (b) rate ratio 1.3;
   (c) a sharp lag-1 effect only, to see what D returns; (d) a drop on `u` in the last 0.3 s with no reward
   effect, which must not move to `s` or to the reward term; (e) a drop before small movements only (`f_m`)
   with flat `f_u`, which the model must separate or the rule above must catch. Twenty data sets each over
-  all sessions; outputs to `models_convention/simulations/visit_rate.parquet`.
+  all sessions (more where the realistic prototype shows the spread needs it); outputs to
+  `models_convention/simulations/visit_rate.parquet`.
 - **ContFrag event sources** (ASK-1, lead: "Move them"): the same models A and D fit to the SWR-sourced and
   MUA-sourced ContFrag events of the rebuilt ContFrag tables, as two more event sources (`event_source` in
   the fit-row record; each source is one stream, with no SWR and No SWR split, call), same bins, same selection, same penalty rule. Their values are a supplementary
@@ -172,13 +207,12 @@ reusing the Phase 3 synthetic helpers. Real data only in the runner's smoke test
 
 - Simulated first (the tests and the stored simulation), then one real session per animal (five), then all
   242 epochs.
-- Smoke test on one session: build, fit A and D for both kinds at a fixed penalty, then one pooled REML
-  evaluation over the five sessions. Time both (the design measured about 0.08 s per two-clock fit). The
-  selection over 242 sessions costs (grid points + Newton steps) x 242 x (one fit); with up to 125 grid
-  points that is about 40 minutes per (model, kind) on one core; parallelize over sessions with a process
-  pool if the smoke test confirms it; run in `tmux` (`csr-5a-rate`). WAITS FOR THE LEAD (smooth-term rule):
-  without a selection the cost is one fit per session, model and kind; drop the pooled evaluation from the
-  smoke test unless a selection remains.
+- Smoke test on one session: build, fit A and D for both kinds at the declared penalties, and time it
+  (the design measured about 0.08 s per two-clock fit with the NumPy fitter; time it again on the JAX
+  fitter). There is no penalty selection: the cost is one fit per session, model and kind, plus the
+  calibration of each declared penalty (about 18 passes of `fit_sessions` per term) and the scenario
+  list's data sets. Time one calibration on the five sessions. Parallelize over sessions with a `spawn`
+  process pool only if the measured run exceeds about 30 minutes (C11); run in `tmux` (`csr-5a-rate`).
 - Compare with the baseline: Q1's sign and the rise over the first seconds against the model-free
   `s` curve; Q7a against the model-free `u` curve; Q2 for SWR against the old lag-1 value (the design's
   section 2.1 says it falls when the end-of-stop time is modeled; state the old and new values from the two
@@ -194,8 +228,9 @@ reusing the Phase 3 synthetic helpers. Real data only in the runner's smoke test
 
 ## Exit criteria
 
-Simulations show model A's reward term null under the counting rule alone and unbiased under a planted
-effect; the full-cohort fits are stored with records; the new values are in the behavior summary; the third
+The lead has answered questions a and b, and the model's form and the reward term's support rule follow
+the answers; the scenario list shows model A's reward term null under the counting rule alone and unbiased
+under a planted effect (on the realistic scenarios too), at the declared penalties; the full-cohort fits are stored with records; the new values are in the behavior summary; the third
 clock's fate is decided by the written rule and stated in the PR.
 
 ## Review

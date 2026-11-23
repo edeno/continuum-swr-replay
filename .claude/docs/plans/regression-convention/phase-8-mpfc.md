@@ -1,13 +1,14 @@
 # Phase 8 — The mPFC unit models on the convention; Figure 5 redrawn
 
-[← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#jax-batch-twin)
+[← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#one-jax-fitter)
 
-Branch: `mpfc-convention` from master after Phases 2 and 3. The one GPU family. Independent of the
+Branch: `mpfc-convention` from master after Phases 2c and 3 (the JAX fitter on master). The one GPU family. Independent of the
 Figure 4 chain (5a to 7, 9, 10).
 
 **Inputs to read first:**
 
-- The design, sections 4.3 to 4.5, 5 ("the mPFC unit models are the GPU case"), 6 (check 6), and section
+- The design, sections 4.3 to 4.5, 5 ("the mPFC unit models are the GPU case"), 6 (check 6, changed by the
+  twenty-first round of section 9), section 9's seventeenth to twenty-first rounds, and section
   7's row for the mPFC models (what changes: the penalty by REML shared over the units of a session, trial
   folds, the shared convergence and support rules, population statements reduced session to day to animal;
   what stays: the peri-event design, the matched-control draws and the per-unit test).
@@ -32,7 +33,8 @@ Figure 4 chain (5a to 7, 9, 10).
 - Branch `swr-trial-folds` (on master by then): `fold_training_masks` and `margin_in_bins` in
   `analysis/event_evidence/tetrode_holdout.py` (a margin that keeps training bins away from a held-out
   piece).
-- References: [designs.md#jax-batch-twin](designs.md#jax-batch-twin) and the appendix.
+- References: [designs.md#one-jax-fitter](designs.md#one-jax-fitter), [jax-fitter-design.md](jax-fitter-design.md)
+  (sections 4, 5 and 12, "After the series": the units of one session on a shared design) and the appendix.
 
 **Contracts referenced:** [C4](shared-contracts.md#c4-the-selection-function-is-the-only-filter) (Figure 5:
 in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-convention),
@@ -43,24 +45,36 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
 - **Baseline**: save `paper/reported/mpfc.json`, Figure 5's files, and three sessions' current bundles
   (one per animal with mPFC units) fit with the current code into a scratch output directory
   (`--max-sessions`, `--output-dir`), with their wall time per GPU.
-- **JAX batch twin** (`analysis/regression/jax_poisson.py`, new): Poisson penalized Newton vmapped over
-  units, the pooled REML over a session's units with one strength per smooth term (the sum of the units'
-  scores, as `_glm_numpy.py:408` sums), exact gradient and Hessian as the NumPy reference. float64 on CPU
-  for tests; float32 on GPU with `jax.default_matmul_precision("highest")` for check 6. Chunk units as
-  `batched_glm.py:425` (`_chunk_rows`) does to bound memory.
-- **Check 6**: on three real sessions, GPU float32 against CPU float64 (the NumPy reference): selected log
-  penalties within 1e-3, coefficients within 1e-4 relative, deviance within 1e-6 relative; a test version on
-  synthetic units runs on CPU in both precisions.
-- **Penalty by REML**: replace the fixed `sigma` (`model_penalties`, `fit.py:112`; `DEFAULT_PENALTY_SIGMA`)
-  with the REML-selected penalty per design and session, shared over the session's units. The penalty on the
+- **The mPFC entry point of the JAX fitter, batched over the units of one session** (in
+  `analysis/regression/`, on Phase 2c's kernels; no second fitter): the units of one session share one
+  design, so the Poisson kernels are vmapped over units (or one `einsum` over units for `X' diag(w_u) X`),
+  units taken in chunks of a fixed size and rows through `lax.scan`, as `batched_glm.py:425`
+  (`_chunk_rows`) and `:460` (`_sweep`) do to bound memory; the batch-first Newton control of Phase 2c
+  serves it unchanged. If the penalty rule below keeps a penalty chosen from the data, add the pooled
+  REML over a session's units with one strength per smooth term (the sum of the units' scores, as
+  `_glm_numpy.py:408` sums), on Phase 2c's REML kernels (for example
+  `pooled_reml_shared_design(lik, X, Y, aux, blocks, rho)`, `Y` of shape `(n_rows, n_units)`; a new
+  entry point, no existing signature changes). Float64 on the CPU and on the GPU, scoped to each call
+  (lead, 2026-11-23: "sure").
+- **Check 6, GPU float64 against CPU float64** (lead, 2026-11-23: the single-precision path and its check
+  are dropped): on three real sessions, the entry point on one free GPU against the same code on the CPU,
+  within the tolerances of the port's acceptance rule (lead, 2026-11-23, "ok": 1e-9 relative, statuses and
+  counts exactly equal; per output, [jax-fitter-design.md](jax-fitter-design.md), section 9), with the
+  deterministic XLA flags, and two GPU runs bitwise equal. A test version on synthetic units runs on CPU in
+  CI.
+- **The penalty of the kernels**: replace the fixed `sigma` (`model_penalties`, `fit.py:112`;
+  `DEFAULT_PENALTY_SIGMA`) with the convention's penalty. The plan had the REML-selected penalty per design
+  and session, shared over the session's units. The penalty on the
   convolved B-spline kernel weights becomes the convention's second-order difference penalty (call: the
   design says the same penalty rule as every family; a ridge on spline weights is not a smoothness penalty);
   the intercept stays free. Keep `--penalty-sigma` only as a fixed-penalty sensitivity path. Apply the same
   to the marked kernels (`marked_glm.py:1409-1422`).
-  WAITS FOR THE LEAD (smooth-term rule): here REML pools over the units of one session, not over sessions,
-  so the kernels' penalty is still chosen from the data within a session. Whether the per-session
-  smooth-term rule (no penalty chosen from the data for smooth terms with few events) applies to these
-  kernels, or REML over a session's many units stays, is part of the decision.
+  **OPEN (lead): mPFC and history penalties.** Here REML would pool over the many units of one session,
+  not over sessions, so the kernels' penalty would still be chosen from the data within a session.
+  Whether that stays, or the declared-penalty rule of the other families (design, seventeenth round: one
+  fixed log penalty per term, set by a target median edf on the model's rows) applies to these kernels,
+  is decided at this phase. Ask the lead before the first real fit, with a simulation of both on three
+  sessions' real designs (a scenario list for the simulation package, Phase 2b).
 - **Fit mask on the common subset**: replace the stop-cohort mask (`cohort.py:65`) with in-visit immobile
   bins (the visit intervals of Phase 3, selected by the one function, C4) and events selected by
   `select_visit_context` in `canonical_events.py:95` (the default set: events that start inside a visit,
@@ -82,13 +96,13 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   family).
 - **Measure, then run** (C11): three sessions on one free GPU (read `nvidia-smi` on zephyr and breeze first;
   message the other session); record GPU-hours per session; extrapolate to every epoch with mPFC units (count them from the epoch register; the last
-  full fit took about 14 GPU-hours with the fixed penalty; REML adds outer iterations: expect a multiple,
+  full fit took about 14 GPU-hours with the fixed penalty; REML over units, if kept, adds outer iterations: expect a multiple,
   measure it). Present the estimate and the free cards to the lead before the full run; run it partitioned
   over the free cards (`--gpu`, `--sessions`) in `tmux` (`csr-8-mpfc`).
 - **Rebuild and redraw**: `summarize.py --summary mpfc`, emit, `generate_figure05.py`; commit the figure
   files.
 - **Docs**: `docs/design/pfc_unit_glm_estimator.md`, `pfc_marked_event_kernels.md` and `pfc_marked_model_family.md`
-  rewritten for the new estimator (the fixed sigma and blocked folds they describe are removed): REML over units, trial folds,
+  rewritten for the new estimator (the fixed sigma and blocked folds they describe are removed): the decided penalty rule, trial folds,
   the in-visit cohort; remove statements about the fixed sigma 3.0 except as the sensitivity path.
 
 - **Retire what this phase replaced** (C13; the items are the REMOVE rows of
@@ -119,13 +133,14 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
 
 | Test | Asserts |
 | --- | --- |
-| `tests/analysis/regression/test_jax_poisson.py::test_matches_numpy_reference` | float64 JAX equals the NumPy fitter and its REML selection on synthetic units to 1e-8 relative |
-| `test_jax_poisson.py::test_float32_close_to_float64` | check 6 on synthetic units: float32 within the stated tolerances of float64 (CPU) |
-| `test_jax_poisson.py::test_pooled_reml_over_units_invariant_to_duplication` | duplicating units leaves the penalty unchanged |
+| `tests/analysis/regression/test_units.py::test_batched_units_equal_single_fits` | the batched entry point equals one `penalized_newton` fit per unit (the same fitter) on synthetic units within the acceptance tolerances; every status exact |
+| `test_units.py::test_chunked_equals_unchunked` | chunks of units and rows give the same fits within the acceptance tolerances |
+| `test_units.py::test_pooled_reml_over_units_invariant_to_duplication` (only if the penalty rule keeps REML over units) | duplicating units leaves the penalty unchanged |
+| `test_units.py::test_float64_scope` | a batched fit leaves the caller's float64 flag as it was |
 | `tests/analysis/pfc/test_heldout.py` (updated) | trial folds with the margin: no training bin within 250 ms of a held-out bin; every bin in one fold |
-| `tests/analysis/pfc/test_glm_pipeline.py` (updated) | a planted peri-event kernel is recovered with the REML penalty; a unit with no modulation is called at the nominal rate against matched controls |
+| `tests/analysis/pfc/test_glm_pipeline.py` (updated) | a planted peri-event kernel is recovered with the decided penalty; a unit with no modulation is called at the nominal rate against matched controls |
 | `tests/analysis/pfc/test_population_statistics.py` (updated) | the reduced statistics on a hand table |
-| check 6 on real sessions (script, GPU) | the tolerances above on three sessions |
+| check 6 on real sessions (script, GPU) | GPU float64 against CPU float64 within the acceptance tolerances on three sessions; two GPU runs bitwise equal |
 
 ## Fixtures
 
@@ -136,7 +151,7 @@ Synthetic units and events (the existing `tests/analysis/pfc/` helpers, for exam
 
 - Simulated first (tests), then three real sessions (baseline against new: per-unit called status, curves,
   deviance), then all sessions.
-- Compare: the fraction of units called per class per animal before and after; the REML penalty against the
+- Compare: the fraction of units called per class per animal before and after; the decided penalty against the
   old `sigma = 3.0` (state the implied prior SD, `batched_glm.py:740`, `implied_prior_sd`); explain each large
   change.
 
@@ -147,8 +162,10 @@ and the emitted files; `paper/figures/figure05/`.
 
 ## Exit criteria
 
-Check 6 passes on three sessions; the full run is done on free cards with the other session told; the
-mPFC summary and Figure 5 are rebuilt on the in-visit cohort with REML penalties and trial folds.
+The lead has answered the penalty question; check 6 (GPU float64 against CPU float64) passes on three
+sessions; the full run is done on free cards with the other session told; the mPFC summary and Figure 5
+are rebuilt on the in-visit cohort with the decided penalties and trial folds; `batched_glm`'s IRLS is
+removed.
 
 ## Review
 

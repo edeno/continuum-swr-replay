@@ -32,16 +32,17 @@ so measure before choosing.
 - **Design on the visit**: the self- and cross-history terms (onset- and end-anchored raised-cosine bases
   as now) added to Phase 5a's model A on the visit bins (C4 selection), with the end-anchored history counted
   from event ends as now.
-- **Penalty by REML**: the history kernels become penalized smooths of lag (the convention's form for a
-  peri-event lag), with one REML strength per kernel shared over sessions, replacing the per-animal nested
-  cross-validation of the ridge sigma (`nested_cv`). WAITS FOR THE LEAD (smooth-term rule): one REML strength
-  shared over sessions is a pooled penalty for a per-session smooth term; under either option of the decision
-  the kernels take the per-session rule instead (a small unpenalized basis, or a fixed weak penalty), and the
-  nested cross-validation is still replaced. The cross-history question ("does a recent event of one kind
+- **Penalty of the history kernels**: the history kernels become penalized smooths of lag (the
+  convention's form for a peri-event lag), replacing the per-animal nested cross-validation of the ridge
+  sigma (`nested_cv`). **OPEN (lead): mPFC and history penalties.** Whether a kernel's penalty is the
+  declared fixed penalty of the per-session rule (design, seventeenth round), or one chosen from the data
+  (the plan had one REML strength per kernel shared over sessions, which is a pooled penalty for a
+  per-session term), is decided at this phase. Ask the lead before the first real fit, with a simulation
+  of both on the visit bins (a scenario list for the simulation package, Phase 2b). The cross-history question ("does a recent event of one kind
   change the other kind's rate") is answered by the kernel with its simultaneous band and, as a held-out
   check, by the score summed over sessions on trial folds (Phase 2's fold function), not by a per-session
   held-out test.
-- **Per session, then reduced**: per-session fits at the shared penalty, reduced session to day to animal,
+- **Per session, then reduced**: per-session fits at the penalty the lead's answer gives, reduced session to day to animal,
   replacing the per-animal pooled fits with `C(session)` (the pooled form is stage 3; say so in the docs).
 - **Runner** `scripts/replay_models/rate/fit_visit_history.py` (new), registered in `run_refits.py`; the
   two old runners are removed by this phase's retire task.
