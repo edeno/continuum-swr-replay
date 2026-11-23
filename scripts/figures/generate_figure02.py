@@ -1229,7 +1229,7 @@ comparison's drawing and two axes are then placed in its space by
 :func:`fit_axes_in_row`."""
 BOTTOM_WSPACE = 0.55
 """The grids' first guess; the panels are then placed in two columns."""
-DECODER_AXES_WIDTHS = (0.8, 0.8, 0.85)
+DECODER_AXES_WIDTHS = (1.1, 0.8, 0.85)
 """The decoder comparison's frame widths, in proportion: its drawing, the full
 minus the SWR-only decoder by time (inside and outside SWRs), and that
 difference outside SWRs in and outside the held-out events
