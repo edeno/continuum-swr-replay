@@ -201,8 +201,8 @@ class OutsideScenario:
         :data:`ExpectedOutcome`.
     planted : mapping of str to float or callable
         Estimand name -> its planted value, a number or a function of the
-        :class:`Model` that returns one; an estimand not named has the
-        planted value NaN.
+        :class:`Model` that returns one (a module-level function, for a run
+        with workers); an estimand not named has the planted value NaN.
     scale, n_trials
         As :class:`InsideScenario`.
     """
