@@ -4334,15 +4334,11 @@ def nonlocal_probability_values(counts: pd.DataFrame, source: str) -> list[Value
 
 
 #: Each signal of ``state_by_signal``: its word in a key, its name in text and
-#: its detection level (z), an edge of its bins.
+#: its detection level in words (the level is
+#: ``nonlocal_by_signal.DETECTION_LEVELS``').
 _STATE_SIGNALS = {
-    "ripple_power": (
-        "ripple",
-        "ripple power",
-        KAY_ZSCORE_THRESHOLD,
-        "the SWR threshold",
-    ),
-    "mua": ("mua", "MUA", nonlocal_by_signal.MUA_LEVEL_Z, "the MUA event threshold"),
+    "ripple_power": ("ripple", "ripple power", "the SWR threshold"),
+    "mua": ("mua", "MUA", "the MUA event threshold"),
 }
 #: Each measure of ``state_by_signal.detection_level_statistics``: its word in
 #: a key, its style and what it is (``{signal}`` the signal, ``{level}`` the
@@ -4375,7 +4371,8 @@ def state_by_signal_values(counts: pd.DataFrame, source: str) -> list[Value]:
         "each epoch's share, each animal's mean over its epochs, the mean over animals"
     )
     values = []
-    for signal, (word, name, level, level_words) in _STATE_SIGNALS.items():
+    for signal, (word, name, level_words) in _STATE_SIGNALS.items():
+        level = nonlocal_by_signal.DETECTION_LEVELS[signal]
         statistics = state_by_signal.detection_level_statistics(counts, signal, level)
         for measure, (key_word, style, what) in _STATE_MEASURES.items():
             row = statistics.loc[measure]

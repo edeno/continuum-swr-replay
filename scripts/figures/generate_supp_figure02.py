@@ -354,6 +354,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     nonlocal_below_threshold_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+    DETECTION_LEVELS,
     MUA_LEVEL_Z,
     animal_nonlocal_counts,
 )
@@ -1080,9 +1081,10 @@ def draw_nonlocal_mua(
     MUA level (bottom), with the MUA level of the reported values and the
     share of non-local time below it (``nonlocal_below_threshold_statistics``,
     the events summary's value; ``counts``: :func:`read_inputs`' ``mua``)."""
-    below = nonlocal_below_threshold_statistics(counts, MUA_LEVEL_Z)
+    level = DETECTION_LEVELS["mua"]
+    below = nonlocal_below_threshold_statistics(counts, level)
     draw_share_by_signal(
-        ax_spread, ax_share, counts, threshold=MUA_LEVEL_Z,
+        ax_spread, ax_share, counts, threshold=level,
         threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
         xlabel="MUA (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "

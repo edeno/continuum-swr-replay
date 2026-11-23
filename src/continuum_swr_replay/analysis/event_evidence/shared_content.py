@@ -45,7 +45,11 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 
-WIDTH_BINS_CM = (0.0, 25.0, 50.0, 100.0, 200.0, np.inf)
+RESOLVED_WIDTH_CM = 200.0
+"""An event whose width is under this (cm) has a resolved place: the lower edge
+of the widest width bin."""
+
+WIDTH_BINS_CM = (0.0, 25.0, 50.0, 100.0, RESOLVED_WIDTH_CM, np.inf)
 """The width bins' edges (cm), each bin closed on the left: under 25, 25 to
 50, 50 to 100, 100 to 200, and 200 or more."""
 

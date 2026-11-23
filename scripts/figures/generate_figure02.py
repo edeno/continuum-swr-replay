@@ -238,6 +238,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     reference_medians,
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+    DETECTION_LEVELS,
     animal_nonlocal_counts,
 )
 from continuum_swr_replay.analysis.event_properties.state_by_signal import (
@@ -1693,9 +1694,10 @@ def draw_share_by_power(
     states : pd.DataFrame
         ``state_by_signal.state_distribution`` of ripple power.
     """
-    below = nonlocal_below_threshold_statistics(counts, KAY_ZSCORE_THRESHOLD)
+    level = DETECTION_LEVELS["ripple_power"]
+    below = nonlocal_below_threshold_statistics(counts, level)
     draw_share_by_signal(
-        ax_spread, ax_share, counts, threshold=KAY_ZSCORE_THRESHOLD,
+        ax_spread, ax_share, counts, threshold=level,
         threshold_label="SWR\nthreshold", threshold_color=C_SWR,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "

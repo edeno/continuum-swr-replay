@@ -41,12 +41,12 @@ from numpy.typing import ArrayLike, NDArray
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.columns import require_columns
 
-LOW_RATE_RANK = 0.10
-"""An event whose places' ranks are both below this is a low-rate event: its
-decoded places are among the lowest-rate tenth of the track's real places."""
-
 N_RANK_BINS = 10
 """The equal bins of the rank (tenths) of :func:`rank_tenth_shares`."""
+
+LOW_RATE_RANK = 1 / N_RANK_BINS
+"""An event whose places' ranks are both below this is a low-rate event: its
+decoded places are among the lowest-rate tenth of the track's real places."""
 
 POSITION_COLUMNS = ("replay_start_position_cm", "replay_end_position_cm")
 """The event table's decoded positions (linear cm) an event is ranked at."""

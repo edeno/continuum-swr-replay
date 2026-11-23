@@ -17,7 +17,7 @@ from __future__ import annotations
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_evidence.shared_content import (
-    WIDTH_BINS_CM,
+    RESOLVED_WIDTH_CM,
     WIDTH_COLUMN,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -26,10 +26,6 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
-
-RESOLVED_WIDTH_CM = WIDTH_BINS_CM[-2]
-"""An event whose width is under this (cm) has a resolved place: the lower edge
-of Figure 2's widest width group."""
 
 
 def event_widths(events: pd.DataFrame, windows: pd.DataFrame) -> pd.Series:

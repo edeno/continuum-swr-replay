@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.detection.swr_detectors import DETECTOR_SETTINGS
 from continuum_swr_replay.analysis.event_definition.analyzed_time import rest_bins
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
@@ -59,8 +60,16 @@ edge and up to its high edge (the first also holds 0, the last anything above
 0.8). The non-local threshold, 0.8, is an edge, so the last bin is the bins
 decoded non-local."""
 
+DETECTION_LEVELS = {
+    "ripple_power": float(DETECTOR_SETTINGS["kay"]["zscore_threshold"]),
+    "mua": MUA_LEVEL_Z,
+}
+"""Each signal's detection level (z), an edge of its bins: the SWR threshold
+(Kay's detector, 2 z) and :data:`MUA_LEVEL_Z`."""
+
 assert DEFAULT_NON_LOCAL_THRESHOLD in PROBABILITY_EDGES
 assert MUA_LEVEL_Z in MUA_EDGES
+assert DETECTION_LEVELS["ripple_power"] in RIPPLE_POWER_EDGES
 
 
 def signal_bin_index(signal: NDArray, edges: NDArray) -> NDArray[np.int64]:
