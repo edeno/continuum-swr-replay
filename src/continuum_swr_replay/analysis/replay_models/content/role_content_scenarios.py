@@ -22,8 +22,8 @@ its planted values are the estimands themselves:
 
 The pooled quantities (each covariate's pooled mean and SD, each curve's
 pooled mean, ``L0``, the reward fraction's mean and SD on current rows) are
-those of the pooled rows the model is fitted on, one kind
-(:class:`ScenarioReference`). A truth from the data, or one whose effects
+those of the scale rows the model's design is built on: both kinds, or the
+kind fitted (``role_content.SCALE_POOLINGS``; :class:`ScenarioReference`). A truth from the data, or one whose effects
 vary over sessions and animals, is a :class:`Truth` per session. For those,
 the target of the project's reduction (session, then recording day, then
 animal, a mean of means) is :func:`planted_target` of the per-session planted
@@ -32,6 +32,19 @@ values.
 The scenario list (:func:`role_content_scenarios`) names, for each scenario,
 the estimands it validates and what result would be a failure of the model.
 The uncertainty model's own truths are in :mod:`.uncertainty_scenarios`.
+
+Each scenario also carries the noise of its simulated shares
+(:class:`ShareNoise`): one categorical draw per event, a multinomial over the
+event's decode bins, or a Dirichlet-multinomial over them. The noise is not
+an assumption of the scenarios: it is a parameter of each, and the results of
+the validation (the spread of the estimates, the coverage, the shrinkage by
+the weak penalty) depend on it. Which noise the real shares have is open.
+Nothing here draws; the simulation engine's draw function reads the choice.
+
+"The 95 % interval covers" in a scenario's failure means the project's
+interval over sessions, recording days and animals
+(``shared_statistics.estimand_summary``), never the record's per-session
+standard error, which is on the model's scale and not a sampling error.
 """
 
 from __future__ import annotations
@@ -50,9 +63,11 @@ from .. import declared_tests as dt
 from . import role_content as rc
 
 __all__ = [
+    "NOISES",
     "SIZES",
     "Scenario",
     "ScenarioReference",
+    "ShareNoise",
     "Truth",
     "arm_effects",
     "expected_shares",
@@ -76,6 +91,53 @@ SIZES: Mapping[str, Mapping[str, float]] = {
     "slope": {"small": 0.1, "large": 0.4},
     "curve": {"small": 0.25, "large": 1.0},
 }
+
+
+NOISES: tuple[str, ...] = ("categorical", "multinomial", "dirichlet_multinomial")
+"""OPEN (lead): the noise of the simulated shares. ``categorical``: each
+event's shares are one categorical draw (one arm takes the whole event).
+``multinomial``: the counts of a multinomial over the event's number of decode
+bins, divided by that number. ``dirichlet_multinomial``: the same with
+overdispersion, the bins' probabilities a Dirichlet draw about the expected
+shares with a stated concentration."""
+
+
+@dataclass(frozen=True)
+class ShareNoise:
+    """The noise of a scenario's simulated shares (:data:`NOISES`).
+
+    Attributes
+    ----------
+    kind : str
+        One of :data:`NOISES`.
+    n_bins_column : str or None
+        The cohort column that gives each event's number of decode bins (for
+        example the event-arm table's ``n_nonlocal_bins``); required for the
+        multinomial and the Dirichlet-multinomial, None for the categorical.
+    concentration : float or None
+        The Dirichlet's total concentration; required for, and only for, the
+        Dirichlet-multinomial.
+    """
+
+    kind: str
+    n_bins_column: str | None = None
+    concentration: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in NOISES:
+            raise ValueError(f"noise {self.kind!r} not in {NOISES}")
+        if (self.kind == "categorical") != (self.n_bins_column is None):
+            raise ValueError(
+                "a number-of-bins column is required for a multinomial noise "
+                "and not read by the categorical"
+            )
+        if (self.kind == "dirichlet_multinomial") != (self.concentration is not None):
+            raise ValueError(
+                "a concentration is required for, and only for, the "
+                "Dirichlet-multinomial"
+            )
+        if self.concentration is not None and not self.concentration > 0:
+            raise ValueError("the concentration must be positive")
 
 
 @dataclass(frozen=True)
@@ -109,13 +171,14 @@ class Truth:
 
 @dataclass(frozen=True)
 class ScenarioReference:
-    """The pooled quantities a truth is centered on: those of the pooled rows
-    of one kind that the model is fitted on.
+    """The pooled quantities a truth is centered on: those of the scale rows
+    the model's design is built on.
 
     Attributes
     ----------
     pooled_rows : pd.DataFrame
-        The cohort rows of every session of the fit.
+        The scale rows: the cohort rows of every session of the fit, of both
+        kinds or of the kind fitted (``role_content.SCALE_POOLINGS``).
     reference_log_duration : float
         ``L0``.
     """
@@ -362,6 +425,8 @@ class Scenario:
         What result counts as a failure of the model.
     truth_for : callable
         Session key -> its :class:`Truth`.
+    noise : ShareNoise
+        The noise of the simulated shares (module docstring).
     """
 
     name: str
@@ -370,6 +435,7 @@ class Scenario:
     validates: tuple[str, ...]
     failure: str
     truth_for: Callable[[SessionKey], Truth]
+    noise: ShareNoise
 
     def expected_shares(
         self, key: SessionKey, rows: pd.DataFrame, reference: ScenarioReference
@@ -403,11 +469,15 @@ _SIZE_FAILURE = (
     "data sets, or their mean estimate differs from 0 by more than its "
     "Monte Carlo SE times 3"
 )
+_INTERVAL = (
+    "the project's 95 % interval over sessions, days and animals (not the "
+    "record's per-session SE)"
+)
 _RECOVERY_FAILURE = (
     "the planted estimand's mean estimate differs from its planted value by "
-    "more than 10 % of it (or its Monte Carlo SE times 3, if larger), its 95 % "
-    "interval covers it in fewer than 90 % of data sets, or another estimand "
-    "planted at zero rejects in more than 7 %"
+    "more than 10 % of it (or its Monte Carlo SE times 3, if larger), "
+    f"{_INTERVAL} covers it in fewer than 90 % of data sets, or another "
+    "estimand planted at zero rejects in more than 7 %"
 )
 
 
@@ -478,8 +548,9 @@ def _ids(model: str) -> tuple[str, ...]:
     return tuple(e.estimand_id for e in rc.model_estimands(model))
 
 
-def role_content_scenarios() -> list[Scenario]:
-    """The scenarios that need no data beyond a session's rows.
+def role_content_scenarios(*, noise: ShareNoise) -> list[Scenario]:
+    """The scenarios that need no data beyond a session's rows, each with the
+    noise ``noise`` (module docstring: the results depend on it).
 
     - ``null`` (arm effects only): every estimand at 0; gives the
       false-positive rate of every content test, in both models.
@@ -509,6 +580,7 @@ def role_content_scenarios() -> list[Scenario]:
             _ids(model),
             _SIZE_FAILURE,
             _constant(Truth(arm=arms)),
+            noise,
         )
         for model in rc.MODELS
     ]
@@ -524,6 +596,7 @@ def role_content_scenarios() -> list[Scenario]:
                 _ids(model),
                 _RECOVERY_FAILURE,
                 _constant(truth),
+                noise,
             )
         )
     out.append(
@@ -534,6 +607,7 @@ def role_content_scenarios() -> list[Scenario]:
             ("Q3a",),
             _RECOVERY_FAILURE + ", at L0 in the length-adjusted variant",
             _constant(Truth(arm=arms, role={"current": 0.5}, length={"current": 0.6})),
+            noise,
         )
     )
     out.append(
@@ -550,6 +624,7 @@ def role_content_scenarios() -> list[Scenario]:
                     length_slopes={(rc.VALUE, rc.REFERENCE_ROLE): 0.3},
                 )
             ),
+            noise,
         )
     )
     large = SIZES["role"]["large"], SIZES["slope"]["large"]
@@ -560,8 +635,9 @@ def role_content_scenarios() -> list[Scenario]:
             "unadjusted",
             ("Q3a", "Q3b", "Q4b", "Q5b-var", "Q5b-n"),
             "the mean estimate is shrunk toward 0 by more than 10 % of the planted "
-            "value at the chosen prior SD (record the shrinkage at SD 1, 2 and 4), "
-            "or the interval covers it in fewer than 90 % of data sets",
+            "value at the chosen prior SD (record the shrinkage at each candidate "
+            f"SD, {', '.join(f'{sd:g}' for sd in rc.PRIOR_SD_CANDIDATES)}), or "
+            f"{_INTERVAL} covers it in fewer than 90 % of data sets",
             _constant(
                 Truth(
                     arm=arms,
@@ -573,6 +649,7 @@ def role_content_scenarios() -> list[Scenario]:
                     },
                 )
             ),
+            noise,
         )
     )
     return out

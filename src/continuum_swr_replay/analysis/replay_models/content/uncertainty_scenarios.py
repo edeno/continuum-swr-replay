@@ -17,7 +17,9 @@ planted one:
   the reward variability was dropped).
 
 All on the other-leaf rows, as the declared tests read them; arm effects as
-:func:`.role_content_scenarios.arm_effects`.
+:func:`.role_content_scenarios.arm_effects`. Each carries the noise of its
+simulated shares (:class:`.role_content_scenarios.ShareNoise`); the results of
+the validation depend on that choice, which is open.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import numpy as np
 from . import role_content as rc
 from .role_content_scenarios import (
     Scenario,
+    ShareNoise,
     Truth,
     arm_effects,
     recency_curve,
@@ -38,7 +41,7 @@ __all__ = [
     "uncertainty_scenarios",
 ]
 
-#: The planted size of a measure's slope, per pooled SD (the scratch study's).
+#: The planted size of a measure's slope, per pooled SD: a placeholder.
 MEASURE_SIZE = 0.25
 
 #: The amplitude of the recency curve every truth here carries.
@@ -51,9 +54,9 @@ def _u_shape(amplitude: float):
     return lambda x: amplitude * 4.0 * (np.asarray(x) - 0.5) ** 2
 
 
-def uncertainty_scenarios() -> list[Scenario]:
+def uncertainty_scenarios(*, noise: ShareNoise) -> list[Scenario]:
     """The uncertainty model's truths (module docstring), each fitted with the
-    unadjusted ``role_content_uncertainty``."""
+    unadjusted ``role_content_uncertainty``, with the noise ``noise``."""
     other = rc.REFERENCE_ROLE
     recency = {(rc.RECENCY, other): recency_curve(RECENCY_AMPLITUDE)}
     size = (
@@ -116,6 +119,7 @@ def uncertainty_scenarios() -> list[Scenario]:
             validates,
             failure,
             (lambda key, truth=truth: truth),
+            noise,
         )
         for name, (truth, validates, failure) in truths.items()
     ]

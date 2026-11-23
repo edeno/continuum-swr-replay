@@ -23,6 +23,7 @@ SESSIONS = (
     ("a2", "20200103", "02_r1"),
 )
 CONTENT_IDS = {e.estimand_id for m in rc.MODELS for e in rc.model_estimands(m)}
+NOISE = sc.ShareNoise("multinomial", n_bins_column="n_nonlocal_bins")
 
 
 @pytest.fixture(scope="module")
@@ -93,12 +94,17 @@ def test_planted_values_by_hand(rows, reference) -> None:
 
 
 def test_the_scenario_list_is_complete_and_named() -> None:
-    scenarios = sc.role_content_scenarios() + us.uncertainty_scenarios()
+    scenarios = sc.role_content_scenarios(noise=NOISE) + us.uncertainty_scenarios(
+        noise=NOISE
+    )
     names = [s.name for s in scenarios]
     assert len(names) == len(set(names))
     for s in scenarios:
         assert s.model in rc.MODELS and s.variant in rc.VARIANTS
         assert s.failure and set(s.validates) <= CONTENT_IDS and s.validates
+        assert s.noise == NOISE
+        if "interval" in s.failure:
+            assert "not the record's per-session SE" in s.failure
     single = {s.name for s in scenarios}
     for size in ("small", "large"):
         for name in ("role_current", "role_previous", "value_other_leaf", "value_current",
@@ -111,7 +117,7 @@ def test_the_scenario_list_is_complete_and_named() -> None:
 
 
 def test_null_plants_zero_and_single_effects_plant_one(reference) -> None:
-    by_name = {s.name: s for s in sc.role_content_scenarios()}
+    by_name = {s.name: s for s in sc.role_content_scenarios(noise=NOISE)}
     key = SESSIONS[0]
     null = sc.planted_values(by_name["null_role_content"].truth_for(key), reference)
     assert all(v == 0 for v in null.values())
@@ -130,7 +136,7 @@ def test_null_plants_zero_and_single_effects_plant_one(reference) -> None:
 def test_uncertainty_truths_plant_no_measure_effect_where_they_should_not(
     reference,
 ) -> None:
-    for s in us.uncertainty_scenarios():
+    for s in us.uncertainty_scenarios(noise=NOISE):
         planted = sc.planted_values(s.truth_for(SESSIONS[0]), reference)
         assert planted["Q5a"] > 0.3
         if s.name != "belief_variance":
@@ -165,7 +171,13 @@ def test_spread_truths_target_the_animal_balanced_mean(reference) -> None:
     truths = sc.spread_truths(keys, mean, animal_sd=0.3, session_sd=0.1, seed=4)
     assert truths == sc.spread_truths(keys, mean, animal_sd=0.3, session_sd=0.1, seed=4)
     scenario = sc.Scenario(
-        "spread", "role_content", "unadjusted", ("Q3a",), "x", truths.__getitem__
+        "spread",
+        "role_content",
+        "unadjusted",
+        ("Q3a",),
+        "x",
+        truths.__getitem__,
+        NOISE,
     )
     planted = scenario.planted(keys, reference)
     target = sc.planted_target(planted)
@@ -188,7 +200,9 @@ def test_thin_events_keeps_whole_events(rows) -> None:
 
 
 def test_every_scenario_gives_shares_on_real_shaped_rows(rows, reference) -> None:
-    scenarios = sc.role_content_scenarios() + us.uncertainty_scenarios()
+    scenarios = sc.role_content_scenarios(noise=NOISE) + us.uncertainty_scenarios(
+        noise=NOISE
+    )
     sessions = rc.session_rows(rows)
     for s in scenarios:
         for key, part in sessions.items():
@@ -196,3 +210,39 @@ def test_every_scenario_gives_shares_on_real_shaped_rows(rows, reference) -> Non
             assert np.isfinite(share).all() and (share > 0).all(), s.name
         planted = s.planted(list(sessions), reference)
         assert len(planted) == len(sessions)
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        sc.ShareNoise("categorical"),
+        sc.ShareNoise("multinomial", n_bins_column="n_nonlocal_bins"),
+        sc.ShareNoise(
+            "dirichlet_multinomial", n_bins_column="n_nonlocal_bins", concentration=20.0
+        ),
+    ],
+    ids=lambda n: n.kind,
+)
+def test_each_noise_is_carried_by_every_scenario(noise) -> None:
+    scenarios = sc.role_content_scenarios(noise=noise) + us.uncertainty_scenarios(
+        noise=noise
+    )
+    assert {s.noise for s in scenarios} == {noise}
+
+
+@pytest.mark.parametrize(
+    "kwargs, match",
+    [
+        ({"kind": "poisson"}, "not in"),
+        ({"kind": "multinomial"}, "number-of-bins column"),
+        ({"kind": "categorical", "n_bins_column": "n_nonlocal_bins"}, "number-of-bins"),
+        ({"kind": "dirichlet_multinomial", "n_bins_column": "n"}, "concentration"),
+        ({"kind": "multinomial", "n_bins_column": "n", "concentration": 5.0},
+         "concentration"),
+        ({"kind": "dirichlet_multinomial", "n_bins_column": "n",
+          "concentration": 0.0}, "positive"),
+    ],
+)  # fmt: skip
+def test_a_noise_must_name_what_it_reads(kwargs, match) -> None:
+    with pytest.raises(ValueError, match=match):
+        sc.ShareNoise(**kwargs)
