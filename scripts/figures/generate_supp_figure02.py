@@ -291,7 +291,6 @@ import string
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
-from functools import partial
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -384,6 +383,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     require_analyzed_epochs,
 )
 from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     TETRODE_HOLDOUT_NAME,
@@ -672,12 +672,13 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
             events["event_id"],
         )
     )
+    event_table_sha256 = sha256_file(inputs.event_table)
     heldout = read_heldout_restriction(
         inputs.nonlocal_restriction_heldout_events,
         inputs.nonlocal_restriction,
         inputs.bin_facts,
         epochs,
-        sha256_file(inputs.event_table),
+        event_table_sha256,
     )
     refusal = heldout_restriction_refusal(
         heldout, restriction_inputs_note(inputs.nonlocal_restriction, epochs)
@@ -691,7 +692,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         inputs.nonlocal_restriction_swr_allowed,
         inputs.bin_facts,
         epochs,
-        sha256_file(inputs.event_table),
+        event_table_sha256,
     )
     refusal = heldout_restriction_refusal(
         four, restriction_inputs_note(inputs.nonlocal_restriction_swr_allowed, epochs)
@@ -858,6 +859,21 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
     return animal_nonlocal_counts(counts, "mua")
 
 
+def _epoch_keys(path: Path, events: pd.DataFrame | None) -> pd.DataFrame | None:
+    """The selected events' keys (``animal``, ``session_date``, ``epoch`` and
+    ``non_local_event``) of the epoch of a decode frame, so that each epoch's
+    task carries its own rows only (None without ``events``)."""
+    if events is None:
+        return None
+    key = parse_epoch_identifier(path.name.removesuffix(data_over_time_suffix()))
+    mine = (
+        (events["animal"].astype(str) == key.animal)
+        & (events["session_date"].astype(np.int64) == key.date)
+        & (events["epoch"].astype(str) == key.epoch_name)
+    )
+    return events.loc[mine, ["animal", "session_date", "epoch", "non_local_event"]]
+
+
 def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
     """One epoch's part of :func:`read_frame_traces`: its MUA level outside
     its No-Spike periods, and, when it has periods, their windows
@@ -929,17 +945,12 @@ def read_frame_traces(
     paths = analyzed_decode_files(
         processed_data_dir(), data_over_time_suffix(), require_all=True
     )
-    keys = (
-        None
-        if events is None
-        else events[["animal", "session_date", "epoch", "non_local_event"]]
-    )
-    read = partial(_frame_epoch, keys=keys)
+    keys = [_epoch_keys(path, events) for path in paths]
     if workers == 1:
-        epochs = list(map(read, paths))
+        epochs = list(map(_frame_epoch, paths, keys))
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            epochs = list(pool.map(read, paths))
+            epochs = list(pool.map(_frame_epoch, paths, keys))
     with_periods = [epoch for epoch in epochs if "windows" in epoch]
     counts: dict = {}
     for epoch in with_periods:
