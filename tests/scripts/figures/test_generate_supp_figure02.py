@@ -17,8 +17,12 @@ import pytest  # noqa: E402
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
 from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
+    DIFFERENCE_SHIFT,
+    GAIN_SPLIT,
     OUTSIDE,
+    SHARE_OF_EVENTS,
     _figure02_events,
+    _gain_statistics,
     _means_at,
     _measure_rows,
     _outside_rows,
@@ -232,6 +236,9 @@ def _statistics() -> dict:
         "step_test": _step_test(),
         "distance": _distance(),
         "timing": _timing(),
+        "split": {
+            column: _gain_statistics(*groups) for column, groups in GAIN_SPLIT.items()
+        },
         "shared": shared_statistics(),
         "participation": _participation(),
         "outside": _outside_rows(),
@@ -253,15 +260,16 @@ def drawn():
 
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     """In six rows, each a group the text cites in turn: the decoder (a, b),
-    the count is robust (c, d), the events are coordinated (e to g), ripple
-    power and the held-out test (h, i), the animals agree and where the
-    content lies (j, k), the fourth decoder (l); each row's letters at one
+    the count is robust (c, d), the left-out tetrode (e to g), participation,
+    ripple power and the held-out test (h to j), the animals agree and where
+    the content lies (k, l), the fourth decoder (m); each row's letters at one
     height, the rows' first letters at one left edge, no heading; within the
     common 20 cm height."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "shared_raw", "participation", "step_test",
-        "outside_distance", "event_traces", "content_distance", "four_decoders",
+        "nonlocal_mua", "left_out_split", "left_out_width", "participation",
+        "step_test", "outside_distance", "event_traces", "content_distance",
+        "four_decoders",
     )  # fmt: skip
     fig = drawn
     assert figure.panel_axes(fig, "no_spike_mua")[0].get_title() == "No-Spike state"
@@ -273,8 +281,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijkl")
-    rows = ("ab", "cd", "efg", "hi", "jk", "l")
+    assert sorted(letters) == list("abcdefghijklm")
+    rows = ("ab", "cd", "efg", "hij", "kl", "m")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -286,21 +294,83 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     figure.check_journal_limits(fig)
 
 
-def test_the_raw_curves_panel_draws_the_agreement_and_the_reference(drawn):
-    """Panel f: Figure 2j's two curves, the agreement by width (dots, means and
-    a line per group) and the width-matched reference in open markers on a
-    dotted line, named once."""
-    (ax,) = figure.panel_axes(drawn, "shared_raw")
-    assert_width_series(ax)
-    references = [line for line in ax.lines if line.get_linestyle() == ":"]
+def test_the_split_panel_draws_the_fit_over_the_animals_place_by_bins(drawn):
+    """Panel f: Figure 2i's first comparison for no-SWR then SWR events, three
+    positions each (all bins, the bins where the scored tetrode spiked, the
+    silent bins): a dot per animal in the group's color, the mean with its
+    interval beside them; the parts named, the groups named over their
+    positions, a dashed zero line named "equal fit", the title and y label."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    (ax,) = figure.panel_axes(drawn, "left_out_split")
+    dots = [
+        c for c in ax.collections
+        if isinstance(c, matplotlib.collections.PathCollection)
+    ]  # fmt: skip
+    assert len(dots) == 6
+    for k, (_group, color) in enumerate(panels.GROUP_COLORS.items()):
+        for j, groups in enumerate(GAIN_SPLIT.values()):
+            x = panels.split_x(k, j)
+            (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
+            np.testing.assert_allclose(mine.get_offsets()[:, 1], groups[k])
+            np.testing.assert_allclose(mine.get_facecolor()[0], to_rgba(color))
+            assert np.allclose(_means_at(ax, x), np.mean(groups[k]))
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == 2 * list(panels.SPLIT_LABELS.values())
+    assert {"No SWR", "SWR", "equal fit"} <= {t.get_text() for t in ax.texts}
+    assert ax.get_title() == "Decoded place over\nanimal's place"
+    assert ax.get_ylabel() == "Left-out tetrode:\nbetter fit (nats/spike)"
+
+
+def test_the_width_panel_draws_the_difference_its_shares_and_its_two_fits(drawn):
+    """Panel g: left, Figure 2i's second comparison by width (the
+    ``difference``), the zero line named "equal fit", no reference curve, and
+    above it each group's mean share over animals per bin as two narrow bars
+    with the animals' range; right, the two fits by width, the fit to this
+    event's place (dots, means and a line per group) and to another event's
+    of the same width in open markers on a dotted line, named once; one x
+    label under both."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    ax, ax_raw, ax_share = figure.panel_axes(drawn, "left_out_width")
+    assert_width_series(ax, DIFFERENCE_SHIFT, xlabel="")
+    assert not [line for line in ax.lines if line.get_linestyle() == ":"]
+    assert "equal fit" in [t.get_text() for t in ax.texts]
+    assert ax.get_ylabel() == "Left-out tetrode:\nbetter fit (nats/spike)"
+    assert ax_share.get_title() == "Decoded place over\nanother event's place"
+    bins = np.arange(len(panels.WIDTH_BIN_LABELS))
+    bars = list(ax_share.patches)
+    assert len(bars) == 2 * len(bins)
+    for side, (group, color) in zip((-1, 1), panels.GROUP_COLORS.items(), strict=True):
+        mine = [b for b in bars if to_rgba(b.get_facecolor()) == to_rgba(color)]
+        np.testing.assert_allclose(
+            [b.get_x() + b.get_width() / 2 for b in mine],
+            bins + side * panels.SHARE_BAR_WIDTH / 2,
+        )
+        np.testing.assert_allclose(
+            [b.get_height() for b in mine], 100 * np.asarray(SHARE_OF_EVENTS[group])
+        )
+    assert ax_share.get_shared_x_axes().joined(ax_share, ax)
+    assert [t.get_text() for t in ax_share.get_yticklabels()][-1].endswith(" %")
+    assert_width_series(ax_raw, xlabel="", named=False)
+    references = [line for line in ax_raw.lines if line.get_linestyle() == ":"]
     assert len(references) == 2
     for line in references:
         assert line.get_marker() == "o" and line.get_markerfacecolor() == "white"
     assert sorted(float(line.get_ydata()[0]) for line in references) == [-0.3, -0.15]
-    assert [t.get_text() for t in ax.get_legend().get_texts()] == [
-        "shuffled events, same width"
+    assert [t.get_text() for t in ax_raw.get_legend().get_texts()] == [
+        "this event's place",
+        "another event's, same width",
     ]
-    assert ax.get_title() == figure.SHARED_RAW_TITLE
+    assert ax_raw.get_title() == "Each fit over a uniform place"
+    assert ax_raw.get_ylabel() == "Fit over a uniform\nplace (nats/spike)"
+    assert panels.WIDTH_XLABEL.replace("\n", " ") in [
+        t.get_text() for t in ax_raw.texts
+    ]
 
 
 def test_each_panels_values_carry_its_letter():
@@ -313,7 +383,9 @@ def test_each_panels_values_carry_its_letter():
         "rule_sweep": "rule_sweep",
         "boundary_timing": "boundary_timing",
         "nonlocal_mua": "nonlocal_mua",
-        "shared_content_raw": "shared_raw",
+        "tetrode_holdout_split": "left_out_split",
+        "shared_content": "left_out_width",
+        "shared_content_raw": "left_out_width",
         "participation": "participation",
         "class_step": "step_test",
         "class_step_evidence": "step_test",
@@ -323,6 +395,11 @@ def test_each_panels_values_carry_its_letter():
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
+    # the gain over local coding is Figure 2i's too
+    assert events.TAGS["tetrode_holdout"].figures == (
+        "2i",
+        f"S2{figure.LETTERS['left_out_split']}",
+    )
     assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua", "event_traces"}
 
 
@@ -501,7 +578,7 @@ def test_the_step_panel_draws_each_animals_jump_and_the_counts(drawn):
 
 
 def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
-    """As Figure 2i draws ripple power: top, each animal's non-local time
+    """As Figure 2h draws ripple power: top, each animal's non-local time
     spread over MUA with the share below the MUA level written; bottom, the
     share of bins decoded non-local at each level; a dashed line at the level
     on both."""
@@ -694,7 +771,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijkl"
+    assert FIGURES["S2"].panels == "abcdefghijklm"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -722,7 +799,11 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "event_table_epochs": lambda table, analyzed: ["e"],
         "analyzed_epoch_ids": lambda: ["e"],
         "read_complete_run": lambda folder, name, epochs: stored["scores"],
-        "window_scores": lambda table: seen.setdefault("tetrode", table),
+        "window_scores": lambda table: seen.setdefault("tetrode", []).append(table)
+        or table,
+        "holdout_statistics": lambda windows, kind, column: seen.setdefault(
+            "split", windows
+        ),
         "shared_content_statistics": lambda windows: seen.setdefault("shared", windows),
         "read_participation": lambda folder, epochs, event_ids: seen.setdefault(
             "participation", event_ids
@@ -766,7 +847,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     """The stored held-out tetrode run with its extra scores (held out in
     folds of whole trials) scores every event; the figure, like the events
     summary, reads the rows (every tetrode's) of the events that start inside a
-    well visit (panel f, the events alone), and the held-out event run's
+    well visit (panels f and g, the events alone), and the held-out event run's
     events and time sums by the summary's reader."""
     inside = _figure02_events().assign(event_id=range(8))
     outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
@@ -779,8 +860,10 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     seen = {}
     _patch_reading(monkeypatch, stored, seen)
     inputs = figure.read_inputs()
-    assert list(seen["tetrode"]["event_id"]) == [0, 0, *range(1, 8)]
+    # the run with its extra scores (panel g), then the canonical run (panel f)
+    assert [list(t["event_id"]) for t in seen["tetrode"]] == [[0, 0, *range(1, 8)]] * 2
     assert list(seen["shared"]["event_id"]) == [0, 0, *range(1, 8)]
+    assert list(seen["split"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
     assert seen["distance"]["event_id"].tolist() == list(range(8))
@@ -791,6 +874,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "step_test",
         "distance",
         "timing",
+        "split",
         "shared",
         "participation",
         "outside",
@@ -816,7 +900,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
 def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     monkeypatch, notes, inputs_note, rerun
 ):
-    """Panel i is refused as Figure 2k is: from a restriction run off
+    """Panel j is refused as Figure 2j is: from a restriction run off
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {
@@ -831,7 +915,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "outside_swr_statistics", refuse)
-    with pytest.raises(ValueError, match="panel i is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel j is not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 
@@ -865,7 +949,7 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
 
 
 def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):
-    """Panel l is refused on the same grounds as panel i, from its own
+    """Panel m is refused on the same grounds as panel j, from its own
     held-out event run (read by the same reader from its own folders)."""
     stored = {
         "table": _figure02_events().assign(event_id=range(8)),
@@ -882,13 +966,13 @@ def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch
         "read_heldout_restriction",
         lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
     )
-    with pytest.raises(ValueError, match="panel l is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel m is not drawn") as refused:
         figure.read_inputs()
     assert "detect_heldout_events" in str(refused.value)
 
 
-def test_the_four_decoder_panel_draws_figure_2ks_axes_with_the_fourth(drawn):
-    """Panel l: the SWR-only, SWR-allowed (open dots) and full decoders over
+def test_the_four_decoder_panel_draws_the_decoders_with_the_fourth(drawn):
+    """Panel m: the SWR-only, SWR-allowed (open dots) and full decoders over
     the local-only decoder; at each time, the full minus the SWR-allowed
     decoder (filled) and the SWR-allowed minus the SWR-only decoder (open),
     named in a legend; and the full minus the SWR-allowed decoder in the

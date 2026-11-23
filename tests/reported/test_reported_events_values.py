@@ -890,7 +890,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     for name, value in values.items():
         assert value.questions == ("2d.1",)
         pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S2k",)), name
+        assert value.figures == (() if pooled else ("S2l",)), name
     assert "under 20 cm from the animal" in values[key].description
 
 
@@ -1196,12 +1196,15 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
     by_key = _by_key(values)
-    # Figure 2's supplement draws the gains (panel S2c); Figure 2 does not, and
-    # no figure draws the agreement
-    agreement = {k for k in by_key if "agreement" in k}
+    # Figure 2i and the supplement's panel S2f draw the events' gain, S2f
+    # alone its parts in the bins with and without a spike; no figure draws
+    # the controls' gain or the agreement
+    agreement = {k for k in by_key if "agreement" in k or "control" in k}
     assert {by_key[k].figures for k in agreement} == {()}
-    assert {v.figures for k, v in by_key.items() if k not in agreement} == {
-        builder.TAGS["tetrode_holdout"].figures
+    parts = {k for k in by_key if "spiking" in k or "silent" in k}
+    assert {by_key[k].figures for k in parts} == {("S2f",)}
+    assert {v.figures for k, v in by_key.items() if k not in agreement | parts} == {
+        ("2i", "S2f")
     }
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
@@ -1319,22 +1322,15 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
         ]
         == 3
     )
-    # Figure 2j draws the difference and the animals' shares, with the counts;
-    # the supplement (S2f) the agreement and the reference; the pooled share
+    # the supplement's panel S2g draws the difference and the animals' shares,
+    # with the counts, and the agreement and the reference; the pooled share
     # is for the text
-    raw = {
-        k for k in values
-        if "minus" not in k
-        and k.removesuffix("_ci_low").removesuffix("_ci_high").endswith(
-            ("_agreement_per_spike", "_reference_per_spike")
-        )
-    }  # fmt: skip
     for name, value in values.items():
         assert value.questions == ("2c.3",)
         if name.endswith("_share_of_events"):
             assert value.figures == (), name
         else:
-            assert value.figures == (("S2f",) if name in raw else ("2j",)), name
+            assert value.figures == ("S2g",), name
     # five bins, two groups: agreement and reference (three values each), the
     # difference (four), the share positive (three), the share pooled and by
     # animal (four), the epochs, the events and the reference's events
@@ -1376,7 +1372,12 @@ def test_tetrode_holdout_extra_values_split_the_evidence():
     # six measures of the events (three values; the difference four), two of
     # the controls (three) and two paired (four), two groups
     assert len(values) == 2 * (5 * 3 + 4 + 2 * 3 + 2 * 3 + 2 * 4)
-    assert {v.figures for v in values.values()} == {()}
+    # Figure 2i draws the agreement minus the reference (over another event's
+    # place); no figure draws the rest
+    drawn = {k for k in values if "_heldout_agreement_minus_reference_per_spike" in k}
+    assert len(drawn) == 2 * 4
+    assert {values[k].figures for k in drawn} == {("2i",)}
+    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # none of the canonical run's keys is made again
     assert not set(values) & {
@@ -1623,10 +1624,10 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic():
     # per group: the estimate, two bounds, animals positive, the events, those
     # scored and those without spikes
     assert len(numbers) == 2 * 7
-    assert {k for k, v in values.items() if v.figures == ("2k",)} == {
+    assert {k for k, v in values.items() if v.figures == ("2j",)} == {
         k for k in values if k.startswith("restriction_heldout_non_swr_")
     }
-    assert {v.figures for v in values.values()} == {(), ("2k",)}
+    assert {v.figures for v in values.values()} == {(), ("2j",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
@@ -1801,7 +1802,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for where in ("", "_outside_heldout_events")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     }
-    assert {k for k, v in values.items() if v.figures == ("2k",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
@@ -1862,19 +1863,9 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # Figure 2j draws the filter family's gains per spike over the local-only
-    # decoder and their paired difference, with the epoch counts; per second,
-    # the share and the two-sided family carry no figure
-    drawn = {
-        f"restriction_immobile_{contrast}_per_spike{end}"
-        for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr")
-        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
-    } | {
-        "restriction_immobile_epochs_full_above_swr_only",
-        "restriction_immobile_epochs",
-    }
-    assert {k for k, v in values.items() if v.figures == ("2k",)} == drawn
-    assert {v.figures for k, v in values.items() if k not in drawn} == {()}
+    # no figure draws them: Figure 2j compares the full and the SWR-only
+    # decoders inside and outside SWRs, not over all immobile time
+    assert {v.figures for v in values.values()} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # the summary says what they are over (``over``), once
     assert not any("inside a well visit" in v.description for v in values.values())
@@ -1886,12 +1877,7 @@ def test_restriction_figure_statistics_are_the_tagged_values():
     statistics = builder.restriction_totals.restriction_figure_statistics(
         windows, sums, bin_s
     )
-    decoders, outside = statistics.decoders, statistics.outside
-    numbers = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
-    measure = builder.RESTRICTION_FIGURE_DIFFERENCE
-    assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
-        numbers[f"restriction_immobile_{measure}"]
-    )
+    outside = statistics.outside
     groups = builder.restriction_outside_swr_values(sums, bin_s, windows, "s")
     numbers = _numbers(groups.with_events)
     key = "restriction_outside_swr_full_minus_swr"
@@ -1960,7 +1946,7 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     }
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("2k",) if name in drawn else ())
+        assert value.figures == (("2j",) if name in drawn else ())
     assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 
@@ -2087,7 +2073,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("S2l",) if name in drawn else ()), name
+        assert value.figures == (("S2m",) if name in drawn else ()), name
     # no key of the canonical builders is made again
     canonical_keys = set(canonical) | set(
         _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))

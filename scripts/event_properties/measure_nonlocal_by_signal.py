@@ -2,7 +2,7 @@
 
 Where the non-local time sits against the SWR threshold and against MUA: how
 much of it has ripple power below the SWR threshold, and the share of bins that
-are non-local at each power (Figure 2i), and the same for MUA (Figure 2's
+are non-local at each power (Figure 2h), and the same for MUA (Figure 2's
 supplement), over the immobile time inside the well visits (the epoch's port
 experiences, read from the session cache:
 ``event_tables.prepare_data.well_visit_times``). One pass over each decode

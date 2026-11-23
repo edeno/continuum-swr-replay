@@ -8,7 +8,7 @@ so the two methods are read on the same bins and summarized by the same
 statistic (``likelihood_advantage.likelihood_advantage_statistics``: one value
 per animal, their mean and its nested-bootstrap interval). The same functions
 sum the windows of the events detected from the held-out decode
-(``scripts/event_evidence/detect_heldout_events.py``), which Figure 2k draws.
+(``scripts/event_evidence/detect_heldout_events.py``), which Figure 2j draws.
 Both runs are held out in folds of whole trials; the window step checks only
 the held-out tetrode run's fold design (``fold_design`` in its manifest
 settings).
@@ -34,7 +34,7 @@ every tetrode the decoder put in those bins, from the per-bin facts,
 table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
 its bins outside the SWR, where ``swr`` may not use the non-local states; in an
 event without an SWR, all its bins but the few inside an SWR the ``swr`` model
-used. Figure 2k's second axis reads ``full - swr`` there, per spike, over the
+used. Figure 2j's second axis reads ``full - swr`` there, per spike, over the
 windows of the events detected from the held-out decode
 (``scripts/event_evidence/detect_heldout_events.py`` sums them with the same
 functions).

@@ -65,7 +65,7 @@ after a change to fitting code only, start at step 6.
    5. `tables/build_timebin_tables.py`;
    6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
 5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
-   the supplements). The runs behind Figure 2i to 2k and the restriction
+   the supplements). The runs behind Figure 2i and 2j and the restriction
    and held-out tetrode values of the events summary go in this order (in `scripts/event_evidence/` unless
    named otherwise; the two GPU runners need `--gpus`):
    1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on
@@ -121,7 +121,7 @@ after a change to fitting code only, start at step 6.
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_windows
    ```
 
-   Figure 2j, the parts of the held-out tetrode evidence and the low-rate events read step 5 made again with its extra scores (the 95 % HPD length, the shuffled-event
+   Figure 2i's comparison with another event's place, Figure 2's supplement, panel g, the parts of the held-out tetrode evidence and the low-rate events read step 5 made again with its extra scores (the 95 % HPD length, the shuffled-event
    reference, the rate and mark parts, the place information), into its own folder:
 
    ```bash

@@ -27,7 +27,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     g — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
         power and head speed, each animal-balanced: the line the mean over
         animals of each animal's median over its events (the lines of Figure
-        2's supplement, panel j), the band the mean over animals of each
+        2's supplement, panel k), the band the mean over animals of each
         animal's quartiles (a spread over events, every animal weighted the
         same), with the epochs' level between events, theta's running level and
         the immobility threshold. Both kinds of event come with a rise in MUA
@@ -42,97 +42,59 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         ``Processed-Data/nonlocal_by_signal``; drawn by
         ``visualization.signal_share_panels.draw_share_by_signal``, which
         Figure 2's supplement draws MUA with).
-    i — The held-out tetrode gain over local coding. The events (the
-        immobile non-local events that start inside a well visit, no SWR and
-        SWR). Each tetrode is left out of the decoder's smoother in turn and
-        scored at every bin of each event under the other tetrodes' position
-        distribution against local coding around the animal (encodings held
-        out in folds of whole trials); the gain is summed over tetrodes and
-        bins and divided by the event's spikes. A dot per animal for no-SWR and
-        SWR events, the animals' mean with its 95 % interval, and a line at
-        zero, where local coding predicts the held-out spikes as well. The line
-        is not a control: the Local-rest controls sit there by construction (in
-        Local rest the decoded position is the animal's own), so they are in
-        the events summary and not drawn. The gain is drawn whole ("All bins")
-        and split by the scored tetrode's own bins: those where it spiked
-        ("Bins with a spike") and those where it was silent ("Silent bins"),
-        which answers whether the events' advantage over local coding comes
-        from the spikes or from their absence (the ground process). For each
-        event the two parts add to the whole; each drawn value is a median over
-        events, so over the cohort they need not add up exactly
+    i — Do the spikes of a left-out tetrode point to the decoded place? At
+        the left, a drawing of the test
+        (``visualization.evidence_drawings.draw_left_out_test``): each tetrode
+        is left out of the decoder's smoother in turn and its spikes scored at
+        every bin of each event under the other tetrodes' position distribution
+        (the decoded place), summed over tetrodes and bins and divided by the
+        event's spikes, against two places it must fit better than. At the
+        right, one axis with the two comparisons, no-SWR and SWR events (the
+        immobile non-local events that start inside a well visit) each: a dot
+        per animal in the event's color, the animals' mean with its 95 %
+        interval (``heldout_gain_panels.draw_animal_gain``), and a dashed line
+        at zero, equal fit. 1, the animal's place: the gain over local coding
+        around the animal, encodings held out in folds of whole trials
         (``tetrode_holdout.holdout_statistics`` of
-        ``Processed-Data/event_tetrode_holdout``,
-        ``scripts/event_evidence/score_tetrode_holdout.py``, refused when it
-        was not held out in folds of whole trials; drawn by
-        ``heldout_gain_panels.draw_split_gain``; the events summary's
-        ``*_heldout_gain_*``, ``*_heldout_spiking_gain_*`` and
-        ``*_heldout_silent_gain_*`` values).
-    j — Agreement above shuffled events: during an event, do the tetrodes
-        point to the same remote place? Each tetrode is left out of the
-        decoder's smoother in turn and scored at every bin of each event under
-        the other tetrodes' position distribution against no place preference
-        (the agreement), summed over tetrodes and bins and divided by the
-        event's spikes; minus the same score under another event's estimate of
-        the same group and fold whose width is in the same width bin (the
-        width-matched shuffled-event reference: against no place preference a
-        wide estimate scores below zero even when nothing is shared, and the
-        reference depends on the donor's width). The events are grouped
-        (``shared_content.WIDTH_BINS_CM``) by the width of the other tetrodes'
-        position estimate (``shared_content.WIDTH_COLUMN``: the 95 % HPD
-        length, the mean over the event's bins and left-out tetrodes). A dot
-        per animal for no-SWR and SWR events in their colors, beside them the
-        animals' mean with its 95 % interval, a thin line through each group's
-        means, and a dashed line at zero, no better than an unrelated event of
-        the same width (``shared_content.shared_content_statistics``,
-        ``difference``; Figure 2's supplement, panel f, draws the agreement and
-        the reference). Above, a thin strip sharing the x axis: the percent of
-        each group's events in each width bin, the mean over animals of each
-        animal's share (the mean over its epochs), with the lowest and highest
-        animal. From ``Processed-Data/event_tetrode_holdout_extra``
-        (``scripts/event_evidence/score_tetrode_holdout.py --extra-scores``),
-        refused when it was not held out in folds of whole trials or has no
-        extra scores; the events summary's ``*_shared_content_*`` values.
-        Tetrode participation (the share of tetrodes with a spike) is in
-        Figure 2's supplement.
-    k — Three decoders that differ only in when the non-local states may be
-        occupied, scored by every tetrode's one-step-ahead predictive score of
-        each bin, the whole decoder (place fields, state transitions, initial
-        conditions) fit on folds of whole trials and each fold scored under the
-        fit that did not see it: the local-only decoder (Local and No-Spike
-        states only), the SWR-only decoder (inside SWRs only the non-local
-        states are allowed, so it is forced non-local there; outside them only
-        the local states) and the full decoder (every state everywhere). Every
-        value is over the immobile bins inside a well visit, which runs from
-        the animal's first nose-poke at a reward well to its last poke-out
-        there. Unless named otherwise, each value is per epoch, summed over its
-        bins and divided by the spikes in them; a dot per animal is the median
-        over its epochs.
-        First axis: the SWR-only and the full decoder's gain over the
-        local-only decoder over every immobile bin, a dot per animal (dark
-        gray, the Non-Local state's green), the animals' mean with its 95 %
-        interval and a dashed line at zero, the local-only decoder
-        (``restriction_totals.immobile_gain_statistics``). Second axis, the
-        full minus the SWR-only decoder: over every immobile bin ("All
-        immobility", each epoch's paired difference, the same statistic), over
-        the immobile bins inside SWRs ("Inside SWRs",
-        ``restriction_totals.inside_swr_gain_statistics``: below zero, forcing
-        the non-local states there predicts the spikes better) and over the
-        immobile bins outside SWRs ("Outside SWRs", the main result, its label
-        in bold; ``restriction_totals.outside_swr_gain_statistics``), a dot per
-        animal in dark gray, the mean with its interval, a dashed line at zero
-        with which way the full decoder is better. The bins outside SWRs are
-        chosen by speed, ripple detection and the well visits alone, not by the
-        decoder: the test. Third axis, on its own scale (about ten times the
-        second's): where the gain outside SWRs sits. The same difference over
-        the bins outside SWRs of the no-SWR events detected from the held-out
-        decode (each event's value per spike, the epoch's median over its
-        events, then the animal's median over its epochs;
-        ``RestrictionFigureStatistics.events``) and over the bins outside SWRs
-        that no held-out event holds (summed per epoch as on the second axis).
-        The two reduce differently, so they show where the gain is, not one
-        quantity twice. An animal's dots are spread sideways so that each
-        shows. Figure 2's supplement (``generate_supp_figure02.py``) draws the
-        gain outside SWRs away from the SWRs. All from
+        ``Processed-Data/event_tetrode_holdout``, column ``gain_per_spike``;
+        the events summary's ``*_heldout_gain_per_spike`` values; Figure 2's
+        supplement splits it into the bins with and without a spike). 2,
+        another event's place: the fit to the decoded place minus the fit to
+        another event's decoded place of the same group, fold and width bin
+        (``Processed-Data/event_tetrode_holdout_extra``, column
+        ``agreement_minus_null_per_spike``; the events summary's
+        ``*_heldout_agreement_minus_reference_per_spike`` values; Figure 2's
+        supplement draws it by width). Both runs are refused when they were not
+        held out in folds of whole trials, the second also when it has no extra
+        scores.
+    j — Does the decoder need non-local states outside SWRs? At the left, a
+        drawing of the two decoders compared
+        (``visualization.evidence_drawings.draw_restriction_test``): the SWR-only
+        decoder (the non-local states allowed only inside SWRs, where only they
+        are allowed) and the full decoder (every state at any time), each
+        scored by every tetrode's one-step-ahead predictive score of each bin,
+        the whole decoder (place fields, state transitions, initial conditions)
+        fit on folds of whole trials and each fold scored under the fit that
+        did not see it. Every value is the full minus the SWR-only decoder over
+        immobile bins inside a well visit (the first nose-poke at a reward well
+        to the last poke-out there), per epoch, summed over its bins and
+        divided by the spikes in them, a dot per animal the median over its
+        epochs, the animals' mean with its 95 % interval, a dashed line at
+        zero, equal fit. First axis, by time: inside SWRs
+        (``restriction_totals.inside_swr_gain_statistics``: below zero, forcing
+        the non-local states there predicts the spikes better) and outside SWRs
+        (the test; ``restriction_totals.outside_swr_gain_statistics``); the bins
+        outside SWRs are chosen by speed, ripple detection and the well visits
+        alone, not by the decoder. Second axis, on its own scale: where the
+        gain outside SWRs sits, over the bins of the no-SWR events detected
+        from the held-out decode (each event's value per spike, the epoch's
+        median over its events, then the animal's median over its epochs;
+        ``RestrictionFigureStatistics.events``) and over the other bins outside
+        SWRs (summed per epoch as on the first axis). The two reduce
+        differently, so they show where the gain is, not one quantity twice.
+        The gains over the local-only decoder are in the events summary, not
+        drawn; Figure 2's supplement draws the gain outside SWRs away from the
+        SWRs. All from
         ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its time
         sums and events) by ``restriction_totals.restriction_figure_statistics``,
         which the events summary's values share.
@@ -145,7 +107,7 @@ features run the summary reads; g's between-events and running lines from
 the stored counts by the functions the events summary uses
 (``nonlocal_by_signal.animal_nonlocal_counts``,
 ``event_statistics.nonlocal_below_threshold_statistics``); i and j from the
-held-out tetrode runs over the selected events; k from the held-out event run's
+held-out tetrode runs over the selected events; j from the held-out event run's
 events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
 held-out decode that start inside a well visit, and the time inside a well
@@ -232,8 +194,6 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_source_name,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
-    RESTRICTION_FIGURE_DECODERS,
-    RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_EVENT_GROUP,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_INSIDE_SWR,
@@ -241,10 +201,6 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_OUTSIDE_SWR,
     RestrictionFigureStatistics,
     restriction_figure_statistics,
-)
-from continuum_swr_replay.analysis.event_evidence.shared_content import (
-    SharedContentStatistics,
-    shared_content_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
@@ -320,20 +276,17 @@ from continuum_swr_replay.runs.io import (
     sha256_file,
 )
 from continuum_swr_replay.runs.staleness import read_output_manifest
+from continuum_swr_replay.visualization.evidence_drawings import (
+    draw_left_out_test,
+    draw_restriction_test,
+)
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    DIFFERENCE_LABELS,
-    EVENTS_LABELS,
-    EVENTS_TITLE,
+    GROUP_COLORS,
     REFERENCE_COLOR,
-    SPLIT_LABELS,
-    draw_decoder_gain_axis,
+    WIDTH_GROUP_NAMES,
+    draw_animal_gain,
     draw_full_minus_swr_axis,
-    draw_split_gain,
-    draw_width_series,
-    draw_width_shares,
-    label_gain_axis,
-    name_width_groups,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -399,7 +352,7 @@ warnings.filterwarnings("ignore")
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
 HEIGHT = 7.86
-OUTER_HEIGHTS = (1.85, 1.9, 1.1, 1.15, 1.1)
+OUTER_HEIGHTS = (1.85, 1.88, 1.02, 1.12, 1.23)
 """The rows' heights, in proportion: a, b, c to f, then the bottom rows
 (:data:`BOTTOM_ROWS`)."""
 OUTER_HSPACE = 0.72
@@ -410,7 +363,7 @@ C_OTHER = "white"
 """Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
 mixed-state, not No-Spike)."""
 C_REFERENCE = REFERENCE_COLOR
-"""A reference level (panel k's zeros, panel g's between-events level): a neutral
+"""A reference level (panels i and j's zeros, panel g's between-events level): a neutral
 gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
 C_NO_SWR = COLORS["No SWR"]
@@ -1196,11 +1149,9 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
-DIFFERENCE_X = {name: float(k) for k, name in enumerate(DIFFERENCE_LABELS)}
-"""Panel k, second axis: the full minus the SWR-only decoder at each time of
-``DIFFERENCE_LABELS``; the main result, outside SWRs, has its label in bold (as
-panels c and d mark their key class)."""
-EVENTS_X = {name: float(k) for k, name in enumerate(EVENTS_LABELS)}
+LEFT_OUT_WIDTHS = (1.65, 1.0)
+"""Panel i's drawing and axis, in proportion within its cell."""
+LEFT_OUT_WSPACE = 0.6
 
 
 def restriction_refusal(cause: str, rerun: str) -> str:
@@ -1214,34 +1165,33 @@ def restriction_refusal(cause: str, rerun: str) -> str:
 
 
 BOTTOM_ROWS = (
-    ("traces", "ripple_power", "heldout_gain"),
-    ("shared_content", "decoder_comparison"),
+    ("traces", "ripple_power"),
+    ("left_out", "decoder_comparison"),
 )
 """The panels below row 3 by what they draw, row by row, left to right: the
-traces around event starts, where the non-local time sits in ripple power and
-the held-out tetrode gain; then the agreement above shuffled events and the
-decoder comparison, whose three axes take most of the row. The one place their order is set: the grids, the letters
-(:data:`BOTTOM_LETTERS`), the decoder comparison's bounds and the letter
-columns follow from it (the docstrings that name a panel by letter are found
-by grepping for ``BOTTOM_LETTERS`` and "panel g" to "panel k")."""
+traces around event starts and where the non-local time sits in ripple power;
+then the left-out tetrode test and the decoder comparison, each a drawing of
+its test beside its axes. The one place their order is set: the grids, the
+letters (:data:`BOTTOM_LETTERS`), the decoder comparison's bounds and the
+letter columns follow from it (the docstrings that name a panel by letter are
+found by grepping for ``BOTTOM_LETTERS`` and "panel g" to "panel j")."""
 BOTTOM_PANELS = tuple(panel for row in BOTTOM_ROWS for panel in row)
-BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghijk", strict=True))
+BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghij", strict=True))
 """Each bottom panel's letter, by its position."""
 BOTTOM_WIDTHS = {
     "traces": 1.0,
     "ripple_power": 1.0,
-    "heldout_gain": 1.05,
-    "shared_content": 1.25,
-    "decoder_comparison": 1.75,
+    "left_out": 1.6,
+    "decoder_comparison": 1.0,
 }
 """Each bottom panel's cell width, in proportion within its row; the decoder
-comparison's three axes are then placed in its space by
+comparison's drawing and two axes are then placed in its space by
 :func:`fit_axes_in_row`."""
 BOTTOM_WSPACE = 0.55
-DECODER_AXES_WIDTHS = (0.55, 1.1, 0.8)
-"""The decoder comparison's three axes' frame widths, in proportion: the
-decoders over the local-only decoder, the full minus the SWR-only decoder,
-and that difference in and outside the held-out events
+DECODER_AXES_WIDTHS = (0.8, 0.8, 0.85)
+"""The decoder comparison's frame widths, in proportion: its drawing, the full
+minus the SWR-only decoder by time (inside and outside SWRs), and that
+difference outside SWRs in and outside the held-out events
 (:func:`fit_axes_in_row`)."""
 DECODER_AXES_WSPACE = 1.0
 """The grid's first guess; :func:`fit_axes_in_row` then places the axes."""
@@ -1270,147 +1220,155 @@ first panel of each bottom row at the figure's left. The bottom rows' other
 panels sit under no letter of row 3, so each is placed by itself."""
 
 
-AGREEMENT_TITLE = "Agreement above shuffled events"
-AGREEMENT_YLABEL = "nats/spike"
-AGREEMENT_ZERO = "no better than shuffled"
-"""Panel j's name of its zero line: the agreement of an unrelated event's
-estimate of the same width."""
+LEFT_OUT_HEADING = "Do the spikes of a left-out tetrode point to the decoded place?"
+DECODER_HEADING = "Does the decoder need non-local states outside SWRs?"
+"""Panels i and j's headings, left-aligned over each panel."""
+HEADING_OFFSET_PT = 10
+"""How far above its axes' top a panel's heading sits (points), clear of the
+axes' titles."""
+FIT_YLABEL = "Better fit to the\ndecoded place\n(nats/spike)"
+FIT_GROUPS = {
+    "animal": "1  the\nanimal's\nplace",
+    "other": "2  another\nevent's\nplace",
+}
+"""Panel i's x groups: what the decoded place's fit is compared with."""
+FIT_X = {
+    ("animal", "no SWR"): 0.0,
+    ("animal", "SWR"): 0.7,
+    ("other", "no SWR"): 1.9,
+    ("other", "SWR"): 2.6,
+}
+"""Panel i: each comparison and group's x position."""
+EQUAL_FIT = "equal fit"
+"""Panels i and j's name of their zero line."""
+DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
+DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
+"""Panel j's first axis, "By time"."""
+DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime"}
+"""Panel j's second axis, "Outside SWRs"."""
 
 
-def draw_agreement_above_shuffled(
-    ax_share: Axes, ax: Axes, statistics: SharedContentStatistics
-) -> None:
-    """Panel j: the held-out agreement per spike minus the width-matched
-    shuffled-event reference, by width bin, for no-SWR and SWR events
-    (``statistics``: ``shared_content.shared_content_statistics``, its
-    ``difference``), drawn by ``heldout_gain_panels.draw_width_series``; the
-    groups named at the top right; the dashed zero line, an unrelated event's
-    estimate of the same width, named in gray (:data:`AGREEMENT_ZERO`). Above,
-    the share of each group's events in each width bin
-    (``heldout_gain_panels.draw_width_shares``)."""
-    draw_width_series(ax, statistics.difference)
-    draw_width_shares(ax_share, ax, statistics.agreement)
-    name_width_groups(ax, 0.98)
+def draw_heading(ax: Axes, text: str) -> None:
+    """A panel's heading, left-aligned at ``ax``'s left edge,
+    :data:`HEADING_OFFSET_PT` above its top."""
     ax.annotate(
-        AGREEMENT_ZERO, (0.02, 0.0),
-        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
-        xytext=(0, -3), textcoords="offset points", ha="left", va="top",
-        fontsize=SMALL_SIZE, color=C_REFERENCE, linespacing=0.95,
+        text, (0.0, 1.0), xycoords="axes fraction",
+        xytext=(0, HEADING_OFFSET_PT), textcoords="offset points",
+        ha="left", va="bottom", fontsize=SMALL_SIZE + 1,
     )  # fmt: skip
+
+
+def name_zero(ax: Axes, text: str = EQUAL_FIT) -> None:
+    """The dashed zero line's name, in gray, just above it at the axis' left."""
+    ax.annotate(
+        text, (0.02, 0.0),
+        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
+        xytext=(0, 1), textcoords="offset points", ha="left", va="bottom",
+        fontsize=SMALL_SIZE, color=C_REFERENCE,
+    )  # fmt: skip
+
+
+def draw_left_out_fit(
+    ax_drawing: Axes, ax: Axes, statistics: dict[str, pd.DataFrame]
+) -> None:
+    """Panel i: do the spikes of a left-out tetrode point to the decoded place?
+
+    Left, the test as a drawing (``evidence_drawings.draw_left_out_test``).
+    Right, one axis: how much better the left-out tetrode's spikes fit the
+    place decoded from the other tetrodes than (1) the animal's place (the
+    gain over local coding over all bins, ``statistics["animal"]``) and (2) the
+    place decoded in another event of the same group and fold (the agreement
+    minus the shuffled-event reference, all widths, ``statistics["other"]``),
+    each ``tetrode_holdout.holdout_statistics`` indexed by group: for no-SWR
+    and SWR events a dot per animal and the animals' mean with its 95 %
+    interval, the groups named in their colors, a dashed zero line named
+    :data:`EQUAL_FIT`. The heading (:data:`LEFT_OUT_HEADING`) sits over the
+    drawing."""
+    draw_left_out_test(ax_drawing)
+    draw_heading(ax_drawing, LEFT_OUT_HEADING)
+    for (comparison, group), x in FIT_X.items():
+        draw_animal_gain(
+            ax, x, statistics[comparison].loc[group], GROUP_COLORS[group], spread=True
+        )
+    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
+    name_zero(ax)
+    centers = [
+        np.mean([x for (c, _), x in FIT_X.items() if c == comparison]) + 0.12
+        for comparison in FIT_GROUPS
+    ]
+    ax.set_xticks(centers, list(FIT_GROUPS.values()))
+    ax.set_xlim(-0.4, max(FIT_X.values()) + 0.6)
     low, high = ax.get_ylim()
-    # room below the zero line for its name
-    ax.set_ylim(min(low, -0.45 * high), high)
-    ax_share.set_title(AGREEMENT_TITLE, fontsize=SMALL_SIZE, pad=3)
-    ax.set_ylabel(AGREEMENT_YLABEL)
+    ax.set_ylim(min(low, -0.12 * high), high * 1.15)
+    for k, (group, color) in enumerate(GROUP_COLORS.items()):
+        ax.text(
+            0.99, 0.99 - 0.1 * k, WIDTH_GROUP_NAMES[group], ha="right", va="top",
+            transform=ax.transAxes, fontsize=SMALL_SIZE,
+            color=readable_text_color(color),
+        )  # fmt: skip
+    ax.set_ylabel(FIT_YLABEL)
 
 
-HELDOUT_GAIN_TITLE = "Held-out tetrode"
-HELDOUT_GAIN_YLABEL = "Held-out gain\nover local (nats/spike)"
+def draw_decoder_need(
+    ax_drawing: Axes,
+    ax_time: Axes,
+    ax_outside: Axes,
+    statistics: RestrictionFigureStatistics,
+) -> None:
+    """Panel j: does the decoder need non-local states outside SWRs?
 
-
-def draw_heldout_tetrode(ax: Axes, statistics: dict) -> None:
-    """Panel i: the held-out tetrode gain over local coding per spike, by
-    group, over all bins, the bins with a spike and the silent bins
-    (``statistics``: ``tetrode_holdout.holdout_statistics`` of each column of
-    ``heldout_gain_panels.SPLIT_LABELS``, indexed by group), drawn by
-    ``heldout_gain_panels.draw_split_gain``."""
-    draw_split_gain(ax, statistics, HELDOUT_GAIN_TITLE)
-    rows = [table.loc[group] for table in statistics.values() for group in table.index]
-    low = min(min(float(np.min(r["animals"])), r["ci_low"]) for r in rows)
-    high = max(max(float(np.max(r["animals"])), r["ci_high"]) for r in rows)
-    label_gain_axis(
-        ax, HELDOUT_GAIN_YLABEL, floor=min(-0.12, low - 0.08 * (high - low))
-    )
-    ax.set_ylim(None, high + 0.15 * (high - low))  # room for the groups' names
-
-
-def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel k, first axis: the SWR-only and full decoders' gains over the
-    local-only decoder per spike of the immobile time inside a well visit
-    (``restriction_totals.immobile_gain_statistics``,
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`),
-    drawn by ``heldout_gain_panels.draw_decoder_gain_axis``.
-
-    Parameters
-    ----------
-    ax : Axes
-    statistics : pd.DataFrame
-        ``immobile_gain_statistics``' rows, indexed by ``family`` and
-        ``measure``.
-    """
-    draw_decoder_gain_axis(
-        ax,
-        {
-            measure: statistics.loc[(RESTRICTION_FIGURE_FAMILY, measure)]
-            for measure in RESTRICTION_FIGURE_DECODERS
-        },
-    )
-
-
-def draw_full_minus_swr(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
-    """Panel k, second axis: the full decoder minus the SWR-only decoder per
-    spike, over all the immobile time inside a well visit (each epoch's paired
-    difference, ``restriction_totals.immobile_gain_statistics``'
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DIFFERENCE`),
-    over its bins inside SWRs (``restriction_totals.inside_swr_gain_statistics``'
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_INSIDE_SWR`)
-    and over its bins outside SWRs
-    (``restriction_totals.outside_swr_gain_statistics``'
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_OUTSIDE_SWR`).
-
-    For each, a dot per animal (the median over its epochs, spread sideways)
-    in a neutral dark gray and the animals' mean with its 95 % interval, with
-    a dashed line at zero, where the two decoders predict the spikes equally
-    well, and which way the full decoder is better. The main result, outside
-    SWRs, has its label in bold. Inside SWRs the SWR-only decoder must be
-    non-local and the full decoder need not, so a value below zero there says
-    that forcing the non-local states inside SWRs predicts those spikes
-    better.
-    """
+    Left, the two decoders as a drawing
+    (``evidence_drawings.draw_restriction_test``). Then two axes of how much
+    better the decoder with the non-local states at any time predicts the
+    spikes than the one with them only in SWRs (the full minus the SWR-only
+    decoder per spike, held-out score): "By time", over the immobile bins
+    inside SWRs and outside SWRs inside a well visit
+    (``restriction_totals.inside_swr_gain_statistics``,
+    ``outside_swr_gain_statistics``); "Outside SWRs", over the bins outside
+    SWRs of the no-SWR events detected from the held-out decode and over the
+    rest of that time (``RestrictionFigureStatistics.events``,
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_OUTSIDE_EVENTS`).
+    Each a dot per animal (the median over its epochs) and the animals' mean
+    with its 95 % interval, a dashed zero line named :data:`EQUAL_FIT`; the
+    second axis on its own scale (about ten times the first's). The heading
+    (:data:`DECODER_HEADING`) sits over the drawing."""
+    draw_restriction_test(ax_drawing)
+    draw_heading(ax_drawing, DECODER_HEADING)
     family = RESTRICTION_FIGURE_FAMILY
-    rows = {
-        "all": statistics.decoders.loc[(family, RESTRICTION_FIGURE_DIFFERENCE)],
-        "inside_swr": statistics.inside.loc[(family, RESTRICTION_FIGURE_INSIDE_SWR)],
-        "outside_swr": statistics.outside.loc[(family, RESTRICTION_FIGURE_OUTSIDE_SWR)],
-    }
-    draw_full_minus_swr_axis(
-        ax, [DIFFERENCE_X[name] for name in rows], list(rows.values()), 1.08
-    )
-    ax.set_xlim(-0.45, max(DIFFERENCE_X.values()) + 0.5)
-    ax.set_xticks(list(DIFFERENCE_X.values()), list(DIFFERENCE_LABELS.values()))
-    ax.get_xticklabels()[list(DIFFERENCE_X).index("outside_swr")].set_fontweight("bold")
-
-
-def draw_heldout_event_gain(ax: Axes, statistics: RestrictionFigureStatistics) -> None:
-    """Panel k, third axis: where the gain outside SWRs sits. The full decoder
-    minus the SWR-only decoder per spike over the bins outside SWRs of the
-    no-SWR events detected from the held-out decode
-    (``RestrictionFigureStatistics.events``, group
-    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_EVENT_GROUP`:
-    each event's value, each epoch's median over its events, each animal's
-    median over its epochs), and over the immobile bins outside SWRs that no
-    held-out event holds
-    (:data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_OUTSIDE_EVENTS`,
-    summed over the epoch's bins, each animal's median over its epochs).
-
-    Drawn as the second axis is, on its own y axis: the gain in the events is
-    about ten times the other values. The two columns reduce over events and
-    over time differently (a median over events against a sum over bins), so
-    they show where the gain sits, not two estimates of one quantity.
-    """
-    rows = {
-        "in_events": statistics.events.loc[RESTRICTION_FIGURE_EVENT_GROUP],
-        "outside_events": statistics.outside.loc[
-            (RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_OUTSIDE_EVENTS)
-        ],
-    }
-    draw_full_minus_swr_axis(
-        ax, [EVENTS_X[name] for name in rows], list(rows.values()), 1.08
-    )
-    ax.set_xlim(-0.45, max(EVENTS_X.values()) + 0.5)
-    ax.set_xticks(list(EVENTS_X.values()), list(EVENTS_LABELS.values()))
-    ax.set_ylabel("")
-    ax.set_title(EVENTS_TITLE, fontsize=SMALL_SIZE, pad=3)
+    for ax, rows, title in (
+        (
+            ax_time,
+            {
+                "inside_swr": statistics.inside.loc[
+                    (family, RESTRICTION_FIGURE_INSIDE_SWR)
+                ],
+                "outside_swr": statistics.outside.loc[
+                    (family, RESTRICTION_FIGURE_OUTSIDE_SWR)
+                ],
+            },
+            "By time",
+        ),
+        (
+            ax_outside,
+            {
+                "in_events": statistics.events.loc[RESTRICTION_FIGURE_EVENT_GROUP],
+                "outside_events": statistics.outside.loc[
+                    (family, RESTRICTION_FIGURE_OUTSIDE_EVENTS)
+                ],
+            },
+            "Outside SWRs",
+        ),
+    ):
+        labels = DECODER_TIMES if ax is ax_time else DECODER_OUTSIDE
+        xs = [float(k) for k in range(len(rows))]
+        draw_full_minus_swr_axis(
+            ax, xs, list(rows.values()), 1.08, ylabel="", cue=False
+        )
+        name_zero(ax)
+        ax.set_xlim(-0.45, xs[-1] + 0.6)
+        ax.set_xticks(xs, [labels[name] for name in rows])
+        ax.set_title(title, fontsize=SMALL_SIZE, pad=3)
+    ax_time.set_ylabel(DECODER_YLABEL)
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1752,7 +1710,6 @@ def generate_figure(
     )
     require_extra_columns(holdout_table, rel(holdout_dir))
     holdout = window_scores(holdout_table)
-    shared = shared_content_statistics(holdout[holdout["kind"] == "event"])
     # the canonical held-out tetrode run, as the events summary reads it: the
     # gain over local coding of the events
     canonical_dir = data_dir / EVENT_TETRODE_HOLDOUT_DIR
@@ -1765,12 +1722,12 @@ def generate_figure(
             events["event_id"],
         )
     )
-    tetrode_gain = {
-        column: holdout_statistics(canonical, "event", column)
-        for column in SPLIT_LABELS
+    left_out_fit = {
+        "animal": holdout_statistics(canonical, "event", "gain_per_spike"),
+        "other": holdout_statistics(holdout, "event", "agreement_minus_null_per_spike"),
     }
     # the events summary's restriction inputs: the same runs, cohorts, time
-    # steps and subset; panel k draws the fold fit on whole trials, and only
+    # steps and subset; panel j draws the fold fit on whole trials, and only
     # from a held-out event run made from the restriction run and the per-bin
     # facts run as they are now, with facts made from the current session
     # cache, and from a restriction run made from the current decode frames
@@ -1839,14 +1796,12 @@ def generate_figure(
         *(fig.add_subplot(triggered[r], sharex=ax_ripple) for r in (1, 2, 3)),
     ]
     draw_triggered(triggered_axes, inputs["triggered_curves"], reference)
-    shared_grid = cells["shared_content"].subgridspec(
-        2, 1, height_ratios=[1.0, 2.6], hspace=0.25
+    left_out_grid = cells["left_out"].subgridspec(
+        1, 2, width_ratios=LEFT_OUT_WIDTHS, wspace=LEFT_OUT_WSPACE
     )
-    ax_shared_strip = fig.add_subplot(shared_grid[0])
-    ax_shared = fig.add_subplot(shared_grid[1])
-    draw_agreement_above_shuffled(ax_shared_strip, ax_shared, shared)
-    ax_gain = fig.add_subplot(cells["heldout_gain"])
-    draw_heldout_tetrode(ax_gain, tetrode_gain)
+    ax_left_out_drawing = fig.add_subplot(left_out_grid[0])
+    ax_left_out = fig.add_subplot(left_out_grid[1])
+    draw_left_out_fit(ax_left_out_drawing, ax_left_out, left_out_fit)
     power_grid = cells["ripple_power"].subgridspec(
         2, 1, height_ratios=[1.0, 1.6], hspace=0.2
     )
@@ -1856,18 +1811,15 @@ def generate_figure(
     decoder_grid = cells["decoder_comparison"].subgridspec(
         1, 3, width_ratios=DECODER_AXES_WIDTHS, wspace=DECODER_AXES_WSPACE
     )
-    ax_decoders, ax_difference, ax_events = (
+    ax_decoder_drawing, ax_time, ax_outside = (
         fig.add_subplot(decoder_grid[k]) for k in range(3)
     )
-    draw_decoder_gains(ax_decoders, restriction.decoders)
-    draw_full_minus_swr(ax_difference, restriction)
-    draw_heldout_event_gain(ax_events, restriction)
+    draw_decoder_need(ax_decoder_drawing, ax_time, ax_outside, restriction)
     bottom_axes = {
         "traces": triggered_axes,
-        "shared_content": [ax_shared_strip, ax_shared],
-        "heldout_gain": [ax_gain],
+        "left_out": [ax_left_out_drawing, ax_left_out],
         "ripple_power": [ax_spread, ax_share],
-        "decoder_comparison": [ax_decoders, ax_difference, ax_events],
+        "decoder_comparison": [ax_decoder_drawing, ax_time, ax_outside],
     }
 
     fig.canvas.draw()

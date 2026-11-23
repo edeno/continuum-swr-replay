@@ -64,7 +64,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   probabilities, with which held-out and canonical events share a bin and the
   bins summed by category, well visit and held-out event window
   (``Processed-Data/event_nonlocal_restriction_heldout_events``, from
-  ``scripts/event_evidence/detect_heldout_events.py``, which Figure 2k draws);
+  ``scripts/event_evidence/detect_heldout_events.py``, which Figure 2j draws);
   each bin's spikes and well-visit flag from ``Processed-Data/event_bin_facts``
   (``scripts/event_evidence/measure_bin_facts.py``); summarized by
   ``analysis.event_evidence.restriction_windows``,
@@ -159,8 +159,6 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
     OUTSIDE_SWR_EVENT_WINDOWS,
-    RESTRICTION_FIGURE_DECODERS,
-    RESTRICTION_FIGURE_DIFFERENCE,
     RESTRICTION_FIGURE_EVENT_GROUP,
     RESTRICTION_FIGURE_FAMILY,
     RESTRICTION_FIGURE_INSIDE_SWR,
@@ -299,26 +297,28 @@ TAGS = {
     "gamma_z": Tags(("2d.8",), ("S3",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
-    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("S2h",)),
-    "class_step_evidence": Tags(("2b.5",), ("S2h",)),
+    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("S2i",)),
+    "class_step_evidence": Tags(("2b.5",), ("S2i",)),
     "nonlocal_power": Tags(("2b.5",), ("2h",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
     "rule_sweep": Tags(("2a.5",), ("S2c",)),
     "rule_sweep_pooled": Tags(("2a.5",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
-    "participation": Tags(("2d.9",), ("S2g",)),
+    "participation": Tags(("2d.9",), ("S2h",)),
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("2i",)),
+    "tetrode_holdout": Tags(("2c.3",), ("2i", "S2f")),
+    "tetrode_holdout_split": Tags(("2c.3",), ("S2f",)),
     "tetrode_holdout_text": Tags(("2c.3",)),
+    "tetrode_holdout_extra_figure": Tags(("2c.3",), ("2i",)),
     "nonlocal_restriction": Tags(("2c.3",)),
-    "nonlocal_restriction_figure": Tags(("2c.3",), ("2k",)),
-    "shared_content": Tags(("2c.3",), ("2j",)),
-    "shared_content_raw": Tags(("2c.3",), ("S2f",)),
+    "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
+    "shared_content": Tags(("2c.3",), ("S2g",)),
+    "shared_content_raw": Tags(("2c.3",), ("S2g",)),
     "shared_content_text": Tags(("2c.3",)),
-    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2i",)),
-    "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2l",)),
+    "nonlocal_restriction_distance": Tags(("2c.3",), ("S2j",)),
+    "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2m",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -331,7 +331,7 @@ TAGS = {
     "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",)),
-    "content_distance": Tags(("2d.1",), ("S2k",)),
+    "content_distance": Tags(("2d.1",), ("S2l",)),
     "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
@@ -378,7 +378,7 @@ one well visit (``event_evidence.participation.CONTROL_RULE``)."""
 
 CANONICAL_WINDOWS_SUBSET = (
     "the canonical events, chosen from the decode fit on the whole epoch (the "
-    "scores are held out; the choice of events is not; Figure 2k's values use "
+    "scores are held out; the choice of events is not; Figure 2j's values use "
     f"the events detected from the held-out decode instead): {CONTROL_SUBSET}"
 )
 """What the restriction values over the canonical windows are over
@@ -2051,7 +2051,7 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.9: tetrode participation and spike rate of the events against
-    Local-rest windows of their length (Figure 2's supplement, panel S2g, shows
+    Local-rest windows of their length (Figure 2's supplement, panel S2h, shows
     the participation)."""
     makers = {
         "participation": value_factory(
@@ -2255,9 +2255,14 @@ _CONTROL_AGREEMENT = (
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding and the
     agreement, per spike, of the events and their Local-rest controls. The
-    gain is drawn on Figure 2i and carries its tag; the
-    agreement is drawn on no figure."""
+    events' gain is drawn on Figure 2i (the fit to the decoded place over the
+    animal's place) and, with its parts in the bins with and without a spike,
+    on Figure 2's supplement (S2f), and carries their tags; the controls' gain
+    and the agreement are drawn on no figure."""
     make_figure = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
+    make_split = value_factory(
+        tetrode_holdout_values, source, TAGS["tetrode_holdout_split"]
+    )
     make_text = value_factory(
         tetrode_holdout_values, source, TAGS["tetrode_holdout_text"]
     )
@@ -2273,7 +2278,12 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     for name, measure, kind, label in estimates:
         column, words = _TETRODE_MEASURES[measure]
         note = _CONTROL_AGREEMENT if (measure, kind) == ("agreement", "control") else ""
-        make = make_text if measure == "agreement" else make_figure
+        if measure == "agreement" or kind == "control":
+            make = make_text
+        elif name == "gain":
+            make = make_figure
+        else:
+            make = make_split
         statistics = tetrode_holdout.holdout_statistics(windows, kind, column)
         for word, group in _RUN_GROUPS.items():
             row = statistics.loc[group]
@@ -2346,7 +2356,7 @@ _EXTRA_RUN = (
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2j: during an event, do the tetrodes point to
+    """Question 2c.3 and Figure 2's supplement (S2g): during an event, do the tetrodes point to
     the same remote place? Over the events of each SWR group by the width of
     the other tetrodes' position distribution in fixed bins
     (``shared_content.shared_content_statistics``, on ``windows`` of a run with
@@ -2356,10 +2366,11 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     ``shared_content.width_matched``), each with its interval, and the
     matched windows; the share of events whose agreement is above zero; and
     the share of the group's events in the bin, each animal's then their mean
-    with the lowest and highest animal, and pooled. Figure 2j draws the
-    difference and the animals' shares, with the counts (its tag); Figure 2's
-    supplement, panel f, draws the agreement and the reference (S2f); the
-    pooled share is for the text."""
+    with the lowest and highest animal, and pooled. Figure 2's supplement,
+    panel g, draws the difference and the animals' shares, with the counts, and
+    the agreement and the reference (S2g); the pooled share is for the text
+    (Figure 2i draws the difference over all widths, from
+    :func:`tetrode_holdout_extra_values`)."""
     make = value_factory(shared_content_values, source, TAGS["shared_content"])
     make_raw = value_factory(shared_content_values, source, TAGS["shared_content_raw"])
     make_text = value_factory(
@@ -2545,9 +2556,14 @@ def tetrode_holdout_extra_values(windows: pd.DataFrame, source: str) -> list[Val
     information of the scored spikes in the events, in their Local-rest
     controls and the event minus its control
     (``low_rate_places.event_minus_control``), by group, with the statistic of
-    the neighboring held-out tetrode values. No figure draws these."""
+    the neighboring held-out tetrode values. Figure 2i draws the agreement minus
+    the reference (the fit to the decoded place over another event's place)
+    and carries its tag; no figure draws the others."""
     make = value_factory(
         tetrode_holdout_extra_values, source, TAGS["tetrode_holdout_text"]
+    )
+    make_figure = value_factory(
+        tetrode_holdout_extra_values, source, TAGS["tetrode_holdout_extra_figure"]
     )
     reduction = (
         "mean over animals of each animal's median over epochs of each epoch's median"
@@ -2578,7 +2594,7 @@ def tetrode_holdout_extra_values(windows: pd.DataFrame, source: str) -> list[Val
                 row = statistics.loc[group]
                 if name == "agreement_minus_reference":
                     values += _interval_and_animals_positive(
-                        make, key, row, description
+                        make_figure, key, row, description
                     )
                 else:
                     values += _per_spike_interval(make, key, row, description)
@@ -3065,7 +3081,7 @@ def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str
 
 @dataclass(frozen=True)
 class HeldoutRestriction:
-    """The held-out event run's inputs to the restriction values and Figure 2k
+    """The held-out event run's inputs to the restriction values and Figure 2j
     (:func:`read_heldout_restriction`), and why a value read from them is
     pending (each None when it is not)."""
 
@@ -3476,7 +3492,7 @@ def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list
     events that overlap one, in :data:`RESTRICTION_FIGURE_FAMILY`
     (:data:`OUTSIDE_SWR_EVENT_WINDOWS`); with the events of each group, those with a
     value and those with bins outside SWRs but no spike in them. The gain per
-    spike in the events with no SWR is drawn on Figure 2k's third axis
+    spike in the events with no SWR is drawn on Figure 2j's second axis
     (``restriction_totals.RestrictionFigureStatistics.events``) and carries its
     tag, the counts with it; the rest is for the text."""
     make_text = value_factory(
@@ -3635,8 +3651,8 @@ def restriction_outside_swr_values(
     marks every held-out event, wherever it starts). The gain per spike and
     the three shares (in the no-SWR events, in the time outside the SWR of the
     events that overlap one, and the rest outside those events) in
-    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2k and carries its
-    tag, as does the gain per spike outside every held-out event (its third
+    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2j and carries its
+    tag, as does the gain per spike outside every held-out event (its second
     axis); the shares are for the text."""
     make_text = value_factory(
         restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
@@ -3786,7 +3802,7 @@ def restriction_outside_swr_part_values(
     which every value outside SWRs leaves out
     (``restriction_totals.outside_swr_not_observed_counts``). The gains per
     spike in :data:`RESTRICTION_FIGURE_FAMILY` away from the SWRs are drawn on
-    Figure 2's supplement and carry its panel's tag (S2i); the gain at
+    Figure 2's supplement and carry its panel's tag (S2j); the gain at
     well-sampled places is for the text."""
     make = value_factory(
         restriction_outside_swr_part_values, source, TAGS["nonlocal_restriction"]
@@ -3880,7 +3896,7 @@ def restriction_inside_swr_values(
     immobile time inside SWRs inside a well visit, per spike and per second,
     with the statistic, interval and epoch counts of the gain outside SWRs
     (``restriction_totals.inside_swr_gain_statistics``). The gain per spike in
-    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2k's second axis and
+    :data:`RESTRICTION_FIGURE_FAMILY` is drawn on Figure 2j's first axis and
     carries its tag; the rest is for the text."""
     make_text = value_factory(
         restriction_inside_swr_values, source, TAGS["nonlocal_restriction"]
@@ -3920,20 +3936,15 @@ def restriction_immobile_values(
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
-    decoder captures. The gains per spike over the local-only decoder and
-    their paired difference in :data:`RESTRICTION_FIGURE_FAMILY` are drawn on
-    Figure 2k and carry that panel's tag, with the epoch counts; the share
-    captured is for the text."""
+    decoder captures. No panel of Figure 2 draws these (Figure 2's supplement,
+    panel m, draws the decoders over the local-only decoder of the run with
+    the fourth decoder)."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
-    )
-    make_figure = value_factory(
-        restriction_immobile_values, source, TAGS["nonlocal_restriction_figure"]
     )
     statistics = restriction_totals.immobile_gain_statistics(
         restriction_totals.epoch_immobile_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    drawn = (*RESTRICTION_FIGURE_DECODERS, RESTRICTION_FIGURE_DIFFERENCE)
     values = []
     for family, suffix in FAMILY_SUFFIX.items():
         scored = (
@@ -3943,10 +3954,9 @@ def restriction_immobile_values(
         for unit, divided, words in _RESTRICTION_UNITS:
             for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr"):
                 measure = f"{contrast}_{unit}"
-                figure = family == RESTRICTION_FIGURE_FAMILY and measure in drawn
                 a, b = restriction_windows.CONTRASTS[contrast]
                 values += _interval_and_animals_positive(
-                    make_figure if figure else make_text,
+                    make_text,
                     f"restriction_immobile_{contrast}{suffix}_{unit}",
                     statistics.loc[(family, measure)],
                     f"{scored}, under {_RESTRICTION_MODELS[a]} minus under "
@@ -3954,10 +3964,9 @@ def restriction_immobile_values(
                     f"{_EPOCH_REDUCTION}",
                     unit=words,
                 )
-        row = statistics.loc[(family, RESTRICTION_FIGURE_DIFFERENCE)]
-        make = make_figure if family == RESTRICTION_FIGURE_FAMILY else make_text
+        row = statistics.loc[(family, "full_minus_swr_per_spike")]
         values.append(
-            make(
+            make_text(
                 f"restriction_immobile_epochs_full_above_swr_only{suffix}",
                 row["n_epochs_full_above_swr_only"],
                 "count",
@@ -3976,9 +3985,9 @@ def restriction_immobile_values(
             f"{_RESTRICTION_MODELS['none']} as a share of the gain of "
             f"{_RESTRICTION_MODELS['full']} over it: {_EPOCH_REDUCTION}",
         )
-    row = statistics.loc[(RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_DIFFERENCE)]
+    row = statistics.loc[(RESTRICTION_FIGURE_FAMILY, "full_minus_swr_per_spike")]
     values.append(
-        make_figure(
+        make_text(
             "restriction_immobile_epochs",
             row["n_epochs"],
             "count",
@@ -4023,7 +4032,7 @@ def restriction_swr_allowed_values(
     (``windows``, those that start inside a well visit), with the events and
     those with a value. The values Figure 2's supplement draws on its
     fourth-decoder panel (``restriction_totals.SWR_ALLOWED_FIGURE_*``, in
-    :data:`RESTRICTION_FIGURE_FAMILY` per spike) carry its tag (S2l); the rest
+    :data:`RESTRICTION_FIGURE_FAMILY` per spike) carry its tag (S2m); the rest
     is for the text."""
     make_text = value_factory(
         restriction_swr_allowed_values, source, TAGS["nonlocal_restriction"]
@@ -4129,7 +4138,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs. No figure draws these: the dip test has no power
     at the observed separation (the analysis's simulation), so Figure 2's
-    supplement, panel S2h, draws the step test.
+    supplement, panel S2i, draws the step test.
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
     stats = event_statistics.peak_ripple_mode_statistics(
@@ -4535,7 +4544,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     This is the value over the properties other than spike evidence, which are
     read from the event table and the event features run;
     :func:`class_step_evidence_values` holds spike evidence's. Figure 2's
-    supplement, panel S2h, draws the animals with a step per property.
+    supplement, panel S2i, draws the animals with a step per property.
     """
     most, attaining = event_statistics.most_steps(
         _step_statistics(steps), list(OTHER_STEP_PROPERTIES)
@@ -4870,7 +4879,7 @@ _DISTANCE_BANDS = {
 
 
 def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.1 and the distance panel of Figure 2's supplement (S2k): for
+    """Question 2d.1 and the distance panel of Figure 2's supplement (S2l): for
     each class, the share of the events whose content lies under 20 cm, 20 to
     100 cm, and 100 cm or more from the animal (the mean over the event's bins
     of the absolute distance along the track of the decoded place from the
@@ -5586,7 +5595,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),
         selected,
     )
-    # the held-out tetrode run with its extra scores (Figure 2j, the parts of
+    # the held-out tetrode run with its extra scores (Figure 2i, the parts of
     # the evidence and the low-rate events): held out as the canonical run is,
     # and with the extra columns
     require_tetrode_holdout_folds(
@@ -5768,7 +5777,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     restriction_dir = inputs.nonlocal_restriction
     restriction_windows_dir = inputs.nonlocal_restriction_windows
     heldout_dir = inputs.nonlocal_restriction_heldout_events
-    # the held-out event run (Figure 2k): its events that start inside a well
+    # the held-out event run (Figure 2j): its events that start inside a well
     # visit, its time sums and time steps, and why a value read from them is
     # pending; a restriction run of the earlier design is refused (the window
     # and held-out event runs must have read this run, staleness below)
