@@ -28,7 +28,7 @@ def fork_calls(path: Path) -> list[int]:
             isinstance(a, ast.Constant) and a.value == "fork" for a in arguments
         ):
             lines.append(node.lineno)
-    return lines
+    return sorted(lines)
 
 
 def test_no_code_starts_a_fork_pool():
