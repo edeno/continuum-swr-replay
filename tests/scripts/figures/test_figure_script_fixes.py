@@ -2039,16 +2039,17 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
         "RESTRICTION_FIGURE_OUTSIDE_SWR",
     ):
         assert getattr(events, name) is getattr(restriction_totals, name), name
-    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
-    # panel i: the gain over local coding (with its split in the supplement)
+    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2k",)
+    # panel j: the gain over local coding (with its split in the supplement)
     # and the agreement minus the reference of the run with its extra scores
-    assert events.TAGS["tetrode_holdout"].figures == ("2i", "S2f")
-    assert events.TAGS["tetrode_holdout_extra_figure"].figures == ("2i",)
+    assert events.TAGS["tetrode_holdout"].figures == ("2j", "S2h")
+    assert events.TAGS["tetrode_holdout_extra_figure"].figures == ("2j",)
+    # panel h, participation, and panel i, ripple power
+    assert events.TAGS["participation"].figures == ("2h",)
+    assert events.TAGS["nonlocal_power"].figures == ("2i",)
     # Figure 2's supplement, panel by panel
     # (each panel's tag: test_generate_supp_figure02)
-    assert events.TAGS["shared_content"].figures == ("S2g",)
-    assert events.TAGS["participation"].figures == ("S2h",)
-    assert events.TAGS["nonlocal_power"].figures == ("2h",)
+    assert events.TAGS["shared_content"].figures == ("S2i",)
     # panel e's detectors are the analysis layer's, whose found shares the
     # summary tags with the panel
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
@@ -2129,6 +2130,8 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(
         figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
     )
+    # panel c's distribution is the analysis layer's, tested there
+    monkeypatch.setattr(figure, "content_distance_distribution", lambda events: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
@@ -2226,6 +2229,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "window_scores": lambda table: table.assign(kind="event"),
         "require_extra_columns": lambda table, what: None,
         "holdout_statistics": lambda windows, kind, column: None,
+        "read_participation": lambda folder, epochs, event_ids: None,
         "well_visit_times": lambda identifier: None,
         "check_visit_context_starts": lambda table, visits: None,
         "restriction_inputs_note": lambda folder, epochs: None,
@@ -2365,7 +2369,7 @@ def test_figure02_refuses_a_restriction_run_off_the_current_decodes_or_swr_sourc
     with pytest.raises(ValueError) as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert str(refused.value) == (
-        "the decoder comparison (panel j) is not drawn: the restriction run "
+        "the decoder comparison (panel k) is not drawn: the restriction run "
         "records another SWR source. "
         "Rerun scripts/event_evidence/score_nonlocal_restriction.py and the runs "
         "made from it."
@@ -2626,3 +2630,115 @@ GAIN_SPLIT = {
     "silent_gain_per_spike": ([0.2, 0.25, 0.15, 0.2, 0.2], [0.25, 0.3, 0.3, 0.2, 0.3]),
 }
 """Figure 2's supplement, panel f: each part's animals, no SWR then SWR."""
+
+
+PARTICIPATION = {
+    ("no SWR", "control"): [0.3, 0.35, 0.4, 0.27, 0.33],
+    ("no SWR", "event"): [0.5, 0.55, 0.6, 0.45, 0.48],
+    ("SWR", "control"): [0.45, 0.5, 0.36, 0.48, 0.42],
+    ("SWR", "event"): [0.7, 0.8, 0.66, 0.72, 0.68],
+}
+"""The participation panel's animals: each group's controls and events."""
+
+
+def _participation() -> pd.DataFrame:
+    """``participation_statistics``' rows indexed by group and kind."""
+    rows = {
+        key: {
+            "participation_animals": np.asarray(values),
+            "animal_names": np.array(list("abcde")),
+        }
+        for key, values in PARTICIPATION.items()
+    }
+    table = pd.DataFrame.from_dict(rows, orient="index")
+    table.index.names = ["group", "kind"]
+    return table
+
+
+def test_figure02_participation_panel_joins_each_animals_rest_to_its_events(offline):
+    """Figure 2h: for no-SWR then SWR events, one line per animal from its Local-rest
+    controls to its events, the controls in the Local state's color and the
+    events in their class's, in percent."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    figure = offline("scripts.figures.generate_figure02")
+    fig, ax = plt.subplots()
+    figure.draw_participation(ax, _participation())
+    for group, color in panels.GROUP_COLORS.items():
+        rest_x, event_x = figure.REST_EVENT_X[group]
+        for x, kind, dot_color in (
+            (rest_x, "control", figure.COLORS["Local"]),
+            (event_x, "event", color),
+        ):
+            (dots,) = [
+                c for c in ax.collections
+                if isinstance(c, matplotlib.collections.PathCollection)
+                and np.allclose(c.get_offsets()[:, 0], x)
+            ]  # fmt: skip
+            np.testing.assert_allclose(
+                dots.get_offsets()[:, 1], 100 * np.asarray(PARTICIPATION[(group, kind)])
+            )
+            np.testing.assert_allclose(dots.get_facecolor()[0], to_rgba(dot_color))
+        pairs = [
+            line for line in ax.lines
+            if np.allclose(line.get_xdata(), (rest_x, event_x))
+        ]  # fmt: skip
+        assert len(pairs) == 5
+    assert ax.get_ylabel() == "Tetrodes active (%)"
+    assert [t.get_text() for t in ax.get_xticklabels()] == [
+        "Local\nrest", "No\nSWR", "Local\nrest", "SWR",
+    ]  # fmt: skip
+    plt.close(fig)
+
+
+def _distance() -> pd.DataFrame:
+    """``content_distance_distribution`` of the distance test's events."""
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        content_distance_distribution,
+    )
+    from tests.analysis.event_properties.test_event_statistics import (
+        _distance_events,
+    )
+
+    return content_distance_distribution(_distance_events())
+
+
+def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_class(
+    offline,
+):
+    """Figure 3's supplement, panel c: for each class, the percent of events within each distance (the bins
+    summed), a thin line per animal and their mean in bold, in the class's
+    color, on a log x axis; dotted lines at 20 cm and 100 cm; the classes
+    named in their colors; a y axis from 0 to 100."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    distribution = _distance()
+    fig, ax = plt.subplots()
+    figure.draw_content_distance(ax, distribution)
+    n_bins = len(figure.DISTANCE_BIN_EDGES_CM) - 1
+    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
+    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
+    for group, color in panels.GROUP_COLORS.items():
+        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
+        mean = max(mine, key=lambda c: c.get_linewidth())
+        within = (
+            distribution[distribution["group"] == group]
+            .pivot(index="bin_high", columns="animal", values="percent")
+            .cumsum()
+        )
+        np.testing.assert_allclose(mean.get_xdata(), within.index.to_numpy())
+        np.testing.assert_allclose(mean.get_ydata(), within.mean(axis=1).to_numpy())
+        assert (np.diff(mean.get_ydata()) >= 0).all()
+    assert ax.get_xscale() == "log"
+    assert ax.get_ylim() == (0, 100)
+    cuts = [line.get_xdata()[0] for line in ax.lines if line.get_linestyle() == ":"]
+    assert cuts == [20.0, 100.0]
+    assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
+    plt.close(fig)

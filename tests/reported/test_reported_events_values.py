@@ -157,33 +157,64 @@ def test_state_fraction_values_name_each_movement_and_state():
             assert value.figures == builder.TAGS["state_fractions"].figures
 
 
-def test_calibration_values_are_each_bin_s_median_over_sessions_in_order():
+def test_calibration_values_are_each_bins_mean_over_animals_of_session_means():
+    """Animal a has two sessions, with distances 10 - k and 20 - k in bin k:
+    its value is 15 - k; animal b has one, 5 - k/2. The value is the mean over
+    animals, not over the three sessions pooled, with the smallest and largest
+    animal."""
     centers = (np.arange(10) + 0.5) / 10
-    # three sessions; in bin k the errors are 10 - k, 10 - k + 1 and 30: the
-    # median is 10 - k + 1, the mean would be larger
-    calibration = pd.DataFrame(
-        {
-            "prob_bin_center": np.repeat(centers, 3),
-            "median_error_cm": np.concatenate(
-                [[10.0 - k, 11.0 - k, 30.0] for k in range(10)]
-            ),
-        }
-    ).sample(frac=1.0, random_state=0)
+    rows = [
+        {"animal": animal, "day": 1, "epoch": epoch, "prob_bin_center": c,
+         "median_error_cm": value(k)}
+        for animal, epoch, value in (
+            ("a", 1, lambda k: 10.0 - k),
+            ("a", 2, lambda k: 20.0 - k),
+            ("b", 1, lambda k: 5.0 - k / 2),
+        )
+        for k, c in enumerate(centers)
+    ]  # fmt: skip
+    calibration = pd.DataFrame(rows).sample(frac=1.0, random_state=0)
 
     values = _by_key(builder.calibration_values(calibration, "s"))
 
-    assert [
-        values[f"calibration_error_bin_{word}"].value
-        for word in builder.CALIBRATION_BINS
-    ] == [11.0 - k for k in range(10)]
-    assert (
-        "centered on 0.05 (bin 1 of 10)"
-        in values["calibration_error_bin_one"].description
-    )
+    for k, word in enumerate(builder.CALIBRATION_BINS):
+        key = f"calibration_error_bin_{word}"
+        a, b = 15.0 - k, 5.0 - k / 2
+        assert values[key].value == pytest.approx((a + b) / 2)
+        assert values[f"{key}_animal_min"].value == pytest.approx(min(a, b))
+        assert values[f"{key}_animal_max"].value == pytest.approx(max(a, b))
+    description = values["calibration_error_bin_one"].description
+    assert "centered on 0.05 (bin 1 of 10)" in description
+    assert "mean over animals" in description and "calibrat" not in description
+    assert {v.figures for v in values.values()} == {("S2d",)}
     with pytest.raises(ValueError, match="has 9 bins, not 10"):
         builder.calibration_values(
             calibration[calibration["prob_bin_center"] != centers[3]], "s"
         )
+
+
+def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range():
+    """The shares at most 0.2, between 0.2 and 0.8, and above 0.8 of the small
+    table of the analysis test, each with its smallest and largest animal,
+    tagged to question 2a.6 and the supplement's panel."""
+    from tests.analysis.decode_quality.test_nonlocal_probability import _stored
+
+    counts = _stored(
+        {
+            ("a", "1"): {0.0: 10},
+            ("a", "2"): {0.1: 5, 0.9: 5},
+            ("b", "1"): {0.5: 1, 0.98: 3},
+        }
+    ).assign(epoch_id="e")
+    values = _by_key(builder.nonlocal_probability_values(counts, "s"))
+    assert values["nonlocal_probability_low_share"].value == pytest.approx(0.375)
+    assert values["nonlocal_probability_middle_share"].value == pytest.approx(0.125)
+    assert values["nonlocal_probability_high_share"].value == pytest.approx(0.5)
+    assert values["nonlocal_probability_high_share_animal_min"].value == 0.25
+    assert values["nonlocal_probability_high_share_animal_max"].value == 0.75
+    assert len(values) == 9
+    assert {v.figures for v in values.values()} == {("S2c",)}
+    assert {v.questions for v in values.values()} == {("2a.6",)}
 
 
 def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
@@ -224,7 +255,7 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     ].value == pytest.approx(2 / 3)
     # the panel draws the animals' mean and range; the pooled share no figure
     for key, value in values.items():
-        assert value.figures == (() if key.endswith("_share") else ("S2d",))
+        assert value.figures == (() if key.endswith("_share") else ("S2f",))
     assert {v.questions for v in values.values()} == {("2b.4",)}
     assert "more than 25 ms later than the matched SWR's start" in (
         values["timing_start_later_end_earlier_share"].description
@@ -890,7 +921,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     for name, value in values.items():
         assert value.questions == ("2d.1",)
         pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S2l",)), name
+        assert value.figures == (() if pooled else ("S3c",)), name
     assert "under 20 cm from the animal" in values[key].description
 
 
@@ -1202,9 +1233,9 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
     agreement = {k for k in by_key if "agreement" in k or "control" in k}
     assert {by_key[k].figures for k in agreement} == {()}
     parts = {k for k in by_key if "spiking" in k or "silent" in k}
-    assert {by_key[k].figures for k in parts} == {("S2f",)}
+    assert {by_key[k].figures for k in parts} == {("S2h",)}
     assert {v.figures for k, v in by_key.items() if k not in agreement | parts} == {
-        ("2i", "S2f")
+        ("2j", "S2h")
     }
     assert {v.questions for v in values} == {("2c.3",)}
     assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
@@ -1330,7 +1361,7 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
         if name.endswith("_share_of_events"):
             assert value.figures == (), name
         else:
-            assert value.figures == ("S2g",), name
+            assert value.figures == ("S2i",), name
     # five bins, two groups: agreement and reference (three values each), the
     # difference (four), the share positive (three), the share pooled and by
     # animal (four), the epochs, the events and the reference's events
@@ -1376,7 +1407,7 @@ def test_tetrode_holdout_extra_values_split_the_evidence():
     # place); no figure draws the rest
     drawn = {k for k in values if "_heldout_agreement_minus_reference_per_spike" in k}
     assert len(drawn) == 2 * 4
-    assert {values[k].figures for k in drawn} == {("2i",)}
+    assert {values[k].figures for k in drawn} == {("2j",)}
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # none of the canonical run's keys is made again
@@ -1624,10 +1655,10 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic():
     # per group: the estimate, two bounds, animals positive, the events, those
     # scored and those without spikes
     assert len(numbers) == 2 * 7
-    assert {k for k, v in values.items() if v.figures == ("2j",)} == {
+    assert {k for k, v in values.items() if v.figures == ("2k",)} == {
         k for k in values if k.startswith("restriction_heldout_non_swr_")
     }
-    assert {v.figures for v in values.values()} == {(), ("2j",)}
+    assert {v.figures for v in values.values()} == {(), ("2k",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
     canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
@@ -1802,7 +1833,7 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
         for where in ("", "_outside_heldout_events")
         for end in ("", "_ci_low", "_ci_high", "_animals_positive")
     }
-    assert {k for k, v in values.items() if v.figures == ("2j",)} == drawn
+    assert {k for k, v in values.items() if v.figures == ("2k",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
 
 
@@ -1946,7 +1977,7 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     }
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("2j",) if name in drawn else ())
+        assert value.figures == (("2k",) if name in drawn else ())
     assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 
@@ -2073,7 +2104,7 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
-        assert value.figures == (("S2m",) if name in drawn else ()), name
+        assert value.figures == (("S2n",) if name in drawn else ()), name
     # no key of the canonical builders is made again
     canonical_keys = set(canonical) | set(
         _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))

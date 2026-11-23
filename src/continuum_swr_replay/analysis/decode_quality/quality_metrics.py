@@ -69,6 +69,9 @@ compute_calibration_curve
     Relationship between decoder confidence and error.
 calibration_curve_statistics
     That relationship over sessions: median and interquartile range.
+animal_distance_by_local_probability
+    That relationship by animal: the mean over an animal's sessions, then over
+    animals.
 compute_session_quality_summary
     Aggregate all metrics into a single per-session summary.
 
@@ -105,6 +108,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -1353,6 +1357,57 @@ def calibration_curve_statistics(calibration: pd.DataFrame) -> pd.DataFrame:
             "q75": grouped.quantile(0.75),
         }
     )
+
+
+def animal_distance_by_local_probability(
+    calibration: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """How far the decoded place is from the animal in each Local-probability
+    bin, by animal: the project's averaging rule.
+
+    The distance is each session's median, in a bin of ``Local_prob``, of the
+    distance along the track between the animal and the maximum of the position
+    estimate conditional on the non-local states (:func:`compute_calibration_curve`'s
+    ``median_error_cm``). An animal's value in a bin is the mean over its
+    sessions of each session's median
+    (``shared_statistics.animal_session_values``); then the mean over animals,
+    with the smallest and largest animal. Not a calibration: no stated
+    probability is compared with a frequency.
+
+    Parameters
+    ----------
+    calibration : pd.DataFrame
+        :func:`compute_calibration_curve`'s table over sessions: ``animal``,
+        ``day``, ``epoch``, ``prob_bin_center`` and ``median_error_cm``, one row
+        per session and bin.
+
+    Returns
+    -------
+    by_animal : pd.DataFrame, shape (n_prob_bins, n_animals)
+        Each animal's value (cm), indexed by ``prob_bin_center`` (ascending),
+        a column per animal.
+    statistics : pd.DataFrame, shape (n_prob_bins, 4)
+        Indexed by ``prob_bin_center``: ``animal_mean``, ``animal_min``,
+        ``animal_max`` (cm) and ``n_animals``.
+    """
+    by_animal = pd.DataFrame(
+        {
+            center: animal_session_values(
+                rows["median_error_cm"], rows["animal"], rows[["day", "epoch"]], "mean"
+            )
+            for center, rows in calibration.groupby("prob_bin_center")
+        }
+    ).T.sort_index()
+    by_animal.index.name = "prob_bin_center"
+    statistics = pd.DataFrame(
+        {
+            "animal_mean": by_animal.mean(axis=1),
+            "animal_min": by_animal.min(axis=1),
+            "animal_max": by_animal.max(axis=1),
+            "n_animals": by_animal.notna().sum(axis=1),
+        }
+    )
+    return by_animal, statistics
 
 
 #: The decoder states' probability columns, in the order the state-fraction

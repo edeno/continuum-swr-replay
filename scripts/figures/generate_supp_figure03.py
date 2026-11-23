@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S3, the supplement to Figure 3: slow and fast
-gamma during SWR and no-SWR events.
+gamma during SWR and no-SWR events, and how far their content lies from the
+animal.
 
 The immobile non-local events of the canonical event table that start inside
 a well visit (``cohort_selection.select_visit_context``), split by whether
@@ -17,6 +18,22 @@ The animal values are ``event_statistics.animal_signal_levels`` with
 ``scripts/event_properties/measure_event_gamma.py``). This was Figure 3's last
 panel; ripple power, MUA, theta and head speed around the events are Figure 2's.
 
+c — How far the content lies from the animal, no-SWR against SWR events (was
+    a panel of Figure 2's supplement). Each event's distance is the mean over
+    its bins of the absolute distance (cm along the track) of the decoded
+    place from the animal's (``mean_abs_ahead_behind_cm`` of the canonical
+    event table). Its cumulative distribution on a log axis, the percent of a
+    class's events whose content lies within each distance (the bins of
+    ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per animal
+    and their mean in bold (``event_statistics.content_distance_distribution``,
+    each animal's distribution), with dotted lines at 20 cm (near) and 100 cm
+    (remote, ``constants.REMOTE_CM``): the heights there are the shares under
+    20 cm and under 100 cm. The events summary reports each class's share under
+    20 cm, 20 to 100 cm and 100 cm or more
+    (``event_statistics.content_distance_band_statistics``: the mean over
+    animals of each animal's share, the mean over its epochs of each epoch's
+    share; the ``content_distance_*`` values, tagged S3c).
+
 Usage
 -----
     python scripts/figures/generate_supp_figure03.py
@@ -31,8 +48,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
+from matplotlib.ticker import NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
@@ -40,7 +60,10 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    DISTANCE_BIN_EDGES_CM,
+    NEAR_CM,
     animal_signal_levels,
+    content_distance_distribution,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
@@ -50,7 +73,11 @@ from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.reported.events import default_inputs, with_brain_state
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.heldout_gain_panels import (
+    GROUP_COLORS,
+    REFERENCE_COLOR,
+)
+from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
@@ -67,9 +94,13 @@ figure_utilities.set_figure_defaults(context="paper")
 set_publication_style()
 warnings.filterwarnings("ignore")
 
-# Inches: a column and a half.
-WIDTH = 4.4
+# Inches: the full page width.
+WIDTH = 6.5
 HEIGHT = 2.3
+PANEL_WIDTHS = (1.0, 1.0, 1.0)
+"""The frames' widths, in proportion: slow gamma, fast gamma, content distance."""
+GROUP_NAMES = ("No SWR", "SWR")
+"""The classes' names on the distance panel, in ``GROUP_COLORS``' order."""
 
 # The two kinds of event, named and colored as in Figures 2 and 3.
 KINDS = ((False, "No SWR", COLORS["No SWR"]), (True, "SWR", COLORS["SWR"]))
@@ -86,7 +117,8 @@ SIGNALS = tuple(
 
 
 def read_inputs() -> dict:
-    """The events with their gamma, and each epoch's rest and running levels.
+    """The events with their gamma, each epoch's rest and running levels, and
+    the selected events' ``content_distance_distribution`` (``distance``).
 
     Raises
     ------
@@ -97,6 +129,7 @@ def read_inputs() -> dict:
     """
     inputs = default_inputs()
     events = select_visit_context(read_swr_table(inputs.event_table))
+    selected = events
     events, reference, gamma_reference = with_brain_state(
         events, inputs, len(analyzed_epoch_ids())
     )
@@ -109,7 +142,9 @@ def read_inputs() -> dict:
         )
         if note is not None:
             raise ValueError(note)
-    return {"events": events, "reference": reference}
+    # panel c: the selected events, as the events summary reads them
+    distance = content_distance_distribution(selected)
+    return {"events": events, "reference": reference, "distance": distance}
 
 
 def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
@@ -138,25 +173,75 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
     axes[0].set_ylabel("Power (z)")
 
 
+DISTANCE_XLABEL = "From the animal (cm)"
+"""The distance panel's x label, under its title "Content distance": each
+event's mean over its bins of the distance along the track of the decoded place
+from the animal's."""
+DISTANCE_YLABEL = "Events at most\nthis far (%)"
+"""The distance panel's y label: the percent of a class's events whose content
+lies at most that far from the animal."""
+DISTANCE_TICKS_CM = (5, 20, 50, 100, 200)
+
+
+def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
+    """Panel c, the distance panel: for no-SWR and SWR events, the percent of the
+    class's events whose content lies within each distance of the animal (the
+    distribution's bins summed up to each bin's high edge) on a log axis, a
+    thin line per animal and their mean in bold in the class's color, the
+    classes named in their colors, and dotted lines at 20 cm (near) and
+    100 cm (remote), where the heights are the shares under 20 cm and under
+    100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
+        within = by_animal.cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    for cut in (NEAR_CM, REMOTE_CM):
+        ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+    for k, (name, color) in enumerate(
+        zip(GROUP_NAMES, GROUP_COLORS.values(), strict=True)
+    ):
+        ax.text(
+            0.02, 1.0 - 0.1 * k, name, transform=ax.transAxes, ha="left",
+            va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
+        )  # fmt: skip
+    ax.set_xscale("log")
+    ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
+    ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlabel(DISTANCE_XLABEL)
+    ax.set_ylabel(DISTANCE_YLABEL)
+    ax.set_title("Content distance", fontsize=SMALL_SIZE)
+
+
 def generate_figure(inputs: dict):
     """Build the figure from :func:`read_inputs`."""
-    fig, axes = plt.subplots(1, 2, figsize=(WIDTH, HEIGHT))
-    fig.subplots_adjust(left=0.13, right=0.99, top=0.76, bottom=0.12, wspace=0.35)
-    draw_gamma(axes, inputs["events"], inputs["reference"])
+    fig, axes = plt.subplots(
+        1, 3, figsize=(WIDTH, HEIGHT), gridspec_kw={"width_ratios": PANEL_WIDTHS}
+    )
+    fig.subplots_adjust(left=0.09, right=0.99, top=0.76, bottom=0.2, wspace=0.45)
+    draw_gamma(axes[:2], inputs["events"], inputs["reference"])
+    draw_content_distance(axes[2], inputs["distance"])
+    # the key of the gamma panels, centered over them
+    middle = (axes[0].get_position().x0 + axes[1].get_position().x1) / 2
     handles = [
         plt.Line2D([], [], marker="o", ls="", ms=3, mfc=color, mec="black", mew=0.5)
         for color in (C_REST, C_RUN)
     ]
     fig.legend(
         handles, ["quiet-rest windows", "running windows"], frameon=False,
-        loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=2, handletextpad=0.1,
+        loc="upper center", bbox_to_anchor=(middle, 1.0), ncol=2, handletextpad=0.1,
         columnspacing=1.5,
     )  # fmt: skip
     fig.draw_without_rendering()
     top = max(drawn_extent(fig, [ax]).y1 for ax in axes) + 0.02
-    for ax, letter in zip(axes, "ab", strict=True):
+    for ax, letter in zip(axes, "abc", strict=True):
         letter_panel(fig, letter, max(drawn_extent(fig, [ax]).x0 - 0.004, 0.0), top)
-    check_placement(fig, {"a": [axes[0]], "b": [axes[1]]})
+    check_placement(fig, dict(zip("abc", ([ax] for ax in axes), strict=True)))
     return fig
 
 

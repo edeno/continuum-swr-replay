@@ -64,29 +64,6 @@ def _no_spike_trace() -> dict:
     }
 
 
-PARTICIPATION = {
-    ("no SWR", "control"): [0.3, 0.35, 0.4, 0.27, 0.33],
-    ("no SWR", "event"): [0.5, 0.55, 0.6, 0.45, 0.48],
-    ("SWR", "control"): [0.45, 0.5, 0.36, 0.48, 0.42],
-    ("SWR", "event"): [0.7, 0.8, 0.66, 0.72, 0.68],
-}
-"""The participation panel's animals: each group's controls and events."""
-
-
-def _participation() -> pd.DataFrame:
-    """``participation_statistics``' rows indexed by group and kind."""
-    rows = {
-        key: {
-            "participation_animals": np.asarray(values),
-            "animal_names": np.array(list("abcde")),
-        }
-        for key, values in PARTICIPATION.items()
-    }
-    table = pd.DataFrame.from_dict(rows, orient="index")
-    table.index.names = ["group", "kind"]
-    return table
-
-
 def _timing() -> pd.DataFrame:
     """``boundary_timing_statistics``' nine cells: the animals' mean shares
     0.05 to 0.7 (the middle cell the largest), each animal range 0.01 either
@@ -109,16 +86,46 @@ def _timing() -> pd.DataFrame:
     )  # fmt: skip
 
 
-def _distance() -> pd.DataFrame:
-    """``content_distance_distribution`` of the distance test's events."""
+def _hpd() -> pd.DataFrame:
+    """``hpd_distribution`` of the HPD test's events."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        content_distance_distribution,
+        hpd_distribution,
     )
-    from tests.analysis.event_properties.test_event_statistics import (
-        _distance_events,
+    from tests.analysis.event_properties.test_event_statistics import _hpd_events
+
+    return hpd_distribution(_hpd_events())
+
+
+def _probability() -> pd.DataFrame:
+    """``animal_probability_distribution`` of two animals' epochs: most of the
+    time in the first bin, some in the last, a little between."""
+    from continuum_swr_replay.analysis.decode_quality import nonlocal_probability
+    from tests.analysis.decode_quality.test_nonlocal_probability import _stored
+
+    counts = _stored(
+        {
+            ("a", "1"): {0.0: 900, 0.5: 10, 0.98: 90},
+            ("b", "1"): {0.0: 800, 0.3: 20, 0.9: 30, 0.98: 150},
+        }
+    )
+    return nonlocal_probability.animal_probability_distribution(counts)
+
+
+def _decoded_distance() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``animal_distance_by_local_probability`` of two animals' sessions: the
+    distance falls from 30 cm to 3 cm over the ten Local-probability bins."""
+    from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
+        animal_distance_by_local_probability,
     )
 
-    return content_distance_distribution(_distance_events())
+    centers = np.arange(0.05, 1.0, 0.1)
+    rows = [
+        {"animal": animal, "day": 1, "epoch": epoch, "prob_bin_center": c,
+         "median_error_cm": scale * (30 - 27 * c)}
+        for animal, epoch, scale in (("a", 1, 1.0), ("a", 2, 1.2), ("b", 1, 0.8))
+        for c in centers
+    ]  # fmt: skip
+    return animal_distance_by_local_probability(pd.DataFrame(rows))
 
 
 EVIDENCE_SHARES = [0.25, 0.14, 0.26, 0.22, 0.12]
@@ -234,13 +241,14 @@ def _statistics() -> dict:
         "sweep": _sweep(),
         "mua": _mua_counts(),
         "step_test": _step_test(),
-        "distance": _distance(),
+        "hpd": _hpd(),
         "timing": _timing(),
+        "probability": _probability(),
+        "distance": _decoded_distance(),
         "split": {
             column: _gain_statistics(*groups) for column, groups in GAIN_SPLIT.items()
         },
         "shared": shared_statistics(),
-        "participation": _participation(),
         "outside": _outside_rows(),
         "parts": _parts(),
         "no_spike": _no_spike_trace(),
@@ -259,17 +267,17 @@ def drawn():
 
 
 def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
-    """In six rows, each a group the text cites in turn: the decoder (a, b),
-    the count is robust (c, d), the left-out tetrode (e to g), participation,
-    ripple power and the held-out test (h to j), the animals agree and where
-    the content lies (k, l), the fourth decoder (m); each row's letters at one
-    height, the rows' first letters at one left edge, no heading; within the
-    common 20 cm height."""
+    """In six rows, each a group the text cites in turn: the decoder (a to d),
+    the count is robust (e, f), the left-out tetrode (g to i), ripple power and
+    the held-out test (j, k), the animals agree and the posterior's spread (l,
+    m), the fourth decoder (n); each row's letters at one height, the rows'
+    first letters at one left edge, no heading; within the common 20 cm
+    height."""
     assert figure.PANELS == (
-        "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "left_out_split", "left_out_width", "participation",
-        "step_test", "outside_distance", "event_traces", "content_distance",
-        "four_decoders",
+        "state_calibration", "no_spike_mua", "nonlocal_probability",
+        "decoded_distance", "rule_sweep", "boundary_timing", "nonlocal_mua",
+        "left_out_split", "left_out_width", "step_test", "outside_distance",
+        "event_traces", "hpd", "four_decoders",
     )  # fmt: skip
     fig = drawn
     assert figure.panel_axes(fig, "no_spike_mua")[0].get_title() == "No-Spike state"
@@ -277,12 +285,11 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
         figure.panel_axes(fig, "boundary_timing")[0].get_title()
         == "Timing against the SWR"
     )
-    assert figure.panel_axes(fig, "participation")[0].get_title() == "Participation"
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
-    assert sorted(letters) == list("abcdefghijklm")
-    rows = ("ab", "cd", "efg", "hij", "kl", "m")
+    assert sorted(letters) == list("abcdefghijklmn")
+    rows = ("abcd", "ef", "ghi", "jk", "lm", "n")
     for row in rows:
         assert len({letters[k][1] for k in row}) == 1, row
     heights = [letters[row[0]][1] for row in rows]
@@ -382,25 +389,98 @@ def test_each_panels_values_carry_its_letter():
         "state_calibration": "state_calibration",
         "rule_sweep": "rule_sweep",
         "boundary_timing": "boundary_timing",
+        "nonlocal_probability": "nonlocal_probability",
+        "calibration": "decoded_distance",
         "nonlocal_mua": "nonlocal_mua",
         "tetrode_holdout_split": "left_out_split",
         "shared_content": "left_out_width",
         "shared_content_raw": "left_out_width",
-        "participation": "participation",
         "class_step": "step_test",
         "class_step_evidence": "step_test",
         "nonlocal_restriction_distance": "outside_distance",
-        "content_distance": "content_distance",
+        "hpd": "hpd",
         "nonlocal_restriction_swr_allowed": "four_decoders",
     }
     for tag, panel in panels.items():
         assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
-    # the gain over local coding is Figure 2i's too
+    # the gain over local coding is Figure 2j's too
     assert events.TAGS["tetrode_holdout"].figures == (
-        "2i",
+        "2j",
         f"S2{figure.LETTERS['left_out_split']}",
     )
     assert set(panels.values()) == set(figure.PANELS) - {"no_spike_mua", "event_traces"}
+
+
+def test_the_hpd_panel_draws_the_distribution_of_each_class(drawn):
+    """For each class, a thin line per animal and their mean in bold, in the
+    class's color, on a log x axis with the named ticks; a dotted line at the
+    tight cut; the classes named in their colors; a y axis from 0."""
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    distribution = _hpd()
+    (ax,) = figure.panel_axes(drawn, "hpd")
+    n_bins = len(figure.HPD_BIN_EDGES_CM) - 1
+    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
+    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
+    for group, color in panels.GROUP_COLORS.items():
+        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
+        mean = max(mine, key=lambda c: c.get_linewidth())
+        expected = (
+            distribution[distribution["group"] == group]
+            .pivot(index="bin_low", columns="animal", values="percent")
+            .mean(axis=1)
+        )
+        np.testing.assert_allclose(mean.get_ydata(), expected.to_numpy())
+    assert ax.get_xscale() == "log"
+    assert [t.get_text() for t in ax.get_xticklabels()] == [
+        "10", "25", "50", "100", "400",
+    ]  # fmt: skip
+    (cut,) = [line for line in ax.lines if line.get_linestyle() == ":"]
+    np.testing.assert_allclose(cut.get_xdata(), figure.HPD_TIGHT_CM)
+    assert {"No SWR", "SWR", "50 cm"} <= {t.get_text() for t in ax.texts}
+    assert ax.get_ylim()[0] == 0
+    assert ax.get_title() == "Posterior spread"
+
+
+def test_the_probability_panel_draws_each_animals_time_by_nonlocal_probability(
+    drawn,
+):
+    """A thin line per animal and their mean in bold, the percent of the time
+    per probability bin at the bins' centers on a log y axis, the event rule's
+    cut dotted and named "used", the title in plain words."""
+    distribution = _probability()
+    (ax,) = figure.panel_axes(drawn, "nonlocal_probability")
+    by_animal = distribution.pivot(index="bin_low", columns="animal", values="percent")
+    curves = [line for line in ax.lines if len(line.get_xdata()) == 50]
+    assert len(curves) == 3
+    mean = max(curves, key=lambda c: c.get_linewidth())
+    np.testing.assert_allclose(mean.get_xdata(), by_animal.index + 0.01)
+    np.testing.assert_allclose(mean.get_ydata(), by_animal.mean(axis=1))
+    assert ax.get_yscale() == "log"
+    (cut,) = [line for line in ax.lines if line.get_linestyle() == ":"]
+    np.testing.assert_allclose(cut.get_xdata(), 0.8)
+    assert "used " in [t.get_text() for t in ax.texts]
+    assert ax.get_xlabel() == "Non-local probability"
+    assert ax.get_title() == "Non-local probability,\nimmobile time"
+
+
+def test_the_decoded_place_panel_draws_each_animals_distance_and_their_mean(drawn):
+    """A thin line per animal (the mean over its sessions) and the mean over
+    animals in bold against the Local probability; no word of calibration."""
+    by_animal, statistics = _decoded_distance()
+    (ax,) = figure.panel_axes(drawn, "decoded_distance")
+    curves = [line for line in ax.lines if len(line.get_xdata()) == 10]
+    assert len(curves) == 3
+    mean = max(curves, key=lambda c: c.get_linewidth())
+    np.testing.assert_allclose(mean.get_ydata(), statistics["animal_mean"])
+    # animal a: the mean of its two sessions, 1.1 times the shape
+    np.testing.assert_allclose(by_animal["a"], 1.1 * (30 - 27 * by_animal.index))
+    assert ax.get_xlabel() == "Local probability"
+    assert ax.get_ylabel() == "Distance from\nthe animal (cm)"
+    assert ax.get_title() == "Decoded place against\nthe animal's place"
+    assert "calibrat" not in (ax.get_title() + ax.get_ylabel()).lower()
 
 
 def test_the_timing_panel_draws_the_timing_table(drawn):
@@ -451,41 +531,6 @@ def test_the_timing_panel_names_the_four_corner_cells(drawn):
             assert t.get_fontsize() >= 6
 
 
-def test_the_participation_panel_joins_each_animals_rest_to_its_events(drawn):
-    """For no-SWR then SWR events, one line per animal from its Local-rest
-    controls to its events, the controls in the Local state's color and the
-    events in their class's, in percent."""
-    from matplotlib.colors import to_rgba
-
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    (ax,) = figure.panel_axes(drawn, "participation")
-    for group, color in panels.GROUP_COLORS.items():
-        rest_x, event_x = figure.REST_EVENT_X[group]
-        for x, kind, dot_color in (
-            (rest_x, "control", figure.COLORS["Local"]),
-            (event_x, "event", color),
-        ):
-            (dots,) = [
-                c for c in ax.collections
-                if isinstance(c, matplotlib.collections.PathCollection)
-                and np.allclose(c.get_offsets()[:, 0], x)
-            ]  # fmt: skip
-            np.testing.assert_allclose(
-                dots.get_offsets()[:, 1], 100 * np.asarray(PARTICIPATION[(group, kind)])
-            )
-            np.testing.assert_allclose(dots.get_facecolor()[0], to_rgba(dot_color))
-        pairs = [
-            line for line in ax.lines
-            if np.allclose(line.get_xdata(), (rest_x, event_x))
-        ]  # fmt: skip
-        assert len(pairs) == 5
-    assert ax.get_ylabel() == "Tetrodes active (%)"
-    assert [t.get_text() for t in ax.get_xticklabels()] == [
-        "Local rest", "No SWR", "Local rest", "SWR",
-    ]  # fmt: skip
-
-
 def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn):
     """Outside SWRs, then only farther than each margin from every SWR: dots
     spread about each column, the mean with its interval, a thin line through
@@ -516,38 +561,6 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn
     assert "↑ full better" in texts
     assert ax.get_ylabel() == "Held-out log score,\nfull − SWR-only\n(nats/spike)"
     assert ax.get_ylim()[0] < 0
-
-
-def test_the_distance_panel_draws_the_content_distance_of_each_class(drawn):
-    """For each class, the percent of events within each distance (the bins
-    summed), a thin line per animal and their mean in bold, in the class's
-    color, on a log x axis; dotted lines at 20 cm and 100 cm; the classes
-    named in their colors; a y axis from 0 to 100."""
-    from matplotlib.colors import to_rgba
-
-    from continuum_swr_replay.visualization import heldout_gain_panels as panels
-
-    distribution = _distance()
-    (ax,) = figure.panel_axes(drawn, "content_distance")
-    n_bins = len(figure.DISTANCE_BIN_EDGES_CM) - 1
-    curves = [line for line in ax.lines if len(line.get_xdata()) == n_bins]
-    assert len(curves) == 2 * (2 + 1)  # two animals and their mean, per class
-    for group, color in panels.GROUP_COLORS.items():
-        mine = [c for c in curves if to_rgba(c.get_color()) == to_rgba(color)]
-        mean = max(mine, key=lambda c: c.get_linewidth())
-        within = (
-            distribution[distribution["group"] == group]
-            .pivot(index="bin_high", columns="animal", values="percent")
-            .cumsum()
-        )
-        np.testing.assert_allclose(mean.get_xdata(), within.index.to_numpy())
-        np.testing.assert_allclose(mean.get_ydata(), within.mean(axis=1).to_numpy())
-        assert (np.diff(mean.get_ydata()) >= 0).all()
-    assert ax.get_xscale() == "log"
-    assert ax.get_ylim() == (0, 100)
-    cuts = [line.get_xdata()[0] for line in ax.lines if line.get_linestyle() == ":"]
-    assert cuts == [20.0, 100.0]
-    assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
 
 
 def test_the_step_panel_draws_each_animals_jump_and_the_counts(drawn):
@@ -771,7 +784,7 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
 def test_the_figure_is_the_question_lists_s2_figure():
     """Values tagged ``S2`` (by panel) name this script."""
-    assert FIGURES["S2"].panels == "abcdefghijklm"
+    assert FIGURES["S2"].panels == "abcdefghijklmn"
     assert FIGURES["S2"].script == ("scripts/figures/generate_supp_figure02.py")
 
 
@@ -805,9 +818,8 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "split", windows
         ),
         "shared_content_statistics": lambda windows: seen.setdefault("shared", windows),
-        "read_participation": lambda folder, epochs, event_ids: seen.setdefault(
-            "participation", event_ids
-        ),
+        "read_nonlocal_probability": lambda folder: "probability",
+        "read_decoded_distance": lambda folder: "distance",
         "sha256_file": lambda path: "0" * 64,
         "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),
         "restriction_inputs_note": lambda folder, epochs: note,
@@ -818,9 +830,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "no_spike": "trace",
             "event_traces": "traces",
         },
-        "content_distance_distribution": lambda events: seen.setdefault(
-            "distance", events
-        ),
+        "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
@@ -866,17 +876,18 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     assert list(seen["split"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
-    assert seen["distance"]["event_id"].tolist() == list(range(8))
+    assert seen["hpd"]["event_id"].tolist() == list(range(8))
     assert list(inputs) == [
         "calibration",
+        "probability",
+        "distance",
         "sweep",
         "mua",
         "step_test",
-        "distance",
+        "hpd",
         "timing",
         "split",
         "shared",
-        "participation",
         "outside",
         "parts",
         "four_decoders",
@@ -915,7 +926,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
         monkeypatch, stored, {}, heldout=_HeldoutRestriction(**notes), note=inputs_note
     )
     monkeypatch.setattr(figure, "outside_swr_statistics", refuse)
-    with pytest.raises(ValueError, match="panel j is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel k is not drawn") as refused:
         figure.read_inputs()
     assert rerun in str(refused.value)
 
@@ -966,7 +977,7 @@ def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch
         "read_heldout_restriction",
         lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
     )
-    with pytest.raises(ValueError, match="panel m is not drawn") as refused:
+    with pytest.raises(ValueError, match="panel n is not drawn") as refused:
         figure.read_inputs()
     assert "detect_heldout_events" in str(refused.value)
 

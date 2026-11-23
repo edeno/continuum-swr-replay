@@ -27,13 +27,24 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     g — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
         power and head speed, each animal-balanced: the line the mean over
         animals of each animal's median over its events (the lines of Figure
-        2's supplement, panel k), the band the mean over animals of each
+        2's supplement, panel j), the band the mean over animals of each
         animal's quartiles (a spread over events, every animal weighted the
         same), with the epochs' level between events, theta's running level and
         the immobility threshold. Both kinds of event come with a rise in MUA
         that is not due to movement or theta: the animal is still and theta
         stays at its level between events, far below running.
-    h — Where the non-local time sits in ripple power, one line per animal:
+    h — Tetrode participation: the events are population events. The share of
+        tetrodes with a spike in each event against a Local-rest window of its
+        length lying wholly inside one well visit, one line per animal from its
+        controls to its events, for no-SWR and SWR events (Local rest in the
+        Local state's color, the events in their class's). Each group's
+        controls have its events' lengths, so the two groups' levels are not
+        compared: a longer window holds a spike on more tetrodes
+        (``participation.participation_statistics``;
+        ``Processed-Data/event_participation``, refused when it was not made
+        over the analyses' subset from the current well visits; the events
+        summary's participation values).
+    i — Where the non-local time sits in ripple power, one line per animal:
         the immobile time bins decoded non-local spread over ripple power, with
         the share of them below the SWR threshold (top), and the share of
         immobile time bins decoded non-local at each power, which has no step
@@ -42,7 +53,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         ``Processed-Data/nonlocal_by_signal``; drawn by
         ``visualization.signal_share_panels.draw_share_by_signal``, which
         Figure 2's supplement draws MUA with).
-    i — Do the spikes of a left-out tetrode point to the decoded place? At
+    j — Do the spikes of a left-out tetrode point to the decoded place? At
         the left, a drawing of the test
         (``visualization.evidence_drawings.draw_left_out_test``): each tetrode
         is left out of the decoder's smoother in turn and its spikes scored at
@@ -67,7 +78,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         supplement draws it by width). Both runs are refused when they were not
         held out in folds of whole trials, the second also when it has no extra
         scores.
-    j — Does the decoder need non-local states outside SWRs? At the left, a
+    k — Does the decoder need non-local states outside SWRs? At the left, a
         drawing of the two decoders compared
         (``visualization.evidence_drawings.draw_restriction_test``): the SWR-only
         decoder (the non-local states allowed only inside SWRs, where only they
@@ -104,10 +115,11 @@ events summary uses (``event_statistics.overlap_class_statistics``,
 ``boundary_offsets``); c and e from ``nonlocal_comparison`` on the event
 features run the summary reads; g's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; h from
-the stored counts by the functions the events summary uses
+the participation run over the selected events, as the events summary reads
+it; i from the stored counts by the functions the events summary uses
 (``nonlocal_by_signal.animal_nonlocal_counts``,
-``event_statistics.nonlocal_below_threshold_statistics``); i and j from the
-held-out tetrode runs over the selected events; j from the held-out event run's
+``event_statistics.nonlocal_below_threshold_statistics``); j from the
+held-out tetrode runs over the selected events; k from the held-out event run's
 events and time sums as the events summary reads them
 (``reported.events.read_heldout_restriction``: the events detected from the
 held-out decode that start inside a well visit, and the time inside a well
@@ -193,6 +205,9 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
+from continuum_swr_replay.analysis.event_evidence.participation import (
+    participation_statistics,
+)
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_EVENT_GROUP,
     RESTRICTION_FIGURE_FAMILY,
@@ -227,6 +242,7 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
+    time_mask_staleness,
     well_visit_times,
 )
 from continuum_swr_replay.data_loaders import load_data
@@ -251,9 +267,11 @@ from continuum_swr_replay.paths import (
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
+    PARTICIPATION_NAME,
     TETRODE_HOLDOUT_NAME,
     event_features_root,
     processed_data_dir,
@@ -285,6 +303,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
     REFERENCE_COLOR,
     WIDTH_GROUP_NAMES,
+    animal_values,
     draw_animal_gain,
     draw_full_minus_swr_axis,
 )
@@ -363,7 +382,7 @@ C_OTHER = "white"
 """Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
 mixed-state, not No-Spike)."""
 C_REFERENCE = REFERENCE_COLOR
-"""A reference level (panels i and j's zeros, panel g's between-events level): a neutral
+"""A reference level (panels j and k's zeros, panel g's between-events level): a neutral
 gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
 C_NO_SWR = COLORS["No SWR"]
@@ -1190,8 +1209,76 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 
 
 LEFT_OUT_WIDTHS = (1.25, 1.0)
-"""Panel i's drawing and axis, in proportion within its cell."""
+"""Panel j's drawing and axis, in proportion within its cell."""
 LEFT_OUT_WSPACE = 0.75
+
+
+REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
+"""The participation panel: each group's Local-rest and event positions on the
+x axis."""
+PAIR_COLOR = "#999999"
+"""A line joining one animal's two values (the participation panel)."""
+
+
+def read_participation(
+    folder: Path, epochs: Sequence[str], event_ids: pd.Series
+) -> pd.DataFrame:
+    """The participation panel's statistics: ``participation_statistics`` of the
+    participation run over ``epochs``, read over the selected events
+    (``event_ids``), as the events summary reads it.
+
+    Raises
+    ------
+    ValueError
+        If the run's settings do not record the analyses' subset or it did not
+        read the current session cache (its controls are Local rest inside the
+        current visits only then).
+    """
+    manifest = read_output_manifest(folder)
+    note = time_mask_staleness(
+        {**manifest, "subset": manifest.get("settings", {}).get("subset")},
+        epochs,
+        rel(folder),
+    )
+    if note is not None:
+        raise ValueError(
+            f"The participation panel (panel {BOTTOM_LETTERS['participation']}) is "
+            f"not drawn: {note}. Rerun "
+            "scripts/event_evidence/measure_event_participation.py."
+        )
+    return participation_statistics(
+        select_events_in(
+            read_complete_run(folder, PARTICIPATION_NAME, epochs), event_ids
+        )
+    )
+
+
+def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
+    """Panel h, the participation panel: tetrode participation, Local rest against
+    events, one line per animal from its length-matched Local-rest controls to
+    its events, for no-SWR and SWR events (``statistics``:
+    :func:`read_participation`)."""
+    for group, color in GROUP_COLORS.items():
+        x = REST_EVENT_X[group]
+        rest, event = (
+            animal_values(statistics.loc[(group, kind)], "participation_animals", 100)
+            for kind in ("control", "event")
+        )
+        for animal in event.index.intersection(rest.index):  # paired by animal
+            ax.plot(x, (rest[animal], event[animal]), color=PAIR_COLOR, lw=0.5,
+                    zorder=1)  # fmt: skip
+        ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=COLORS["Local"], lw=0,
+                   zorder=2)  # fmt: skip
+        ax.scatter(np.full(event.size, x[1]), event, s=6, color=color, lw=0,
+                   zorder=2)  # fmt: skip
+    ax.set_ylabel("Tetrodes active (%)")
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlim(-0.5, 3.9)
+    ticks = [x for pair in REST_EVENT_X.values() for x in pair]
+    # horizontal, on two lines, so that they do not hang into the next row
+    ax.set_xticks(ticks, ["Local\nrest", "No\nSWR", "Local\nrest", "SWR"])
+    ax.set_title("Participation", fontsize=SMALL_SIZE, pad=3)
 
 
 def restriction_refusal(cause: str, rerun: str) -> str:
@@ -1205,22 +1292,24 @@ def restriction_refusal(cause: str, rerun: str) -> str:
 
 
 BOTTOM_ROWS = (
-    ("traces", "ripple_power"),
+    ("traces", "participation", "ripple_power"),
     ("left_out", "decoder_comparison"),
 )
 """The panels below row 3 by what they draw, row by row, left to right: the
-traces around event starts and where the non-local time sits in ripple power;
-then the left-out tetrode test and the decoder comparison, each a drawing of
-its test beside its axes. The one place their order is set: the grids, the
-letters (:data:`BOTTOM_LETTERS`), the decoder comparison's bounds and the
-letter columns follow from it (the docstrings that name a panel by letter are
-found by grepping for ``BOTTOM_LETTERS`` and "panel g" to "panel j")."""
+traces around event starts, tetrode participation and where the non-local time
+sits in ripple power; then the left-out tetrode test and the decoder
+comparison, each a drawing of its test beside its axes. The one place their
+order is set: the grids, the letters (:data:`BOTTOM_LETTERS`), the columns
+(:data:`BOTTOM_COLUMNS`) and the letter columns follow from it (the docstrings
+that name a panel by letter are found by grepping for ``BOTTOM_LETTERS`` and
+"panel g" to "panel k")."""
 BOTTOM_PANELS = tuple(panel for row in BOTTOM_ROWS for panel in row)
-BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghij", strict=True))
+BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghijk", strict=True))
 """Each bottom panel's letter, by its position."""
 BOTTOM_WIDTHS = {
     "traces": 1.0,
-    "ripple_power": 1.0,
+    "participation": 0.5,
+    "ripple_power": 0.6,
     "left_out": 1.45,
     "decoder_comparison": 1.2,
 }
@@ -1246,15 +1335,25 @@ BOTTOM_RIGHT = 0.995
 """Where the decoder comparison's drawing may end when it is its row's last
 panel (figure width): the figure is saved cropped to its ink, so the edge is
 the page's."""
+BOTTOM_COLUMNS = {
+    "traces": "c",
+    "participation": "e",
+    "ripple_power": "f",
+    "left_out": "c",
+    "decoder_comparison": "e",
+}
+"""Each bottom panel's column: the row-3 panel whose left edge it starts at (c,
+the figure's left column; e; f). A panel ends a gap before the next panel's
+left edge, the last of its row at the figure's right."""
 LETTER_COLUMNS = (
-    "abc" + "".join(BOTTOM_LETTERS[row[0]] for row in BOTTOM_ROWS),
+    "abc" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "c"),
     "d",
-    "e" + "".join(BOTTOM_LETTERS[row[1]] for row in BOTTOM_ROWS),
-    "f",
+    "e" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "e"),
+    "f" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "f"),
 )
 """The panel letters that share a left edge (convention 10): a, b, c and the
-first panel of each bottom row at the figure's left; e and the second panel of
-each bottom row, which starts at panel e's left edge."""
+bottom panels that start at the figure's left; e and those that start at its
+left edge; f and those that start at its left edge."""
 OVERVIEW_GAP = 0.02
 """Panel a: the space between the track drawing and the labels of the example
 beside it (figure width)."""
@@ -1265,7 +1364,7 @@ panels' left edge, panel e's (figure width)."""
 
 LEFT_OUT_HEADING = "Do the spikes of a left-out tetrode point to the decoded place?"
 DECODER_HEADING = "Does the decoder need non-local states outside SWRs?"
-"""Panels i and j's headings, centered over each panel."""
+"""Panels j and k's headings, centered over each panel."""
 HEADING_OFFSET_PT = 10
 """How far above its axes' top a panel's heading sits (points), clear of the
 axes' titles."""
@@ -1274,21 +1373,21 @@ FIT_GROUPS = {
     "animal": "1  animal's\nplace",
     "other": "2  another\nevent's place",
 }
-"""Panel i's x groups: what the decoded place's fit is compared with."""
+"""Panel j's x groups: what the decoded place's fit is compared with."""
 FIT_X = {
     ("animal", "no SWR"): 0.0,
     ("animal", "SWR"): 0.7,
     ("other", "no SWR"): 2.2,
     ("other", "SWR"): 2.9,
 }
-"""Panel i: each comparison and group's x position."""
+"""Panel j: each comparison and group's x position."""
 EQUAL_FIT = "equal fit"
-"""Panels i and j's name of their zero line."""
+"""Panels j and k's name of their zero line."""
 DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
 DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
-"""Panel j's first axis, "All immobility time"."""
+"""Panel k's first axis, "All immobility time"."""
 DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime"}
-"""Panel j's second axis, "Outside SWRs"."""
+"""Panel k's second axis, "Outside SWRs"."""
 
 
 def draw_heading(ax: Axes, text: str) -> None:
@@ -1332,7 +1431,7 @@ def name_zero(ax: Axes, text: str = EQUAL_FIT) -> None:
 def draw_left_out_fit(
     ax_drawing: Axes, ax: Axes, statistics: dict[str, pd.DataFrame]
 ) -> None:
-    """Panel i: do the spikes of a left-out tetrode point to the decoded place?
+    """Panel j: do the spikes of a left-out tetrode point to the decoded place?
 
     Left, the test as a drawing (``evidence_drawings.draw_left_out_test``).
     Right, one axis: how much better the left-out tetrode's spikes fit the
@@ -1376,7 +1475,7 @@ def draw_decoder_need(
     ax_outside: Axes,
     statistics: RestrictionFigureStatistics,
 ) -> None:
-    """Panel j: does the decoder need non-local states outside SWRs?
+    """Panel k: does the decoder need non-local states outside SWRs?
 
     Left, the two decoders as a drawing
     (``evidence_drawings.draw_restriction_test``). Then two axes of how much
@@ -1584,7 +1683,7 @@ def draw_detector_overlap(
 
 
 def draw_share_by_power(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
-    """Panel h: where the non-local time sits in ripple power, drawn by
+    """Panel i: where the non-local time sits in ripple power, drawn by
     ``signal_share_panels.draw_share_by_signal`` with the share of non-local
     time below the SWR threshold written (``nonlocal_below_threshold_statistics``,
     the events summary's value).
@@ -1797,12 +1896,15 @@ def generate_figure(
             events["event_id"],
         )
     )
+    participation = read_participation(
+        data_dir / EVENT_PARTICIPATION_DIR, event_epochs, events["event_id"]
+    )
     left_out_fit = {
         "animal": holdout_statistics(canonical, "event", "gain_per_spike"),
         "other": holdout_statistics(holdout, "event", "agreement_minus_null_per_spike"),
     }
     # the events summary's restriction inputs: the same runs, cohorts, time
-    # steps and subset; panel j draws the fold fit on whole trials, and only
+    # steps and subset; panel k draws the fold fit on whole trials, and only
     # from a held-out event run made from the restriction run and the per-bin
     # facts run as they are now, with facts made from the current session
     # cache, and from a restriction run made from the current decode frames
@@ -1881,6 +1983,8 @@ def generate_figure(
     ax_left_out_drawing = fig.add_subplot(left_out_grid[0])
     ax_left_out = fig.add_subplot(left_out_grid[1])
     draw_left_out_fit(ax_left_out_drawing, ax_left_out, left_out_fit)
+    ax_participation = fig.add_subplot(cells["participation"])
+    draw_participation(ax_participation, participation)
     power_grid = cells["ripple_power"].subgridspec(
         2, 1, height_ratios=[1.0, 1.6], hspace=0.2
     )
@@ -1896,6 +2000,7 @@ def generate_figure(
     draw_decoder_need(ax_decoder_drawing, ax_time, ax_outside, restriction)
     bottom_axes = {
         "traces": triggered_axes,
+        "participation": [ax_participation],
         "left_out": [ax_left_out_drawing, ax_left_out],
         "ripple_power": [ax_spread, ax_share],
         "decoder_comparison": [ax_decoder_drawing, ax_time, ax_outside],
@@ -1911,15 +2016,21 @@ def generate_figure(
         )
         - 0.004
     )
-    # the bottom rows in two columns: the first panel of each row from the
-    # figure's left column (a, b, c) to a gap before panel e's left edge, the
-    # second from panel e's left edge to the figure's right
-    e_left = panel_extent(fig, renderer, [ax_e, ax_e2]).x0
-    columns = ((x_left + 0.004, e_left - COLUMN_GAP), (e_left, BOTTOM_RIGHT))
+    # the bottom panels in the columns of row 3 (BOTTOM_COLUMNS): each from its
+    # column's left edge to a gap before the next panel's, the last of a row to
+    # the figure's right
+    starts = {
+        "c": x_left + 0.004,
+        "e": panel_extent(fig, renderer, [ax_e, ax_e2]).x0,
+        "f": panel_extent(fig, renderer, [ax_f1, ax_f2]).x0,
+    }
     fitters = {
         "traces": lambda left, right: fit_grid_in_column(
             fig, renderer, [triggered_axes[:2], triggered_axes[2:]], left, right,
             TRACES_WSPACE,
+        ),
+        "participation": lambda left, right: fit_grid_in_column(
+            fig, renderer, [[ax_participation]], left, right, 0.0
         ),
         "ripple_power": lambda left, right: fit_grid_in_column(
             fig, renderer, [[ax_spread], [ax_share]], left, right, 0.0
@@ -1933,7 +2044,9 @@ def generate_figure(
         ),
     }  # fmt: skip
     for row in BOTTOM_ROWS:
-        for panel, (left, right) in zip(row, columns, strict=True):
+        lefts = [starts[BOTTOM_COLUMNS[panel]] for panel in row]
+        rights = [left - COLUMN_GAP for left in lefts[1:]] + [BOTTOM_RIGHT]
+        for panel, left, right in zip(row, lefts, rights, strict=True):
             fitters[panel](left, right)
             if panel in ("left_out", "decoder_comparison"):
                 center_heading(fig, bottom_axes[panel], left, right)
