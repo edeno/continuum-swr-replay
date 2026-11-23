@@ -951,3 +951,80 @@ def test_animal_balanced_unit_curve_has_no_band_with_one_animal():
 
     np.testing.assert_allclose(population, [2.0, 1.0])
     assert np.isnan(sem).all()
+
+
+# --- population numbers reduced session -> day -> animal ------------------------------
+
+
+@pytest.fixture
+def two_animals():
+    """Animal a: day 1 with two sessions (1 of 2 called; 0 of 1 tested), day 2
+    with one (1 of 1). Animal b: one session, 1 of 5 called, and one session
+    with no unit tested."""
+    p = HELDOUT_P_COLUMNS["SWR"]
+    rows = [
+        ("a", "a20200101_.nwb", "02_r1", 0.01, "SWR", 0.5),
+        ("a", "a20200101_.nwb", "02_r1", 0.20, "constant", -0.3),
+        ("a", "a20200101_.nwb", "04_r2", NAN, None, NAN),
+        ("a", "a20200101_.nwb", "04_r2", 0.50, "SWR", 0.2),
+        ("a", "a20200102_.nwb", "02_r1", 0.02, "SWR", -1.0),
+        *[
+            ("b", "b20200301_.nwb", "02_r1", pv, "constant", pk)
+            for pv, pk in zip(
+                [0.01, 0.3, 0.4, 0.6, 0.9], [0.4, 0.1, -0.2, 0.3, 0.6], strict=True
+            )
+        ],
+        ("b", "b20200301_.nwb", "04_r2", NAN, None, NAN),
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "animal",
+            "nwb_file_name",
+            "epoch_name",
+            p,
+            "min_heldout_model",
+            "SWR: peak_log_modulation",
+        ],
+    )
+
+
+def test_session_called_fractions_per_session(two_animals):
+    sessions = stats.session_called_fractions(two_animals, "SWR", ALPHA)
+    assert sessions[["animal", "day", "session"]].values.tolist() == [
+        ["a", 20200101, "02_r1"],
+        ["a", 20200101, "04_r2"],
+        ["a", 20200102, "02_r1"],
+        ["b", 20200301, "02_r1"],
+    ]
+    assert sessions["n_called"].tolist() == [1, 0, 1, 1]
+    assert sessions["n_tested"].tolist() == [2, 1, 1, 5]
+    np.testing.assert_allclose(sessions["value"], [0.5, 0.0, 1.0, 0.2])
+
+
+def test_the_called_fraction_is_reduced_session_to_day_to_animal(two_animals):
+    sessions = stats.session_called_fractions(two_animals, "SWR", ALPHA)
+    summary = stats.reduced_statistic(sessions, n_draws=200, seed=1)
+    # a: day 1 (0.5 + 0) / 2, day 2 1.0, animal 0.625; b: 0.2
+    assert summary["estimate"] == pytest.approx((0.625 + 0.2) / 2)
+    assert (summary["n_animals"], summary["n_days"], summary["n_sessions"]) == (2, 3, 4)
+    assert summary["n_animals_same_sign"] == 2
+    assert summary["low"] <= summary["estimate"] <= summary["high"]
+    # the pooled fraction it replaces weighs units, not animals: 3 of 9
+    pooled = stats.called_fractions(
+        two_animals, ALPHA, {"SWR": HELDOUT_P_COLUMNS["SWR"]}
+    )
+    assert pooled.loc["SWR", "fraction"] == (pytest.approx(3 / 9))
+
+
+def test_best_model_and_peak_statistics_per_session(two_animals):
+    best = stats.session_best_model_fractions(two_animals, "SWR")
+    np.testing.assert_allclose(best["value"], [0.5, 1.0, 1.0, 0.0])
+    assert best["n_known"].tolist() == [2, 1, 1, 5]
+    peaks = stats.session_peak_statistics(two_animals, "SWR")
+    np.testing.assert_allclose(peaks["abs_peak_median"], [0.4, 0.2, 1.0, 0.3])
+    np.testing.assert_allclose(peaks["suppressed_fraction"], [0.5, 0.0, 1.0, 0.2])
+    summary = stats.reduced_statistic(peaks, "abs_peak_median", n_draws=200, seed=1)
+    assert summary["estimate"] == pytest.approx(
+        ((0.4 + 0.2) / 2 + 1.0) / 2 / 2 + 0.3 / 2
+    )

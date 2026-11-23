@@ -25,6 +25,14 @@ they are not population inference. A unit's *peak* for a curve is its
 ``<curve>: peak_log_modulation``, the fit's largest log-rate change over the
 reported window, signed.
 
+A population number as an estimand (:func:`reduced_statistic`) is a value per
+session (:func:`session_called_fractions`, :func:`session_best_model_fractions`,
+:func:`session_peak_statistics`) reduced session -> recording day -> animal by
+:func:`~continuum_swr_replay.analysis.shared_statistics.estimand_summary`: the
+animal-balanced estimate with its nested bootstrap interval, the animals with
+its sign and the day-level test. The pooled fractions and the
+Benjamini-Hochberg fraction stay beside it as references.
+
 A population curve is taken unit -> session -> animal
 (:func:`animal_balanced_unit_curve`, from
 :mod:`~continuum_swr_replay.analysis.shared_statistics`' :func:`session_mean_curve`,
@@ -57,8 +65,10 @@ from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_curve,
     animal_curve_sem,
     benjamini_hochberg,
+    estimand_summary,
     session_mean_curve,
 )
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 # --- the cohort and its fits ---------------------------------------------------------
 
@@ -1366,3 +1376,151 @@ def animal_balanced_unit_curve(
     animal_of = dict(zip(sessions, np.asarray(animals), strict=True))
     population, per_animal = animal_balanced_curve(by_session, animal_of)
     return population, animal_curve_sem(per_animal)
+
+
+# --- population numbers reduced session -> day -> animal ------------------------------
+
+#: The columns of a table of values per session (:func:`reduced_statistic`).
+SESSION_KEY = ("animal", "day", "session")
+
+
+def _session_keys(population: pd.DataFrame) -> pd.DataFrame:
+    """Each unit's session key: its animal, recording day (the NWB file's
+    date) and session (its epoch)."""
+    days = population["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[1])
+    return pd.DataFrame(
+        {
+            "animal": population["animal"].to_numpy(),
+            "day": days.to_numpy(),
+            "session": population["epoch_name"].to_numpy(),
+        },
+        index=population.index,
+    )
+
+
+def session_called_fractions(
+    population: pd.DataFrame,
+    name: str,
+    alpha: float,
+    columns: Mapping[str, str] = HELDOUT_P_COLUMNS,
+) -> pd.DataFrame:
+    """Each session's share of its tested units called for one test.
+
+    Parameters
+    ----------
+    population : pd.DataFrame, shape (n_units, n_columns)
+        The unit table, with ``animal``, ``nwb_file_name``, ``epoch_name`` and
+        the test's p-value column.
+    name : str
+        A key of ``columns``.
+    alpha : float
+        The raw empirical-p threshold.
+    columns : mapping of str to str
+        The p-value column of each test, as in :func:`called_fractions`.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with a tested unit: :data:`SESSION_KEY`,
+        ``n_called``, ``n_tested`` and ``value`` (their ratio).
+    """
+    tested, called = tested_and_called(population[columns[name]], alpha)
+    units = _session_keys(population).assign(called=called, tested=tested)
+    sessions = (
+        units[tested]
+        .groupby(list(SESSION_KEY), sort=True)[["called", "tested"]]
+        .sum()
+        .astype(int)
+        .rename(columns={"called": "n_called", "tested": "n_tested"})
+        .reset_index()
+    )
+    sessions["value"] = sessions["n_called"] / sessions["n_tested"]
+    return sessions
+
+
+def session_best_model_fractions(
+    population: pd.DataFrame, model: str, column: str = "min_heldout_model"
+) -> pd.DataFrame:
+    """Each session's share of its units whose best model is ``model``.
+
+    A unit with no best model is left out, as in :func:`best_model_fractions`.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with a unit that has a best model:
+        :data:`SESSION_KEY`, ``n_best``, ``n_known`` and ``value``.
+    """
+    best = population[column]
+    known = best.notna().to_numpy()
+    units = _session_keys(population).assign(best=(best == model).to_numpy())[known]
+    sessions = units.groupby(list(SESSION_KEY), sort=True)["best"].agg(["sum", "size"])
+    sessions = sessions.rename(columns={"sum": "n_best", "size": "n_known"})
+    sessions = sessions.astype(int).reset_index()
+    sessions["value"] = sessions["n_best"] / sessions["n_known"]
+    return sessions
+
+
+def session_peak_statistics(population: pd.DataFrame, curve: str) -> pd.DataFrame:
+    """Each session's median absolute peak and suppressed share for one curve.
+
+    Parameters
+    ----------
+    population : pd.DataFrame, shape (n_units, n_columns)
+        The unit table, with ``<curve>: peak_log_modulation``; a unit without
+        a peak is left out.
+    curve : str
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session with a peak: :data:`SESSION_KEY`, ``n_units``,
+        ``abs_peak_median`` (log rate) and ``suppressed_fraction``.
+    """
+    peak = population[f"{curve}: peak_log_modulation"]
+    keep = peak.notna().to_numpy()
+    units = _session_keys(population).assign(peak=peak.to_numpy())[keep]
+    grouped = units.groupby(list(SESSION_KEY), sort=True)["peak"]
+    return pd.DataFrame(
+        {
+            "n_units": grouped.size(),
+            "abs_peak_median": grouped.agg(lambda p: p.abs().median()),
+            "suppressed_fraction": grouped.agg(lambda p: (p < 0).mean()),
+        }
+    ).reset_index()
+
+
+def reduced_statistic(
+    per_session: pd.DataFrame,
+    value: str = "value",
+    *,
+    n_draws: int,
+    seed: int,
+) -> dict[str, float]:
+    """A population number as an estimand: per-session values reduced session ->
+    day -> animal (``shared_statistics.estimand_summary``).
+
+    Parameters
+    ----------
+    per_session : pd.DataFrame
+        One row per session: :data:`SESSION_KEY` and ``value``.
+    value : str
+        The column reduced.
+    n_draws, seed : int
+        The nested bootstrap's.
+
+    Returns
+    -------
+    dict
+        ``estimand_summary``'s: ``estimate`` (the animal-balanced value),
+        ``low``, ``high``, ``sd``, ``n_animals``, ``n_days``, ``n_sessions``,
+        ``n_animals_same_sign``, ``day_p``, ``n_draws`` and ``seed``.
+    """
+    return estimand_summary(
+        per_session[value],
+        per_session["animal"],
+        per_session["day"],
+        per_session["session"],
+        n_draws=n_draws,
+        seed=seed,
+    )
