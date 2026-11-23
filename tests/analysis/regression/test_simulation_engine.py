@@ -6,7 +6,8 @@ Two synthetic models of the engine's own, on rows from ``conftest``:
   penalty, a smooth of the time since the visit began and the exposure's
   offset; 5 animals of 2 sessions, each on its own day (``rate_rows``);
 - a content model (grouped softmax): the role category with the weak penalty;
-  5 animals of 2 sessions (``content_rows``).
+  5 animals of 2 sessions (``content_rows``, with each event's number of
+  decode bins), its shares drawn by each of the softmax's noise models.
 
 ``python -m tests.analysis.regression.test_simulation_engine`` writes the
 fixed-seed fixture ``data/numpy_reference/simulation_engine.json``.
@@ -171,9 +172,57 @@ def rate_sessions_cohort() -> dict:
     return _cohort(rate_rows)
 
 
+def _content_rows(seed: int) -> pd.DataFrame:
+    """``content_rows`` with ``n_bins``, each event's number of decode bins
+    (3 to 30, the same on its rows)."""
+    rows = content_rows(seed)
+    n_bins = np.random.default_rng(seed).integers(3, 31, rows["event_id"].max() + 1)
+    return rows.assign(n_bins=n_bins[rows["event_id"]])
+
+
 @pytest.fixture(scope="module")
 def content_sessions_cohort() -> dict:
-    return _cohort(content_rows)
+    return _cohort(_content_rows)
+
+
+#: The share noise of the content model: one categorical choice per event;
+#: a multinomial of the event's decode bins; the same, overdispersed.
+CONTENT_NOISE = {
+    "categorical": {},
+    "multinomial": {"n_trials": "n_bins"},
+    "dirichlet_multinomial": {"n_trials": "n_bins", "concentration": 2.0},
+}
+
+
+@pytest.mark.parametrize("noise", list(CONTENT_NOISE))
+def test_content_share_noise(noise: str, content_sessions_cohort) -> None:
+    """Each share noise model, chosen by the scenario, draws shares of the
+    kind it names (0 or 1; counts over the event's ``n_bins``), and the
+    planted current-role coefficient is recovered (bias within 2 SEs and the
+    weak penalty's shrinkage)."""
+    sessions = content_sessions_cohort
+    model = content_model(sessions)
+    scenario = InsideScenario(
+        noise, CONTENT_INSIDE.coefficients, **CONTENT_NOISE[noise]
+    )
+    key = next(iter(sessions))
+    drawn = draw_data_set(model, sessions, scenario, np.random.default_rng(1))[key]
+    share = drawn["share"].to_numpy()
+    np.testing.assert_allclose(drawn.groupby("event_id")["share"].sum(), 1.0)
+    if noise == "categorical":
+        assert set(np.unique(share)) == {0.0, 1.0}
+    else:
+        counts = share * drawn["n_bins"].to_numpy()
+        np.testing.assert_allclose(counts, np.round(counts), atol=1e-9)
+        assert len(np.unique(share)) > 2
+    result = engine.run(_simulation(model, sessions, [scenario], n_data_sets=6))
+    row = result.summary.iloc[0]
+    assert row["planted"] == 1.0
+    # The weak penalty (prior SD 2) shrinks the coefficient by about 0.01 at
+    # this size: with the prior SD at 100, 30 data sets of the multinomial
+    # gave a bias of 0.006 (SE 0.005), and at SD 2, 6 data sets -0.025 (SE
+    # 0.006). The bound allows that shrinkage beside 2 SEs.
+    assert abs(row["bias"]) < 2 * row["bias_se"] + 0.02
 
 
 def _simulation(model, sessions, scenarios, n_data_sets=2, seed=5) -> Simulation:
@@ -412,7 +461,7 @@ def reference_tables() -> dict[str, list[dict]]:
     """The summary tables of the fixture: the rate model under the inside and
     the outside scenario, and the content model inside, on fixed seeds."""
     rate_sessions = _cohort(rate_rows)
-    content_sessions = _cohort(content_rows)
+    content_sessions = _cohort(_content_rows)
     rate = engine.run(
         _simulation(
             rate_model(rate_sessions),

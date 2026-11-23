@@ -722,9 +722,14 @@ penalty (`support.require_tested_penalized`; the engine refuses the model otherw
 
 **The draws.** `likelihoods.draw(lik, eta, aux, rng)` draws outcomes at a linear
 predictor: Poisson counts at `exp(eta + offset)`, Bernoulli 0/1, Gaussian with a given
-variance, and under the grouped softmax `n_trials` choices per group by the Gumbel-max
-draw, the outcome being each row's share of them (shares sum to one, as the content
-response does). The draws use only a NumPy `Generator`, never the fitter, so the same
+variance, and under the grouped softmax each row's share of its group (shares sum to
+one, as the content response does). The softmax has three noise models, which a scenario
+chooses (`n_trials`, `concentration`; a number, or a column that holds one per event):
+one categorical choice per event (a share is 0 or 1, variance `p (1 - p)`); a multinomial
+of `n` choices, such as the event's decode bins (variance `p (1 - p) / n`); and a
+Dirichlet-multinomial of `n` choices with concentration `a` (variance
+`p (1 - p) (n + a) / (n (1 + a))`). Each has the model's mean share `p`. The fit treats
+each event as one choice, so the noise model decides what a content simulation shows. The draws use only a NumPy `Generator`, never the fitter, so the same
 seeds give the same data after the solver changes. Data set `i` of the scenario at place
 `s` of the list is drawn from `SeedSequence([seed, s, i])`, the sessions in order; each
 (model, estimand) of the data set has its own bootstrap seed, spawned from it. A run of

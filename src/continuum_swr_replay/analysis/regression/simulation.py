@@ -34,7 +34,9 @@ i).spawn(...)`` (:func:`bootstrap_seeds`).
 
 A row with a missing value the design reads gets a missing outcome: the fit
 removes it in any case. Under the grouped softmax a group's outcome is drawn
-over its rows that are not missing.
+over its rows that are not missing, by the noise model the scenario chooses
+(``n_trials`` and ``concentration``: one categorical choice per event, a
+multinomial, or a Dirichlet-multinomial; :func:`.likelihoods.draw`).
 
 What depends only on the rows is computed once per run: each session's
 offset, its rows with a missing value, and its linear predictor under each
@@ -71,7 +73,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
 
 from .contrasts import evaluate_contrast
-from .likelihoods import GroupedSoftmax, Likelihood, Poisson, draw
+from .likelihoods import GroupedSoftmax, Likelihood, Poisson, draw, group_starts
 from .newton import CONVERGED
 from .record import FitRecord, NoFit
 from .sessions import NOT_FITTED, SessionKey, fit_sessions
@@ -167,15 +169,25 @@ class InsideScenario:
     scale : float or None
         The Gaussian's variance; required under the Gaussian, not read
         otherwise.
-    n_trials : int
-        The choices per group of a share draw under the grouped softmax
-        (:func:`.likelihoods.draw`).
+    n_trials : int or str
+        Under the grouped softmax, the choices per event of the share draw
+        (:func:`.likelihoods.draw`): a number, or the name of a column of the
+        rows that holds it for each event (read on the event's first row;
+        for example the event's number of decode bins). 1 with no
+        concentration is one categorical draw per event; more is a
+        multinomial. Not read otherwise.
+    concentration : float, str or None
+        Under the grouped softmax, the Dirichlet concentration of an
+        overdispersed (Dirichlet-multinomial) share draw: a number, or the
+        name of a column that holds it for each event; None for none. Not
+        read otherwise.
     """
 
     name: str
     coefficients: Mapping[str, float]
     scale: float | None = None
-    n_trials: int = 1
+    n_trials: int | str = 1
+    concentration: float | str | None = None
 
 
 #: Each session's rows -> its expected outcome per row, shape ``(n_rows,)``:
@@ -203,7 +215,7 @@ class OutsideScenario:
         Estimand name -> its planted value, a number or a function of the
         :class:`Model` that returns one (a module-level function, for a run
         with workers); an estimand not named has the planted value NaN.
-    scale, n_trials
+    scale, n_trials, concentration
         As :class:`InsideScenario`.
     """
 
@@ -213,7 +225,8 @@ class OutsideScenario:
         default_factory=dict
     )
     scale: float | None = None
-    n_trials: int = 1
+    n_trials: int | str = 1
+    concentration: float | str | None = None
 
 
 Scenario = InsideScenario | OutsideScenario
@@ -361,9 +374,18 @@ def _check_expected(lik: Likelihood, mean: np.ndarray, where: str) -> None:
         raise ValueError(f"{where}: an expected probability is outside [0, 1]")
 
 
+def _per_event(value: object, frame: pd.DataFrame, first: np.ndarray) -> object:
+    """A noise parameter of the softmax draw: a number as it is; a column's
+    value on each event's first row, shape ``(n_events,)``."""
+    if isinstance(value, str):
+        return frame[value].to_numpy(dtype=float)[first]
+    return value
+
+
 def _draw_session(
     model: Model,
     scenario: Scenario,
+    frame: pd.DataFrame,
     prepared: _Prepared,
     eta: np.ndarray,
     rng: np.random.Generator,
@@ -376,6 +398,16 @@ def _draw_session(
     if isinstance(lik, GroupedSoftmax):
         rows = rows[np.argsort(prepared.unit[rows], kind="stable")]
         aux = prepared.unit[rows]
+        first = rows[group_starts(aux)]
+        y[rows] = draw(
+            lik,
+            eta[rows],
+            aux,
+            rng,
+            n_trials=_per_event(scenario.n_trials, frame, first),
+            concentration=_per_event(scenario.concentration, frame, first),
+        )
+        return y
     elif isinstance(lik, Poisson):
         aux = np.zeros(rows.size) if prepared.offset is None else prepared.offset[rows]
     elif lik.name == "gaussian":
@@ -384,7 +416,7 @@ def _draw_session(
         aux = scenario.scale
     else:
         aux = None
-    y[rows] = draw(lik, eta[rows], aux, rng, n_trials=scenario.n_trials)
+    y[rows] = draw(lik, eta[rows], aux, rng)
     return y
 
 
@@ -418,7 +450,7 @@ def _draw(
         key: rows.assign(
             **{
                 model.response: _draw_session(
-                    model, scenario, prepared[key], etas[key], rng
+                    model, scenario, rows, prepared[key], etas[key], rng
                 )
             }
         )
