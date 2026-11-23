@@ -694,9 +694,9 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
     from the animal in each of ten Local-probability bins, over all analyzed
     time (``quality_metrics.animal_distance_by_local_probability``: each
     session's median distance between the animal and the maximum of the
-    position estimate conditional on the non-local states, the mean over an
-    animal's sessions, then over animals, with the smallest and largest
-    animal). The keys keep their old name; the quantity is not a calibration."""
+    position estimate conditional on the non-local states, the median over an
+    animal's sessions, then the mean over animals, with the smallest and
+    largest animal). The keys keep their old name; the quantity is not a calibration."""
     make = value_factory(calibration_values, source, TAGS["calibration"])
     _, curve = quality_metrics.animal_distance_by_local_probability(calibration)
     if len(curve) != len(CALIBRATION_BINS):
@@ -725,7 +725,7 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
                 row["animal_mean"],
                 "quantity",
                 "sig2",
-                f"mean over animals of each animal's mean over its sessions of {what}",
+                f"mean over animals of each animal's median over its sessions of {what}",
                 "cm",
             ),
             make(

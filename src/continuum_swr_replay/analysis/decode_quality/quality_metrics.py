@@ -1368,10 +1368,11 @@ def animal_distance_by_local_probability(
     The distance is each session's median, in a bin of ``Local_prob``, of the
     distance along the track between the animal and the maximum of the position
     estimate conditional on the non-local states (:func:`compute_calibration_curve`'s
-    ``median_error_cm``). An animal's value in a bin is the mean over its
+    ``median_error_cm``). An animal's value in a bin is the median over its
     sessions of each session's median
-    (``shared_statistics.animal_session_values``); then the mean over animals,
-    with the smallest and largest animal. Not a calibration: no stated
+    (``shared_statistics.animal_session_values``; a mean over sessions is
+    carried by the few sessions with a large value); then the mean over
+    animals, with the smallest and largest animal. Not a calibration: no stated
     probability is compared with a frequency.
 
     Parameters
@@ -1393,7 +1394,10 @@ def animal_distance_by_local_probability(
     by_animal = pd.DataFrame(
         {
             center: animal_session_values(
-                rows["median_error_cm"], rows["animal"], rows[["day", "epoch"]], "mean"
+                rows["median_error_cm"],
+                rows["animal"],
+                rows[["day", "epoch"]],
+                "median",
             )
             for center, rows in calibration.groupby("prob_bin_center")
         }

@@ -467,7 +467,7 @@ def test_the_probability_panel_draws_each_animals_time_by_nonlocal_probability(
 
 
 def test_the_decoded_place_panel_draws_each_animals_distance_and_their_mean(drawn):
-    """A thin line per animal (the mean over its sessions) and the mean over
+    """A thin line per animal (the median over its sessions) and the mean over
     animals in bold against the Local probability; no word of calibration."""
     by_animal, statistics = _decoded_distance()
     (ax,) = figure.panel_axes(drawn, "decoded_distance")

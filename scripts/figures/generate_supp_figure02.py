@@ -90,7 +90,7 @@ the order the text cites them, in six rows:
         (``ahead_behind_distance`` of the decode frame), each session's median
         in ten equal Local-probability bins
         (``quality_metrics.compute_calibration_curve``, the decoder-quality
-        run's table); a thin line per animal (the mean over its sessions) and
+        run's table); a thin line per animal (the median over its sessions) and
         the mean over animals in bold
         (``quality_metrics.animal_distance_by_local_probability``; the events
         summary's ``calibration_error_bin_*`` values, whose keys keep their old
@@ -1363,7 +1363,7 @@ def draw_decoded_distance(
     """The decoded-place panel: how far the decoded place (the maximum of the
     position estimate conditional on the non-local states) is from the animal
     against the Local probability, over all analyzed time, a thin line per
-    animal (the mean over its sessions of each session's median) and the mean
+    animal (the median over its sessions of each session's median) and the mean
     over animals in bold (``by_animal``, ``statistics``: :func:`read_inputs`'
     ``distance``, ``quality_metrics.animal_distance_by_local_probability``)."""
     centers = by_animal.index.to_numpy()

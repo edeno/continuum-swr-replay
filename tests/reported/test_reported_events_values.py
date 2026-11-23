@@ -157,11 +157,11 @@ def test_state_fraction_values_name_each_movement_and_state():
             assert value.figures == builder.TAGS["state_fractions"].figures
 
 
-def test_calibration_values_are_each_bins_mean_over_animals_of_session_means():
-    """Animal a has two sessions, with distances 10 - k and 20 - k in bin k:
-    its value is 15 - k; animal b has one, 5 - k/2. The value is the mean over
-    animals, not over the three sessions pooled, with the smallest and largest
-    animal."""
+def test_calibration_values_are_each_bins_mean_over_animals_of_session_medians():
+    """Animal a has three sessions, with distances 10 - k, 20 - k and 60 - k in
+    bin k: its value is their median, 20 - k (their mean would be 30 - k);
+    animal b has one, 5 - k/2. The value is the mean over animals, not over the
+    four sessions pooled, with the smallest and largest animal."""
     centers = (np.arange(10) + 0.5) / 10
     rows = [
         {"animal": animal, "day": 1, "epoch": epoch, "prob_bin_center": c,
@@ -169,6 +169,7 @@ def test_calibration_values_are_each_bins_mean_over_animals_of_session_means():
         for animal, epoch, value in (
             ("a", 1, lambda k: 10.0 - k),
             ("a", 2, lambda k: 20.0 - k),
+            ("a", 3, lambda k: 60.0 - k),
             ("b", 1, lambda k: 5.0 - k / 2),
         )
         for k, c in enumerate(centers)
@@ -179,7 +180,7 @@ def test_calibration_values_are_each_bins_mean_over_animals_of_session_means():
 
     for k, word in enumerate(builder.CALIBRATION_BINS):
         key = f"calibration_error_bin_{word}"
-        a, b = 15.0 - k, 5.0 - k / 2
+        a, b = 20.0 - k, 5.0 - k / 2
         assert values[key].value == pytest.approx((a + b) / 2)
         assert values[f"{key}_animal_min"].value == pytest.approx(min(a, b))
         assert values[f"{key}_animal_max"].value == pytest.approx(max(a, b))
