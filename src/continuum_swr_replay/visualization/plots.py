@@ -509,7 +509,9 @@ def plot_spike_times(
         linelengths=0.9,
         linewidths=1,
     )
-    ax.set_yticks((1, n_neurons))
+    # eventplot draws row k at y = k (0 to n - 1): ticks on the first and last
+    # rows, labeled by their number from 1
+    ax.set_yticks((0, n_neurons - 1), (1, n_neurons))
     ax.fill_between(
         non_local_probabilities.time,
         (np.ones_like(non_local_probabilities.values) * n_neurons) + 0.75,

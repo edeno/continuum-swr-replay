@@ -9,7 +9,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         stretches and the SWRs; the counted non-local events are shaded.
     b — Six examples: a non-local event inside an SWR, one that starts before
         its SWR, one that ends after it, two with no SWR (a trajectory and a
-        stationary event), and an SWR whose content is Local.
+        stationary event), and an SWR whose content is Local; the ripple
+        traces carry panel a's dashed SWR threshold.
     c — The SWRs by content (bars pooled over SWRs, dots one per animal): with a
         non-local event, mostly Local, or other. The decoder finds the replay
         SWRs are known for.
@@ -519,7 +520,7 @@ def _compute_figure_inputs(
     """Run the expensive loads and derivations; return the cached render inputs.
 
     The example session's ``data``/``results``/``detector``/``env`` (panels a
-    and b), the triggered-average curves (i) over the frames' rows of
+    and b), the triggered-average curves (g) over the frames' rows of
     ``events`` (the selected events), the frames' immobile non-local events by
     SWR overlap, which the canonical event table is checked against, and the
     detector comparison (c and e). The multi-GB ``data_over_time`` is consumed
@@ -994,6 +995,8 @@ def draw_examples(
         center = (start + end) / 2
         sl = slice(center - EXAMPLE_HALF_WINDOW_S, center + EXAMPLE_HALF_WINDOW_S)
         plot_ripple_consensus_trace_zscore(data, sl, ax_rip)
+        # the SWR threshold as panel a draws it, under the trace
+        ax_rip.axhline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.5, ls="--", zorder=-1)
         plot_spike_times(data, sl, detector, env, results, ax_raster)
         draw_posterior(ax_post, data, results, env, sl, center, max_pos)
         draw_state_stack(ax_states, results, sl, center)
