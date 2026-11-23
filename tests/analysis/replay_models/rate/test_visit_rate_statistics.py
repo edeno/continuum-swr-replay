@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.regression.contrasts import range_grid
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.replay_models.declared_tests import DIFFERENCE
 from continuum_swr_replay.analysis.replay_models.rate import visit_rate as vr
@@ -18,6 +17,7 @@ from continuum_swr_replay.analysis.replay_models.rate.visit_rate_statistics impo
     lag_curves,
     session_estimands,
     summarize_estimands,
+    third_clock_q7a,
 )
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
 
@@ -45,20 +45,35 @@ def cohort(make_visit_rows, cohort_of):
     return out
 
 
+def _at_clock(rows: pd.DataFrame, clock: str, lo: float, hi: float) -> pd.DataFrame:
+    """One row of the session repeated at clock values from ``lo`` to ``hi``
+    in steps of 0.01 s, every other column held."""
+    grid = np.arange(round(lo * 100), round(hi * 100) + 1) / 100.0
+    frame = rows.iloc[[0] * grid.size].reset_index(drop=True)
+    frame[clock] = grid
+    return frame
+
+
 def test_estimands_are_linear_functionals(cohort) -> None:
-    """Q1 and Q7a are the grid means of the fitted smooths over their
-    windows; Q2 is the reward coefficient; each variance is ``c' V c``. The
-    session without an event has no fit and no value."""
-    fit = vr.fit_visit_rate(cohort, model="A", kind="SWR", settings=SETTINGS)
+    """Q1 and Q7a are the differences of the mean linear predictor of the
+    full design (``Design.session``) at the clock values of their windows,
+    every other column held, so that every other term cancels; Q2 is the
+    reward coefficient; each variance is ``c' V c`` with ``c`` the same
+    difference of the design rows. The session without an event has no fit
+    and no value."""
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=SETTINGS, allow_provisional="test"
+    )
     values = (
         session_estimands(fit)
         .set_index(["animal", "session_date", "estimand_id"])
         .sort_index()
     )
-    c = vr.declared_contrasts(fit.design, SETTINGS)
-    arrival = vr.curve_rows(fit.design, f"s({vr.ARRIVAL})")
-    leaving = vr.curve_rows(fit.design, f"s({vr.LEAVING})")
-    for record in fit.records:
+    windows = {
+        "Q1": (vr.ARRIVAL, (2.0, 4.0), (0.0, 1.0)),
+        "Q7a": (vr.LEAVING, (0.0, 0.25), (1.0, 2.0)),
+    }
+    for rows, record in zip(cohort.values(), fit.records, strict=True):
         at = (record.animal, record.session_date)
         if record.status != CONVERGED:
             assert record.no_fit == "no_events"
@@ -66,18 +81,18 @@ def test_estimands_are_linear_functionals(cohort) -> None:
             continue
         beta = np.asarray(record.coef)
         vcov = np.asarray(record.vcov)
-        q1 = (arrival(range_grid(2.0, 4.0)) @ beta).mean() - (
-            arrival(range_grid(0.0, 1.0)) @ beta
-        ).mean()
-        q7a = (leaving(range_grid(0.0, 0.25)) @ beta).mean() - (
-            leaving(range_grid(1.0, 2.0)) @ beta
-        ).mean()
-        q2 = beta[fit.design.coef_names.index(vr.REWARD)]
-        for estimand_id, expected in (("Q1", q1), ("Q2", q2), ("Q7a", q7a)):
+        session_rows = rows.rows["A"]
+        c = {}
+        for estimand_id, (clock, first, second) in windows.items():
+            X_first, _ = fit.design.session(_at_clock(session_rows, clock, *first))
+            X_second, _ = fit.design.session(_at_clock(session_rows, clock, *second))
+            c[estimand_id] = X_first.mean(axis=0) - X_second.mean(axis=0)
+        c["Q2"] = np.eye(len(beta))[fit.design.coef_names.index(vr.REWARD)]
+        for estimand_id, contrast in c.items():
             row = values.loc[(*at, estimand_id)]
-            assert row["estimate"] == pytest.approx(expected, rel=1e-10)
-            variance = c[estimand_id] @ vcov @ c[estimand_id]
-            assert row["variance"] == pytest.approx(variance, rel=1e-10)
+            assert row["estimate"] == pytest.approx(contrast @ beta, rel=1e-9)
+            variance = contrast @ vcov @ contrast
+            assert row["variance"] == pytest.approx(variance, rel=1e-9)
             assert row["se"] == pytest.approx(np.sqrt(variance))
     assert sum(r.status == CONVERGED for r in fit.records) == 3
 
@@ -138,7 +153,9 @@ def test_difference_between_kinds() -> None:
 
 
 def test_lag_curves_and_their_band(cohort) -> None:
-    fit = vr.fit_visit_rate(cohort, model="D", kind="SWR", settings=SETTINGS)
+    fit = vr.fit_visit_rate(
+        cohort, model="D", kind="SWR", settings=SETTINGS, allow_provisional="test"
+    )
     curves = lag_curves(fit, seed=0)
     assert len(curves) == len(fit.records) * len(vr.LAGS)
     fitted = curves.dropna(subset=["estimate"])
@@ -150,3 +167,53 @@ def test_lag_curves_and_their_band(cohort) -> None:
     assert np.all(band.low < band.high)
     with pytest.raises(ValueError, match="model A"):
         session_estimands(fit)
+
+
+def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> None:
+    """A drop on the leaving clock only, in visits of one or two stretches:
+    Q7a of each fit is its own session value, the difference is with less
+    without, and each summary is ``estimand_summary`` of its column."""
+    rng = np.random.default_rng(8)
+    cohort = {}
+    for i in range(3):
+        key = (f"rat{i}", "20200101", "02_r1")
+        rows = make_visit_rows(key, n_visits=80, seed=80 + i)
+        truth = scenarios.drop_before_leaving(
+            rows, CLOCKS.arrival, drop=1.0, total=800.0
+        )
+        rows["count"] = rng.poisson(truth.expected).astype(float)
+        cohort[key] = cohort_of(rows, "SWR")
+    fits = {
+        include: vr.fit_visit_rate(
+            cohort,
+            model="A",
+            kind="SWR",
+            settings=vr.VisitRateSettings(include_stretch_clock=include),
+            allow_provisional="test",
+        )
+        for include in (True, False)
+    }
+    compared = third_clock_q7a(fits[True], fits[False], n_draws=200, seed=2)
+    sessions = compared.sessions
+    assert len(sessions) == 3 and (sessions["kind"] == "SWR").all()
+    for include, column in ((True, "with_stretch"), (False, "without_stretch")):
+        q7a = session_estimands(fits[include])
+        q7a = q7a[q7a["estimand_id"] == "Q7a"]["estimate"].to_numpy()
+        assert sessions[column].to_numpy() == pytest.approx(q7a)
+    assert sessions["difference"].to_numpy() == pytest.approx(
+        sessions["with_stretch"] - sessions["without_stretch"]
+    )
+    summary = compared.summary.set_index("value")
+    for column in ("with_stretch", "without_stretch", "difference"):
+        expected = estimand_summary(
+            sessions[column],
+            sessions["animal"],
+            sessions["session_date"],
+            sessions["epoch"],
+            n_draws=200,
+            seed=2,
+        )
+        for name, value in expected.items():
+            assert summary.loc[column, name] == pytest.approx(value, nan_ok=True)
+    with pytest.raises(ValueError, match="does not"):
+        third_clock_q7a(fits[False], fits[True], n_draws=10, seed=0)

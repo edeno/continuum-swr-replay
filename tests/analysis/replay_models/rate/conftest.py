@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.replay_models.rate.visit_rate import (
     REWARD,
     STRETCH,
     CohortRows,
+    model_d_rows,
 )
 from continuum_swr_replay.analysis.replay_models.visit_design import (
     REWARD_LAG_COLUMNS,
@@ -38,6 +39,7 @@ def synthetic_visit_rows(
     p_reward: float = 0.6,
     two_stretch_share: float = 0.5,
     length_s: tuple[float, float] = (1.5, 8.0),
+    omission_length_s: tuple[float, float] | None = None,
 ) -> pd.DataFrame:
     """One session's synthetic in-visit bins (module docstring).
 
@@ -56,6 +58,9 @@ def synthetic_visit_rows(
         leaving clock in every bin.
     length_s : tuple of float
         The range of the visits' lengths (uniform).
+    omission_length_s : tuple of float, optional
+        The range of the lengths of the visits whose last outcome is an
+        omission; None draws them from ``length_s`` too.
 
     Returns
     -------
@@ -66,13 +71,14 @@ def synthetic_visit_rows(
     outcomes = (rng.random(n_visits + len(REWARD_LAG_COLUMNS)) < p_reward).astype(float)
     parts = []
     for visit in range(n_visits):
-        length = rng.uniform(*length_s)
+        history = outcomes[visit : visit + len(REWARD_LAG_COLUMNS)][::-1]
+        omitted = history[0] == 0.0 and omission_length_s is not None
+        length = rng.uniform(*(omission_length_s if omitted else length_s))
         if rng.random() < two_stretch_share:
             cut = rng.uniform(0.3, length - GAP_S - 0.3)
             stretches = [(0.0, cut), (cut + GAP_S, length)]
         else:
             stretches = [(0.0, length)]
-        history = outcomes[visit : visit + len(REWARD_LAG_COLUMNS)][::-1]
         for index, (start, end) in enumerate(stretches):
             left = np.arange(start, end - 1e-9, bin_s)
             right = np.minimum(left + bin_s, end)
@@ -103,8 +109,10 @@ def synthetic_visit_rows(
 
 
 def as_cohort(rows: pd.DataFrame, kind: str) -> CohortRows:
-    """Synthetic rows as the cohort step gives them (both models, no counts)."""
-    return CohortRows(kind, {"A": rows, "D": rows}, {})
+    """Synthetic rows as the cohort step gives them: model A's are the rows,
+    model D's are ``model_d_rows`` of them, with its counts."""
+    rows_d, counts = model_d_rows(rows)
+    return CohortRows(kind, {"A": rows, "D": rows_d}, counts)
 
 
 @pytest.fixture
