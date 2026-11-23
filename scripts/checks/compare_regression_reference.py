@@ -25,7 +25,8 @@ penalties with two models:
 
 The tables are read only, from ``$CSR_PROCESSED_DATA_DIR``; nothing is written
 there. ``--write DIR`` writes the records (every field, as plain values) to
-``DIR/real_slice.json`` with the commit; ``--against DIR`` fits the slice again
+``DIR/real_slice.json`` with the commit; a ``DIR`` inside the repository or
+under the processed-data root is refused before anything is read; ``--against DIR`` fits the slice again
 and compares it with that file by the rule of
 ``_regression_reference.differences`` (a float within ``1e-11 + 1e-9 |b|``, the
 rest equal), exiting 1 on a difference. Real data are not committed: the stored
@@ -81,7 +82,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     format_epoch_identifier,
     nwb_file_name,
 )
-from continuum_swr_replay.paths import table_path  # noqa: E402
+from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty  # noqa: E402
 from scripts.checks import _regression_reference as reference  # noqa: E402
@@ -198,6 +199,26 @@ def real_slice() -> dict:
     return reference.plain({"rate": rate_records(), "content": content_records()})
 
 
+def why_not_a_write_folder(folder: Path, repo: Path = REPO) -> str | None:
+    """Why ``folder`` may not hold the slice's fits, or None when it may.
+
+    The fits are of real sessions: they are not committed, so they may not be
+    written inside the repository, nor among the canonical tables, under the
+    processed-data root. Both are compared after resolving links.
+    """
+    folder = folder.resolve()
+    for root, what in (
+        (repo.resolve(), "the repository"),
+        (processed_data_dir().resolve(), "the processed-data root"),
+    ):
+        if folder.is_relative_to(root):
+            return (
+                f"--write {folder} is inside {what} ({root}): the fits of real "
+                "sessions go to a scratch folder outside both"
+            )
+    return None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -205,6 +226,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     action.add_argument("--write", type=Path, help="Write the slice's fits here.")
     action.add_argument("--against", type=Path, help="Compare with the fits here.")
     args = parser.parse_args(argv)
+    if args.write and (refused := why_not_a_write_folder(args.write)):
+        parser.error(refused)
     fits = real_slice()
     for model, records in fits.items():
         statuses = pd.Series([r["status"] for r in records]).value_counts().to_dict()
