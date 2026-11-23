@@ -1,0 +1,8 @@
+{
+"commit": "093c926a7ced5ab81970c8e8da737c4b7feae233",
+"command": "python scripts/checks/write_regression_reference.py",
+"versions": {"python": "3.11.13", "numpy": "2.3.4", "scipy": "1.16.3"},
+"cases": {
+"rate_edf_4": {"log_penalty": 1.580047607421875, "median_edf": 3.9998304652737158, "n_sessions_used": 6, "edf": [4.489322088448331, 3.98073202689777, 3.9469694408761455, 4.018928903649662, 3.9599989464745486, 4.085339399444209]}
+}
+}
