@@ -872,19 +872,92 @@ The lead: "I would prefer a jax fitter for all models".
   before and after it and the engine checks the port. The author told the lead this order and its
   reason, and the lead did not object.
 
-### Open after the twenty-first round
+### Twenty-second round (lead, 2026-11-23, 13:00 and 13:02): a weak penalty on simple coefficients
 
-Each of these is open. None is decided by the rounds above.
+At 13:00 the author listed five options for the reward coefficient of the rate model (item a of the open
+list below): the event-based support rule of the plan; a lower minimum; counting visits with at-risk time;
+a weak penalty on the coefficient; one coefficient for several sessions. The lead: "I think weak penalty".
 
-a. **The reward term's support rule.** The planned rule (5 visits with an event on each side) fails in
-   86 % of the real SWR sessions and 42 % of the No SWR sessions (counts of the input tables, not
-   results). That is over the plan's 20 % limit (`MAX_FAILING_SHARE`), so by the plan the term would leave the
-   per-session model. The author proposed to count visits with at-risk time on each side: every one of
-   the 242 sessions passes, and a session with no event after an omission then has no finite maximum
-   (12.8 % of SWR sessions) and is reported with the term missing (sixteenth round). Simulation with the
-   plain fit: bias +0.05 to +0.10 on the log scale, and the project's interval covered the planted value
-   in 0.975 to 1.00 of data sets; the planned rule gave -0.23 at a threefold effect. The lead has not
-   said yes to the changed rule in words.
+At 13:02 the author asked: "For consistency, should the same weak penalty apply to every simple tested
+coefficient in every model? I recommend yes, with a simulation check for each family before use." The
+lead: "yes".
+
+- The reward coefficient of the rate model has a weak penalty. Item a of the open list is decided.
+- Every simple tested coefficient (a 0/1 step, a slope, a level of a tested category) in every model has
+  the same weak penalty. Each family's simulation (Phase 2b's engine, the family's scenario list) checks
+  the penalty before the family's fit is used.
+- This replaces two sentences of section 4.3: "Terms with no smooth ... carry no penalty and must pass the
+  support rule below", and the support rule "decided from the data before the fit (the term varies in too
+  few units with events on each side)".
+
+The author's calls that go with these decisions (**call**, each):
+
+- Baselines are not penalized: the intercept, the arm effects and the other nuisance categories.
+  Greenland and Mansournia (2015, Statistics in Medicine 34:3133, doi 10.1002/sim.6537) advise a weak
+  penalty on coefficients as a default for sparse data, caution against penalizing intercepts, and advise
+  a sensitivity analysis over the strength.
+- A guard stays, and it reads the design only, never the outcome. A term is absent in a session when its
+  column does not vary enough there: fewer than 5 units with a row on each side (a level: with a row of the
+  level; a continuous slope: above and below the median of its rows; a constant column fails). No rule
+  reads the event counts before a fit. What happens to a failing term is unchanged (inactive; a level's
+  rows dropped), and the 20 % rule stays, on these counts. Under the grouped softmax every candidate row
+  belongs to an event, so the counts there do not change.
+- A penalized coefficient always has a finite maximum, so a session with no event on one side of a
+  penalized term is fitted with the term in. An unpenalized term in that case still has no finite maximum
+  and is left out by the sixteenth round's rule.
+- Each fit records how much the penalty mattered: the effective parameters of each penalized simple
+  coefficient (near 1: the data decide; near 0: the penalty decides).
+- The width is one declared number for all models: a Normal prior SD on the coefficient in the
+  convention's reported unit (a 0/1 step; one pooled SD of a continuous covariate). The log penalty is
+  `log(1 / SD^2)`. Its value is not chosen yet (open item g below).
+
+Built: the penalty on `Slope` and `Category` and the support rule on the design, branch `weak-penalty`,
+commit aa8f8425 (`docs/design/regression_fitter.md`, "Terms and their names" and "The support rule").
+
+### Twenty-third round (lead, 2026-11-23, 12:34 and 13:21): the JAX port goes ahead without blocking Figure 4
+
+At 12:34 the lead said, on one JAX fitter: "I think I would in general prefer one fitter, but if there's a
+good reason not to, then that's fine". The author then measured whole workloads with the present fitter
+and a JAX prototype, under load (absolute times rough;
+`.claude/docs/plans/regression-convention/jax-fitter-timing.md`):
+
+| Workload | NumPy, 32 processes | JAX CPU, 32 processes | JAX, one A100 |
+|---|---|---|---|
+| One whole fit of a rate session | 0.349 s (one core) | 0.727 s (one core) | 0.102 s |
+| The real rate fit | 32 s | 1.4 min | 5.2 min |
+| One penalty calibration | 6.3 min | 13.5 min | 60 min |
+| One simulation sweep | 42 min | 1.5 h | 6.6 h |
+| The content fit | under 1 min | under 1 min | under 1 min |
+| The mPFC fit at its present size (extrapolated) | 3.1 h | 2.0 h | 15 min |
+
+Fits that share one design, batched, took 0.8 ms each on the GPU against 311 ms in a NumPy loop.
+
+The lead asked "what do you recommend?". The author recommended that the port go ahead without blocking
+Figure 4, in this order:
+
+1. the weak-penalty change in the present fitter (twenty-second round);
+2. the simulation engine;
+3. in parallel, on separate branches, the rate model and the JAX port;
+4. the port replaces the solver, and every fit is rerun once to confirm equality.
+
+The lead: "ok".
+
+- Item d of the open list (the port's speed) is decided. The entry condition of the JAX fitter phase is
+  met.
+- (**call**) The acceptance rule of the port (twenty-first round) gets an absolute floor: a value `b`
+  matches when the difference is at most `1e-11 + 1e-9 |b|`, with the statuses and counts exactly equal.
+  The prototype had one coefficient near zero (about 4e-4) at a relative difference of 5.4e-9. The author
+  told the lead, and the lead did not object.
+
+### Open after the twenty-third round
+
+Each of these is open unless it says it is decided.
+
+a. *(Decided in the twenty-second round: a weak penalty on the reward coefficient, and on every simple
+   tested coefficient; the support rule reads the design.)* The evidence that led to it: the planned
+   event-based rule (5 visits with an event on each side) failed in 86 % of the real SWR sessions and 42 %
+   of the No SWR sessions (counts of the input tables, not results), over the plan's 20 % limit
+   (`MAX_FAILING_SHARE`).
 b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled; not results): omission
    visits have a median length of 0.9 s against 5.4 s after reward. SWR events almost never start in the
    first second after arrival after either outcome (none in 93 % of sessions), so the first window of Q1
@@ -896,15 +969,16 @@ b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled;
    time range; whether the reward effect may change with time since arrival; the reference window of
    Q1; the value of each clock's penalty.
 c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
-d. **The JAX port's speed.** Whether a slower fit on one CPU core is acceptable. Measured under load, one
-   core: 0.41 s against 0.26 s for one rate-sized fit, plus 0.6 s to compile each new shape; GPU and
-   several threads not measured. The lead: "depends on how much time things take". (The acceptance rule
-   is decided; the order is a call; both in the twenty-first round.)
+d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
+   has an absolute floor.)*
 e. **The penalties of the mPFC models and of the history kernels.** Whether a penalty chosen over the
    many units of one session, or the declared-penalty rule, applies there. Decided at those phases.
 f. **A support rule per grid point** for curves averaged over sessions (an idea of the author; not built,
    not decided). Simulation: few sessions have bins near the 20 s end of the arrival clock, and the
    average curve is far off there.
+g. **The width of the weak penalty.** One declared prior SD for all models, in the reported unit. Not
+   chosen. A simulation with SD 1, 2 and 4 is running. Each family reports a sensitivity analysis over the
+   strength (Greenland and Mansournia 2015).
 
 ## 10. Left to the builder
 

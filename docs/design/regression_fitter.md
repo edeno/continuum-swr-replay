@@ -501,8 +501,9 @@ rule are in the module docstring. A term that fails in more than `MAX_FAILING_SH
 A smooth and a lag functional have no counts; every term is judged by the design check.
 
 The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
-side. The lead chose a weak penalty on each simple tested coefficient in place of a
-support rule on the events (design, section 9, twenty-second and twenty-third rounds).
+side. The lead chose a weak penalty on the reward coefficient and on every simple tested
+coefficient; a guard that reads the design only is the author's call that goes with it
+(design, section 9, twenty-second round).
 Under the grouped softmax every candidate row belongs to an event, so the counts are the
 same as before (`test_support.py::test_softmax_counts_are_those_of_the_event_rule`, the
 records of two content sessions against the old rule's counts at commit `ec1ae69c`).
