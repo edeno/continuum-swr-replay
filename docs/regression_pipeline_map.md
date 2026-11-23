@@ -896,7 +896,7 @@ Run the port and the reference's own arithmetic on one input, and compare.
 
 Fit a real slice with the shared regression fitter, and compare it with a stored fit of the same slice.
 
-`rate_sessions`, `content_sessions`, `rate_records`, `content_records`, `real_slice`, `main`
+`rate_sessions`, `content_sessions`, `rate_records`, `content_records`, `real_slice`, `why_not_a_write_folder`, `main`
 
 ### `scripts/checks/compare_regression_to_current_fitters.py`
 
