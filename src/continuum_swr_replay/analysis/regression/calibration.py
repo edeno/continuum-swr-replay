@@ -11,10 +11,15 @@ model's term as a constant.
 Each session is fitted by :func:`.sessions.fit_sessions`, the loop the model
 itself uses (its support rule, its rows and its refits), and the edf is the
 one its records hold. The median is over the sessions with a kept fit in which
-the term is fitted. It is searched by bisection on the log penalty inside
-``LOG_PENALTY_BOUNDS``, assuming that the median edf falls as the penalty
-rises; the search is deterministic. A bound is fitted only when the bracket
-ends there, to tell whether the target is out of reach.
+the term is fitted, so the set of sessions can change with the penalty: a
+session whose fit is not kept at one penalty drops out of the median there.
+It is searched by bisection on the log penalty inside ``LOG_PENALTY_BOUNDS``,
+assuming that the median edf falls as the penalty rises; the search is
+deterministic. A bound is fitted only when the bracket ends there, to tell
+whether the target is out of reach. The median at the returned penalty must
+be the target to within ``CALIBRATION_EDF_TOL``: a larger gap means the
+median jumped past the target (a session entered or left it), and the
+calibration raises rather than return that penalty.
 """
 
 from __future__ import annotations
@@ -26,7 +31,11 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from .constants import CALIBRATION_LOG_PENALTY_TOL, LOG_PENALTY_BOUNDS
+from .constants import (
+    CALIBRATION_EDF_TOL,
+    CALIBRATION_LOG_PENALTY_TOL,
+    LOG_PENALTY_BOUNDS,
+)
 from .likelihoods import Likelihood
 from .newton import CONVERGED
 from .sessions import SessionKey, fit_sessions
@@ -44,7 +53,11 @@ class EdfCalibration(NamedTuple):
         The middle of the bisection's last bracket, narrower than
         ``CALIBRATION_LOG_PENALTY_TOL``.
     median_edf : float
-        The median over sessions of the term's edf at ``log_penalty``.
+        The median over sessions of the term's edf at ``log_penalty``, within
+        ``CALIBRATION_EDF_TOL`` of the target.
+    n_sessions_used : int
+        The sessions the median is over: those with a kept fit in which the
+        term is fitted at ``log_penalty``.
     edf : pd.Series, shape (n_sessions,)
         Each session's edf of the term at ``log_penalty``, indexed by the
         session keys in the order given; NaN for a session without a kept
@@ -53,6 +66,7 @@ class EdfCalibration(NamedTuple):
 
     log_penalty: float
     median_edf: float
+    n_sessions_used: int
     edf: pd.Series
 
 
@@ -128,7 +142,9 @@ def log_penalty_for_edf(
         no session has a kept fit with the term at a log penalty tried; if
         the target is not between the median edf at the upper bound and at
         the lower bound of ``LOG_PENALTY_BOUNDS`` (it cannot be reached
-        inside them); if a session's first fit fails
+        inside them); if the median edf at the returned log penalty differs
+        from the target by more than ``CALIBRATION_EDF_TOL`` (the median
+        jumped past it); if a session's first fit fails
         (:func:`.sessions.fit_sessions`).
     """
     if term not in design.by_name:
@@ -178,4 +194,14 @@ def log_penalty_for_edf(
                 )
     log_penalty = 0.5 * (lo + hi)
     edf = at(log_penalty)
-    return EdfCalibration(log_penalty, float(np.nanmedian(edf)), edf)
+    median_edf = float(np.nanmedian(edf))
+    n_used = int(edf.notna().sum())
+    if abs(median_edf - target_edf) > CALIBRATION_EDF_TOL:
+        raise ValueError(
+            f"the median edf of {term!r} at log penalty {log_penalty:.6g} is "
+            f"{median_edf:.4g}, over {n_used} of {edf.size} sessions; it differs "
+            f"from the target {target_edf} by more than {CALIBRATION_EDF_TOL}: the "
+            "median jumps past the target, as when a session's fit is kept on "
+            "one side of the penalty and not on the other"
+        )
+    return EdfCalibration(log_penalty, median_edf, n_used, edf)

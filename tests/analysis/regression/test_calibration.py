@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression import calibration
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
@@ -149,3 +150,44 @@ def test_a_term_without_a_fixed_penalty_is_refused(rate_sessions) -> None:
             response="count",
             unit="well_visit_id",
         )
+
+
+def test_every_session_is_counted_in_the_median(rate_sessions) -> None:
+    """With every session fitted, the median is over all of them."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    found = _calibrate(_design(pooled), rate_sessions, 4.0)
+    assert found.n_sessions_used == len(rate_sessions)
+
+
+def test_a_session_without_an_edf_is_counted_out(rate_sessions, monkeypatch) -> None:
+    """A session whose edf is NaN at every penalty (no kept fit) is left out
+    of the median, and ``n_sessions_used`` says so."""
+    real = calibration._term_edf
+
+    def one_missing(*args, **kwargs):
+        edf = real(*args, **kwargs).copy()
+        edf.iloc[0] = np.nan
+        return edf
+
+    monkeypatch.setattr(calibration, "_term_edf", one_missing)
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    found = _calibrate(_design(pooled), rate_sessions, 4.0)
+    assert found.n_sessions_used == len(rate_sessions) - 1
+    assert np.isnan(found.edf.iloc[0])
+    assert found.median_edf == pytest.approx(4.0, abs=0.01)
+
+
+def test_a_median_that_jumps_past_the_target_raises(rate_sessions, monkeypatch) -> None:
+    """An edf that is a step of the penalty (8 below a log penalty of 3, 2
+    above it), as when sessions drop in and out of the median: the bisection
+    ends at the step, the median there is far from the target 4, and the
+    calibration refuses it rather than return it."""
+
+    def step(design, sessions, lik, term, response, unit):
+        rho = design.log_penalties[design.by_name[term].block]
+        return pd.Series(8.0 if rho < 3.0 else 2.0, index=pd.Index(list(sessions)))
+
+    monkeypatch.setattr(calibration, "_term_edf", step)
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    with pytest.raises(ValueError, match="differs from the target"):
+        _calibrate(_design(pooled), rate_sessions, 4.0)
