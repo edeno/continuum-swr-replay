@@ -151,8 +151,10 @@ from continuum_swr_replay.analysis.event_evidence import (
     tetrode_holdout,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    ALL_CONTRASTS,
     FAMILY_SUFFIX,
     FIT,
+    SWR_ALLOWED_CONTRASTS,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
@@ -164,6 +166,9 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_INSIDE_SWR,
     RESTRICTION_FIGURE_OUTSIDE_EVENTS,
     RESTRICTION_FIGURE_OUTSIDE_SWR,
+    SWR_ALLOWED_FIGURE_DECODERS,
+    SWR_ALLOWED_FIGURE_DIFFERENCES,
+    SWR_ALLOWED_TIME_CONTRASTS,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     BASELINE_GROUP,
@@ -210,6 +215,8 @@ from continuum_swr_replay.paths import (
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
@@ -301,6 +308,7 @@ TAGS = {
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
     "shared_content": Tags(("2c.3",), ("2h",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2j",)),
+    "nonlocal_restriction_swr_allowed": Tags(("2c.3",), ("S2m",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -425,6 +433,8 @@ class EventsInputs:
     nonlocal_restriction: Path
     nonlocal_restriction_windows: Path
     nonlocal_restriction_heldout_events: Path
+    nonlocal_restriction_swr_allowed: Path
+    nonlocal_restriction_swr_allowed_heldout_events: Path
     bin_facts: Path
     exposure_in_visits: Path
 
@@ -459,6 +469,10 @@ def default_inputs() -> EventsInputs:
         / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
         nonlocal_restriction_heldout_events=processed_data_dir()
         / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+        nonlocal_restriction_swr_allowed=processed_data_dir()
+        / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+        nonlocal_restriction_swr_allowed_heldout_events=processed_data_dir()
+        / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
         bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
         exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
     )
@@ -2384,6 +2398,8 @@ _RESTRICTION_MODELS = {
     "swr": "the SWR-only decoder (only the non-local states in SWR bins, only the "
     "local states elsewhere)",
     "full": "the full decoder (every state at every bin)",
+    "swr_allowed": "the SWR-allowed decoder (every state in SWR bins, only the "
+    "local states elsewhere)",
 }
 #: The two score families (``nonlocal_restriction.FAMILY_SUFFIX``), in words.
 _RESTRICTION_SCORES = {
@@ -2477,17 +2493,19 @@ def _full_minus_swr_values(
     time: str,
     epochs: str,
     positive: str = "epochs whose gain per second is above zero",
+    difference: str = _FULL_MINUS_SWR,
 ) -> list[Value]:
-    """The full minus the SWR-only decoder over ``time``, per ``unit`` (an entry
-    of ``_RESTRICTION_UNITS``): :func:`_interval_and_animals_positive`, and per
-    second also the epochs whose value is above zero (``positive``) and the
-    epochs with a value (``epochs``, what they have)."""
+    """The full minus the SWR-only decoder (or another ``difference``, in
+    words) over ``time``, per ``unit`` (an entry of ``_RESTRICTION_UNITS``):
+    :func:`_interval_and_animals_positive`, and per second also the epochs
+    whose value is above zero (``positive``) and the epochs with a value
+    (``epochs``, what they have)."""
     name, divided, words = unit
     values = _interval_and_animals_positive(
         make,
         f"{key}_{name}",
         row,
-        f"{scored}, {_FULL_MINUS_SWR}, summed over {time} and divided by "
+        f"{scored}, {difference}, summed over {time} and divided by "
         f"{divided}: {_EPOCH_REDUCTION}",
         unit=words,
     )
@@ -3512,6 +3530,117 @@ def restriction_immobile_values(
             "epochs with immobile bins in the restriction comparison",
         )
     )
+    return values
+
+
+#: Each time of ``restriction_totals.CONTRAST_TIMES``, in words: the bins a
+#: contrast is summed over.
+_CONTRAST_TIME_BINS = {
+    "inside_swr": f"{_INSIDE_SWR_BINS} inside a well visit",
+    "outside_swr": f"{_OUTSIDE_SWR_BINS} inside a well visit",
+    "immobile": "immobile bins inside a well visit (inside and outside SWRs)",
+}
+_SWR_ALLOWED_RUN = (
+    "every decoder scored in one pass under the stored fold fits "
+    "(scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit)"
+)
+
+
+def restriction_swr_allowed_values(
+    windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series, source: str
+) -> list[Value]:
+    """Question 2c.3: the SWR-allowed decoder (every state inside SWRs, only the
+    local states outside them) against the other three, from a restriction run
+    that scored all four in one pass (``restriction_totals.swr_allowed_statistics``).
+
+    Over the immobile time inside SWRs, outside SWRs and all of it inside a well
+    visit (``restriction_totals.CONTRAST_TIMES``), each contrast of
+    ``nonlocal_restriction.SWR_ALLOWED_CONTRASTS`` per spike and per second, in
+    both score families, with the statistic, interval and epoch counts of the
+    gain inside SWRs (keys ``restriction_<time>_<contrast>...``); over all the
+    immobile time also the SWR-only and full decoders' gains over the local-only
+    decoder of the same pass (keys ``restriction_swr_allowed_run_immobile_...``);
+    and the full minus the SWR-allowed decoder per spike over the bins outside
+    SWRs of the no-SWR events detected from that run's held-out decode
+    (``windows``, those that start inside a well visit), with the events and
+    those with a value. The values Figure 2's supplement draws on its
+    fourth-decoder panel (``restriction_totals.SWR_ALLOWED_FIGURE_*``, in
+    :data:`RESTRICTION_FIGURE_FAMILY` per spike) carry its tag (S2m); the rest
+    is for the text."""
+    make_text = value_factory(
+        restriction_swr_allowed_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_figure = value_factory(
+        restriction_swr_allowed_values,
+        source,
+        TAGS["nonlocal_restriction_swr_allowed"],
+    )
+    statistics = restriction_totals.swr_allowed_statistics(windows, time_sums, bin_s)
+    values = []
+    for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items():
+        bins = _CONTRAST_TIME_BINS[time]
+        drawn = (
+            *SWR_ALLOWED_FIGURE_DIFFERENCES,
+            *(SWR_ALLOWED_FIGURE_DECODERS if time == "immobile" else ()),
+        )
+        for contrast in contrasts:
+            a, b = ALL_CONTRASTS[contrast]
+            prefix = (
+                "restriction"
+                if contrast in SWR_ALLOWED_CONTRASTS
+                else "restriction_swr_allowed_run"
+            )
+            for family, suffix in FAMILY_SUFFIX.items():
+                for unit in _RESTRICTION_UNITS:
+                    measure = f"{contrast}_{unit[0]}"
+                    figure = family == RESTRICTION_FIGURE_FAMILY and measure in drawn
+                    values += _full_minus_swr_values(
+                        make_figure if figure else make_text,
+                        f"{prefix}_{time}_{contrast}{suffix}",
+                        statistics.times.loc[(time, family, measure)],
+                        unit,
+                        f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, "
+                        f"{_SWR_ALLOWED_RUN}",
+                        f"every one of the epoch's {bins}",
+                        bins,
+                        "epochs whose value per second is above zero",
+                        difference=f"under {_RESTRICTION_MODELS[a]} minus under "
+                        f"{_RESTRICTION_MODELS[b]}",
+                    )
+    group = RESTRICTION_FIGURE_EVENT_GROUP
+    row = statistics.events.loc[group]
+    word = _GROUP_WORDS[group]
+    a, b = ALL_CONTRASTS[restriction_totals.SWR_ALLOWED_FIGURE_EVENT_CONTRAST]
+    values += _interval_and_animals_positive(
+        make_figure,
+        f"restriction_heldout_{word}_events_outside_swr_full_minus_swr_allowed"
+        "_per_spike",
+        row,
+        f"{_RESTRICTION_SCORES[RESTRICTION_FIGURE_FAMILY]}, "
+        f"{_RESTRICTION_HELD_OUT}, {_SWR_ALLOWED_RUN}, under "
+        f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, summed "
+        f"{_OUTSIDE_SWR_WHERE[group]} and divided by their spikes: mean over "
+        "animals of each animal's median over epochs of each epoch's median",
+    )
+    values += [
+        make_figure(
+            f"restriction_heldout_swr_allowed_run_{word}_events",
+            row["n_events"],
+            "count",
+            "count",
+            f"{group} events detected from the held-out decode of the run that "
+            "scored the SWR-allowed decoder",
+        ),
+        make_figure(
+            f"restriction_heldout_swr_allowed_run_{word}_events_outside_swr_scored"
+            "_per_spike",
+            row["n_scored"],
+            "count",
+            "count",
+            f"{group} events of that run with a value per spike outside SWRs "
+            "(immobile bins there and a spike in them)",
+        ),
+    ]
     return values
 
 
@@ -5285,8 +5414,55 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             TIME_SUBSET,
         )
     )
+    # the fourth decoder (SWR-allowed): from the run that scored all four
+    # decoders in one pass under the stored fold fits and the held-out event
+    # run made from it, read and checked as the canonical runs are
+    swr_allowed_dir = inputs.nonlocal_restriction_swr_allowed
+    swr_allowed_heldout_dir = inputs.nonlocal_restriction_swr_allowed_heldout_events
+    swr_allowed = read_heldout_restriction(
+        swr_allowed_heldout_dir,
+        swr_allowed_dir,
+        inputs.bin_facts,
+        analyzed,
+        current_sha256,
+    )
+    summary.add(
+        *over(
+            pend(
+                restriction_swr_allowed_values(
+                    swr_allowed.events,
+                    swr_allowed.time_sums,
+                    swr_allowed.bin_s,
+                    f"{rel(swr_allowed_heldout_dir)} "
+                    "(scripts/event_evidence/detect_heldout_events.py, from "
+                    f"{rel(swr_allowed_dir)}, scripts/event_evidence/"
+                    "score_nonlocal_restriction.py --from-stored-fit, and "
+                    f"{rel(inputs.bin_facts)}, scripts/event_evidence/"
+                    "measure_bin_facts.py; its held-out events and time sums)",
+                ),
+                swr_allowed.event_table,
+                swr_allowed.restriction_run,
+                swr_allowed.bin_facts_run,
+                restriction_inputs_note(
+                    swr_allowed_dir, analyzed, rel(swr_allowed_dir), features_manifest
+                ),
+                swr_allowed.session_cache,
+            ),
+            f"{TIME_SUBSET}, and {HELDOUT_EVENTS_SUBSET}",
+        )
+    )
     summary.inputs += [
         file_record(restriction_dir / MANIFEST, ROOT_DIR),
+        file_record(swr_allowed_dir / MANIFEST, ROOT_DIR),
+        *(
+            files_record(
+                f"*_{name}.parquet",
+                ok_table_paths(swr_allowed_heldout_dir, name),
+                ROOT_DIR,
+            )
+            for name in (HELDOUT_EVENTS_NAME, HELDOUT_TIME_SUMS_NAME)
+        ),
+        file_record(swr_allowed_heldout_dir / MANIFEST, ROOT_DIR),
         files_record(
             f"*_{NONLOCAL_RESTRICTION_WINDOWS_NAME}.parquet",
             ok_table_paths(restriction_windows_dir, NONLOCAL_RESTRICTION_WINDOWS_NAME),

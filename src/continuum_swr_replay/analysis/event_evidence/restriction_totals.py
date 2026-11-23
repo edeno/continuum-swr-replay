@@ -117,6 +117,7 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
+    SWR_ALLOWED_CONTRASTS,
     ratio_or_nan,
     table_contrasts,
     table_score_columns,
@@ -1171,3 +1172,91 @@ def restriction_figure_statistics(
     return RestrictionFigureStatistics(
         decoders, inside, outside_swr_statistics(time_sums, bin_s, windows), events
     )
+
+
+# --- the fourth decoder (Figure 2's supplement) --------------------------------
+
+SWR_ALLOWED_TIME_CONTRASTS = {
+    time: (
+        *SWR_ALLOWED_CONTRASTS,
+        *(("swr_minus_none", "full_minus_none") if time == "immobile" else ()),
+    )
+    for time in CONTRAST_TIMES
+}
+"""The contrasts read of a restriction run that scored the fourth model
+(:data:`.nonlocal_restriction.SWR_ALLOWED`), by the time they are read over
+(:data:`CONTRAST_TIMES`): the fourth model's three contrasts over each, and
+over all immobile time also the SWR-only and full decoders' gains over the
+local-only decoder of the same scoring pass."""
+SWR_ALLOWED_FIGURE_DECODERS = (
+    "swr_minus_none_per_spike",
+    "swr_allowed_minus_none_per_spike",
+    "full_minus_none_per_spike",
+)
+"""Figure 2's supplement, the fourth decoder's panel, first axis: each decoder's
+gain over the local-only decoder per spike of all the immobile time inside a
+well visit, in drawing order (SWR-only, SWR-allowed, Full)."""
+SWR_ALLOWED_FIGURE_DIFFERENCES = (
+    "full_minus_swr_allowed_per_spike",
+    "swr_allowed_minus_swr_per_spike",
+)
+"""The same panel, second axis: the two differences drawn at each time of
+:data:`CONTRAST_TIMES`, left to right at each time."""
+SWR_ALLOWED_FIGURE_EVENT_CONTRAST = "full_minus_swr_allowed"
+"""The same panel, third axis: the contrast read per spike over the bins
+outside SWRs of the held-out events with no SWR
+(:data:`RESTRICTION_FIGURE_EVENT_GROUP`)."""
+
+
+class SwrAllowedStatistics(NamedTuple):
+    """The fourth decoder's statistics (:func:`swr_allowed_statistics`)."""
+
+    times: pd.DataFrame
+    """:func:`contrast_gain_statistics` of :data:`SWR_ALLOWED_TIME_CONTRASTS`
+    over each time, indexed by ``time``, ``family`` and ``measure``."""
+    events: pd.DataFrame
+    """``restriction_windows.restriction_window_statistics`` of
+    :data:`OUTSIDE_SWR_EVENT_WINDOWS` with the contrast
+    :data:`SWR_ALLOWED_FIGURE_EVENT_CONTRAST` over the held-out events, indexed
+    by ``group``."""
+
+
+def swr_allowed_statistics(
+    windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
+) -> SwrAllowedStatistics:
+    """The fourth decoder against the other three, as the events summary and
+    Figure 2's supplement read it.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The held-out events of a run made from a restriction run that scored
+        the fourth model, as :func:`restriction_figure_statistics` takes them.
+    time_sums : pd.DataFrame
+        That run's time sums of every epoch.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+
+    Raises
+    ------
+    ValueError
+        If the time sums or the windows do not hold the fourth model.
+    """
+    times = pd.concat(
+        [
+            contrast_gain_statistics(
+                epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
+                contrasts,
+            ).assign(time=time)
+            for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
+        ],
+        ignore_index=True,
+    ).set_index(["time", "family", "measure"])
+    events = restriction_window_statistics(
+        windows,
+        **{
+            **OUTSIDE_SWR_EVENT_WINDOWS,
+            "contrasts": [SWR_ALLOWED_FIGURE_EVENT_CONTRAST],
+        },
+    ).set_index("group")
+    return SwrAllowedStatistics(times, events)

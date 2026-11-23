@@ -1754,6 +1754,164 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     assert "inside SWRs" in values[f"{key}_per_spike"].description
 
 
+def _swr_allowed_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    """:func:`_immobile_time_sums` with the fourth decoder: ``swr_allowed`` is
+    ``swr`` plus 1 nat in SWRs and ``swr`` outside them (two-sided twice that).
+    So per epoch (a, b, c): inside SWRs (10 spikes, 5 s) ``full -
+    swr_allowed`` 4, 2, 3 and ``swr_allowed - swr`` 1; outside SWRs (10
+    spikes, 5 s) ``full - swr_allowed`` 5 and ``swr_allowed - swr`` 0; and the
+    held-out events of :func:`_restriction_windows` with ``swr_allowed`` a
+    quarter of ``full`` outside SWRs, so ``full - swr_allowed`` there is three
+    quarters of ``full - swr``. Returns the time sums, the time steps and the
+    events."""
+    sums = _immobile_time_sums()
+    in_swr = (sums["category"] == "immobile_in_swr").to_numpy()
+    sums["swr_allowed"] = sums["swr"] + np.where(in_swr, 1.0, 0.0)
+    sums["swr_allowed_two_sided"] = 2 * sums["swr_allowed"]
+    windows = _restriction_windows()
+    events = windows[windows["kind"] == "event"].copy()
+    events["swr_allowed"] = events["swr"]
+    events["swr_allowed_two_sided"] = events["swr_two_sided"]
+    for suffix in ("", "_two_sided"):
+        for where in ("_outside_swr", "_outside_swr_in_visit"):
+            events[f"swr_allowed{suffix}{where}"] = (
+                0.25 * events[f"full{suffix}{where}"]
+            )
+    return sums, pd.Series(1.0, index=["a1", "b1", "c1"]), events
+
+
+def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
+    """On :func:`_swr_allowed_inputs`: each contrast of the fourth decoder over
+    each time, per spike and per second, both families, with the statistic,
+    interval and epoch counts of the gain inside SWRs; the SWR-only and full
+    decoders of the same pass over all immobile time; and the full minus the
+    SWR-allowed decoder in the held-out no-SWR events. Figure 2's supplement
+    (S2m) draws the filter family's gains per spike of
+    ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value with its counts."""
+    sums, bin_s, events = _swr_allowed_inputs()
+    values = _by_key(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
+    numbers = {key: value.value for key, value in values.items()}
+    # inside SWRs: per spike 0.4, 0.2, 0.3 and 0.1; per second twice that
+    key = "restriction_inside_swr_{}{}_{}"
+    assert numbers[key.format("full_minus_swr_allowed", "", "per_spike")] == (
+        pytest.approx(0.3)
+    )
+    assert numbers[key.format("full_minus_swr_allowed", "", "per_s")] == (
+        pytest.approx(0.6)
+    )
+    assert numbers[key.format("swr_allowed_minus_swr", "", "per_spike")] == (
+        pytest.approx(0.1)
+    )
+    assert numbers[key.format("swr_allowed_minus_swr", "_two_sided", "per_spike")] == (
+        pytest.approx(0.2)
+    )
+    # swr_allowed - none in SWRs: 21, 25, 22 over 10 spikes
+    assert numbers[key.format("swr_allowed_minus_none", "", "per_spike")] == (
+        pytest.approx(6.8 / 3)
+    )
+    # outside SWRs: the SWR-allowed decoder is the SWR-only decoder there
+    key = "restriction_outside_swr_{}_per_spike"
+    assert numbers[key.format("full_minus_swr_allowed")] == pytest.approx(0.5)
+    assert numbers[key.format("swr_allowed_minus_swr")] == pytest.approx(0.0)
+    assert numbers[key.format("swr_allowed_minus_swr") + "_animals_positive"] == 0
+    # all immobile time (20 spikes, 10 s): full - swr_allowed 9, 7, 8 nats
+    key = "restriction_immobile_{}_per_spike"
+    assert numbers[key.format("full_minus_swr_allowed")] == pytest.approx(0.4)
+    assert numbers[key.format("swr_allowed_minus_swr")] == pytest.approx(0.05)
+    assert numbers[key.format("swr_allowed_minus_none")] == pytest.approx(6.8 / 6)
+    assert numbers["restriction_immobile_full_minus_swr_allowed_epochs"] == 3
+    assert numbers["restriction_immobile_full_minus_swr_allowed_epochs_positive"] == 3
+    assert values[key.format("full_minus_swr_allowed")].unit == "nats per spike"
+    assert values["restriction_immobile_full_minus_swr_allowed_per_s"].unit == (
+        "nats per s"
+    )
+    # the other two decoders of the same pass equal the canonical values on the
+    # same time sums
+    canonical = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
+    for contrast in ("swr_minus_none", "full_minus_none"):
+        for family in ("", "_two_sided"):
+            for unit in ("per_spike", "per_s"):
+                assert numbers[
+                    f"restriction_swr_allowed_run_immobile_{contrast}{family}_{unit}"
+                ] == pytest.approx(
+                    canonical[f"restriction_immobile_{contrast}{family}_{unit}"]
+                )
+    # the held-out no-SWR events outside SWRs: three quarters of 1, 2, 3
+    key = "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_allowed"
+    assert numbers[f"{key}_per_spike"] == pytest.approx(1.5)
+    assert numbers[f"{key}_per_spike_animals_positive"] == 3
+    assert numbers["restriction_heldout_swr_allowed_run_non_swr_events"] == 3
+    assert (
+        numbers[
+            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
+            "_per_spike"
+        ]
+        == 3
+    )
+    # eleven contrasts over a time, two families: per spike four values, per
+    # second six; the held-out events' four and two counts
+    assert len(numbers) == 11 * 2 * (4 + 6) + 4 + 2
+    ends = ("", "_ci_low", "_ci_high", "_animals_positive")
+    drawn = (
+        {
+            f"restriction_{time}_{contrast}_per_spike{end}"
+            for time in ("inside_swr", "outside_swr", "immobile")
+            for contrast in ("full_minus_swr_allowed", "swr_allowed_minus_swr")
+            for end in ends
+        }
+        | {
+            f"restriction{run}_immobile_{contrast}_per_spike{end}"
+            for run, contrast in (
+                ("_swr_allowed_run", "swr_minus_none"),
+                ("", "swr_allowed_minus_none"),
+                ("_swr_allowed_run", "full_minus_none"),
+            )
+            for end in ends
+        }
+        | {f"{key}_per_spike{end}" for end in ends}
+        | {
+            "restriction_heldout_swr_allowed_run_non_swr_events",
+            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
+            "_per_spike",
+        }
+    )
+    for name, value in values.items():
+        assert value.questions == ("2c.3",)
+        assert value.figures == (("S2m",) if name in drawn else ()), name
+    # no key of the canonical builders is made again
+    canonical_keys = set(canonical) | set(
+        _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
+    )
+    assert not canonical_keys & set(numbers)
+    assert "SWR-allowed decoder" in values[f"{key}_per_spike"].description
+
+
+def test_swr_allowed_statistics_are_the_tagged_values():
+    """Figure 2's supplement, panel m, draws the rows the S2m values are made
+    from."""
+    sums, bin_s, events = _swr_allowed_inputs()
+    statistics = builder.restriction_totals.swr_allowed_statistics(events, sums, bin_s)
+    numbers = _numbers(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
+    for time in ("inside_swr", "outside_swr", "immobile"):
+        for measure in builder.SWR_ALLOWED_FIGURE_DIFFERENCES:
+            assert statistics.times.loc[
+                (time, "filter", measure), "estimate"
+            ] == pytest.approx(numbers[f"restriction_{time}_{measure}"])
+    for measure in builder.SWR_ALLOWED_FIGURE_DECODERS:
+        run = "" if measure.startswith("swr_allowed") else "_swr_allowed_run"
+        assert statistics.times.loc[
+            ("immobile", "filter", measure), "estimate"
+        ] == pytest.approx(numbers[f"restriction{run}_immobile_{measure}"])
+    assert statistics.events.loc[
+        builder.RESTRICTION_FIGURE_EVENT_GROUP, "estimate"
+    ] == pytest.approx(
+        numbers[
+            "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_allowed"
+            "_per_spike"
+        ]
+    )
+
+
 def _part_time_sums() -> pd.DataFrame:
     """Animals a, b, c, one epoch each, bins of 1 s outside SWRs inside a well
     visit, one spike a bin, ``full - swr`` per bin by part: 4 bins within
