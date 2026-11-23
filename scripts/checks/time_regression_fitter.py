@@ -25,7 +25,8 @@ that interface (the NumPy solver today, a JAX one later):
 5. ``pytest_regression``: ``pytest tests/analysis/regression``, once with an
    empty JAX compilation cache and once with the cache that run filled.
 
-Each case runs in its own process, given ``--threads`` threads (the BLAS
+JAX runs on ``JAX_PLATFORMS``, the CPU when it is unset. Each case runs in its
+own process, given ``--threads`` threads (the BLAS
 variables and the process's CPU set, the first that many of ``--cores``; JAX's
 CPU thread pool follows the CPU set). A process builds the inputs (not timed),
 makes the first call (for a JAX fitter it compiles) and then ``--reps`` more;
@@ -80,6 +81,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     build_design,
     log_penalty_from_prior_sd,
 )
+from continuum_swr_replay.runs.device import default_jax_platforms
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -368,7 +370,6 @@ def _environment(threads: int) -> dict[str, str]:
             for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
         }
     )
-    env.setdefault("JAX_PLATFORMS", "cpu")
     env["PYTHONPATH"] = os.pathsep.join(
         [str(REPO / "src"), str(REPO), env.get("PYTHONPATH", "")]
     ).rstrip(os.pathsep)
@@ -484,6 +485,7 @@ def table(records: Sequence[dict]) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--case",
