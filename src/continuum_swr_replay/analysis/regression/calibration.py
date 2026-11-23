@@ -123,8 +123,9 @@ def log_penalty_for_edf(
         Each session's rows, as :func:`.sessions.fit_sessions` takes them.
     lik : Likelihood
     term : str
-        The name of a term with a fixed penalty (a smooth, or a lag
-        functional), as :class:`.terms.DesignTerm` names it.
+        The name of a smooth or a lag functional with a fixed penalty, as
+        :class:`.terms.DesignTerm` names it. A penalized simple term (a
+        slope, a level of a category) is refused.
     target_edf : float
         The term's edf counts its penalty's null space (for a constrained
         P-spline, the line).
@@ -138,7 +139,8 @@ def log_penalty_for_edf(
     Raises
     ------
     ValueError
-        If ``term`` is not a term of the design or has no fixed penalty; if
+        If ``term`` is not a term of the design, has no fixed penalty, or is
+        not a smooth or a lag functional; if
         no session has a kept fit with the term at a log penalty tried; if
         the target is not between the median edf at the upper bound and at
         the lower bound of ``LOG_PENALTY_BOUNDS`` (it cannot be reached
@@ -152,6 +154,11 @@ def log_penalty_for_edf(
     block = design.by_name[term].block
     if block is None:
         raise ValueError(f"{term!r} has no fixed penalty to calibrate")
+    if design.by_name[term].kind not in ("smooth", "lag"):
+        raise ValueError(
+            f"{term!r} is a {design.by_name[term].kind} term: calibration by edf "
+            "is for only a smooth or a lag functional"
+        )
 
     def at(log_penalty: float) -> pd.Series:
         # The fit reads Design.log_penalties; this design's log_penalty_record

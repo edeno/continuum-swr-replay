@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.regression.calibration import log_penalty_for
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
 from continuum_swr_replay.analysis.regression.terms import (
+    Category,
     Offset,
     Slope,
     Smooth,
@@ -147,6 +148,38 @@ def test_a_term_without_a_fixed_penalty_is_refused(rate_sessions) -> None:
             Poisson(),
             term="s(nothing)",
             target_edf=4.0,
+            response="count",
+            unit="well_visit_id",
+        )
+
+
+@pytest.mark.parametrize("term", ["x", "g[b]"])
+def test_a_penalized_simple_term_is_refused(rate_sessions, term) -> None:
+    """Calibration by edf is for a smooth or a lag functional: a penalized
+    slope, or one level of a penalized category, is refused."""
+    sessions = {}
+    for key, rows in rate_sessions.items():
+        rows = rows.copy()
+        rows["g"] = np.where(rows["well_visit_id"] % 2 == 0, "a", "b")
+        sessions[key] = rows
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [
+            Smooth("time_since_s", 0.0, 20.0, 12, 2.0),
+            Category("g", ("a", "b"), reference="a", penalty=0.0),
+            Slope("x", 0.0),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+    )
+    with pytest.raises(ValueError, match="only a smooth or a lag functional"):
+        log_penalty_for_edf(
+            design,
+            sessions,
+            Poisson(),
+            term=term,
+            target_edf=0.5,
             response="count",
             unit="well_visit_id",
         )
