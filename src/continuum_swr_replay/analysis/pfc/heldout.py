@@ -59,6 +59,10 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
+    fold_training_masks,
+    margin_in_bins,
+)
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     PreparedHeldoutResponse,
@@ -69,11 +73,20 @@ from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_onset_counts,
 )
-from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
+from continuum_swr_replay.analysis.pfc.event_sets import (
+    DEFAULT_BASIS_HALF_WINDOW_S,
+    EVENT_CLASSES,
+)
 from continuum_swr_replay.analysis.pfc.matched_control import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     MATCHED_CONTROL_SOURCE_CLASS,
     make_matched_control_times,
+)
+from continuum_swr_replay.analysis.regression.folds import (
+    MAX_SEGMENT_S,
+    N_FOLDS,
+    task_segment_starts,
+    trial_folds_and_groups,
 )
 from continuum_swr_replay.intervals import (
     contiguous_true_runs,
@@ -312,6 +325,108 @@ def assign_blocked_folds(
         folds[position:stop] = fold_of_block[block_index]
         position = stop
     return folds
+
+
+class TrialFolds(NamedTuple):
+    """The trial folds of a session's fit bins, with each fold's training bins.
+
+    Attributes
+    ----------
+    folds : NDArray of int, shape (n_fit_bins,)
+        Each fit bin's fold, in time order (the row order of a design
+        restricted to the fit mask).
+    training : tuple of NDArray of bool, each shape (n_fit_bins,)
+        For each fold, the fit bins its model is trained on: outside the fold
+        and more than ``margin_bins`` from every bin of it.
+    margin_bins : int
+        The training margin, in bins of the session's time axis.
+    counts : dict
+        ``n_segments`` and ``n_groups`` holding a fit bin, ``fold_sizes``, and
+        ``n_margin_bins``: per fold, the fit bins outside it left out of its
+        training by the margin.
+    """
+
+    folds: NDArray
+    training: tuple[NDArray, ...]
+    margin_bins: int
+    counts: dict
+
+
+def assign_trial_folds(
+    time: NDArray,
+    fit_mask: pd.Series | NDArray,
+    trials: pd.DataFrame,
+    *,
+    margin_s: float = DEFAULT_BASIS_HALF_WINDOW_S,
+    n_folds: int = N_FOLDS,
+    max_segment_s: float = MAX_SEGMENT_S,
+) -> TrialFolds:
+    """Trial folds of the fit bins, with a training margin of the kernel's reach.
+
+    The project's one fold rule (``analysis/regression/folds.py``): the trial
+    segments of the epoch (each trial from its departure to the next, its
+    class the destination well) are found on the session's whole time axis
+    (``task_segment_starts``), then the fit bins are dealt into ``n_folds``
+    folds of whole pieces of segments, balanced by class
+    (``trial_folds_and_groups`` on the fit bins' times). A fold's model is
+    trained on the fit bins outside it that lie more than ``margin_s`` from
+    every bin of it (``event_evidence.tetrode_holdout.fold_training_masks``,
+    on the whole axis), so a peri-event kernel of half-width ``margin_s``
+    centered on a training bin covers no held-out bin. Deterministic: no
+    seed.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The session's time axis, s, ascending.
+    fit_mask : pd.Series or NDArray of bool, shape (n_time,)
+        The bins the models are fit on.
+    trials : pd.DataFrame
+        The epoch's trials: ``movement_start_time``, ``end_time`` (s) and
+        ``to_well``.
+    margin_s : float
+        The training margin, s: the half-width of the widest kernel.
+    n_folds : int
+    max_segment_s : float
+        The longest piece of a segment kept whole, s.
+
+    Returns
+    -------
+    TrialFolds
+
+    Raises
+    ------
+    ValueError
+        As ``task_segment_starts`` and ``trial_folds_and_groups``: trials off
+        the time axis' clock, or fewer pieces holding a fit bin than folds.
+    """
+    time = np.asarray(time, dtype=float)
+    mask = np.asarray(fit_mask, dtype=bool)
+    trials = trials.sort_values("movement_start_time", kind="stable")
+    starts, classes = task_segment_starts(
+        time,
+        trials["movement_start_time"].to_numpy(dtype=float),
+        trials["to_well"].to_numpy(),
+        float(trials["end_time"].iloc[-1]),
+    )
+    folds, segment, group = trial_folds_and_groups(
+        time[mask], starts, classes, n_folds, max_segment_s
+    )
+    on_axis = np.full(time.size, -1, dtype=np.int64)
+    on_axis[mask] = folds
+    margin = margin_in_bins(margin_s, time)
+    training = tuple(
+        train[mask] for train in fold_training_masks(mask, on_axis, n_folds, margin)
+    )
+    counts = {
+        "n_segments": int(np.unique(segment).size),
+        "n_groups": int(np.unique(group).size),
+        "fold_sizes": np.bincount(folds, minlength=n_folds).tolist(),
+        "n_margin_bins": [
+            int(((folds != k) & ~train).sum()) for k, train in enumerate(training)
+        ],
+    }
+    return TrialFolds(folds, training, margin, counts)
 
 
 def poisson_deviance(counts: NDArray, fitted_mean: NDArray) -> NDArray:
