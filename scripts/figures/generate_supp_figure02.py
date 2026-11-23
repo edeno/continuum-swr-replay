@@ -130,22 +130,30 @@ the order the text cites them, in five rows:
         positive end offset one that ends later), classed by its start
         (earlier, within 25 ms, later) and its end (the same), 25 ms being the
         tolerance of the events summary's ``*_beyond_twenty_five_ms_fraction``
-        values (``event_statistics.TIMING_TOLERANCE``). Each cell is the mean
-        over animals of each animal's share of its pairs in it (the mean over
-        its epochs of each epoch's share), as Figure 2c and d take their bars,
-        with the lowest and highest animal's share under it in small type
-        (``event_statistics.boundary_timing_statistics``; the events summary's
-        ``timing_*_share_animal_*`` values). The four corner cells are named, as the event
-        and its SWR overlap there with neither bound together: start and end
-        earlier, the event leads; start earlier and end later, it contains the
-        SWR; start later and end earlier, it is inside the SWR; start and end
-        later, it lags.
+        values (``event_statistics.TIMING_TOLERANCE``; "same" in the panel).
+        Six rows, the largest share first (:data:`TIMING_CASES`): the five
+        combinations with at least one bound the same, then the four with both
+        apart together. Each row: its name and a small drawing of the case (the
+        SWR as a bar in the SWR color, the event under it in the non-local
+        color, longer or shorter at the bound that differs;
+        ``evidence_drawings.draw_boundary_cases``), a bar of the mean over
+        animals of each animal's share of its pairs (the mean over its epochs
+        of each epoch's share), a dot per animal, and the percent at the bar's
+        end (``event_statistics.boundary_timing_statistics`` and
+        ``boundary_both_ends_differ_statistics``; the events summary's
+        ``timing_*_share_animal_*`` values of the drawn cases and
+        ``timing_both_ends_differ_share_animal_*``).
 
     g — Supports Figure 2g and i, on population activity and the events:
         where the non-local time sits in MUA (the z-scored multiunit rate of
-        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top, each
-        animal's immobile time bins decoded non-local spread over MUA (percent
-        per 0.25 z), the share below 2 z written; bottom, the percent of
+        the decoded tetrodes, ``MUA_zscore``), in Figure 2i's format. Top,
+        confident Local time (Local probability above 0.8) and confident
+        non-local time (non-local probability above 0.8) spread over MUA
+        (percent of each class's time per 0.25 z; the mean over animals of
+        each animal's mean over its epochs,
+        ``state_by_signal.state_distribution`` of
+        ``Processed-Data/state_by_signal``), each in its state's color and
+        named, the share of non-local time below 2 z written; bottom, the percent of
         immobile bins decoded non-local at each MUA level; a line per animal,
         their mean in bold, a dashed line at 2 z, the MUA event detector's
         threshold (``nonlocal_by_signal.MUA_LEVEL_Z``). Over the immobile time
@@ -342,7 +350,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     HPD_BIN_EDGES_CM,
     HPD_TIGHT_CM,
-    TIMING_CLASSES,
+    boundary_both_ends_differ_statistics,
     boundary_offsets,
     boundary_timing_statistics,
     hpd_distribution,
@@ -355,6 +363,9 @@ from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
 from continuum_swr_replay.analysis.event_properties.rule_sweep import (
     RULE,
     sweep_statistics,
+)
+from continuum_swr_replay.analysis.event_properties.state_by_signal import (
+    state_distribution,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     TRIGGERED_SIGNALS,
@@ -393,6 +404,7 @@ from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import rel
 from continuum_swr_replay.runs.io import read_complete_run, sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
+from continuum_swr_replay.visualization.evidence_drawings import draw_boundary_cases
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_LABELS,
@@ -436,23 +448,24 @@ LEFT_OUT_YLABEL = "Left-out tetrode:\nbetter fit (nats/spike)"
 EQUAL_FIT = "equal fit"
 """The name of their dashed zero line."""
 SPLIT_TITLE = "Decoded place over\nanimal's place"
-TIMING_LABELS = ("Earlier", "Within\n25 ms", "Later")
-"""The timing table's tick labels for :data:`event_statistics.TIMING_CLASSES`."""
-TIMING_CORNERS = {
-    ("earlier", "earlier"): "event leads",
-    ("earlier", "later"): "contains SWR",
-    ("later", "earlier"): "inside SWR",
-    ("later", "later"): "event lags",
-}
-"""The timing table's names of its corner cells, by (start, end) class: the event and its
-SWR overlap there, and neither bound is within 25 ms of the SWR's."""
-CORNER_DROP = -0.3
-SHARE_DROP = 0.0
-RANGE_DROP = 0.28
-"""Where a cell's corner name, share and animals' range sit, from its center
-(cell heights, down)."""
-TIMING_CMAP = "bone_r"
-"""The timing table's colormap: sequential, the posteriors' (prints in gray)."""
+TIMING_CASES = (
+    ("Same start and end", "together", "together"),
+    ("Ends later", "together", "later"),
+    ("Starts later", "later", "together"),
+    ("Starts earlier", "earlier", "together"),
+    ("Ends earlier", "together", "earlier"),
+    ("Both ends differ", "later", "later"),
+)
+"""Panel f's rows, top to bottom (the largest share first): each case's name
+and the start and end class its drawing shows (``event_statistics.TIMING_CLASSES``).
+The last row is the four corner combinations together, drawn as one offset
+pair; its share is ``boundary_both_ends_differ_statistics``'."""
+TIMING_NOTE = "same: within 25 ms"
+"""Panel f's note of what "same" means (the tolerance of
+``event_statistics.TIMING_TOLERANCE``)."""
+TIMING_BAR_COLOR = "#bbbbbb"
+"""Panel f's bars of the mean over animals: a neutral gray, under the animals'
+dots."""
 CALIBRATION_COLORS = {
     "Local": STATE_COLORS["Local"],
     "Non-Local Continuous": STATE_COLORS["Continuous"],
@@ -690,8 +703,12 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "distance": read_decoded_distance(inputs.decoder_quality),
         "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "mua": read_mua_counts(inputs.nonlocal_by_signal),
+        "mua_states": read_mua_states(inputs.state_by_signal),
         "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
+        "timing_both": boundary_both_ends_differ_statistics(
+            boundary_offsets(events), events
+        ),
         "split": {
             column: holdout_statistics(canonical, "event", column)
             for column in SPLIT_LABELS
@@ -760,6 +777,21 @@ def read_decoded_distance(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     return animal_distance_by_local_probability(
         pd.read_parquet(folder / "calibration.parquet")
     )
+
+
+def read_mua_states(folder: Path) -> pd.DataFrame:
+    """The MUA panel's top strip: ``state_by_signal.state_distribution`` of the
+    stored counts by MUA and decoder state, refused as :func:`read_mua_counts`
+    refuses its counts."""
+    counts = pd.read_parquet(folder / "counts.parquet")
+    try:
+        checked_reference(counts, folder, "counts by signal and state")
+    except ValueError as error:
+        raise ValueError(
+            f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
+            f"{error}. Rerun scripts/event_properties/measure_state_by_signal.py."
+        ) from error
+    return state_distribution(counts, "mua")
 
 
 def read_state_calibration(folder: Path) -> pd.DataFrame:
@@ -945,45 +977,41 @@ def read_frame_traces(
     return {"no_spike": no_spike, "event_traces": traces}
 
 
-def draw_boundary_timing(ax: Axes, timing: pd.DataFrame) -> None:
-    """The timing table: the share of SWR-overlapping events in each combination of
-    start (rows) and end (columns) against the matched SWR's, as a heat map
-    with the mean over animals' percent in each cell, the animals' range (in
-    percent) under it
-    and the corner cells' names (:data:`TIMING_CORNERS`) above it, in black
-    or white, whichever reads against the cell (``timing``: :func:`read_inputs`'
-    ``timing``)."""
-    n = len(TIMING_CLASSES)
-    shares = timing["share_animal_mean"].to_numpy().reshape(n, n)
-    cmap = plt.get_cmap(TIMING_CMAP)
-    ax.imshow(100 * shares, cmap=cmap, vmin=0, vmax=100, aspect="auto")
-    for (row, column), cell in zip(np.ndindex(n, n), timing.itertuples(), strict=True):
-        red, green, blue, _ = cmap(cell.share_animal_mean)
-        color = "white" if 0.299 * red + 0.587 * green + 0.114 * blue < 0.5 else "black"
-        if cell.Index in TIMING_CORNERS:
-            ax.text(
-                column, row + CORNER_DROP, TIMING_CORNERS[cell.Index],
-                ha="center", va="center", fontsize=SMALL_SIZE, color=color,
-                style="italic",
-            )  # fmt: skip
+def draw_boundary_timing(
+    ax_cases: Axes, ax: Axes, timing: pd.DataFrame, both: dict
+) -> None:
+    """Panel f: each SWR-overlapping event against its matched SWR, one row per
+    case of :data:`TIMING_CASES` (the largest share first). At the left the
+    case's name and a small drawing of it
+    (``evidence_drawings.draw_boundary_cases``); at the right a bar of the mean
+    over animals of each animal's share with a dot per animal, and the percent
+    at the bar's end (``timing``: ``boundary_timing_statistics``, a row per
+    start and end class; ``both``: ``boundary_both_ends_differ_statistics``,
+    the last row). A note in gray says what "same" means."""
+    draw_boundary_cases(ax_cases, list(TIMING_CASES))
+    rows = [timing.loc[(start, end)] for _, start, end in TIMING_CASES[:-1]] + [both]
+    for k, row in enumerate(rows):
+        mean = 100 * row["share_animal_mean"]
+        ax.barh(k, mean, height=0.55, color=TIMING_BAR_COLOR, lw=0, zorder=1)
+        animals = 100 * np.asarray(row["animals"], dtype=float)
+        ax.scatter(
+            animals, np.full(animals.size, k), s=5, color="black", lw=0, zorder=2
+        )
         ax.text(
-            column, row + SHARE_DROP, f"{100 * cell.share_animal_mean:.0f}%",
-            ha="center",
-            va="center", fontsize=SMALL_SIZE, color=color,
+            max(mean, animals.max()) + 3, k, f"{mean:.0f}%", ha="left",
+            va="center", fontsize=SMALL_SIZE,
         )  # fmt: skip
-        ax.text(
-            column, row + RANGE_DROP,
-            f"{100 * cell.animal_min:.0f}\u2013{100 * cell.animal_max:.0f}",
-            ha="center", va="center", fontsize=SMALL_SIZE, color=color,
-        )  # fmt: skip
-    ax.set_xticks(range(n), TIMING_LABELS)
-    ax.set_yticks(range(n), TIMING_LABELS)
-    ax.tick_params(length=0)
-    for side in ax.spines.values():
-        side.set_visible(False)
-    ax.set_xlabel("Event ends, vs SWR end")
-    ax.set_ylabel("Event starts,\nvs SWR start")
-    ax.set_title("Timing against the SWR", fontsize=SMALL_SIZE, pad=3)
+    ax.set_ylim(len(rows) - 0.5, -0.5)
+    ax.set_yticks([])
+    ax.spines["left"].set_visible(False)
+    ax.set_xlim(0, 80)
+    ax.set_xticks([0, 25, 50, 75])
+    ax.set_xlabel("% of overlapping pairs")
+    ax.text(
+        1.0, 1.0, TIMING_NOTE, transform=ax.transAxes, ha="right", va="bottom",
+        fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
+    )  # fmt: skip
+    ax_cases.set_title("Event against its SWR", fontsize=SMALL_SIZE, pad=3, loc="left")
 
 
 def name_equal_fit(ax: Axes) -> None:
@@ -1046,10 +1074,13 @@ def draw_outside_swr_series(
     )  # fmt: skip
 
 
-def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
+def draw_nonlocal_mua(
+    ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame, states: pd.DataFrame
+) -> None:
     """The MUA panel, drawn as Figure 2i draws ripple power
-    (``signal_share_panels.draw_share_by_signal``): where the non-local time
-    sits in MUA (top) and the share of immobile bins decoded non-local at each
+    (``signal_share_panels.draw_share_by_signal``): where confident Local and
+    confident non-local time sit in MUA (top; ``states``: :func:`read_inputs`'
+    ``mua_states``) and the share of immobile bins decoded non-local at each
     MUA level (bottom), with the MUA level of the reported values and the
     share of non-local time below it (``nonlocal_below_threshold_statistics``,
     the events summary's value; ``counts``: :func:`read_inputs`' ``mua``)."""
@@ -1059,7 +1090,7 @@ def draw_nonlocal_mua(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> 
         threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
         shade_color=COLORS["All Events"], xlabel="MUA (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
-        f"below\n{MUA_LEVEL_Z:g} z",
+        f"below\n{MUA_LEVEL_Z:g} z", states=states, title="MUA by state",
     )  # fmt: skip
     ax_share.set_xticks([0, 5, 10])
 
@@ -1387,20 +1418,25 @@ def draw_four_decoders(axes: Sequence[Axes], statistics: SwrAllowedStatistics) -
 
 
 PANEL_GRIDS = {
+    "boundary_timing": (1, 2),
     "nonlocal_mua": (2, 1),
     "rule_sweep": (2, 3),
     "event_traces": (1, len(TRIGGERED_SIGNALS)),
     "four_decoders": (1, 3),
 }
 """The panels drawn on several axes in their frame: rows and columns."""
-PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1)}
+PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1), "nonlocal_mua": (1.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
 GRID_GAP = (0.1, 0.1)
 """The gap between a panel's axes, as a share of its frame's height and width."""
-PANEL_COLUMN_SHARES = {"four_decoders": (0.7, 1.6, 0.35)}
+PANEL_COLUMN_SHARES = {
+    "boundary_timing": (1.15, 1.0),
+    "four_decoders": (0.7, 1.6, 0.35),
+}
 """The widths of a panel's columns, as shares (equal when not named): panel l's
 three axes."""
 PANEL_COLUMN_GAPS = {
+    "boundary_timing": 0.03,
     "event_traces": 0.12,
     "four_decoders": 0.16,
 }
@@ -1479,13 +1515,17 @@ def generate_figure(statistics: dict) -> Figure:
         ]
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_event_traces(axes["event_traces"], statistics["event_traces"])
-    draw_boundary_timing(axes["boundary_timing"][0], statistics["timing"])
+    draw_boundary_timing(
+        *axes["boundary_timing"], statistics["timing"], statistics["timing_both"]
+    )
     draw_left_out_split(axes["left_out_split"][0], statistics["split"])
     draw_hpd(axes["hpd"][0], statistics["hpd"])
     draw_outside_swr_series(
         axes["outside_distance"][0], statistics["outside"], statistics["parts"]
     )
-    draw_nonlocal_mua(*axes["nonlocal_mua"], statistics["mua"])
+    draw_nonlocal_mua(
+        *axes["nonlocal_mua"], statistics["mua"], statistics["mua_states"]
+    )
     draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
     draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
     draw_nonlocal_probability(

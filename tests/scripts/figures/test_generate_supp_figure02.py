@@ -77,8 +77,36 @@ def _timing() -> pd.DataFrame:
             "share_animal_mean": shares, "animal_min": shares - 0.01,
             "animal_max": shares + 0.01, "share": shares[::-1],
             "n_events": (1000 * shares).astype(int),
+            "animals": [np.array([s - 0.01, s, s + 0.01]) for s in shares],
+            "animal_names": [np.array(list("abc"))] * len(shares),
         },
         index=cells,
+    )  # fmt: skip
+
+
+TIMING_BOTH = {
+    "share_animal_mean": 0.2, "animal_min": 0.19, "animal_max": 0.21,
+    "n_events": 200, "animals": np.array([0.19, 0.2, 0.21]),
+    "animal_names": np.array(list("abc")),
+}  # fmt: skip
+"""``boundary_both_ends_differ_statistics``: the four corner cells together."""
+
+
+def _mua_states() -> pd.DataFrame:
+    """``state_distribution`` of MUA: Local time all at -1 z, non-local time
+    all at 3 z, for two animals."""
+    from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
+        MUA_EDGES,
+    )
+
+    return pd.DataFrame(
+        [
+            {"state": state, "animal": animal, "signal_low": lo, "signal_high": hi,
+             "percent": 100.0 * (lo == peak)}
+            for state, peak in (("local", -1.0), ("non_local", 3.0))
+            for animal in ("a", "b")
+            for lo, hi in zip(MUA_EDGES[:-1], MUA_EDGES[1:], strict=True)
+        ]
     )  # fmt: skip
 
 
@@ -205,8 +233,10 @@ def _statistics() -> dict:
         "calibration": _calibration(),
         "sweep": _sweep(),
         "mua": _mua_counts(),
+        "mua_states": _mua_states(),
         "hpd": _hpd(),
         "timing": _timing(),
+        "timing_both": TIMING_BOTH,
         "probability": _probability(),
         "distance": _decoded_distance(),
         "split": {
@@ -245,8 +275,8 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     fig = drawn
     assert figure.panel_axes(fig, "no_spike_mua")[0].get_title() == "No-Spike state"
     assert (
-        figure.panel_axes(fig, "boundary_timing")[0].get_title()
-        == "Timing against the SWR"
+        figure.panel_axes(fig, "boundary_timing")[0].get_title(loc="left")
+        == "Event against its SWR"
     )
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
@@ -404,52 +434,31 @@ def test_the_decoded_place_panel_draws_each_animals_distance_and_their_mean(draw
     assert "calibrat" not in (ax.get_title() + ax.get_ylabel()).lower()
 
 
-def test_the_timing_panel_draws_the_timing_table(drawn):
-    """The nine shares (the mean over animals, not the pooled share) as a 3
-    by 3 heat map (rows the start, columns the end), each cell's percent and
-    its animals' range, white on the dark cell and black on the pale ones, and
-    the labels."""
-    fig = drawn
-    (ax,) = figure.panel_axes(fig, "boundary_timing")
-    (image,) = ax.images
-    np.testing.assert_allclose(
-        image.get_array(),
-        100 * _timing()["share_animal_mean"].to_numpy().reshape(3, 3),
-    )
-    texts = {t.get_text(): t for t in ax.texts}
-    assert texts["70%"].get_position() == pytest.approx((1, 1 + figure.SHARE_DROP))
-    assert texts["15%"].get_position()[0] == 2  # start together, end later
-    assert "69\u201371" in texts
-    assert texts["70%"].get_color() == "white"
-    assert texts["5%"].get_color() == "black"
-    assert [t.get_text() for t in ax.get_yticklabels()] == list(figure.TIMING_LABELS)
-    assert ax.get_ylabel() == "Event starts,\nvs SWR start"
-    assert ax.get_xlabel() == "Event ends, vs SWR end"
-
-
-def test_the_timing_panel_names_the_four_corner_cells(drawn):
-    """The corner cells, where the event and its SWR overlap but neither
-    bound is together, are named in small text at the top of each cell: start
-    and end earlier, the event leads; start earlier and end later, it
-    contains the SWR; start later and end earlier, it is inside the SWR;
-    start and end later, it lags. The middle row and column have no name."""
-    fig = drawn
-    (ax,) = figure.panel_axes(fig, "boundary_timing")
-    named = {
-        t.get_text(): t.get_position()
-        for t in ax.texts
-        if t.get_text() in figure.TIMING_CORNERS.values()
-    }
-    assert named == {
-        "event leads": pytest.approx((0, figure.CORNER_DROP)),
-        "contains SWR": pytest.approx((2, figure.CORNER_DROP)),
-        "inside SWR": pytest.approx((0, 2 + figure.CORNER_DROP)),
-        "event lags": pytest.approx((2, 2 + figure.CORNER_DROP)),
-    }
-    assert figure.CORNER_DROP < figure.SHARE_DROP < figure.RANGE_DROP
-    for t in ax.texts:
-        if t.get_text() in named:
-            assert t.get_fontsize() >= 6
+def test_the_timing_panel_draws_a_row_per_case_with_its_drawing(drawn):
+    """Panel f: six rows, largest first, each named beside a drawing of the
+    case; a bar of the mean over animals with a dot per animal and the percent
+    at its end; the four corner cells together in the last row; the note of
+    what "same" means."""
+    ax_cases, ax = figure.panel_axes(drawn, "boundary_timing")
+    names = [t.get_text() for t in ax_cases.texts]
+    assert names == [name for name, _, _ in figure.TIMING_CASES]
+    assert names[0] == "Same start and end" and names[-1] == "Both ends differ"
+    widths = [bar.get_width() for bar in ax.patches]
+    # together-together 70, ends later 15, starts later 10, starts earlier 5,
+    # ends earlier 5, both ends differ 20 (the corner cells' own statistic)
+    np.testing.assert_allclose(widths, [70, 15, 10, 5, 5, 20])
+    texts = [t.get_text() for t in ax.texts]
+    assert texts[:6] == ["70%", "15%", "10%", "5%", "5%", "20%"]
+    assert figure.TIMING_NOTE in texts
+    dots = [
+        c for c in ax.collections
+        if isinstance(c, matplotlib.collections.PathCollection)
+    ]  # fmt: skip
+    assert len(dots) == 6
+    np.testing.assert_allclose(sorted(dots[0].get_offsets()[:, 0]), [69, 70, 71])
+    assert ax.get_xlabel() == "% of overlapping pairs"
+    assert ax_cases.get_title(loc="left") == "Event against its SWR"
+    assert ax.get_ylim() == ax_cases.get_ylim()
 
 
 def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn):
@@ -485,22 +494,30 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn
 
 
 def test_the_mua_panel_draws_where_the_nonlocal_time_sits_in_mua(drawn):
-    """As Figure 2h draws ripple power: top, each animal's non-local time
-    spread over MUA with the share below the MUA level written; bottom, the
-    share of bins decoded non-local at each level; a dashed line at the level
-    on both."""
+    """As Figure 2i draws ripple power: top, Local and non-local time spread
+    over MUA (the mean over animals of each), named, with the share of
+    non-local time below the MUA level written; bottom, the share of bins
+    decoded non-local at each level; a dashed line at the level on both."""
     fig = drawn
     ax_spread, ax_share = figure.panel_axes(fig, "nonlocal_mua")
+    assert len(ax_spread.lines) == 2 + 1  # the two classes, the level
+    assert len(ax_share.lines) == 2 + 2  # two animals, their mean, the level
     for ax in (ax_spread, ax_share):
-        assert len(ax.lines) == 2 + 2  # two animals, their mean, the level
         (level,) = [line for line in ax.lines if line.get_linestyle() == "--"]
         np.testing.assert_allclose(level.get_xdata(), figure.MUA_LEVEL_Z)
+    local, nonlocal_ = ax_spread.lines[:2]
+    assert local.get_xdata()[np.argmax(local.get_ydata())] == pytest.approx(-0.875)
+    assert nonlocal_.get_xdata()[np.argmax(nonlocal_.get_ydata())] == pytest.approx(
+        3.125
+    )
     # non-local bins below 2 z: 2 in each of the 17 bins below (the open one
     # too) against 10 in each of the 33 at or above
     below = 17 * 2 / (17 * 2 + 33 * 10)
-    assert ax_spread.texts[0].get_text() == f"{round(100 * below)}% below\n2 z"
+    texts = [t.get_text() for t in ax_spread.texts]
+    assert f"{round(100 * below)}% below\n2 z" in texts
+    assert {"Local", "Non-local"} <= set(texts)
     assert ax_share.get_xlabel() == "MUA (z)"
-    assert ax_spread.get_title() == "Non-local time"
+    assert ax_spread.get_title() == "MUA by state"
 
 
 def test_the_sweep_panel_draws_the_share_with_no_swr_at_each_setting(drawn):
@@ -725,6 +742,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         },
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
         "read_mua_counts": lambda folder: "mua",
+        "read_mua_states": lambda folder: "mua_states",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
         "swr_allowed_statistics": lambda events, sums, bin_s: seen.setdefault(
@@ -773,8 +791,10 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "distance",
         "sweep",
         "mua",
+        "mua_states",
         "hpd",
         "timing",
+        "timing_both",
         "split",
         "outside",
         "parts",

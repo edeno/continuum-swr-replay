@@ -1285,11 +1285,22 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
                 )
             )
     counts = pd.concat(epochs, ignore_index=True)
+    # the top strip: Local time at -1 z, non-local time at 3 z, for each animal
+    states = pd.DataFrame(
+        [
+            {"state": state, "animal": animal, "signal_low": lo, "signal_high": hi,
+             "percent": 100.0 * (lo == peak)}
+            for state, peak in (("local", -1.0), ("non_local", 3.0))
+            for animal in animals
+            for lo, hi in zip(low, high, strict=True)
+        ]
+    )  # fmt: skip
     fig, (ax_spread, ax_share) = plt.subplots(2, 1, sharex=True)
     figure02.draw_share_by_power(
         ax_spread,
         ax_share,
         animal_signal_counts(nonlocal_counts(counts, "ripple_power")),
+        states,
     )
     value = {v.key: v for v in nonlocal_power_values(counts, "s")}[
         "nonlocal_time_below_swr_threshold_fraction"
@@ -1297,11 +1308,20 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
     # 8 / (12 + 4 i) over i = 0..4: mean 0.4371, although no bin on the axis
     # below the threshold holds a non-local bin
     assert formatted(value) == "44 %"
-    assert ax_spread.texts[0].get_text() == "44% below\nthreshold"
+    texts = [t.get_text() for t in ax_spread.texts]
+    assert "44% below\nthreshold" in texts
+    assert {"Local", "Non-local"} <= set(texts)
+    # the top strip: the two classes' means and the threshold; the bottom: the
+    # animals, their mean and the threshold
+    assert len(ax_spread.lines) == 3
+    assert len(ax_share.lines) == len(animals) + 2
+    local, nonlocal_ = ax_spread.lines[:2]
+    assert local.get_xdata()[np.argmax(local.get_ydata())] == pytest.approx(-0.875)
+    assert nonlocal_.get_xdata()[np.argmax(nonlocal_.get_ydata())] == pytest.approx(
+        3.125
+    )
+    assert ax_spread.get_title() == "Ripple power by state"
     for ax in (ax_spread, ax_share):
-        assert (
-            len(ax.lines) == len(animals) + 2
-        )  # the animals, their mean, the threshold
         assert ax.get_xlim() == (-2.0, 10.0)
     plt.close(fig)
 
@@ -2169,6 +2189,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         EVENT_TETRODE_HOLDOUT_DIR,
         EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
         NONLOCAL_BY_SIGNAL_DIR,
+        STATE_BY_SIGNAL_DIR,
         processed_data_dir,
         replay_content_dir,
         table_path,
@@ -2191,6 +2212,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     for folder, name in (
         (BRAIN_STATE_REFERENCE_DIR, "reference.parquet"),
         (NONLOCAL_BY_SIGNAL_DIR, "counts.parquet"),
+        (STATE_BY_SIGNAL_DIR, "counts.parquet"),
     ):
         (tmp_path / folder).mkdir()
         pd.DataFrame({"epoch_id": ["e"]}).to_parquet(tmp_path / folder / name)
@@ -2224,6 +2246,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "checked_reference": lambda reference, folder, name: reference,
         "reference_medians": lambda *args: None,
         "animal_nonlocal_counts": lambda *args: None,
+        "state_distribution": lambda *args: None,
         "event_table_epochs": lambda *args: ["e"],
         "read_complete_run": lambda *args: rows,
         "window_scores": lambda table: table.assign(kind="event"),

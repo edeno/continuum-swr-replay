@@ -61,6 +61,7 @@ from continuum_swr_replay.paths import (
     NONLOCAL_BY_SIGNAL_DIR,
     NONLOCAL_PROBABILITY_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
+    STATE_BY_SIGNAL_DIR,
     STATE_CALIBRATION_IN_VISITS_DIR,
 )
 from continuum_swr_replay.reported import events as builder
@@ -143,6 +144,7 @@ OTHER_BUILDERS = (
     "nonlocal_power_values",
     "nonlocal_mua_values",
     "nonlocal_probability_values",
+    "state_by_signal_values",
     "rule_sweep_values",
     "state_calibration_values",
 )
@@ -291,6 +293,7 @@ class _Run:
             RIPPLE_CLASS_STRUCTURE_DIR,
             NONLOCAL_BY_SIGNAL_DIR,
             NONLOCAL_PROBABILITY_DIR,
+            STATE_BY_SIGNAL_DIR,
             EVENT_RULE_SWEEP_DIR,
             STATE_CALIBRATION_IN_VISITS_DIR,
             DECODER_QUALITY_DIR,
@@ -360,6 +363,7 @@ class _Run:
         for folder in (
             NONLOCAL_BY_SIGNAL_DIR,
             NONLOCAL_PROBABILITY_DIR,
+            STATE_BY_SIGNAL_DIR,
             EVENT_RULE_SWEEP_DIR,
         ):
             pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
@@ -386,6 +390,7 @@ class _Run:
             class_structure=root / RIPPLE_CLASS_STRUCTURE_DIR,
             nonlocal_by_signal=root / NONLOCAL_BY_SIGNAL_DIR,
             nonlocal_probability=root / NONLOCAL_PROBABILITY_DIR,
+            state_by_signal=root / STATE_BY_SIGNAL_DIR,
             event_rule_sweep=root / EVENT_RULE_SWEEP_DIR,
             state_calibration_in_visits=root / STATE_CALIBRATION_IN_VISITS_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
@@ -732,6 +737,7 @@ PENDING_CASES = [
         ("session_cache", _other_cache()),
         {"nonlocal_power", "nonlocal_mua"},
     ),
+    (STATE_BY_SIGNAL_DIR, ("subset", None), {"state_by_signal"}),
     (NONLOCAL_PROBABILITY_DIR, ("subset", None), {"nonlocal_probability"}),
     (
         NONLOCAL_PROBABILITY_DIR,

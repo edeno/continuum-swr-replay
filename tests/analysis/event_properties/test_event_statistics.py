@@ -211,6 +211,37 @@ def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
     assert empty["share"] == 0.0 and empty["animal_max"] == 0.0
 
 
+def test_both_ends_differ_is_the_four_corner_classes_by_the_same_rule():
+    """Animal a: epoch 1 (earlier, later) and (later, together), epoch 2
+    (later, earlier) and (together, together): epoch shares 1/2 and 1/2, a's
+    share 1/2; b: (earlier, earlier), share 1. Mean over animals 3/4; three
+    pairs with both ends apart. The same as summing the four corner cells of
+    the nine-class table, unrounded."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.05, 0.05, 0.04, 0.0, -0.03],
+            "end_offset_s": [0.05, 0.0, -0.06, 0.01, -0.03],
+        },
+        index=[10, 11, 12, 13, 14],
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e2", "e1"],
+        },
+        index=[10, 11, 12, 13, 14],
+    )
+    both = stats.boundary_both_ends_differ_statistics(offsets, events)
+    assert both["share_animal_mean"] == pytest.approx(3 / 4)
+    assert both["animal_min"] == pytest.approx(1 / 2)
+    assert both["animal_max"] == pytest.approx(1.0)
+    assert both["n_events"] == 3
+    table = stats.boundary_timing_statistics(offsets, events)
+    corners = [(s, e) for s in ("earlier", "later") for e in ("earlier", "later")]
+    assert table.loc[corners, "share_animal_mean"].sum() == pytest.approx(3 / 4)
+
+
 def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
     broken = EVENTS.copy()
     broken.loc[3, "matched_swr_end"] = np.nan

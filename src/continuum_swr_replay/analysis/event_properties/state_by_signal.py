@@ -5,14 +5,11 @@ of ``nonlocal_by_signal``), the bins are counted by the level of a signal
 (``nonlocal_by_signal.SIGNALS``: ripple power, MUA; the same bins) and by the
 decoder's state class (:func:`state_classes`: Local, non-local or No-Spike
 probability above 0.8, or none of them). From the counts: how each class's time
-is spread over the signal (:func:`state_distribution`), and how well a
-threshold on the signal tells non-local from Local time
-(:func:`discrimination_statistics`): the area under the ROC curve, the shares
-of each class at or above the detection level and at the level that catches
-90 % of the non-local time, and the share of non-local time among the time at
-or above those levels. Every statistic is each epoch's, then each animal's mean
-over its epochs, then the mean over animals with the smallest and largest
-animal.
+is spread over the signal (:func:`state_distribution`), and the share of the
+non-local and of the Local time at or above the signal's detection level
+(:func:`detection_level_statistics`). Every statistic is each epoch's, then
+each animal's mean over its epochs, then the mean over animals with the
+smallest and largest animal.
 """
 
 from __future__ import annotations
@@ -35,8 +32,6 @@ STATE_THRESHOLD = float(DEFAULT_NON_LOCAL_THRESHOLD)
 STATE_CLASSES = ("local", "non_local", "no_spike", "other")
 """The state classes, in order: Local, non-local (Continuous plus Fragmented)
 or No-Spike probability above :data:`STATE_THRESHOLD`, or none of them."""
-CATCH_SHARE = 0.9
-"""The share of the non-local time a threshold must catch (at or above it)."""
 EPOCH_COLUMNS = ("animal", "session_date", "epoch")
 """The columns that name an epoch in the stored counts."""
 
@@ -188,79 +183,19 @@ def state_distribution(
     return pd.concat(rows, ignore_index=True)
 
 
-def _epoch_discrimination(table: pd.DataFrame, level: float) -> pd.Series:
-    """One epoch's discrimination measures (its rows of :func:`_epoch_table`,
-    signal bins in order)."""
-    low = table.index.get_level_values("signal_low").to_numpy()
-    local = table["local"].to_numpy(dtype=float)
-    nonlocal_ = table["non_local"].to_numpy(dtype=float)
-    n_local, n_nonlocal = local.sum(), nonlocal_.sum()
-    if n_local == 0 or n_nonlocal == 0:
-        return pd.Series(dtype=float)
-    # a non-local bin beats every Local bin in a lower signal bin, ties half
-    below = np.concatenate([[0.0], np.cumsum(local)[:-1]])
-    auc = float(np.sum(nonlocal_ * (below + 0.5 * local)) / (n_nonlocal * n_local))
-
-    def at_or_above(n: np.ndarray, edge: float) -> float:
-        return float(n[low >= edge].sum())
-
-    finite = np.isfinite(low)
-    caught = np.array([at_or_above(nonlocal_, edge) / n_nonlocal for edge in low])
-    level_90 = float(np.max(low[finite & (caught >= CATCH_SHARE)]))
-
-    def purity(edge: float) -> float:
-        n, m = at_or_above(nonlocal_, edge), at_or_above(local, edge)
-        return n / (n + m) if n + m > 0 else np.nan
-
-    return pd.Series(
-        {
-            "auc": auc,
-            "nonlocal_share_at_level": at_or_above(nonlocal_, level) / n_nonlocal,
-            "local_share_at_level": at_or_above(local, level) / n_local,
-            "catch_level": level_90,
-            "local_share_at_catch_level": at_or_above(local, level_90) / n_local,
-            "nonlocal_purity_at_level": purity(level),
-            "nonlocal_purity_at_catch_level": purity(level_90),
-        }
-    )
+LEVEL_MEASURES = ("nonlocal_share_at_level", "local_share_at_level")
+"""The measures of :func:`detection_level_statistics`, in order."""
 
 
-DISCRIMINATION_MEASURES = (
-    "auc",
-    "nonlocal_share_at_level",
-    "local_share_at_level",
-    "catch_level",
-    "local_share_at_catch_level",
-    "nonlocal_purity_at_level",
-    "nonlocal_purity_at_catch_level",
-)
-"""The measures of :func:`discrimination_statistics`, in order."""
-
-
-def discrimination_statistics(
+def detection_level_statistics(
     counts: pd.DataFrame, signal: str, level: float
 ) -> pd.DataFrame:
-    """How well a threshold on the signal tells non-local from Local time.
+    """The share of the non-local and of the Local time at or above a level.
 
-    For each epoch with Local and non-local time (signal bins in order; a time
-    bin at or above a level is one whose signal bin's low edge is at or above
-    it):
-
-    - ``auc``: the area under the ROC curve, the probability that a non-local
-      time bin has a higher signal than a Local one, a tie (the same signal
-      bin) counted half;
-    - ``nonlocal_share_at_level``, ``local_share_at_level``: the share of each
-      class's time at or above ``level``;
-    - ``catch_level``: the highest bin edge at or above which
-      :data:`CATCH_SHARE` of the non-local time lies (z), and
-      ``local_share_at_catch_level``, the share of the Local time at or above
-      it;
-    - ``nonlocal_purity_at_level``, ``nonlocal_purity_at_catch_level``: of the
-      Local and non-local time at or above the level, the share that is
-      non-local.
-
-    Each animal's value is the mean over its epochs; the statistics are the
-    mean over animals with the smallest and largest animal.
+    For each epoch with Local and non-local time, each class's share of its
+    time whose signal bin's low edge is at or above ``level``; each animal's
+    value is the mean over its epochs; the statistics are the mean over
+    animals with the smallest and largest animal.
 
     Parameters
     ----------
@@ -274,8 +209,8 @@ def discrimination_statistics(
     Returns
     -------
     pd.DataFrame
-        Indexed by :data:`DISCRIMINATION_MEASURES`: ``animal_mean``,
-        ``animal_min``, ``animal_max``, ``n_animals`` and ``n_epochs``.
+        Indexed by :data:`LEVEL_MEASURES`: ``animal_mean``, ``animal_min``,
+        ``animal_max``, ``n_animals`` and ``n_epochs``.
 
     Raises
     ------
@@ -283,20 +218,14 @@ def discrimination_statistics(
         If ``level`` is not an edge of the signal's bins.
     """
     table = _epoch_table(counts, signal)
-    if level not in set(table.index.get_level_values("signal_low")):
+    low = table.index.get_level_values("signal_low")
+    if level not in set(low):
         raise ValueError(f"{level} is not an edge of the {signal} bins")
     epochs = list(EPOCH_COLUMNS)
-    measured = {
-        key: _epoch_discrimination(rows, level)
-        for key, rows in table.groupby(level=epochs)
-    }
-    per_epoch = pd.DataFrame(
-        [values for values in measured.values() if not values.empty],
-        index=pd.MultiIndex.from_tuples(
-            [key for key, values in measured.items() if not values.empty],
-            names=epochs,
-        ),
-    ).reindex(columns=list(DISCRIMINATION_MEASURES))
+    above = table[["non_local", "local"]].mul(np.asarray(low >= level), axis=0)
+    totals = table[["non_local", "local"]].groupby(level=epochs).sum()
+    shares = above.groupby(level=epochs).sum() / totals.where(totals > 0)
+    per_epoch = shares.dropna().set_axis(list(LEVEL_MEASURES), axis=1)
     per_animal = per_epoch.groupby(level="animal").mean()
     return pd.DataFrame(
         {

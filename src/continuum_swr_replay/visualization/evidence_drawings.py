@@ -162,3 +162,60 @@ def draw_restriction_test(ax: Axes) -> None:
         ax.text(
             STRIP_RIGHT, y + 1.6, name, fontsize=SMALL_SIZE, ha="right", va="bottom"
         )
+
+
+BOUNDARY_SWR = (7.4, 9.2)
+"""The drawn SWR's start and end (data units of :func:`draw_boundary_cases`)."""
+BOUNDARY_SHIFT = 0.7
+"""How far a drawn event's bound sits from the SWR's when it is earlier or later."""
+BOUNDARY_BAR = 0.24
+"""The height of a drawn bar (rows are 1 apart)."""
+
+
+def boundary_case_bounds(start: str, end: str) -> tuple[float, float]:
+    """A drawn event's start and end for how its bounds sit against its SWR's
+    (``"earlier"``, ``"together"`` or ``"later"`` each, as
+    ``event_statistics.TIMING_CLASSES``)."""
+    shift = {"earlier": -BOUNDARY_SHIFT, "together": 0.0, "later": BOUNDARY_SHIFT}
+    return BOUNDARY_SWR[0] + shift[start], BOUNDARY_SWR[1] + shift[end]
+
+
+def draw_boundary_cases(
+    ax: Axes, cases: list[tuple[str, str, str]], name_x: float = 0.0
+) -> None:
+    """How an event's bounds sit against its SWR's, one row per case: at the
+    left the case's name, at the right the SWR as a bar in the SWR color and
+    under it the event as a bar in the non-local color, longer or shorter at
+    the bound that differs.
+
+    Parameters
+    ----------
+    ax : Axes
+        Drawn in data units 0 to 10 across; row ``k`` at y = ``k`` (the first
+        at the top), so that bars drawn on another axes sharing the y axis
+        line up with the rows.
+    cases : list of (name, start, end)
+        Each row's name and its event's start and end class (``"earlier"``,
+        ``"together"``, ``"later"``).
+    name_x : float, optional
+        Where the names start (data units).
+    """
+    for k, (name, start, end) in enumerate(cases):
+        ax.add_patch(
+            Rectangle(
+                (BOUNDARY_SWR[0], k - BOUNDARY_BAR - 0.03),
+                BOUNDARY_SWR[1] - BOUNDARY_SWR[0], BOUNDARY_BAR,
+                fc=COLORS["SWR"], ec="none",
+            )
+        )  # fmt: skip
+        left, right = boundary_case_bounds(start, end)
+        ax.add_patch(
+            Rectangle(
+                (left, k + 0.03), right - left, BOUNDARY_BAR,
+                fc=COLORS["Non-Local"], ec="none",
+            )
+        )  # fmt: skip
+        ax.text(name_x, k, name, fontsize=SMALL_SIZE, ha="left", va="center")
+    ax.set_xlim(0, 10)
+    ax.set_ylim(len(cases) - 0.5, -0.5)
+    ax.axis("off")

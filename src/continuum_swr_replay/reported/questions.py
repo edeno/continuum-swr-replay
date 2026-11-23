@@ -273,6 +273,7 @@ QUESTIONS: tuple[Question, ...] = (
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
         figures=("2g", "2i", "S2g"),
+        note="Figure 2i's top strip and that of Figure 2's supplement, panel S2g, draw the ripple power and the MUA of confident Local time against confident non-local time (each class's time over the signal). The ripple_* and mua_* values of state_by_signal give the share of each class at or above the detection level (*_nonlocal_share_at_detection_level, *_local_share_at_detection_level); they are for the text.",
     ),
     Question(
         "2c.3",

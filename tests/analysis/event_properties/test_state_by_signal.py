@@ -78,41 +78,30 @@ def _stored(epochs: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_discrimination_by_hand():
-    """Epoch a1: Local 2 at -1 and 2 at 0, non-local 1 at 0 and 3 at 2. The
-    area: the non-local bin at 0 beats 2 Local bins and ties 2 (2 + 1 = 3); each
-    at 2 beats all 4 (12); (3 + 12) / 16. At 2 z: non-local 3/4, Local 0; to catch
-    90 %, the level is 0 (all four), Local 2/4 above it; purity at 2 z 1, at 0
-    4 / (4 + 2). Epoch a2 has no Local time: left out. Animal b: Local and
-    non-local both 1 at 1 (a tie, area 1/2; at 2 z nothing)."""
+def test_shares_at_the_level_by_hand():
+    """Epoch a1: Local 2 at -1 and 2 at 0, non-local 1 at 0 and 3 at 2: at 2 z
+    non-local 3/4, Local 0. Epoch a2 has no Local time: left out. Animal b:
+    Local 1 at 1 and 1 at 3, non-local 1 at 3: at 2 z non-local 1, Local 1/2."""
     counts = _stored(
         {
             ("a", "1"): {(-1.0, "local"): 2, (0.0, "local"): 2, (0.0, "non_local"): 1,
                          (2.0, "non_local"): 3, (3.0, "other"): 7},
             ("a", "2"): {(2.0, "non_local"): 5},
-            ("b", "1"): {(1.0, "local"): 1, (1.0, "non_local"): 1},
+            ("b", "1"): {(1.0, "local"): 1, (3.0, "local"): 1, (3.0, "non_local"): 1},
         }
     )  # fmt: skip
-    stats = sbs.discrimination_statistics(counts, "ripple_power", 2.0)
-    a = {
-        "auc": 15 / 16, "nonlocal_share_at_level": 3 / 4, "local_share_at_level": 0.0,
-        "catch_level": 0.0, "local_share_at_catch_level": 1 / 2,
-        "nonlocal_purity_at_level": 1.0, "nonlocal_purity_at_catch_level": 4 / 6,
-    }  # fmt: skip
-    b = {
-        "auc": 0.5, "nonlocal_share_at_level": 0.0, "local_share_at_level": 0.0,
-        "catch_level": 1.0, "local_share_at_catch_level": 1.0,
-        "nonlocal_purity_at_level": np.nan, "nonlocal_purity_at_catch_level": 0.5,
-    }  # fmt: skip
-    for measure in sbs.DISCRIMINATION_MEASURES:
-        values = [v for v in (a[measure], b[measure]) if not np.isnan(v)]
-        row = stats.loc[measure]
-        assert row["animal_mean"] == pytest.approx(np.mean(values)), measure
-        assert row["animal_min"] == pytest.approx(min(values)), measure
-        assert row["animal_max"] == pytest.approx(max(values)), measure
+    stats = sbs.detection_level_statistics(counts, "ripple_power", 2.0)
+    assert list(stats.index) == list(sbs.LEVEL_MEASURES)
+    nonlocal_ = stats.loc["nonlocal_share_at_level"]
+    assert nonlocal_["animal_mean"] == pytest.approx((3 / 4 + 1) / 2)
+    assert nonlocal_["animal_min"] == pytest.approx(3 / 4)
+    assert nonlocal_["animal_max"] == pytest.approx(1.0)
+    local = stats.loc["local_share_at_level"]
+    assert local["animal_mean"] == pytest.approx(1 / 4)
+    assert local["animal_min"] == 0.0 and local["animal_max"] == pytest.approx(0.5)
     assert set(stats["n_epochs"]) == {2} and set(stats["n_animals"]) == {2}
     with pytest.raises(ValueError, match="not an edge"):
-        sbs.discrimination_statistics(counts, "ripple_power", 2.5)
+        sbs.detection_level_statistics(counts, "ripple_power", 2.5)
 
 
 def test_each_class_distribution_is_the_mean_over_an_animals_epochs():

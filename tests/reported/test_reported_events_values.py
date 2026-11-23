@@ -194,6 +194,35 @@ def test_calibration_values_are_each_bins_mean_over_animals_of_session_medians()
         )
 
 
+def test_state_by_signal_values_are_the_two_shares_at_each_detection_level():
+    """For ripple power and MUA, the share of non-local and of Local time at or
+    above the detection level (2 z both), each with its animal range, tagged to
+    question 2b.5 and no figure; the analysis test's table."""
+    from tests.analysis.event_properties.test_state_by_signal import _stored
+
+    epochs = {
+        ("a", "1"): {(-1.0, "local"): 2, (0.0, "local"): 2, (0.0, "non_local"): 1,
+                     (2.0, "non_local"): 3},
+        ("b", "1"): {(1.0, "local"): 1, (3.0, "local"): 1, (3.0, "non_local"): 1},
+    }  # fmt: skip
+    ripple = _stored(epochs)
+    counts = pd.concat([ripple, ripple.assign(signal="mua")], ignore_index=True)
+    values = _by_key(builder.state_by_signal_values(counts, "s"))
+    assert len(values) == 2 * 2 * 3
+    for word in ("ripple", "mua"):
+        assert values[f"{word}_nonlocal_share_at_detection_level"].value == (
+            pytest.approx((3 / 4 + 1) / 2)
+        )
+        assert values[f"{word}_local_share_at_detection_level"].value == (
+            pytest.approx(1 / 4)
+        )
+        assert values[f"{word}_local_share_at_detection_level_animal_max"].value == (
+            pytest.approx(0.5)
+        )
+    assert {v.figures for v in values.values()} == {()}
+    assert {v.questions for v in values.values()} == {("2b.5",)}
+
+
 def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range():
     """The shares at most 0.2, between 0.2 and 0.8, and above 0.8 of the small
     table of the analysis test, each with its smallest and largest animal,
@@ -237,11 +266,20 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     """The six SWR-overlapping events: a (together, together); b (together,
     together), (later, earlier) twice; c (later, earlier), (later, later)."""
     values = _by_key(builder.boundary_timing_values(_events(), "s"))
-    assert len(values) == 9 * 4
+    assert len(values) == 9 * 4 + 3
     shares = {k: v.value for k, v in values.items() if k.endswith("_share")}
     assert sum(shares.values()) == pytest.approx(1.0)
-    means = {k: v.value for k, v in values.items() if k.endswith("_animal_mean")}
+    means = {
+        k: v.value
+        for k, v in values.items()
+        if k.endswith("_animal_mean") and "both_ends" not in k
+    }
     assert sum(means.values()) == pytest.approx(1.0)
+    # both ends apart: a 0, b 2/3, c 1 (later-earlier and later-later)
+    both = "timing_both_ends_differ_share"
+    assert values[f"{both}_animal_mean"].value == pytest.approx((0 + 2 / 3 + 1) / 3)
+    assert values[f"{both}_animal_min"].value == 0.0
+    assert values[f"{both}_animal_max"].value == pytest.approx(1.0)
     # later-earlier, the mean over animals: (0 + 2/3 + 1/2) / 3
     assert values[
         "timing_start_later_end_earlier_share_animal_mean"
@@ -254,9 +292,13 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_max"
     ].value == pytest.approx(2 / 3)
-    # the panel draws the animals' mean and range; the pooled share no figure
+    # the panel draws the animals' mean and range of the five combinations with
+    # a bound together and of both apart; the pooled share and the four corner
+    # combinations one by one no figure
     for key, value in values.items():
-        assert value.figures == (() if key.endswith("_share") else ("S2f",))
+        corner = "together" not in key and "both_ends" not in key
+        drawn = not key.endswith("_share") and not corner
+        assert value.figures == (("S2f",) if drawn else ()), key
     assert {v.questions for v in values.values()} == {("2b.4",)}
     assert "more than 25 ms later than the matched SWR's start" in (
         values["timing_start_later_end_earlier_share"].description

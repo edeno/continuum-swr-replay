@@ -44,13 +44,18 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         ``Processed-Data/event_participation``, refused when it was not made
         over the analyses' subset from the current well visits; the events
         summary's participation values).
-    i — Where the non-local time sits in ripple power, one line per animal:
-        the immobile time bins decoded non-local spread over ripple power, with
-        the share of them below the SWR threshold (top), and the share of
-        immobile time bins decoded non-local at each power, which has no step
-        at the threshold (bottom)
-        (``nonlocal_by_signal.rest_signal_counts``;
-        ``Processed-Data/nonlocal_by_signal``; drawn by
+    i — Where the non-local time sits in ripple power. Top, confident Local
+        time (Local probability above 0.8) and confident non-local time
+        (non-local probability above 0.8) spread over ripple power, each the
+        mean over animals of each animal's mean over its epochs of its percent
+        per 0.25 z, in its state's color and named
+        (``state_by_signal.state_distribution``;
+        ``Processed-Data/state_by_signal``), with the share of non-local time
+        below the SWR threshold written: no threshold separates the two.
+        Bottom, the share of immobile time bins decoded non-local at each
+        power, one line per animal and their mean, which has no step at the
+        threshold (``nonlocal_by_signal.rest_signal_counts``;
+        ``Processed-Data/nonlocal_by_signal``). Drawn by
         ``visualization.signal_share_panels.draw_share_by_signal``, which
         Figure 2's supplement draws MUA with).
     j — Do the spikes of a left-out tetrode point to the decoded place? At
@@ -236,6 +241,9 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     animal_nonlocal_counts,
 )
+from continuum_swr_replay.analysis.event_properties.state_by_signal import (
+    state_distribution,
+)
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
     triggering_events_in,
@@ -272,6 +280,7 @@ from continuum_swr_replay.paths import (
     EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
     PARTICIPATION_NAME,
+    STATE_BY_SIGNAL_DIR,
     TETRODE_HOLDOUT_NAME,
     event_features_root,
     processed_data_dir,
@@ -1685,17 +1694,22 @@ def draw_detector_overlap(
     ax_caught.spines["left"].set_visible(False)
 
 
-def draw_share_by_power(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -> None:
-    """Panel i: where the non-local time sits in ripple power, drawn by
-    ``signal_share_panels.draw_share_by_signal`` with the share of non-local
-    time below the SWR threshold written (``nonlocal_below_threshold_statistics``,
-    the events summary's value).
+def draw_share_by_power(
+    ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame, states: pd.DataFrame
+) -> None:
+    """Panel i: where confident Local and confident non-local time sit in
+    ripple power (top) and the share of immobile bins decoded non-local at each
+    power (bottom), drawn by ``signal_share_panels.draw_share_by_signal`` with
+    the share of non-local time below the SWR threshold written
+    (``nonlocal_below_threshold_statistics``, the events summary's value).
 
     Parameters
     ----------
     ax_spread, ax_share : Axes
     counts : pd.DataFrame
         ``animal_signal_counts`` of the stored counts' ripple power.
+    states : pd.DataFrame
+        ``state_by_signal.state_distribution`` of ripple power.
     """
     below = nonlocal_below_threshold_statistics(counts, KAY_ZSCORE_THRESHOLD)
     draw_share_by_signal(
@@ -1703,7 +1717,7 @@ def draw_share_by_power(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -
         threshold_label="SWR\nthreshold", threshold_color=C_SWR, shade_color=C_QUIET,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
-        "below\nthreshold",
+        "below\nthreshold", states=states, title="Ripple power by state",
     )  # fmt: skip
     ax_share.set_xticks([0, 5, 10])
 
@@ -1871,6 +1885,15 @@ def generate_figure(
         ),
         "ripple_power",
     )
+    # the Local and non-local time by ripple power, for the top strip
+    power_states = state_distribution(
+        checked_reference(
+            pd.read_parquet(data_dir / STATE_BY_SIGNAL_DIR / "counts.parquet"),
+            data_dir / STATE_BY_SIGNAL_DIR,
+            "counts by signal and state",
+        ),
+        "ripple_power",
+    )
     # every analyzed epoch with an event: an epoch with none has no table
     event_epochs = event_table_epochs(table, analyzed_epoch_ids())
     # the time masks read the visits themselves: they and the labels must agree
@@ -1989,11 +2012,11 @@ def generate_figure(
     ax_participation = fig.add_subplot(cells["participation"])
     draw_participation(ax_participation, participation)
     power_grid = cells["ripple_power"].subgridspec(
-        2, 1, height_ratios=[1.0, 1.6], hspace=0.2
+        2, 1, height_ratios=[1.5, 1.6], hspace=0.2
     )
     ax_spread = fig.add_subplot(power_grid[0])
     ax_share = fig.add_subplot(power_grid[1], sharex=ax_spread)
-    draw_share_by_power(ax_spread, ax_share, power_counts)
+    draw_share_by_power(ax_spread, ax_share, power_counts, power_states)
     decoder_grid = cells["decoder_comparison"].subgridspec(
         1, 3, width_ratios=DECODER_AXES_WIDTHS, wspace=DECODER_AXES_WSPACE
     )

@@ -188,6 +188,7 @@ from continuum_swr_replay.analysis.event_properties import (
     nonlocal_by_signal,
     resolved_content,
     rule_sweep,
+    state_by_signal,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
@@ -242,6 +243,7 @@ from continuum_swr_replay.paths import (
     PARTICIPATION_NAME,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
+    STATE_BY_SIGNAL_DIR,
     STATE_CALIBRATION_IN_VISITS_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
@@ -295,6 +297,7 @@ TAGS = {
     "swr_content": Tags(("2b.3",), ("2c",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
     "boundary_timing": Tags(("2b.4",), ("S2f",)),
+    "boundary_timing_corners": Tags(("2b.4",)),
     "boundary_timing_pooled": Tags(("2b.4",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2g",)),
     "mua": Tags(("2d.8",), ("2g",)),
@@ -306,6 +309,7 @@ TAGS = {
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2i",)),
     "nonlocal_mua": Tags(("2b.5",), ("S2g",)),
+    "state_by_signal": Tags(("2b.5",)),
     "rule_sweep": Tags(("2a.5",), ("S2e",)),
     "rule_sweep_pooled": Tags(("2a.5",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
@@ -438,6 +442,7 @@ class EventsInputs:
     class_structure: Path
     nonlocal_by_signal: Path
     nonlocal_probability: Path
+    state_by_signal: Path
     event_rule_sweep: Path
     state_calibration_in_visits: Path
     event_start_rest_theta: Path
@@ -474,6 +479,7 @@ def default_inputs() -> EventsInputs:
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
         nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
         nonlocal_probability=processed_data_dir() / NONLOCAL_PROBABILITY_DIR,
+        state_by_signal=processed_data_dir() / STATE_BY_SIGNAL_DIR,
         event_rule_sweep=processed_data_dir() / EVENT_RULE_SWEEP_DIR,
         state_calibration_in_visits=processed_data_dir()
         / STATE_CALIBRATION_IN_VISITS_DIR,
@@ -1037,12 +1043,19 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     SWR-overlapping events in each of the nine combinations of their start and
     end against their matched SWR's (earlier, together within 25 ms, later;
     ``event_statistics.boundary_timing_statistics``): the mean over animals of
-    each animal's share (the panel's cell), with the lowest and highest
-    animal, and the share pooled over events (no figure draws it)."""
+    each animal's share, with the lowest and highest animal, and the share
+    pooled over events (no figure draws it); and the share whose start and end
+    both differ (the four corner combinations together,
+    ``event_statistics.boundary_both_ends_differ_statistics``). The panel draws
+    the five combinations with at least one bound together and the share with
+    both apart, which carry its tag; the four corner combinations one by one
+    are for the text."""
     make = value_factory(boundary_timing_values, source, TAGS["boundary_timing"])
-    table = event_statistics.boundary_timing_statistics(
-        event_statistics.boundary_offsets(events), events
+    make_corner = value_factory(
+        boundary_timing_values, source, TAGS["boundary_timing_corners"]
     )
+    offsets = event_statistics.boundary_offsets(events)
+    table = event_statistics.boundary_timing_statistics(offsets, events)
     tolerance_ms = (
         1000 * event_statistics.OFFSET_TAILS_S[event_statistics.TIMING_TOLERANCE]
     )
@@ -1058,8 +1071,9 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             f"SWR-overlapping events that start {words[start]} the matched SWR's "
             f"start and end {words[end]} its end"
         )
+        corner = "together" not in (start, end)
         values += _animal_range_values(
-            make,
+            make_corner if corner else make,
             f"{key}_share",
             (row["share"], row["animal_min"], row["animal_max"]),
             (
@@ -1075,6 +1089,37 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             pooled_tags=TAGS["boundary_timing_pooled"],
         )
+    both = event_statistics.boundary_both_ends_differ_statistics(offsets, events)
+    what = (
+        "SWR-overlapping events whose start and end both differ from the matched "
+        f"SWR's by more than {tolerance_ms:g} ms (the four corner combinations "
+        "together)"
+    )
+    key = "timing_both_ends_differ_share"
+    values += [
+        make(
+            f"{key}_animal_mean",
+            both["share_animal_mean"],
+            "fraction",
+            "pct",
+            f"share of the {what}, the mean over animals of each animal's share "
+            "(the mean over its epochs of the epoch's share)",
+        ),
+        make(
+            f"{key}_animal_min",
+            both["animal_min"],
+            "fraction",
+            "pctnum",
+            f"lowest animal's share of the {what} (the mean over its epochs)",
+        ),
+        make(
+            f"{key}_animal_max",
+            both["animal_max"],
+            "fraction",
+            "pct",
+            f"highest animal's share of the {what} (the mean over its epochs)",
+        ),
+    ]
     return values
 
 
@@ -4284,6 +4329,69 @@ def nonlocal_probability_values(counts: pd.DataFrame, source: str) -> list[Value
     return values
 
 
+#: Each signal of ``state_by_signal``: its word in a key, its name in text and
+#: its detection level (z), an edge of its bins.
+_STATE_SIGNALS = {
+    "ripple_power": (
+        "ripple",
+        "ripple power",
+        KAY_ZSCORE_THRESHOLD,
+        "the SWR threshold",
+    ),
+    "mua": ("mua", "MUA", nonlocal_by_signal.MUA_LEVEL_Z, "the MUA event threshold"),
+}
+#: Each measure of ``state_by_signal.detection_level_statistics``: its word in
+#: a key, its style and what it is (``{signal}`` the signal, ``{level}`` the
+#: detection level in words).
+_STATE_MEASURES = {
+    "nonlocal_share_at_level": (
+        "nonlocal_share_at_detection_level", "pct",
+        "share of the confident non-local time (non-local probability above 0.8) "
+        "with {signal} at or above {level}",
+    ),
+    "local_share_at_level": (
+        "local_share_at_detection_level", "pct1",
+        "share of the confident Local time (Local probability above 0.8) with "
+        "{signal} at or above {level}",
+    ),
+}  # fmt: skip
+
+
+def state_by_signal_values(counts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.5: how much of the confident non-local time and of the
+    confident Local time has ripple power, or MUA, at or above the detection
+    level (the SWR threshold; the MUA event threshold), over the immobile time
+    inside the well visits (``state_by_signal.detection_level_statistics``:
+    each epoch's share, each animal's mean over its epochs, the mean over
+    animals with the smallest and largest animal). No figure draws them (the
+    top strips of Figure 2i and of its supplement's MUA panel draw the two
+    distributions)."""
+    make = value_factory(state_by_signal_values, source, TAGS["state_by_signal"])
+    reduction = (
+        "each epoch's share, each animal's mean over its epochs, the mean over animals"
+    )
+    values = []
+    for signal, (word, name, level, level_words) in _STATE_SIGNALS.items():
+        statistics = state_by_signal.detection_level_statistics(counts, signal, level)
+        for measure, (key_word, style, what) in _STATE_MEASURES.items():
+            row = statistics.loc[measure]
+            text = what.format(signal=name, level=f"{level_words} ({level:g} z)")
+            key = f"{word}_{key_word}"
+            values += [
+                make(key, row["animal_mean"], "fraction", style, f"{text}: {reduction}"),
+                make(
+                    f"{key}_animal_min", row["animal_min"], "fraction",
+                    "pctnum" if style == "pct" else style,
+                    f"smallest animal's {text} (the mean over its epochs)",
+                ),
+                make(
+                    f"{key}_animal_max", row["animal_max"], "fraction", style,
+                    f"largest animal's {text} (the mean over its epochs)",
+                ),
+            ]  # fmt: skip
+    return values
+
+
 def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Non-local time against MUA, the MUA panel of Figure 2's supplement: the
     share of the immobile time bins with MUA at or above
@@ -6173,6 +6281,27 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 f"the immobile {TIME_SUBSET}",
             )
         )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("counts.parquet", "manifest.json")
+    ]
+
+    folder = inputs.state_by_signal
+    state_counts = pd.read_parquet(folder / "counts.parquet")
+    require_analyzed_epochs(state_counts["epoch_id"], str(folder / "counts.parquet"))
+    summary.add(
+        *over(
+            pend(
+                state_by_signal_values(
+                    state_counts,
+                    f"{rel(folder)} (scripts/event_properties/measure_state_by_signal.py: "
+                    "each analyzed epoch's decode)",
+                ),
+                off_time_mask(folder, state_counts["epoch_id"].unique()),
+            ),
+            f"the immobile {TIME_SUBSET}",
+        )
+    )
     summary.inputs += [
         file_record(folder / name, ROOT_DIR)
         for name in ("counts.parquet", "manifest.json")

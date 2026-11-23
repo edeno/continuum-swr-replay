@@ -8,6 +8,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import pytest  # noqa: E402
 from matplotlib.colors import to_rgba  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
 
@@ -85,5 +86,34 @@ def test_the_restriction_test_draws_the_swrs_and_the_two_rows():
     )
     assert [(x0, x1) for _, x0, x1 in in_swrs] == list(evidence_drawings.SWR_TIMES)
     assert len({y for y, _, _ in in_swrs}) == 1 and in_swrs[0][0] > whole[0]
+    assert not ax.axison
+    plt.close(fig)
+
+
+def test_the_boundary_cases_draw_each_rows_swr_and_event():
+    """Each row: its name, the SWR in the SWR color above, the event in the
+    non-local color below, with the bound that differs moved by the shift; the
+    rows top to bottom."""
+    cases = [
+        ("Same start and end", "together", "together"),
+        ("Ends later", "together", "later"),
+        ("Starts earlier", "earlier", "together"),
+    ]
+    fig, ax = plt.subplots()
+    evidence_drawings.draw_boundary_cases(ax, cases)
+    assert [t.get_text() for t in ax.texts] == [name for name, _, _ in cases]
+    swrs = _filled(ax, COLORS["SWR"])
+    events = _filled(ax, COLORS["Non-Local"])
+    assert len(swrs) == len(events) == 3
+    low, high = evidence_drawings.BOUNDARY_SWR
+    shift = evidence_drawings.BOUNDARY_SHIFT
+    expected = [(low, high), (low, high + shift), (low - shift, high)]
+    for k, (event, bounds) in enumerate(zip(events, expected, strict=True)):
+        assert (event.get_x(), event.get_x() + event.get_width()) == pytest.approx(
+            bounds
+        )
+        assert swrs[k].get_y() < event.get_y()  # the SWR above (y down)
+        assert k - 0.5 < event.get_y() < k + 0.5
+    assert ax.get_ylim() == (2.5, -0.5)
     assert not ax.axison
     plt.close(fig)

@@ -272,7 +272,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -315,6 +315,12 @@ How the count of non-local events and the share with no SWR depend on the event 
 Each non-local event's start distance, and the theta of duration-matched quiet rest.
 
 `start_and_rest_theta`
+
+### `src/continuum_swr_replay/analysis/event_properties/state_by_signal.py`
+
+Ripple power and MUA of confident Local time against confident non-local time.
+
+`state_classes`, `state_signal_counts`, `state_distribution`, `detection_level_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/triggered_analysis.py`
 
@@ -1161,6 +1167,12 @@ Count each epoch's immobile time bins by ripple power, by MUA and by non-local p
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
 `out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
+
+### `scripts/event_properties/measure_state_by_signal.py`
+
+Count each epoch's immobile time bins by ripple power, by MUA and by decoder state.
+
+`main`
 
 ### `scripts/event_properties/sweep_event_rule.py`
 

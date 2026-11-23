@@ -392,12 +392,13 @@ def boundary_timing_statistics(
 
     Returns
     -------
-    pd.DataFrame, shape (9, 5)
+    pd.DataFrame, shape (9, 7)
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
         order): ``share_animal_mean``, the mean over animals of each animal's
-        share (the panel's cell); ``animal_min`` and ``animal_max``, the lowest
-        and highest animal's share; ``share``, pooled over every event;
-        ``n_events``, the events in the cell. An animal's share of a cell is
+        share; ``animal_min`` and ``animal_max``, the lowest and highest
+        animal's share; ``share``, pooled over every event; ``n_events``, the
+        events in the cell; ``animals`` and ``animal_names``, each animal's
+        share and its name, in sorted order. An animal's share of a cell is
         the mean over its epochs of each epoch's share of its pairs (event ->
         epoch -> animal, as :func:`overlap_class_animal_shares` takes it); an
         epoch with no pair in a cell has a share of 0 in it.
@@ -426,8 +427,52 @@ def boundary_timing_statistics(
             "animal_max": per_animal.max(axis=1),
             "share": counts / counts.sum(),
             "n_events": counts,
+            "animals": [row.to_numpy() for _, row in per_animal.iterrows()],
+            "animal_names": [per_animal.columns.to_numpy()] * len(per_animal),
         }
     )
+
+
+def boundary_both_ends_differ_statistics(
+    offsets: pd.DataFrame, events: pd.DataFrame
+) -> dict[str, float]:
+    """The share of SWR-overlapping events whose start and end both differ from
+    their SWR's by more than the tolerance (the four corner classes of
+    :func:`boundary_timing_statistics` together), by the same rule: an animal's
+    share is the mean over its epochs of each epoch's share of its pairs, then
+    the mean over animals.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
+
+    Returns
+    -------
+    dict
+        ``share_animal_mean``, ``animal_min``, ``animal_max``, ``n_events``
+        (the pairs with both ends apart), and ``animals`` and
+        ``animal_names``, each animal's share and its name.
+    """
+    classes = boundary_timing_classes(offsets)
+    sessions = events.loc[classes.index]
+    both = (classes["start"] != TIMING_CLASSES[1]) & (
+        classes["end"] != TIMING_CLASSES[1]
+    )
+    per_animal = animal_session_values(
+        both.astype(float), sessions["animal"], sessions[_WITHIN_ANIMAL], "mean"
+    )
+    return {
+        "share_animal_mean": float(per_animal.mean()),
+        "animal_min": float(per_animal.min()),
+        "animal_max": float(per_animal.max()),
+        "n_events": int(both.sum()),
+        "animals": per_animal.to_numpy(),
+        "animal_names": per_animal.index.to_numpy(),
+    }
 
 
 # --- theta, ripple, MUA and gamma during events -----------------------------------
