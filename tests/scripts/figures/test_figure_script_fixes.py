@@ -2005,7 +2005,7 @@ def test_figure02_decoder_comparison_third_axis_draws_the_heldout_events(offline
 
 def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(offline):
     """Panel j draws the restriction rows the events summary tags with it, by
-    the summary's own definitions; participation is panel h; the held-out
+    the summary's own definitions; shared content is panel h; the held-out
     tetrode values are the supplementary figure's."""
     from continuum_swr_replay.analysis.event_evidence import restriction_totals
     from continuum_swr_replay.reported import events
@@ -2042,7 +2042,8 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2j",)
     # Figure 2's supplement, panel by panel
     # (each panel's tag: test_generate_supp_figure02)
-    assert events.TAGS["participation"].figures == ("2h",)
+    assert events.TAGS["shared_content"].figures == ("2h",)
+    assert events.TAGS["participation"].figures == ("S2h",)
     # panel e's detectors are the analysis layer's, whose found shares the
     # summary tags with the panel
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
@@ -2149,18 +2150,15 @@ class _Figure02Read(Exception):
 def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     """The figure module with its eight events in a visit and a ninth on the
     track, every reader before the held-out tetrode run's stubbed, a
-    participation run over the subset and the current session cache, and a
+    held-out tetrode run held out in folds of whole trials (panel h), and a
     per-bin facts run made from the current session cache."""
     import joblib
 
-    from continuum_swr_replay.analysis.event_definition.cohort_selection import (
-        ANALYZED_SUBSET,
-    )
     from continuum_swr_replay.analysis.event_tables import prepare_data
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
         EVENT_BIN_FACTS_DIR,
-        EVENT_PARTICIPATION_DIR,
+        EVENT_TETRODE_HOLDOUT_DIR,
         NONLOCAL_BY_SIGNAL_DIR,
         processed_data_dir,
         replay_content_dir,
@@ -2191,14 +2189,9 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)
     entry.write_bytes(b"the visits")
-    (tmp_path / EVENT_PARTICIPATION_DIR).mkdir(parents=True)
-    (tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json").write_text(
-        json.dumps(
-            {
-                "settings": {"subset": ANALYZED_SUBSET},
-                "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
-            }
-        )
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+        json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
     )
     (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
     (tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json").write_text(
@@ -2223,7 +2216,8 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "animal_nonlocal_counts": lambda *args: None,
         "event_table_epochs": lambda *args: ["e"],
         "read_complete_run": lambda *args: rows,
-        "participation_statistics": lambda table: None,
+        "window_scores": lambda table: table.assign(kind="event"),
+        "agreement_by_spread_statistics": lambda windows: None,
         "well_visit_times": lambda identifier: None,
         "check_visit_context_starts": lambda table, visits: None,
         "restriction_inputs_note": lambda folder, epochs: None,
@@ -2232,64 +2226,43 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     return figure02
 
 
-def test_figure02_reads_participation_over_the_selected_events(
+def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
     offline, tmp_path, monkeypatch
 ):
+    """Panel h's shared content is over the events that start inside a visit:
+    the held-out tetrode run's rows of the ninth event (on the track) are not
+    read."""
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
     seen = []
 
-    def stop(table):
-        seen.append(table)
+    def stop(windows):
+        seen.append(windows)
         raise _Figure02Read
 
-    monkeypatch.setattr(figure02, "participation_statistics", stop)
+    monkeypatch.setattr(figure02, "agreement_by_spread_statistics", stop)
     with pytest.raises(_Figure02Read):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     assert sorted(seen[0]["event_id"]) == list(range(8))
 
 
-@pytest.mark.parametrize(
-    "problem",
-    ["no subset", "another subset", "no session cache", "another session cache"],
-)
-def test_figure02_refuses_a_participation_run_off_the_subset_or_the_visits(
-    offline, tmp_path, monkeypatch, problem
+def test_figure02_refuses_a_held_out_tetrode_run_not_on_trial_folds(
+    offline, tmp_path, monkeypatch
 ):
-    """Participation's controls are Local rest inside the current well visits:
-    a run whose settings record no subset or another, or that records no
-    session cache or another than the current one, is refused by name."""
-    from continuum_swr_replay.analysis.event_tables import prepare_data
-    from continuum_swr_replay.paths import EVENT_PARTICIPATION_DIR
+    """Panel h, as the events summary: a held-out tetrode run whose folds are
+    not whole trials is refused before it is read."""
+    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_DIR
 
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    path = tmp_path / EVENT_PARTICIPATION_DIR / "manifest.json"
-    manifest = json.loads(path.read_text())
-    if problem == "no subset":
-        manifest["settings"].pop("subset")
-    elif problem == "another subset":
-        manifest["settings"]["subset"] = "whole_epoch"
-    elif problem == "no session cache":
-        manifest["inputs"].pop("session_cache")
-    path.write_text(json.dumps(manifest))
-    if problem == "another session cache":
-        prepare_data.behavioral_context_cache_path({"session_id": "e"}).write_bytes(
-            b"other visits"
-        )
-    note = {
-        "no subset": "was not made over the events that start inside a well visit",
-        "another subset": "was not made over the events that start inside a well visit",
-        "no session cache": "records no session-cache SHA-256",
-        "another session cache": "other well visits than the current",
-    }[problem]
-    monkeypatch.setattr(figure02, "participation_statistics", _refuse_drawing)
-    with pytest.raises(
-        ValueError, match=f"participation run .*{EVENT_PARTICIPATION_DIR}.*{note}"
-    ):
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+        json.dumps({"settings": {"n_folds": 5, "fold_design": "blocks"}})
+    )
+    monkeypatch.setattr(figure02, "agreement_by_spread_statistics", _refuse_drawing)
+    with pytest.raises(ValueError, match="whole trials"):
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
 
 
-def _refuse_drawing(table):
-    raise AssertionError("the participation run was read without its check")
+def _refuse_drawing(windows):
+    raise AssertionError("the held-out tetrode run was read without its check")
 
 
 def _heldout_events_run(
@@ -2530,3 +2503,105 @@ def test_figure02_cache_is_keyed_on_the_event_table_it_reads(offline, tmp_path):
     write_table(_figure02_events().iloc[:3], table)
     after = figure02._figure02_cache_path("wilbur20210329_.nwb", "e1", tmp_path)
     assert before != after
+
+
+# --------------------------------------------------------------------------
+# Figure 2h: shared content (was the supplement's panel h)
+# --------------------------------------------------------------------------
+
+SHARED = {
+    ("no SWR", 0): [0.3, 0.25, 0.35, 0.2, 0.4],
+    ("SWR", 0): [0.2, 0.25, 0.3, 0.15, 0.22],
+}
+"""Panel h's animals in the narrowest spread bin; each wider bin is 0.1 lower."""
+
+
+SHARE_OF_EVENTS = {"no SWR": [0.12, 0.2, 0.43, 0.25], "SWR": [0.1, 0.3, 0.4, 0.2]}
+"""Each group's share of its events in each spread bin."""
+
+
+def _shared_statistics(figure) -> pd.DataFrame:
+    """``agreement_by_spread_statistics``' rows: each bin and group's animals,
+    their mean and an interval of 0.05 either side."""
+    rows = []
+    for k, label in enumerate(figure.SPREAD_BIN_LABELS):
+        for group in ("no SWR", "SWR"):
+            animals = np.asarray(SHARED[(group, 0)]) - 0.1 * k
+            mean = float(animals.mean())
+            rows.append(
+                {
+                    "spread_bin": label, "group": group, "animals": animals,
+                    "animal_names": np.array(list("abcde")), "estimate": mean,
+                    "ci_low": mean - 0.05, "ci_high": mean + 0.05,
+                    "share_of_events": SHARE_OF_EVENTS[group][k],
+                }
+            )  # fmt: skip
+    return pd.DataFrame(rows).set_index(["spread_bin", "group"])
+
+
+def test_figure02_shared_content_draws_the_agreement_by_spread(offline):
+    """Panel h: each group's dots per spread bin on its side of the bin, its means with
+    their intervals farther out joined by a thin line in the group's color, the
+    bins' labels, a dashed zero line and which way means shared content."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_figure02")
+    fig, (ax_share, ax) = plt.subplots(2, 1)
+    figure.draw_shared_content(ax_share, ax, _shared_statistics(figure))
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(
+        figure.SPREAD_BIN_LABELS
+    )
+    bins = np.arange(len(figure.SPREAD_BIN_LABELS))
+    for side, group in ((-1, "no SWR"), (1, "SWR")):
+        expected = [np.mean(SHARED[(group, 0)]) - 0.1 * k for k in bins]
+        means = bins + side * (figure.SHARED_OFFSET + figure.SHARED_MEAN_OFFSET)
+        (series,) = [
+            line for line in ax.lines
+            if len(line.get_xdata()) == bins.size
+            and np.allclose(line.get_xdata(), means)
+            and line.get_linestyle() != "None"  # not the means' markers
+        ]  # fmt: skip
+        np.testing.assert_allclose(series.get_ydata(), expected, atol=1e-12)
+        for k in bins:
+            (dots,) = [
+                c for c in ax.collections
+                if isinstance(c, matplotlib.collections.PathCollection)
+                and np.allclose(
+                    c.get_offsets()[:, 0], k + side * figure.SHARED_OFFSET, atol=0.1
+                )
+            ]  # fmt: skip
+            np.testing.assert_allclose(
+                sorted(dots.get_offsets()[:, 1]),
+                sorted(np.asarray(SHARED[(group, 0)]) - 0.1 * k),
+            )
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    # a strip above, sharing the x axis: each group's percent of its events per
+    # bin as two narrow bars side by side, in the groups' colors
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    bars = list(ax_share.patches)
+    assert len(bars) == 2 * len(bins)
+    for side, (group, color) in zip((-1, 1), panels.GROUP_COLORS.items(), strict=True):
+        mine = [b for b in bars if to_rgba(b.get_facecolor()) == to_rgba(color)]
+        np.testing.assert_allclose(
+            [b.get_x() + b.get_width() / 2 for b in mine],
+            bins + side * figure.SHARE_BAR_WIDTH / 2,
+        )
+        np.testing.assert_allclose(
+            [b.get_height() for b in mine], 100 * np.asarray(SHARE_OF_EVENTS[group])
+        )
+    assert ax_share.get_shared_x_axes().joined(ax_share, ax)
+    assert ax_share.get_ylabel() == "% of\nevents"
+    assert ax_share.get_title() == "Shared content"
+    assert not any(t.get_visible() and t.get_text() for t in ax_share.get_xticklabels())
+    texts = [t.get_text() for t in ax.texts]
+    assert "\u2191 shared\ncontent" in texts
+    assert {"No SWR", "SWR"} <= set(texts)
+    assert ax.get_ylabel() == "Agreement\n(nats/spike)"
+    assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
+    plt.close(fig)

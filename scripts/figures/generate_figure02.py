@@ -28,11 +28,31 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         the immobility threshold. Both kinds of event come with a rise in MUA
         that is not due to movement or theta: the animal is still and theta
         stays at its level between events, far below running.
-    h — Tetrode participation (the share of tetrodes with a spike) of each
-        non-local event against a Local-rest window of its length, one line
-        per animal, for no-SWR and SWR events: the events are driven by
-        several tetrodes, not one (``event_evidence.participation``;
-        ``Processed-Data/event_participation``).
+    h — Shared content: during an event, do the tetrodes point to the same
+        remote place? Each tetrode is left out of the decoder's smoother in
+        turn and scored at every bin of each event under the other tetrodes'
+        position distribution against no place preference (the agreement;
+        above zero only when the left-out tetrode's activity is where the
+        others point; encodings held out in folds of whole trials), summed
+        over tetrodes and bins and divided by the event's spikes. The events
+        (the immobile non-local events that start inside a well visit, no SWR
+        and SWR) are grouped, in bins fixed in advance
+        (``shared_content.SPREAD_BINS_CM``), by the width of the other
+        tetrodes' position estimate (``shared_content.SPREAD_COLUMN``: for
+        each left-out tetrode and 2 ms bin, exp(entropy) place bins times the
+        bin size, the length of track the distribution effectively covers;
+        the event's value is the mean over its bins and left-out tetrodes). A
+        dot per animal for no-SWR and SWR events in their colors, beside them
+        the animals' mean with its 95 % interval, a thin line through each
+        group's means and a dashed line at zero, no place preferred
+        (``shared_content.agreement_by_spread_statistics``). Above, a thin
+        strip sharing the x axis: the percent of each group's events in each
+        width bin (``share_of_events``). From
+        ``Processed-Data/event_tetrode_holdout``
+        (``scripts/event_evidence/score_tetrode_holdout.py``), refused when
+        it was not held out in folds of whole trials; the events summary's
+        ``*_shared_content_*`` values. Tetrode participation (the share of
+        tetrodes with a spike) is in Figure 2's supplement.
     i — Where the non-local time sits in ripple power, one line per animal:
         the immobile time bins decoded non-local spread over ripple power, with
         the share of them below the SWR threshold (top), and the share of
@@ -144,8 +164,8 @@ from matplotlib.axes import Axes
 from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
-from matplotlib.ticker import NullLocator
-from matplotlib.transforms import Bbox
+from matplotlib.ticker import MaxNLocator, NullLocator
+from matplotlib.transforms import Bbox, blended_transform_factory
 from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -178,9 +198,6 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
-from continuum_swr_replay.analysis.event_evidence.participation import (
-    participation_statistics,
-)
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RESTRICTION_FIGURE_DECODERS,
     RESTRICTION_FIGURE_DIFFERENCE,
@@ -192,6 +209,12 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     RestrictionFigureStatistics,
     restriction_figure_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.shared_content import (
+    SPREAD_BIN_LABELS,
+    SPREAD_COLUMN,
+    agreement_by_spread_statistics,
+)
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_scores
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
@@ -211,7 +234,6 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
-    time_mask_staleness,
     well_visit_times,
 )
 from continuum_swr_replay.data_loaders import load_data
@@ -236,9 +258,9 @@ from continuum_swr_replay.paths import (
     EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-    EVENT_PARTICIPATION_DIR,
+    EVENT_TETRODE_HOLDOUT_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
-    PARTICIPATION_NAME,
+    TETRODE_HOLDOUT_NAME,
     event_features_root,
     processed_data_dir,
     replay_content_dir,
@@ -248,9 +270,11 @@ from continuum_swr_replay.reported.events import (
     checked_reference,
     heldout_restriction_refusal,
     read_heldout_restriction,
+    require_tetrode_holdout_folds,
     restriction_inputs_note,
 )
 from continuum_swr_replay.reported.formatting import format_number
+from continuum_swr_replay.reported.values import rel
 from continuum_swr_replay.runs.io import (
     ok_epochs,
     read_complete_run,
@@ -261,12 +285,13 @@ from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     GAIN_FLOOR,
+    GROUP_COLORS,
     NEUTRAL_DOTS,
     REFERENCE_COLOR,
-    animal_values,
     draw_animal_gain,
     draw_full_minus_swr_axis,
     label_gain_axis,
+    spread_offsets,
 )
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -329,7 +354,11 @@ warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
-HEIGHT = 7.72
+HEIGHT = 7.86
+OUTER_HEIGHTS = (1.85, 1.9, 1.15, 1.2, 0.95)
+"""The rows' heights, in proportion: a, b, c to f, then the bottom rows
+(:data:`BOTTOM_ROWS`)."""
+OUTER_HSPACE = 0.72
 
 C_LOCAL = COLORS["Local"]
 C_NOSPIKE = COLORS["No-Spike"]
@@ -346,8 +375,6 @@ which marks the state and every non-local event in a and b and the SWRs with
 non-local content in c."""
 C_SWR = COLORS["SWR"]
 C_SWR_PARTIAL = COLORS["SWR partial"]
-C_PAIR = "#999999"
-"""A line joining one animal's two values (panel h)."""
 C_QUIET = COLORS["All Events"]
 CLASS_ORDER = ("swr_contained", "swr_partial", "non_swr")
 CLASS_COLORS = {
@@ -811,7 +838,7 @@ def draw_overview(
     )
     label_reward_well(ax_track, data["track_graph"])
     rows = gs[1].subgridspec(
-        5, 1, height_ratios=[1.5, 1.05, 0.42, 0.42, 0.42], hspace=0.14
+        5, 1, height_ratios=[1.35, 1.2, 0.42, 0.42, 0.42], hspace=0.14
     )
     ax_pos, ax_lane, ax_rip, ax_st, ax_sp = (fig.add_subplot(rows[i]) for i in range(5))
     draw_posterior(ax_pos, data, results, env, sl, start, max_pos)
@@ -1030,7 +1057,7 @@ def draw_examples(
             first = (ax_rip, ax_raster, ax_post, ax_states)
             for ax, label in zip(
                 first,
-                ("Ripple\n(z)", "Tetrode", "Decoded\nposition (cm)", "State\nprob."),
+                ("Ripple\n(z)", "Tetrode", "Decoded\npos. (cm)", "State\nprob."),
                 strict=True,
             ):
                 ax.set_ylabel(label)
@@ -1122,9 +1149,6 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
-REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
-"""Panel h: each group's Local-rest and event positions on the x axis."""
-
 DECODER_STYLES = {
     "swr_minus_none_per_spike": ("SWR-\nforced", NEUTRAL_DOTS),
     "full_minus_none_per_spike": ("Full", C_NL),
@@ -1163,30 +1187,36 @@ def restriction_refusal(cause: str, rerun: str) -> str:
     """Why the decoder comparison is not drawn: what is not current (``cause``)
     and the runners to make again (``rerun``), from
     ``reported.events.heldout_restriction_refusal``."""
-    letter = ROW4_LETTERS["decoder_comparison"]
+    letter = BOTTOM_LETTERS["decoder_comparison"]
     return (
         f"the decoder comparison (panel {letter}) is not drawn: {cause}. Rerun {rerun}."
     )
 
 
-ROW4_PANELS = ("traces", "participation", "ripple_power", "decoder_comparison")
-"""Row 4's panels by what they draw, left to right: the traces around event
-starts, tetrode participation, where the non-local time sits in ripple power,
-and the decoder comparison. The one place the row's order is set: the grid,
-the letters (:data:`ROW4_LETTERS`), the decoder comparison's bounds and the
-letter columns follow from it (the docstrings that name a panel by letter are
-found by grepping for ``ROW4_LETTERS`` and "panel g" to "panel j")."""
-ROW4_LETTERS = dict(zip(ROW4_PANELS, "ghij", strict=True))
-"""Each row-4 panel's letter, by its position."""
-ROW4_WIDTHS = {
-    "traces": 0.9,
-    "participation": 0.5,
-    "ripple_power": 0.8,
-    "decoder_comparison": 3.8,
+BOTTOM_ROWS = (
+    ("traces", "shared_content", "ripple_power"),
+    ("decoder_comparison",),
+)
+"""The panels below row 3 by what they draw, row by row, left to right: the
+traces around event starts, shared content and where the non-local time sits
+in ripple power; then the decoder comparison, whose three axes need a row of
+their own. The one place their order is set: the grids, the letters
+(:data:`BOTTOM_LETTERS`), the decoder comparison's bounds and the letter
+columns follow from it (the docstrings that name a panel by letter are found
+by grepping for ``BOTTOM_LETTERS`` and "panel g" to "panel j")."""
+BOTTOM_PANELS = tuple(panel for row in BOTTOM_ROWS for panel in row)
+BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghij", strict=True))
+"""Each bottom panel's letter, by its position."""
+BOTTOM_WIDTHS = {
+    "traces": 1.0,
+    "shared_content": 1.1,
+    "ripple_power": 1.0,
+    "decoder_comparison": 1.0,
 }
-"""Each row-4 panel's cell width, in proportion; the decoder comparison's two
-axes are then placed in its space by :func:`fit_axes_in_row`."""
-ROW4_WSPACE = 0.5
+"""Each bottom panel's cell width, in proportion within its row; the decoder
+comparison's three axes are then placed in its space by
+:func:`fit_axes_in_row`."""
+BOTTOM_WSPACE = 0.55
 DECODER_AXES_WIDTHS = (0.6, 1.2, 0.6)
 """The decoder comparison's three axes' frame widths, in proportion: the
 decoders over the local-only decoder, the full minus the SWR-forced decoder,
@@ -1203,55 +1233,98 @@ DECODER_AXES_GAP = 0.012
 PANEL_GAP = 0.012
 """The space between the decoder comparison's drawing and its neighbors'
 (figure width)."""
-ROW4_RIGHT = 0.995
-"""Where the decoder comparison's drawing may end when it is the row's last
+BOTTOM_RIGHT = 0.995
+"""Where the decoder comparison's drawing may end when it is its row's last
 panel (figure width): the figure is saved cropped to its ink, so the edge is
 the page's."""
 LETTER_COLUMNS = (
-    "abc" + ROW4_LETTERS[ROW4_PANELS[0]],
+    "abc" + "".join(BOTTOM_LETTERS[row[0]] for row in BOTTOM_ROWS),
     "d",
     "e",
     "f",
-    *(ROW4_LETTERS[panel] for panel in ROW4_PANELS[1:]),
+    *(BOTTOM_LETTERS[panel] for row in BOTTOM_ROWS for panel in row[1:]),
 )
-"""The panel letters that share a left edge (convention 10): a, b, c and row
-4's first panel at the figure's left. Row 4's other panels sit under no letter
-of row 3, so each is placed by itself."""
+"""The panel letters that share a left edge (convention 10): a, b, c and the
+first panel of each bottom row at the figure's left. The bottom rows' other
+panels sit under no letter of row 3, so each is placed by itself."""
 
 
-def draw_rest_to_event(
-    ax: Axes, rest: pd.Series, event: pd.Series, group: str, color: str
-) -> None:
-    """One line per animal from its Local-rest value to its event value."""
-    x = REST_EVENT_X[group]
-    for animal in event.index.intersection(rest.index):  # paired by animal
-        ax.plot(x, (rest[animal], event[animal]), color=C_PAIR, lw=0.5, zorder=1)
-    ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2)
-    ax.scatter(np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2)
+SHARED_XLABELS = {
+    "spread_cm": "Width of the other tetrodes'\nposition estimate (cm)",
+}
+"""Panel h's x label, by the width column the events are binned on
+(``shared_content.SPREAD_COLUMN``): a new column needs its label here."""
+SHARED_YLABEL = "Agreement\n(nats/spike)"
+SHARED_OFFSET = 0.2
+"""Panel h: each group's dots sit this far either side of its width bin; the
+mean with its interval sits a further :data:`SHARED_MEAN_OFFSET` out."""
+SHARED_MEAN_OFFSET = 0.11
+SHARE_BAR_WIDTH = 0.3
+"""The width of each group's bar in panel h's strip (x units)."""
+SHARED_GROUP_NAMES = {"no SWR": "No SWR", "SWR": "SWR"}
+"""Panel h's name of each group of ``GROUP_COLORS``."""
 
 
-def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel h: tetrode participation, Local rest vs events.
+def draw_shared_content(ax_share: Axes, ax: Axes, statistics: pd.DataFrame) -> None:
+    """Panel h: the held-out agreement per spike by width bin, for no-SWR and
+    SWR events (``statistics``: ``shared_content.agreement_by_spread_statistics``).
 
-    One line per animal from its length-matched Local-rest controls to its
-    events, for no-SWR events and for SWR events (``participation_statistics``).
-    Each group's controls have its events' lengths, so the two groups' levels
-    are not compared: a longer window holds a spike on more tetrodes.
+    Each group's dots (one per animal) in its color on its side of the bin, the
+    animals' mean with its 95 % interval in black farther out, a thin line
+    through the group's means, the groups named at the top right, a dashed line
+    at zero and, above it at the right, which way means shared content. Above,
+    a thin strip sharing the x axis: each group's percent of its events in each
+    bin (``share_of_events``), two narrow bars side by side in the groups'
+    colors.
     """
-    for group, color in (("no SWR", C_NO_SWR), ("SWR", C_SWR)):
-        rest, event = (
-            animal_values(statistics.loc[(group, kind)], "participation_animals", 100)
-            for kind in ("control", "event")
-        )
-        draw_rest_to_event(ax, rest, event, group, color)
-    ax.set_ylabel("Tetrodes active (%)")
-    ax.set_ylim(0, 100)
-    ax.set_yticks([0, 50, 100])
-    ax.set_xlim(-0.5, 3.9)
-    ticks = [x for pair in REST_EVENT_X.values() for x in pair]
-    ax.set_xticks(
-        ticks, ["Local rest", "No SWR", "Local rest", "SWR"], rotation=45, ha="right"
-    )
+    bins = np.arange(len(SPREAD_BIN_LABELS))
+    for side, (group, color) in zip((-1, 1), GROUP_COLORS.items(), strict=True):
+        rows = [statistics.loc[(label, group)] for label in SPREAD_BIN_LABELS]
+        for x, row in zip(bins + side * SHARED_OFFSET, rows, strict=True):
+            animals = np.asarray(row["animals"], dtype=float)
+            ax.scatter(
+                x + spread_offsets(animals, 0.03), animals, s=5, color=color, lw=0,
+                zorder=2,
+            )  # fmt: skip
+        means = bins + side * (SHARED_OFFSET + SHARED_MEAN_OFFSET)
+        estimates = np.array([row["estimate"] for row in rows])
+        ax.errorbar(
+            means, estimates,
+            yerr=[estimates - [r["ci_low"] for r in rows],
+                  [r["ci_high"] for r in rows] - estimates],
+            fmt="_", color="black", ms=4, lw=0.8, capsize=0, zorder=3,
+        )  # fmt: skip
+        ax.plot(means, estimates, color=color, lw=0.6, zorder=1)
+        ax_share.bar(
+            bins + side * SHARE_BAR_WIDTH / 2,
+            [100 * row["share_of_events"] for row in rows],
+            width=SHARE_BAR_WIDTH, color=color, lw=0,
+        )  # fmt: skip
+    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
+    # above the zero line at the right, over the widest bin, whose values are
+    # all below zero
+    ax.annotate(
+        "\u2191 shared\ncontent", (0.99, 0.0),
+        xycoords=blended_transform_factory(ax.transAxes, ax.transData),
+        xytext=(0, 4), textcoords="offset points", ha="right", va="bottom",
+        fontsize=SMALL_SIZE, color=C_REFERENCE, linespacing=0.95,
+    )  # fmt: skip
+    for k, (group, color) in enumerate(GROUP_COLORS.items()):
+        ax.text(
+            0.99, 0.97 - 0.14 * k, SHARED_GROUP_NAMES[group], ha="right", va="top",
+            transform=ax.transAxes, fontsize=SMALL_SIZE,
+            color=readable_text_color(color),
+        )  # fmt: skip
+    ax_share.sharex(ax)
+    ax_share.tick_params(labelbottom=False)
+    ax_share.set_ylim(0, None)
+    ax_share.yaxis.set_major_locator(MaxNLocator(2))
+    ax_share.set_ylabel("% of\nevents")
+    ax_share.set_title("Shared content", fontsize=SMALL_SIZE, pad=3)
+    ax.set_xlim(-0.6, bins[-1] + 0.6)
+    ax.set_xticks(bins, SPREAD_BIN_LABELS)
+    ax.set_xlabel(SHARED_XLABELS[SPREAD_COLUMN])
+    ax.set_ylabel(SHARED_YLABEL)
 
 
 def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
@@ -1285,7 +1358,11 @@ def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
     top = (
         max(max(float(r["animals"].max()), r["ci_high"]) for r in rows.values()) * 1.08
     )
-    label_gain_axis(ax, DECODERS_YLABEL, DECODERS_REFERENCE, floor=-GAIN_FLOOR * top)
+    # twice the usual floor, so that the reference's name clears the frame of
+    # this short axis
+    label_gain_axis(
+        ax, DECODERS_YLABEL, DECODERS_REFERENCE, floor=-2 * GAIN_FLOOR * top
+    )
     ax.set_ylim(top=top)
 
 
@@ -1509,6 +1586,7 @@ def draw_share_by_power(ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame) -
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
         "below\nthreshold",
     )  # fmt: skip
+    ax_share.set_xticks([0, 5, 10])
 
 
 OFFSET_BINS_MS = np.arange(-100, 101, 5)
@@ -1680,23 +1758,17 @@ def generate_figure(
     check_visit_context_starts(
         table, {identifier: well_visit_times(identifier) for identifier in event_epochs}
     )
-    # its controls are Local rest inside the current visits only when its
-    # settings record the subset and it read the current session cache
-    participation_dir = data_dir / EVENT_PARTICIPATION_DIR
-    manifest = read_output_manifest(participation_dir)
-    note = time_mask_staleness(
-        {**manifest, "subset": manifest.get("settings", {}).get("subset")},
-        event_epochs,
-        f"the participation run ({participation_dir})",
-    )
-    if note is not None:
-        raise ValueError(note)
-    participation = participation_statistics(
+    # the held-out tetrode run, as the events summary reads it: held out in
+    # folds of whole trials, over the selected events
+    holdout_dir = data_dir / EVENT_TETRODE_HOLDOUT_DIR
+    require_tetrode_holdout_folds(read_output_manifest(holdout_dir), rel(holdout_dir))
+    holdout = window_scores(
         select_events_in(
-            read_complete_run(participation_dir, PARTICIPATION_NAME, event_epochs),
+            read_complete_run(holdout_dir, TETRODE_HOLDOUT_NAME, event_epochs),
             events["event_id"],
         )
     )
+    shared = agreement_by_spread_statistics(holdout[holdout["kind"] == "event"])
     # the events summary's restriction inputs: the same runs, cohorts, time
     # steps and subset; panel j draws the fold fit on whole trials, and only
     # from a held-out event run made from the restriction run and the per-bin
@@ -1725,11 +1797,11 @@ def generate_figure(
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
-        4,
+        3 + len(BOTTOM_ROWS),
         1,
         figure=fig,
-        height_ratios=[1.9, 2.0, 1.3, 1.45],
-        hspace=0.62,
+        height_ratios=OUTER_HEIGHTS,
+        hspace=OUTER_HSPACE,
         left=0.1,
         right=0.99,
         top=0.985,
@@ -1751,10 +1823,15 @@ def generate_figure(
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
     draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
-    row4 = outer[3].subgridspec(
-        1, 4, width_ratios=[ROW4_WIDTHS[p] for p in ROW4_PANELS], wspace=ROW4_WSPACE
-    )
-    cells = dict(zip(ROW4_PANELS, row4, strict=True))
+    cells = {}
+    for k, row in enumerate(BOTTOM_ROWS):
+        grid = outer[3 + k].subgridspec(
+            1,
+            len(row),
+            width_ratios=[BOTTOM_WIDTHS[p] for p in row],
+            wspace=BOTTOM_WSPACE,
+        )
+        cells.update(zip(row, grid, strict=True))
     triggered = cells["traces"].subgridspec(4, 1, hspace=0.2)
     ax_ripple = fig.add_subplot(triggered[0])
     triggered_axes = [
@@ -1762,8 +1839,12 @@ def generate_figure(
         *(fig.add_subplot(triggered[r], sharex=ax_ripple) for r in (1, 2, 3)),
     ]
     draw_triggered(triggered_axes, inputs["triggered_curves"], reference)
-    ax_participation = fig.add_subplot(cells["participation"])
-    draw_participation(ax_participation, participation)
+    shared_grid = cells["shared_content"].subgridspec(
+        2, 1, height_ratios=[1.0, 2.6], hspace=0.12
+    )
+    ax_shared_strip = fig.add_subplot(shared_grid[0])
+    ax_shared = fig.add_subplot(shared_grid[1])
+    draw_shared_content(ax_shared_strip, ax_shared, shared)
     power_grid = cells["ripple_power"].subgridspec(
         2, 1, height_ratios=[1.0, 1.6], hspace=0.2
     )
@@ -1779,9 +1860,9 @@ def generate_figure(
     draw_decoder_gains(ax_decoders, restriction.decoders)
     draw_full_minus_swr(ax_difference, restriction)
     draw_heldout_event_gain(ax_events, restriction)
-    row4_axes = {
+    bottom_axes = {
         "traces": triggered_axes,
-        "participation": [ax_participation],
+        "shared_content": [ax_shared_strip, ax_shared],
         "ripple_power": [ax_spread, ax_share],
         "decoder_comparison": [ax_decoders, ax_difference, ax_events],
     }
@@ -1796,22 +1877,23 @@ def generate_figure(
         )
         - 0.004
     )
-    # the decoder comparison fills the space between its neighbors' drawings, a
-    # gap from each (panel c's drawing's left edge, or the figure's right, where
-    # it has no neighbor on that side)
-    position = ROW4_PANELS.index("decoder_comparison")
+    # the decoder comparison fills the space between its neighbors' drawings in
+    # its row, a gap from each (panel c's drawing's left edge, or the figure's
+    # right, where it has no neighbor on that side)
+    (row,) = [row for row in BOTTOM_ROWS if "decoder_comparison" in row]
+    position = row.index("decoder_comparison")
     if position > 0:
-        neighbor = row4_axes[ROW4_PANELS[position - 1]]
+        neighbor = bottom_axes[row[position - 1]]
         left = panel_extent(fig, renderer, neighbor).x1 + PANEL_GAP
     else:
         left = panel_extent(fig, renderer, [ax_c]).x0
-    if position < len(ROW4_PANELS) - 1:
-        neighbor = row4_axes[ROW4_PANELS[position + 1]]
+    if position < len(row) - 1:
+        neighbor = bottom_axes[row[position + 1]]
         right = panel_extent(fig, renderer, neighbor).x0 - PANEL_GAP
     else:
-        right = ROW4_RIGHT
+        right = BOTTOM_RIGHT
     fit_axes_in_row(
-        fig, renderer, row4_axes["decoder_comparison"], left, right,
+        fig, renderer, bottom_axes["decoder_comparison"], left, right,
         DECODER_AXES_WIDTHS,
     )  # fmt: skip
     fit_track_to_height(fig, ax_a, x_left)
@@ -1826,17 +1908,22 @@ def generate_figure(
             "d": [ax_d],
             "e": [ax_e, ax_e2],
             "f": [ax_f1, ax_f2],
-            **{ROW4_LETTERS[p]: row4_axes[p] for p in ROW4_PANELS},
+            **{BOTTOM_LETTERS[p]: bottom_axes[p] for p in BOTTOM_PANELS},
         },
-        rows=["a", "b", "cdef", "ghij"],
+        rows=[
+            "a",
+            "b",
+            "cdef",
+            *("".join(BOTTOM_LETTERS[p] for p in row) for row in BOTTOM_ROWS),
+        ],
         columns=LETTER_COLUMNS,
         heights={
             # panel a's letter sits at the top of its decode, not of the track
             # drawing
             "a": ax_a_top.get_position().y1 + 0.004,
-            # the legend drawn above the traces' axes would lift the last row's
+            # the legend drawn above the traces' axes would lift the row's
             # letters away from the row's other panels
-            ROW4_LETTERS["traces"]: [],
+            BOTTOM_LETTERS["traces"]: [],
         },
     )
     for name, (x, y) in positions.items():

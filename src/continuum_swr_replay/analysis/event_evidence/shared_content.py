@@ -40,6 +40,10 @@ SPREAD_BINS_CM = (0.0, 25.0, 50.0, 100.0, np.inf)
 SPREAD_BIN_LABELS = ("<25", "25–50", "50–100", "≥100")
 """Each spread bin's label, in order."""
 
+SPREAD_COLUMN = "spread_cm"
+"""The ``tetrode_holdout.window_scores`` column the events are binned on: the
+one place the width measure is chosen (Figure 2h's x axis follows it)."""
+
 
 def spread_bins(spread_cm: pd.Series) -> pd.Series:
     """Each event's spread bin, the label of :data:`SPREAD_BIN_LABELS` it
@@ -58,7 +62,7 @@ def agreement_by_spread_statistics(
     ----------
     windows : pd.DataFrame
         ``tetrode_holdout.window_scores`` of the events (``kind`` ``"event"``):
-        ``animal``, ``epoch_id``, ``group``, ``spread_cm`` and
+        ``animal``, ``epoch_id``, ``group``, :data:`SPREAD_COLUMN` and
         ``agreement_per_spike`` (NaN for an event without spikes, which counts
         in no statistic).
     n_boot, seed : int, optional
@@ -84,7 +88,7 @@ def agreement_by_spread_statistics(
           in the bin, pooled over every event.
     """
     scored = windows.dropna(subset=["agreement_per_spike"]).assign(
-        spread_bin=lambda t: spread_bins(t["spread_cm"])
+        spread_bin=lambda t: spread_bins(t[SPREAD_COLUMN])
     )
     totals = scored.groupby("group").size()
     rows = []

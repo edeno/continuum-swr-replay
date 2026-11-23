@@ -325,14 +325,15 @@ The review of the restriction and held-out tetrode runs before the
   `tests/integration/` of the restriction and held-out tetrode runs take about 13 and 23
   minutes.
   *When:* when the suite's time matters (CI).
-- [ ] **One definition for the supplement's two spread panels.** The lead wants
-  panel h's x axis (the width of the other tetrodes' position estimate) measured
-  as panel g's spread is, by the 95 % HPD length, so that the two panels use one
-  definition. The stored held-out tetrode tables hold only the effective width
+- [ ] **One definition for the two spread panels.** The lead wants
+  Figure 2h's x axis (the width of the other tetrodes' position estimate) measured
+  as the supplement's panel g spread is, by the 95 % HPD length, so that the two
+  panels use one definition. The stored held-out tetrode tables hold only the effective width
   (`spread_cm`, exp(entropy) place bins times the bin size), so this needs the
   held-out tetrode run again with the 95 % HPD length of the other tetrodes'
   distribution stored per window (`scripts/event_evidence/score_tetrode_holdout.py`,
-  a GPU run), then `shared_content` binned on it.
+  a GPU run), then `shared_content.SPREAD_COLUMN` set to it (and its x label
+  added to `generate_figure02.SHARED_XLABELS`).
   *When:* after the `figure02g-review` branch is merged.
 - [ ] **Is an event's decoded place where silence alone would put it?** Not done and not planned unless a reviewer asks: compare each event's decoded place with the lowest-rate place bins of the saved encoding model (`decoding/encoding_model.py`), where the ground process alone would put it. The split of the held-out tetrode gain into bins with a spike and silent bins (Figure 2's supplement, panel f) and the events' spike rate against matched Local rest (`non_swr_event_spike_rate_hz`, `non_swr_control_spike_rate_hz`) already speak against a silence-driven estimate; events with a wide estimate (a quarter of no-SWR events, `non_swr_shared_content_hundred_cm_or_more_share_of_events`) are where it could still hold.
   *When:* only if a reviewer asks.

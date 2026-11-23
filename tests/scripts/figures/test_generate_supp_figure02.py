@@ -59,34 +59,27 @@ def _no_spike_trace() -> dict:
     }
 
 
-SHARED = {
-    ("no SWR", 0): [0.3, 0.25, 0.35, 0.2, 0.4],
-    ("SWR", 0): [0.2, 0.25, 0.3, 0.15, 0.22],
+PARTICIPATION = {
+    ("no SWR", "control"): [0.3, 0.35, 0.4, 0.27, 0.33],
+    ("no SWR", "event"): [0.5, 0.55, 0.6, 0.45, 0.48],
+    ("SWR", "control"): [0.45, 0.5, 0.36, 0.48, 0.42],
+    ("SWR", "event"): [0.7, 0.8, 0.66, 0.72, 0.68],
 }
-"""Panel c's animals in the narrowest spread bin; each wider bin is 0.1 lower."""
+"""The participation panel's animals: each group's controls and events."""
 
 
-SHARE_OF_EVENTS = {"no SWR": [0.12, 0.2, 0.43, 0.25], "SWR": [0.1, 0.3, 0.4, 0.2]}
-"""Each group's share of its events in each spread bin."""
-
-
-def _shared_statistics() -> pd.DataFrame:
-    """``agreement_by_spread_statistics``' rows: each bin and group's animals,
-    their mean and an interval of 0.05 either side."""
-    rows = []
-    for k, label in enumerate(figure.SPREAD_BIN_LABELS):
-        for group in ("no SWR", "SWR"):
-            animals = np.asarray(SHARED[(group, 0)]) - 0.1 * k
-            mean = float(animals.mean())
-            rows.append(
-                {
-                    "spread_bin": label, "group": group, "animals": animals,
-                    "animal_names": np.array(list("abcde")), "estimate": mean,
-                    "ci_low": mean - 0.05, "ci_high": mean + 0.05,
-                    "share_of_events": SHARE_OF_EVENTS[group][k],
-                }
-            )  # fmt: skip
-    return pd.DataFrame(rows).set_index(["spread_bin", "group"])
+def _participation() -> pd.DataFrame:
+    """``participation_statistics``' rows indexed by group and kind."""
+    rows = {
+        key: {
+            "participation_animals": np.asarray(values),
+            "animal_names": np.array(list("abcde")),
+        }
+        for key, values in PARTICIPATION.items()
+    }
+    table = pd.DataFrame.from_dict(rows, orient="index")
+    table.index.names = ["group", "kind"]
+    return table
 
 
 def _timing() -> pd.DataFrame:
@@ -204,7 +197,7 @@ def _statistics() -> dict:
         "hpd": _hpd(),
         "timing": _timing(),
         "tetrode": _split_statistics(),
-        "shared": _shared_statistics(),
+        "participation": _participation(),
         "outside": _outside_rows(),
         "parts": _parts(),
         "no_spike": _no_spike_trace(),
@@ -227,7 +220,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     height, the rows' first letters at one left edge, no heading."""
     assert figure.PANELS == (
         "state_calibration", "no_spike_mua", "rule_sweep", "boundary_timing",
-        "nonlocal_mua", "heldout_gain", "hpd", "shared_content", "ripple_modes",
+        "nonlocal_mua", "heldout_gain", "hpd", "participation", "ripple_modes",
         "outside_distance",
     )  # fmt: skip
     fig = drawn
@@ -239,7 +232,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
         figure.panel_axes(fig, "boundary_timing")[0].get_title()
         == "Timing against the SWR"
     )
-    assert figure.panel_axes(fig, "shared_content")[0].get_title() == "Shared content"
+    assert figure.panel_axes(fig, "participation")[0].get_title() == "Participation"
     letters = {
         t.get_text(): t.get_position() for t in fig.texts if len(t.get_text()) == 1
     }
@@ -306,7 +299,7 @@ def test_each_panels_values_carry_its_letter():
         "hpd": "hpd",
         "tetrode_holdout": "heldout_gain",
         "spike_rate": "heldout_gain",
-        "shared_content": "shared_content",
+        "participation": "participation",
         "class_distribution": "ripple_modes",
         "nonlocal_restriction_distance": "outside_distance",
     }
@@ -361,68 +354,39 @@ def test_the_timing_panel_names_the_four_corner_cells(drawn):
             assert t.get_fontsize() >= 6
 
 
-def test_the_shared_content_panel_draws_the_agreement_by_spread(drawn):
-    """Each group's dots per spread bin on its side of the bin, its means with
-    their intervals farther out joined by a thin line in the group's color, the
-    bins' labels, a dashed zero line and which way means shared content."""
-    fig = drawn
-    ax_share, ax = figure.panel_axes(fig, "shared_content")
-    assert [t.get_text() for t in ax.get_xticklabels()] == list(
-        figure.SPREAD_BIN_LABELS
-    )
-    bins = np.arange(len(figure.SPREAD_BIN_LABELS))
-    for side, group in ((-1, "no SWR"), (1, "SWR")):
-        expected = [np.mean(SHARED[(group, 0)]) - 0.1 * k for k in bins]
-        means = bins + side * (figure.SHARED_OFFSET + figure.SHARED_MEAN_OFFSET)
-        (series,) = [
-            line for line in ax.lines
-            if len(line.get_xdata()) == bins.size
-            and np.allclose(line.get_xdata(), means)
-            and line.get_linestyle() != "None"  # not the means' markers
-        ]  # fmt: skip
-        np.testing.assert_allclose(series.get_ydata(), expected, atol=1e-12)
-        for k in bins:
-            (dots,) = [
-                c for c in ax.collections
-                if isinstance(c, matplotlib.collections.PathCollection)
-                and np.allclose(
-                    c.get_offsets()[:, 0], k + side * figure.SHARED_OFFSET, atol=0.1
-                )
-            ]  # fmt: skip
-            np.testing.assert_allclose(
-                sorted(dots.get_offsets()[:, 1]),
-                sorted(np.asarray(SHARED[(group, 0)]) - 0.1 * k),
-            )
-    assert any(
-        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
-        for line in ax.lines
-    )
-    # a strip above, sharing the x axis: each group's percent of its events per
-    # bin as two narrow bars side by side, in the groups' colors
+def test_the_participation_panel_joins_each_animals_rest_to_its_events(drawn):
+    """For no-SWR then SWR events, one line per animal from its Local-rest
+    controls to its events, the controls in the Local state's color and the
+    events in their class's, in percent."""
     from matplotlib.colors import to_rgba
 
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
-    bars = list(ax_share.patches)
-    assert len(bars) == 2 * len(bins)
-    for side, (group, color) in zip((-1, 1), panels.GROUP_COLORS.items(), strict=True):
-        mine = [b for b in bars if to_rgba(b.get_facecolor()) == to_rgba(color)]
-        np.testing.assert_allclose(
-            [b.get_x() + b.get_width() / 2 for b in mine],
-            bins + side * figure.SHARE_BAR_WIDTH / 2,
-        )
-        np.testing.assert_allclose(
-            [b.get_height() for b in mine], 100 * np.asarray(SHARE_OF_EVENTS[group])
-        )
-    assert ax_share.get_shared_x_axes().joined(ax_share, ax)
-    assert ax_share.get_ylabel() == "% of\nevents"
-    assert ax_share.get_title() == "Shared content"
-    assert not any(t.get_visible() and t.get_text() for t in ax_share.get_xticklabels())
-    texts = [t.get_text() for t in ax.texts]
-    assert "\u2191 shared\ncontent" in texts
-    assert {"No SWR", "SWR"} <= set(texts)
-    assert ax.get_ylabel() == "Agreement\n(nats/spike)"
-    assert ax.get_xlabel() == "Width of the other tetrodes'\nposition estimate (cm)"
+    (ax,) = figure.panel_axes(drawn, "participation")
+    for group, color in panels.GROUP_COLORS.items():
+        rest_x, event_x = figure.REST_EVENT_X[group]
+        for x, kind, dot_color in (
+            (rest_x, "control", figure.COLORS["Local"]),
+            (event_x, "event", color),
+        ):
+            (dots,) = [
+                c for c in ax.collections
+                if isinstance(c, matplotlib.collections.PathCollection)
+                and np.allclose(c.get_offsets()[:, 0], x)
+            ]  # fmt: skip
+            np.testing.assert_allclose(
+                dots.get_offsets()[:, 1], 100 * np.asarray(PARTICIPATION[(group, kind)])
+            )
+            np.testing.assert_allclose(dots.get_facecolor()[0], to_rgba(dot_color))
+        pairs = [
+            line for line in ax.lines
+            if np.allclose(line.get_xdata(), (rest_x, event_x))
+        ]  # fmt: skip
+        assert len(pairs) == 5
+    assert ax.get_ylabel() == "Tetrodes active (%)"
+    assert [t.get_text() for t in ax.get_xticklabels()] == [
+        "Local rest", "No SWR", "Local rest", "SWR",
+    ]  # fmt: skip
 
 
 def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn):
@@ -697,7 +661,9 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_complete_run": lambda folder, name, epochs: stored["scores"],
         "window_scores": lambda table: seen.setdefault("tetrode", table),
         "holdout_statistics": lambda windows, kind, column: windows,
-        "agreement_by_spread_statistics": lambda windows: windows,
+        "read_participation": lambda folder, epochs, event_ids: seen.setdefault(
+            "participation", event_ids
+        ),
         "sha256_file": lambda path: "0" * 64,
         "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),
         "restriction_inputs_note": lambda folder, epochs: note,
@@ -755,7 +721,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
         "hpd",
         "timing",
         "tetrode",
-        "shared",
+        "participation",
         "outside",
         "parts",
         "no_spike",

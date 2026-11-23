@@ -287,7 +287,7 @@ TAGS = {
     "nonlocal_mua": Tags(("2b.5",), ("S2e",)),
     "rule_sweep": Tags(("2a.5",), ("S2c",)),
     "state_calibration": Tags(("2a.7",), ("S2a",)),
-    "participation": Tags(("2d.9",), ("2h",)),
+    "participation": Tags(("2d.9",), ("S2h",)),
     "spike_rate": Tags(("2d.9",), ("S2f",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
@@ -295,7 +295,7 @@ TAGS = {
     "tetrode_holdout_text": Tags(("2c.3",)),
     "nonlocal_restriction": Tags(("2c.3",)),
     "nonlocal_restriction_figure": Tags(("2c.3",), ("2j",)),
-    "shared_content": Tags(("2c.3",), ("S2h",)),
+    "shared_content": Tags(("2c.3",), ("2h",)),
     "nonlocal_restriction_distance": Tags(("2c.3",), ("S2j",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
@@ -1850,7 +1850,8 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.9: tetrode participation and spike rate of the events against
-    Local-rest windows of their length (Figure 2h shows the participation)."""
+    Local-rest windows of their length (Figure 2's supplement, panel S2h, shows
+    the participation)."""
     makers = {
         "participation": value_factory(
             participation_values, source, TAGS["participation"]
@@ -2123,7 +2124,7 @@ _SPREAD_WORDS = (
 
 
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.3 and Figure 2's supplement, panel S2h: during an event, do
+    """Question 2c.3 and Figure 2h: during an event, do
     the tetrodes point to the same remote place? The held-out tetrode agreement
     per spike of the events of each SWR group, by the spread of the other
     tetrodes' position distribution in fixed bins
