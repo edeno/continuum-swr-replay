@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import scripts.event_properties._epoch_counts as epoch_counts
 import scripts.event_properties.measure_brain_state_reference as brain_state
 import scripts.event_properties.measure_nonlocal_by_signal as by_signal
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
@@ -47,7 +48,7 @@ def _frame() -> pd.DataFrame:
 def one_visit(monkeypatch):
     """The epoch's one well visit holds the first six bins (0 to 0.012 s, its
     final poke-out at the seventh bin, which is outside)."""
-    for script in (brain_state, by_signal):
+    for script in (brain_state, epoch_counts):
         monkeypatch.setattr(
             script.analyzed_time,
             "read_verified_dot_with_swr_source",
@@ -70,7 +71,7 @@ def test_the_brain_state_rest_is_the_rest_inside_the_visits(one_visit):
 
 
 def test_the_counts_by_signal_count_the_bins_inside_the_visits(one_visit):
-    counts, kept = by_signal._epoch((IDENTIFIER, "sha"))
+    counts, kept = epoch_counts._epoch((IDENTIFIER, "sha"), by_signal.measure)
     assert kept == {"n_immobile_bins_in_visit": 6, "n_immobile_bins_outside_visit": 4}
     ripple = nonlocal_counts(counts, "ripple_power")
     assert ripple["n_bins"].sum() == 6

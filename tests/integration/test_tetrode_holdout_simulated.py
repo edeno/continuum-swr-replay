@@ -19,6 +19,7 @@ window with missing bins and a silent window are scored as specified.
 """
 
 import copy
+import time as clock
 
 import numpy as np
 import pandas as pd
@@ -409,3 +410,324 @@ def test_trial_folds_change_only_the_encodings(inserted, inserted_trials):
     assert (local["gain"].abs() < 0.2).all()
     bursts = per_window[per_window["kind"] == "local_burst"]
     assert (bursts["gain_per_spike"].abs() < 0.02).all()
+
+
+# The extra scores (``holdout_scores`` with ``extras``): the HPD length, the
+# rate and mark parts, and the shuffled-window reference.
+
+
+def _score_extra(detector, recording, windows, *, is_missing=None, marks=None):
+    """``holdout_scores`` with ``extras`` of ``windows`` (each with the
+    simulated ``content`` and its ``group``; every window an event), the
+    recording's time blocks as folds; the per-window scores
+    (``window_scores``) with ``content``, and the record."""
+    windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
+    windows = windows.assign(kind="event", event_id=windows["window_id"])
+    missing = (
+        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
+    )
+    scores, record = th.holdout_scores(
+        detector,
+        recording.time,
+        recording.position[:, None],
+        recording.position,
+        recording.spike_times,
+        recording.marks if marks is None else marks,
+        recording.is_running,
+        missing,
+        windows,
+        folds=time_blocks(recording.time),
+        margin_bins=TIME_BLOCK_MARGIN_BINS,
+        extras=True,
+        null_seed=0,
+        log=sim.quiet,
+    )
+    keyed = windows.set_index("window_id")[["event_id", "kind", "group", "content"]]
+    scores = scores.join(keyed, on="window_id").assign(epoch_id="e", animal="a")
+    per_window = th.window_scores(scores.drop(columns="content")).join(
+        keyed["content"], on="window_id"
+    )
+    return scores, per_window, record
+
+
+@pytest.fixture(scope="module")
+def extra(recording):
+    """The inserted events (and the missing bins) of :func:`inserted`, scored
+    with the extras: the remote events in one group, the local ones (local
+    bursts and silent windows) in the other, so the remote events' donors are
+    other remote events of another place or time."""
+    recording, detector = recording
+    windows, is_missing, _ = _inserted_windows(recording)
+    windows = windows[windows["kind"] != "rest"].rename(columns={"kind": "content"})
+    windows["group"] = np.where(
+        windows["content"].isin(["local_burst", "silent"]), "SWR", "no SWR"
+    )
+    started = clock.time()
+    out = _score_extra(detector, recording, windows, is_missing=is_missing)
+    return (*out, windows, is_missing, clock.time() - started)
+
+
+@pytest.fixture(scope="module")
+def extra_chance(chance_recording):
+    """The chance recording's inserted bursts with the extras: the bursts whose
+    tetrodes each follow their own random place (``nonspatial``) one group, the
+    bursts they share (``shared_random``) the other."""
+    recording, detector = chance_recording
+    windows = recording.events[
+        recording.events.kind.isin(["nonspatial", "shared_random"])
+    ].rename(columns={"kind": "content"})
+    windows["group"] = np.where(windows["content"] == "nonspatial", "no SWR", "SWR")
+    return _score_extra(detector, recording, windows)
+
+
+def test_the_extras_change_none_of_the_canonical_scores(recording, extra):
+    """The same pass without the extras gives every canonical column bit for
+    bit, so the extras are additions only. The time of each pass is printed
+    (``-s``) for the run's estimate."""
+    recording, detector = recording
+    scores, _, record, windows, is_missing, extra_s = extra
+    keyed = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
+    keyed = keyed.assign(kind="event")
+    started = clock.time()
+    plain, _ = th.holdout_scores(
+        detector,
+        recording.time,
+        recording.position[:, None],
+        recording.position,
+        recording.spike_times,
+        recording.marks,
+        recording.is_running,
+        is_missing,
+        keyed,
+        folds=time_blocks(recording.time),
+        margin_bins=TIME_BLOCK_MARGIN_BINS,
+        log=sim.quiet,
+    )
+    plain_s = clock.time() - started
+    print(f"holdout_scores: {plain_s:.1f} s without extras, {extra_s:.1f} s with")
+    assert not set(th.EXTRA_COLUMNS) & set(plain.columns)
+    pd.testing.assert_frame_equal(scores[list(plain.columns)], plain)
+    assert record["n_null_windows"] > 0
+
+
+def test_the_rate_and_mark_parts_add_up_and_silence_is_all_rate(extra):
+    scores, per_window, *_ = extra
+    # a tetrode silent through a window: every bin's term is its rate term
+    # (exactly, bin by bin: tests/analysis/event_evidence/test_tetrode_holdout.py);
+    # the window sums are differences of cumulative sums over every scored
+    # bin, so they agree to their rounding (here up to 5e-11 nats)
+    silent = scores[scores["n_spikes"] == 0]
+    assert len(silent) > 50
+    np.testing.assert_allclose(silent["gain_rate"], silent["gain"], rtol=0, atol=1e-8)
+    np.testing.assert_allclose(
+        silent["agreement_rate"], silent["agreement"], rtol=0, atol=1e-8
+    )
+    # the parts per spike add to the scores per spike
+    spiking = per_window.dropna(subset=["gain_per_spike"])
+    np.testing.assert_allclose(
+        spiking["gain_rate_per_spike"] + spiking["gain_mark_per_spike"],
+        spiking["gain_per_spike"],
+        rtol=1e-12,
+    )
+    np.testing.assert_allclose(
+        spiking["agreement_rate_per_spike"] + spiking["agreement_mark_per_spike"],
+        spiking["agreement_per_spike"],
+        rtol=1e-12,
+    )
+
+
+def test_place_specific_marks_agree_where_the_tetrodes_share_a_place(extra):
+    """The simulated marks name the cell, and each cell has its own place, so
+    the marks tell where a tetrode points: for remote content the tetrodes
+    share, the mark part of the agreement is positive."""
+    _, per_window, *_ = extra
+    remote = per_window[per_window["content"].isin(REMOTE)]
+    assert (remote["agreement_mark_per_spike"] > 0).mean() > 0.9
+    assert remote["agreement_mark_per_spike"].median() > 0.2
+
+
+def test_marks_without_place_information_carry_no_part_of_the_scores(recording, extra):
+    """With every spike's mark drawn from one distribution, whatever its cell,
+    the marks say nothing about place: the mark parts of the gain and the
+    agreement are small beside the rate parts and beside the mark parts of the
+    same events with the simulated marks, which name the cell. Without place
+    information in the marks the agreement is small too (the spike count
+    alone says little about place). Not 0: each
+    place's mark density is estimated from the training spikes near it, and
+    the log of a noisy estimate varies with place (observed: the gain's mark
+    part 0.13 of its rate part)."""
+    _, informative, *_ = extra
+    informative = informative[informative["content"].isin(REMOTE)]
+    recording, detector = recording
+    rng = np.random.default_rng(4)
+    marks = [rng.normal(50.0, 20.0, m.shape) for m in recording.marks]
+    windows = recording.events[recording.events.kind.isin(REMOTE)].rename(
+        columns={"kind": "content"}
+    )
+    windows["group"] = "no SWR"
+    _, per_window, _ = _score_extra(detector, recording, windows, marks=marks)
+    # the marks' own place information: near 0 here, positive with the
+    # simulated marks, below log(n_place_bins) either way
+    n_places = np.log(
+        detector.encoding_model_[ENCODING_KEY]["environment"].is_track_interior_.sum()
+    )
+    flat = per_window["mark_information_per_spike"].median()
+    named = informative["mark_information_per_spike"].median()
+    print(f"mark information: {flat:.3f} flat, {named:.3f} named, bound {n_places:.3f}")
+    assert abs(flat) < 0.1 * named
+    assert 0 < named < n_places
+    assert (informative["spike_information_per_spike"] > 0).all()
+    for score in ("gain", "agreement"):
+        mark = per_window[f"{score}_mark_per_spike"].abs().median()
+        rate = per_window[f"{score}_rate_per_spike"].abs().median()
+        named = informative[f"{score}_mark_per_spike"].abs().median()
+        print(f"{score}: mark {mark:.3f}, rate {rate:.3f}; named marks {named:.3f}")
+        # observed: gain mark 0.094, rate 0.711, named 5.4; agreement mark
+        # 0.006, rate 0.044, named 1.0 (nats per spike, medians)
+        assert rate > 0.01, (score, rate)
+        assert mark < 0.25 * rate, (score, mark, rate)
+        assert mark < 0.25 * named, (score, mark, named)
+
+
+def test_hpd_is_the_event_tables_hpd(recording):
+    """The decode frame's ``hpd`` (``get_posterior_stats``: the library's HPD
+    on the decode's conditional non-local posterior over every place bin, the
+    junction placeholders NaN) is ``hpd_lengths`` of the same posterior over
+    the real place bins, to the bit."""
+    from non_local_detector.model_checking.highest_posterior_density import (
+        get_highest_posterior_threshold,
+        get_HPD_spatial_coverage,
+    )
+
+    from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
+        get_conditional_non_local_posterior,
+    )
+    from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+        interior_bin_mask,
+    )
+
+    recording, detector = recording
+    keep = slice(0, 20_000)
+    results = detector.predict(
+        spike_times=recording.spike_times,
+        spike_waveform_features=recording.marks,
+        time=recording.time[keep],
+        position=recording.position[keep, None],
+        position_time=recording.time[keep],
+    )
+    posterior = get_conditional_non_local_posterior(results)
+    event_table = get_HPD_spatial_coverage(
+        posterior, get_highest_posterior_threshold(posterior, coverage=0.95)
+    )
+    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+    interior = interior_bin_mask(environment)
+    mine = th.hpd_lengths(np.asarray(posterior)[:, interior], environment)
+    np.testing.assert_array_equal(mine, event_table)
+    assert np.ptp(mine) > 0
+
+
+def test_the_reference_is_below_shared_content(extra):
+    """Remote content the tetrodes share agrees more with its own window's
+    distribution than with another window's (another place or time)."""
+    _, per_window, *_ = extra
+    remote = per_window[per_window["content"].isin(REMOTE)].dropna(
+        subset=["agreement_null_per_spike"]
+    )
+    assert len(remote) > 20
+    assert (
+        remote["agreement_per_spike"] > remote["agreement_null_per_spike"]
+    ).mean() > 0.9
+    assert remote["agreement_null_per_spike"].median() < 0
+
+
+def test_unrelated_places_agree_at_the_reference_below_zero(extra_chance):
+    """Bursts whose tetrodes each follow their own random place agree with
+    their own window's distribution as with another burst's: the two are
+    exchangeable (the scored tetrode is not in the decode that makes the
+    distribution, and each tetrode's places are drawn on their own), so their
+    paired difference is 0 up to its sampling error, and both are below 0
+    (Jensen: a distribution unrelated to the spikes loses to no preference).
+    The per-window differences are large (observed: real -0.87 and reference
+    -0.75 nats per spike on average over 36 bursts, the real one lower in 61 %
+    of them, a difference of about 2 standard errors). Bursts the tetrodes
+    share are above the reference."""
+    _, per_window, _ = extra_chance
+    known = per_window.dropna(
+        subset=["agreement_null_per_spike", "agreement_per_spike"]
+    )
+    nonspatial = known[known["content"] == "nonspatial"]
+    shared = known[known["content"] == "shared_random"]
+    assert len(nonspatial) >= 20 and len(shared) >= 6
+    real = nonspatial["agreement_per_spike"].to_numpy()
+    null = nonspatial["agreement_null_per_spike"].to_numpy()
+    difference = real - null
+    error = difference.std(ddof=1) / np.sqrt(difference.size)
+    print(
+        f"unrelated places: real {real.mean():.3f}, reference {null.mean():.3f}, "
+        f"difference {difference.mean():.3f} +/- {error:.3f} (standard error)"
+    )
+    assert real.mean() < 0 and null.mean() < 0
+    assert abs(difference.mean()) < 3 * error
+    assert (shared["agreement_per_spike"] > shared["agreement_null_per_spike"]).all()
+
+
+def test_donors_are_other_windows_of_the_group_and_fold_and_seeded(recording, extra):
+    recording, _ = recording
+    scores, per_window, record, windows, *_ = extra
+    folds = time_blocks(recording.time)
+    by_id = per_window.set_index("window_id")
+    with_donor = by_id[by_id["null_window_id"] >= 0]
+    assert len(with_donor) == record["n_null_windows"] > 20
+    starts = windows.reset_index(drop=True)["s"]
+    for w, row in with_donor.iterrows():
+        d = int(row["null_window_id"])
+        assert d != w
+        assert by_id.loc[d, "group"] == row["group"]
+        assert folds[starts[d]] == folds[starts[w]]
+    # without a donor the reference is NaN
+    without = by_id[by_id["null_window_id"] < 0]
+    assert without["agreement_null"].isna().all()
+    # the same seed, the same donors and the same reference
+    keyed = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
+    keyed = keyed.assign(kind="event")
+    np.testing.assert_array_equal(
+        th.null_donors(keyed, folds, 0), th.null_donors(keyed, folds, 0)
+    )
+    donors = th.null_donors(keyed, folds, 0)
+    expected = np.where(donors >= 0, keyed["window_id"].to_numpy()[donors], -1)
+    np.testing.assert_array_equal(by_id["null_window_id"].to_numpy(), expected)
+
+
+def test_place_information_is_a_property_of_the_spike_and_its_encoding(
+    recording, extra
+):
+    """Scored with only the first four tetrodes (another decode, other
+    distributions), those tetrodes' spikes carry the same place information,
+    window by window, while their agreement changes."""
+    recording, detector = recording
+    scores, _, _, windows, is_missing, _ = extra
+    subset = copy.deepcopy(detector)
+    fewer, _, _ = _score_extra(
+        subset,
+        sim.Recording(
+            time=recording.time,
+            position=recording.position,
+            is_running=recording.is_running,
+            spike_times=recording.spike_times[:4],
+            marks=recording.marks[:4],
+            events=recording.events,
+            region_tetrode=recording.region_tetrode,
+        ),
+        windows,
+        is_missing=is_missing,
+    )
+    key = ["window_id", "tetrode"]
+    mine = scores[scores["tetrode"] < 4].set_index(key).sort_index()
+    theirs = fewer.set_index(key).sort_index()
+    same = mine["n_scored_bins"] == theirs["n_scored_bins"]
+    assert same.mean() > 0.95
+    for column in ("mark_information", "spike_information", "n_information_spikes"):
+        np.testing.assert_allclose(
+            theirs.loc[same, column], mine.loc[same, column], rtol=1e-6, atol=1e-9
+        )
+    assert not np.allclose(theirs["agreement"], mine["agreement"])

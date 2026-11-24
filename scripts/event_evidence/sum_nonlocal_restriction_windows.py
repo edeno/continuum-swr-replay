@@ -135,6 +135,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     event_table_path,
     file_input,
     participation_input,
+    restriction_bin_columns,
     restriction_run_dir,
     run,
     run_input,
@@ -178,7 +179,9 @@ def run_epoch(
     participation_path = output_path(
         epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME
     )
-    bins = pd.read_parquet(bins_path, columns=list(rw.WINDOW_BIN_COLUMNS))
+    bins = pd.read_parquet(
+        bins_path, columns=restriction_bin_columns(bins_path, rw.WINDOW_BIN_COLUMNS)
+    )
     time = decode_time(epoch_id, data_dir)
     if not np.array_equal(bins["time"].to_numpy(dtype=float), time):
         raise ValueError("the per-bin table's time is not the decode frame's")

@@ -100,6 +100,26 @@ def run_input(run_dir: Path) -> dict[str, str]:
     return {"sha256": sha256_file(run_dir / MANIFEST), "path": str(run_dir)}
 
 
+def restriction_bin_columns(path: Path, columns: Sequence[str]) -> list[str]:
+    """``columns`` of a restriction run's per-bin table and the score columns
+    of every other model the table holds
+    (``nonlocal_restriction.table_score_columns``): a run that scored the
+    fourth model (``swr_allowed``) is read with its columns, the canonical run
+    as before."""
+    import pyarrow.parquet as pq
+
+    from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+        table_score_columns,
+    )
+
+    extra = [
+        column
+        for column in table_score_columns(pq.read_schema(path).names)
+        if column not in columns
+    ]
+    return [*columns, *extra]
+
+
 def participation_input(data_dir: Path) -> dict[str, str]:
     """The participation tables under ``data_dir`` as a run's input: the
     digest of the tables of the participation run's ``ok`` records, and their

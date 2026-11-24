@@ -32,9 +32,7 @@ holds it; :func:`outside_swr_not_observed_counts` counts those left out. The
 sums over all immobile time keep them: they are immobile time, inside an SWR
 or not.
 
-**All immobile time** (:func:`epoch_immobile_gains`; Figure 2j draws each
-decoder's gain over the local-only decoder and their paired difference
-``full - swr`` per spike):
+**All immobile time** (:func:`epoch_immobile_gains`; values for the text):
 per epoch, over the bins of both immobile categories (``immobile_in_swr`` and
 ``immobile_outside_swr``) inside a well visit, each decoder's gain over the
 local-only decoder, ``(swr - none)`` and ``(full - none)``, and their
@@ -48,7 +46,7 @@ over the ``immobile_outside_swr`` bins inside a well visit, where ``swr`` may
 not use the non-local states and ``full`` may, so ``full - swr`` is what the
 non-local states buy outside SWRs:
 
-- the gain per spike and per second (the second column of Figure 2j's second
+- the gain per spike and per second (the second column of Figure 2k's first
   axis);
 - the share in the given events with no SWR, and the share in the given events'
   time outside the SWR of those that overlap one: the events' summed
@@ -70,8 +68,9 @@ non-local states buy outside SWRs:
 
 **Immobile time inside SWRs** (:func:`epoch_inside_swr_gains`,
 :func:`inside_swr_gain_statistics`): the same ``full - swr`` per spike and per
-second over the ``immobile_in_swr`` bins inside a well visit, where both
-decoders may use the non-local states, a reported value for the text.
+second over the ``immobile_in_swr`` bins inside a well visit, where the
+SWR-only decoder must use the non-local states and the full decoder may use
+any state (Figure 2k's first axis draws it per spike).
 
 **Parts of the time outside SWRs** (:func:`epoch_outside_swr_subset_gains`,
 :func:`outside_swr_subset_statistics`): the same gain, per spike and per
@@ -98,6 +97,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Iterable, Iterator
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -109,13 +109,16 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    ALL_CONTRASTS,
     CATEGORIES,
     CONTRASTS,
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
-    SCORE_COLUMNS,
+    SWR_ALLOWED_CONTRASTS,
     ratio_or_nan,
+    table_contrasts,
+    table_score_columns,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     IN_VISIT_SUFFIX,
@@ -124,6 +127,7 @@ from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     _window_bounds,
     not_observed_outside_swr_bins,
     outside_swr_bins,
+    restriction_window_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -273,7 +277,9 @@ def restriction_time_sums(
         bin in time order: :data:`TIME_SUM_BIN_COLUMNS`, of which ``time``
         (s), ``category``, the six score columns
         (:data:`.nonlocal_restriction.SCORE_COLUMNS`), ``in_swr`` and
-        ``place_sampling_s`` are read.
+        ``place_sampling_s`` are read, and the score columns of any other
+        model the table holds (``nonlocal_restriction.table_score_columns``),
+        which are summed too.
     facts : pd.DataFrame
         The epoch's per-bin facts (``bin_facts.bin_facts``) on the same grid:
         ``time``, ``n_spikes``, ``in_well_visit`` and ``swr_observed``.
@@ -308,7 +314,7 @@ def restriction_time_sums(
     s, e = _window_bounds(windows[windows["kind"] == "event"], len(bins))
     in_event = np.zeros(len(bins), dtype=bool)
     in_event[window_rows(s, e)] = True
-    frame = bins[list(SCORE_COLUMNS)].astype(np.float64)
+    frame = bins[list(table_score_columns(bins.columns))].astype(np.float64)
     frame.insert(0, "n_spikes", facts["n_spikes"].to_numpy(dtype=np.int64))
     frame.insert(0, "n_bins", np.int64(1))
     bin_s = sample_step(bins["time"].to_numpy(dtype=float))
@@ -350,10 +356,28 @@ def _chosen_time(time_sums: pd.DataFrame, rows: np.ndarray) -> pd.DataFrame:
     visit: ``n_bins``, ``n_spikes`` and the scores, indexed by ``epoch_id``,
     every epoch of ``time_sums`` included."""
     rows = np.asarray(rows, dtype=bool) & time_sums["in_well_visit"].to_numpy(bool)
-    columns = ["n_bins", "n_spikes", *SCORE_COLUMNS]
+    columns = ["n_bins", "n_spikes", *table_score_columns(time_sums.columns)]
     epochs = sorted(time_sums["epoch_id"].unique())
     return (
         time_sums[rows].groupby("epoch_id")[columns].sum().reindex(epochs, fill_value=0)
+    )
+
+
+def _epoch_header(
+    time_sums: pd.DataFrame, bin_s: pd.Series, total: pd.DataFrame
+) -> pd.DataFrame:
+    """Each epoch's chosen bins (``total``, :func:`_chosen_time`'s rows):
+    ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``."""
+    animals = time_sums.groupby("epoch_id")["animal"].first()
+    return pd.DataFrame(
+        {
+            "epoch_id": total.index,
+            "animal": animals.reindex(total.index).to_numpy(),
+            "n_bins": total["n_bins"].to_numpy(),
+            "n_spikes": total["n_spikes"].to_numpy(),
+            "seconds": total["n_bins"].to_numpy()
+            * bin_s.reindex(total.index).to_numpy(dtype=float),
+        }
     )
 
 
@@ -364,17 +388,7 @@ def _epoch_gain_frame(
     ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes`` and ``seconds``, and for
     each family ``full_minus_swr`` (nats), ``gain_per_spike`` and ``gain_per_s``
     (NaN without spikes or bins)."""
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": total["n_spikes"].to_numpy(),
-            "seconds": total["n_bins"].to_numpy()
-            * bin_s.reindex(total.index).to_numpy(dtype=float),
-        }
-    )
+    out = _epoch_header(time_sums, bin_s, total)
     for suffix in FAMILY_SUFFIX.values():
         gain = (total[f"full{suffix}"] - total[f"swr{suffix}"]).to_numpy()
         out[f"full_minus_swr{suffix}"] = gain
@@ -561,18 +575,8 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
     total = _chosen_time(
         time_sums, time_sums["category"].isin([IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR])
     )
-    animals = time_sums.groupby("epoch_id")["animal"].first()
-    seconds = total["n_bins"].to_numpy() * bin_s.reindex(total.index).to_numpy(float)
-    spikes = total["n_spikes"].to_numpy()
-    out = pd.DataFrame(
-        {
-            "epoch_id": total.index,
-            "animal": animals.reindex(total.index).to_numpy(),
-            "n_bins": total["n_bins"].to_numpy(),
-            "n_spikes": spikes,
-            "seconds": seconds,
-        }
-    )
+    out = _epoch_header(time_sums, bin_s, total)
+    spikes, seconds = out["n_spikes"].to_numpy(), out["seconds"].to_numpy()
     for suffix in FAMILY_SUFFIX.values():
         gains = {
             contrast: (total[f"{a}{suffix}"] - total[f"{b}{suffix}"]).to_numpy()
@@ -593,8 +597,9 @@ def epoch_immobile_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFr
 def epoch_inside_swr_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.DataFrame:
     """Each epoch's ``full - swr`` over its immobile bins inside SWRs inside a
     well visit (``immobile_in_swr``), per spike and per second, both score
-    families: the other side of :func:`epoch_outside_swr_gains`, where both
-    decoders may use the non-local states.
+    families: the other side of :func:`epoch_outside_swr_gains`, where the
+    SWR-only decoder must use the non-local states and the full decoder may
+    use any state.
 
     Parameters
     ----------
@@ -620,6 +625,121 @@ def epoch_inside_swr_gains(time_sums: pd.DataFrame, bin_s: pd.Series) -> pd.Data
     _check_time_sums(time_sums, bin_s)
     total = _chosen_time(time_sums, time_sums["category"] == IMMOBILE_IN_SWR)
     return _epoch_gain_frame(time_sums, bin_s, total)
+
+
+CONTRAST_TIMES = ("inside_swr", "outside_swr", "immobile")
+"""The immobile time a contrast is read over by :func:`epoch_contrast_gains`:
+the bins inside SWRs (``immobile_in_swr``), outside SWRs
+(:func:`.restriction_windows.outside_swr_bins`) or of both immobile categories,
+each inside a well visit."""
+
+
+def epoch_contrast_gains(
+    time_sums: pd.DataFrame,
+    bin_s: pd.Series,
+    *,
+    time: str,
+    contrasts: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Each epoch's contrasts over one kind of immobile time inside a well
+    visit, in nats, per spike and per second, both score families.
+
+    It reads any contrast of :data:`.nonlocal_restriction.ALL_CONTRASTS` whose
+    models the time sums hold, the fourth model's (``swr_allowed``) among them
+    when the restriction run scored it, on the same bins as
+    :func:`epoch_inside_swr_gains`, :func:`epoch_outside_swr_gains` and
+    :func:`epoch_immobile_gains` (their ``full - swr`` is this function's
+    ``full_minus_swr``).
+
+    Parameters
+    ----------
+    time_sums : pd.DataFrame
+        The cohort's time sums, as :func:`epoch_outside_swr_gains` takes them.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+    time : str
+        One of :data:`CONTRAST_TIMES`.
+    contrasts : iterable of str, optional
+        The contrasts (of :data:`.nonlocal_restriction.ALL_CONTRASTS`); by
+        default every one the time sums hold.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per epoch of ``time_sums``, sorted by ``epoch_id``:
+        ``epoch_id``, ``animal``, ``n_bins``, ``n_spikes``, ``seconds`` of the
+        chosen bins, and for each contrast and family (suffix ``""`` for the
+        filter score, ``"_two_sided"``): ``<contrast><suffix>`` (nats),
+        ``<contrast>_per_spike<suffix>`` and ``<contrast>_per_s<suffix>`` (NaN
+        without spikes or bins).
+
+    Raises
+    ------
+    ValueError
+        If ``time`` is not one of :data:`CONTRAST_TIMES`, a contrast is
+        unknown or its models are not in the time sums, an epoch has a row of
+        the time sums twice or no time step.
+    """
+    _check_time_sums(time_sums, bin_s)
+    held = table_contrasts(time_sums.columns)
+    chosen = list(held) if contrasts is None else list(contrasts)
+    if unknown := sorted(set(chosen) - set(ALL_CONTRASTS)):
+        raise ValueError(f"unknown contrasts {unknown}")
+    if missing := sorted(set(chosen) - set(held)):
+        raise ValueError(
+            f"the time sums do not hold the models of contrasts {missing}: they "
+            "are of a restriction run that did not score them"
+        )
+    immobile = time_sums["category"].isin([IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR])
+    rows = {
+        "inside_swr": time_sums["category"] == IMMOBILE_IN_SWR,
+        "outside_swr": _outside_swr_rows(time_sums),
+        "immobile": immobile,
+    }
+    if time not in rows:
+        raise ValueError(f"time {time!r} is not one of {CONTRAST_TIMES}")
+    total = _chosen_time(time_sums, np.asarray(rows[time]))
+    out = _epoch_header(time_sums, bin_s, total)
+    spikes, seconds = out["n_spikes"].to_numpy(), out["seconds"].to_numpy()
+    for contrast in chosen:
+        a, b = ALL_CONTRASTS[contrast]
+        for suffix in FAMILY_SUFFIX.values():
+            gain = (total[f"{a}{suffix}"] - total[f"{b}{suffix}"]).to_numpy()
+            out[f"{contrast}{suffix}"] = gain
+            for unit, divisor in (("per_spike", spikes), ("per_s", seconds)):
+                out[f"{contrast}_{unit}{suffix}"] = list(
+                    map(ratio_or_nan, gain, divisor)
+                )
+    return out
+
+
+def contrast_gain_statistics(
+    epochs: pd.DataFrame,
+    contrasts: Iterable[str],
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Each contrast per spike and per second over the epochs of
+    :func:`epoch_contrast_gains`, reduced over epochs and animals as
+    :func:`outside_swr_gain_statistics` reduces its measures, with the same
+    columns (``measure`` is ``<contrast>_per_spike`` or ``<contrast>_per_s``).
+
+    Parameters
+    ----------
+    epochs : pd.DataFrame
+        :func:`epoch_contrast_gains`' rows.
+    contrasts : iterable of str
+        Contrasts the rows hold.
+    n_boot, seed : int, optional
+        The bootstrap's replicates and seed, the same for every row.
+    """
+    measures = tuple(
+        f"{contrast}_{unit}"
+        for unit in ("per_spike", "per_s")
+        for contrast in contrasts
+    )
+    return _epoch_measure_statistics(epochs, measures, n_boot=n_boot, seed=seed)
 
 
 def outside_swr_not_observed_counts(time_sums: pd.DataFrame) -> dict[str, int]:
@@ -843,7 +963,7 @@ def outside_swr_statistics(
     time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame
 ) -> pd.DataFrame:
     """:func:`outside_swr_gain_statistics` over :func:`epoch_outside_swr_gains`,
-    indexed by ``family`` and ``measure``: the statistics Figure 2j, Figure 2's
+    indexed by ``family`` and ``measure``: the statistics Figure 2k, Figure 2's
     supplement and the events summary read of the immobile time outside SWRs."""
     return outside_swr_gain_statistics(
         epoch_outside_swr_gains(time_sums, bin_s, windows)
@@ -932,23 +1052,23 @@ def _epoch_measure_statistics(
     return pd.DataFrame(parts)
 
 
-# --- Figure 2j ---------------------------------------------------------------
+# --- Figure 2k ---------------------------------------------------------------
 
 RESTRICTION_FIGURE_FAMILY = "filter"
-"""Figure 2j, the decoders compared, in one score family (the events summary's
+"""Figure 2k, the decoders compared, in one score family (the events summary's
 values of it carry the panel's tag; the other family's do not)."""
-RESTRICTION_FIGURE_DECODERS = ("swr_minus_none_per_spike", "full_minus_none_per_spike")
-"""Figure 2j's first axis: each decoder's gain over the local-only decoder per
-spike of the immobile time inside a well visit, by its measure
-(:data:`IMMOBILE_MEASURES`), in drawing order (SWR-only, Full)."""
-RESTRICTION_FIGURE_DIFFERENCE = "full_minus_swr_per_spike"
-"""Figure 2j's second axis, first column: the full decoder minus the SWR-only
-decoder per spike of all the immobile time inside a well visit, each epoch's
-paired difference (:data:`IMMOBILE_MEASURES`)."""
 RESTRICTION_FIGURE_OUTSIDE_SWR = "gain_per_spike"
-"""Figure 2j's second axis, second column: the full decoder minus the SWR-only
+"""Figure 2k's first axis, outside SWRs: the full decoder minus the SWR-only
 decoder per spike of the immobile time outside SWRs inside a well visit
 (:data:`MEASURES`)."""
+RESTRICTION_FIGURE_INSIDE_SWR = "gain_per_spike"
+"""Figure 2k's first axis, inside SWRs: the full decoder minus the SWR-only
+decoder per spike of the immobile time inside SWRs inside a well visit
+(:data:`SUBSET_MEASURES` of :func:`inside_swr_gain_statistics`)."""
+RESTRICTION_FIGURE_OUTSIDE_EVENTS = "outside_events_gain_per_spike"
+"""Figure 2k's second axis, second column: the full decoder minus the SWR-only
+decoder per spike of the immobile time outside SWRs that no event detected from
+the held-out decode holds (:data:`MEASURES`)."""
 OUTSIDE_SWR_EVENT_WINDOWS = {
     "parts": ["outside_swr"],
     "families": [RESTRICTION_FIGURE_FAMILY],
@@ -962,12 +1082,36 @@ bins outside SWRs of each event window, which the events summary reports."""
 OUTSIDE_SWR_EVENT_WINDOW_GROUPS = (SWR_LABELS[False], SWR_LABELS[True])
 """The groups of :data:`OUTSIDE_SWR_EVENT_WINDOWS`, in order: events with no SWR, then
 the time outside the SWR of the events that overlap one."""
+RESTRICTION_FIGURE_EVENT_GROUP = SWR_LABELS[False]
+"""Figure 2k's second axis, first column: the group of
+:data:`OUTSIDE_SWR_EVENT_WINDOWS` drawn, the held-out events with no SWR."""
+
+
+class RestrictionFigureStatistics(NamedTuple):
+    """Figure 2k's statistics (:func:`restriction_figure_statistics`), each
+    indexed as the events summary reads it."""
+
+    inside: pd.DataFrame
+    """:func:`inside_swr_gain_statistics` over the immobile time inside SWRs
+    inside a well visit, indexed by ``family`` and ``measure``."""
+    outside: pd.DataFrame
+    """:func:`outside_swr_statistics` over the immobile time outside SWRs inside
+    a well visit, indexed by ``family`` and ``measure``: the first axis'
+    outside-SWR column and, as :data:`RESTRICTION_FIGURE_OUTSIDE_EVENTS`, the
+    second axis' column outside the held-out events."""
+    events: pd.DataFrame
+    """``restriction_windows.restriction_window_statistics`` of
+    :data:`OUTSIDE_SWR_EVENT_WINDOWS` over the held-out events, indexed by
+    ``group``: the full minus the SWR-only decoder per spike over each
+    event's bins outside SWRs (each epoch's median over its events, then each
+    animal's median over its epochs). The second axis draws the events with no
+    SWR."""
 
 
 def restriction_figure_statistics(
     windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Figure 2j's statistics, as the events summary computes them.
+) -> RestrictionFigureStatistics:
+    """Figure 2k's statistics, as the events summary computes them.
 
     Parameters
     ----------
@@ -984,16 +1128,105 @@ def restriction_figure_statistics(
 
     Returns
     -------
-    decoders : pd.DataFrame
-        :func:`immobile_gain_statistics` over the immobile time inside a well
-        visit, indexed by ``family`` and ``measure`` (the first axis and the
-        second axis' first column).
-    outside : pd.DataFrame
-        :func:`outside_swr_statistics` over the immobile time outside SWRs
-        inside a well visit, with the shares of it in the events of
-        ``windows`` (the second axis' second column).
+    RestrictionFigureStatistics
+        The difference inside SWRs, the difference outside SWRs (with the shares in the events of ``windows``
+        and the rest outside every held-out event), and the difference over the
+        held-out events' bins outside SWRs.
     """
-    decoders = immobile_gain_statistics(
-        epoch_immobile_gains(time_sums, bin_s)
+    inside = inside_swr_gain_statistics(
+        epoch_inside_swr_gains(time_sums, bin_s)
     ).set_index(["family", "measure"])
-    return decoders, outside_swr_statistics(time_sums, bin_s, windows)
+    events = restriction_window_statistics(
+        windows, **OUTSIDE_SWR_EVENT_WINDOWS
+    ).set_index("group")
+    return RestrictionFigureStatistics(
+        inside, outside_swr_statistics(time_sums, bin_s, windows), events
+    )
+
+
+# --- the fourth decoder (Figure 2's supplement) --------------------------------
+
+SWR_ALLOWED_TIME_CONTRASTS = {
+    time: (
+        *SWR_ALLOWED_CONTRASTS,
+        *(("swr_minus_none", "full_minus_none") if time == "immobile" else ()),
+    )
+    for time in CONTRAST_TIMES
+}
+"""The contrasts read of a restriction run that scored the fourth model
+(:data:`.nonlocal_restriction.SWR_ALLOWED`), by the time they are read over
+(:data:`CONTRAST_TIMES`): the fourth model's three contrasts over each, and
+over all immobile time also the SWR-only and full decoders' gains over the
+local-only decoder of the same scoring pass."""
+SWR_ALLOWED_FIGURE_DECODERS = (
+    "swr_minus_none_per_spike",
+    "swr_allowed_minus_none_per_spike",
+    "full_minus_none_per_spike",
+)
+"""Figure 2's supplement, the fourth decoder's panel, first axis: each decoder's
+gain over the local-only decoder per spike of all the immobile time inside a
+well visit, in drawing order (SWR-only, SWR-allowed, Full)."""
+SWR_ALLOWED_FIGURE_DIFFERENCES = (
+    "full_minus_swr_allowed_per_spike",
+    "swr_allowed_minus_swr_per_spike",
+)
+"""The same panel, second axis: the two differences drawn at each time of
+:data:`CONTRAST_TIMES`, left to right at each time."""
+SWR_ALLOWED_FIGURE_EVENT_CONTRAST = "full_minus_swr_allowed"
+"""The same panel, third axis: the contrast read per spike over the bins
+outside SWRs of the held-out events with no SWR
+(:data:`RESTRICTION_FIGURE_EVENT_GROUP`)."""
+
+
+class SwrAllowedStatistics(NamedTuple):
+    """The fourth decoder's statistics (:func:`swr_allowed_statistics`)."""
+
+    times: pd.DataFrame
+    """:func:`contrast_gain_statistics` of :data:`SWR_ALLOWED_TIME_CONTRASTS`
+    over each time, indexed by ``time``, ``family`` and ``measure``."""
+    events: pd.DataFrame
+    """``restriction_windows.restriction_window_statistics`` of
+    :data:`OUTSIDE_SWR_EVENT_WINDOWS` with the contrast
+    :data:`SWR_ALLOWED_FIGURE_EVENT_CONTRAST` over the held-out events, indexed
+    by ``group``."""
+
+
+def swr_allowed_statistics(
+    windows: pd.DataFrame, time_sums: pd.DataFrame, bin_s: pd.Series
+) -> SwrAllowedStatistics:
+    """The fourth decoder against the other three, as the events summary and
+    Figure 2's supplement read it.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The held-out events of a run made from a restriction run that scored
+        the fourth model, as :func:`restriction_figure_statistics` takes them.
+    time_sums : pd.DataFrame
+        That run's time sums of every epoch.
+    bin_s : pd.Series
+        Each epoch's decode time step (s), indexed by ``epoch_id``.
+
+    Raises
+    ------
+    ValueError
+        If the time sums or the windows do not hold the fourth model.
+    """
+    times = pd.concat(
+        [
+            contrast_gain_statistics(
+                epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
+                contrasts,
+            ).assign(time=time)
+            for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
+        ],
+        ignore_index=True,
+    ).set_index(["time", "family", "measure"])
+    events = restriction_window_statistics(
+        windows,
+        **{
+            **OUTSIDE_SWR_EVENT_WINDOWS,
+            "contrasts": [SWR_ALLOWED_FIGURE_EVENT_CONTRAST],
+        },
+    ).set_index("group")
+    return SwrAllowedStatistics(times, events)

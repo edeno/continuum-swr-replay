@@ -61,6 +61,12 @@ def test_other_detector_statistics_split_events_by_overlap_and_state():
     # (pooled, a's 3 of 5 and b's 4 of 8 would give 0.6 and 0.5)
     assert result["no_nonlocal_fraction_animal_min"] == pytest.approx(0.4)
     assert result["no_nonlocal_fraction_animal_max"] == pytest.approx(0.5)
+    # Figure 2c's bars, the mean over animals: no non-local (0.5 + 0.4) / 2;
+    # mostly Local, a's (2/3 + 0) / 2 and b's (1/5 + 0) / 2
+    assert result["no_nonlocal_fraction_animal_mean"] == pytest.approx(0.45)
+    assert result["mostly_local_fraction_animal_mean"] == pytest.approx(
+        (1 / 3 + 0.1) / 2
+    )
     # of the six events with state shares that overlap no non-local event (the
     # seventh has none and is left out)
     assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(3 / 6)
@@ -491,6 +497,8 @@ def test_nonlocal_events_overlapped_pools_events_and_averages_each_animals_epoch
     assert list(overlap.index) == ["kay", "mua"]
     assert overlap.loc["kay", "pooled"] == pytest.approx(2 / 5)
     np.testing.assert_allclose(overlap.loc["kay", "animals"], [0.75, 0.0])
+    # Figure 2e's bar: the mean of the animals' shares
+    assert overlap.loc["kay", "animal_mean"] == pytest.approx(0.375)
     # an animal with no event against a detector has no dot
     np.testing.assert_allclose(overlap.loc["mua", "animals"], [1.0])
 

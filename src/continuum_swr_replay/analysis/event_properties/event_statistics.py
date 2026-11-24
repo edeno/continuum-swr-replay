@@ -30,6 +30,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
@@ -147,6 +148,9 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
         - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
           lying inside an SWR and overlapping one in part, pooled the same way.
+        - ``non_swr_fraction_animal_mean``, ``swr_contained_fraction_animal_mean``,
+          ``swr_partial_fraction_animal_mean``: the mean over animals of each
+          animal's own share of the class (Figure 2d's bars).
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -185,6 +189,10 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "non_swr_fraction": counts["non_swr"] / counts["total"],
         "swr_contained_fraction": counts["swr_contained"] / counts["total"],
         "swr_partial_fraction": counts["swr_partial"] / counts["total"],
+        **{
+            f"{overlap_class}_fraction_animal_mean": shares[overlap_class].mean()
+            for overlap_class in OVERLAP_CLASSES
+        },
         "non_swr_fraction_animal_min": non_swr.min(),
         "non_swr_fraction_animal_max": non_swr.max(),
         "n_animals": len(shares),
@@ -285,7 +293,7 @@ def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     return offsets
 
 
-OFFSET_TAILS_S = {"twenty_five_ms": 0.025, "fifty_ms": 0.050}
+OFFSET_TAILS_S = {"ten_ms": 0.010, "fifty_ms": 0.050}
 """How far (s) an event's bound may sit from its SWR's before it counts in the
 tail (:func:`boundary_offset_statistics`), by the name its statistic carries."""
 
@@ -327,10 +335,13 @@ def _offset_us(offset_s: pd.Series) -> pd.Series:
     return np.round(1e6 * offset_s)
 
 
-TIMING_TOLERANCE = "twenty_five_ms"
+TIMING_TOLERANCE = "ten_ms"
 """The :data:`OFFSET_TAILS_S` tolerance within which an event's bound is
-together with its SWR's (:func:`boundary_timing_statistics`): the same 25 ms
-as the ``*_beyond_twenty_five_ms_fraction`` statistics."""
+together with its SWR's (:func:`boundary_timing_statistics`): the same 10 ms
+as the ``*_beyond_ten_ms_fraction`` statistics. About the resolution of the
+two bounds (the SWR detectors smooth ripple power with a Gaussian of 4 ms
+standard deviation; the decode has 2 ms bins). The shares depend on it, with
+no plateau: a wider tolerance calls more pairs together."""
 TIMING_CLASSES = ("earlier", "together", "later")
 """How an event's bound sits against its SWR's, in order."""
 
@@ -369,7 +380,7 @@ def boundary_timing_classes(offsets: pd.DataFrame) -> pd.DataFrame:
 
 
 def boundary_timing_statistics(
-    offsets: pd.DataFrame, animal: pd.Series
+    offsets: pd.DataFrame, events: pd.DataFrame
 ) -> pd.DataFrame:
     """The share of SWR-overlapping events in each of the nine combinations of
     their start and end against their SWR's (:func:`boundary_timing_classes`).
@@ -378,39 +389,93 @@ def boundary_timing_statistics(
     ----------
     offsets : pd.DataFrame, shape (n_overlapping_events, 2)
         :func:`boundary_offsets`.
-    animal : pd.Series
-        Each event's animal, indexed as ``offsets`` (or a superset of it).
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
 
     Returns
     -------
-    pd.DataFrame, shape (9, 4)
+    pd.DataFrame, shape (9, 7)
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
-        order): ``share``, pooled over every event, as panels c and d pool;
-        ``animal_min`` and ``animal_max``, the lowest and highest of each
-        animal's share over its own events; ``n_events``, the events in the
-        cell.
+        order): ``share_animal_mean``, the mean over animals of each animal's
+        share; ``animal_min`` and ``animal_max``, the lowest and highest
+        animal's share; ``share``, pooled over every event; ``n_events``, the
+        events in the cell; ``animals`` and ``animal_names``, each animal's
+        share and its name, in sorted order. An animal's share of a cell is
+        the mean over its epochs of each epoch's share of its pairs (event ->
+        epoch -> animal, as :func:`overlap_class_animal_shares` takes it); an
+        epoch with no pair in a cell has a share of 0 in it.
     """
     classes = boundary_timing_classes(offsets)
+    sessions = events.loc[classes.index]
     cells = pd.MultiIndex.from_product(
         [TIMING_CLASSES, TIMING_CLASSES], names=["start", "end"]
     )
     counts = classes.value_counts(["start", "end"]).reindex(cells, fill_value=0)
-    per_animal = (
-        classes.assign(animal=animal.loc[classes.index])
-        .groupby("animal")
-        .value_counts(["start", "end"], normalize=True)
-        .unstack("animal")
-        .reindex(cells, fill_value=0.0)
-        .fillna(0.0)
-    )
+    per_animal = pd.DataFrame(
+        {
+            (start, end): animal_session_values(
+                ((classes["start"] == start) & (classes["end"] == end)).astype(float),
+                sessions["animal"],
+                sessions[_WITHIN_ANIMAL],
+                "mean",
+            )
+            for start, end in cells
+        }
+    ).T.set_axis(cells)
     return pd.DataFrame(
         {
-            "share": counts / counts.sum(),
+            "share_animal_mean": per_animal.mean(axis=1),
             "animal_min": per_animal.min(axis=1),
             "animal_max": per_animal.max(axis=1),
+            "share": counts / counts.sum(),
             "n_events": counts,
+            "animals": [row.to_numpy() for _, row in per_animal.iterrows()],
+            "animal_names": [per_animal.columns.to_numpy()] * len(per_animal),
         }
     )
+
+
+def boundary_both_ends_differ_statistics(
+    offsets: pd.DataFrame, events: pd.DataFrame
+) -> dict[str, float]:
+    """The share of SWR-overlapping events whose start and end both differ from
+    their SWR's by more than the tolerance (the four corner classes of
+    :func:`boundary_timing_statistics` together), by the same rule: an animal's
+    share is the mean over its epochs of each epoch's share of its pairs, then
+    the mean over animals.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
+
+    Returns
+    -------
+    dict
+        ``share_animal_mean``, ``animal_min``, ``animal_max``, ``n_events``
+        (the pairs with both ends apart), and ``animals`` and
+        ``animal_names``, each animal's share and its name.
+    """
+    classes = boundary_timing_classes(offsets)
+    sessions = events.loc[classes.index]
+    both = (classes["start"] != TIMING_CLASSES[1]) & (
+        classes["end"] != TIMING_CLASSES[1]
+    )
+    per_animal = animal_session_values(
+        both.astype(float), sessions["animal"], sessions[_WITHIN_ANIMAL], "mean"
+    )
+    return {
+        "share_animal_mean": float(per_animal.mean()),
+        "animal_min": float(per_animal.min()),
+        "animal_max": float(per_animal.max()),
+        "n_events": int(both.sum()),
+        "animals": per_animal.to_numpy(),
+        "animal_names": per_animal.index.to_numpy(),
+    }
 
 
 # --- theta, ripple, MUA and gamma during events -----------------------------------
@@ -1043,6 +1108,52 @@ def nonlocal_share_above_statistics(
     }
 
 
+def main_step_fits(
+    steps: pd.DataFrame, n_knots: int, window_z: float, n_animals: int
+) -> pd.DataFrame:
+    """The step fits of the main setting: the Kay criterion, no covariate,
+    ``n_knots`` knots and a window of ``window_z`` around the threshold.
+
+    Parameters
+    ----------
+    steps : pd.DataFrame, shape (n_fits, n_columns)
+        The one-class-or-two analysis's step fits (as
+        :func:`threshold_step_statistics` takes them).
+    n_knots : int
+        The spline's knots in the main setting.
+    window_z : float
+        The half-width of the main setting's window around the threshold, z.
+    n_animals : int
+        The animals every property must have one fit for.
+
+    Returns
+    -------
+    fits : pd.DataFrame, shape (n_properties * n_animals, n_columns)
+        The rows of ``steps`` in the main setting, sorted by property and
+        animal: one per property and animal.
+
+    Raises
+    ------
+    ValueError
+        If a property does not have one fit for each of ``n_animals`` animals
+        in the main setting.
+    """
+    main = steps[
+        (steps.n_knots == n_knots)
+        & (steps.power == "criterion")
+        & np.isclose(steps.window_z, window_z)
+        & (steps.covariate == "none")
+    ]
+    fits = main.groupby("property").agg(
+        n_fits=("animal", "size"), n_animals_fitted=("animal", "nunique")
+    )
+    if not (fits == n_animals).all(axis=None):
+        raise ValueError(
+            f"not every property has one fit for each of {n_animals} animals:\n{fits}"
+        )
+    return main.sort_values(["property", "animal"])
+
+
 def threshold_step_statistics(
     steps: pd.DataFrame, n_knots: int, window_z: float, n_animals: int
 ) -> pd.DataFrame:
@@ -1066,7 +1177,7 @@ def threshold_step_statistics(
     Returns
     -------
     statistics : pd.DataFrame, shape (n_properties, 3)
-        Indexed by property, for the main setting (the Kay criterion, no
+        Indexed by property, over :func:`main_step_fits` (the Kay criterion, no
         covariate), each of ``n_animals`` animals: ``n_animals_with_step``;
         ``n_animals_same_sign``, the animals whose step points the way of their
         SWR minus non-SWR difference (a positive share); and
@@ -1079,25 +1190,12 @@ def threshold_step_statistics(
         If a property does not have one fit for each of ``n_animals`` animals
         in the main setting.
     """
-    main = steps[
-        (steps.n_knots == n_knots)
-        & (steps.power == "criterion")
-        & np.isclose(steps.window_z, window_z)
-        & (steps.covariate == "none")
-    ]
-    by_property = main.groupby("property").agg(
+    main = main_step_fits(steps, n_knots, window_z, n_animals)
+    return main.groupby("property").agg(
         n_animals_with_step=("has_step", "sum"),
-        n_fits=("has_step", "size"),
-        n_animals_fitted=("animal", "nunique"),
         n_animals_same_sign=("step_share_overall", lambda share: (share > 0).sum()),
         step_share_median=("step_share_overall", "median"),
     )
-    fits = by_property[["n_fits", "n_animals_fitted"]]
-    if not (fits == n_animals).all(axis=None):
-        raise ValueError(
-            f"not every property has one fit for each of {n_animals} animals:\n{fits}"
-        )
-    return by_property.drop(columns=fits.columns)
 
 
 def most_steps(
@@ -1176,10 +1274,10 @@ HPD_BIN_EDGES_CM = np.geomspace(5.0, 500.0, 25)
 event's coverage lies inside them."""
 
 
-def _hpd_table(events: pd.DataFrame) -> pd.DataFrame:
-    """The events with a coverage: ``animal``, ``epoch_id`` (one label per
-    session), ``group`` (``"no SWR"`` or ``"SWR"``) and ``hpd_coverage_cm``."""
-    known = events.dropna(subset=["hpd_coverage_cm"])
+def _class_table(events: pd.DataFrame, column: str) -> pd.DataFrame:
+    """The events with a value of ``column``: ``animal``, ``epoch_id`` (one
+    label per session), ``group`` (``"no SWR"`` or ``"SWR"``) and ``column``."""
+    known = events.dropna(subset=[column])
     return pd.DataFrame(
         {
             "animal": known["animal"].to_numpy(),
@@ -1188,9 +1286,34 @@ def _hpd_table(events: pd.DataFrame) -> pd.DataFrame:
             .agg("_".join, axis=1)
             .to_numpy(),
             "group": np.where(known["is_swr"].astype(bool), "SWR", "no SWR"),
-            "hpd_coverage_cm": known["hpd_coverage_cm"].to_numpy(dtype=float),
+            column: known[column].to_numpy(dtype=float),
         }
     )
+
+
+def _class_distribution(
+    events: pd.DataFrame, column: str, edges: np.ndarray
+) -> pd.DataFrame:
+    """Each animal's distribution of a per-event property, by class: one row
+    per animal, class and bin, with ``animal``, ``group``, ``bin_low``,
+    ``bin_high`` and ``percent`` (the percent of the animal's events of the
+    class in the bin; a bin holds its low edge and not its high one)."""
+    table = _class_table(events, column)
+    rows = []
+    for (animal, group), mine in table.groupby(["animal", "group"]):
+        counts, _ = np.histogram(mine[column], bins=edges)
+        rows.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "group": group,
+                    "bin_low": edges[:-1],
+                    "bin_high": edges[1:],
+                    "percent": 100 * counts / len(mine),
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True)
 
 
 def hpd_distribution(
@@ -1215,22 +1338,7 @@ def hpd_distribution(
         ``bin_high`` and ``percent`` (the percent of the animal's events of the
         class in the bin).
     """
-    table = _hpd_table(events)
-    rows = []
-    for (animal, group), mine in table.groupby(["animal", "group"]):
-        counts, _ = np.histogram(mine["hpd_coverage_cm"], bins=edges)
-        rows.append(
-            pd.DataFrame(
-                {
-                    "animal": animal,
-                    "group": group,
-                    "bin_low": edges[:-1],
-                    "bin_high": edges[1:],
-                    "percent": 100 * counts / len(mine),
-                }
-            )
-        )
-    return pd.concat(rows, ignore_index=True)
+    return _class_distribution(events, "hpd_coverage_cm", edges)
 
 
 def hpd_tight_share_statistics(
@@ -1264,7 +1372,7 @@ def hpd_tight_share_statistics(
         ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
         their SWR share.
     """
-    table = _hpd_table(events)
+    table = _class_table(events, "hpd_coverage_cm")
     shares = (
         table.assign(tight=table["hpd_coverage_cm"] < cut_cm)
         .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
@@ -1279,6 +1387,100 @@ def hpd_tight_share_statistics(
     }
     higher = by_group["no SWR"] > by_group["SWR"].reindex(by_group["no SWR"].index)
     return {"rows": rows, "n_animals_non_swr_higher": int(higher.sum())}
+
+
+DISTANCE_COLUMN = "mean_abs_ahead_behind_cm"
+"""The event table's distance of the content from the animal: the mean over the
+event's bins of the absolute distance (cm along the track) of the decoded place
+from the animal's."""
+
+DISTANCE_BIN_EDGES_CM = np.geomspace(2.0, 256.0, 22)
+"""The content-distance bins of the distance panel (cm), log-spaced (each
+about 1.26 times the last), so that content under 20 cm and content at 100 cm
+or more are both resolved: every event's distance lies inside them."""
+
+NEAR_CM = 20.0
+"""The distance under which an event's content counts as near the animal (cm)."""
+
+DISTANCE_BANDS_CM = {
+    "near": (0.0, NEAR_CM),
+    "middle": (NEAR_CM, REMOTE_CM),
+    "remote": (REMOTE_CM, np.inf),
+}
+"""The distance bands (cm), each closed on the left: under 20 cm, 20 to 100 cm,
+and 100 cm or more (``constants.REMOTE_CM``, the spike-evidence analysis's
+remote place)."""
+
+
+def content_distance_distribution(
+    events: pd.DataFrame, edges: np.ndarray = DISTANCE_BIN_EDGES_CM
+) -> pd.DataFrame:
+    """Each animal's distribution of the distance of the events' content from
+    the animal (:data:`DISTANCE_COLUMN`), by class, as
+    :func:`hpd_distribution` takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        :data:`DISTANCE_COLUMN` (an event without one is left out).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (cm).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent``.
+    """
+    return _class_distribution(events, DISTANCE_COLUMN, edges)
+
+
+def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
+    """The share of each class's events whose content lies in each distance
+    band from the animal (:data:`DISTANCE_BANDS_CM`).
+
+    An animal's share is the mean over its epochs of each epoch's share of its
+    events of the class (event -> epoch -> animal, as
+    :func:`overlap_class_animal_shares` takes it); an epoch with no event of
+    the class in a band has a share of 0 in it.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        As :func:`content_distance_distribution` takes them.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
+        of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
+        mean over animals of the animals' shares; ``animal_min`` and
+        ``animal_max``; ``share``, pooled over the class's events;
+        ``n_animals`` and ``n_events`` (the class's events).
+    """
+    table = _class_table(events, DISTANCE_COLUMN)
+    rows = []
+    for group in ("no SWR", "SWR"):
+        mine = table[table["group"] == group]
+        for band, (low, high) in DISTANCE_BANDS_CM.items():
+            inside = (mine[DISTANCE_COLUMN] >= low) & (mine[DISTANCE_COLUMN] < high)
+            per_animal = animal_session_values(
+                inside.astype(float), mine["animal"], mine["epoch_id"], "mean"
+            )
+            rows.append(
+                {
+                    "group": group,
+                    "band": band,
+                    "share_animal_mean": float(per_animal.mean()),
+                    "animal_min": float(per_animal.min()),
+                    "animal_max": float(per_animal.max()),
+                    "share": float(inside.mean()),
+                    "n_animals": len(per_animal),
+                    "n_events": len(mine),
+                }
+            )
+    return pd.DataFrame(rows).set_index(["group", "band"])
 
 
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:

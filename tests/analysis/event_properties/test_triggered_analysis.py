@@ -493,17 +493,62 @@ def test_triggering_events_in_keeps_the_frames_rows_of_the_selected_events():
     assert len(event_types[no_swr]) == 4  # the input is not changed
 
 
-def test_window_quartiles_are_over_events_at_each_lag():
-    """Five events, two lags: at the first lag 1..5 (quartiles 2, 3, 4); at the
-    second one value missing, 10, 20, 30, 40 (17.5, 25, 32.5)."""
+def test_animal_quartiles_are_over_each_animals_events_at_each_lag():
+    """Animal a's five events, two lags: at the first lag 1..5 (quartiles 2,
+    3, 4); at the second one value missing, 10, 20, 30, 40 (17.5, 25, 32.5).
+    Animal b's one event is its own quartiles."""
     from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
-        window_quartiles,
+        animal_quartiles,
     )
 
     windows = np.array(
-        [[1.0, 10.0], [2.0, 20.0], [3.0, np.nan], [4.0, 30.0], [5.0, 40.0]]
+        [[1.0, 10.0], [2.0, 20.0], [3.0, np.nan], [4.0, 30.0], [5.0, 40.0], [7.0, 8.0]]
     )
-    quartiles = window_quartiles(windows)
-    np.testing.assert_allclose(quartiles["q25"], [2.0, 17.5])
-    np.testing.assert_allclose(quartiles["median"], [3.0, 25.0])
-    np.testing.assert_allclose(quartiles["q75"], [4.0, 32.5])
+    quartiles = animal_quartiles(windows, ["a"] * 5 + ["b"])
+    np.testing.assert_allclose(quartiles["q25"]["a"], [2.0, 17.5])
+    np.testing.assert_allclose(quartiles["median"]["a"], [3.0, 25.0])
+    np.testing.assert_allclose(quartiles["q75"]["a"], [4.0, 32.5])
+    for label in ("q25", "median", "q75"):
+        np.testing.assert_allclose(quartiles[label]["b"], [7.0, 8.0])
+
+
+def test_animal_balanced_quartiles_weight_every_animal_the_same():
+    """Animal a's four events of 1 and b's one event of 9: pooled, the median
+    would be 1; animal-balanced, every quartile is (1 + 9) / 2 = 5. Where only
+    b has a value, b's value alone."""
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        animal_balanced_quartiles,
+    )
+
+    windows = np.array(
+        [[1.0, np.nan], [1.0, np.nan], [1.0, np.nan], [1.0, np.nan], [9.0, 3.0]]
+    )
+    quartiles = animal_balanced_quartiles(windows, ["a", "a", "a", "a", "b"])
+    for label in ("q25", "median", "q75"):
+        np.testing.assert_allclose(quartiles[label], [5.0, 3.0])
+
+
+def test_animal_window_medians_are_each_animals_median_over_its_events():
+    """Animal a's three events and b's one: a's median at each lag is the
+    middle of its three windows (a NaN left out), b's is its own window."""
+    import xarray as xr
+
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        animal_window_medians,
+    )
+
+    values = np.array([[1.0, 5.0], [2.0, np.nan], [3.0, 7.0], [10.0, 20.0]])[:, :, None]
+    index = pd.MultiIndex.from_tuples(
+        [("a", 1, "e", 1), ("a", 1, "e", 2), ("a", 2, "e", 1), ("b", 1, "e", 1)],
+        names=["animal", "day", "epoch", "non_local_event"],
+    )
+    windows = xr.DataArray(
+        values,
+        dims=("event", "time", "signal"),
+        coords={"event": index, "time": [-0.002, 0.0], "signal": ["MUA_zscore"]},
+    )
+    medians = animal_window_medians(windows, "MUA_zscore")
+    assert list(medians.columns) == ["a", "b"]
+    np.testing.assert_allclose(medians["a"], [2.0, 6.0])
+    np.testing.assert_allclose(medians["b"], [10.0, 20.0])
+    np.testing.assert_allclose(medians.index, [-0.002, 0.0])

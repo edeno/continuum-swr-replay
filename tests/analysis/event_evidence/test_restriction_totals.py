@@ -390,3 +390,98 @@ def test_subset_shares_are_the_mean_over_animals_of_their_epoch_medians():
     share = shares.loc[("beyond_swr_margin", 0.25)]
     assert share["estimate"] == pytest.approx((4 / 6 + 2 / 6) / 2)
     assert share["animal_min"] == pytest.approx(2 / 6)
+
+
+def _four_model_time_sums() -> pd.DataFrame:
+    """:func:`_time_sums` with the fourth model: ``swr_allowed`` half of
+    ``full`` in each row (two-sided twice the filter score, as the others)."""
+    sums = _time_sums()
+    for suffix in ("", "_two_sided"):
+        sums[f"swr_allowed{suffix}"] = 0.5 * sums[f"full{suffix}"]
+    return sums
+
+
+def test_time_sums_sum_a_fourth_model_when_the_bins_hold_it():
+    category = ["immobile_outside_swr"] * 3 + ["immobile_in_swr", "moving", "excluded"]
+    scores = dict.fromkeys(SCORE_COLUMNS, np.arange(6))
+    bins = restriction_bins(
+        np.arange(6.0),
+        scores,
+        np.arange(6) == 3,
+        category,
+        place_sampling_s=np.zeros(6, dtype=np.float32),
+        swr_allowed=np.full(6, 2.0, dtype=np.float32),
+        swr_allowed_two_sided=np.full(6, 3.0, dtype=np.float32),
+    )
+    facts = bin_facts_table(np.arange(6.0), [1, 2, 3, 4, 5, 6], np.arange(6) < 3)
+    windows = pd.DataFrame({"kind": ["event"], "s": [1], "e": [2]})
+    sums = rt.restriction_time_sums(bins, facts, windows)
+    assert sums["swr_allowed"].sum() == 12.0
+    assert sums["swr_allowed_two_sided"].sum() == 18.0
+    plain = rt.restriction_time_sums(
+        bins.drop(columns=["swr_allowed", "swr_allowed_two_sided"]), facts, windows
+    )
+    assert "swr_allowed" not in plain.columns
+    pd.testing.assert_frame_equal(plain, sums[list(plain.columns)])
+
+
+def test_contrast_gains_inside_outside_and_over_all_immobile_time():
+    """Inside SWRs inside a visit: a1 full 7, swr_allowed 3.5, swr 6 over 2
+    bins and 2 spikes; b1 2, 1, 3. Outside SWRs inside a visit: a1 full 10,
+    swr_allowed 5, swr 0 over 10 bins and 6 spikes. All immobile time inside a
+    visit: a1 full 17, swr_allowed 8.5, none 0 over 12 bins and 8 spikes."""
+    sums = _four_model_time_sums()
+    inside = rt.epoch_contrast_gains(sums, _bin_s(), time="inside_swr")
+    assert list(inside["epoch_id"]) == ["a1", "a2", "b1"]
+    np.testing.assert_allclose(inside["full_minus_swr_allowed"], [3.5, 0.0, 1.0])
+    np.testing.assert_allclose(
+        inside["full_minus_swr_allowed_per_spike"], [1.75, np.nan, 0.5]
+    )
+    np.testing.assert_allclose(
+        inside["swr_allowed_minus_swr_per_s"], [-2.5, np.nan, -2]
+    )
+    np.testing.assert_allclose(
+        inside["swr_allowed_minus_swr_per_s_two_sided"], [-5.0, np.nan, -4.0]
+    )
+    outside = rt.epoch_contrast_gains(sums, _bin_s(), time="outside_swr")
+    np.testing.assert_allclose(outside["swr_allowed_minus_swr"], [5.0, 5.0, -1.0])
+    np.testing.assert_allclose(
+        outside["full_minus_swr_allowed_per_spike"], [5 / 6, 0.5, -0.5]
+    )
+    immobile = rt.epoch_contrast_gains(sums, _bin_s(), time="immobile")
+    np.testing.assert_allclose(
+        immobile["swr_allowed_minus_none_per_spike"], [8.5 / 8, 0.5, 0.0]
+    )
+    # the canonical contrasts are the existing functions' values
+    np.testing.assert_allclose(
+        immobile["full_minus_swr_per_spike"],
+        rt.epoch_immobile_gains(sums, _bin_s())["full_minus_swr_per_spike"],
+    )
+    np.testing.assert_allclose(
+        outside["full_minus_swr_per_s_two_sided"],
+        rt.epoch_outside_swr_gains(sums, _bin_s(), _windows())["gain_per_s_two_sided"],
+    )
+    stats = rt.contrast_gain_statistics(
+        inside, ["full_minus_swr_allowed"], n_boot=50, seed=1
+    ).set_index(["family", "measure"])
+    row = stats.loc[("filter", "full_minus_swr_allowed_per_spike")]
+    # a: its one epoch with SWR bins (1.75); b: 0.5
+    np.testing.assert_allclose(row["animals"], [1.75, 0.5])
+    assert len(stats) == 2 * 2
+
+
+def test_contrast_gains_refuse_a_contrast_the_time_sums_do_not_hold():
+    with pytest.raises(ValueError, match="do not hold the models"):
+        rt.epoch_contrast_gains(
+            _time_sums(), _bin_s(), time="immobile", contrasts=["swr_allowed_minus_swr"]
+        )
+    with pytest.raises(ValueError, match="unknown contrasts"):
+        rt.epoch_contrast_gains(
+            _time_sums(), _bin_s(), time="immobile", contrasts=["x"]
+        )
+    with pytest.raises(ValueError, match="not one of"):
+        rt.epoch_contrast_gains(_time_sums(), _bin_s(), time="moving")
+    # by default, the contrasts the time sums hold
+    canonical = rt.epoch_contrast_gains(_time_sums(), _bin_s(), time="immobile")
+    assert "full_minus_swr_allowed" not in canonical.columns
+    assert "full_minus_none_per_s" in canonical.columns

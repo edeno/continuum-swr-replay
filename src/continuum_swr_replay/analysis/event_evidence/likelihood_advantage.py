@@ -201,7 +201,8 @@ def likelihood_advantage_statistics(
     pd.DataFrame
         Indexed by group: ``animals`` (the animals' values, sorted animal
         order), ``animal_names``, ``estimate``, ``ci_low``, ``ci_high``,
-        ``n_events``, ``n_scored`` (events with a value) and ``n_animals``.
+        ``n_events``, ``n_scored`` (events with a value), ``n_animals`` and
+        ``n_animals_positive`` (animals whose value is above zero).
     """
     rows = {}
     for group, mine in table.groupby("group"):
@@ -228,5 +229,6 @@ def likelihood_advantage_statistics(
             "n_events": len(mine),
             "n_scored": len(scored),
             "n_animals": len(per_animal),
+            "n_animals_positive": int((per_animal > 0).sum()),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")

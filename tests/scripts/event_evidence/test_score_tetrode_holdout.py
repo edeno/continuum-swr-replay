@@ -87,7 +87,7 @@ def patched(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runner, "epoch_windows", epoch_windows)
 
-    def run():
+    def run(extras=None):
         given = {}
 
         def epoch_inputs(epoch_id, data_dir, *, trials):
@@ -114,7 +114,9 @@ def patched(tmp_path, monkeypatch):
             folds,
             margin_bins,
             log,
+            **options,
         ):
+            given["options"] = options
             assert d is detector
             np.testing.assert_array_equal(time, TIME)
             np.testing.assert_array_equal(
@@ -135,7 +137,11 @@ def patched(tmp_path, monkeypatch):
         monkeypatch.setattr(runner.th, "holdout_scores", holdout_scores)
         output = tmp_path / "out"
         record = runner.run_epoch(
-            EPOCH, tmp_path / "event_table.parquet", tmp_path, output
+            EPOCH,
+            tmp_path / "event_table.parquet",
+            tmp_path,
+            output,
+            *(() if extras is None else (extras,)),
         )
         table = pd.read_parquet(output_path(EPOCH, output, TETRODE_HOLDOUT_NAME))
         assert list(table["kind"]) == ["event", "control", "event", "control"]
@@ -193,3 +199,37 @@ def test_the_header_names_the_fold_design_and_its_margin(header):
         "n_folds": fo.N_FOLDS,
         **th.fold_settings(),
     }
+
+
+def test_extra_scores_ask_for_the_extras_with_the_seed(patched):
+    _, given = patched()
+    assert given["options"] == {}
+    _, given = patched({"null_seed": 7, "hpd_coverage": 0.95, "null_donor_rule": "r"})
+    assert given["options"] == {"extras": True, "null_seed": 7}
+
+
+def test_extra_scores_record_their_settings_and_need_a_new_folder(
+    header, processed_data_root, tmp_path
+):
+    settings = header("--extra-scores", "--output-dir", str(tmp_path / "new"))[
+        "settings"
+    ]
+    assert settings["extra_scores"] == {
+        "hpd_coverage": 0.95,
+        "null_seed": 0,
+        "null_donor_rule": th.NULL_DONOR_RULE,
+    }
+    assert (
+        header("--extra-scores", "--null-seed", "3", "--output-dir", "x")["settings"][
+            "extra_scores"
+        ]["null_seed"]
+        == 3
+    )
+    with pytest.raises(SystemExit):
+        header("--extra-scores")
+    with pytest.raises(SystemExit):
+        header(
+            "--extra-scores",
+            "--output-dir",
+            str(processed_data_root / "event_tetrode_holdout"),
+        )

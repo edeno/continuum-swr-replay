@@ -8,7 +8,7 @@ so the two methods are read on the same bins and summarized by the same
 statistic (``likelihood_advantage.likelihood_advantage_statistics``: one value
 per animal, their mean and its nested-bootstrap interval). The same functions
 sum the windows of the events detected from the held-out decode
-(``scripts/event_evidence/detect_heldout_events.py``), which Figure 2j draws.
+(``scripts/event_evidence/detect_heldout_events.py``), which Figure 2k draws.
 Both runs are held out in folds of whole trials; the window step checks only
 the held-out tetrode run's fold design (``fold_design`` in its manifest
 settings).
@@ -34,7 +34,7 @@ every tetrode the decoder put in those bins, from the per-bin facts,
 table's ``*_outside_swr`` columns). In an event that overlaps an SWR these are
 its bins outside the SWR, where ``swr`` may not use the non-local states; in an
 event without an SWR, all its bins but the few inside an SWR the ``swr`` model
-used. Figure 2j's second axis reads ``full - swr`` there, per spike, over the
+used. Figure 2k's second axis reads ``full - swr`` there, per spike, over the
 windows of the events detected from the held-out decode
 (``scripts/event_evidence/detect_heldout_events.py`` sums them with the same
 functions).
@@ -87,11 +87,14 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    ALL_CONTRASTS,
     CONTRASTS,
     FAMILY_SUFFIX,
     IMMOBILE_IN_SWR,
     IMMOBILE_OUTSIDE_SWR,
     SCORE_COLUMNS,
+    table_contrasts,
+    table_score_columns,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     window_rows,
@@ -106,12 +109,14 @@ OUTSIDE_SWR_SUFFIX = "_outside_swr"
 """The suffix of a window's columns over its bins outside SWRs only
 (:func:`outside_swr_bins`, :func:`restriction_window_sums`)."""
 
+
 OUTSIDE_SWR_COLUMNS = (
     "n_bins_outside_swr",
     "duration_outside_swr_s",
     *(f"{column}{OUTSIDE_SWR_SUFFIX}" for column in SCORE_COLUMNS),
 )
-"""The window table's columns over the bins outside SWRs."""
+"""The window table's columns over the bins outside SWRs (the canonical
+run's)."""
 
 PARTS = ("whole", "outside_swr")
 """Each part of a window a contrast is read over, in both units: the whole
@@ -123,20 +128,30 @@ IN_VISIT_SUFFIX = "_outside_swr_in_visit"
 (:func:`outside_swr_bins`) that are inside a well visit
 (:func:`window_bin_fact_sums`)."""
 
-BIN_FACT_COLUMNS = (
-    "n_spikes_outside_swr",
-    "n_bins_outside_swr_in_visit",
-    "n_spikes_outside_swr_in_visit",
-    *(f"{column}{IN_VISIT_SUFFIX}" for column in SCORE_COLUMNS),
-)
+
+def bin_fact_columns(score_columns: Sequence[str] = SCORE_COLUMNS) -> tuple:
+    """The window table's columns from the per-bin facts
+    (:func:`window_bin_fact_sums`), for a per-bin table with
+    ``score_columns``."""
+    return (
+        "n_spikes_outside_swr",
+        "n_bins_outside_swr_in_visit",
+        "n_spikes_outside_swr_in_visit",
+        *(f"{column}{IN_VISIT_SUFFIX}" for column in score_columns),
+    )
+
+
+BIN_FACT_COLUMNS = bin_fact_columns()
 """The window table's columns from the per-bin facts
-(:func:`window_bin_fact_sums`)."""
+(:func:`window_bin_fact_sums`; the canonical run's)."""
 
 WINDOW_KEYS = ("window_id", "event_id", "kind", "group")
 """The columns that name a window (``epoch_windows``)."""
 
 WINDOW_BIN_COLUMNS = ("time", *SCORE_COLUMNS, "in_swr", "category")
-"""The per-bin table's columns :func:`window_table` reads."""
+"""The per-bin table's columns :func:`window_table` reads; it also reads the
+score columns of any other model the table holds
+(``nonlocal_restriction.table_score_columns``)."""
 
 EVENT_TABLE_NOTE = "event_table_note"
 """The window run's settings key of the note it records when the event table it
@@ -208,9 +223,10 @@ def restriction_window_sums(
     ----------
     bins : pd.DataFrame
         The epoch's per-bin table of the restriction run, one row per decode
-        bin in time order: ``time`` (s), the six score columns
-        (:data:`.nonlocal_restriction.SCORE_COLUMNS`), ``in_swr`` and
-        ``category``.
+        bin in time order: ``time`` (s), the score columns
+        (:data:`.nonlocal_restriction.SCORE_COLUMNS`, and those of any other
+        model the table holds, ``nonlocal_restriction.table_score_columns``),
+        ``in_swr`` and ``category``.
     windows : pd.DataFrame
         The epoch's windows (``epoch_windows``): :data:`WINDOW_KEYS` and the
         first and last bin ``s`` and ``e`` (inclusive), positions in ``bins``.
@@ -244,7 +260,8 @@ def restriction_window_sums(
     """
     s, e = _window_bounds(windows, len(bins))
     rows = window_rows(s, e)
-    scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
+    columns = table_score_columns(bins.columns)
+    scores = bins[list(columns)].to_numpy(dtype=np.float64)[rows]
     finite = np.isfinite(scores)
     every_category = bins["category"].astype(str).to_numpy()
     outside = outside_swr_bins(every_category, swr_observed)[rows]
@@ -294,11 +311,11 @@ def restriction_window_sums(
     ):
         out[name] = counted[name]
     out["duration_s"] = n_bins * step
-    for j, column in enumerate(SCORE_COLUMNS):
+    for j, column in enumerate(columns):
         out[column] = whole[:, j]
     out["n_bins_outside_swr"] = counted["n_bins_outside_swr"]
     out["duration_outside_swr_s"] = counted["n_bins_outside_swr"] * step
-    for j, column in enumerate(SCORE_COLUMNS):
+    for j, column in enumerate(columns):
         out[f"{column}{OUTSIDE_SWR_SUFFIX}"] = outside_sums[:, j]
     return out
 
@@ -350,7 +367,8 @@ def window_bin_fact_sums(
         bins["category"].astype(str).to_numpy(), facts["swr_observed"].to_numpy()
     )[rows]
     in_visit = outside & facts["in_well_visit"].to_numpy(dtype=bool)[rows]
-    scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
+    columns = table_score_columns(bins.columns)
+    scores = bins[list(columns)].to_numpy(dtype=np.float64)[rows]
     counts = {
         "n_spikes_bins": spikes,
         "n_spikes_outside_swr": spikes * outside,
@@ -369,7 +387,7 @@ def window_bin_fact_sums(
     out = pd.DataFrame(
         {name: np.rint(summed[name][:, 0]).astype(np.int64) for name in counts}
     )
-    for j, column in enumerate(SCORE_COLUMNS):
+    for j, column in enumerate(columns):
         out[f"{column}{IN_VISIT_SUFFIX}"] = summed["scores_in_visit"][:, j]
     return out
 
@@ -402,7 +420,7 @@ def window_table(
         bins, windows, swr_observed=facts["swr_observed"].to_numpy()
     )
     table["n_spikes"] = from_facts["n_spikes_bins"].to_numpy()
-    for column in BIN_FACT_COLUMNS:
+    for column in bin_fact_columns(table_score_columns(bins.columns)):
         table[column] = from_facts[column].to_numpy()
     return table
 
@@ -580,7 +598,9 @@ def window_contrasts(
     -------
     pd.DataFrame
         ``windows`` with one column per part, contrast, family and unit
-        (:func:`contrast_column`). Over the whole window: the contrast's window
+        (:func:`contrast_column`), for every contrast whose two models the
+        windows hold (``nonlocal_restriction.table_contrasts``: the canonical
+        three, and those of the fourth model when its columns are there). Over the whole window: the contrast's window
         sum (nats) divided by ``n_spikes`` (NaN without spikes) or by
         ``duration_s``. So the two units do not cover the same windows: a
         window without spikes has a value per second and none per spike (the
@@ -609,7 +629,7 @@ def window_contrasts(
                 "per_s": out["duration_s"].to_numpy(float),
             }
             where = ""
-        for contrast, (a, b) in CONTRASTS.items():
+        for contrast, (a, b) in table_contrasts(out.columns).items():
             for family, suffix in FAMILY_SUFFIX.items():
                 difference = (
                     out[f"{a}{suffix}{where}"].to_numpy()
@@ -654,8 +674,11 @@ def restriction_window_statistics(
         The bootstrap's replicates and seed, the same for every row.
     families, contrasts, units, kinds : sequence of str, optional
         Only these score families (:data:`.nonlocal_restriction.FAMILY_SUFFIX`),
-        contrasts (:data:`.nonlocal_restriction.CONTRASTS`), units
-        (:data:`UNITS`) and kinds of window; each defaults to all of them. Each row's bootstrap starts from ``seed``
+        contrasts (of :data:`.nonlocal_restriction.ALL_CONTRASTS`), units
+        (:data:`UNITS`) and kinds of window; each defaults to all of them,
+        except the contrasts, which default to the canonical three
+        (:data:`.nonlocal_restriction.CONTRASTS`). A contrast of the fourth
+        model needs windows of a run that scored it. Each row's bootstrap starts from ``seed``
         on its own, so a row is the same whichever others are computed.
     parts : sequence of str, optional
         The parts of the window (:data:`PARTS`): ``"whole"`` (the
@@ -677,10 +700,18 @@ def restriction_window_statistics(
     Raises
     ------
     ValueError
-        If a choice is unknown, or no window is of a chosen kind.
+        If a choice is unknown, a chosen contrast's models are not in the
+        windows, or no window is of a chosen kind.
     """
     families = _chosen(families, FAMILY_SUFFIX, "family")
-    contrasts = _chosen(contrasts, CONTRASTS, "contrast")
+    contrasts = _chosen(
+        list(CONTRASTS) if contrasts is None else contrasts, ALL_CONTRASTS, "contrast"
+    )
+    if missing := sorted(set(contrasts) - set(table_contrasts(windows.columns))):
+        raise ValueError(
+            f"the windows do not hold the models of contrasts {missing}: they "
+            "are of a run that did not score them"
+        )
     units = _chosen(units, UNITS, "unit")
     parts = _chosen(parts, PARTS, "part")
     scored = window_contrasts(windows, parts)
