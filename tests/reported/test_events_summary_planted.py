@@ -48,8 +48,6 @@ from continuum_swr_replay.paths import (
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
-    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
@@ -314,7 +312,6 @@ class _Run:
             EVENT_CONTENT_PLACE_RATE_DIR,
             EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
             EVENT_BIN_FACTS_DIR,
             "state_evidence",
         ):
@@ -322,17 +319,13 @@ class _Run:
             self.manifests[folder] = json.loads(json.dumps(fresh))
         # the restriction run is the fold fit: its settings record the fit and
         # the current SWR source, its records the current decode frames
-        # and so is the run that scored the fourth decoder from its stored fits
-        for folder in (
-            EVENT_NONLOCAL_RESTRICTION_DIR,
-            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
-        ):
-            (root / folder).mkdir(parents=True, exist_ok=True)
-            self.manifests[folder] = {
-                **json.loads(json.dumps(fresh)),
-                "settings": _restriction_settings(),
-                "epochs": _restriction_records(),
-            }
+        folder = EVENT_NONLOCAL_RESTRICTION_DIR
+        (root / folder).mkdir(parents=True, exist_ok=True)
+        self.manifests[folder] = {
+            **json.loads(json.dumps(fresh)),
+            "settings": _restriction_settings(),
+            "epochs": _restriction_records(),
+        }
         # the held-out tetrode run is held out in folds of whole trials
         self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
             "n_folds": 5,
@@ -414,10 +407,6 @@ class _Run:
             nonlocal_restriction_windows=root / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             nonlocal_restriction_heldout_events=root
             / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-            nonlocal_restriction_swr_allowed=root
-            / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
-            nonlocal_restriction_swr_allowed_heldout_events=root
-            / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
         )
@@ -600,7 +589,8 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     ):
         assert seen[name][0]["epoch_id"].tolist() == EPOCHS
         assert seen[name][1].to_dict() == dict.fromkeys(EPOCHS, BIN_S)
-    # the fourth decoder's builder: its run's events, time sums and time steps
+    # the fourth decoder's builder: the held-out event run's events, time sums
+    # and time steps
     assert seen["restriction_swr_allowed_values"][1]["epoch_id"].tolist() == EPOCHS
     assert seen["restriction_swr_allowed_values"][2].to_dict() == dict.fromkeys(
         EPOCHS, BIN_S
@@ -672,6 +662,7 @@ def _other_cache() -> dict:
 WINDOW_VALUES = {"restriction_window", AFTER_VISIT}
 HELDOUT_EVENT_VALUES = {
     "restriction_heldout_event",
+    "restriction_swr_allowed",
     "restriction_agreement",
     "restriction_outside_swr",
     OUTSIDE_EVENTS,
@@ -681,12 +672,7 @@ HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {
     "restriction_outside_swr_part",
     "restriction_inside_swr",
 }
-#: The fourth decoder's values, which read their own restriction and held-out
-#: event runs and the canonical per-bin facts
-SWR_ALLOWED_VALUES = {"restriction_swr_allowed"}
-RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES | SWR_ALLOWED_VALUES) - {
-    "restriction_window"
-}
+RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES) - {"restriction_window"}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
 #: The values against the participation run's Local-rest controls
 CONTROL_VALUES = {
@@ -832,20 +818,6 @@ PENDING_CASES = [
             ("nonlocal_restriction", HELDOUT_RUN_VALUES),
             ("bin_facts", HELDOUT_RUN_VALUES),
         )
-    ),
-    # the fourth decoder's held-out event run: the same checks, its values only
-    *(
-        (
-            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
-            (name, {"sha256": "old"}),
-            SWR_ALLOWED_VALUES,
-        )
-        for name in ("event_table", "nonlocal_restriction", "bin_facts")
-    ),
-    (
-        EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
-        ("settings", _restriction_settings(swr_source="kay@old+artifacts@none")),
-        SWR_ALLOWED_VALUES,
     ),
     # the visits reach the restriction values through the bin facts only: a run
     # made from another session cache, or before it recorded one, makes the

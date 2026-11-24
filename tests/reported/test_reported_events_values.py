@@ -2046,11 +2046,10 @@ def _swr_allowed_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
 def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     """On :func:`_swr_allowed_inputs`: each contrast of the fourth decoder over
     each time, per spike and per second, both families, with the statistic,
-    interval and epoch counts of the gain inside SWRs; the SWR-only and full
-    decoders of the same pass over all immobile time; and the full minus the
+    interval and epoch counts of the gain inside SWRs; and the full minus the
     SWR-allowed decoder in the held-out no-SWR events. Figure 2's supplement
     (S2l) draws the filter family's gains per spike of
-    ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value with its counts."""
+    ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value."""
     sums, bin_s, events = _swr_allowed_inputs()
     values = _by_key(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
     numbers = {key: value.value for key, value in values.items()}
@@ -2088,32 +2087,14 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     assert values["restriction_immobile_full_minus_swr_allowed_per_s"].unit == (
         "nats per s"
     )
-    # the other two decoders of the same pass equal the canonical values on the
-    # same time sums
     canonical = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
-    for contrast in ("swr_minus_none", "full_minus_none"):
-        for family in ("", "_two_sided"):
-            for unit in ("per_spike", "per_s"):
-                assert numbers[
-                    f"restriction_swr_allowed_run_immobile_{contrast}{family}_{unit}"
-                ] == pytest.approx(
-                    canonical[f"restriction_immobile_{contrast}{family}_{unit}"]
-                )
     # the held-out no-SWR events outside SWRs: three quarters of 1, 2, 3
     key = "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_allowed"
     assert numbers[f"{key}_per_spike"] == pytest.approx(1.5)
     assert numbers[f"{key}_per_spike_animals_positive"] == 3
-    assert numbers["restriction_heldout_swr_allowed_run_non_swr_events"] == 3
-    assert (
-        numbers[
-            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
-            "_per_spike"
-        ]
-        == 3
-    )
-    # eleven contrasts over a time, two families: per spike four values, per
-    # second six; the held-out events' four and two counts
-    assert len(numbers) == 11 * 2 * (4 + 6) + 4 + 2
+    # nine contrasts over a time, two families: per spike four values, per
+    # second six; the held-out events' four
+    assert len(numbers) == 9 * 2 * (4 + 6) + 4
     ends = ("", "_ci_low", "_ci_high", "_animals_positive")
     drawn = (
         {
@@ -2123,20 +2104,10 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
             for end in ends
         }
         | {
-            f"restriction{run}_immobile_{contrast}_per_spike{end}"
-            for run, contrast in (
-                ("_swr_allowed_run", "swr_minus_none"),
-                ("", "swr_allowed_minus_none"),
-                ("_swr_allowed_run", "full_minus_none"),
-            )
+            f"restriction_immobile_swr_allowed_minus_none_per_spike{end}"
             for end in ends
         }
         | {f"{key}_per_spike{end}" for end in ends}
-        | {
-            "restriction_heldout_swr_allowed_run_non_swr_events",
-            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
-            "_per_spike",
-        }
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
@@ -2160,11 +2131,12 @@ def test_swr_allowed_statistics_are_the_tagged_values():
             assert statistics.times.loc[
                 (time, "filter", measure), "estimate"
             ] == pytest.approx(numbers[f"restriction_{time}_{measure}"])
+    # the SWR-only and full decoders' gains are the canonical builder's values
+    numbers |= _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
     for measure in builder.SWR_ALLOWED_FIGURE_DECODERS:
-        run = "" if measure.startswith("swr_allowed") else "_swr_allowed_run"
         assert statistics.times.loc[
             ("immobile", "filter", measure), "estimate"
-        ] == pytest.approx(numbers[f"restriction{run}_immobile_{measure}"])
+        ] == pytest.approx(numbers[f"restriction_immobile_{measure}"])
     assert statistics.events.loc[
         builder.RESTRICTION_FIGURE_EVENT_GROUP, "estimate"
     ] == pytest.approx(
