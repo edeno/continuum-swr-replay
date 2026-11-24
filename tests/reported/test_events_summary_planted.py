@@ -21,7 +21,9 @@ staleness checks are the real ones."""
 
 from __future__ import annotations
 
+import importlib
 import json
+import pkgutil
 from pathlib import Path
 
 import numpy as np
@@ -29,11 +31,15 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
-from continuum_swr_replay.analysis.event_definition import cohort_selection
+from continuum_swr_replay.analysis.event_definition import cohort_selection, swr_source
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
 )
-from continuum_swr_replay.analysis.event_evidence import heldout_runs
+from continuum_swr_replay.analysis.event_evidence import (
+    heldout_runs,
+    restriction_windows,
+    tetrode_holdout,
+)
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
 )
@@ -67,10 +73,34 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported import inputs as stored_inputs
-from continuum_swr_replay.reported.values import Tags, pend, value_factory
+from continuum_swr_replay.reported.events import (
+    common,
+    restriction,
+)
+from continuum_swr_replay.reported.inputs import EventsInputs
+from continuum_swr_replay.reported.values import Summary, Tags, pend, value_factory
 from tests.reported.test_reported_events_values import _events
 from tests.support._session_cache_fixtures import write_session_cache_entries
 from tests.support._tetrode_holdout_tables import run_table
+
+BUILDER_MODULES = (
+    builder,
+    *(
+        importlib.import_module(f"{builder.__name__}.{module.name}")
+        for module in pkgutil.iter_modules(builder.__path__)
+    ),
+)
+"""The events builder's package and its modules."""
+
+
+def patch_builder(monkeypatch, name: str, value) -> None:
+    """Set ``name`` to ``value`` in every module of the events builder that
+    holds it, where its callers look it up; a name none holds is an error."""
+    holders = [module for module in BUILDER_MODULES if hasattr(module, name)]
+    assert holders, f"no module of the events builder holds {name}"
+    for module in holders:
+        monkeypatch.setattr(module, name, value)
+
 
 PLANTED = 999
 """The event that starts outside every visit (on the track, at 50 s)."""
@@ -196,8 +226,8 @@ def _restriction_windows() -> pd.DataFrame:
     """The window run's rows: a per-event run's, with the sums over the bins
     outside SWRs and from the per-bin facts that the summary requires (zero)."""
     columns = (
-        *builder.restriction_windows.OUTSIDE_SWR_COLUMNS,
-        *builder.restriction_windows.BIN_FACT_COLUMNS,
+        *restriction_windows.OUTSIDE_SWR_COLUMNS,
+        *restriction_windows.BIN_FACT_COLUMNS,
     )
     return _per_event_run().assign(**dict.fromkeys(columns, 0))
 
@@ -257,7 +287,7 @@ def _restriction_settings(**changes) -> dict:
         "fit": "folds",
         "fold_design": "trials",
         "em": {"max_iter": 20},
-        "swr_source": builder.swr_source.swr_source_name(),
+        "swr_source": swr_source.swr_source_name(),
         **changes,
     }
 
@@ -383,9 +413,9 @@ class _Run:
             root / EXPOSURE_IN_VISITS_DIR / "exposure.parquet"
         )
 
-    def inputs(self) -> builder.EventsInputs:
+    def inputs(self) -> EventsInputs:
         root = self.root
-        return builder.EventsInputs(
+        return EventsInputs(
             event_table=root / "event_table.parquet",
             event_features_run=root / "run",
             spike_evidence_dir=root / "spike_evidence",
@@ -440,20 +470,22 @@ class _Run:
     def _patch(self, monkeypatch) -> None:
         seen = self.seen
         for name in (*EVENT_BUILDERS, *OTHER_BUILDERS, *RESTRICTION_BUILDERS):
-            monkeypatch.setattr(builder, name, self._spy(name))
+            patch_builder(monkeypatch, name, self._spy(name))
         # the window values hold counts that read the visits
-        monkeypatch.setattr(
-            builder,
+        patch_builder(
+            monkeypatch,
             "restriction_window_values",
-            self._spy("restriction_window_values", builder.WindowValues, AFTER_VISIT),
+            self._spy(
+                "restriction_window_values", restriction.WindowValues, AFTER_VISIT
+            ),
         )
         # the outside-SWR values hold the time that no event holds
-        monkeypatch.setattr(
-            builder,
+        patch_builder(
+            monkeypatch,
             "restriction_outside_swr_values",
             self._spy(
                 "restriction_outside_swr_values",
-                builder.OutsideSwrValues,
+                restriction.OutsideSwrValues,
                 OUTSIDE_EVENTS,
             ),
         )
@@ -502,7 +534,7 @@ class _Run:
             checked(table, visits)
 
         monkeypatch.setattr(
-            builder.Summary,
+            Summary,
             "add",
             lambda summary, *values: seen.setdefault("added", []).extend(values),
         )
@@ -532,7 +564,7 @@ class _Run:
             "with_event_ids": lambda metrics, table: metrics,
             "read_complete_run": _read_complete_run,
         }.items():
-            monkeypatch.setattr(builder, name, value)
+            patch_builder(monkeypatch, name, value)
             # the shared readers of the stored outputs, where they are defined
             if hasattr(stored_inputs, name):
                 monkeypatch.setattr(stored_inputs, name, value)
@@ -543,7 +575,7 @@ class _Run:
             "read_output_manifest",
             lambda folder: self.manifests[folder.name],
         )
-        monkeypatch.setattr(builder.nonlocal_comparison, "read_comparison", comparison)
+        monkeypatch.setattr(nonlocal_comparison, "read_comparison", comparison)
         # the inputs' epoch check reads the register where it is defined
         monkeypatch.setattr(epoch_register, "analyzed_epoch_ids", lambda: EPOCHS)
 
@@ -552,9 +584,9 @@ class _Run:
             return pd.DataFrame({"planted": [PLANTED]})
 
         monkeypatch.setattr(
-            builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
+            nonlocal_comparison, "nonlocal_event_memberships", memberships
         )
-        monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
+        monkeypatch.setattr(tetrode_holdout, "window_scores", lambda t: t)
 
     def summarize(self) -> dict:
         builder.summarize(self.inputs(), "by")
@@ -643,14 +675,14 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     assert "wherever that event starts" in values["left_out"].description
     assert "partner may start outside a visit" in values["other_detector"].description
     # the restriction values say what they are over, in the summary's words
-    subset = builder.CANONICAL_WINDOWS_SUBSET
+    subset = common.CANONICAL_WINDOWS_SUBSET
     for key in ("restriction_window", AFTER_VISIT):
         assert values[key].description.endswith(f"; over {subset}")
     assert values["restriction_outside_swr"].description.endswith(
-        f"; over {builder.TIME_SUBSET}, and {builder.HELDOUT_EVENTS_SUBSET}"
+        f"; over {common.TIME_SUBSET}, and {common.HELDOUT_EVENTS_SUBSET}"
     )
     assert values["restriction_heldout_event"].description.endswith(
-        f"; over {builder.HELDOUT_EVENTS_SUBSET}"
+        f"; over {common.HELDOUT_EVENTS_SUBSET}"
     )
     assert values["restriction_agreement"].description.endswith(
         "so its partner may start outside a visit"
@@ -662,9 +694,9 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "restriction_inside_swr",
         OUTSIDE_EVENTS,
     ):
-        assert values[key].description.endswith(f"; over {builder.TIME_SUBSET}")
+        assert values[key].description.endswith(f"; over {common.TIME_SUBSET}")
     assert values["restriction_swr_allowed"].description.endswith(
-        f"; over {builder.TIME_SUBSET}, and {builder.HELDOUT_EVENTS_SUBSET}"
+        f"; over {common.TIME_SUBSET}, and {common.HELDOUT_EVENTS_SUBSET}"
     )
 
 
@@ -827,7 +859,7 @@ PENDING_CASES = [
     ),
     (
         EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
-        ("settings", {builder.restriction_windows.EVENT_TABLE_NOTE: _NOTE}),
+        ("settings", {restriction_windows.EVENT_TABLE_NOTE: _NOTE}),
         WINDOW_VALUES,
     ),
     # the held-out event run: its events read the event table (the canonical

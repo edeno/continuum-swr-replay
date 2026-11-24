@@ -146,7 +146,7 @@ violation fails.
 | Part 3, behavior | `behavior`, `event_tables`, `replay_models` | `scripts/behavior/`, `scripts/tables/`, `scripts/replay_models/` | `paper/reported/behavior.json` |
 | Part 4, mPFC | `pfc` | `scripts/pfc/` | `paper/reported/mpfc.json` |
 
-The summary names follow the paper's parts, not the package names: `reported/events.py`
+The summary names follow the paper's parts, not the package names: `reported/events/`
 builds Part 2's summary from three packages, and `reported/detection.py` Part 1's from
 two.
 

@@ -192,7 +192,7 @@ Work that is deferred on purpose. Each item says when it should be done.
 - [ ] **Readers and staleness helpers live in the events builder.** The figures import
   `read_heldout_restriction`, `checked_reference`, `restriction_inputs_note`,
   `heldout_restriction_refusal` and `event_table_staleness` from
-  `reported/events.py`, a builder whose job is to name and describe values. Move the
+  `reported/events.py` (removed in fa8fc372), a builder whose job is to name and describe values. Move the
   readers and their checks into a module the builder and the figures both import.
   *When:* when a third figure reads them, or at the next reorganization of `reported/`.
 

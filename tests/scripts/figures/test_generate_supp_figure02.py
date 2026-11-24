@@ -337,7 +337,7 @@ def test_the_split_panel_draws_the_fit_over_the_animals_place_by_bins(drawn):
 def test_each_panels_values_carry_its_letter():
     """The events summary tags each panel's values with the panel's letter, as
     the figure places it."""
-    from continuum_swr_replay.reported import events
+    from continuum_swr_replay.reported.events.common import TAGS
 
     panels = {
         "state_calibration": "state_calibration",
@@ -352,9 +352,9 @@ def test_each_panels_values_carry_its_letter():
         "nonlocal_restriction_swr_allowed": "four_decoders",
     }
     for tag, panel in panels.items():
-        assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
+        assert TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
     # the gain over local coding is Figure 2j's too
-    assert events.TAGS["tetrode_holdout"].figures == (
+    assert TAGS["tetrode_holdout"].figures == (
         "2j",
         f"S2{figure.LETTERS['left_out_split']}",
     )

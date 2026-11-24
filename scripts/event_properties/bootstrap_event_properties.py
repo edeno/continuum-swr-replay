@@ -1,6 +1,6 @@
 """Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
 
-For each Part 2 event property (``reported.events`` ``property_values`` and the
+For each Part 2 event property (``reported.events.properties`` ``property_values`` and the
 two added ones, start distance and arms visited), over the immobile non-local
 events of the canonical event table that start inside a well visit
 (``cohort_selection.select_visit_context``): the median of each class, the SWR minus
@@ -64,7 +64,7 @@ SEED = 20261028
 N_STRATA = 10
 MIN_PER_CLASS = 20
 
-#: property word (as ``reported.events`` names it) -> (column, scale)
+#: property word (as ``reported.events.properties`` names it) -> (column, scale)
 PROPERTIES = {
     "duration": ("event_duration_s", 1000.0),
     "extent": ("spatial_extent_cm", 1.0),

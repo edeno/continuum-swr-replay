@@ -142,7 +142,7 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
-from continuum_swr_replay.reported.events import (
+from continuum_swr_replay.reported.events.content import (
     content_mass_tables,
     with_event_start_end,
 )
