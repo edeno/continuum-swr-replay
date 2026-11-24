@@ -1013,8 +1013,9 @@ def _records(design, sessions, lik, response: str, unit: str) -> list[dict]:
 
     The references are of the NumPy fitter, whose record had no unit of the
     fit. Every case here is a per-session fit, where the two fields repeat what
-    the record already holds; that is checked here before they are left out of
-    the comparison.
+    the record already holds (its key, counts and rows removed, with no
+    baseline copy); that is checked here before they are left out of the
+    comparison.
     """
     with np.errstate(over="ignore", invalid="ignore"):
         records = fit_sessions(
@@ -1039,11 +1040,18 @@ def _records(design, sessions, lik, response: str, unit: str) -> list[dict]:
             or tuple(entries[0][k] for k in ("animal", "session_date", "epoch")) != key
         ):
             raise AssertionError(f"session {key}: sessions {entries!r}")
-        for field in ("n_rows", "n_units", "n_events"):
-            if entries[0][field] != record[field]:
+        counts = record["cohort_counts"]
+        own = {
+            **{f: record[f] for f in ("n_rows", "n_units", "n_events")},
+            **{f: counts[f] for f in counts if f != "rows_dropped"},
+            "rows_dropped": {n: c for n, c in counts["rows_dropped"].items() if c},
+            "baseline": [],
+        }
+        for field, value in own.items():
+            if entries[0][field] != value:
                 raise AssertionError(
                     f"session {key}: sessions[0][{field!r}] {entries[0][field]!r}, "
-                    f"the record's {record[field]!r}"
+                    f"the record's {value!r}"
                 )
         out.append(record)
     return out
