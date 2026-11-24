@@ -948,3 +948,5 @@ pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
 | `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
 | `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
 | `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |
+| `sessions._fit_session` (renamed) | `sessions._fit_unit`: one fit of a unit of the fit (a session, a day or an animal; `fit_sessions(..., fit_by=...)`) | fa7a43ac |
+| `sessions.SessionKey` (moved) | `terms.SessionKey`; `sessions` imports it, so `from ...regression.sessions import SessionKey` still works | fa7a43ac |

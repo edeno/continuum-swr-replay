@@ -1,7 +1,8 @@
 # The shared regression fitter
 
 `src/continuum_swr_replay/analysis/regression/` fits penalized generalized linear models,
-one per session, with penalty strengths shared by the sessions. It knows nothing of the
+one per unit of the fit (a session, a recording day or an animal; `fit_by`), with penalty
+strengths shared by the units. It knows nothing of the
 task: it takes design matrices, responses and penalty blocks and returns fits. Which
 columns and rows a model uses is decided by the code that calls it. The design behind it
 is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-convention-and-figure04.md)
@@ -17,9 +18,9 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
-| `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
+| `sessions.py` | the fitting loop, one fit for each unit of the fit, and the row rule for an inactive level |
 | `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
-| `record.py` | the fit-row record and the closed set of causes of a session without a kept fit |
+| `record.py` | the fit-row record (one per unit of the fit, with its sessions) and the closed set of causes of a fit not kept |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
@@ -410,10 +411,28 @@ A smooth or a slope fitted for one level of a category appends `:<by column>=<le
 to its term name, for example `s(clock_s):role=current`. The declared estimands name
 their terms by this rule.
 
+**Baselines.** A model declares its baseline terms to `build_design` (`baseline`): the
+intercept or a category (the rate models' intercept, the content models' arm category;
+`declared_tests.BASELINES`). In a fit of several sessions
+(`Design.for_sessions`) each is copied for each session, zero on the other sessions' rows:
+the intercept becomes one 0/1 column per session, each coded level of a category one
+column per session, so each session keeps the reference level. A copy is named
+`<name>@<animal>/<session_date>/<epoch>`, and the record's `sessions` lists each session's
+copies by name, so a reader does not split the names. A copy is a level of its session:
+the loop judges and drops it as a level. A copy keeps the term's declared penalty (the
+intercept and the arm category have none). No declared contrast reads a baseline
+(`test_declared_tests.py::test_no_contrast_reads_a_baseline`), and the simulation engine
+refuses an estimand that does. The collinearity record projects the copies out, as it does
+the intercept; the edf and `Design.term_columns` do not hold them. In a fit of one session
+nothing is copied. A category's reference level must have rows in every session of a fit
+that copies it: a session without rows of the reference arm makes the first fit an error
+that names the fit and the copies
+(`test_sessions.py::test_a_session_without_the_reference_arm_is_an_error_naming_the_fit`).
+
 A built design describes each term once, as a `DesignTerm`: its kind (intercept, level,
 0/1 slope, continuous slope, smooth, lag functional), its columns, its level, its
 covariate, its penalty block and, for a level, the terms that leave a session with it.
-The support rule, the design check and the per-session loop read these descriptions.
+The support rule, the design check and the loop over fits read these descriptions.
 
 Every term but the offset takes a required penalty: `"none"` or a fixed log penalty. No
 penalty is chosen from the data in a per-session fit. A smooth's penalty is its
@@ -559,7 +578,7 @@ finite maximum along unpenalized design columns only, makes the columns running 
 inactive and fits again, at most `REFIT_MAX_ROUNDS` rounds; a direction through a penalty
 block, any other status, or the intercept among the columns running away leaves the
 session without a fit. Its docstring states the rule. The penalty search's refit of a
-session it set aside and the per-session loop both call it, so the rule is in one place.
+session it set aside and the loop over fits both call it, so the rule is in one place.
 
 A session with columns left out is reported with those terms missing, not left out of a
 summary, because leaving it out would depend on the outcome: the sessions that fail are
@@ -567,13 +586,26 @@ those with no events in one condition. Its record names each column left out wit
 cause and the round, and holds NaN for those coefficients and their covariance. A term of
 several unpenalized columns leaves a session whole (`sessions.py`'s docstring).
 
-## The per-session loop
+## The loop over fits
 
 `sessions.fit_sessions(design, sessions, lik, model=..., kind=..., response=..., unit=...,
-table_sha256=...)` fits every session alone and returns one record per session. Its
-module docstring states the steps: missing rows; the levels to a fixed point; every other
-term once on the final rows; the fit; a level the refit leaves out is removed and the
-steps run again.
+table_sha256=..., fit_by="session")` groups the sessions given into units of the fit
+(`tables.session_keys.unit_key`: a session, a recording day `(animal, session_date)` or an
+animal), the units in the order of their first session, and returns one record per unit.
+The design of the behavior models is decided in
+[2026-11-24-unit-of-fit.md](2026-11-24-unit-of-fit.md) (design C, fitted at the day and the
+animal unit; `analysis/replay_models/fit_by.py`). Each unit is one fit through the same
+steps (the module docstring): missing rows; the levels to a fixed point; every other term
+once on the final rows; the fit; a level the refit leaves out is removed and the steps run
+again. In a fit of several sessions each session's rows are sorted by unit (under the
+softmax) and then joined, the support unit is coded within each session and then offset
+(a well visit id starts at 0 in every session), and the baselines are copied for each
+session (above). An intercept copy that fails the support rule, or that the refit leaves
+out (a session with no event), drops that session's rows, counted under `rows_dropped`.
+A unit of one session is the per-session fit, bit for bit: the stored per-session
+references pass unedited (`scripts/checks/_regression_reference.py::_records` checks that
+`fit_by` is `"session"` and that `sessions` repeats the record's own session before it
+leaves the two fields out of the comparison).
 
 A session's design is built once, on all its rows; one mask with one reason code per row
 removed says which rows are kept, and the kept rows' design is a slice. Measured on
@@ -595,7 +627,11 @@ few rows by another path. Against the code before the cleanup, no kept fit diffe
 
 ## The fit record
 
-`record.FitRecord` is one row per (model, kind, session); its docstring lists every field.
+`record.FitRecord` is one row per (model, kind, unit of the fit); its docstring lists every
+field. `fit_by` names the unit (at `"day"` `epoch` is `""`, at `"animal"` `session_date` and
+`epoch` are too). `sessions` has one entry per session of the fit: its key, the rows, units
+and events the fit saw of it, its rows and events removed by reason, and the names of its
+baseline copies.
 A session with no rows, or no events of the kind, left is not fitted: no fit is tried,
 and its record has the status "not fitted" and NaN coefficients. A fit tried and not
 kept keeps the last fit's status and the true counts, with NaN coefficients, and lists
@@ -732,9 +768,19 @@ day, or one row per animal whose day label is the animal
 ## Simulation
 
 **The rule.** A simulation replaces only the outcome column of a model's own rows. The
-rows, the design, the per-session fit (`fit_sessions`), the estimands (`contrasts`) and
-the reduction session to recording day to animal with the project's interval
-(`shared_statistics.estimand_summary`) are the real functions. The engine,
+rows, the design, the fit of each unit (`fit_sessions` at the model's `fit_by`), the
+estimands (`contrasts`) and the reduction over the units with the project's interval
+(`shared_statistics.unit_summary`) are the real functions. Models that differ only in
+their `fit_by` are fitted to the same drawn data sets in one run.
+
+**Two targets.** Each data set has the present target, `planted` (the planted value, the
+session to day to animal mean of the sessions' values), and the unit's own target,
+`planted_unit`: the model at its `fit_by` fitted by the real fitter to the expected outcome,
+with the weak penalty off, reduced over the units as the estimates are
+(`2026-11-24-unit-of-fit.md`, section 6). The summary gives the bias and the coverage
+against both (`bias`, `coverage`; `bias_unit`, `coverage_unit`). The target is fitted once
+per run for an inside scenario and once per data set for an outside one. The Bernoulli
+takes only 0/1 outcomes, so its `planted_unit` is NaN. The engine,
 `analysis/regression/simulation.py`, builds no model: the caller gives a `Model` (the
 `Design` as the model's own code builds it, the likelihood, the response and unit columns,
 and each estimand's `c`). Every coefficient that an estimand uses must carry a fixed
@@ -1085,10 +1131,10 @@ process, so it clears once or twice; the tests that count traces fix the limit h
 their own run.
 
 The clear can fire only at the entry of an outermost call, so which functions carry
-`in_float64` decides where the bound holds. The per-session loop (`sessions.fit_sessions`)
+`in_float64` decides where the bound holds. The loop over fits (`sessions.fit_sessions`)
 and the calibration (`calibration.log_penalty_for_edf`, which runs that loop at each trial
-penalty) do not carry it: each session's fit is an outermost call, the caches can be cleared
-between two sessions, and the live programs stay bounded through a whole cohort
+penalty) do not carry it: each unit's fit is an outermost call, the caches can be cleared
+between two units, and the live programs stay bounded through a whole cohort
 (`test_the_program_bound_holds_between_the_sessions_of_one_loop`,
 `test_the_program_bound_holds_during_a_calibration`). The penalty searches
 (`select_penalties`, `refine_penalties`, `fit_at_penalties`, `pooled_reml`), `refit_session`
@@ -1109,6 +1155,22 @@ rate model's `visit_rate`, `visit_rate_statistics` and `visit_rate_scenarios`). 
 took 1.6 s against 1.1 s before (three runs each, under load, 2026-11-23).
 
 ## Cost
+
+**A fit of a larger unit** (measured 2026-11-24 on synthetic rows, CPU, one thread, a shared
+machine at a load near 32; timings, not results; scratch script `measure_mechanism.py`):
+
+| Unit | Rows x columns | `fit_sessions` | of which the collinearity record | the fit (`refit_session`) | peak memory |
+|---|---|---|---|---|---|
+| content-like, 60 sessions x 110 events x 9 arms, arm baselines | 59,400 x 494 | 140 s | 133 s | 5.5 s | 2.6 GB |
+| rate-like, 5 sessions x 40,000 bins, intercept baselines, 3 smooths | 200,000 x 97 | 5.4 s | 2.9 s | 1.9 s | 2.1 GB |
+| rate-like, 58 sessions x 40,000 bins | 2,320,000 x 150 | 252 s | 216 s | 21 s | 20.9 GB |
+
+The dense design fits at the animal size. The collinearity record takes most of the time:
+it projects each baseline copy out of the weighted design one column at a time
+(`collinearity.concurvity`), so its cost grows with the copies times the size of the design.
+The copies, the support count and the record of the sessions take under 10 s in every case.
+A loop over 45 content-like day units and 5 animal units took 321 s and left at most 48
+live programs (the limit is 256).
 
 Measured on 2026-11-20 on synthetic sessions of the real size: 242 sessions of 40,000
 bins, a Poisson model with two smooths and 56 coefficients. One pooled evaluation took

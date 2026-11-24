@@ -19,13 +19,14 @@ package may import it.
   information-weighted design (VIF, mgcv's concurvity).
 - ``support``: the support rule of a simple term and the guard that a
   tested coefficient carries a penalty.
-- ``sessions``: the per-session fitting loop, with the row rule for an
-  inactive level of a category and the handling of a session without a
+- ``sessions``: the fitting loop, one fit for each unit of the fit (a
+  session, a recording day or an animal, ``fit_by``), with the row rule for
+  an inactive level of a category and the handling of a fit without a
   finite maximum.
 - ``calibration``: the declared log penalty of a per-session smooth, the one
   at which its median edf over the sessions is a target.
-- ``record``: the fit-row record and the causes of a session without a
-  kept fit.
+- ``record``: the fit-row record, one per unit of the fit with its
+  sessions, and the causes of a fit not kept.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
 - ``folds``: the one fold rule, five folds of whole trials balanced by

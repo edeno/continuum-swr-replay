@@ -75,7 +75,7 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   what the animal did: covariates/ (behavioral covariates, qvals_table), design constants, track lookups
 │   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
-│   ├── regression/        #   the shared fitter, arrays in and fits out: likelihoods, penalized Newton, pooled REML penalties, P-splines, terms, support, collinearity, the per-session loop and its record, contrasts, folds, bands
+│   ├── regression/        #   the shared fitter, arrays in and fits out: likelihoods, penalized Newton, pooled REML penalties, P-splines, terms, support, collinearity, the loop over the units of the fit and its record, contrasts, folds, bands
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── event_definition/  #   the rule: analyzed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
 │   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode, Figure 1's simulated run

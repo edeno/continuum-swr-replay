@@ -606,7 +606,7 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 ### `src/continuum_swr_replay/analysis/regression/record.py`
 
-The fit-row record: one row per (model, kind, session) of every stored fit.
+The fit-row record: one row per (model, kind, unit of the fit) of every fit.
 
 `NoFit`, `FitRecord`
 
@@ -624,7 +624,7 @@ How the fitter's JAX code runs: float64 for each call, one device, float64 kerne
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
-The per-session fitting loop: one design, every session fitted alone.
+The fitting loop: one design, one fit for each unit of the fit.
 
 `fit_sessions`
 
