@@ -750,6 +750,18 @@ some scenarios only keeps each scenario's place, and so its data.
 Several models with the same coefficients (for example one model at several declared
 penalties) are fitted to the same data sets of one run.
 
+**A model's own fit.** A model may bring its own fit (`Model.fit`) for a value the
+per-session loop does not give, such as one coefficient shared by an animal's sessions.
+The engine draws the data set as for any model and hands it to that fit, which returns
+one row per unit of inference and estimand (`simulation.UNIT_COLUMNS`): a session, or an
+animal (no session labels). An estimand whose units are sessions is reduced session to
+recording day to animal as above; one whose units are animals is the mean over the
+animals with a value with the t interval over them
+(`shared_statistics.animal_mean_interval`), with no day-level test. The estimands only
+the own fit gives (`Model.fit_estimands`) have no `c`, so their planted value is an
+outside scenario's. A model with its own fit need not share the other models'
+coefficients; the likelihood, response and unit must agree.
+
 **The results table** (`simulation.summarize`; one row per scenario, model and
 estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),
 `bias_se`; `coverage` (the share of data sets whose 95 % interval holds the planted

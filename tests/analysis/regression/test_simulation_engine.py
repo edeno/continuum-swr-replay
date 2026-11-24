@@ -733,6 +733,214 @@ def test_refusals(rate_sessions_cohort) -> None:
         )
 
 
+# --- A model's own fit ------------------------------------------------------------
+
+
+def own_session_fit(data, *, design, estimands) -> pd.DataFrame:
+    """An own fit that does what the engine does for a plain model: each
+    session's fit by ``fit_sessions`` and each estimand's contrast, one row
+    per session and estimand."""
+    records = engine.fit_sessions(
+        design,
+        data,
+        Poisson(),
+        model="own",
+        kind="own",
+        response="count",
+        unit="well_visit_id",
+        table_sha256={},
+    )
+    rows = []
+    for record in records:
+        coef, vcov = np.array(record.coef), np.array(record.vcov)
+        for name, c in estimands.items():
+            used = [design.coef_names[j] for j in np.flatnonzero(c)]
+            left = [record.left_out[n] for n in used if n in record.left_out]
+            cause = record.no_fit or (left[0] if left else "")
+            value = None if cause else engine.evaluate_contrast(c, coef, vcov)
+            rows.append(
+                {
+                    "estimand": name,
+                    "animal": record.animal,
+                    "session_date": record.session_date,
+                    "epoch": record.epoch,
+                    "status": record.status,
+                    "no_fit": record.no_fit,
+                    "without_value": cause,
+                    "estimate": np.nan if value is None else value.estimate,
+                    "se": np.nan if value is None else value.se,
+                    "edf": record.edf,
+                    "n_sessions": 1,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def own_animal_fit(data, *, without=()) -> pd.DataFrame:
+    """An own fit of one value per animal: the log of the animal's events per
+    second, over its sessions; the animals in ``without`` have no value."""
+    totals: dict[str, list[float]] = {}
+    for (animal, _, _), rows in data.items():
+        count, exposure, n = totals.setdefault(animal, [0.0, 0.0, 0])
+        totals[animal] = [
+            count + rows["count"].sum(),
+            exposure + rows["exposure"].sum(),
+            n + 1,
+        ]
+    return pd.DataFrame(
+        [
+            {
+                "estimand": "log_rate",
+                "animal": animal,
+                "session_date": None,
+                "epoch": None,
+                "status": "converged",
+                "no_fit": "no_events" if animal in without else "",
+                "without_value": "no_events" if animal in without else "",
+                "estimate": np.nan if animal in without else np.log(count / exposure),
+                "se": np.nan,
+                "edf": {},
+                "n_sessions": n,
+            }
+            for animal, (count, exposure, n) in totals.items()
+        ]
+    )
+
+
+def test_an_own_fit_at_the_session_level_gives_the_engine_tables(
+    rate_sessions_cohort,
+) -> None:
+    """A model whose own fit does what the engine does gives the plain
+    model's ``data_sets`` and ``sessions`` rows, at the same seed."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+    own = Model(
+        "rate",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=partial(own_session_fit, design=plain.design, estimands=plain.estimands),
+        fit_estimands=tuple(plain.estimands),
+    )
+    scenario = OutsideScenario("outside", expected_rate, planted={"reward": 0.5})
+    a = engine.run(_simulation(plain, sessions, [scenario]))
+    b = engine.run(_simulation(own, sessions, [scenario]))
+    pd.testing.assert_frame_equal(a.data_sets, b.data_sets)
+    columns = list(a.sessions.columns)
+    pd.testing.assert_frame_equal(a.sessions, b.sessions[columns])
+    pd.testing.assert_frame_equal(a.summary, b.summary)
+
+
+def test_an_own_fit_at_the_animal_level_is_reduced_over_the_animals(
+    rate_sessions_cohort,
+) -> None:
+    """One value per animal (no session labels): a data set's estimate is
+    the mean over the animals with a value, its interval the t interval over
+    them, its sessions used those of those animals; the share without a value
+    is over the animals. The model's coefficient names need not be the
+    plain model's."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design([Offset("exposure")], pooled, intercept=True)
+    animal = Model(
+        "animal",
+        design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=partial(own_animal_fit, without=("animal0",)),
+        fit_estimands=("log_rate",),
+    )
+    scenario = OutsideScenario(
+        "outside", expected_rate, planted={"reward": 0.5, "log_rate": 0.0}
+    )
+    simulation = Simulation([plain, animal], sessions, [scenario], 3, 200, 5)
+    result = engine.run(simulation)
+    units = result.sessions.query("model == 'animal'")
+    assert len(units) == 3 * 5 and units["session_date"].isna().all()
+    for i, part in result.data_sets.query("model == 'animal'").groupby("data_set"):
+        (row,) = part.to_dict("records")
+        values = units[units["data_set"] == i].set_index("animal")["estimate"]
+        finite = values.dropna()
+        assert len(finite) == 4
+        se = finite.std(ddof=1) / 2.0
+        half = scipy.stats.t.ppf(0.975, 3) * se
+        assert row["estimate"] == pytest.approx(finite.mean())
+        assert row["low"] == pytest.approx(finite.mean() - half)
+        assert row["high"] == pytest.approx(finite.mean() + half)
+        assert row["interval_sd"] == pytest.approx(se)
+        assert np.isnan(row["day_p"])
+        assert row["n_sessions_used"] == 8
+        assert row["covered"] == float(row["low"] <= 0.0 <= row["high"])
+    summary = result.summary.set_index("model").loc["animal"]
+    assert summary["share_without_value"] == pytest.approx(0.2)
+    assert summary["without_value_no_events"] == pytest.approx(0.2)
+    assert summary["n_sessions_used_min"] == 8
+    assert summary["n_data_sets_with_day_p"] == 0
+
+
+def test_own_fit_refusals(rate_sessions_cohort) -> None:
+    """Values of an own fit without one, an own fit that gives other
+    estimands, and an estimand with units of both levels are refused."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+    with pytest.raises(ValueError, match="own fit"):
+        Model(
+            "x",
+            plain.design,
+            Poisson(),
+            "count",
+            "well_visit_id",
+            {},
+            fit_estimands=("log_rate",),
+        )
+    with pytest.raises(ValueError, match="no estimand"):
+        Model(
+            "x",
+            plain.design,
+            Poisson(),
+            "count",
+            "well_visit_id",
+            {},
+            fit=own_animal_fit,
+        )
+    scenario = OutsideScenario("outside", expected_rate)
+    wrong = Model(
+        "x",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=own_animal_fit,
+        fit_estimands=("other",),
+    )
+    with pytest.raises(ValueError, match="estimands"):
+        engine.run(_simulation(wrong, sessions, [scenario]))
+
+    def mixed(data):
+        table = own_animal_fit(data)
+        table.loc[0, ["session_date", "epoch"]] = ["20260001", "02_r1"]
+        return table
+
+    both = Model(
+        "x",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=mixed,
+        fit_estimands=("log_rate",),
+    )
+    with pytest.raises(ValueError, match="both"):
+        engine.run(_simulation(both, sessions, [scenario]))
+
+
 def reference_tables() -> dict[str, list[dict]]:
     """The summary tables of the fixture: the rate model under the inside and
     the outside scenario, and the content model inside, on fixed seeds."""

@@ -20,6 +20,8 @@
   :func:`weighted_median`.
 - :func:`bootstrap_interval`: the 95 % interval from those draws, a
   small-sample t correction over the animals.
+- :func:`animal_mean_interval`: the mean of one value per animal with the t
+  interval over the animals.
 - :func:`animal_balanced_bootstrap`: a per-session number (or curve) taken
   session -> recording day -> animal as a mean of means, with its nested
   bootstrap draws (animals, then their sessions; the days are not resampled).
@@ -672,6 +674,54 @@ def bootstrap_interval(
     if bounds is not None:
         low, high = max(low, bounds[0]), min(high, bounds[1])
     return BootstrapInterval(low, high, sd)
+
+
+def animal_mean_interval(values: pd.Series) -> dict[str, float]:
+    """The mean of one value per animal, with the t interval over the animals.
+
+    For a quantity estimated once per animal (one coefficient shared by an
+    animal's sessions): ``mean +/- t(0.975, A - 1) * SD / sqrt(A)`` over the
+    ``A`` animals with a finite value, ``SD`` with ``ddof=1``. It is the
+    interval :func:`bootstrap_interval` gives a mean of animal values, with no
+    resampling below the animals.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_animals,)
+        One value per animal, indexed by animal. A value that is not finite is
+        left out.
+
+    Returns
+    -------
+    summary : dict
+        ``estimate`` (the mean), ``se`` (``SD / sqrt(A)``), ``low``, ``high``,
+        ``n_animals`` and ``n_animals_same_sign`` (the animals whose value
+        has the sign of the estimate). ``estimate`` is NaN without an animal;
+        ``se``, ``low`` and ``high`` are NaN with fewer than two.
+
+    Raises
+    ------
+    ValueError
+        If an animal has more than one value.
+    """
+    if values.index.duplicated().any():
+        raise ValueError("one value per animal: an animal is repeated")
+    finite = values.to_numpy(dtype=float)
+    finite = finite[np.isfinite(finite)]
+    n = finite.size
+    estimate = float(finite.mean()) if n else float("nan")
+    se = float(finite.std(ddof=1) / np.sqrt(n)) if n >= 2 else float("nan")
+    half = float(student_t.ppf(0.975, n - 1)) * se if n >= 2 else float("nan")
+    return {
+        "estimate": estimate,
+        "se": se,
+        "low": estimate - half,
+        "high": estimate + half,
+        "n_animals": int(n),
+        "n_animals_same_sign": int(np.sum(np.sign(finite) == np.sign(estimate)))
+        if n
+        else 0,
+    }
 
 
 class AnimalBalancedDraws(NamedTuple):

@@ -947,3 +947,32 @@ def test_a_missing_label_is_refused_by_name(column):
             stats.animal_balanced_bootstrap(
                 t.value, t.animal, t.day, n_draws=10, seed=0
             )
+
+
+# --- the mean over animals with the t interval -------------------------------------
+
+
+def test_animal_mean_interval_by_hand():
+    # Values 1, 2, 3, 4, 10 over five animals: mean 4, SD (ddof=1) sqrt(42.5 / 4),
+    # standard error that over sqrt(5), t(0.975, 4) = 2.7764451052. A missing
+    # animal value is left out; four of the five share the mean's sign.
+    values = pd.Series([1.0, 2.0, 3.0, -4.0, 18.0, NAN], index=list("abcdef"))
+    summary = stats.animal_mean_interval(values)
+    se = np.sqrt(((values.dropna() - 4.0) ** 2).sum() / 4 / 5)
+    assert summary["estimate"] == pytest.approx(4.0)
+    assert summary["se"] == pytest.approx(se)
+    assert summary["low"] == pytest.approx(4.0 - 2.7764451052 * se)
+    assert summary["high"] == pytest.approx(4.0 + 2.7764451052 * se)
+    assert summary["n_animals"] == 5
+    assert summary["n_animals_same_sign"] == 4
+
+
+def test_animal_mean_interval_needs_two_animals_for_an_interval():
+    one = stats.animal_mean_interval(pd.Series([0.7], index=["a"]))
+    assert one["estimate"] == pytest.approx(0.7)
+    assert np.isnan(one["low"]) and np.isnan(one["high"]) and np.isnan(one["se"])
+    assert one["n_animals"] == 1
+    none = stats.animal_mean_interval(pd.Series([NAN], index=["a"]))
+    assert np.isnan(none["estimate"]) and none["n_animals"] == 0
+    with pytest.raises(ValueError, match="one value per animal"):
+        stats.animal_mean_interval(pd.Series([1.0, 2.0], index=["a", "a"]))
