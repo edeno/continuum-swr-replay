@@ -429,6 +429,9 @@ def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
 #: (s, in all: half on each side), which Figure 2's supplement draws per animal.
 TRIGGERED_SIGNALS = ("SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed")
 TRIGGERED_WINDOW_S = 0.3
+WINDOW_KINDS = {"overlap": True, "no_overlap": False}
+"""The keys of :func:`triggered_windows`' windows and each one's ``is_swr``, in
+the figures' drawing order (the SWR events first, under the no-SWR events)."""
 
 #: The ``get_event_types`` entries :func:`compute_triggered_average_curves` reads:
 #: the immobile non-local events that do and do not overlap an SWR.

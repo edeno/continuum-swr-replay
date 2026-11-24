@@ -78,7 +78,7 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     REFERENCE_COLOR,
     name_groups,
 )
-from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, COLORS
+from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, EVENT_KINDS
 from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
@@ -98,8 +98,6 @@ warnings.filterwarnings("ignore")
 WIDTH = 6.5
 HEIGHT = 2.3
 
-# The two kinds of event, named and colored as in Figures 2 and 3.
-KINDS = ((False, "No SWR", COLORS["No SWR"]), (True, "SWR", COLORS["SWR"]))
 # The rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
 C_RUN = "black"
@@ -150,7 +148,7 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
     for ax, (band, column, title) in zip(axes, SIGNALS, strict=True):
         levels = animal_signal_levels(events, reference, band, column, matched=True)
         centers = []
-        for k, (is_swr, _, color) in enumerate(KINDS):
+        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
             x = 3.7 * k + np.arange(3)
             values = levels.loc[is_swr, ["rest", "event", "running"]]
             for _, row in values.iterrows():
@@ -164,7 +162,7 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
         ax.set_title(title, fontsize=SMALL_SIZE)
         # One label per kind; the key says which dots are rest and running.
-        ax.set_xticks(centers, [name for _, name, _ in KINDS])
+        ax.set_xticks(centers, [name for name, _ in EVENT_KINDS.values()])
         ax.set_xlim(-0.7, centers[-1] + 1.7)
     axes[0].set_ylabel("Power (z)")
 

@@ -509,7 +509,7 @@ def test_the_event_overlap_panel_prints_the_digits_of_the_events_summary(figure0
     assert all(len(dots.get_offsets()) == len(animals) for dots in ax.collections)
     widths = [bar.get_width() for bar in ax.patches]  # top to bottom
     np.testing.assert_allclose(
-        widths, 100 * animals[list(figure02.CLASS_ORDER)].mean().to_numpy()
+        widths, 100 * animals[list(figure02.OVERLAP_CLASSES)].mean().to_numpy()
     )
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
     assert formatted(cohort["non_swr_fraction_animal_mean"]) == "63 %"

@@ -37,6 +37,7 @@ import pytest  # noqa: E402
 from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
     analyzed_time,
 )
+from continuum_swr_replay.visualization.palettes import EVENT_KINDS  # noqa: E402
 from scripts.figures import generate_supp_pipeline_data_flow as flow  # noqa: E402
 from tests.support._figure02_tables import figure02_events  # noqa: E402
 from tests.support._swr_inventory_fixtures import (  # noqa: E402
@@ -759,25 +760,16 @@ def test_the_uncertainty_annotation_refuses_a_metric_without_an_overall_row():
         figure._positive_animals_note(contrasts, "absolute_rate")
 
 
-def test_no_swr_events_have_one_color_in_every_figure(offline):
-    """A non-local event that overlaps no SWR is drawn in ``COLORS["No SWR"]`` in
-    Figures 2, 3 and 5 and in the shared per-event panels: not in the Non-Local
+def test_figure05_draws_the_no_swr_events_in_the_palettes_color(offline):
+    """Figure 5 colors its bars by name, not from ``palettes.EVENT_KINDS``: its
+    no-SWR events are in the table's no-SWR color, not in the Non-Local
     state's green, which every non-local event is drawn in."""
-    from continuum_swr_replay.visualization import figure_panels
     from continuum_swr_replay.visualization.palettes import COLORS
 
-    figure02 = offline("scripts.figures.generate_figure02")
-    figure03 = offline("scripts.figures.generate_figure03")
     figure05 = offline("scripts.figures.generate_figure05")
-    no_swr = COLORS["No SWR"]
-    assert no_swr not in (COLORS["Non-Local"], COLORS["SWR"])
-    assert figure02.CLASS_COLORS["non_swr"] == no_swr
-    assert {name: color for _, name, color in figure03.KINDS}["No SWR"] == no_swr
     bars = {label: COLORS[color] for label, _, color in figure05.SIGNIFICANCE_BARS}
-    assert bars["No SWR"] == no_swr
+    assert bars["No SWR"] == EVENT_KINDS[False][1]
     assert bars["Non-local"] == COLORS["Non-Local"]  # every non-local event
-    classes = {word: color for _, word, color, _ in figure_panels._EVENT_CLASSES}
-    assert classes["non_swr"] == no_swr
 
 
 # ---------------------------------------------------------------------------
@@ -870,8 +862,8 @@ def test_figure03_histogram_marks_each_animal_s_median(offline):
     expected = animal_class_medians(events, "spatial_extent_cm")
     ticks = [c for c in ax.collections if isinstance(c, LineCollection)]
     assert len(ticks) == 2
-    for (_, _, color), word, drawn in zip(
-        figure03.KINDS, ("non_swr", "swr"), ticks, strict=True
+    for (_, color), word, drawn in zip(
+        EVENT_KINDS.values(), ("non_swr", "swr"), ticks, strict=True
     ):
         x = [segment[0, 0] for segment in drawn.get_segments()]
         np.testing.assert_allclose(x, expected[word])
@@ -893,7 +885,7 @@ def test_figure03_cumulative_is_the_share_of_events_at_or_below(offline):
     figure03.draw_cumulative(ax, events, "speed")
     curves = [line for line in ax.lines if len(line.get_xdata()) > 2]
     assert len(curves) == 2
-    for (is_swr, _, _), curve in zip(figure03.KINDS, curves, strict=True):
+    for is_swr, curve in zip(EVENT_KINDS, curves, strict=True):
         speed, share = curve.get_xdata(), curve.get_ydata()
         values = events.loc[events["is_swr"] == is_swr, column].to_numpy()
         assert (np.diff(share) >= 0).all()
@@ -1010,7 +1002,7 @@ def test_figure03_density_tracks_draw_each_kind_against_even(offline):
     fig, axes = plt.subplots(1, 2)
     figure03.draw_density_tracks(axes, graph, edge_order, against_even)
     limit = figure03.DENSITY_LIMIT_LOG2
-    for ax, (is_swr, name, _) in zip(axes, figure03.KINDS, strict=True):
+    for ax, (is_swr, (name, _)) in zip(axes, EVENT_KINDS.items(), strict=True):
         assert ax.get_title() == name
         (bands,) = [c for c in ax.collections if isinstance(c, PolyCollection)]
         _, values = figure03.track_bands(graph, edge_order, against_even.loc[is_swr])
@@ -1160,7 +1152,7 @@ def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
         # per kind, three sets of dots: rest, events, running
         dots = ax.collections
         assert len(dots) == 6
-        for k, (is_swr, _, color) in enumerate(figure.KINDS):
+        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
             rest, event, running = dots[3 * k : 3 * k + 3]
             for drawn, word in ((rest, "rest"), (event, "event"), (running, "running")):
                 np.testing.assert_allclose(

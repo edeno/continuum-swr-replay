@@ -265,3 +265,20 @@ def test_a_light_color_is_darkened_for_text_and_a_dark_one_kept():
     hue, lightness, _ = rgb_to_hls(*to_rgb(darkened))
     assert lightness == pytest.approx(0.4, abs=0.01)
     assert hue == pytest.approx(rgb_to_hls(*to_rgb("#add8e6"))[0], abs=0.01)
+
+
+def test_the_event_kinds_and_classes_have_one_name_and_color_each():
+    """The no-SWR events are a wine, not the Non-Local state's green, which
+    every non-local event is drawn in, nor the SWR color; the class with no
+    SWR is the no-SWR kind."""
+    from continuum_swr_replay.visualization.palettes import (
+        COLORS,
+        EVENT_KINDS,
+        OVERLAP_CLASSES,
+    )
+
+    assert list(EVENT_KINDS) == [False, True]  # the figures' order
+    no_swr, swr = EVENT_KINDS[False][1], EVENT_KINDS[True][1]
+    assert no_swr not in (COLORS["Non-Local"], swr)
+    assert OVERLAP_CLASSES["non_swr"] == EVENT_KINDS[False]
+    assert len({color for _, color in OVERLAP_CLASSES.values()}) == 3

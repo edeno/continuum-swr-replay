@@ -111,7 +111,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.reported.events import content_along_arms_bins
 from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.visualization.figure_utilities import save_figure
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.palettes import EVENT_KINDS
 from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
@@ -131,10 +131,6 @@ warnings.filterwarnings("ignore")
 WIDTH = 6.5
 HEIGHT = 4.3
 
-C_NO_SWR = COLORS["No SWR"]
-C_SWR = COLORS["SWR"]
-# The two kinds of event, named as in Figure 2.
-KINDS = ((False, "No SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
 # The track drawn in panel e: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
@@ -217,7 +213,7 @@ def kind_labels(events: pd.DataFrame) -> list[str]:
     """Each kind's name with its number of events, for the figure's legend."""
     return [
         f"{name} (n = {int((events['is_swr'] == is_swr).sum()):,} events)"
-        for is_swr, name, _ in KINDS
+        for is_swr, (name, _) in EVENT_KINDS.items()
     ]
 
 
@@ -237,7 +233,7 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     marked_below = ticks.get(edges[0], "").startswith("≤")
     marked_above = ticks.get(edges[-1], "").startswith("≥")
     top = 0.0
-    for is_swr, _, color in KINDS:
+    for is_swr, (_, color) in EVENT_KINDS.items():
         values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
         below, above = (values < edges[0]).any(), (values > edges[-1]).any()
         if (below and not marked_below) or (above and not marked_above):
@@ -248,7 +244,7 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
         ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
         ax.stairs(share, edges, color=color, lw=0.8)
         top = max(top, share.max())
-    for (_, _, color), word in zip(KINDS, ("non_swr", "swr"), strict=True):
+    for (_, color), word in zip(EVENT_KINDS.values(), ("non_swr", "swr"), strict=True):
         ax.plot(
             scale * medians[f"median_{word}"], top * 1.19, marker="v", ms=3.5,
             color=color, lw=0,
@@ -270,7 +266,7 @@ def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
         raise ValueError(f"{label}: an event has no value")
     grid = np.linspace(edges[0], edges[-1], 301)
     ax.axhline(50, color="0.8", lw=0.5)
-    for is_swr, _, color in KINDS:
+    for is_swr, (_, color) in EVENT_KINDS.items():
         values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
         at_or_below = np.searchsorted(np.sort(values), grid, side="right")
         ax.plot(grid, 100 * at_or_below / len(values), color=color, lw=0.8)
@@ -363,7 +359,7 @@ def draw_density_tracks(axes, track_graph, edge_order, against_even: pd.Series) 
     even, the kind's color where denser. The scale saturates at
     ``DENSITY_LIMIT_LOG2``, and its end labels say so."""
     limit = DENSITY_LIMIT_LOG2
-    for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
+    for ax, (is_swr, (name, color)) in zip(axes, EVENT_KINDS.items(), strict=True):
         polygons, values = track_bands(
             track_graph, edge_order, against_even.loc[is_swr]
         )
@@ -484,7 +480,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
         transform=ax.transAxes, color="0.4", ha="left", va="top",
         fontsize=SMALL_SIZE,
     )  # fmt: skip
-    for is_swr, name, color in KINDS:
+    for is_swr, (name, color) in EVENT_KINDS.items():
         trunk = profiles.loc[(is_swr, "trunk"), "density_per_cm"].to_numpy()
         leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
         ax.plot(x, 100 * trunk, color=color)
@@ -517,7 +513,7 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
     """
-    for g, (is_swr, _, color) in enumerate(KINDS):
+    for g, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
         row = statistics.loc["SWR" if is_swr else "no SWR"]  # the statistic's names
         for x, state in enumerate(("continuous", "fragmented")):
             position = x + (g - 0.5) * 0.36
@@ -569,7 +565,7 @@ def generate_figure(inputs: dict):
     for ax in (ax_a, ax_c, ax_d):
         ax.set_ylabel("% events")
     ax_d_cumulative.set_ylabel("% events\nat or below")
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, c in EVENT_KINDS.values()]
     fig.legend(
         handles, kind_labels(events), frameon=False, loc="upper center",
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,

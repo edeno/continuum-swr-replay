@@ -365,6 +365,8 @@ from continuum_swr_replay.analysis.event_properties.state_by_signal import (
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     TRIGGERED_SIGNALS,
+    TRIGGERED_WINDOW_S,
+    WINDOW_KINDS,
     animal_balanced_quartiles,
     animal_window_medians,
     get_signal_windows,
@@ -420,6 +422,8 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
 from continuum_swr_replay.visualization.palettes import (
     ANIMAL_LINE_COLOR,
     COLORS,
+    EVENT_KINDS,
+    SIGNAL_LABELS,
     readable_text_color,
 )
 from continuum_swr_replay.visualization.panel_layout import (
@@ -510,7 +514,6 @@ of the next row's titles; the mean over the bins is in the caption)."""
 HPD_YLABEL = "% of events"
 HPD_TICKS_CM = (10, 25, 50, 100, 400)
 DISTANCE_LABEL = "at least this far from\nany SWR (ms)"
-OUTSIDE_LABEL = "Outside\nSWRs"
 PARTS_LABEL_DROP = 13
 """How far below the axis a series' parts label starts (points): just under
 the parts' one-line tick labels, beside the two lines of "Outside SWRs" (it
@@ -573,9 +576,6 @@ LETTER_HEIGHT = 0.0268
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
 NO_SPIKE_SIGNAL = "MUA_zscore"
-TRIGGER_WINDOW_S = 0.3
-"""The No-Spike panel's window around each start (s, in all), Figure 2g's: the periods
-last a few tens of ms."""
 NO_SPIKE_COLOR = COLORS["No-Spike"]
 NO_SPIKE_WORKERS = 4
 """The processes that read the decode frames for the No-Spike panel by
@@ -860,13 +860,13 @@ def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
             frame,
             triggering_events_in(get_event_types(frame), keys),
             list(TRIGGERED_SIGNALS),
-            window_sec=TRIGGER_WINDOW_S,
+            window_sec=TRIGGERED_WINDOW_S,
         )
     if periods.empty:
         return epoch
     windows = get_signal_windows(
         frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
-        window_sec=TRIGGER_WINDOW_S,
+        window_sec=TRIGGERED_WINDOW_S,
     )  # fmt: skip
     return {
         **epoch,
@@ -1021,7 +1021,7 @@ def draw_outside_swr_series(
     xs = [0.0, *(SERIES_START + k for k in range(len(OUTSIDE_SWR_MARGINS_S)))]
     draw_full_minus_swr_axis(ax, xs, rows, 1.05, through_means=True)
     ax.set_xlim(-0.45, xs[-1] + 0.6)
-    ax.set_xticks(xs, [OUTSIDE_LABEL, *names])
+    ax.set_xticks(xs, [DIFFERENCE_LABELS["outside_swr"], *names])
     # the parts' label, centered under their tick labels
     ax.annotate(
         DISTANCE_LABEL, (float(np.mean(xs[1:])), 0), xycoords=("data", "axes fraction"),
@@ -1216,22 +1216,6 @@ def draw_rule_sweep(axes: Sequence[Axes], sweep: pd.DataFrame) -> None:
         )  # fmt: skip
 
 
-TRACE_LABELS = dict(
-    zip(
-        TRIGGERED_SIGNALS,
-        ("Ripple (z)", "MUA (z)", "Theta (z)", "Speed (cm/s)"),
-        strict=True,
-    )
-)
-"""The traces panel's name of each of Figure 2g's signals, as Figure 2g names
-them."""
-TRACE_CLASSES = {
-    "overlap": ("SWR", COLORS["SWR"]),
-    "no_overlap": ("No SWR", COLORS["No SWR"]),
-}
-"""The traces panel's classes, as Figure 2g draws them."""
-
-
 def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
     """The traces panel: Figure 2g's signals around event starts, one axis per
     signal, a thin line per animal and class (each animal's median over its
@@ -1240,15 +1224,17 @@ def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
     at the start."""
     t_ms = 1000 * np.asarray(traces["time"])
     for ax, signal in zip(axes, TRIGGERED_SIGNALS, strict=True):
-        for kind, (_, color) in TRACE_CLASSES.items():
+        for kind, is_swr in WINDOW_KINDS.items():
+            color = EVENT_KINDS[is_swr][1]
             ax.plot(t_ms, traces[kind][signal].to_numpy(), color=color, lw=0.5)
         ax.axvline(0, color="k", lw=0.5, ls=":")
         ax.set_xlim(t_ms[0], t_ms[-1])
         ax.set_xticks([-100, 0, 100])
-        ax.set_title(TRACE_LABELS[signal], fontsize=SMALL_SIZE, pad=3)
+        ax.set_title(SIGNAL_LABELS[signal], fontsize=SMALL_SIZE, pad=3)
         ax.yaxis.set_major_locator(MaxNLocator(3))
     # the classes named past the last axis, clear of the lines
-    for k, (name, color) in enumerate(TRACE_CLASSES.values()):
+    for k, is_swr in enumerate(WINDOW_KINDS.values()):
+        name, color = EVENT_KINDS[is_swr]
         axes[-1].text(
             1.08, 0.75 - 0.2 * k, name, transform=axes[-1].transAxes, ha="left",
             va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),

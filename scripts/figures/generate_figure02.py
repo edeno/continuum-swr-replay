@@ -245,6 +245,7 @@ from continuum_swr_replay.analysis.event_properties.state_by_signal import (
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     TRIGGERED_SIGNALS,
     TRIGGERED_WINDOW_S,
+    WINDOW_KINDS,
     compute_triggered_average_curves,
     triggering_events_in,
 )
@@ -298,7 +299,9 @@ from continuum_swr_replay.visualization.evidence_drawings import (
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
+    DIFFERENCE_LABELS,
     EQUAL_FIT,
+    EVENTS_LABELS,
     GROUP_COLORS,
     REFERENCE_COLOR,
     animal_values,
@@ -312,6 +315,9 @@ from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import (
     ANIMAL_LINE_COLOR,
     COLORS,
+    EVENT_KINDS,
+    OVERLAP_CLASSES,
+    SIGNAL_LABELS,
     readable_text_color,
 )
 from continuum_swr_replay.visualization.panel_layout import (
@@ -493,24 +499,8 @@ C_REFERENCE = REFERENCE_COLOR
 """A reference level (panels j and k's zeros, panel g's between-events level): a neutral
 gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
-C_NO_SWR = COLORS["No SWR"]
-"""The no-SWR events as a class (d, g, h): not the Non-Local state's green,
-which marks the state and every non-local event in a and b and the SWRs with
-non-local content in c."""
 C_SWR = COLORS["SWR"]
-C_SWR_PARTIAL = COLORS["SWR partial"]
 C_QUIET = COLORS["All Events"]
-CLASS_ORDER = ("swr_contained", "swr_partial", "non_swr")
-CLASS_COLORS = {
-    "swr_contained": C_SWR,
-    "swr_partial": C_SWR_PARTIAL,
-    "non_swr": C_NO_SWR,
-}
-CLASS_LABELS = {
-    "swr_contained": "Inside SWR",
-    "swr_partial": "Partly in SWR",
-    "non_swr": "No SWR",
-}
 DETECTOR_LABELS = dict(
     zip(
         nonlocal_comparison.FIGURE_DETECTORS,
@@ -530,10 +520,6 @@ FIT_GROUPS = {
 }
 """Panel j's x groups: what the decoded place's fit is compared with."""
 DECODER_YLABEL = "Better fit with non-local\nat any time (nats/spike)"
-DECODER_TIMES = {"inside_swr": "Inside\nSWRs", "outside_swr": "Outside\nSWRs"}
-"""Panel k's first axis, "All immobility time"."""
-DECODER_OUTSIDE = {"in_events": "No-SWR\nevents", "outside_events": "Other\ntime"}
-"""Panel k's second axis, "Outside SWRs"."""
 
 
 # ---------------------------------------------------------------------------
@@ -1369,14 +1355,8 @@ def draw_events_bars(ax: Axes, classes: dict, animals: pd.DataFrame) -> None:
     every event.
     """
     rows = [
-        (
-            CLASS_LABELS[c],
-            classes[f"{c}_fraction_animal_mean"],
-            animals[c],
-            CLASS_COLORS[c],
-            c == "non_swr",
-        )
-        for c in CLASS_ORDER
+        (name, classes[f"{c}_fraction_animal_mean"], animals[c], color, c == "non_swr")
+        for c, (name, color) in OVERLAP_CLASSES.items()
     ]
     draw_class_bars(
         ax, rows, f"Non-local events (n = {classes['n_events']:,})", "% events"
@@ -1488,7 +1468,7 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     every non-local, SWR and MUA event (``reference_medians``).
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
-    groups = (("overlap", C_SWR, "SWR"), ("no_overlap", C_NO_SWR, "No SWR"))
+    groups = [(key, *EVENT_KINDS[is_swr][::-1]) for key, is_swr in WINDOW_KINDS.items()]
     for ax, signal in (
         (ax_rip, "SWR_zscore"),
         (ax_mua, "MUA_zscore"),
@@ -1525,7 +1505,7 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     ax_speed.set_ylim(0, 1.6 * DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
     ax_speed.set_yticks([0, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC])
     for ax, label in zip(
-        axes, ("Ripple (z)", "MUA (z)", "Theta (z)", "Speed (cm/s)"), strict=True
+        axes, (SIGNAL_LABELS[signal] for signal in TRIGGERED_SIGNALS), strict=True
     ):
         ax.axvline(0, color="k", lw=0.5, ls=":")
         ax.set_xlim(t_ms[0], t_ms[-1])
@@ -1730,7 +1710,7 @@ def draw_decoder_need(
             "Outside SWRs",
         ),
     ):
-        labels = DECODER_TIMES if ax is ax_time else DECODER_OUTSIDE
+        labels = DIFFERENCE_LABELS if ax is ax_time else EVENTS_LABELS
         xs = [float(k) for k in range(len(rows))]
         draw_full_minus_swr_axis(
             ax, xs, list(rows.values()), 1.08, ylabel="", cue=False

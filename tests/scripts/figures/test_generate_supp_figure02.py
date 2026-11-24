@@ -677,7 +677,7 @@ def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
     )
 
     def windows(data, event_times, signals, window_sec):
-        assert window_sec == figure.TRIGGER_WINDOW_S
+        assert window_sec == figure.TRIGGERED_WINDOW_S
         values = np.tile(np.array([2.0, 0.0]), (len(event_times), 1))[..., None]
         return xr.DataArray(
             values,
@@ -702,9 +702,15 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
     axes = figure.panel_axes(drawn, "event_traces")
     traces = _event_traces()
-    assert [ax.get_title() for ax in axes] == list(figure.TRACE_LABELS.values())
+    assert [ax.get_title() for ax in axes] == [
+        "Ripple (z)",
+        "MUA (z)",
+        "Theta (z)",
+        "Speed (cm/s)",
+    ]
     for ax, signal in zip(axes, figure.TRIGGERED_SIGNALS, strict=True):
-        for kind, (_, color) in figure.TRACE_CLASSES.items():
+        for kind, is_swr in figure.WINDOW_KINDS.items():
+            color = figure.EVENT_KINDS[is_swr][1]
             mine = [
                 line for line in ax.lines
                 if len(line.get_xdata()) == TRACE_TIME.size
