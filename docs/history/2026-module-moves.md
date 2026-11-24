@@ -978,4 +978,5 @@ the one of before, with two new fields (`fit_by`, `sessions`). Paths are under
 | `sessions.SessionKey` (moved) | `tables.session_keys.SessionKey`; `terms` and `sessions` import it, so `from ...regression.sessions import SessionKey` still works | fa7a43ac, 47942202 |
 | `shared_statistics.unit_summary` (moved) | `units.unit_summary`, beside `units.unit_values` and `units.unit_estimate`; `shared_statistics` keeps `estimand_summary` and `animal_mean_interval` | d109c0ac |
 | `shared_statistics._UNIT_KEY_LEVELS`, `tests/analysis/test_unit_key_levels.py` (removed) | `tables.session_keys.FIT_BY_COLUMNS`, read through `fit_by_columns` | d109c0ac |
+| `simulation._unit_c` and the engine's own refusal of an estimand on a baseline (moved) | `terms.Design.contrast_on` (a contrast mapped onto a fit's coefficients by name; it refuses one that reads a baseline) and `terms.Design.baseline_read` | 6e95bb1e |
 | `simulation._unit_key`, `simulation._unit_values`, `simulation._reduced_estimate` (removed) | `FitRecord.unit_key`, `units.unit_values`, `units.unit_estimate` | d109c0ac |

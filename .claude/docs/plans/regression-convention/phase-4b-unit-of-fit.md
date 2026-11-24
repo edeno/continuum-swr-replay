@@ -484,3 +484,42 @@ The design note's section 11 has the evidence. What changes in this file:
   model's settings carry one `fit_by` for each run (tasks 8 and 9). Task 7: since both units are always
   run, a run of the engine fits the same drawn data sets at several units where the engine's structure
   allows it.
+
+## Notes from the /simplify round of 2026-11-24 (for tasks 8 to 10 and later)
+
+The four reviews and the fix list are in
+`.claude/research/2026-11-20-regression-prototypes/unit_of_fit_simplify/` (main checkout). Skipped there,
+recorded here:
+
+- **The general form of a baseline, if per-session smooths or design D's factor smooth are wanted.** The
+  session becomes an ordinary row factor (the fit's rows carry a session column whose levels are the unit's
+  sessions), and a baseline becomes "a term by session" through the existing term builders: the intercept
+  is a fully coded session category that replaces it; a category gets `by` the session, each session with
+  its own reference; a per-session curve is `Smooth(by=session)`, which exists and takes its sum-to-zero
+  constraint on each session's rows. It removes `Design._base`, `_source`, `_build_copies`,
+  `DesignTerm.session` and the special names of `for_sessions`, and it keeps "a term leaves with its
+  level". Not built: the behavior models need only an intercept or a category as the baseline, which the
+  copies serve; per-session curves are not planned (the rate follow-up's interim numbers: they bias the
+  reward term more than shared curves do). About a day or two. The main session's call; the lead can
+  overrule it.
+- **A penalized baseline** (design D: one strength over a term's copies) is refused by `build_design`
+  today. When it is built, one penalty block covers a term's copies over the sessions, and the fit's data
+  take the block's active columns, as a session's copy can be dropped.
+- **A category baseline in the record (A6).** At the session unit the content arm category is an ordinary
+  term (in `edf` and `collinearity`); at a day or an animal its copies are projected out and are in
+  neither. A rule keyed on the declared `design.baseline` would change the content model's session
+  records: the lead's decision. Until then this is the documented behavior.
+- **Task 7 follow-ups (A7b, A7c).** The unit target is NaN under the Bernoulli because `Bernoulli.check`
+  refuses proportions, not for a reason of the mathematics. The noise-free target fit runs the support rule
+  and the refit on the expected outcome, so its active set can differ from a data fit's.
+- **Several units as one model (A8).** Today several units in one run are models that differ only in
+  `fit_by`, with distinct names. A `Simulation.fit_by` tuple, rows keyed by (model, fit_by), would let one
+  `Model` run at `BEHAVIOR_FIT_BY`: for tasks 8 to 10 if the runners want it.
+- **Typed session entries (A9).** `FitRecord.sessions` entries are plain dicts; a `TypedDict` or a small
+  dataclass, with a helper for the sessions with rows, if tasks 8 to 10 read them often.
+- **A copy's support counted on its session's rows (E4) is not built.** The counts would be identical
+  (`n_high` unchanged; `n_low` = the session's units with a zero row plus the distinct kept units of the
+  other sessions), but the support rule would need each session's rows, which only the copies of the
+  intercept carry today: not a local change. It would save about 4 s of 47 s in an animal-size rate fit
+  (measured 2026-11-24).
+

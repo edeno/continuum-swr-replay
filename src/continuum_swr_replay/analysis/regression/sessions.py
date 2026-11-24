@@ -9,8 +9,9 @@ likelihood, the names of the response and unit columns and the unit of the fit
 The sessions given are grouped by their unit
 (:func:`continuum_swr_replay.tables.session_keys.unit_key`), the units in the
 order of each one's first session and each unit's sessions in the order given.
-Each unit is one fit, through the steps below; a unit of one session is
-today's per-session fit, bit for bit. In a fit of several sessions:
+Each unit is one fit, through the steps below; a unit of one session has no
+baseline copies and is the per-session fit, bit for bit. In a fit of several
+sessions:
 
 - the rows are each session's rows (sorted by unit under the grouped softmax),
   in turn; each row keeps its session;
@@ -18,11 +19,10 @@ today's per-session fit, bit for bit. In a fit of several sessions:
   unit id that starts again in every session (a well visit) is a different
   unit in each session;
 - each baseline term of the design is copied for each session
-  (:meth:`.terms.Design.for_sessions`). A copy is a level, judged on its
-  session's rows: an intercept copy that fails the support rule, or that the
-  refit leaves out, drops that session's rows from the fit (counted under
-  ``rows_dropped`` by the copy's name); a level copy drops that level's rows in
-  its session only.
+  (:meth:`.terms.Design.for_sessions`). A copy is a level, so the steps below
+  judge and drop it as a level; what that drops is stated once, in
+  :mod:`.terms` ("Baselines"). A copy's dropped rows are counted under
+  ``rows_dropped`` by the copy's name.
 
 The fit's design is built once, on all its rows; from then on one mask over
 those rows says which are kept, with one reason for each row removed, and the
