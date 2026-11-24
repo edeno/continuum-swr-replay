@@ -186,6 +186,9 @@ DENSITY_TICK_LABELS = ("≤¼×", "even", "≥4×")
 # Panel f: the top of the y axis (% of content time per cm), above every
 # animal's curve, so that the shares written in the panel clear them.
 PROFILE_TOP_PERCENT_PER_CM = 4.0
+# Panel f: the height of the bars that mark the zones by the center, a patch
+# junction and a well along the x axis, as a part of the axes' height.
+ZONE_BAR_HEIGHT = 0.03
 # Panel e: the color of content sparser than even content, for either kind.
 C_BELOW_EVEN = "#6e6e6e"
 
@@ -510,7 +513,8 @@ def draw_profiles(
     leaf arms (junction to well), each kind; and what content spread evenly
     over the track would give (``even``: ``content_along_arms.even_content``),
     a flat line. The parts of the arms within ``AT_WELL_CM`` of the center, of a
-    patch junction and of a well are shaded (the three places the axis names),
+    patch junction and of a well are marked by a bar along the x axis, over the
+    name of each place,
     and each kind's share of content time at a well is written under the
     heading "At a well", with even content's, in the room above the curves.
     With
@@ -526,7 +530,9 @@ def draw_profiles(
     )  # fmt: skip
     trunk, leaf = even["trunk_arm_fraction"], even["leaf_arm_fraction"]
     for low, high in ((0, trunk), (1 - trunk, 1 + leaf), (2 - leaf, 2)):
-        ax.axvspan(low, high, color="0.93", lw=0, zorder=-1, gid="zone")
+        ax.axvspan(
+            low, high, ymin=0, ymax=ZONE_BAR_HEIGHT, color="0.55", lw=0, gid="zone"
+        )
     ax.text(
         0.03, 0.97, "At a well:", transform=ax.transAxes, color="0.25",
         ha="left", va="top", fontsize=SMALL_SIZE,
