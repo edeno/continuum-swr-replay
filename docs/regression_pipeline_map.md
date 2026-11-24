@@ -620,7 +620,7 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 
 How the fitter's JAX code runs: float64 for each call, one device, float64 kernels, and a log of the programs traced.
 
-`require_device`, `in_float64`, `CompileLog`, `float64_kernel`
+`require_device`, `in_float64`, `live_programs`, `CompileLog`, `float64_kernel`
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
