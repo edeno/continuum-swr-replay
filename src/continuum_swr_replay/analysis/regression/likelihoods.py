@@ -67,6 +67,7 @@ cap on its length.
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Protocol
 
@@ -251,6 +252,18 @@ def _gram(X: Any, weights: Any) -> Any:
     return X.T @ (weights[:, None] * X)
 
 
+@functools.cache
+def _can_keep_state(cls: type) -> bool:
+    """Whether a family class defines ``__init__`` or a
+    ``functools.cached_property`` (itself or a base), either of which can put
+    an attribute on an object after it is made."""
+    return cls.__init__ is not object.__init__ or any(
+        isinstance(value, functools.cached_property)
+        for klass in cls.__mro__
+        for value in vars(klass).values()
+    )
+
+
 class _Family:
     """The public methods of every family, on its JAX functions."""
 
@@ -263,7 +276,15 @@ class _Family:
 
     def _stateless(self) -> bool:
         """True; raise ``TypeError`` when the object keeps an attribute of its
-        own, which the kernels, keyed on the class, would not see."""
+        own, which the kernels, keyed on the class, would not see, or when its
+        class could put one there (:func:`_can_keep_state`). Checked at every
+        hash and every public call."""
+        if _can_keep_state(type(self)):
+            raise TypeError(
+                f"{type(self).__name__} can keep state on its objects (it defines "
+                "__init__ or a cached property): a family is keyed on its class in "
+                "the compiled kernels, so whatever changes its result goes in aux"
+            )
         attributes = sorted(vars(self))
         if attributes:
             raise TypeError(

@@ -14,6 +14,8 @@ family's mean.
 
 from __future__ import annotations
 
+import functools
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -441,6 +443,28 @@ def test_a_single_poisson_offset_is_every_rows() -> None:
     )
     with pytest.raises(TypeError, match="offset is None"):
         lik.score_eta(eta, y, None)
+
+
+def test_a_family_class_that_can_keep_state_is_refused_before_any_call() -> None:
+    """A class with an ``__init__`` or a cached property could put a parameter
+    on its objects: it is refused at the first call, whatever was read
+    before, not only once the attribute exists."""
+
+    class _Cached(Poisson):
+        @functools.cached_property
+        def scale(self) -> float:
+            return 2.0
+
+    class _Initialized(Poisson):
+        def __init__(self) -> None:
+            pass
+
+    lik, X, y, aux, eta = _case("poisson")
+    for family in (_Cached(), _Initialized()):
+        with pytest.raises(TypeError, match="can keep state on its objects"):
+            family.loglik(eta, y, aux)
+        with pytest.raises(TypeError, match="can keep state on its objects"):
+            hash(family)
 
 
 def test_a_family_with_an_attribute_of_its_own_is_refused() -> None:
