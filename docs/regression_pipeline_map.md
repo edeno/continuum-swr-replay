@@ -254,7 +254,7 @@ One class or two: do SWR-coupled and non-SWR non-local events differ by kind or 
 
 Where along the track event content sits: each time bin's arm and place on it.
 
-`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `arm_lengths_cm`, `even_content`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_against_even`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
+`event_place_mass`, `check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `arm_lengths_cm`, `even_content`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_against_even`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `epoch_place_shares`, `place_share_intervals`, `place_share_statistics`, `event_place_shares`, `event_well_counts`, `well_count_shares`, `remote_well_share_by_extent`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
 
@@ -274,11 +274,17 @@ Analysis functions for manipulating and characterizing detected events.
 
 `get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
 
+### `src/continuum_swr_replay/analysis/event_properties/event_speed.py`
+
+How fast a non-local event's content moves along the track: two measures.
+
+`nonnegative_line`, `map_line_fit_speed`, `transport_edges`, `transport_distance`, `transport_slope_speed`, `event_speeds`
+
 ### `src/continuum_swr_replay/analysis/event_properties/event_statistics.py`
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_distribution`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_shares`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_distribution`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_shares`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `transport_speed_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -332,7 +338,7 @@ Ripple power and MUA of confident Local time against confident non-local time.
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `animal_quartiles`, `animal_balanced_quartiles`, `lag_column`, `frame_event_counts`, `epoch_trigger_windows`, `stored_windows_of`, `stored_triggered_curves`, `stored_animal_window_medians`, `stored_no_spike_trace`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `epoch_labels`, `animal_quartiles`, `animal_balanced_quartiles`, `lag_column`, `frame_event_counts`, `epoch_trigger_windows`, `stored_windows_of`, `stored_triggered_curves`, `stored_animal_window_medians`, `stored_no_spike_trace`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -1216,6 +1222,12 @@ Place every event time bin's content on its arm of the track.
 
 `measure_epoch`, `main`
 
+### `scripts/event_properties/measure_content_mass_along_arms.py`
+
+Place every event's posterior mass on the arms of the track.
+
+`measure_epoch`, `main`
+
 ### `scripts/event_properties/measure_content_place_rate.py`
 
 The rank of the tetrodes' summed rate at each non-local event's decoded place.
@@ -1227,6 +1239,12 @@ The rank of the tetrodes' summed rate at each non-local event's decoded place.
 Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
 
 `out_dir`, `epoch_gamma`, `epochs_to_measure`, `main`
+
+### `scripts/event_properties/measure_event_speed.py`
+
+Measure how fast each event's content moves along the track, two ways.
+
+`measure_epoch`, `main`
 
 ### `scripts/event_properties/measure_event_start_and_rest_theta.py`
 

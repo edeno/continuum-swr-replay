@@ -1261,6 +1261,9 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(figure, "place_share_intervals", lambda along: None)
     monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
     monkeypatch.setattr(figure, "well_count_shares", lambda e, **_: None)
+    # panel a's session and examples are read after the references are checked
+    monkeypatch.setattr(figure, "read_example_decode", lambda *_: None)
+    monkeypatch.setattr(figure, "example_windows", lambda events: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
@@ -1422,3 +1425,30 @@ def test_supp_figure03_draws_how_many_wells_an_event_represents(offline):
     assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 3 * 2
     assert ax.get_ylim() == (0, 100)
     plt.close(fig)
+
+
+def test_supp_figure03_examples_are_checked_against_the_event_table(offline):
+    """Panel a's examples: three events with no SWR, then three with one, each
+    titled with its kind and duration and drawn over its own start and end; an
+    example missing from the table, or of the other kind, is refused."""
+    figure = offline("scripts.figures.generate_supp_figure03")
+    ids = [*figure.EXAMPLES[False], *figure.EXAMPLES[True]]
+    events = pd.DataFrame(
+        {
+            "event_id": ids,
+            "is_swr": [False] * 3 + [True] * 3,
+            "event_start_s": np.arange(6, dtype=float),
+            "event_duration_s": 0.05 + 0.01 * np.arange(6),
+        }
+    )
+    events["event_end_s"] = events["event_start_s"] + events["event_duration_s"]
+    windows = figure.example_windows(events)
+    assert list(windows) == [
+        "No SWR, 50 ms", "No SWR, 60 ms", "No SWR, 70 ms",
+        "SWR, 80 ms", "SWR, 90 ms", "SWR, 100 ms",
+    ]  # fmt: skip
+    assert windows["SWR, 80 ms"] == (3.0, 3.08)
+    with pytest.raises(AssertionError, match="matches 0 rows"):
+        figure.example_windows(events.iloc[1:])
+    with pytest.raises(AssertionError, match="not of its kind"):
+        figure.example_windows(events.assign(is_swr=True))

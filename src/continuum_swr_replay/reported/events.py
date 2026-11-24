@@ -313,12 +313,12 @@ TAGS = {
     "spike_gpi": Tags(("2c.4",)),
     "content_occupancy": Tags(("2d.1",), ("3f",)),
     "content_by_animal": Tags(("2d.1",)),
-    "content_well_side": Tags(("2d.1",), ("S3d",)),
+    "content_well_side": Tags(("2d.1",), ("S3c",)),
     "duration": Tags(("2d.6",), ("3a",)),
     "extent": Tags(("2d.3",), ("3c",)),
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
-    "transport_speed": Tags(("2d.2",), ("S3c",)),
+    "transport_speed": Tags(("2d.2",), ("S3b",)),
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2k",)),
     "content_distance": Tags(("2d.1",), ("3g",)),
@@ -4477,7 +4477,7 @@ _SPEED_PROPERTIES = ("speed", "transport_speed")
 def speed_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.2: how fast the events' content moves, non-SWR against SWR,
     as :func:`property_values`: the MAP line-fit speed (Figure 3d) and the
-    transport-slope speed (the supplement's S3c), read from the event-speed
+    transport-slope speed (the supplement's S3b), read from the event-speed
     output (``analysis/event_properties/event_speed.py`` has the two
     definitions)."""
     values = []
@@ -4812,7 +4812,7 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     (``content_along_arms.place_share_intervals``).
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
-    # The places that depend on where the animal is: the supplement's panel d
+    # The places that depend on where the animal is: the supplement's panel c
     # draws the remote well and the animal's own; the other two are in no panel.
     make_by_animal = value_factory(
         content_occupancy_values, source, TAGS["content_by_animal"]

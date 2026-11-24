@@ -1,24 +1,22 @@
 #!/usr/bin/env python
-"""Generate Supplementary Figure S3, the supplement to Figure 3: slow and fast
-gamma during SWR and no-SWR events, how fast their position distribution
-moves, and which of their content is at a well far from the animal.
+"""Generate Supplementary Figure S3, the supplement to Figure 3: example events
+of each kind, how fast their position distribution moves, which of their
+content is at a well far from the animal, how many wells an event represents,
+and slow and fast gamma during them.
 
 The immobile non-local events of the canonical event table that start inside
 a well visit (``cohort_selection.select_visit_context``), split by whether
-they overlap an SWR; quiet rest is the rest inside a well visit. For each band of ``gamma_power.GAMMA_BANDS`` (a, slow
-gamma; b, fast gamma) and each kind of event, every animal's level during the
-events, between the levels of the same epochs' quiet-rest and running windows
-as long as the kind's events. An event's gamma is a mean over its bins, and a
-mean of skewed power over a window sits above the median of single bins, so the
-reference is windows of the events' own length.
+they overlap an SWR. The panels follow the text of Figure 3.
 
-The animal values are ``event_statistics.animal_signal_levels`` with
-``matched``: the values the events summary's ``<band>_animals_*`` counts compare
-(``paper/reported/events.json``; the gamma run is
-``scripts/event_properties/measure_event_gamma.py``). This was Figure 3's last
-panel; ripple power, MUA, theta and head speed around the events are Figure 2's.
+a — Six example events of the example session (:data:`EXAMPLES`,
+    ``parameters.EXAMPLE_EPOCH``), three with no SWR whose content stays at one
+    remote place and three with an SWR whose content extends, each a column as
+    in Figure 2b (``visualization.example_event_panels.draw_examples``): the
+    ripple trace with the SWR threshold and the SWRs, the tetrodes' spikes with
+    the event shaded, the decoded position with the animal's (magenta) and the
+    linearized track, and the state probabilities.
 
-c — How fast the position distribution moves, no-SWR against SWR events: each
+b — How fast the position distribution moves, no-SWR against SWR events: each
     event's transport-slope speed (``event_speed.transport_slope_speed``; the
     event-speed run, ``scripts/event_properties/measure_event_speed.py``), the
     slope, at least 0, of the earth mover's distance on the track between the
@@ -33,7 +31,7 @@ c — How fast the position distribution moves, no-SWR against SWR events: each
     have a speed: one too short for three lags, or with too few time bins that
     are mostly Continuous, has none.
 
-d — The share of each kind's content time at a well, apart for the wells far
+c — The share of each kind's content time at a well, apart for the wells far
     from the animal (remote) and the animal's own: every one of these events
     happens with the animal at a well, so content at "a well" (Figure 3f) could
     be content at the animal's. Each animal's share for no-SWR and for SWR
@@ -44,6 +42,12 @@ d — The share of each kind's content time at a well, apart for the wells far
     20 cm from the animal along the track), with the mean's 95 % interval as a
     line beside the dots (``content_along_arms.place_share_intervals``).
 
+d — Whether an event represents one location: the share of each kind's events
+    that represent no well, one well, and two or more, where an event
+    represents a well when at least a tenth of its content time
+    (``content_along_arms.WELL_CONTENT_SHARE``) is within 20 cm of it; bars the
+    animals' mean, dots the animals (``content_along_arms.well_count_shares``).
+
 e — Whether the events whose content stays in one place are the ones at a
     remote well: the mean share of an event's content time at a remote well, by
     the event's spatial extent (the classes of
@@ -52,11 +56,18 @@ e — Whether the events whose content stays in one place are the ones at a
     (``content_along_arms.remote_well_share_by_extent``: event, then epoch,
     then animal).
 
-f — Whether an event represents one location: the share of each kind's events
-    that represent no well, one well, and two or more, where an event
-    represents a well when at least a tenth of its content time
-    (``content_along_arms.WELL_CONTENT_SHARE``) is within 20 cm of it; bars the
-    animals' mean, dots the animals (``content_along_arms.well_count_shares``).
+f, g — Whether the two kinds differ in the local field potential: for each
+    band of ``gamma_power.GAMMA_BANDS`` (f, slow gamma; g, fast gamma) and each
+    kind of event, every animal's level during the events, between the levels
+    of the same epochs' quiet-rest and running windows as long as the kind's
+    events; quiet rest is the rest inside a well visit. An event's gamma is a
+    mean over its bins, and a mean of skewed power over a window sits above the
+    median of single bins, so the reference is windows of the events' own
+    length. The animal values are ``event_statistics.animal_signal_levels``
+    with ``matched``: the values the events summary's ``<band>_animals_*``
+    counts compare (``paper/reported/events.json``; the gamma run is
+    ``scripts/event_properties/measure_event_gamma.py``). Ripple power, MUA,
+    theta and head speed around the events are Figure 2's.
 
 Usage
 -----
@@ -99,14 +110,16 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
+from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
 from continuum_swr_replay.reported.events import (
     content_mass_along_arms,
     with_brain_state,
     with_event_place_shares,
     with_event_speed,
 )
-from continuum_swr_replay.reported.inputs import default_inputs
+from continuum_swr_replay.reported.inputs import default_inputs, read_example_decode
 from continuum_swr_replay.runs.staleness import read_output_manifest
+from continuum_swr_replay.visualization.example_event_panels import draw_examples
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
@@ -130,7 +143,7 @@ warnings.filterwarnings("ignore")
 
 # Inches: the full page width.
 WIDTH = 6.5
-HEIGHT = 4.4
+HEIGHT = 7.0
 
 # The rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
@@ -190,6 +203,8 @@ def read_inputs() -> dict:
         "places": content_place_shares(along),
         "place_intervals": place_share_intervals(along),
         "well_counts": well_count_shares(with_places, column="content_n_wells"),
+        "session": read_example_decode(EXAMPLE_NWB_FILE, EXAMPLE_EPOCH),
+        "examples": example_windows(selected),
         "by_extent": remote_well_share_by_extent(
             with_places, column="content_remote_well"
         ),
@@ -226,7 +241,7 @@ SPEED_TICKS_CM_S = (0, 500, 1000)
 
 
 def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
-    """Panel c, the speed panel: for no-SWR and SWR events, the percent of the
+    """Panel b, the speed panel: for no-SWR and SWR events, the percent of the
     class's events (with a speed) whose transport-slope speed is at most each
     speed, a thin line per animal and their mean in bold in the class's color
     (``distribution``: :func:`read_inputs`' ``speed``)."""
@@ -254,7 +269,7 @@ WELL_PLACES = (("remote_well", "remote well"), ("own_well", "own well"))
 def draw_well_shares(
     ax: Axes, shares: pd.DataFrame, intervals: pd.DataFrame | None = None
 ) -> None:
-    """Panel d: each animal's share of no-SWR and of SWR content time at a
+    """Panel c: each animal's share of no-SWR and of SWR content time at a
     remote well and at its own well, the two kinds joined by a line per animal,
     and the animals' mean as a bar (``shares``: :func:`read_inputs`'
     ``places``, indexed by ``is_swr`` and ``animal``); with ``intervals``
@@ -315,7 +330,7 @@ def draw_remote_well_by_extent(ax: Axes, by_extent: pd.DataFrame) -> None:
 
 
 def draw_well_counts(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel f: the share of each kind's events that represent no well, one
+    """Panel d: the share of each kind's events that represent no well, one
     well, and two or more: bars the animals' mean, dots the animals
     (``shares``: :func:`read_inputs`' ``well_counts``, indexed by ``is_swr``
     and ``animal``)."""
@@ -332,40 +347,82 @@ def draw_well_counts(ax: Axes, shares: pd.DataFrame) -> None:
     ax.set_xlim(-0.55, len(WELL_COUNT_CLASSES) - 0.45)
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
-    ax.set_xlabel("Wells the event represents")
     ax.set_ylabel("Events (%)")
-    ax.set_title("Wells per event", fontsize=SMALL_SIZE)
+    ax.set_title("Wells an event represents", fontsize=SMALL_SIZE)
+
+
+EXAMPLES = {
+    False: (7156386530554463803, 5354495646056365027, 611840950996746651),
+    True: (3352114973072553739, 225761306712118988, 7036534662482105035),
+}
+"""Panel a's example events of the example session (``parameters.EXAMPLE_EPOCH``)
+by kind, chosen by eye from a sheet of its candidates: events with no SWR whose
+content stays at one remote place (extent at most 10 cm, at least nine tenths
+of the content time at a remote well, HPD coverage under 30 cm, 40 ms or
+longer), and events with an SWR whose content extends (extent at least 60 cm,
+Fragmented under a tenth, 80 ms or longer). :func:`example_windows` checks each
+one's kind."""
+
+
+def example_windows(events: pd.DataFrame) -> dict[str, tuple[float, float]]:
+    """Panel a's examples as (start, end) seconds by title, no-SWR ones first;
+    a title is the kind's name and the event's duration.
+
+    Raises
+    ------
+    AssertionError
+        If an example is not one row of ``events``, or is not of its kind.
+    """
+    windows = {}
+    for is_swr, event_ids in EXAMPLES.items():
+        for event_id in event_ids:
+            rows = events[events["event_id"] == event_id]
+            if len(rows) != 1:
+                raise AssertionError(f"event_id {event_id} matches {len(rows)} rows")
+            row = rows.iloc[0]
+            if bool(row["is_swr"]) != is_swr:
+                raise AssertionError(f"event {event_id} is not of its kind")
+            title = f"{EVENT_KINDS[is_swr][0]}, {1e3 * row['event_duration_s']:.0f} ms"
+            if title in windows:
+                raise AssertionError(f"two examples are titled {title!r}")
+            windows[title] = (float(row["event_start_s"]), float(row["event_end_s"]))
+    return windows
 
 
 def generate_figure(inputs: dict):
     """Build the figure from :func:`read_inputs`."""
-    fig, grid = plt.subplots(2, 3, figsize=(WIDTH, HEIGHT))
-    fig.subplots_adjust(
-        left=0.09, right=0.99, top=0.88, bottom=0.1, wspace=0.45, hspace=0.75
-    )
-    axes = grid[0]
-    draw_gamma(axes[:2], inputs["events"], inputs["reference"])
-    draw_transport_speed(axes[2], inputs["speed"])
-    ax_d, ax_e, ax_f = grid[1]
-    draw_well_shares(ax_d, inputs["places"], inputs["place_intervals"])
+    fig = plt.figure(figsize=(WIDTH, HEIGHT))
+    outer = fig.add_gridspec(
+        3, 1, height_ratios=[1.55, 1.0, 1.0], hspace=0.42,
+        left=0.09, right=0.99, top=0.97, bottom=0.06,
+    )  # fmt: skip
+    session = inputs["session"]
+    max_pos = float(np.ceil(session["data"]["position_info"].linear_position.max()))
+    ax_a = draw_examples(fig, outer[0], session, inputs["examples"], max_pos)
+    middle = outer[1].subgridspec(1, 3, wspace=0.5)
+    ax_b, ax_c, ax_d = (fig.add_subplot(middle[k]) for k in range(3))
+    draw_transport_speed(ax_b, inputs["speed"])
+    draw_well_shares(ax_c, inputs["places"], inputs["place_intervals"])
+    draw_well_counts(ax_d, inputs["well_counts"])
+    lower = outer[2].subgridspec(1, 3, wspace=0.5)
+    ax_e, ax_f, ax_g = (fig.add_subplot(lower[k]) for k in range(3))
     draw_remote_well_by_extent(ax_e, inputs["by_extent"])
-    draw_well_counts(ax_f, inputs["well_counts"])
-    # the key of the gamma panels, centered over them
-    middle = (axes[0].get_position().x0 + axes[1].get_position().x1) / 2
+    draw_gamma((ax_f, ax_g), inputs["events"], inputs["reference"])
+    # the gamma panels' key, inside the first of them
     handles = [
         plt.Line2D([], [], marker="o", ls="", ms=3, mfc=color, mec="black", mew=0.5)
         for color in (C_REST, C_RUN)
     ]
-    fig.legend(
-        handles, ["quiet-rest windows", "running windows"], frameon=False,
-        loc="upper center", bbox_to_anchor=(middle, 1.0), ncol=2, handletextpad=0.1,
-        columnspacing=1.5,
+    ax_f.legend(
+        handles, ["quiet rest", "running"], frameon=False, loc="upper left",
+        handletextpad=0.1, borderaxespad=0.0, fontsize=SMALL_SIZE,
     )  # fmt: skip
     fig.draw_without_rendering()
-    panels = dict(
-        zip("abcdef", ([ax] for ax in (*axes, ax_d, ax_e, ax_f)), strict=True)
-    )
-    place_letters(fig, panels, rows=["abc", "def"], columns=["ad", "be", "cf"])
+    panels = {
+        "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d], "e": [ax_e],
+        "f": [ax_f], "g": [ax_g],
+    }  # fmt: skip
+    place_letters(fig, panels, rows=["a", "bcd", "efg"], columns=["abe", "cf", "dg"])
     check_placement(fig, panels)
     return fig
 

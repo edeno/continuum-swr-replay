@@ -1068,7 +1068,7 @@ def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
     assert builder.TAGS["content_occupancy"].figures == ("3f",)
     assert builder.TAGS["content_by_animal"].figures == ()
-    assert builder.TAGS["content_well_side"].figures == ("S3d",)
+    assert builder.TAGS["content_well_side"].figures == ("S3c",)
     assert (
         builder.TAGS["content_by_animal"].questions
         == builder.TAGS["content_occupancy"].questions
@@ -1119,11 +1119,11 @@ def test_content_occupancy_values_name_each_group_and_place():
         "swr_content_at_well_fraction": ("3f",),
         "animals_non_swr_more_at_well": ("3f",),
         "even_content_at_well_fraction": ("3f",),
-        # the wells by the animal's side: the supplement's panel d
-        "non_swr_content_remote_well_fraction": ("S3d",),
-        "non_swr_content_own_well_fraction": ("S3d",),
-        "swr_content_remote_well_fraction": ("S3d",),
-        "swr_content_own_well_fraction": ("S3d",),
+        # the wells by the animal's side: the supplement's panel c
+        "non_swr_content_remote_well_fraction": ("S3c",),
+        "non_swr_content_own_well_fraction": ("S3c",),
+        "swr_content_remote_well_fraction": ("S3c",),
+        "swr_content_own_well_fraction": ("S3c",),
     }
     # each of the three shares at a well has its interval and its difference
     extra = {
@@ -1136,7 +1136,7 @@ def test_content_occupancy_values_name_each_group_and_place():
     # (no SWR all at a remote well, SWR none)
     assert extra["content_remote_well_fraction_difference"].value == pytest.approx(1.0)
     assert extra["content_at_well_fraction_difference"].figures == ("3f",)
-    assert extra["non_swr_content_remote_well_fraction_ci_low"].figures == ("S3d",)
+    assert extra["non_swr_content_remote_well_fraction_ci_low"].figures == ("S3c",)
     low, high = (
         extra[f"non_swr_content_remote_well_fraction_ci_{b}"].value
         for b in ("low", "high")
