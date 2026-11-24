@@ -62,7 +62,6 @@ The tables of a run (:class:`SimulationResult`):
 
 from __future__ import annotations
 
-import multiprocessing
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import NamedTuple
@@ -71,6 +70,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
+from continuum_swr_replay.runs.threads import pool_context
 
 from .contrasts import evaluate_contrast
 from .likelihoods import GroupedSoftmax, Likelihood, Poisson, draw, group_starts
@@ -688,8 +688,7 @@ def run(
         )
         parts = [_run_task(simulation, prepared, task) for task in tasks]
     else:
-        context = multiprocessing.get_context("spawn")
-        with context.Pool(workers, _init_worker, (simulation,)) as pool:
+        with pool_context().Pool(workers, _init_worker, (simulation,)) as pool:
             parts = pool.map(_worker_task, tasks, chunksize=1)
     data_sets = pd.DataFrame([row for part in parts for row in part[0]])
     sessions = pd.DataFrame([row for part in parts for row in part[1]])

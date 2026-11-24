@@ -24,6 +24,8 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
 | `simulation.py` | the simulation engine: an outcome drawn from a planted truth on a model's own rows, fitted and reduced by the real code |
+| `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces (not used by the solver yet) |
+| `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows (not used by the solver yet) |
 
 The reduction of a per-session estimate to recording days and animals is in
 `analysis/shared_statistics.py`, beside the project's other statistics. The declared
@@ -776,6 +778,75 @@ the solver is checked on the whole pipeline of bias and coverage.
 session's offset, missing rows and linear predictor under each inside scenario) is
 computed once per run; `fit_sessions` builds each session's design again for every data
 set, since its interface takes rows, not a built design.
+
+## Precision, devices, threads and padding
+
+The solver is being moved to JAX, one fitter for every model. These pieces are in place;
+the solver does not call them yet. The rules hold for the JAX code as it is added.
+
+**Float64 for each call.** Every public entry that makes a JAX array or runs a kernel
+carries `runtime.in_float64`, which enters a fresh `jax.enable_x64(True)` for that call.
+The flag is never set for the whole process, because the decoders in the same process
+compute in float32. In JAX 0.8.0 the flag is thread-local: a thread started inside the
+scope sees it off, and the calling thread has its old value back after the call, also
+when the call raises (measured, and `tests/analysis/regression/test_runtime.py`). The jit
+caches are keyed on the flag (`jax/_src/config.py`, `include_in_jit_key=True`), so a
+function called inside and outside the scope has two compiled programs. With the flag
+off, `jnp.asarray` of a float64 NumPy array silently gives float32. So every kernel is
+jitted through `runtime.float64_kernel`, which refuses when it is traced with the flag off
+or with a floating input that is not float64. A float64 array made inside the scope stays
+float64 after it, but arithmetic on it outside the scope is in float32.
+
+**One device.** `in_float64` first calls `runtime.require_device`, which is
+`runs.device.require_one_jax_device`: the fitter refuses to start unless this process
+configured a card (`configure_jax_gpu`), `JAX_PLATFORMS` excludes CUDA, or
+`CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
+starts no backend. The message says what to set. A runner that fits calls
+`runs.device.default_jax_platforms("cpu")` in `main` unless it asks for a GPU
+(`simulate_declared_penalty.py`, `compare_regression_to_mgcv.py`,
+`compare_regression_to_current_fitters.py`). The GPU's own check is a later step.
+
+**Threads.** JAX 0.8.0 has no setting for the number of CPU threads. Its CPU client takes
+no thread count (`jax/_src/xla_bridge.py`, `make_cpu_client`), and its pool follows the
+process's CPU set: 7 threads on 1 CPU, 18 on 4 and 30 on 8, and a float64 `X'X` took 1.0
+second of CPU time per second of wall time on 1 CPU and 6.5 on 8.
+`--xla_cpu_multi_thread_eigen=false` changed neither (6.7 on 8; measured 2026-11-23, under
+load). `os.sched_setaffinity(0, ...)` moves only the calling thread: called after the
+backend started, it left the pool on 8 CPUs (7.3). The pool's threads are made when JAX
+starts its backend and keep the CPU set they were made with, so a process is pinned
+before its first JAX computation. `runs.threads.pin_to_cpus(cpus)` moves every thread of
+the process to `cpus` and sets the BLAS thread variables to their number; it refuses when
+numpy was already imported with another count, which its BLAS keeps. A pool whose
+processes compute with JAX starts them by spawn, `runs.threads.pool_context()`: a fork of
+a process with JAX's threads running can deadlock. `tests/repository/test_no_fork_pools.py`
+fails when `src/` or `scripts/` asks for fork explicitly (`get_context("fork")`,
+`set_start_method("fork")`). A pool made with no start method also forks on Linux, so the
+same file fails when a module that imports `jax`, the regression fitter or
+`non_local_detector` (directly or through this repository's modules) makes a `Pool` or a
+`ProcessPoolExecutor` with no `mp_context=` or `context=`, other than by `pool_context()` or
+`get_context(...)`. The present offenders are listed there with their reasons; the test
+also fails when a listed one is gone.
+
+**Padding.** `jit` compiles once for each new shape, so a session's rows are padded to a
+bucket: a multiple of 4,096 rows for the Poisson, Bernoulli and Gaussian families
+(`padding.pad_rows`), and of 1,024 rows and 64 groups for the grouped softmax
+(`padding.pad_groups`). Columns are not padded. A padded row has a design row of zeros, a
+response of 0, an offset of 0 and a weight of 0, after the real rows. A kernel multiplies
+each row's terms by the weight, so a padded row adds exactly 0 to the log-likelihood, its
+gradient and its information; with a zero design row it adds nothing to the gradient or
+the information even unweighted. Its terms are finite: an offset of minus infinity would
+make a zero weight give `0 * -inf = nan`. For the grouped softmax the padded rows form
+one group after the real ones, with a response total of 0, and the groups after it to the
+bucket have no rows. A kernel guards each group's `n_g log(sum exp)` term where `n_g = 0`,
+since a group with no rows gives `0 * -inf`. The padded and unpadded log-likelihood,
+gradient and information agree to 1e-12 of their largest entry for each family, against
+the NumPy likelihoods (`tests/analysis/regression/test_padding.py`).
+
+**Compilations.** `runtime.COMPILE_LOG` counts each kernel's traces by input signature.
+JAX traces a jitted function once for each new signature and compiles each trace; a
+program found in the persistent compilation cache is still traced (measured). So the count
+is the number of programs a process needed, whatever the cache holds, and a test can bound
+it for a set of sessions.
 
 ## Cost
 

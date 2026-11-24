@@ -103,11 +103,10 @@ per curve; its table is the fixed-seed fixture
 
 from __future__ import annotations
 
-import multiprocessing
 from dataclasses import dataclass
 from functools import partial
 
-from continuum_swr_replay.runs.threads import pin_blas_threads
+from continuum_swr_replay.runs.threads import pin_blas_threads, pool_context
 
 pin_blas_threads()
 
@@ -385,8 +384,7 @@ def simulation(
     if workers == 1:
         found = [work(target) for target in TARGETS]
     else:
-        context = multiprocessing.get_context("spawn")
-        with context.Pool(min(workers, len(TARGETS))) as pool:
+        with pool_context().Pool(min(workers, len(TARGETS))) as pool:
             found = pool.map(work, TARGETS, chunksize=1)
     calibration, models = {}, []
     for target, (log_penalty, median_edf) in zip(TARGETS, found, strict=True):

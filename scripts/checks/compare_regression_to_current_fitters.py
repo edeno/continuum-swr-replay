@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import 
     freeze_per_bin_cohort,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path
+from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -203,6 +204,7 @@ def _rows_of(table: pd.DataFrame, keys: tuple) -> pd.DataFrame:
 
 
 def main() -> int:
+    default_jax_platforms("cpu")
     rc = replay_content_dir()
     stop, _ = select_stop_cohort(read_table(table_path("stop_table", rc)))
     event_table = read_table(table_path("event_table", rc))
