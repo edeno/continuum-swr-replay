@@ -59,7 +59,7 @@ def test_single_column_equals_r2() -> None:
     beyond the intercept; VIF = 1 / (1 - R^2)."""
     X, y, offset, beta, terms = _poisson_design()
     weighted = weighted_design(Poisson(), X, y, offset, X @ beta)
-    measures = concurvity(weighted, terms, beta, intercept=0)["z"]
+    measures = concurvity(weighted, terms, beta, intercept=[0])["z"]
 
     column, rest = weighted[:, 8], weighted[:, :8]
     residual = column - rest @ np.linalg.lstsq(rest, column, rcond=None)[0]
@@ -70,7 +70,7 @@ def test_single_column_equals_r2() -> None:
     for key in ("observed", "worst", "estimate"):
         assert measures[key] == pytest.approx(r2, rel=1e-10)
 
-    record = term_collinearity(Poisson(), X, y, offset, beta, terms, intercept=0)
+    record = term_collinearity(Poisson(), X, y, offset, beta, terms, intercept=[0])
     assert record["z"]["r2"] == pytest.approx(r2, rel=1e-10)
     assert record["z"]["vif"] == pytest.approx(1.0 / (1.0 - r2), rel=1e-10)
     assert set(record["s(t)"]) == {"observed", "worst", "estimate"}
@@ -85,7 +85,7 @@ def test_the_intercept_does_not_explain_a_column() -> None:
         [np.ones(n), rng.normal(size=n), (rng.uniform(size=n) < 0.85).astype(float)]
     )
     terms = {"x": np.array([1]), "r": np.array([2])}
-    measures = concurvity(X, terms, np.array([0.0, 1.0, 1.0]), intercept=0)
+    measures = concurvity(X, terms, np.array([0.0, 1.0, 1.0]), intercept=[0])
     assert measures["r"]["estimate"] < 0.01
 
 
@@ -149,7 +149,7 @@ def test_matches_mgcv_concurvity(name: str) -> None:
     else:
         lik, data = Gaussian(), SessionData(X, y)
     beta = select_penalties(lik, [data], blocks).sessions[0].fit.beta
-    ours = concurvity(X, terms, beta, intercept=0)
+    ours = concurvity(X, terms, beta, intercept=[0])
     for variable in SMOOTHS[name]:
         k = mgcv["terms"].index(f"s({variable})")
         for key in ("observed", "worst", "estimate"):
@@ -166,10 +166,10 @@ def test_an_inactive_column_is_left_out() -> None:
     with_nan = np.r_[beta, np.nan]
     terms = {**terms, "w": np.array([9])}
     record = term_collinearity(
-        Poisson(), extra, y, offset, with_nan, terms, intercept=0
+        Poisson(), extra, y, offset, with_nan, terms, intercept=[0]
     )
     alone = term_collinearity(
-        Poisson(), X, y, offset, beta, {**terms, "w": np.array([], int)}, intercept=0
+        Poisson(), X, y, offset, beta, {**terms, "w": np.array([], int)}, intercept=[0]
     )
     assert "w" not in record
     assert record == alone
@@ -199,8 +199,8 @@ def test_a_column_zero_in_the_session_does_not_change_the_measures() -> None:
     padded_weighted = weighted_design(
         Poisson(), padded, y, offset, padded @ padded_beta
     )
-    one = concurvity(weighted, terms, beta, intercept=0)
-    two = concurvity(padded_weighted, padded_terms, padded_beta, intercept=0)
+    one = concurvity(weighted, terms, beta, intercept=[0])
+    two = concurvity(padded_weighted, padded_terms, padded_beta, intercept=[0])
     for name in terms:
         for key in ("observed", "worst", "estimate"):
             assert two[name][key] == pytest.approx(one[name][key], rel=1e-9)
@@ -222,7 +222,7 @@ def test_a_column_that_does_not_vary_is_not_measured() -> None:
         "copy": np.array([11]),
     }
     record = term_collinearity(
-        Poisson(), flat, y, offset, flat_beta, flat_terms, intercept=0
+        Poisson(), flat, y, offset, flat_beta, flat_terms, intercept=[0]
     )
     for name in ("c", "zero"):
         assert np.isnan(record[name]["r2"]) and np.isnan(record[name]["vif"])

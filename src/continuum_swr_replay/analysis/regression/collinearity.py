@@ -38,7 +38,7 @@ weights its measures are mgcv's.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 
@@ -103,7 +103,7 @@ def concurvity(
     terms: Mapping[str, np.ndarray],
     beta: np.ndarray,
     *,
-    intercept: int | list[int] | None,
+    intercept: Sequence[int] | None,
 ) -> dict[str, dict[str, float]]:
     """mgcv's three concurvity measures of each term, on a given design.
 
@@ -116,11 +116,11 @@ def concurvity(
         column once.
     beta : np.ndarray, shape (p,)
         The fitted coefficients (``observed`` reads them).
-    intercept : int, list of int or None
-        The intercept's column (or the columns of the sessions' baseline
-        copies), projected out of the others first, one after another (each
-        on what the ones before it left, so the projection is onto their
-        span); None without one.
+    intercept : sequence of int or None
+        The columns projected out of the others first: the intercept's, and
+        in a fit of several sessions the baseline copies'. They are projected
+        one after another, each on what the ones before it left, so the
+        projection is onto their span. None (or empty) for none.
 
     Returns
     -------
@@ -133,7 +133,7 @@ def concurvity(
     """
     columns = [np.asarray(c, dtype=int) for c in terms.values()]
     used = np.concatenate(columns) if columns else np.empty(0, int)
-    projected = [] if intercept is None else np.atleast_1d(intercept).tolist()
+    projected = [] if intercept is None else [int(c) for c in intercept]
     expected = np.setdiff1d(np.arange(X.shape[1]), projected)
     if np.sort(used).tolist() != expected.tolist():
         raise ValueError("the terms and the intercept must cover every column once")
@@ -206,7 +206,7 @@ def term_collinearity(
     beta: np.ndarray,
     terms: Mapping[str, np.ndarray],
     *,
-    intercept: int | None,
+    intercept: Sequence[int] | None,
 ) -> dict[str, dict[str, float]]:
     """Each term's collinearity with the others at a fit (the record's
     ``collinearity``).
@@ -225,9 +225,10 @@ def term_collinearity(
         The fit; NaN at its inactive columns.
     terms : mapping of str to np.ndarray of int
         Each term's columns; with ``intercept`` they cover every column once.
-    intercept : int, list of int or None
-        The intercept's column, or the columns of the baseline copies
-        (:func:`concurvity`); None without one.
+    intercept : sequence of int or None
+        The columns projected out first (:func:`concurvity`): the
+        intercept's and the active baseline copies'; None (or empty) for
+        none. Each must be active.
 
     Returns
     -------
@@ -238,7 +239,7 @@ def term_collinearity(
         with the reason.
     """
     active = np.isfinite(beta)
-    projected = [] if intercept is None else np.atleast_1d(intercept).tolist()
+    projected = [] if intercept is None else [int(c) for c in intercept]
     if not active[projected].all():
         raise ValueError("the intercept is inactive")
     index = _positions(active)
@@ -253,13 +254,7 @@ def term_collinearity(
         weighted,
         kept,
         ba,
-        intercept=(
-            None
-            if intercept is None
-            else index[intercept]
-            if np.ndim(intercept) == 0
-            else [int(index[c]) for c in projected]
-        ),
+        intercept=[int(index[c]) for c in projected],
     )
     out = {}
     for name, cols in kept.items():

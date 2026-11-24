@@ -554,7 +554,12 @@ def _record(
         decrement, n_iter = float(last.fit.newton_decrement), int(last.fit.n_iter)
         beta, vcov = last.fit.beta, last.covariance
         if refit.fitted:
-            projected = [j for j in design.projected_columns if np.isfinite(beta[j])]
+            # The intercept always; a baseline copy when it is active.
+            projected = [
+                j
+                for j in design.projected_columns
+                if np.isfinite(beta[j]) or design.column_terms[j].kind == "intercept"
+            ]
             collinearity = term_collinearity(
                 session.lik,
                 data.X,
@@ -562,7 +567,7 @@ def _record(
                 data.aux,
                 beta,
                 design.term_columns,
-                intercept=projected or None,
+                intercept=projected,
             )
             edf = _edf(design, last, block_terms, np.isfinite(beta))
     animal, session_date, epoch = (*identity.key, "", "")[:3]
