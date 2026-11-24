@@ -1,0 +1,10 @@
+{
+"commit": "3e10c19b186633c5fda3a9831058d5ba3b1f8ecd",
+"command": "python scripts/checks/write_regression_reference.py",
+"versions": {"python": "3.11.13", "numpy": "2.3.4", "scipy": "1.16.3", "numpy_blas": "scipy-openblas 0.3.30", "scipy_blas": "scipy-openblas 0.3.29.dev"},
+"machine": "Linux x86_64",
+"blas_settings": {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
+"cases": {
+"rate_edf_4": {"log_penalty": 1.580047607421875, "median_edf": 3.9998304652737158, "n_sessions_used": 6, "edf": [4.489322088448331, 3.98073202689777, 3.9469694408761455, 4.018928903649662, 3.9599989464745486, 4.085339399444209]}
+}
+}
