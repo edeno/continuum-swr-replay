@@ -419,6 +419,7 @@ class _Run:
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
             trigger_windows=root / EVENT_TRIGGER_WINDOWS_DIR,
+            gamma_trigger_windows=root / "event_gamma_trigger_windows",
         )
 
     def _spy(self, name: str, group=None, group_key: str | None = None):

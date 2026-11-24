@@ -10,7 +10,6 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.constants import VISIT_CONTEXTS
-from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
     count_visit_context,
@@ -247,39 +246,6 @@ def test_each_selected_event_gets_where_its_content_starts_and_ends(tmp_path):
     assert len(joined) == len(events)
     assert joined["starts_near_animal"].all() and joined["ends_at_remote_well"].all()
     assert not joined["ends_near_animal"].any()
-
-
-def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
-    """One epoch whose slow gamma is the sample number and fast gamma its
-    negative; every selected event starts at sample 200, so each kind's median
-    trace is the samples 125 to 275 (0.3 s at 500 Hz)."""
-    events = select_visit_context(_labeled())
-    events = events.assign(
-        animal="a", session_date=20200101, epoch="02_r1", event_start_s=200 * 0.002
-    )
-    (epoch_id,) = set(swr_source.event_epoch_ids(events))
-    sample = np.arange(400.0)
-    pd.DataFrame(
-        {"time": sample * 0.002, "slow_gamma_z": sample, "fast_gamma_z": -sample}
-    ).to_parquet(tmp_path / f"{epoch_id}_gamma_z.parquet")
-
-    curves, paths = builder.gamma_triggered_curves(events, tmp_path, 1)
-
-    assert [path.name for path in paths] == [f"{epoch_id}_gamma_z.parquet"]
-    np.testing.assert_allclose(
-        curves["slow_gamma"]["time"][[0, 75, -1]], [-0.15, 0, 0.15]
-    )
-    for kind in ("overlap", "no_overlap"):
-        np.testing.assert_allclose(
-            curves["slow_gamma"][f"{kind}_median"], np.arange(125.0, 276.0)
-        )
-        np.testing.assert_allclose(
-            curves["fast_gamma"][f"{kind}_q75"], -np.arange(125.0, 276.0)
-        )
-    with pytest.raises(ValueError, match="not 2"):
-        builder.gamma_triggered_curves(events, tmp_path, 2)
-    with pytest.raises(ValueError, match="no gamma for an event's epoch"):
-        builder.gamma_triggered_curves(events.assign(epoch="04_r2"), tmp_path, 1)
 
 
 def test_an_output_not_made_over_the_subset_is_pending():

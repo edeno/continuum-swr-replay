@@ -1138,10 +1138,10 @@ def test_the_gamma_panels_draw_each_kind_s_trace_and_the_two_levels(offline):
     time = np.array([-0.002, 0.0, 0.002])
     curves, levels = {}, {}
     for k, (band, _) in enumerate(figure.SIGNALS):
-        curves[band] = {"time": time}
+        curves[f"{band}_z"] = {"time": time}
         for j, kind in enumerate(figure.WINDOW_KINDS):
             for i, label in enumerate(("q25", "median", "q75")):
-                curves[band][f"{kind}_{label}"] = np.full(3, k + j + 0.1 * i)
+                curves[f"{band}_z"][f"{kind}_{label}"] = np.full(3, k + j + 0.1 * i)
         levels[band] = {"rest": -1.0 - k, "running": 3.0 + k}
     levels = pd.DataFrame(levels).T
 
@@ -1159,7 +1159,9 @@ def test_the_gamma_panels_draw_each_kind_s_trace_and_the_two_levels(offline):
         ):
             band = figure.SIGNALS[k][0]
             np.testing.assert_allclose(line.get_xdata(), [-2.0, 0.0, 2.0])
-            np.testing.assert_allclose(line.get_ydata(), curves[band][f"{kind}_median"])
+            np.testing.assert_allclose(
+                line.get_ydata(), curves[f"{band}_z"][f"{kind}_median"]
+            )
             assert to_rgba(line.get_color()) == to_rgba(EVENT_KINDS[is_swr][1])
         dashed = sorted(
             line.get_ydata()[0] for line in ax.lines if line.get_linestyle() == "--"

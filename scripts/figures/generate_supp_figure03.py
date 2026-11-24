@@ -80,8 +80,9 @@ i, j — Whether the two kinds differ in the local field potential: for each
     draws ripple power and theta: the line is the mean over animals of each
     animal's median (the median over its epochs of the epoch's median over its
     events), the band the same of the quartiles
-    (``triggered_analysis.kind_triggered_curves``, from the gamma run's per-bin
-    power, ``scripts/event_properties/measure_event_gamma.py``). The dashed
+    (``triggered_analysis.stored_triggered_curves`` of the windows
+    ``scripts/event_properties/measure_gamma_trigger_windows.py`` stores, made
+    as Figure 2g's are: a window that touches excluded time is left out). The dashed
     lines are the band's level in quiet rest inside a well visit (gray) and
     while running (black) (``event_statistics.reference_medians``). The events
     summary's ``<band>_animals_*`` counts compare each animal's level over
@@ -133,6 +134,8 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     WINDOW_KINDS,
+    stored_triggered_curves,
+    stored_windows_of,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
@@ -141,13 +144,13 @@ from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
 from continuum_swr_replay.reported.events import (
     content_mass_tables,
-    gamma_triggered_curves,
     with_event_start_end,
 )
 from continuum_swr_replay.reported.inputs import (
     EventsInputs,
     default_inputs,
     read_example_decode,
+    read_gamma_trigger_windows,
 )
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.example_event_panels import draw_examples
@@ -231,7 +234,12 @@ def read_inputs() -> dict:
         with_places, inputs.content_along_arms, n_epochs
     )
     return {
-        "gamma": gamma_triggered_curves(events, inputs.event_gamma, n_epochs)[0],
+        "gamma": stored_triggered_curves(
+            stored_windows_of(
+                read_gamma_trigger_windows(inputs.gamma_trigger_windows), events
+            ),
+            [f"{band}_z" for band in GAMMA_BANDS],
+        ),
         "gamma_levels": read_gamma_levels(inputs),
         "speed": property_distribution(
             with_speed, TRANSPORT_SPEED_COLUMN, TRANSPORT_SPEED_BIN_EDGES_CM_S
@@ -255,12 +263,13 @@ def draw_gamma(axes, curves: dict, levels: pd.DataFrame) -> None:
     band), as Figure 2g draws ripple power and theta: the line is the mean over
     animals of each animal's median (the median over its epochs of each
     epoch's median over its events), the band the same of the quartiles
-    (``curves``: ``reported.events.gamma_triggered_curves``). The dashed lines
+    (``curves``: ``triggered_analysis.stored_triggered_curves`` of the stored
+    gamma windows). The dashed lines
     are the band's level in quiet rest (gray) and while running (black),
     each animal's median over its epochs, then the mean over animals
     (``levels``: ``event_statistics.reference_medians``)."""
     for ax, (band, title) in zip(axes, SIGNALS, strict=True):
-        curve = curves[band]
+        curve = curves[f"{band}_z"]
         t_ms = 1000 * np.asarray(curve["time"])
         for kind, is_swr in WINDOW_KINDS.items():
             color = EVENT_KINDS[is_swr][1]

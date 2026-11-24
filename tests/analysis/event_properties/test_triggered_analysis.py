@@ -604,8 +604,6 @@ def test_an_epochs_trigger_windows_are_stored_a_row_per_window_and_signal(
     frame's events by SWR overlap and the MUA level outside the periods."""
     import xarray as xr
 
-    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
-
     frame = pd.DataFrame(
         {"animal": "a", "day": 1, "epoch": "02_r1"}, index=[0.0, 0.002, 0.004]
     )
@@ -700,7 +698,6 @@ def test_the_stored_windows_give_figure_2gs_curves_and_the_supplements_traces():
     windows (no SWR: a's median of 1, 3 and b's 5 -> mean (2 + 5) / 2 = 3.5 at
     the first lag), the supplement's traces each animal's median, and the time
     axis the offsets over the sampling frequency."""
-    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
     from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
     rows = _stored_rows()
@@ -726,7 +723,6 @@ def test_the_stored_windows_are_reduced_epoch_by_epoch():
     Day 1's median is 1 and day 2's 7, so a's is 4 (pooled over its four
     events it would be 5); with b's 5 the mean is 4.5. A No-Spike window of a
     third day is one more of a's epochs."""
-    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
 
     rows = _stored_rows()
     a_two = (rows["animal"] == "a") & (rows["non_local_event"] == 2)
@@ -761,8 +757,6 @@ def test_the_stored_windows_are_reduced_epoch_by_epoch():
 
 
 def test_the_stored_windows_of_the_selected_events_are_kept_with_every_period():
-    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
-
     rows = _stored_rows()
     events = pd.DataFrame(
         {"animal": ["a", "b"], "session_date": 1, "epoch": "02_r1",
@@ -803,28 +797,24 @@ def test_the_frames_events_are_counted_by_swr_overlap():
     assert counts == {"swr": 1, "non_swr": 2, "total": 3}
 
 
-def test_windows_at_take_the_samples_around_each_time_and_nan_past_the_ends():
-    time = np.arange(10) * 0.002
-    signal = np.arange(10.0)
-    windows = ta.windows_at(time, signal, np.array([0.008, 0.0, 0.0171]), 2)
-    np.testing.assert_array_equal(windows[0], [2, 3, 4, 5, 6])
-    np.testing.assert_array_equal(windows[1], [np.nan, np.nan, 0, 1, 2])
-    # 17.1 ms: the first sample at or after it is the last
-    np.testing.assert_array_equal(windows[2], [7, 8, 9, np.nan, np.nan])
-
-
-def test_kind_triggered_curves_are_animal_balanced_by_kind():
-    """Animal a's no-SWR windows are flat at 0 and 2 in one epoch (median 1),
-    animal b's at 5: the no-SWR median is 3 at every lag. One SWR window at 7."""
-    windows = np.array([[0.0] * 3, [2.0] * 3, [5.0] * 3, [7.0] * 3])
-    curves = ta.kind_triggered_curves(
-        windows,
-        np.array([False, False, False, True]),
-        np.array(["a", "a", "b", "b"]),
-        np.array(["d/e"] * 4),
-        sampling_frequency=500.0,
+def test_stored_triggered_curves_take_the_signals_they_are_given():
+    """Two stored windows of one signal, one per kind, flat at 1 and at 3: each
+    kind's median is its window, at lags of one sample."""
+    windows = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "e",
+            "kind": ["no_overlap", "overlap"],
+            "signal": "slow_gamma_z",
+            "non_local_event": [1, 2],
+            "lag-001": [1.0, 3.0],
+            "lag+000": [1.0, 3.0],
+            "lag+001": [1.0, 3.0],
+        }
     )
-    np.testing.assert_allclose(curves["time"], [-0.002, 0.0, 0.002])
-    np.testing.assert_allclose(curves["no_overlap_median"], 3.0)
-    np.testing.assert_allclose(curves["overlap_median"], 7.0)
-    np.testing.assert_allclose(curves["no_overlap_q25"], (0.5 + 5.0) / 2)
+    curves = ta.stored_triggered_curves(windows, ["slow_gamma_z"])
+    assert list(curves) == ["slow_gamma_z"]
+    np.testing.assert_allclose(curves["slow_gamma_z"]["no_overlap_median"], 1.0)
+    np.testing.assert_allclose(curves["slow_gamma_z"]["overlap_q75"], 3.0)
+    assert len(curves["slow_gamma_z"]["time"]) == 3
