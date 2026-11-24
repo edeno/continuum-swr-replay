@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import likelihoods, newton
+from continuum_swr_replay.analysis.regression import likelihoods, newton, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     NEWTON_DECREMENT_TOL,
     NO_MAXIMUM_ETA_STEP,
@@ -519,7 +519,9 @@ def test_a_softmax_design_constant_within_groups_is_not_identified() -> None:
     assert fit.status == NOT_IDENTIFIED
 
 
-def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
+def test_sessions_of_ten_sizes_compile_once_per_bucket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Ten fits with ten row counts in four row buckets (512, 2,048, 4,096 and
     8,192 rows) trace each Newton kernel exactly once per bucket. The family
     is a class made here, so no earlier test can have traced its kernels."""
@@ -527,6 +529,7 @@ def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
     class _Counted(Poisson):
         pass
 
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 10**9)  # no clear here
     sizes = [300, 500, 1500, 2500, 3500, 4000, 4100, 5000, 6500, 8190]
     buckets = {bucket_size(n, ROW_BUCKET, SMALLEST_ROW_BUCKET) for n in sizes}
     assert buckets == {512, 2048, 4096, 8192}
@@ -651,6 +654,7 @@ def test_a_patched_rule_constant_takes_effect_after_the_kernel_compiled(
     call: with no halvings allowed the same fit fails at its first step, and
     with a loose decrement tolerance (and the step allowed to move the linear
     predictor) it stops after the one last step, without a new trace."""
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 10**9)  # no clear here
     X, y = _logistic_data()
     S = np.zeros((2, 2))
     start = np.array([0.3, 1.0])
