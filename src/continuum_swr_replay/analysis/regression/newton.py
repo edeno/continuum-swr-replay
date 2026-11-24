@@ -264,9 +264,26 @@ def _objective_one(lik, X, y, aux, weight, S, beta):
 
 @float64_kernel(static_argnames=("lik",))
 def _evaluate(lik, X, Y, aux, weight, S, beta):
-    """``(F, l)`` of each fit of the batch, each shape ``(B,)``; ``Y`` and
-    ``beta`` have a leading axis of fits."""
-    return jax.vmap(lambda y, b: _objective_one(lik, X, y, aux, weight, S, b))(Y, beta)
+    """``F`` and ``l`` of each fit of the batch, stacked in one array of shape
+    ``(2, B)``; ``Y`` and ``beta`` have a leading axis of fits."""
+    F, loglik = jax.vmap(lambda y, b: _objective_one(lik, X, y, aux, weight, S, b))(
+        Y, beta
+    )
+    return jnp.stack([F, loglik])
+
+
+#: The scalars of an iteration of one fit, in the order of the kernel's stack;
+#: the flags among them are 0 or 1.
+_SCALARS = (
+    "ok",
+    "decrement",
+    "eta_step",
+    "capped",
+    "F_new",
+    "loglik_new",
+    "halving_ok",
+)
+_FLAGS = ("ok", "capped", "halving_ok")
 
 
 def _iteration_one(
@@ -281,6 +298,8 @@ def _iteration_one(
     shortened to ``cap`` (``capped``) and halved, at most ``n_halvings``
     times, until ``F`` is finite and does not rise: the ``candidate``, its
     ``F_new`` and ``loglik_new``, and ``halving_ok`` when one was found.
+    Returned as the scalars in one array, in the order of ``_SCALARS``, and
+    ``A``, ``step`` and ``candidate`` by name.
     """
     eta = X @ beta
     # score @ X, not X.T @ score: XLA would copy the transposed design.
@@ -317,24 +336,25 @@ def _iteration_one(
     _, _, candidate, F_new, loglik_new, found = jax.lax.while_loop(
         untried, try_scale, (start, scale0, beta, F, jnp.nan * F, jnp.array(False))
     )
-    return {
-        "A": A,
+    scalars = {
         "ok": ok,
-        "step": step,
         "decrement": decrement,
         "eta_step": jnp.max(jnp.abs(X @ step)),
         "capped": scale0 < 1.0,
-        "candidate": candidate,
         "F_new": F_new,
         "loglik_new": loglik_new,
         "halving_ok": found,
     }
+    stacked = jnp.stack(
+        [jnp.asarray(scalars[name], dtype=F.dtype) for name in _SCALARS]
+    )
+    return stacked, {"A": A, "step": step, "candidate": candidate}
 
 
 @float64_kernel(static_argnames=("lik",))
 def _iterate(lik, X, Y, aux, weight, S, beta, F, cap, decrement_tol, n_halvings):
     """:func:`_iteration_one` of each fit of the batch; every output has a
-    leading axis of fits."""
+    leading axis of fits (the scalars, shape ``(B, len(_SCALARS))``)."""
     return jax.vmap(
         lambda y, b, f: _iteration_one(
             lik, X, y, aux, weight, S, b, f, cap, decrement_tol, n_halvings
@@ -389,16 +409,16 @@ class _Problem:
     def evaluate(self, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """``(F, l)`` at ``beta`` of shape ``(B, p)``, each shape ``(B,)``."""
         r = self.rows
-        F, loglik = _evaluate(
-            self.lik, r.X, self.Y, r.aux, r.weight, self.S_device, beta
+        F, loglik = np.array(
+            _evaluate(self.lik, r.X, self.Y, r.aux, r.weight, self.S_device, beta)
         )
-        return np.array(F), np.array(loglik)
+        return F, loglik
 
-    def iterate(self, beta: np.ndarray, F: np.ndarray, cap: float) -> dict:
+    def iterate(self, beta: np.ndarray, F: np.ndarray, cap: float) -> _Iteration:
         """:func:`_iteration_one` at ``beta`` (B, p) with objectives ``F``
-        (B,), the rule constants read now; NumPy arrays."""
+        (B,), the rule constants read now."""
         r = self.rows
-        out = _iterate(
+        scalars, arrays = _iterate(
             self.lik,
             r.X,
             self.Y,
@@ -411,7 +431,28 @@ class _Problem:
             np.float64(NEWTON_DECREMENT_TOL),
             np.int64(MAX_STEP_HALVINGS),
         )
-        return {k: np.array(v) for k, v in jax.device_get(out).items()}
+        return _Iteration(np.asarray(scalars), arrays)
+
+
+class _Iteration(dict):
+    """One iteration of a batch (:func:`_iterate`) on the host, by name.
+
+    The scalars of every fit (``_SCALARS``, shape ``(B,)`` each; the flags as
+    bools) come over in one transfer. ``A``, ``step`` and ``candidate`` stay
+    on the device until first read, since the loop reads ``A`` and ``step``
+    only where a fit stops, then as NumPy arrays.
+    """
+
+    def __init__(self, scalars: np.ndarray, arrays: dict[str, Any]) -> None:
+        super().__init__(
+            (name, scalars[:, i] != 0 if name in _FLAGS else scalars[:, i])
+            for i, name in enumerate(_SCALARS)
+        )
+        self._device = arrays
+
+    def __missing__(self, name: str) -> np.ndarray:
+        self[name] = value = np.asarray(self._device[name])
+        return value
 
 
 @in_float64
