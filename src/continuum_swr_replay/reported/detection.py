@@ -182,8 +182,10 @@ def state_evidence_values(
     """Held-out tetrodes support each decoder state.
 
     Half the tetrodes choose the location, the other half score it; each
-    animal's value is the mean of its epochs' medians, and "animals positive"
-    counts the animals whose mean is above zero. Bouts are the primary
+    epoch's value is its median over its bouts, each animal's value the median
+    over its epochs (``state_evidence.summary.animal_step``: a log-likelihood
+    ratio), and "animals positive" counts the animals whose median is above
+    zero. Bouts are the primary
     (``runcv_``, time-held-out running-only encoding) rows of ``bout_stats``.
     """
     make = value_factory(state_evidence_values, source, TAGS["state_evidence"])
@@ -233,7 +235,8 @@ def state_evidence_values(
                 "quantity",
                 "sig2",
                 f"held-out evidence of {label}, {compares}: mean over animals of "
-                "each animal's mean epoch median",
+                "each animal's median over its epochs of each epoch's median over "
+                "its bouts",
                 "nats per window",
             ),
             make(
@@ -242,8 +245,8 @@ def state_evidence_values(
                 "quantity",
                 "sig2",
                 f"lower bound of its 95 % interval (nested bootstrap of the animals "
-                f"and their epochs, small-sample t correction over the {total} "
-                "animals)",
+                "and their epochs, each replicate with the same estimator, "
+                f"small-sample t correction over the {total} animals)",
                 "nats per window",
             ),
             make(
@@ -259,7 +262,8 @@ def state_evidence_values(
                 positive,
                 "count",
                 "count",
-                f"animals whose mean held-out evidence of {label} is above zero",
+                f"animals whose median over their epochs of the held-out evidence of "
+                f"{label} is above zero",
             ),
             make(
                 f"heldout_{word}_epochs_positive",
