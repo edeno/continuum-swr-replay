@@ -70,6 +70,14 @@ real fit and state the answers in `docs/regression_models.md`):
 - The declared penalty of each per-session smooth term (gate item 2 below): the rule is decided (design,
   seventeenth round); the values found on this model's rows, with the targets, go to the lead with the
   gate's results.
+- (**call**, 2026-11-23) The collinearity rule of a tested coefficient is measured on the penalized problem:
+  the information at the fit plus the smooths' declared penalties, the weak penalties left out
+  (`role_content.tested_coefficient_collinearity`). On the likelihood's information alone `role[current]`
+  failed in 87 % of the recency simulation's session fits (R^2 0.9999994) while the fits recovered it:
+  each by-role smooth's sum-to-zero constraint is computed on the scale rows, so in a session that does
+  not see one of its basis functions the curve's columns hold the role's indicator, and only the curve's
+  penalty fixes that direction (the weak penalties do not). Evidence and the remaining failures (arm
+  effects concentrated on few arms): `content_validation/REPORT.md` in the scratch folder, part 2.
 
 **Gate before any real fit: the uncertainty simulations.** Two semi-synthetic studies on the real data
 structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`):

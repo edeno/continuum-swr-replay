@@ -761,6 +761,106 @@ def test_the_collinearity_rule_reads_the_tested_coefficients(trunk_session) -> N
     assert fit.separable[key]["role[current]"] and fit.separable[key]["role[previous]"]
 
 
+def _one_session_fit(table, model="role_content", seed=0):
+    """The No SWR fit of the one session of ``table``, with a current and a
+    previous level planted; the scale rows are the session's rows of both
+    kinds."""
+    cohort = rc.role_content_cohort(table)
+    scale = cohort.model_rows(model)
+    reference = sc.ScenarioReference(scale, cohort.reference_log_duration)
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 1.0, "previous": -0.5})
+    ((key, rows),) = rc.session_rows(scale[scale[rc.KIND] == KIND]).items()
+    rows = draw_shares(rows, sc.expected_shares(rows, truth, reference), 40, seed)
+    fit = rc.fit_role_content_session(
+        key, rows, model=model, variant="unadjusted", kind=KIND,
+        reference_log_duration=cohort.reference_log_duration, scale_rows=scale,
+    )  # fmt: skip
+    return key, rows, fit
+
+
+def _likelihood_r2(fit, key, rows, name):
+    """The R^2 of one coefficient on every other column, on the information
+    of the likelihood alone (``collinearity.term_collinearity``)."""
+    from continuum_swr_replay.analysis.regression.collinearity import (
+        term_collinearity,
+    )
+    from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
+
+    (record,) = fit.records
+    prepared = rc.design_rows(rows, fit.model, fit.variant, fit.reference).assign(
+        **{rc.WEIGHTED_RESPONSE: rows[rc.RESPONSE]}
+    )
+    used = rc._fitted_rows(fit.design, prepared, record)
+    X, _ = fit.design.session(used)
+    j = fit.design.coef_names.index(name)
+    others = np.setdiff1d(np.arange(X.shape[1]), [j])
+    measured = term_collinearity(
+        GroupedSoftmax(), X, used[rc.WEIGHTED_RESPONSE].to_numpy(dtype=float),
+        pd.factorize(used[rc.UNIT])[0], np.asarray(record.coef, dtype=float),
+        {name: np.array([j]), "rest": others}, intercept=None,
+    )  # fmt: skip
+    return measured[name]["r2"]
+
+
+@pytest.fixture(scope="module")
+def unseen_table() -> pd.DataFrame:
+    """One session whose No SWR events are all at least 0.3 s before the
+    final poke-out, while 3 % of its SWR events are closer: the first basis
+    functions of the current role's smooth of time until leaving are seen
+    in the scale rows (both kinds), barely, and not in the No SWR rows (as
+    in real sessions, where a basis function at the end of a range is seen
+    in some sessions and kinds only)."""
+    table = synthetic_event_arm_table(SESSIONS[:1], n_visits=300, seed=21)
+    rng = np.random.default_rng(4)
+    events = table["event_id"].unique()
+    swr = table.groupby("event_id")["is_swr"].first().loc[events].to_numpy()
+    close = swr & (rng.random(events.size) < 0.03)
+    until = np.where(
+        close, rng.uniform(0.0, 0.3, events.size), rng.uniform(0.3, 3.0, events.size)
+    )
+    return table.assign(
+        time_until_visit_end_s=table["event_id"].map(pd.Series(until, index=events))
+    )
+
+
+def test_a_role_level_fixed_by_its_curve_penalty_is_separable(unseen_table) -> None:
+    """The likelihood alone cannot tell the current level from the current
+    role's curve of time until leaving in this session: the curve's
+    sum-to-zero constraint is computed on the scale rows, so on the
+    session's rows the curve's columns hold the current rows' indicator
+    (R^2 1). The curve's declared penalty fixes that direction: the planted
+    level is recovered, and the rule passes it."""
+    key, rows, fit = _one_session_fit(unseen_table)
+    assert _likelihood_r2(fit, key, rows, "role[current]") > 1 - 1e-6
+    (record,) = fit.records
+    estimate = record.coef[fit.design.coef_names.index("role[current]")]
+    assert estimate == pytest.approx(1.0, abs=0.2)
+    assert fit.separable[key]["role[current]"]
+    assert fit.tested_collinearity[key]["role[current]"]["r2"] < 0.5
+
+
+def test_a_slope_in_a_curve_null_space_is_not_separable(table) -> None:
+    """A value that is a straight line in the reward fraction is the linear
+    part of the role's reward-fraction curve, which its penalty does not
+    touch: neither the likelihood nor the penalty determines the value
+    slope, and the rule fails it. (The role levels fail too here: the value
+    slopes are centered on the pooled leaf rows, so on a role's rows they
+    hold its indicator beside the curve's straight line.)"""
+    one = table[table["session_date"] == int(SESSIONS[0][1])]
+    fraction = one["reward_fraction_candidate_arm_last10_visits"]
+    leaf = one["candidate_arm"] < 6
+    one = one.assign(
+        reward_belief_mean_candidate_arm_preoutcome=np.where(
+            leaf, 0.3 + 0.4 * fraction, np.nan
+        )
+    )
+    key, rows, fit = _one_session_fit(one)
+    name = "value:role=other_leaf"
+    assert _likelihood_r2(fit, key, rows, name) > 1 - 1e-6
+    assert fit.tested_collinearity[key][name]["r2"] > 1 - 1e-6
+    assert not fit.separable[key][name]
+
+
 def test_an_event_weight_counts_as_repeated_events(table) -> None:
     rng = np.random.default_rng(0)
     events = table[rc.UNIT].unique()

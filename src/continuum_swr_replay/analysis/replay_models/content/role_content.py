@@ -66,6 +66,14 @@ A call of this module, made where the plan does not fix it:
   never the record's term ``role``; the trunk level is not a tested
   coefficient and is left out of it, because its collinearity is a property of
   the design (a function of the arm, fitted at 0), not of the data.
+- The collinearity of a tested coefficient is measured on the information of
+  the penalized problem with the smooths' declared penalties in and the weak
+  penalties out (:func:`tested_coefficient_collinearity` says why). On the
+  information of the likelihood alone a role level is collinear with its own
+  curves in most real sessions (R^2 1 to six decimals), because a curve's
+  sum-to-zero constraint is computed on the scale rows and a basis function
+  seen there can be unseen in a session; the curve's penalty fixes that
+  direction, and the fit recovers the level.
 
 The cohort step (:func:`role_content_cohort`) selects the events with
 ``select_visit_context`` (default ``STARTS_IN_WELL_VISIT``), checks the nine
@@ -97,8 +105,10 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
 )
 from continuum_swr_replay.analysis.regression.collinearity import (
+    RANK_TOL,
+    concurvity,
     separable,
-    term_collinearity,
+    weighted_design,
 )
 from continuum_swr_replay.analysis.regression.contrasts import range_mean_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
@@ -1013,9 +1023,9 @@ class RoleContentFit:
         """The collinearity rule of these models: session key -> tested
         coefficient -> True when the other columns explain less than
         ``collinearity.MAX_EXPLAINED`` of it (``collinearity.separable`` of
-        :attr:`tested_collinearity`). The record's collinearity of the term
-        ``role`` is not read: it counts the trunk level, exactly collinear
-        with the arm effects by construction."""
+        :attr:`tested_collinearity`, measured on the penalized problem). The
+        record's collinearity of the term ``role`` is not read: it counts the
+        trunk level, exactly collinear with the arm effects by construction."""
         return {key: separable(m) for key, m in self.tested_collinearity.items()}
 
 
@@ -1189,12 +1199,30 @@ def _fitted_rows(design: Design, rows: pd.DataFrame, record: FitRecord) -> pd.Da
 def tested_coefficient_collinearity(
     design: Design, rows: pd.DataFrame, record: FitRecord, tested: Sequence[str]
 ) -> dict[str, dict[str, float]]:
-    """Each tested coefficient's collinearity with every other column, alone.
+    """Each tested coefficient's collinearity with every other column, alone,
+    on the information of the fit's penalized problem.
 
-    Measured as the record's (``collinearity.term_collinearity``, on the
-    information at the fit), with each tested coefficient as a term of its
-    own and each model term's other columns as one term. Empty for a session
-    without a kept fit.
+    The measure is ``collinearity.concurvity`` (``r2`` and ``vif`` for one
+    column) on the design weighted by the information at the fit
+    (``collinearity.weighted_design``), with the square root of each smooth
+    term's declared penalty appended as rows: ``X~' X~`` is then the
+    information plus the smooths' penalties. The weak penalties of the
+    simple terms are left out, so that a coefficient fixed only by its own
+    prior, or by another tested coefficient's, still fails.
+
+    Why the smooths' penalties are in: a smooth's sum-to-zero constraint is
+    computed on the scale rows, not on a session's rows. When a basis
+    function of a role's curve is seen in the scale rows and not in a
+    session's rows of the kind fitted, the curve's columns hold that role's
+    indicator on the session's rows, and the likelihood alone cannot tell
+    the role level from the curve's level (R^2 1). The curve's declared
+    penalty fixes that direction (the curve beyond the session's values is
+    its penalized extrapolation), and the fit recovers the level. A
+    direction the penalty does not touch (a slope that is a straight line
+    in a smooth's covariate, in the penalty's null space) still fails.
+
+    Each tested coefficient is a term of its own and each model term's other
+    columns are one term. Empty for a session without a kept fit.
 
     Parameters
     ----------
@@ -1220,23 +1248,57 @@ def tested_coefficient_collinearity(
             f"rebuilt {len(used)} rows for the fit, the record has {record.n_rows}"
         )
     X, _ = design.session(used)
-    aux = pd.factorize(used[UNIT])[0]
+    beta = np.asarray(record.coef, dtype=float)
+    active = np.isfinite(beta)
+    index = np.cumsum(active) - 1  # a column's place among the active ones
+    weighted = weighted_design(
+        GroupedSoftmax(),
+        X[:, active],
+        used[WEIGHTED_RESPONSE].to_numpy(dtype=float),
+        pd.factorize(used[UNIT])[0],
+        X[:, active] @ beta[active],
+    )
+    augmented = np.vstack([weighted, _smooth_penalty_root(design, active, index)])
     names = list(design.coef_names)
     terms: dict[str, np.ndarray] = {}
     for term, columns in design.term_columns.items():
+        columns = [j for j in columns if active[j]]
         alone = [j for j in columns if names[j] in tested]
         rest = [j for j in columns if names[j] not in tested]
         for j in alone:
-            terms[names[j]] = np.array([j])
+            terms[names[j]] = index[[j]]
         if rest:
-            terms[term] = np.array(rest)
-    measured = term_collinearity(
-        GroupedSoftmax(),
-        X,
-        used[WEIGHTED_RESPONSE].to_numpy(dtype=float),
-        aux,
-        np.asarray(record.coef, dtype=float),
-        terms,
-        intercept=None,
-    )
-    return {name: measured[name] for name in tested if name in measured}
+            terms[term] = index[rest]
+    measured = concurvity(augmented, terms, beta[active], intercept=None)
+    out = {}
+    for name in tested:
+        if name not in measured:
+            continue
+        r2 = measured[name]["estimate"]
+        vif = np.inf if 1.0 - r2 <= RANK_TOL else 1.0 / (1.0 - r2)
+        out[name] = {"r2": r2, "vif": float(np.nan if np.isnan(r2) else vif)}
+        if "not_measured" in measured[name]:
+            out[name]["not_measured"] = measured[name]["not_measured"]
+    return out
+
+
+def _smooth_penalty_root(
+    design: Design, active: np.ndarray, index: np.ndarray
+) -> np.ndarray:
+    """Rows ``L`` with ``L' L`` the smooth terms' declared penalties over the
+    active columns (each block at its fixed log penalty), shape
+    ``(n_rows, n_active)``."""
+    out = []
+    for term in design.terms:
+        if term.kind != "smooth" or term.block is None:
+            continue
+        block = design.blocks[term.block]
+        values, vectors = np.linalg.eigh(
+            np.exp(design.log_penalties[term.block]) * block.S
+        )
+        root = np.sqrt(np.clip(values, 0.0, None))[:, None] * vectors.T
+        keep = active[block.columns]
+        rows = np.zeros((root.shape[0], int(active.sum())))
+        rows[:, index[block.columns[keep]]] = root[:, keep]
+        out.append(rows)
+    return np.vstack(out) if out else np.zeros((0, int(active.sum())))
