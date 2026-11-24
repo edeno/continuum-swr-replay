@@ -62,6 +62,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [2026-11-11-paper-development-plan.md](design/2026-11-11-paper-development-plan.md) — proposed scientific plan for the paper.
   - [2026-11-12-paper-question-outline.md](design/2026-11-12-paper-question-outline.md) — proposed questions and subquestions of the paper.
   - [2026-11-20-regression-convention-and-figure04.md](design/2026-11-20-regression-convention-and-figure04.md) — one convention for every regression model, the shared fitter, and the plan of Figure 4, with the lead's decisions.
+  - [2026-11-24-unit-of-fit.md](design/2026-11-24-unit-of-fit.md) — the unit of the fit of the behavior models: one fit for each recording day and for each animal, a baseline for each session (design C), with the lead's decision and the simulation evidence.
   - [content_model_design.md](design/content_model_design.md) — the `is_swr` content ladder.
   - [content_estimator_comparison.md](design/content_estimator_comparison.md) — three content estimators compared on one cohort.
   - [pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md) — the mPFC unit GLM, its held-out test, and its bundles.

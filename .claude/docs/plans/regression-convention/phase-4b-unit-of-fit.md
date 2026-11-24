@@ -16,7 +16,11 @@ for now." (02:14); "I'm inclined to do C and then attempt D as we are doing C, b
 prohibitive" (03:13; C is one fit per animal with a baseline for each session, D one model with random
 session effects and REML penalties); "Maybe we make it easy in the code to do day or animal grouping"
 (03:33). On the penalties: "Should we keep the fixed penalty?" / "Ok decide then" (03:18, 03:20): the
-author decides after the running simulations report. Still in force from 2026-11-23: no Firth fit; a
+author decides after the running simulations report. After the simulations: "I suspect with will end up
+doing design C for all. And then running both the day and animal model and compare" (09:47); "So maybe
+design C with day and animal model and then design D later to check." (09:49); "I did say maybe, lets
+just make this the decision now and we can change if the evidence is against it" (09:55). So design C is
+decided, at both the day and the animal unit. Still in force from 2026-11-23: no Firth fit; a
 regression model; the weak penalty on every simple tested coefficient; simulations use the real code.
 
 **The gate stays:** simulation results go to the lead before any real fit at a new unit.
@@ -37,8 +41,9 @@ Each is OPEN. The phase builds what is needed to answer it; it does not answer i
    The lead left this to the author ("Ok decide then"). Awaited: the unit run's "pS" against "pU" arms;
    the design D trials (`S/design_d_trial/rate/`, `S/design_d_trial/content/`). The author reports the
    choice and its evidence to the lead before task 6's losing path is removed.
-4. **The declared value of `fit_by`: `"day"` or `"animal"`** (the lead's 03:31 question, "And grouping by
-   day wouldn't work?", and 03:33). Awaited: the validation slice at both units.
+4. *(Answered, 09:55: both units. The behavior models are fitted at the day and the animal unit and the
+   two are compared.)* **The declared value of `fit_by`: `"day"` or `"animal"`** (the lead's 03:31
+   question, "And grouping by day wouldn't work?", and 03:33).
 5. **Which target the paper states when sessions differ**: the plain mean of session effects (today's)
    or the unit's information-weighted effect. Awaited: both targets, reported side by side, under the
    scenarios that plant session differences (task 7, task 10).
@@ -184,9 +189,11 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
 1. **The setting and the key.** In `tables/session_keys.py`: `FitBy = Literal["session", "day",
    "animal"]`, `FIT_BY_COLUMNS` (`"session"`: `SESSION_COLUMNS`; `"day"`: `("animal", "session_date")`;
    `"animal"`: `("animal",)`) and `unit_key(session_key, fit_by)`. In `analysis/replay_models/fit_by.py`
-   (new): `BEHAVIOR_FIT_BY: FitBy = "session"` (the default until question 4 is answered), with the
-   decision record in its docstring. Tests: `tests/tables/test_session_keys.py::test_unit_key_of_each_fit_by`,
-   `::test_unknown_fit_by_refused`.
+   (new): `BEHAVIOR_FIT_BY: tuple[FitBy, ...] = ("day", "animal")` (the units every behavior model is
+   fitted at, in that order; question 4), with the decision record in its docstring. `"session"` stays a
+   value of `FitBy` and the default of `fit_sessions`, with today's behavior exactly. Tests:
+   `tests/tables/test_session_keys.py::test_unit_key_of_each_fit_by`, `::test_unknown_fit_by_refused`,
+   `tests/analysis/replay_models/test_fit_by.py::test_behavior_units_are_day_and_animal`.
 2. **The grouping key through the fitter's loop and its record.** `fit_sessions(..., fit_by="session")`
    groups the sessions given by `unit_key`, in the order of each unit's first session, concatenates each
    unit's rows (each row keeping its session key) and runs one fit per unit. The support unit is
@@ -440,3 +447,9 @@ The design note's section 11 has the evidence. What changes in this file:
 - **The program bound** (`runtime.LIVE_PROGRAM_LIMIT`): a unit's fit is one outermost call per unit, as a
   session's is today; `fit_sessions` stays without `in_float64` (`docs/design/regression_fitter.md`, "How
   many programs a process keeps").
+- **Question 4 is answered (lead, 09:55): both units.** "I did say maybe, lets just make this the decision
+  now and we can change if the evidence is against it". Task 1 declares `BEHAVIOR_FIT_BY = ("day",
+  "animal")`, not one value. `"session"` stays a value of `FitBy` and the default of `fit_sessions`. A
+  model's settings carry one `fit_by` for each run (tasks 8 and 9). Task 7: since both units are always
+  run, a run of the engine fits the same drawn data sets at several units where the engine's structure
+  allows it.

@@ -1,8 +1,8 @@
 # The unit of the fit: session, day or animal, one setting for the behavior models
 
-2026-11-24. Status: **direction given by the lead; the task-free mechanism is being built** (section 11
-has what the simulations and the lead settled after sections 1 to 10 were written, and where it and an
-earlier section disagree, section 11 holds). The implementation plan is
+2026-11-24. Status: **decided by the lead (09:55): design C, fitted at the day and the animal unit; the
+task-free mechanism is being built** (section 11 has what the simulations and the lead settled after
+sections 1 to 10 were written, and where it and an earlier section disagree, section 11 holds). The implementation plan is
 `.claude/docs/plans/regression-convention/phase-4b-unit-of-fit.md`. The convention this changes is
 [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-convention-and-figure04.md)
 (the "design" below), sections 4.3 and 4.5 and the fourteenth and seventeenth rounds of its section 9.
@@ -72,6 +72,7 @@ All on 2026-11-24, in order.
   running simulations report (section 5).
 - 03:31: "And grouping by day wouldn't work?"
 - 03:33: "Maybe we make it easy in the code to do day or animal grouping"
+- 09:47 to 09:55: the decision (section 11.1).
 
 Earlier decisions that still hold (2026-11-23, recorded in the design's section 9): no bias-reduced
 (Firth) fit (eighteenth round); a regression model, not a stratified estimate (nineteenth round); the
@@ -124,26 +125,28 @@ One setting, three values (**call**, on the lead's 03:33 words):
 
 | value | one fit for | the unit's key |
 |---|---|---|
-| `"session"` | each session (today) | `(animal, session_date, epoch)` |
-| `"day"` | each recording day of an animal | `(animal, session_date)` |
-| `"animal"` | each animal | `(animal,)` |
+| `"session"` | each session (the earlier design; validation and comparison only) | `(animal, session_date, epoch)` |
+| `"day"` | each recording day of an animal (a declared unit of the behavior models) | `(animal, session_date)` |
+| `"animal"` | each animal (a declared unit of the behavior models) | `(animal,)` |
 
 - **Name** (**call**): `fit_by`. The word "unit" is taken: the fitter's `unit` argument is the support
   replicate (a visit, an event). `fit_sessions(..., unit="well_visit_id", fit_by="animal")` reads without
   a clash.
-- **One declaration** (**call**). The type and the key of each value are task-free. They live beside
-  the session key, in `tables/session_keys.py` (new there: `FitBy`, `FIT_BY_COLUMNS`, `unit_key`); the
-  fitter reads them (the fitter's package may import that foundation module, as `record.py` already
-  imports `tables.io`). The value that every behavior model uses is declared once, in
-  `analysis/replay_models/fit_by.py` (new: `BEHAVIOR_FIT_BY`). The rate, content, choice, stay-or-leave
-  and ripple-power models read it. The mPFC models do not (decided, 02:14).
+- **One declaration.** The type and the key of each value are task-free. They live beside the session
+  key, in `tables/session_keys.py` (`FitBy`, `FIT_BY_COLUMNS`, `unit_key`); the fitter reads them (the
+  fitter's package may import that foundation module). The units at which every behavior model is
+  fitted are declared once, in `analysis/replay_models/fit_by.py`: `BEHAVIOR_FIT_BY = ("day",
+  "animal")`, both units, in that order (decided, 09:55; section 11.1). The rate, content, choice,
+  stay-or-leave and ripple-power models read it. The mPFC models do not (decided, 02:14). `"session"`
+  stays a value of `FitBy` and of the mechanism, with today's behavior exactly: it is the earlier design,
+  kept for the validation and for comparison, and it is the default of `fit_sessions`.
 - **One code path.** `fit_sessions` takes `fit_by` and groups the sessions it is given into units. Each
   unit is one fit through the same steps as today's session (support, levels, refits, record). There is
   no second loop. At `fit_by="session"` every unit holds one session, and the records equal today's.
-- **Overrides.** A model's settings (`VisitRateSettings`, `RoleContentSettings`) carry `fit_by`, with
-  `BEHAVIOR_FIT_BY` as the default, so that a simulation can fit every unit on the same data sets. The
-  record stores `fit_by`. The reported-values builders refuse a set of behavior fits with more than one
-  value (**call**: this is how "consistent" is enforced).
+- **Runs.** A model's settings (`VisitRateSettings`, `RoleContentSettings`) carry one `fit_by` for each
+  run, one of `BEHAVIOR_FIT_BY` for a real fit, so that a simulation can fit every unit on the same data
+  sets. The record stores `fit_by`. A reported value names the unit it comes from (**call**: this is how
+  "consistent" is enforced; which unit the headline values come from is open, section 11.4).
 
 ### 4.1 What is shared and what stays per session
 
@@ -297,7 +300,8 @@ to it and does not replace it:
 2. Content: arm effects shared or per session (section 4.1 b).
 3. Penalties under a larger unit: fixed and recalibrated, or REML; and the target edf of a unit
    (section 5).
-4. The declared value of `fit_by`: day or animal (the lead's 03:31 question and 03:33 words leave both).
+4. *(Decided, 09:55: both. The behavior models are fitted at the day and the animal unit and the two
+   are compared; section 11.1.)* The declared value of `fit_by`: day or animal.
 5. Which target the paper states when sessions differ (section 6).
 6. Whether design D follows, and for which models (section 9).
 
@@ -319,14 +323,20 @@ session arm effects and REML, a hand-built sparse fitter, 2,110 fits), `content_
 - 09:48: "I think there will be a decent amount of variation from day to day (or even session to session)
   from learning, motivation, etc."
 - 09:49: "So maybe design C with day and animal model and then design D later to check."
+- 09:55: "I did say maybe, lets just make this the decision now and we can change if the evidence is
+  against it"
 
-**Call (the author's reading):** the behavior models are built as design C; the setting `fit_by` carries
-both `"day"` and `"animal"`, both are simulated and, after the lead has seen the validation, both are
-fitted and compared; design D is a later check on the same mechanism (section 9), not part of this phase.
+**Decided by the lead (09:55):** the behavior models are built as design C. There is one fit for each
+unit, a baseline for each session, the tested terms shared inside the unit, fixed declared penalties and
+the weak penalty on every simple tested coefficient. Every behavior model is fitted at the day unit and at
+the animal unit (`BEHAVIOR_FIT_BY = ("day", "animal")`), both are simulated and, after the lead has seen
+the validation, both are fitted to the real data and compared. Design D is a later check on the same
+mechanism (section 9), not part of this phase. The decision changes if the evidence is against it.
 Design C shares the tested terms, the curves included, inside a unit. That is the point the fourteenth
 round declined on 2026-11-21 for the per-session design; the lead has now seen design C described in those
 terms twice (the rate trial's "C-like" form, the content run's form B) and named it. The rate model's
-clock curves stay question 1 until its scenario with session-specific curves reports (11.4).
+clock curves are the point that the running scenario with session-specific curves can still change
+(11.4; "we can change if the evidence is against it").
 
 ### 11.2 What the simulations settled
 

@@ -740,6 +740,7 @@ terms. The lead: "I don't want one curve for each animal. This is a whole new de
   average recover the planted shape, and at which strength.
 - The shared fitter is corrected for the failures that the content design showed (sessions with no finite
   maximum, fits at very strong penalties, a flat score); its merge waits for that.
+- Changed on 2026-11-24 for the behavior models: see the twenty-fourth round ("the unit of the fit").
 
 ### Fifteenth round (2026-11-21): the shared fitter on master; two questions open with the lead
 
@@ -813,6 +814,8 @@ The author's reading of these two answers (**call**). The author told the lead t
 - A target does not carry from one model to another. Simulation: the same target (6 effective
   parameters) gave different log penalties in two designs (about 3.4 for one arrival curve alone, about
   1.8 with two clocks and the reward term), and biases of the Q1 contrast of opposite sign.
+- Changed on 2026-11-24 for the behavior models: "one fit for each session" gives way to one fit for each
+  recording day and for each animal (the twenty-fourth round, "the unit of the fit").
 
 ### Eighteenth round (lead, 2026-11-23, 09:52): no bias-reduced fit
 
@@ -983,6 +986,58 @@ f. **A support rule per grid point** for curves averaged over sessions (an idea 
 g. **The width of the weak penalty.** One declared prior SD for all models, in the reported unit. Not
    chosen. A simulation with SD 1, 2 and 4 is running. Each family reports a sensitivity analysis over the
    strength (Greenland and Mansournia 2015).
+
+### Twenty-fourth round (lead, 2026-11-24, 02:09 to 09:55): the unit of the fit
+
+This round's number is settled when the unmerged branches merge: they hold rounds of their own with the
+same numbers. The record is `docs/design/2026-11-24-unit-of-fit.md` (sections 2 and 11).
+
+The lead's words, 2026-11-24:
+
+- 02:09 and 02:10: "I'd like to be consistent with what we do with the behavior models" / "By behavior
+  models, I mean rate, content, etc"
+- 02:14: "Does not include the mpfc models for now."
+- 03:13: "I'm inclined to do C and then attempt D as we are doing C, but we will see if it is
+  prohibitive"
+- 03:33: "Maybe we make it easy in the code to do day or animal grouping"
+- 09:47: "I suspect with will end up doing design C for all. And then running both the day and animal
+  model and compare"
+- 09:48: "I think there will be a decent amount of variation from day to day (or even session to
+  session) from learning, motivation, etc."
+- 09:49: "So maybe design C with day and animal model and then design D later to check."
+- 09:55: "I did say maybe, lets just make this the decision now and we can change if the evidence is
+  against it"
+
+What is decided:
+
+- **Design C for every behavior model** (rate, content, choice, stay or leave, ripple power; not the mPFC
+  models). There is one fit for each unit. Each session in the unit keeps a baseline of its own (the
+  intercept of a rate model, the arm effects of a content model). The tested terms, the curves included,
+  are shared inside the unit. The penalties are fixed and declared. The weak penalty stays on every simple
+  tested coefficient.
+- **Two units, compared**: one fit for each recording day and one for each animal
+  (`analysis/replay_models/fit_by.py`, `BEHAVIOR_FIT_BY = ("day", "animal")`). One fit for each session
+  stays in the code for the validation and for comparison.
+- Design D (random session effects, their strengths selected by REML) is a later check on the same
+  mechanism.
+- The decision changes if the evidence is against it.
+
+This round changes two earlier rounds. The fourteenth round kept one fit for each session and declined
+one curve for each animal (2026-11-21, for the per-session design). The seventeenth round kept one fit
+for each session for every model (2026-11-22).
+
+The evidence (simulation numbers; the design note, section 11.2): with nothing planted, the content
+model's per-session estimates are off by up to 0.47 (Q3a -0.22 / -0.15, Q7b -0.34 / -0.47, Q5b-var
++0.26 / +0.25, No SWR / SWR), and one fit per animal takes these to 0.03 or less; one fit per day takes
+them to between 0.03 and 0.18. The rate model's reward coefficient goes from +0.11 / +0.09 per session to
++0.011 / +0.006 per animal. Per-session arm effects gave a smaller largest bias than shared ones (0.035
+against 0.062), and penalties selected by REML over-smoothed the curves that the tests read at their ends.
+The reports are `.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/REPORT.md`,
+`.../design_d_trial/content/REPORT.md` and `.../content_validation/unit_of_fit/tables.md`.
+
+Open (the design note, section 11.4): whether the rate model's clock curves are shared inside a unit or
+are per session; the rate model at the day unit and the declared penalties of its clocks at a larger unit;
+which target the paper states when sessions differ; which unit the headline values come from.
 
 ## 10. Left to the builder
 
