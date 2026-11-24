@@ -893,9 +893,9 @@ def reml_and_derivatives(
     vectors, rotated = _eigenbasis(blocks, n_columns)
     if rho.shape != (len(blocks),):
         raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
-    X_rotated = X.copy()
-    for block, V in zip(blocks, vectors, strict=True):
-        X_rotated[:, block.columns] = X[:, block.columns] @ V
+    # X Q as one product: assigning each block's columns by index took 3 to 6
+    # times as long (fancy indexing copies) at the rate model's size.
+    X_rotated = X @ _rotate(blocks, vectors, np.eye(n_columns))
     start = np.zeros(n_columns) if beta0 is None else np.asarray(beta0, dtype=float)
     session = _reml_in_basis(
         lik,
