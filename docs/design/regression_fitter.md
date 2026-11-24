@@ -282,7 +282,7 @@ in choosing the penalties); one without a fit has NaN coefficients, covariance, 
 score. `PooledFit.score` is the
 pooled score over `search.in_choice` only, so two models' scores are compared only on
 the same set. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for reporting
-a model) of the sessions end without a fit (`PenaltySearch.share_without_fit`), the
+a model) of the sessions end without a fit (set aside and not fitted by their refits), the
 search raises, naming each with its statuses and the reason.
 
 In exact arithmetic the first refit, before any column is left out, cannot succeed:
@@ -297,7 +297,7 @@ fitted. A search that does not converge (50 steps, or a step no halving accepts)
 too, with the last log strengths, the gradient and the steps taken; there is no argument
 that returns an unconverged result. When sessions fail at only part of the grid, the
 search goes on from the finite points and records how many failed and why
-(`PenaltySearch.n_grid_not_finite`, `grid_failures`: the count per status).
+(`PenaltySearch.grid_failures`: the count per status).
 `fit_at_penalties` fits at given strengths without a search (and without the score's
 derivatives).
 Each session's fit carries its covariance `A^-1` (mgcv's `Vp`) and the edf per term and in
@@ -426,7 +426,7 @@ the `by` of another term is not a term, and its penalty is not read.
 
 A fixed log penalty `rho` on a simple coefficient is a Normal prior of mean 0 and SD
 `exp(-rho / 2)`: the fit minimizes `-l + exp(rho) b**2 / 2`
-(`terms.log_penalty_from_prior_sd` and `terms.prior_sd_from_log_penalty`). The
+(`terms.log_penalty_from_prior_sd`). The
 coefficient is in the unit the convention reports: a 0/1 column enters as it is (a step
 from 0 to 1), and a continuous column enters divided by its pooled SD (centered first
 when it is by a category), so its coefficient is per pooled SD and the prior SD is too.
@@ -962,10 +962,9 @@ jitted through `runtime.float64_kernel`, which refuses when it is traced with th
 or with a floating input that is not float64. A float64 array made inside the scope stays
 float64 after it, but arithmetic on it outside the scope is in float32.
 
-**One device.** `in_float64` first calls `runtime.require_device`, which is
-`runs.device.require_one_jax_device`: the fitter refuses to start unless this process
-configured a card (`configure_jax_gpu`), `JAX_PLATFORMS` excludes CUDA, or
-`CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
+**One device.** `in_float64` first calls `runs.device.require_one_jax_device`: the
+fitter refuses to start unless this process configured a card (`configure_jax_gpu`),
+`JAX_PLATFORMS` excludes CUDA, or `CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
 starts no backend. The message says what to set. A runner that fits calls
 `runs.device.default_jax_platforms("cpu")` in `main` unless it asks for a GPU
 (`simulate_declared_penalty.py`, `compare_regression_to_mgcv.py`,

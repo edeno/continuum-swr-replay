@@ -22,7 +22,7 @@ A :class:`Category` and a :class:`Slope` take the same required ``penalty``
 as a smooth. A fixed log penalty puts the identity on each of the term's
 columns (each coded level; each level's slope), as its own penalty block: a
 Normal prior of mean 0 on each coefficient, of SD
-:func:`prior_sd_from_log_penalty`. The coefficient is in the unit the
+``exp(-rho / 2)`` (the inverse of :func:`log_penalty_from_prior_sd`). The coefficient is in the unit the
 convention reports (a 0/1 step; one pooled SD of a continuous covariate, see
 Standardization), so the prior SD is in that unit too. A category used only
 as the ``by`` of another term is not a term: its ``penalty`` is not read.
@@ -108,7 +108,6 @@ __all__ = [
     "Standardization",
     "build_design",
     "log_penalty_from_prior_sd",
-    "prior_sd_from_log_penalty",
     "standardization",
 ]
 
@@ -159,13 +158,6 @@ def log_penalty_from_prior_sd(sd: float) -> float:
     if not (np.isfinite(sd) and sd > 0):
         raise ValueError(f"a prior SD must be positive and finite, not {sd}")
     return float(-2.0 * np.log(sd))
-
-
-def prior_sd_from_log_penalty(log_penalty: float) -> float:
-    """The prior SD of one coefficient at ``log_penalty``:
-    ``exp(-log_penalty / 2)``, the inverse of
-    :func:`log_penalty_from_prior_sd`."""
-    return float(np.exp(-0.5 * log_penalty))
 
 
 @dataclass(frozen=True)

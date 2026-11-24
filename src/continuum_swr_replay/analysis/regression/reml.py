@@ -434,12 +434,6 @@ class SetAsideSession:
         """True when its last fit at the chosen log penalties converged."""
         return self.refits[-1].fit.converged
 
-    @property
-    def running_away(self) -> np.ndarray:
-        """The columns running away at the reference point
-        (:func:`.newton.running_away_columns`)."""
-        return self.reference.fit.running_away
-
 
 @dataclass(frozen=True)
 class PenaltySearch:
@@ -485,19 +479,6 @@ class PenaltySearch:
     grid_failures: dict[str, int]
     n_outer_steps: int
     at_boundary: np.ndarray
-
-    @property
-    def n_grid_not_finite(self) -> int:
-        """Grid points whose pooled score was not finite."""
-        return sum(self.grid_failures.values())
-
-    @property
-    def share_without_fit(self) -> float:
-        """The share of the sessions given (those in the choice and those set
-        aside) that end without a fit (set aside and not fitted by their
-        refits); at most ``MAX_FAILING_SHARE``."""
-        n_sessions = self.in_choice.size + len(self.set_aside)
-        return sum(not r.fitted for r in self.set_aside) / n_sessions
 
 
 @dataclass(frozen=True)

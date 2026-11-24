@@ -321,11 +321,6 @@ class _DiagonalFamily(_Family):
         """The design whose column space the likelihood identifies: ``X``."""
         return X
 
-    def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
-        """The rows padded to their bucket (``padding.pad_rows``)."""
-        padded = pad_rows(X, y)
-        return Rows(padded.X, padded.y, aux, padded.weight, padded.n_real)
-
     def _jax_weights(self, eta: Any, aux: Any) -> tuple[Any, Any, Any]:
         """``(w, dw/deta, d2w/deta2)``, each shape ``(n_rows,)``."""
         raise NotImplementedError
