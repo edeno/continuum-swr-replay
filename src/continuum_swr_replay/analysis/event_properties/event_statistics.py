@@ -1076,35 +1076,43 @@ def peak_ripple_mode_statistics(
 
 
 def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
-    """Each animal's time bins, and its non-local ones, by the level of a signal
-    (ripple power or MUA).
+    """Each animal's shares of its time bins by the level of a signal (ripple
+    power or MUA), epoch -> animal: each epoch's share, then the mean over the
+    animal's epochs.
 
     Parameters
     ----------
     epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
-        One row per epoch and signal bin (``nonlocal_by_signal.nonlocal_counts``),
-        with ``animal``, ``signal_low``, ``signal_high``, ``n_bins`` and
-        ``n_nonlocal``.
+        One row per epoch and signal bin (``nonlocal_by_signal.nonlocal_counts``,
+        every signal bin of every epoch), with ``epoch_id``, ``animal``,
+        ``signal_low``, ``signal_high``, ``n_bins`` and ``n_nonlocal``.
 
     Returns
     -------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, 7)
+    counts : pd.DataFrame, shape (n_animals * n_signal_bins, 6)
         One row per animal and signal bin, in that order: ``animal``,
-        ``signal_low``, ``signal_high``, ``n_bins`` and ``n_nonlocal`` summed
-        over the animal's epochs, ``share`` (the non-local share of the bin's
-        time bins, NaN where the animal has none) and ``nonlocal_fraction``
-        (the bin's share of the animal's non-local bins).
+        ``signal_low``, ``signal_high``, ``share`` (the mean over the animal's
+        epochs with a time bin in the signal bin of each epoch's non-local
+        share of them; NaN where the animal has no such epoch),
+        ``nonlocal_fraction`` (the mean over the animal's epochs with a
+        non-local bin of each epoch's share of its non-local bins in the signal
+        bin, 0 where the epoch has none there) and ``n_epochs`` (the epochs
+        with a time bin in the signal bin).
     """
-    counts = epoch_counts.groupby(
-        ["animal", "signal_low", "signal_high"], as_index=False
-    )[["n_bins", "n_nonlocal"]].sum()
-    counts["share"] = counts["n_nonlocal"] / counts["n_bins"].where(
-        counts["n_bins"] > 0
+    epochs = epoch_counts.assign(
+        share=epoch_counts["n_nonlocal"]
+        / epoch_counts["n_bins"].where(epoch_counts["n_bins"] > 0),
+        has_bins=epoch_counts["n_bins"] > 0,
     )
-    counts["nonlocal_fraction"] = counts["n_nonlocal"] / counts.groupby("animal")[
-        "n_nonlocal"
-    ].transform("sum")
-    return counts
+    total = epochs.groupby("epoch_id")["n_nonlocal"].transform("sum")
+    epochs["nonlocal_fraction"] = epochs["n_nonlocal"] / total.where(total > 0)
+    # pandas' mean leaves out NaN: an epoch with no time bin (no non-local
+    # bin) is not one of the animal's epochs for that share
+    return epochs.groupby(["animal", "signal_low", "signal_high"], as_index=False).agg(
+        share=("share", "mean"),
+        nonlocal_fraction=("nonlocal_fraction", "mean"),
+        n_epochs=("has_bins", "sum"),
+    )
 
 
 def _require_edge(counts: pd.DataFrame, threshold: float) -> None:
@@ -1128,7 +1136,8 @@ def nonlocal_below_threshold_statistics(
     -------
     statistics : dict
         - ``fraction_animal_mean``: the mean over animals of each animal's
-          share of its non-local time bins whose signal is below ``threshold``.
+          share of its non-local time bins whose signal is below ``threshold``:
+          the mean over its epochs with a non-local bin of each epoch's share.
         - ``fraction_animal_min``, ``fraction_animal_max``: the lowest and
           highest of the animals' shares.
         - ``n_animals``: the animals.
@@ -1139,6 +1148,8 @@ def nonlocal_below_threshold_statistics(
         If ``threshold`` is not an edge of the signal's bins.
     """
     _require_edge(counts, threshold)
+    # the mean over epochs of each bin's fraction, summed over the bins below,
+    # is the mean over the same epochs of each epoch's fraction below
     below = (
         counts[counts["signal_high"] <= threshold]
         .groupby("animal")["nonlocal_fraction"]
@@ -1153,23 +1164,24 @@ def nonlocal_below_threshold_statistics(
 
 
 def nonlocal_share_above_statistics(
-    counts: pd.DataFrame, threshold: float
+    epoch_counts: pd.DataFrame, threshold: float
 ) -> dict[str, float]:
     """The share of the time bins with a signal at or above a level that are
     decoded non-local.
 
     Parameters
     ----------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
-        :func:`animal_signal_counts`.
+    epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
+        As :func:`animal_signal_counts` takes them.
     threshold : float
         The level, z; an edge of the signal's bins.
 
     Returns
     -------
     statistics : dict
-        - ``share_animal_mean``: the mean over animals of each animal's
-          non-local bins at or above ``threshold`` over its bins there.
+        - ``share_animal_mean``: the mean over animals of each animal's share:
+          the mean over its epochs with a time bin at or above ``threshold`` of
+          each epoch's non-local bins there over its bins there.
         - ``share_animal_min``, ``share_animal_max``: the lowest and highest
           animal.
         - ``n_animals``: the animals.
@@ -1179,13 +1191,14 @@ def nonlocal_share_above_statistics(
     ValueError
         If ``threshold`` is not an edge of the signal's bins.
     """
-    _require_edge(counts, threshold)
+    _require_edge(epoch_counts, threshold)
     above = (
-        counts[counts["signal_low"] >= threshold]
-        .groupby("animal")[["n_nonlocal", "n_bins"]]
+        epoch_counts[epoch_counts["signal_low"] >= threshold]
+        .groupby(["animal", "epoch_id"])[["n_nonlocal", "n_bins"]]
         .sum()
     )
-    share = above["n_nonlocal"] / above["n_bins"]
+    above = above[above["n_bins"] > 0]
+    share = (above["n_nonlocal"] / above["n_bins"]).groupby(level="animal").mean()
     return {
         "share_animal_mean": float(share.mean()),
         "share_animal_min": float(share.min()),

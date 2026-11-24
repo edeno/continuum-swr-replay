@@ -3749,9 +3749,10 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5: how much of the non-local time has ripple power below the
     Kay threshold (Figure 2i)?
 
-    Over the immobile time bins decoded non-local, each animal's bins pooled
-    over its epochs (``counts``: the stored per-epoch counts by signal and
-    non-local probability, ``nonlocal_by_signal.rest_signal_counts``).
+    Over the immobile time bins decoded non-local: each epoch's share, each
+    animal's mean over its epochs, the mean over animals (``counts``: the
+    stored per-epoch counts by signal and non-local probability,
+    ``nonlocal_by_signal.rest_signal_counts``).
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
@@ -3767,15 +3768,17 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "pct",
             "share of the immobile time bins decoded non-local (non-local "
             f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
-            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
-            "animals of each animal's share of its bins",
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): each "
+            "epoch's share of its bins, each animal's mean over its epochs, the mean "
+            "over animals",
         ),
         make(
             f"{key}_animal_min",
             stats["fraction_animal_min"],
             "fraction",
             "pct",
-            "lowest per-animal share of non-local time bins below the Kay threshold",
+            "lowest per-animal share of non-local time bins below the Kay threshold "
+            "(the mean over its epochs)",
         ),
         make(
             f"{key}_animal_max",
@@ -3893,10 +3896,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     detection is independent of population bursts (the held-out tetrode values
     address whether the spikes point to the decoded place)."""
     make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
-    animals = nonlocal_by_signal.animal_nonlocal_counts(counts, "mua")
     level = nonlocal_by_signal.MUA_LEVEL_Z
-    above = event_statistics.nonlocal_share_above_statistics(animals, level)
-    below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
+    above = event_statistics.nonlocal_share_above_statistics(
+        nonlocal_by_signal.nonlocal_counts(counts, "mua"), level
+    )
+    below = event_statistics.nonlocal_below_threshold_statistics(
+        nonlocal_by_signal.animal_nonlocal_counts(counts, "mua"), level
+    )
     nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
     level_words = (
         f"{level:g} z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded "
@@ -3924,12 +3930,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins with MUA at or above {level_words} "
-                f"that are decoded non-local ({nonlocal_}): mean over animals of each "
-                "animal's share of its bins. Nearly all time above the MUA level is "
+                f"that are decoded non-local ({nonlocal_}): each epoch's share of its "
+                "bins, each animal's mean over its epochs, the mean over animals. "
+                "Nearly all time above the MUA level is "
                 "decoded non-local: the decoder needs spikes, so this does not show "
                 "that non-local detection is independent of population bursts",
                 f"lowest per-animal share of the bins with MUA at or above {level:g} z "
-                "that are decoded non-local",
+                "that are decoded non-local (the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -3944,9 +3951,11 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
-                f"MUA is below {level_words}: mean over animals of each animal's share "
-                "of its bins. Most non-local time is below the MUA level",
-                f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+                f"MUA is below {level_words}: each epoch's share of its bins, each "
+                "animal's mean over its epochs, the mean over animals. Most non-local "
+                "time is below the MUA level",
+                f"lowest per-animal share of non-local time bins with MUA below {level:g} z "
+                "(the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",

@@ -241,10 +241,10 @@ def nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
 
 
 def animal_nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
-    """Each animal's immobile time bins, and its non-local ones, by the level of
-    ``signal``: ``event_statistics.animal_signal_counts`` of
-    :func:`nonlocal_counts`, the counts Figure 2i, its supplement and the events
-    summary read.
+    """Each animal's non-local shares of its immobile time bins by the level of
+    ``signal`` (each epoch's, then the mean over the animal's epochs):
+    ``event_statistics.animal_signal_counts`` of :func:`nonlocal_counts`, what
+    Figure 2i, its supplement and the events summary read.
 
     Parameters
     ----------
