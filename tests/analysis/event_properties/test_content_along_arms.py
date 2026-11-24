@@ -17,11 +17,14 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     even_content,
     event_place_mass,
     event_place_shares,
+    event_well_counts,
     leaf_and_trunk_profiles,
     log2_density_against_even,
     log2_density_ratio,
+    place_share_intervals,
     place_share_statistics,
     remote_well_share_by_extent,
+    well_count_shares,
 )
 
 
@@ -444,3 +447,82 @@ def test_remote_well_share_by_extent_goes_event_then_epoch_then_animal():
     assert len(shares) == 2  # no row for a class with no event
     with pytest.raises(ValueError, match="outside"):
         remote_well_share_by_extent(events.assign(spatial_extent_cm=np.nan))
+
+
+def test_place_share_intervals_estimate_the_animals_mean_and_bound_it():
+    """Three animals of two epochs each. No SWR: every epoch all at a remote
+    well except animal c's (half). SWR: every epoch a quarter at a remote well.
+    The estimates are content_place_shares' means over animals; the difference
+    is of each epoch's pair; a share's interval stays inside 0 to 1, and the
+    difference's is the t-interval over three animals, wide enough to hold 0
+    here (two animals differ by 0.75, the third by 0.25)."""
+
+    def rows(animal, epoch, is_swr, d_well):
+        return pd.DataFrame(
+            {
+                "animal": animal,
+                "epoch_id": f"{animal}{epoch}",
+                "is_swr": is_swr,
+                "distance_to_animal_cm": 100.0,
+                "distance_to_well_cm": d_well,
+            }
+        )
+
+    frames = []
+    for animal in "abc":
+        for epoch in (1, 2):
+            no_swr = [5.0, 5.0] if animal != "c" else [5.0, 50.0]
+            frames.append(rows(animal, epoch, False, no_swr))
+            frames.append(rows(animal, epoch, True, [5.0, 50.0, 50.0, 50.0]))
+    bins = pd.concat(frames, ignore_index=True)
+    intervals = place_share_intervals(bins, n_draws=200, seed=1)
+    means = place_share_statistics(content_place_shares(bins))["means"]
+    for group, is_swr in (("non_swr", False), ("swr", True)):
+        for place in ("at_well", "remote_well", "own_well"):
+            row = intervals.loc[(group, place)]
+            assert row["estimate"] == pytest.approx(means.loc[is_swr, place])
+            assert 0.0 <= row["ci_low"] <= row["estimate"] <= row["ci_high"] <= 1.0
+    assert intervals.loc[("non_swr", "remote_well"), "estimate"] == pytest.approx(5 / 6)
+    difference = intervals.loc[("difference", "remote_well")]
+    assert difference["estimate"] == pytest.approx(5 / 6 - 0.25)
+    assert difference["n_epochs"] == 6
+    assert difference["ci_low"] < 0 < difference["estimate"] < difference["ci_high"]
+    # the SWR share is the same in every epoch: no spread, a point interval
+    swr = intervals.loc[("swr", "remote_well")]
+    assert swr["ci_low"] == pytest.approx(0.25) and swr["ci_high"] == pytest.approx(
+        0.25
+    )
+    assert intervals.loc[("non_swr", "own_well"), "estimate"] == 0.0
+
+
+def test_event_well_counts_count_the_wells_that_hold_a_tenth_of_the_event():
+    """Event 1: 6 of 10 time bins at the well of arm 0, 0.5 at the well of arm
+    3 (under a tenth), the rest off the wells: one well. Event 2: 5 at arm 1's
+    well and 5 at arm 4's: two. Event 3: all on a trunk arm: none."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2, 3],
+            "arm": [0, 3, 0, 1, 4, 6],
+            "weight": [6.0, 0.5, 3.5, 5.0, 5.0, 4.0],
+            "distance_to_well_cm": [5.0, 5.0, 40.0, 5.0, 5.0, 80.0],
+        }
+    )
+    assert event_well_counts(rows).to_dict() == {1: 1, 2: 2, 3: 0}
+    # with a lower bar, event 1's second well counts
+    assert event_well_counts(rows, share=0.05)[1] == 2
+
+
+def test_well_count_shares_go_event_then_epoch_then_animal():
+    """Animal a, no SWR: epoch e1 has events with 1, 1, 0 and 2 wells, e2 one
+    event with 1 well: one well is (0.5 + 1) / 2 of its events, not the pooled
+    3/5."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": ["e1", "e1", "e1", "e1", "e2"],
+            "is_swr": False,
+            "n_wells": [1, 1, 0, 2, 1],
+        }
+    )
+    shares = well_count_shares(events).loc[(False, "a")]
+    assert shares.to_dict() == {"none": 0.125, "one": 0.75, "two or more": 0.125}

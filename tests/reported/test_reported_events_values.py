@@ -1108,7 +1108,11 @@ def test_content_occupancy_values_name_each_group_and_place():
         ignore_index=True,
     )
     values = builder.content_occupancy_values(bins, "s")
-    shown = {value.key: value.figures for value in values if value.figures}
+    shown = {
+        value.key: value.figures
+        for value in values
+        if value.figures and "_ci_" not in value.key and "difference" not in value.key
+    }
     assert shown == {
         "occupancy_epochs": ("3f",),
         "non_swr_content_at_well_fraction": ("3f",),
@@ -1121,6 +1125,24 @@ def test_content_occupancy_values_name_each_group_and_place():
         "swr_content_remote_well_fraction": ("S3d",),
         "swr_content_own_well_fraction": ("S3d",),
     }
+    # each of the three shares at a well has its interval and its difference
+    extra = {
+        key: value
+        for key, value in _by_key(values).items()
+        if "_ci_" in key or key.endswith("_difference")
+    }
+    assert len(extra) == 3 * (2 * 2 + 3)
+    # the difference is of an epoch's two shares: only a's e1 has both kinds
+    # (no SWR all at a remote well, SWR none)
+    assert extra["content_remote_well_fraction_difference"].value == pytest.approx(1.0)
+    assert extra["content_at_well_fraction_difference"].figures == ("3f",)
+    assert extra["non_swr_content_remote_well_fraction_ci_low"].figures == ("S3d",)
+    low, high = (
+        extra[f"non_swr_content_remote_well_fraction_ci_{b}"].value
+        for b in ("low", "high")
+    )
+    assert 0.0 <= low <= 0.75 <= high <= 1.0
+    values = [value for value in values if value.key not in extra]
     assert _numbers(values) == {
         "occupancy_epochs": 3,
         # no SWR: a (0.5, 0.25, 0.25, 0), b (1, 0, 0, 0); the animals' mean

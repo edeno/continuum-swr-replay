@@ -1258,7 +1258,9 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
         figure, "with_event_place_shares", lambda events, *_: (events, [])
     )
     monkeypatch.setattr(figure, "content_place_shares", lambda along: None)
+    monkeypatch.setattr(figure, "place_share_intervals", lambda along: None)
     monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
+    monkeypatch.setattr(figure, "well_count_shares", lambda e, **_: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
@@ -1351,6 +1353,17 @@ def test_supp_figure03_draws_the_shares_at_a_remote_and_at_the_own_well(offline)
     )
     assert means == [5.0, 10.0, 20.0, 40.0]
     assert [t.get_text() for t in ax.get_xticklabels()] == ["remote well", "own well"]
+    # with the intervals: one line per place and kind, from low to high
+    intervals = pd.DataFrame(
+        {"ci_low": 0.1, "ci_high": 0.6},
+        index=pd.MultiIndex.from_product(
+            [["non_swr", "swr"], ["remote_well", "own_well"]], names=["group", "place"]
+        ),
+    )
+    figure.draw_well_shares(ax, shares, intervals)
+    drawn = [line for line in ax.lines if line.get_gid() == "interval"]
+    assert len(drawn) == 4
+    np.testing.assert_allclose(drawn[0].get_ydata(), [10.0, 60.0])
     plt.close(fig)
 
 
@@ -1377,4 +1390,35 @@ def test_supp_figure03_draws_the_remote_well_share_by_extent(offline):
     np.testing.assert_allclose(bold[0].get_ydata(), [15, 25, 35, 45, 50])
     labels = [t.get_text() for t in ax.get_xticklabels()]
     assert labels == ["<10", "10–20", "20–50", "50–100", "≥100"]
+    plt.close(fig)
+
+
+def test_supp_figure03_draws_how_many_wells_an_event_represents(offline):
+    """Panel f: per class (none, one, two or more) a bar per kind at the
+    animals' mean, in the kind's color, with a dot per animal."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization.palettes import EVENT_KINDS
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b"]], names=["is_swr", "animal"]
+    )
+    shares = pd.DataFrame(
+        {
+            "none": [0.4, 0.5, 0.6, 0.7],
+            "one": [0.5, 0.45, 0.35, 0.28],
+            "two or more": [0.1, 0.05, 0.05, 0.02],
+        },
+        index=index,
+    )
+    fig, ax = plt.subplots()
+    figure.draw_well_counts(ax, shares)
+    heights = [round(bar.get_height(), 6) for bar in ax.patches]
+    assert heights == [45.0, 47.5, 7.5, 65.0, 31.5, 3.5]
+    colors = {to_rgba(bar.get_facecolor()) for bar in ax.patches[:3]}
+    assert colors == {to_rgba(EVENT_KINDS[False][1])}
+    assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 3 * 2
+    assert ax.get_ylim() == (0, 100)
     plt.close(fig)

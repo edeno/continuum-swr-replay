@@ -4807,6 +4807,9 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     (``content_along_arms.content_place_shares``): each epoch's share of its
     content time, averaged over the animal's epochs, then over animals. And the share at a well of content spread evenly over the track
     (``content_along_arms.even_content``), which those shares are read against.
+    The shares at a well, at a remote well and at the animal's own each have a
+    95 % interval, and so does the no-SWR minus SWR difference of each
+    (``content_along_arms.place_share_intervals``).
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
     # The places that depend on where the animal is: the supplement's panel d
@@ -4848,6 +4851,56 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
                     "states over the place bins, summed over their time bins; wells "
                     "are the track graph's end points; each epoch's share, averaged "
                     "over the animal's epochs, then over animals)",
+                )
+            )
+    # the headline shares' 95 % intervals, and the no-SWR minus SWR differences
+    intervals = content_along_arms.place_share_intervals(bins)
+    names = {"non_swr": "non-SWR", "swr": "SWR"}
+    how = (
+        "nested bootstrap of the animals and their epochs, small-sample t "
+        "correction over the animals"
+    )
+    for place in content_along_arms.INTERVAL_PLACES:
+        made = makers[place]
+        where = place.replace("_", " ")
+        for word, name in names.items():
+            row = intervals.loc[(word, place)]
+            for bound in ("low", "high"):
+                values.append(
+                    made(
+                        f"{word}_content_{place}_fraction_ci_{bound}",
+                        row[f"ci_{bound}"],
+                        "fraction",
+                        "pct",
+                        f"{'lower' if bound == 'low' else 'upper'} bound of the 95 % "
+                        f"interval of the share of {name} non-local content time "
+                        f"{where} ({how})",
+                    )
+                )
+        row = intervals.loc[("difference", place)]
+        text = (
+            f"non-SWR minus SWR share of non-local content time {where}, in "
+            "percentage points: each epoch's difference of its two shares, "
+            "averaged over the animal's epochs, then over animals"
+        )
+        values.append(
+            made(
+                f"content_{place}_fraction_difference",
+                row["estimate"],
+                "fraction",
+                "pct",
+                text,
+            )
+        )
+        for bound in ("low", "high"):
+            values.append(
+                made(
+                    f"content_{place}_fraction_difference_ci_{bound}",
+                    row[f"ci_{bound}"],
+                    "fraction",
+                    "pct",
+                    f"{'lower' if bound == 'low' else 'upper'} bound of the 95 % "
+                    f"interval of that difference {where} ({how})",
                 )
             )
     values.append(
@@ -4952,8 +5005,10 @@ def with_event_place_shares(
     """``events`` with each one's share of content time at a well, at a remote
     well and at the animal's own (``content_at_well``, ``content_remote_well``
     and ``content_own_well``: ``content_along_arms.event_place_shares`` of the
-    content-mass run; the event table's own ``at_well`` is where the animal is)
-    and its ``epoch_id``; and the files read.
+    content-mass run; the event table's own ``at_well`` is where the animal is),
+    the number of wells it represents (``content_n_wells``:
+    ``content_along_arms.event_well_counts``) and its ``epoch_id``; and the
+    files read.
 
     Raises
     ------
@@ -4971,6 +5026,7 @@ def with_event_place_shares(
                 columns=[
                     "event_id",
                     "epoch_id",
+                    "arm",
                     "far",
                     "weight",
                     "distance_to_well_cm",
@@ -4979,6 +5035,7 @@ def with_event_place_shares(
             events["event_id"],
         )
         shares = content_along_arms.event_place_shares(rows).add_prefix("content_")
+        shares["content_n_wells"] = content_along_arms.event_well_counts(rows)
         shares["epoch_id"] = path.stem
         tables.append(shares.reset_index())
     joined = events.merge(

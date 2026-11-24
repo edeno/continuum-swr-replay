@@ -43,6 +43,10 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     OCCUPANCY_PLACES,
     quadrant_fractions,
 )
+from continuum_swr_replay.analysis.shared_statistics import (
+    animal_balanced_bootstrap,
+    bootstrap_interval,
+)
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
 
 CENTER_NODE = 9
@@ -548,6 +552,24 @@ def content_place_shares(bins: pd.DataFrame) -> pd.DataFrame:
     shares : pd.DataFrame, shape (n_kinds * n_animals, 5)
         One column per place, indexed by ``is_swr`` and ``animal``.
     """
+    per_epoch = epoch_place_shares(bins)
+    return per_epoch.groupby(["is_swr", "animal"])[list(OCCUPANCY_PLACES)].mean()
+
+
+def epoch_place_shares(bins: pd.DataFrame) -> pd.DataFrame:
+    """Each epoch's share of each kind's content time at each place.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame
+        As :func:`content_place_shares` takes them.
+
+    Returns
+    -------
+    shares : pd.DataFrame
+        One row per kind and epoch: ``is_swr``, ``animal``, ``epoch_id`` and
+        one column per place of :data:`~.event_statistics.OCCUPANCY_PLACES`.
+    """
     rows = []
     for (is_swr, animal, epoch), group in bins.groupby(_EPOCH_KEYS):
         fractions = quadrant_fractions(
@@ -559,8 +581,77 @@ def content_place_shares(bins: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {"is_swr": is_swr, "animal": animal, "epoch_id": epoch, **fractions}
         )
-    per_epoch = pd.DataFrame(rows)
-    return per_epoch.groupby(["is_swr", "animal"])[list(OCCUPANCY_PLACES)].mean()
+    return pd.DataFrame(rows)
+
+
+INTERVAL_PLACES = ("at_well", "remote_well", "own_well")
+"""The places :func:`place_share_intervals` gives an interval for."""
+
+
+def place_share_intervals(
+    bins: pd.DataFrame, n_draws: int = 1000, seed: int = 0
+) -> pd.DataFrame:
+    """The animals' mean share of each kind's content time at a well, at a
+    remote well and at the animal's own, and of the no-SWR minus SWR
+    difference, each with its 95 % interval.
+
+    The estimate is :func:`content_place_shares`' mean over animals (epoch,
+    then animal); the difference is of each epoch's two shares, over the epochs
+    with events of both kinds. The interval is the project's
+    (``shared_statistics.bootstrap_interval``) from a nested bootstrap of the
+    animals, then their epochs (``shared_statistics.animal_balanced_bootstrap``,
+    each epoch its own day); an epoch's events are not resampled.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame
+        As :func:`content_place_shares` takes them.
+    n_draws, seed : int, optional
+        The bootstrap's replicates and seed.
+
+    Returns
+    -------
+    intervals : pd.DataFrame
+        ``estimate``, ``ci_low``, ``ci_high`` and ``n_epochs``, indexed by
+        ``group`` (``"non_swr"``, ``"swr"``, ``"difference"``) and ``place``
+        (:data:`INTERVAL_PLACES`). A share's interval is kept inside 0 to 1.
+    """
+    per_epoch = epoch_place_shares(bins)
+    by_kind = per_epoch.set_index(["animal", "epoch_id", "is_swr"])[
+        list(INTERVAL_PLACES)
+    ].unstack("is_swr")
+    rows = []
+    for place in INTERVAL_PLACES:
+        both = by_kind[place].dropna()
+        groups = {
+            "non_swr": by_kind[place][False].dropna(),
+            "swr": by_kind[place][True].dropna(),
+            "difference": both[False] - both[True],
+        }
+        for group, values in groups.items():
+            animal = values.index.get_level_values("animal")
+            epoch = values.index.get_level_values("epoch_id")
+            drawn = animal_balanced_bootstrap(
+                values.to_numpy(), animal, epoch, n_draws=n_draws, seed=seed
+            )
+            estimate = float(drawn.estimate)
+            interval = bootstrap_interval(
+                estimate,
+                drawn.draws,
+                drawn.n_animals,
+                None if group == "difference" else (0.0, 1.0),
+            )
+            rows.append(
+                {
+                    "group": group,
+                    "place": place,
+                    "estimate": estimate,
+                    "ci_low": interval.low,
+                    "ci_high": interval.high,
+                    "n_epochs": len(values),
+                }
+            )
+    return pd.DataFrame(rows).set_index(["group", "place"])
 
 
 def place_share_statistics(shares: pd.DataFrame) -> dict:
@@ -625,6 +716,84 @@ def event_place_shares(rows: pd.DataFrame) -> pd.DataFrame:
     )
     summed = parts.groupby("event_id").sum()
     return summed[list(EVENT_PLACES)].div(summed["total"], axis=0)
+
+
+WELL_CONTENT_SHARE = 0.1
+"""An event represents a well when at least this share of its content time is
+within ``AT_WELL_CM`` of it."""
+
+WELL_COUNT_CLASSES = ("none", "one", "two or more")
+"""The classes of :func:`well_count_shares`: how many wells an event represents."""
+
+
+def event_well_counts(
+    rows: pd.DataFrame, share: float = WELL_CONTENT_SHARE
+) -> pd.Series:
+    """How many wells each event represents.
+
+    A leaf arm ends at one well, so the content within ``AT_WELL_CM`` of a well
+    on an arm is at that arm's well.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        The content-mass rows of the events: ``event_id``, ``arm``,
+        :data:`WEIGHT` and ``distance_to_well_cm``.
+    share : float, optional
+        The share of an event's content time a well must hold to count.
+
+    Returns
+    -------
+    n_wells : pd.Series of int
+        Indexed by ``event_id``: the wells holding at least ``share`` of the
+        event's content time (0 for an event with none).
+    """
+    weight = rows[WEIGHT].astype(float)
+    total = weight.groupby(rows["event_id"]).sum()
+    at_well = rows["distance_to_well_cm"] < AT_WELL_CM
+    by_well = (
+        weight[at_well]
+        .groupby([rows.loc[at_well, "event_id"], rows.loc[at_well, "arm"]])
+        .sum()
+    )
+    held = (
+        by_well / total.reindex(by_well.index.get_level_values("event_id")).to_numpy()
+    )
+    counted = (held >= share).groupby(level="event_id").sum()
+    return counted.reindex(total.index, fill_value=0).astype(int).rename("n_wells")
+
+
+def well_count_shares(events: pd.DataFrame, column: str = "n_wells") -> pd.DataFrame:
+    """Each animal's share of its events of each kind that represent no well,
+    one well, and two or more.
+
+    An epoch's share is over its events of the kind; an animal's is the mean
+    over its epochs with such an event.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, ``epoch_id``, ``is_swr`` and
+        ``column`` (:func:`event_well_counts`).
+
+    Returns
+    -------
+    shares : pd.DataFrame
+        One column per class of :data:`WELL_COUNT_CLASSES`, indexed by
+        ``is_swr`` and ``animal``; a row sums to 1.
+    """
+    count = events[column].to_numpy()
+    frame = events[["is_swr", "animal", "epoch_id"]].assign(
+        **{
+            "none": count == 0,
+            "one": count == 1,
+            "two or more": count >= 2,
+        }
+    )
+    per_epoch = frame.groupby(["is_swr", "animal", "epoch_id"])[
+        list(WELL_COUNT_CLASSES)
+    ].mean()
+    return per_epoch.groupby(["is_swr", "animal"]).mean()
 
 
 def remote_well_share_by_extent(

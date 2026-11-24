@@ -41,7 +41,8 @@ d — The share of each kind's content time at a well, apart for the wells far
     (``content_along_arms.content_place_shares`` of the content-mass run, the
     events summary's ``*_content_remote_well_fraction`` and
     ``*_content_own_well_fraction``; a well is within 20 cm, far is more than
-    20 cm from the animal along the track).
+    20 cm from the animal along the track), with the mean's 95 % interval as a
+    line beside the dots (``content_along_arms.place_share_intervals``).
 
 e — Whether the events whose content stays in one place are the ones at a
     remote well: the mean share of an event's content time at a remote well, by
@@ -50,6 +51,12 @@ e — Whether the events whose content stays in one place are the ones at a
     thin line per animal and their mean in bold
     (``content_along_arms.remote_well_share_by_extent``: event, then epoch,
     then animal).
+
+f — Whether an event represents one location: the share of each kind's events
+    that represent no well, one well, and two or more, where an event
+    represents a well when at least a tenth of its content time
+    (``content_along_arms.WELL_CONTENT_SHARE``) is within 20 cm of it; bars the
+    animals' mean, dots the animals (``content_along_arms.well_count_shares``).
 
 Usage
 -----
@@ -76,8 +83,11 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     EXTENT_BIN_EDGES_CM,
+    WELL_COUNT_CLASSES,
     content_place_shares,
+    place_share_intervals,
     remote_well_share_by_extent,
+    well_count_shares,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TRANSPORT_SPEED_BIN_EDGES_CM_S,
@@ -178,6 +188,8 @@ def read_inputs() -> dict:
         "reference": reference,
         "speed": transport_speed_distribution(with_speed),
         "places": content_place_shares(along),
+        "place_intervals": place_share_intervals(along),
+        "well_counts": well_count_shares(with_places, column="content_n_wells"),
         "by_extent": remote_well_share_by_extent(
             with_places, column="content_remote_well"
         ),
@@ -239,11 +251,15 @@ WELL_PLACES = (("remote_well", "remote well"), ("own_well", "own well"))
 """Panel d's two places and their names under the axis."""
 
 
-def draw_well_shares(ax: Axes, shares: pd.DataFrame) -> None:
+def draw_well_shares(
+    ax: Axes, shares: pd.DataFrame, intervals: pd.DataFrame | None = None
+) -> None:
     """Panel d: each animal's share of no-SWR and of SWR content time at a
     remote well and at its own well, the two kinds joined by a line per animal,
     and the animals' mean as a bar (``shares``: :func:`read_inputs`'
-    ``places``, indexed by ``is_swr`` and ``animal``)."""
+    ``places``, indexed by ``is_swr`` and ``animal``); with ``intervals``
+    (``content_along_arms.place_share_intervals``), the mean's 95 % interval
+    as a line beside the dots."""
     for k, (column, _) in enumerate(WELL_PLACES):
         # one row per animal; columns no-SWR, SWR (the order of EVENT_KINDS)
         by_kind = 100 * shares[column].unstack("is_swr").to_numpy()
@@ -254,6 +270,13 @@ def draw_well_shares(ax: Axes, shares: pd.DataFrame) -> None:
                 np.full(len(by_kind), x[i]), by_kind[:, i], s=9, color=color,
                 edgecolors="black", linewidths=0.5, zorder=2,
             )  # fmt: skip
+            if intervals is not None:
+                row = intervals.loc[(("non_swr", "swr")[i], column)]
+                side = x[i] + (-0.42 if i == 0 else 0.42)
+                ax.plot(
+                    [side, side], [100 * row["ci_low"], 100 * row["ci_high"]],
+                    color=color, lw=0.8, zorder=3, gid="interval",
+                )  # fmt: skip
             mean = by_kind[:, i].mean()
             ax.plot(
                 [x[i] - 0.3, x[i] + 0.3], [mean, mean], color=color, lw=1.5, zorder=3
@@ -291,6 +314,29 @@ def draw_remote_well_by_extent(ax: Axes, by_extent: pd.DataFrame) -> None:
     ax.set_title("Remote well, by extent", fontsize=SMALL_SIZE)
 
 
+def draw_well_counts(ax: Axes, shares: pd.DataFrame) -> None:
+    """Panel f: the share of each kind's events that represent no well, one
+    well, and two or more: bars the animals' mean, dots the animals
+    (``shares``: :func:`read_inputs`' ``well_counts``, indexed by ``is_swr``
+    and ``animal``)."""
+    for g, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
+        mine = 100 * shares.loc[is_swr]
+        for x, name in enumerate(WELL_COUNT_CLASSES):
+            position = x + (g - 0.5) * 0.36
+            ax.bar(position, mine[name].mean(), width=0.34, color=color)
+            ax.scatter(
+                position + np.linspace(-0.08, 0.08, len(mine)), mine[name], s=3,
+                color="k", lw=0, zorder=3,
+            )  # fmt: skip
+    ax.set_xticks(range(len(WELL_COUNT_CLASSES)), ["none", "one", "two\nor more"])
+    ax.set_xlim(-0.55, len(WELL_COUNT_CLASSES) - 0.45)
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlabel("Wells the event represents")
+    ax.set_ylabel("Events (%)")
+    ax.set_title("Wells per event", fontsize=SMALL_SIZE)
+
+
 def generate_figure(inputs: dict):
     """Build the figure from :func:`read_inputs`."""
     fig, grid = plt.subplots(2, 3, figsize=(WIDTH, HEIGHT))
@@ -300,13 +346,10 @@ def generate_figure(inputs: dict):
     axes = grid[0]
     draw_gamma(axes[:2], inputs["events"], inputs["reference"])
     draw_transport_speed(axes[2], inputs["speed"])
-    # the lower row: d, and e over the other two columns
-    for ax in grid[1, 1:]:
-        ax.remove()
-    ax_d = grid[1, 0]
-    ax_e = fig.add_subplot(grid[1, 1].get_gridspec()[1, 1:])
-    draw_well_shares(ax_d, inputs["places"])
+    ax_d, ax_e, ax_f = grid[1]
+    draw_well_shares(ax_d, inputs["places"], inputs["place_intervals"])
     draw_remote_well_by_extent(ax_e, inputs["by_extent"])
+    draw_well_counts(ax_f, inputs["well_counts"])
     # the key of the gamma panels, centered over them
     middle = (axes[0].get_position().x0 + axes[1].get_position().x1) / 2
     handles = [
@@ -319,8 +362,10 @@ def generate_figure(inputs: dict):
         columnspacing=1.5,
     )  # fmt: skip
     fig.draw_without_rendering()
-    panels = dict(zip("abcde", ([ax] for ax in (*axes, ax_d, ax_e)), strict=True))
-    place_letters(fig, panels, rows=["abc", "de"], columns=["ad", "be"])
+    panels = dict(
+        zip("abcdef", ([ax] for ax in (*axes, ax_d, ax_e, ax_f)), strict=True)
+    )
+    place_letters(fig, panels, rows=["abc", "def"], columns=["ad", "be", "cf"])
     check_placement(fig, panels)
     return fig
 
