@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "fff07b7ef70c",
+ "commit": "760be7f299f5",
  "code": {
-  "head": "fff07b7ef70c3afe0847441a38ccf5085eee4d23",
+  "head": "760be7f299f53bb095f46f04a2cb1b09feaafe0d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -103,8 +103,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/decode_quality/nonlocal_probability.py": {
-    "sha256": "cc20b333127d42a77edeef46f4f97e4acc71ec35ac84e7afaa61c417f2e7bfbf",
-    "code_sha256": "1ee827278ba7a2c079122a518e4b441213be6a6c13b53f90d76b7e0cd7dd06e5"
+    "sha256": "14bed801c00a8aa9900489b09e1eeb8e3c430177f8577f2136811e048b107ef7",
+    "code_sha256": "98b71fc775ae132888d78ae1b000a5fc739241a08c1e837a50c1dadac3baff68"
    },
    "src/continuum_swr_replay/analysis/decode_quality/posterior_analysis.py": {
     "sha256": "d293355131e0d9fa542e58fcd9aede711886c868225e110ce9d361292c5081a4",
@@ -235,8 +235,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_definition/analyzed_time.py": {
-    "sha256": "250a67ab64c7145787dcb5b1b44edd80f999e27473e477e7c97cc4ae3fa413a0",
-    "code_sha256": "a080d104b737d295cf0bbf19c6cf564ba80c4c6fde3743fe67dc1b9b3225287c"
+    "sha256": "2a2e87d9ab8b959c14f6b7f876ed7a3c62368b1c20c4e905934298ffd2b74c9f",
+    "code_sha256": "029d5d53ced38de888f564a09d527522ea75e61929136ba6ce5a6b13f63be39c"
    },
    "src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py": {
     "sha256": "a66ffa26bdedf307a823a8f2591b023a36927ab2200b16b98d2f0a1d19b5e961",
@@ -307,16 +307,16 @@
     "code_sha256": "870e60557d17a9e49a6d9ea79a563f9c9911b9977f860e39c926013a78ade74c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_totals.py": {
-    "sha256": "d227c8d10b70d264141e5bc0cbbdef97d8c3ca4552e3fef5308fd2380ec3081e",
-    "code_sha256": "b733f38bd5b4f2d7d6d6801346808b27a20538420e5d68003eea075f28d66109"
+    "sha256": "fb899e7e56ffb8d5628e5ed6b7f049e84d5f3f372be457627d6621d865985d99",
+    "code_sha256": "fcc1f142ad40f9268eafed779890f37bba730119ee4451ff49ce83af8334c799"
    },
    "src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py": {
-    "sha256": "c23fa7acab39852509450cfcc3b8bc62ade4e5adbcc3c741c7fc17e3b9ab162b",
-    "code_sha256": "7381494a1acf4239d0c23a05761927ca4f96cc458643f9d497a148ddb539e9a5"
+    "sha256": "a04971fe004a1f974176f19b81faf5da4380ff28060d3908ee4df30e23c9d5e5",
+    "code_sha256": "8f38b25b3b03a53dc6053df0922dad0f16364c3407fa313bba29429415d40e24"
    },
    "src/continuum_swr_replay/analysis/event_evidence/shared_content.py": {
-    "sha256": "d6d42c306546890f23c7fb6d293ca67cfc3fc461a42d4ea70747019f44bae7ec",
-    "code_sha256": "675c003795dca19b8f8cb1be6f5656f5f1a91ab3bbd65b4f119ba6d886a0fe01"
+    "sha256": "fdf03a36c651aac3ac05753919fdda6b4c56a72d98934af2e188dd60fa60a8ba",
+    "code_sha256": "4bccca2d06fa87b9414980ff3b32c805a52436274a5d5fddafb913a6d0467450"
    },
    "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
     "sha256": "39b3c45092b7bac5651960a68b86d0ea846bcc00847014b3f03ad33ff932bbf5",
@@ -355,16 +355,16 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py": {
-    "sha256": "aa9f2bf055f9682b0cebb33bf3ec5581298b7177be8da647cc2c29bf2034ddc0",
-    "code_sha256": "9a1cf7cf7e01a8bdd60cd7edf1cfd0271dacbb6e1c369bc8fdd5152eb5b90af9"
+    "sha256": "d2b16e6309cb289e7593a2de9d8424713f721d313d2299c6eda59cb318d9adff",
+    "code_sha256": "24d7e896e5dd03d21be85209910b5dcbfc6740797dc6801425505efd46184180"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
     "sha256": "83bc35c9b3c390372098ed012f5584d938d945afd8233f4934febcc19bb8e4f8",
     "code_sha256": "d7b4bb815f91a50bc8639721cf7aa1dd0f6b293617a94eb7d9340177310a1e24"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_place_rate.py": {
-    "sha256": "0edb99266be1d9dfee57970f03f95709ce18bac94389d2bde9dca3a19493c597",
-    "code_sha256": "01d3e865719fda8aaab3c5bce868457728a62b25cfe5d150b422b7ccde36c9b0"
+    "sha256": "a5c0102fc0f7ba10bfcc35a8d52c415991bc059b6c9c8b3dde7028a5cc3173ba",
+    "code_sha256": "c6b488a65008abc3e00c566db25538d0e40d260a2b22e837155645ecba41f19d"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
     "sha256": "60faaaf2cdfe8e32b88173f178d5cbc462f5dc1ed8aa2323c98e104f3e8de318",
@@ -375,24 +375,24 @@
     "code_sha256": "da9fa57a038d464921149eb2acfa865a726a28f8053bb811f92fc2a4ee02a97e"
    },
    "src/continuum_swr_replay/analysis/event_properties/nonlocal_by_signal.py": {
-    "sha256": "8c33eea6824f29fc9bac102fca29666e0d9703da9fbe6c0f7648db4063d539da",
-    "code_sha256": "66b7ebb1b31d7425d488569cd250d597853852571a90f85daa601cc42e0354e9"
+    "sha256": "b6fffce12c6317e38369a6514b41107086639e1450414deb6a9531b56d30fb5f",
+    "code_sha256": "6c53ab725e8640bbd7407f5ebefae765d5c313c1695ec0cd669168dce9d0c6aa"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
     "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
    },
    "src/continuum_swr_replay/analysis/event_properties/resolved_content.py": {
-    "sha256": "23301692e589d46b74c85ed8da27ac17a6182885f2eb399b89ecaf95a1d3f809",
-    "code_sha256": "46a4349fbf2266ca6e2aa3ed6eb2b1ea846bfcc14dec0c4b9e6404c1156ceb81"
+    "sha256": "6fb9257021e79d8c08203cc903f9ca64cb605f46591262b550c26709eda226b2",
+    "code_sha256": "8e229eebc1b49094b3c590d3c5d741387a880d4e681d61c8d906cae5d8bdb447"
    },
    "src/continuum_swr_replay/analysis/event_properties/rule_sweep.py": {
     "sha256": "ccda7e3edc834a5f6295a29133e57c0108f5945f046cdacd395d1efb9507e581",
     "code_sha256": "64f9324391641ffd4adaeb3bd91bc67dcd92a9d496deccdcccaba4c9ffe7ef06"
    },
    "src/continuum_swr_replay/analysis/event_properties/state_by_signal.py": {
-    "sha256": "28b5d3a815809064ca203d591eb83d878f401d847e75f45fdc97f7c598bf6417",
-    "code_sha256": "c0d84f318fea1026197286171ce04bce37b4a0a366706b04fafde8c88ece36a0"
+    "sha256": "6d09f88deae140370d33418db87bd90a474b8951d8eceb7fae4d7ce666bcec53",
+    "code_sha256": "e4466436cf8216d027bfdeb68d64598ae62557dad10e567671590eab2624e4cf"
    },
    "src/continuum_swr_replay/analysis/event_tables/__init__.py": {
     "sha256": "cbb29294c811a4b945fdd3aede000b0fcb85102d8258312c41bb98e099c3630a",
@@ -451,7 +451,7 @@
     "code_sha256": "10a0d890b4532049a71b7ce1c86828a69132cc59dc3f3a4657e7e0cf24871046"
    },
    "src/continuum_swr_replay/analysis/regression/__init__.py": {
-    "sha256": "cdefdcd4b070c8772d9bcdce6f96d6fc8e204b90506327fefec77e5c777cf6c0",
+    "sha256": "9e6aa7a18e1a14b41ae28269b9ab294f6068b31fd52b4202d6f3e1749490f96b",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/regression/folds.py": {
@@ -459,8 +459,8 @@
     "code_sha256": "b6edc2b2642ff0a733debb4b7a660234a2d1ff125d07a8638caec0515b182a71"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "20de20718ad8cf2c5297d31f9fb2a8422de96d1a3b5d812ae4dec22499c4ca4f",
-    "code_sha256": "e7fec9377bddbefb9ee8c4bc80b751fea924cabc72b06ce74a157fa8c1fda444"
+    "sha256": "f5dca6a6f79fcbd7ed8f68b694fa88eab52a9e2eb3624196c0018a0c478bffd9",
+    "code_sha256": "d5ce859cf785f6c8063bd577c5488b615de76e084c95e2d01c073d17544343e9"
    },
    "src/continuum_swr_replay/columns.py": {
     "sha256": "ce2b6258d178bf3faf8a65a7fcb140a40ccbb39206df076afe186d5e21b00ae8",
@@ -539,8 +539,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "82259435bf69673679d624a241692d11e74b00870e627d2a689b3c40def63246",
-    "code_sha256": "bec0e76b96ae50f33b2687c8f351bfbb58a60e2a7148f95f5521e8a5c98eac24"
+    "sha256": "ad11a95a22885535c2272efb786fab554a30a6251917dceb90be3d81889b578a",
+    "code_sha256": "289632949551e60dc51df276ad7e966b41bd388d8088b9ce2c66a42702367060"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
