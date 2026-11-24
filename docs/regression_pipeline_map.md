@@ -1584,7 +1584,7 @@ How three content estimators agree, fit on one shared event set per session.
 
 Content on the nine arms by arm role: the cohort, the design and the fit.
 
-`RoleContentSettings`, `recency_term`, `assign_roles`, `RoleContentCohort`, `role_content_cohort`, `session_rows`, `ContrastReference`, `design_rows`, `role_terms`, `role_design`, `model_estimands`, `estimand_contrasts`, `tested_coefficients`, `RoleContentFit`, `fit_role_content`, `fit_role_content_session`, `tested_coefficient_collinearity`
+`RoleContentSettings`, `assign_roles`, `RoleContentCohort`, `role_content_cohort`, `session_rows`, `ContrastReference`, `design_rows`, `role_terms`, `role_design`, `model_estimands`, `estimand_contrasts`, `tested_coefficients`, `RoleContentFit`, `fit_role_content`, `fit_role_content_session`, `tested_coefficient_collinearity`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/role_content_scenarios.py`
 

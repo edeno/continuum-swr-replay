@@ -37,12 +37,15 @@ As of 2026-11-23 (branch `regression-declared-penalty`, from master 07c52783):
 | Phase | State | Commit |
 |---|---|---|
 | 1, the shared fitter | done; interface differs from the plan's sketch (the "as built" note at the top of [phase-1-shared-fitter.md](phase-1-shared-fitter.md)) | merged 6e54eda8, cleaned up 98fe5c06 |
-| 2, the convention's tools | done on master, with the declared-penalty parts (the calibration function, its recovery test, the stored check; merged 2026-11-23 with the lead's "merge"); the weak penalty on simple terms and the support rule on the design on `weak-penalty`, pushed, in review, not merged | master 492dffb4 and ec1ae69c; `weak-penalty` aa8f8425 |
+| 2, the convention's tools | done on master: the declared-penalty tools (the calibration function, its recovery test, the stored check), and the weak penalty on simple terms with the support rule on the design; each merged on 2026-11-23 with the lead's explicit yes | master 492dffb4, ec1ae69c and 502f9bc9 |
 | 3, the well visit in the tables | done; the 13 canonical tables published | d14ff888 |
 | 4, Figures 2 and 3 on the common subset | done, except 20 held-out tetrode values in `paper/reported/events.json` that were pending on 2026-11-21 until another session's rerun ended (not checked again on 2026-11-23); the fold task waits for `swr-trial-folds` | 5dc74fc6 |
-| 2b, the simulation engine | **next** | |
-| 2c, one JAX fitter | after 2b, in parallel with 5a; its entry condition is met (twenty-third round) | |
-| 5a to 12 | not started; 5a and 6a wait for 2b only and run on the present fitter beside 2c (Figure 4 does not wait for the port; lead, twenty-third round); 8 waits for 2c | |
+| 2b, the simulation engine | done on master (2026-11-23, the lead: "merge is fine") | merged 7959aca7 |
+| 2c, one JAX fitter | in progress. On master: the NumPy reference outputs, and the plumbing (`runtime.py`, `padding.py`, the device and thread helpers). The fixed-penalty fit is in work on branch `regression-jax-3`, not merged | master 82ee00bc and 8ed7dcea |
+| 5a, the rate model | in progress. On master: the model module, its statistics and its scenario functions; no real fit has been made and nothing of the old per-bin ladder has been removed. Its validation through the engine is in work on branch `visit-rate-validation`, not merged | master f12f2f28 |
+| 6a, the content model | in progress on branch `role-content-models`, not merged; the gate (simulation results to the lead before any real fit) is in force | |
+| 8, mPFC | a first part (the visit event sets, the trial folds, the unit design and its scenario functions) is on branch `mpfc-convention`, not merged; it merges only when Phase 8 is whole | |
+| 5b, 6b, 7, 9 to 12 | not started | |
 
 **What is done next, in order** (design, twenty-third round: the author's recommendation, and the lead,
 2026-11-23, 13:21: "ok"): the port goes ahead without blocking Figure 4.
@@ -107,6 +110,12 @@ and after the port); the lead was told it and did not object (design, twenty-fir
     recommend?"; the author recommended the order above; the lead, 13:21: "ok". The open question on the
     port's CPU speed is closed, and the entry condition of Phase 2c is met.
 
+12. **The content models' recency curve covers the other leaf arms only** (twenty-fourth round). After
+    the explanation of the two options and their simulation, the lead, 2026-11-23, 18:17: "do option B".
+    The role terms carry everything for the current and previous arms; Q3a and Q3b compare with an
+    average other leaf arm, and "current arm" cannot be separated from "most recently visited arm" (the
+    paper says so). Phase 6a; its other questions stay open.
+
 **Open** (each with its evidence in the design, "Open after the twenty-third round"; a phase that
 depends on one names it with `OPEN (lead): <name>`):
 
@@ -124,6 +133,7 @@ depends on one names it with `OPEN (lead): <name>`):
 - g. `OPEN (lead): penalty width`: the one declared prior SD of the weak penalty (in the reported unit). Not
   chosen; a simulation with SD 1, 2 and 4 is running. Every phase with a penalized simple term (5a, 5b,
   6a, 7, 8, 11) reads it; each family's simulation checks the penalty before use.
+- h. Decided (item 12 above): the rows of the content models' recency curve.
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
 on a stop's first sample, which the rate design does not count (about 0.2 % of the No SWR events, none of

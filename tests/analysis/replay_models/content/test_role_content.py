@@ -561,7 +561,6 @@ def test_a_thin_previous_level_is_dropped_with_its_rows(table) -> None:
         rc.RoleContentSettings(q5a_trials=(40.0, 5.0)),
         rc.RoleContentSettings(scale_pooling="per_kind"),
         rc.RoleContentSettings(event_weight="n_nonlocal_bins"),
-        rc.RoleContentSettings(recency_rows="all_leaf"),
     ],
     ids=lambda s: repr(s)[:60],
 )
@@ -601,8 +600,6 @@ def test_open_settings_refuse_values_outside_their_candidates() -> None:
         rc.RoleContentSettings(q4a_reading="slope")
     with pytest.raises(ValueError, match="smooth_log_penalties"):
         rc.RoleContentSettings(smooth_log_penalties={"reward_fraction": 0.0})
-    with pytest.raises(ValueError, match="recency_rows"):
-        rc.RoleContentSettings(recency_rows="trunk")
 
 
 def test_records_carry_the_cohort_counts_and_tested_collinearity(cohort) -> None:
@@ -889,7 +886,7 @@ def test_a_session_of_another_kind_is_refused(cohort) -> None:
 
 
 # ---------------------------------------------------------------------------
-# The rows of the recency curve (an open setting)
+# The rows of the recency curve (decided: the other-leaf rows)
 # ---------------------------------------------------------------------------
 
 
@@ -905,9 +902,9 @@ def _recency_fixed_case():
     return table, truth
 
 
-def test_other_leaf_recency_rows_keep_the_present_fit() -> None:
-    # The estimates of this fixed case before the setting existed (commit
-    # 66f49d00), to 1e-8: the default, other_leaf, changes nothing.
+def test_the_recency_curve_is_on_the_other_leaf_rows_only() -> None:
+    # The estimates of this fixed case from the fit on the other-leaf rows
+    # (commit 66f49d00), to 1e-8; no setting chooses the rows any more.
     pinned = {
         ("role_content", "20200101", "Q3a"): 1.0046419949810848,
         ("role_content", "20200101", "Q3b"): -0.538315217883582,
@@ -919,60 +916,25 @@ def test_other_leaf_recency_rows_keep_the_present_fit() -> None:
         ("role_content_uncertainty", "20200102", "Q5a"): 0.38477520910167545,
         ("role_content_uncertainty", "20200103", "Q5a"): 0.7331946525204704,
     }
+    assert not hasattr(rc.RoleContentSettings(), "recency_rows")
     table, truth = _recency_fixed_case()
-    assert rc.RoleContentSettings().recency_rows == "other_leaf"
-    for settings in (None, rc.RoleContentSettings(recency_rows="other_leaf")):
-        cohort = rc.role_content_cohort(table, settings)
-        rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
-        reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
-        sessions = {
-            key: draw_shares(part, sc.expected_shares(part, truth, reference), 40, 5)
-            for key, part in rc.session_rows(rows).items()
-        }
-        for model in rc.MODELS:
-            fit = _fit(cohort, sessions, model, settings=settings)
-            per = rs.session_estimands(fit).set_index(["session_date", "estimand_id"])[
-                "estimate"
-            ]
-            for (m, date, eid), value in pinned.items():
-                if m == model:
-                    assert per[(date, eid)] == pytest.approx(value, abs=1e-8)
-
-
-def test_all_leaf_recency_rows_read_recency_on_every_leaf_row(table) -> None:
-    settings = rc.RoleContentSettings(recency_rows="all_leaf")
-    rows = rc.role_content_cohort(table, settings).rows
-    role = rows[rc.ROLE]
-    # The current arm is 1 trial since its last visit, the previous arm 2.
-    assert (rows.loc[role == "current", rc.RECENCY] == 0.0).all()
-    np.testing.assert_allclose(rows.loc[role == "previous", rc.RECENCY], np.log(2.0))
-    assert (rows.loc[role.isin(["current", "previous"]), rc.NEVER_VISITED] == 0).all()
-    assert (rows.loc[role == "trunk", [rc.RECENCY, rc.NEVER_VISITED]] == 0).all().all()
-    # declared_tests names Q5a's term as the default's.
-    assert dt.estimand("Q5a").contrast.term == rc.recency_term()
-    for option, term in (
-        ("other_leaf", "s(log_trials_since_last_visit):role=other_leaf"),
-        ("all_leaf", "s(log_trials_since_last_visit):leaf_row=leaf"),
-    ):
-        settings = rc.RoleContentSettings(recency_rows=option)
-        assert rc.recency_term(settings) == term
-        cohort = rc.role_content_cohort(table, settings)
-        design, reference, _ = _design(
-            cohort, "role_content_uncertainty", "unadjusted", settings
-        )
-        assert term in design.by_name
-        contrasts = rc.estimand_contrasts(
-            design, "role_content_uncertainty", "unadjusted", reference, settings
-        )
-        # Q5a reads the option's curve at 20 and at 3 trials, nothing else.
-        columns = [
-            j for j, n in enumerate(design.coef_names) if n.startswith(term + ".")
+    cohort = rc.role_content_cohort(table)
+    rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
+    sessions = {
+        key: draw_shares(part, sc.expected_shares(part, truth, reference), 40, 5)
+        for key, part in rc.session_rows(rows).items()
+    }
+    for model in rc.MODELS:
+        fit = _fit(cohort, sessions, model)
+        recency = [t.name for t in fit.design.terms if t.covariate == rc.RECENCY]
+        assert recency == [dt.estimand("Q5a").contrast.term]
+        per = rs.session_estimands(fit).set_index(["session_date", "estimand_id"])[
+            "estimate"
         ]
-        by_hand = _basis_rows(design, term, np.log([20.0, 3.0]))
-        np.testing.assert_allclose(
-            contrasts["Q5a"][columns], by_hand[0] - by_hand[1], atol=1e-12
-        )
-        assert np.count_nonzero(contrasts["Q5a"]) <= len(columns)
+        for (m, date, eid), value in pinned.items():
+            if m == model:
+                assert per[(date, eid)] == pytest.approx(value, abs=1e-8)
 
 
 def _within_event_null_space(design, rows):
@@ -993,99 +955,33 @@ def _identified(c, null):
     return bool(np.abs(c @ null).max(initial=0.0) < 1e-8)
 
 
-def _recency_designs(table, *, only_visited_other_leaf: bool):
-    """Each option's design and its within-event null space on the No SWR
-    rows; with ``only_visited_other_leaf``, without the events that have an
-    other-leaf row below 3 trials (a never-visited arm at the epoch's first
-    visit carries the censored count 2)."""
+def test_the_role_levels_are_identified_beside_the_recency_curve(table) -> None:
+    """On events whose other-leaf arms are all at least 3 trials since their
+    last visit, the current and previous levels are identified by the
+    unpenalized likelihood and Q5a is too; the trunk level is not."""
     model = "role_content"
-    out = {}
-    for option in rc.RECENCY_ROWS:
-        settings = rc.RoleContentSettings(recency_rows=option)
-        cohort = rc.role_content_cohort(table, settings)
-        rows = cohort.model_rows(model)
-        rows = rows[rows[rc.KIND] == KIND]
-        if only_visited_other_leaf:
-            other = rows[rows[rc.ROLE] == rc.REFERENCE_ROLE]
-            early = other.loc[other[rc.RECENCY] < np.log(3.0) - 1e-9, rc.UNIT]
-            rows = rows[~rows[rc.UNIT].isin(early)]
-        rows = rows.reset_index(drop=True)
-        reference = rc.ContrastReference.from_rows(
-            rows, cohort.reference_log_duration, model
-        )
-        design = rc.role_design(
-            rows, model, "unadjusted", settings, reference=reference
-        )
-        out[option] = (design, settings, _within_event_null_space(design, rows))
-    return out
-
-
-def _level_and_curve(design, settings, role, trials):
-    """The functional ``role[<role>]`` alone, and the role's row at its
-    recency ``trials`` less an other-leaf row of the same arm at 20 trials:
-    ``role[<role>] + f(trials) - f(20)`` under all_leaf (the curve's level
-    on the leaf rows is not identified, only its differences), the level
-    alone under other_leaf."""
+    cohort = rc.role_content_cohort(table)
+    rows = cohort.model_rows(model)
+    rows = rows[rows[rc.KIND] == KIND]
+    other = rows[rows[rc.ROLE] == rc.REFERENCE_ROLE]
+    early = other.loc[other[rc.RECENCY] < np.log(3.0) - 1e-9, rc.UNIT]
+    rows = rows[~rows[rc.UNIT].isin(early)].reset_index(drop=True)
+    reference = rc.ContrastReference.from_rows(
+        rows, cohort.reference_log_duration, model
+    )
+    design = rc.role_design(rows, model, "unadjusted", reference=reference)
+    null = _within_event_null_space(design, rows)
     names = design.coef_names
-    term = rc.recency_term(settings)
-    alone = np.zeros(len(names))
-    alone[names.index(f"role[{role}]")] = 1.0
-    with_curve = alone.copy()
-    if settings.recency_rows == "all_leaf":
-        columns = [j for j, n in enumerate(names) if n.startswith(term + ".")]
-        at = _basis_rows(design, term, np.log([trials, 20.0]))
-        with_curve[columns] = at[0] - at[1]
-    return alone, with_curve
-
-
-def _q5a(design, settings):
-    term = rc.recency_term(settings)
-    names = design.coef_names
-    c = np.zeros(len(names))
+    unit = np.eye(len(names))
+    assert not _identified(unit[names.index(rc.TRUNK_LEVEL)], null)
+    for role in ("current", "previous"):
+        assert _identified(unit[names.index(f"role[{role}]")], null)
+    term = dt.estimand("Q5a").contrast.term
     columns = [j for j, n in enumerate(names) if n.startswith(term + ".")]
     at = _basis_rows(design, term, np.log([20.0, 3.0]))
-    c[columns] = at[0] - at[1]
-    return c
-
-
-def test_all_leaf_recency_rows_confound_the_role_levels_with_the_curve(
-    table,
-) -> None:
-    """What the unpenalized likelihood identifies under each option.
-
-    On events whose other-leaf arms are all at least 3 trials since their
-    last visit: under other_leaf the current and previous levels are
-    identified; under all_leaf each level alone is not (a null direction of
-    the design moves it with the curve below 3 trials), while the role's row
-    against an other-leaf row of the same arm, each at its own recency (1 or
-    2 trials against 20), is. Q5a is identified under both.
-    The rank of the design does not show it: the curve's part below 3 trials
-    is a null direction under other_leaf too, where it touches no level.
-    """
-    designs = _recency_designs(table, only_visited_other_leaf=True)
-    for option, (design, settings, null) in designs.items():
-        assert null.shape[1] >= 1  # at least the trunk level
-        assert not _identified(
-            np.eye(len(design.coef_names))[design.coef_names.index(rc.TRUNK_LEVEL)],
-            null,
-        )
-        assert _identified(_q5a(design, settings), null)
-        for role, trials in (("current", 1.0), ("previous", 2.0)):
-            alone, with_curve = _level_and_curve(design, settings, role, trials)
-            assert _identified(with_curve, null)
-            assert _identified(alone, null) == (option == "other_leaf"), (option, role)
-
-
-def test_all_leaf_levels_rest_on_the_never_visited_rows_at_two_trials(table) -> None:
-    """With the events at an epoch's first visit kept, the all_leaf levels are
-    identified by the likelihood: the censored count 2 of a never-visited arm
-    is an other-leaf row below 3 trials, and the cubic's form carries the
-    curve from there to 1 trial."""
-    designs = _recency_designs(table, only_visited_other_leaf=False)
-    design, settings, null = designs["all_leaf"]
-    for role, trials in (("current", 1.0), ("previous", 2.0)):
-        alone, _ = _level_and_curve(design, settings, role, trials)
-        assert _identified(alone, null)
+    q5a = np.zeros(len(names))
+    q5a[columns] = at[0] - at[1]
+    assert _identified(q5a, null)
 
 
 # ---------------------------------------------------------------------------
