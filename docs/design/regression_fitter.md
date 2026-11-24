@@ -1168,7 +1168,7 @@ machine at a load near 32; timings, not results; scratch script `measure_mechani
 The dense design fits at the animal size. The collinearity record takes most of the time:
 it projects each baseline copy out of the weighted design one column at a time
 (`collinearity.concurvity`), so its cost grows with the copies times the size of the design.
-The copies, the support count and the record of the sessions take under 10 s in every case.
+The copies, the support count and the record of the sessions take at most 15 s (the animal-size rate unit).
 A loop over 45 content-like day units and 5 animal units took 321 s and left at most 48
 live programs (the limit is 256).
 
