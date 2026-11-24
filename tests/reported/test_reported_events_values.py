@@ -979,7 +979,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     values = _by_key(builder.content_distance_values(_distance_events(), "s"))
     assert len(values) == 2 * 3 * 4 + 2
     key = "content_distance_under_non_swr_fraction"
-    assert values[key].value == pytest.approx(1 / 6)
+    assert values[key].value == pytest.approx(1 / 12)  # the animals' mean
     assert values[f"{key}_animal_mean"].value == pytest.approx(1 / 12)
     assert values[f"{key}_animal_max"].value == pytest.approx(1 / 6)
     assert values["content_distance_beyond_swr_fraction_animal_mean"].value == (

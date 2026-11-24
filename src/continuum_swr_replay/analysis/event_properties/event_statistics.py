@@ -1338,13 +1338,14 @@ def most_steps(
 def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     """A per-event property's median in non-SWR and in SWR events.
 
-    Plain medians of all events with a value, pooled over epochs and animals;
-    not duration-controlled.
+    Event -> epoch -> animal: the mean over animals of each animal's median
+    of the class (:func:`animal_class_medians`: the median over its epochs of
+    the epoch's median); not duration-controlled.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``is_swr`` and ``column``.
+        As :func:`animal_class_medians` takes them.
     column : str
         The property.
 
@@ -1353,8 +1354,11 @@ def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     statistics : dict
         ``median_non_swr`` and ``median_swr``.
     """
-    median = events.dropna(subset=[column]).groupby("is_swr")[column].median()
-    return {"median_non_swr": median[False], "median_swr": median[True]}
+    medians = animal_class_medians(events, column)
+    return {
+        "median_non_swr": float(medians["non_swr"].mean()),
+        "median_swr": float(medians["swr"].mean()),
+    }
 
 
 def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -1448,6 +1452,31 @@ def _class_distribution(
             )
         )
     return pd.concat(rows, ignore_index=True)
+
+
+def property_distribution(
+    events: pd.DataFrame, column: str, edges: np.ndarray
+) -> pd.DataFrame:
+    """Each animal's distribution of a per-event property, by class, as
+    :func:`hpd_distribution` takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        ``column`` (an event without a value is left out).
+    column : str
+        The property.
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges, in the property's unit.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent``.
+    """
+    return _class_distribution(events, column, edges)
 
 
 def hpd_distribution(
@@ -1641,8 +1670,9 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
         Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
         of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
         mean over animals of the animals' shares; ``animal_min`` and
-        ``animal_max``; ``share``, pooled over the class's events;
-        ``n_animals`` and ``n_events`` (the class's events).
+        ``animal_max``; ``share``, the same number as ``share_animal_mean``
+        (the headline share is animal-first); ``n_animals`` and ``n_events``
+        (the class's events).
     """
     table = _class_table(events, DISTANCE_COLUMN)
     rows = []
@@ -1660,7 +1690,7 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
                     "share_animal_mean": float(per_animal.mean()),
                     "animal_min": float(per_animal.min()),
                     "animal_max": float(per_animal.max()),
-                    "share": float(inside.mean()),
+                    "share": float(per_animal.mean()),
                     "n_animals": len(per_animal),
                     "n_events": len(mine),
                 }

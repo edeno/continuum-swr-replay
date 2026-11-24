@@ -54,8 +54,19 @@ def test_bootstrap_contrasts_and_intervals():
     )
     assert set(out.replicate) == set(range(-1, 60))
     data = out[out.replicate < 0].set_index("property")
-    assert data.loc["y", "median_swr"] == pytest.approx(np.median(y[is_swr]))
-    assert data.loc["y", "median_non_swr"] == pytest.approx(np.median(y[~is_swr]))
+    # event -> session -> animal: the mean of the animals' medians of their
+    # sessions' medians
+    frame = pd.DataFrame({"y": y, "is_swr": is_swr, "animal": animal, "s": session})
+    expected = (
+        frame.groupby(["is_swr", "animal", "s"])["y"].median()
+        .groupby(["is_swr", "animal"]).median()
+        .groupby("is_swr").mean()
+    )  # fmt: skip
+    assert data.loc["y", "median_swr"] == pytest.approx(expected[True])
+    assert data.loc["y", "median_non_swr"] == pytest.approx(expected[False])
+    assert data.loc["y", "difference"] == pytest.approx(
+        expected[True] - expected[False]
+    )
     intervals = pc.bootstrap_intervals(out, 5)
     row = intervals.loc["y"]
     assert row.difference_low <= row.difference <= row.difference_high
@@ -168,3 +179,42 @@ def test_a_replicate_drawing_no_event_of_a_class_skips_the_stratum():
     value, skipped = groups.matched(weights, [0, 1])
     assert skipped == 1
     assert value == pytest.approx(-1.0)  # stratum 0 alone: median 1 - median 2
+
+
+def test_animal_first_medians_take_each_drawn_copy_on_its_own():
+    """Two animals of two sessions each; in every session the non-SWR events
+    all hold one value, so any resample of a session with a non-SWR event
+    gives that value. Animal 0: sessions at 1 and 3 (median 2); animal 1: at
+    10 and 20 (median 15). The estimate is 8.5, and a replicate is the mean
+    over its two animal copies of 1, 2 or 3 (animal 0) and 10, 15 or 20
+    (animal 1): never a median over the pooled copies' sessions. One session
+    has no SWR event with a value: it is not one of its animal's sessions for
+    the SWR class."""
+    level = np.repeat([1.0, 3.0, 10.0, 20.0], 6)
+    session = np.repeat(np.arange(4), 6)
+    animal = np.repeat([0, 0, 1, 1], 6)
+    is_swr = np.tile([False, False, False, False, True, True], 4)
+    y = np.where(is_swr, 100.0 + level, level)
+    y[(session == 3) & is_swr] = np.nan
+    estimate, drawn = pc.animal_first_medians(
+        {"y": y},
+        is_swr,
+        animal,
+        session,
+        n_replicates=200,
+        rng=np.random.default_rng(0),
+    )
+    assert estimate[0, 0] == pytest.approx((2.0 + 15.0) / 2)
+    assert estimate[0, 1] == pytest.approx((102.0 + 110.0) / 2)
+    means = {
+        (a + b) / 2
+        for first in ((1.0, 2.0, 3.0), (10.0, 15.0, 20.0))
+        for second in ((1.0, 2.0, 3.0), (10.0, 15.0, 20.0))
+        for a in first
+        for b in second
+    }
+    non_swr = drawn[:, 0, 0]
+    assert all(
+        any(np.isclose(v, m) for m in means) for v in non_swr[np.isfinite(non_swr)]
+    )
+    assert len(np.unique(np.round(non_swr, 6))) > 5

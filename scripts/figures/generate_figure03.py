@@ -71,7 +71,8 @@ not drawn: it restates c in arms, and an arm counts when one time bin's position
 is on it. Its values stay in the events summary.
 
 Panels a, c and d mark each class's median (triangle;
-``event_statistics.class_medians``), the events summary's
+``event_statistics.class_medians``, the mean of the animals' medians; the
+distributions are the mean over animals of each animal's), the events summary's
 ``<property>_median_*`` values (``paper/reported/events.json``), and under it
 each animal's median (ticks; ``event_statistics.animal_class_medians``), the
 medians the summary's ``<property>_animals_in_direction`` counts compare. Panels
@@ -133,6 +134,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     animal_class_medians,
     class_medians,
     content_distance_distribution,
+    property_distribution,
     state_composition_statistics,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
@@ -258,8 +260,11 @@ def kind_labels(events: pd.DataFrame) -> list[str]:
 
 
 def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
-    """A property's distribution for each kind, % of the kind's events per bin,
-    with each kind's median (triangle) and, under it, each animal's (ticks).
+    """A property's distribution for each kind, % of the kind's events per bin
+    (the mean over animals of each animal's percent, itself the mean over its
+    epochs: ``event_statistics.property_distribution``), with each kind's
+    median (triangle: the mean of the animals' medians) and, under it, each
+    animal's (ticks).
 
     The events beyond an end of the axis are counted in its end bin, whose tick
     then says so (≤ or ≥). An event beyond an end that is not marked raises, and
@@ -273,14 +278,15 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     marked_below = ticks.get(edges[0], "").startswith("≤")
     marked_above = ticks.get(edges[-1], "").startswith("≥")
     top = 0.0
-    for is_swr, (_, color) in EVENT_KINDS.items():
-        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
-        below, above = (values < edges[0]).any(), (values > edges[-1]).any()
-        if (below and not marked_below) or (above and not marked_above):
-            raise ValueError(f"{label}: an event lies beyond the axis, unmarked")
-        values = np.clip(values, edges[0], edges[-1])
-        counts, _ = np.histogram(values, bins=edges)
-        share = 100 * counts / counts.sum()
+    values = scale * events[column]
+    below, above = (values < edges[0]).any(), (values > edges[-1]).any()
+    if (below and not marked_below) or (above and not marked_above):
+        raise ValueError(f"{label}: an event lies beyond the axis, unmarked")
+    percent = _mean_percent(
+        events.assign(**{column: values.clip(edges[0], edges[-1])}), column, edges
+    )
+    for name, color in EVENT_KINDS.values():
+        share = percent[name].to_numpy()
         ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
         ax.stairs(share, edges, color=color, lw=0.8)
         top = max(top, share.max())
@@ -296,20 +302,41 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
+def _mean_percent(events: pd.DataFrame, column: str, edges) -> pd.DataFrame:
+    """Each kind's percent of its events in each bin, the mean over animals of
+    each animal's (``event_statistics.property_distribution``): one column per
+    kind's name, one row per bin in the order of ``edges``."""
+    distribution = property_distribution(events, column, np.asarray(edges))
+    mean = distribution.groupby(["group", "bin_low"])["percent"].mean()
+    return pd.DataFrame(
+        {name: mean[_GROUP_NAMES[is_swr]].sort_index().to_numpy()
+         for is_swr, (name, _) in EVENT_KINDS.items()}
+    )  # fmt: skip
+
+
+#: the statistics' names of the two kinds
+_GROUP_NAMES = {False: "no SWR", True: "SWR"}
+
+
 def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
     """The share of each kind's events at or below each value, on the
-    histogram's axis. A curve crosses the 50 % line at the kind's median, and
-    what it lacks of 100 % at the end of the axis is the share of events beyond
-    it (the histogram's end bin)."""
+    histogram's axis: the mean over animals of each animal's share (the mean
+    over its epochs), from bins a 300th of the axis wide. What a curve lacks
+    of 100 % at the end of the axis is the share of events beyond it (the
+    histogram's end bin)."""
     column, label, scale, edges, ticks = HISTOGRAMS[key]
     if events[column].isna().any():
         raise ValueError(f"{label}: an event has no value")
     grid = np.linspace(edges[0], edges[-1], 301)
     ax.axhline(50, color="0.8", lw=0.5)
-    for is_swr, (_, color) in EVENT_KINDS.items():
-        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
-        at_or_below = np.searchsorted(np.sort(values), grid, side="right")
-        ax.plot(grid, 100 * at_or_below / len(values), color=color, lw=0.8)
+    # an event below the axis counts from its start; one above it in no bin
+    percent = _mean_percent(
+        events.assign(**{column: (scale * events[column]).clip(lower=edges[0])}),
+        column,
+        grid,
+    )
+    for name, color in EVENT_KINDS.values():
+        ax.plot(grid[1:], percent[name].cumsum(), color=color, lw=0.8)
     ax.set_xlim(edges[0], edges[-1])
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])

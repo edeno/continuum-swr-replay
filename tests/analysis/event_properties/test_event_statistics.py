@@ -849,10 +849,10 @@ def _property_events() -> pd.DataFrame:
     )
 
 
-def test_class_medians_pool_the_events_with_a_value():
+def test_class_medians_are_the_mean_of_the_animals_medians():
     medians = stats.class_medians(_property_events(), "extent")
-    # non-SWR: 1, 1, 3, 7, 8; SWR: 4, 5, 7, 9
-    assert medians == {"median_non_swr": 3.0, "median_swr": 6.0}
+    # the animals' medians: non-SWR 2, 8, 1, 7; SWR 5, 4, 9, 7
+    assert medians == {"median_non_swr": 4.5, "median_swr": 6.25}
 
 
 def test_animal_class_medians_give_each_animal_s_median_of_each_class():
@@ -944,7 +944,7 @@ def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
     np.testing.assert_allclose(no_swr["share_animal_mean"], [1 / 12, 1 / 3, 7 / 12])
     np.testing.assert_allclose(no_swr["animal_min"], [0.0, 0.0, 1 / 6])
     np.testing.assert_allclose(no_swr["animal_max"], [1 / 6, 2 / 3, 1.0])
-    np.testing.assert_allclose(no_swr["share"], [1 / 6, 2 / 6, 3 / 6])
+    np.testing.assert_allclose(no_swr["share"], no_swr["share_animal_mean"])
     swr = table.loc["SWR"]
     np.testing.assert_allclose(swr["share_animal_mean"], [0.5, 1 / 8, 3 / 8])
     assert (swr["n_events"] == 4).all() and (no_swr["n_animals"] == 2).all()
@@ -1017,8 +1017,9 @@ def test_n_animals_in_direction_takes_each_class_median_over_the_epochs():
             "extent": [1.0, 1.0, 1.0, 2.0, 10.0, 3.0],
         }
     )
+    # one animal: the median over its two epochs of the epoch's median
     assert stats.class_medians(events, "extent") == {
-        "median_non_swr": 1.0,
+        "median_non_swr": 5.5,
         "median_swr": 2.5,
     }
     assert stats.n_animals_in_direction(events, "extent", "lower") == 0

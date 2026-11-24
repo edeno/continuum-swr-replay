@@ -1516,3 +1516,22 @@ def test_supp_figure03_class_panels_draw_a_bar_per_class_and_kind(
     assert [t.get_text() for t in ax.get_xticklabels()] == labels
     assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 2 * len(classes)
     plt.close(fig)
+
+
+def test_figure03_histograms_are_the_mean_of_the_animals_distributions(offline):
+    """Animal a has one epoch with 9 no-SWR events at 10 ms and 1 at 30 ms;
+    animal b one epoch with 1 event at 30 ms. Pooled, 82 % lie in the first
+    bin; each animal weighing the same, (90 + 0) / 2 = 45 %."""
+    figure = offline("scripts.figures.generate_figure03")
+    events = pd.DataFrame(
+        {
+            "animal": ["a"] * 11 + ["b"] * 2,
+            "session_date": "d",
+            "epoch": "e",
+            "is_swr": [False] * 10 + [True] + [False, True],
+            "duration": [10.0] * 9 + [30.0, 10.0, 30.0, 30.0],
+        }
+    )
+    percent = figure._mean_percent(events, "duration", [0.0, 20.0, 40.0])
+    assert percent["No SWR"].tolist() == pytest.approx([45.0, 55.0])
+    assert percent["SWR"].tolist() == pytest.approx([50.0, 50.0])

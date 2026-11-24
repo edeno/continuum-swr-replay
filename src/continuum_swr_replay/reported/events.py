@@ -4550,7 +4550,9 @@ def _class_median_values(
             scale * stats["median_non_swr"],
             "quantity",
             style,
-            f"median {name} of immobile non-SWR non-local events",
+            f"median {name} of immobile non-SWR non-local events: the mean over "
+            "animals of each animal's median (the median over its epochs of the "
+            "epoch's median)",
             unit,
         ),
         make(
@@ -4558,7 +4560,9 @@ def _class_median_values(
             scale * stats["median_swr"],
             "quantity",
             style,
-            f"median {name} of immobile SWR-overlapping non-local events",
+            f"median {name} of immobile SWR-overlapping non-local events: the "
+            "mean over animals of each animal's median (the median over its "
+            "epochs of the epoch's median)",
             unit,
         ),
         make(
@@ -4650,8 +4654,7 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
     of the absolute distance along the track of the decoded place from the
     animal's; ``event_statistics.content_distance_band_statistics``): the mean
     over animals of each animal's share with the lowest and highest animal,
-    tagged to the panel, and the share pooled over events (no figure draws
-    it)."""
+    tagged to the panel; the headline share is the same number."""
     make = value_factory(content_distance_values, source, TAGS["content_distance"])
     table = event_statistics.content_distance_band_statistics(events)
     values = []
@@ -4671,7 +4674,9 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
                 f"content_distance_{band_word}_{word}_fraction",
                 (row["share"], row["animal_min"], row["animal_max"]),
                 (
-                    f"{what}, pooled over events",
+                    f"{what}: the mean over animals of each animal's share (the "
+                    "mean over its epochs of the epoch's share), the same number "
+                    f"as content_distance_{band_word}_{word}_fraction_animal_mean",
                     f"lowest animal's {what} (an animal's share is the mean over "
                     "its epochs of the epoch's share)",
                     f"highest animal's {what} (the mean over its epochs)",
@@ -4756,7 +4761,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 "quantity",
                 "sig2s",
                 f"lower bound of the {interval} of the SWR minus non-SWR difference "
-                f"of median {name}",
+                f"of median {name} (each class's median the mean over animals of "
+                "each animal's median over its epochs of the epoch's median)",
                 unit,
             ),
             make(
@@ -4777,7 +4783,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 "quantity",
                 "sig2s",
                 f"SWR minus non-SWR difference of median {name} at matched duration "
-                "(within ten duration-quantile strata, averaged by stratum size)",
+                "(within ten duration-quantile strata of the pooled events, "
+                "averaged by stratum size; pooled over events by design)",
                 unit,
             ),
             make(
