@@ -854,11 +854,14 @@ def test_an_own_fit_at_the_animal_level_is_reduced_over_the_animals(
         {},
         fit=partial(own_animal_fit, without=("animal0",)),
         fit_estimands=("log_rate",),
+        fit_columns=("time_since_s",),
     )
     scenario = OutsideScenario(
         "outside", expected_rate, planted={"reward": 0.5, "log_rate": 0.0}
     )
     simulation = Simulation([plain, animal], sessions, [scenario], 3, 200, 5)
+    alone = Simulation([animal], sessions, [scenario], 3, 200, 5)
+    assert engine.run_columns(alone) == ("exposure", "well_visit_id", "time_since_s")
     result = engine.run(simulation)
     units = result.sessions.query("model == 'animal'")
     assert len(units) == 3 * 5 and units["session_date"].isna().all()

@@ -190,6 +190,9 @@ class Model:
     fit_estimands : tuple of str
         The estimands only the own fit gives, with no ``c``: their planted
         value is an outside scenario's (NaN under an inside scenario).
+    fit_columns : tuple of str
+        The columns the own fit reads beyond the design's and the unit (a run
+        keeps them, :func:`run_columns`).
     """
 
     name: str
@@ -200,10 +203,11 @@ class Model:
     estimands: Mapping[str, np.ndarray]
     fit: OwnFit | None = None
     fit_estimands: tuple[str, ...] = ()
+    fit_columns: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         n_coef = len(self.design.coef_names)
-        if self.fit_estimands and self.fit is None:
+        if (self.fit_estimands or self.fit_columns) and self.fit is None:
             raise ValueError(
                 f"model {self.name!r}: estimands of an own fit without an own fit"
             )
@@ -380,26 +384,33 @@ def planted_value(scenario: Scenario, model: Model, estimand: str) -> float:
     """The planted value of ``estimand`` of ``model`` under ``scenario``:
     ``c' beta`` inside the model, the scenario's own value outside it (NaN
     when it names none). An estimand of an own fit with no ``c`` has the
-    planted value NaN inside the model."""
+    planted value NaN inside the model; for a model with its own fit, the
+    planted coefficients its design lacks (those its own fit holds) are not
+    read."""
     if isinstance(scenario, InsideScenario):
         if estimand not in model.estimands:
             return np.nan
-        return float(model.estimands[estimand] @ _planted_beta(scenario, model.design))
+        beta = _planted_beta(scenario, model.design, model.fit is not None)
+        return float(model.estimands[estimand] @ beta)
     value = scenario.planted.get(estimand, np.nan)
     return float(value(model) if callable(value) else value)
 
 
-def _planted_beta(scenario: InsideScenario, design: Design) -> np.ndarray:
-    """The planted coefficients over ``design.coef_names``, shape ``(n_coef,)``."""
+def _planted_beta(
+    scenario: InsideScenario, design: Design, absent_allowed: bool = False
+) -> np.ndarray:
+    """The planted coefficients over ``design.coef_names``, shape ``(n_coef,)``;
+    a coefficient the design lacks is refused unless ``absent_allowed``."""
     names = list(design.coef_names)
     unknown = [name for name in scenario.coefficients if name not in names]
-    if unknown:
+    if unknown and not absent_allowed:
         raise ValueError(
             f"scenario {scenario.name!r}: {unknown} not coefficients of the design"
         )
     beta = np.zeros(len(names))
     for name, value in scenario.coefficients.items():
-        beta[names.index(name)] = value
+        if name in names:
+            beta[names.index(name)] = value
     return beta
 
 
@@ -917,11 +928,13 @@ def _check(simulation: Simulation) -> None:
 
 def run_columns(simulation: Simulation) -> tuple[str, ...]:
     """The columns of the rows a run keeps, each once: every model's design
-    columns (:attr:`.terms.Design.columns`) and unit, the columns a scenario
+    columns (:attr:`.terms.Design.columns`), unit and own fit's
+    ``fit_columns``, the columns a scenario
     names for the softmax's noise, and an outside scenario's ``columns``. The
     response is not kept: it is drawn."""
     out = [c for model in simulation.models for c in model.design.columns]
     out += [model.unit for model in simulation.models]
+    out += [c for model in simulation.models for c in model.fit_columns]
     for scenario in simulation.scenarios:
         out += [
             value
