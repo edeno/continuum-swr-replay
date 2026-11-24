@@ -12,11 +12,14 @@ Each row asks one thing:
 
     Size and movement
         a — Duration.
-        b — The mean share of an event in Non-Local Continuous and in Non-Local
-            Fragmented (each event's mean state probability, each event weighted
+        b — The mean probability of the Non-Local Continuous and of the Non-Local
+            Fragmented state over an event's time bins (each event weighted
             alike); bars the animals' mean, dots the animals
             (``event_statistics.state_composition_statistics``).
-        c — Spatial extent of the decoded content.
+        c — Spatial extent of the decoded content. Inset: how much farther
+            SWR events' content extends than no-SWR events', over all events
+            and at matched duration, with 95 % intervals (the property
+            bootstrap's, ``scripts/event_properties/bootstrap_event_properties.py``).
         d — Replay speed, twice on one axis: the distribution, and under it
             the share of events at or below each speed. An event's speed is
             the MAP line-fit speed: the slope, at least 0, of the track
@@ -230,6 +233,9 @@ def read_inputs() -> dict:
     return {
         "events": events,
         "distance": distance,
+        "extent_difference": pd.read_csv(
+            inputs.property_bootstrap / "intervals.csv", index_col=0
+        ).loc["extent"],
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "profiles": leaf_and_trunk_profiles(density),
         "animal_profiles": leaf_and_trunk_profiles(
@@ -563,7 +569,9 @@ def draw_profiles(
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
-    """Panel b: the mean share of an event in Continuous and in Fragmented.
+    """Panel b: the mean probability of the Continuous and of the Fragmented
+    state over an event's time bins (not time classified into a state; the two
+    do not sum to 100, the rest being the Local and No-Spike states).
 
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
@@ -582,12 +590,40 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     ax.set_xlim(-0.55, 1.55)
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
-    ax.set_ylabel("% of event\n(mean over events)")
+    ax.set_ylabel("Mean state\nprobability (%)")
 
 
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
+
+
+def draw_extent_difference(ax, interval: pd.Series) -> None:
+    """Panel c's inset: how much farther SWR events' content extends than
+    no-SWR events', over all events and at matched duration, each with its 95 %
+    interval (``interval``: the property bootstrap's row for the extent, the
+    events summary's ``extent_difference_*`` and ``extent_matched_difference*``
+    values; the rows are named ``all`` and ``matched``). SWR events last about
+    twice as long, and a longer event has more time to cover more track: the
+    matched difference is what is left."""
+    rows = (("all", "difference"), ("matched", "matched_difference"))
+    for y, (_, column) in enumerate(rows):
+        ax.plot(
+            [interval[f"{column}_low"], interval[f"{column}_high"]], [y, y],
+            color="0.25", lw=0.8,
+        )  # fmt: skip
+        ax.plot(interval[column], y, "o", color="0.25", ms=2.5)
+    ax.axvline(0, color="0.7", lw=0.5, zorder=0)
+    ax.set_yticks(range(len(rows)), [name for name, _ in rows], fontsize=SMALL_SIZE)
+    ax.set_ylim(len(rows) - 0.4, -0.6)
+    ax.set_xlim(
+        left=min(0.0, interval[["difference_low", "matched_difference_low"]].min()) - 5
+    )
+    ax.set_xlabel("SWR − No SWR\n(cm)", fontsize=SMALL_SIZE, labelpad=1)
+    ax.tick_params(labelsize=SMALL_SIZE, length=2, pad=1)
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+
 
 DISTANCE_XLABEL = "From the animal (cm)"
 """The distance panel's x label, under its title "Content distance": each
@@ -654,6 +690,9 @@ def generate_figure(inputs: dict):
     for ax, key in ((ax_a, "duration"), (ax_c, "extent"), (ax_d, "speed")):
         draw_histogram(ax, events, key)
     draw_cumulative(ax_d_cumulative, events, "speed")
+    # c's upper middle is empty: the extent difference, raw and duration-matched
+    ax_c_inset = ax_c.inset_axes([0.52, 0.5, 0.44, 0.18])
+    draw_extent_difference(ax_c_inset, inputs["extent_difference"])
     ax_d.set_xlabel("")
     ax_d.tick_params(labelbottom=False)
     for ax in (ax_a, ax_c, ax_d):
@@ -690,7 +729,8 @@ def generate_figure(inputs: dict):
 
     fig.draw_without_rendering()
     panels_by_letter = {
-        "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
+        "a": [ax_a], "b": [ax_b], "c": [ax_c, ax_c_inset],
+        "d": [ax_d, ax_d_cumulative],
         "e": [ax_e_frame, *ax_e], "f": [ax_f], "g": [ax_g],
     }  # fmt: skip
     place_letters(

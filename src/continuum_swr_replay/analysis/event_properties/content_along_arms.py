@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    AT_WELL_CM,
     FAR_CM,
     OCCUPANCY_PLACES,
     quadrant_fractions,
@@ -583,6 +584,102 @@ def place_share_statistics(shares: pd.DataFrame) -> dict:
         "means": shares.groupby("is_swr").mean(),
         "n_animals_non_swr_more_at_well": int((at_well[False] > at_well[True]).sum()),
     }
+
+
+EVENT_PLACES = ("at_well", "remote_well", "own_well")
+"""The shares :func:`event_place_shares` gives each event."""
+
+EXTENT_BIN_EDGES_CM = (0.0, 10.0, 20.0, 50.0, 100.0, np.inf)
+"""The spatial-extent classes of :func:`remote_well_share_by_extent` (cm); a
+class holds its low edge and not its high one."""
+
+
+def event_place_shares(rows: pd.DataFrame) -> pd.DataFrame:
+    """Each event's share of its content time at a well, and at a remote one.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        The content-mass rows of the events (:func:`event_place_mass` with each
+        place's ``distance_to_well_cm``): ``event_id``, ``far``, :data:`WEIGHT`
+        and ``distance_to_well_cm``.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_events, 3)
+        :data:`EVENT_PLACES`, indexed by ``event_id``: the share of the event's
+        content time within ``AT_WELL_CM`` of a well; of that, the part far
+        from the animal (``remote_well``) and the part near it (``own_well``).
+    """
+    weight = rows[WEIGHT].astype(float)
+    at_well = rows["distance_to_well_cm"] < AT_WELL_CM
+    far = rows["far"].astype(bool)
+    parts = pd.DataFrame(
+        {
+            "event_id": rows["event_id"],
+            "total": weight,
+            "at_well": weight.where(at_well, 0.0),
+            "remote_well": weight.where(at_well & far, 0.0),
+            "own_well": weight.where(at_well & ~far, 0.0),
+        }
+    )
+    summed = parts.groupby("event_id").sum()
+    return summed[list(EVENT_PLACES)].div(summed["total"], axis=0)
+
+
+def remote_well_share_by_extent(
+    events: pd.DataFrame,
+    edges_cm: tuple[float, ...] = EXTENT_BIN_EDGES_CM,
+    column: str = "remote_well",
+) -> pd.DataFrame:
+    """Each animal's mean share of an event at a remote well, by the event's
+    spatial extent and kind.
+
+    Whether the events whose content stays in one place are the ones at a
+    remote well. An epoch's value for a kind and an extent class is the mean of
+    its events' ``remote_well`` shares; an animal's is the mean over its epochs
+    that have such an event.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, ``epoch_id``, ``is_swr``,
+        ``spatial_extent_cm`` and ``column``.
+    edges_cm : tuple of float, optional
+        The extent classes' edges, covering every extent.
+    column : str, optional
+        Each event's share of content time at a remote well
+        (:func:`event_place_shares`).
+
+    Returns
+    -------
+    shares : pd.DataFrame
+        ``remote_well`` and ``n_events`` (the animal's events of the kind in
+        the class), indexed by ``is_swr``, ``animal`` and ``extent_class`` (the
+        class's place in ``edges_cm``, 0 the narrowest); a class an animal has
+        no event in has no row.
+
+    Raises
+    ------
+    ValueError
+        If an extent is missing or outside ``edges_cm``.
+    """
+    edges = np.asarray(edges_cm, dtype=float)
+    extent = events["spatial_extent_cm"].to_numpy(dtype=float)
+    if not ((extent >= edges[0]) & (extent < edges[-1])).all():
+        raise ValueError("a spatial extent is missing or outside the classes")
+    frame = events[["is_swr", "animal", "epoch_id"]].assign(
+        remote_well=events[column].to_numpy(dtype=float),
+        extent_class=np.searchsorted(edges, extent, side="right") - 1,
+    )
+    keys = ["is_swr", "animal", "extent_class"]
+    per_epoch = frame.groupby([*keys, "epoch_id"])["remote_well"].agg(["mean", "size"])
+    return pd.DataFrame(
+        {
+            "remote_well": per_epoch["mean"].groupby(keys).mean(),
+            "n_events": per_epoch["size"].groupby(keys).sum(),
+        }
+    )
 
 
 _EPOCH_KEYS = ["is_swr", "animal", "epoch_id"]

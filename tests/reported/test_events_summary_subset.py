@@ -165,6 +165,41 @@ def test_the_content_mass_is_summed_over_the_selected_events(tmp_path):
         )
 
 
+def test_each_selected_event_gets_its_shares_of_content_time_at_wells(tmp_path):
+    """Every event of the run has 1 time bin at a remote well, 1 at its own
+    well and 2 off the wells; the selected events get shares 0.5, 0.25 and
+    0.25 (named apart from the table's own at_well), the other is not read."""
+    events = select_visit_context(_labeled())
+    rows = [
+        {
+            "event_id": event_id,
+            "epoch_id": "e",
+            "far": far,
+            "weight": weight,
+            "distance_to_well_cm": d_well,
+        }
+        for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
+        for far, weight, d_well in (
+            (True, 1.0, 5.0),
+            (False, 1.0, 5.0),
+            (True, 2.0, 60.0),
+        )
+    ]
+    pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
+
+    joined, _ = builder.with_event_place_shares(events, tmp_path, 1)
+
+    assert joined["event_id"].tolist() == events["event_id"].tolist()
+    assert (joined["content_at_well"] == 0.5).all()
+    assert (joined["content_remote_well"] == 0.25).all()
+    assert (joined["content_own_well"] == 0.25).all()
+    assert (joined["epoch_id"] == "e").all()
+    with pytest.raises(ValueError, match="no row"):
+        builder.with_event_place_shares(
+            pd.concat([events, events.iloc[[0]].assign(event_id=999)]), tmp_path, 1
+        )
+
+
 def test_an_output_not_made_over_the_subset_is_pending():
     assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
     assert "rerun it" in builder.subset_staleness({}, "out")

@@ -1068,6 +1068,7 @@ def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
     assert builder.TAGS["content_occupancy"].figures == ("3f",)
     assert builder.TAGS["content_by_animal"].figures == ()
+    assert builder.TAGS["content_well_side"].figures == ("S3d",)
     assert (
         builder.TAGS["content_by_animal"].questions
         == builder.TAGS["content_occupancy"].questions
@@ -1107,13 +1108,18 @@ def test_content_occupancy_values_name_each_group_and_place():
         ignore_index=True,
     )
     values = builder.content_occupancy_values(bins, "s")
-    shown = {value.key for value in values if value.figures}
+    shown = {value.key: value.figures for value in values if value.figures}
     assert shown == {
-        "occupancy_epochs",
-        "non_swr_content_at_well_fraction",
-        "swr_content_at_well_fraction",
-        "animals_non_swr_more_at_well",
-        "even_content_at_well_fraction",
+        "occupancy_epochs": ("3f",),
+        "non_swr_content_at_well_fraction": ("3f",),
+        "swr_content_at_well_fraction": ("3f",),
+        "animals_non_swr_more_at_well": ("3f",),
+        "even_content_at_well_fraction": ("3f",),
+        # the wells by the animal's side: the supplement's panel d
+        "non_swr_content_remote_well_fraction": ("S3d",),
+        "non_swr_content_own_well_fraction": ("S3d",),
+        "swr_content_remote_well_fraction": ("S3d",),
+        "swr_content_own_well_fraction": ("S3d",),
     }
     assert _numbers(values) == {
         "occupancy_epochs": 3,

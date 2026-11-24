@@ -2092,6 +2092,15 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     # panel c's distribution is the analysis layer's, tested there
     monkeypatch.setattr(figure, "with_event_speed", lambda events, *_: (events, []))
     monkeypatch.setattr(figure, "transport_speed_distribution", lambda events: None)
+    # panels d and e read the content-mass run, tested with its reader
+    monkeypatch.setattr(
+        figure, "content_mass_along_arms", lambda events, *_: (None, [])
+    )
+    monkeypatch.setattr(
+        figure, "with_event_place_shares", lambda events, *_: (events, [])
+    )
+    monkeypatch.setattr(figure, "content_place_shares", lambda along: None)
+    monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
@@ -2603,4 +2612,88 @@ def test_the_figure03_distance_panel_draws_the_content_distance_of_each_class(
     cuts = [line.get_xdata()[0] for line in ax.lines if line.get_linestyle() == ":"]
     assert cuts == [20.0, 100.0]
     assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
+    plt.close(fig)
+
+
+def test_figure03_extent_inset_draws_the_difference_and_the_matched_one(offline):
+    """Panel c's inset: the SWR minus no-SWR extent over all events and at
+    matched duration, each a dot on its 95 % interval, rows named in order."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    interval = pd.Series(
+        {
+            "difference": 40.0,
+            "difference_low": 15.0,
+            "difference_high": 65.0,
+            "matched_difference": 35.0,
+            "matched_difference_low": 16.0,
+            "matched_difference_high": 54.0,
+        }
+    )
+    fig, ax = plt.subplots()
+    figure03.draw_extent_difference(ax, interval)
+    spans = [list(line.get_xdata()) for line in ax.lines if len(line.get_xdata()) == 2]
+    assert [15.0, 65.0] in spans and [16.0, 54.0] in spans
+    dots = [line.get_xdata()[0] for line in ax.lines if line.get_marker() == "o"]
+    assert dots == [40.0, 35.0]
+    assert [label.get_text() for label in ax.get_yticklabels()] == ["all", "matched"]
+    assert ax.get_xlim()[0] < 0  # the zero line is inside the axis
+    plt.close(fig)
+
+
+def test_supp_figure03_draws_the_shares_at_a_remote_and_at_the_own_well(offline):
+    """Panel d: per place, each animal's no-SWR and SWR share joined by a line,
+    dots in the kinds' colors, and the animals' mean as a bar."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b", "c"]], names=["is_swr", "animal"]
+    )
+    shares = pd.DataFrame(
+        {
+            "remote_well": [0.4, 0.3, 0.5, 0.2, 0.1, 0.3],
+            "own_well": [0.1, 0.1, 0.1, 0.05, 0.05, 0.05],
+        },
+        index=index,
+    )
+    fig, ax = plt.subplots()
+    figure.draw_well_shares(ax, shares)
+    joined = [line for line in ax.lines if len(line.get_xdata()) == 2]
+    # three animals and two mean bars, per place
+    assert len(joined) == 2 * (3 + 2)
+    means = sorted(
+        round(float(line.get_ydata()[0]), 6)
+        for line in joined
+        if line.get_linewidth() == 1.5
+    )
+    assert means == [5.0, 10.0, 20.0, 40.0]
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["remote well", "own well"]
+    plt.close(fig)
+
+
+def test_supp_figure03_draws_the_remote_well_share_by_extent(offline):
+    """Panel e: per kind a thin line per animal and their mean in bold, over
+    the extent classes; a class an animal has no event in leaves a gap."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    rows = [
+        (is_swr, animal, k, 0.1 * (k + 1) + 0.1 * (animal == "b"))
+        for is_swr in (False, True)
+        for animal in ("a", "b")
+        for k in range(5)
+        if not (animal == "b" and k == 4)
+    ]
+    by_extent = pd.DataFrame(
+        rows, columns=["is_swr", "animal", "extent_class", "remote_well"]
+    ).set_index(["is_swr", "animal", "extent_class"])
+    fig, ax = plt.subplots()
+    figure.draw_remote_well_by_extent(ax, by_extent)
+    bold = [line for line in ax.lines if line.get_linewidth() == 1.2]
+    assert len(bold) == 2 and len(ax.lines) == 2 * (2 + 1)
+    np.testing.assert_allclose(bold[0].get_ydata(), [15, 25, 35, 45, 50])
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == ["<10", "10–20", "20–50", "50–100", "≥100"]
     plt.close(fig)

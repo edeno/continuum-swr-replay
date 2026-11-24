@@ -132,10 +132,11 @@ FIGURES: dict[str, Figure] = {
         "abcdefghijkl",
     ),
     "S3": Figure(
-        "Slow and fast gamma during SWR and no-SWR events, and how fast their "
-        "position distribution moves",
+        "Slow and fast gamma during SWR and no-SWR events, how fast their "
+        "position distribution moves, and which of their content is at a well "
+        "far from the animal",
         "scripts/figures/generate_supp_figure03.py",
-        "abc",
+        "abcde",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -296,7 +297,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3e", "3f", "3g"),
+        figures=("3e", "3f", "3g", "S3d"),
     ),
     Question(
         "2d.2",

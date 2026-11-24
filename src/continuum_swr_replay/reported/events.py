@@ -335,6 +335,7 @@ TAGS = {
     "spike_gpi": Tags(("2c.4",)),
     "content_occupancy": Tags(("2d.1",), ("3f",)),
     "content_by_animal": Tags(("2d.1",)),
+    "content_well_side": Tags(("2d.1",), ("S3d",)),
     "duration": Tags(("2d.6",), ("3a",)),
     "extent": Tags(("2d.3",), ("3c",)),
     "arms": Tags(("2d.3",)),
@@ -5227,11 +5228,19 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     (``content_along_arms.even_content``), which those shares are read against.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
-    # The places that depend on where the animal is are in no panel: content
-    # against the animal is the behavior figure's.
+    # The places that depend on where the animal is: the supplement's panel d
+    # draws the remote well and the animal's own; the other two are in no panel.
     make_by_animal = value_factory(
         content_occupancy_values, source, TAGS["content_by_animal"]
     )
+    make_well_side = value_factory(
+        content_occupancy_values, source, TAGS["content_well_side"]
+    )
+    makers = {
+        "at_well": make,
+        "remote_well": make_well_side,
+        "own_well": make_well_side,
+    }
     statistics = content_along_arms.place_share_statistics(
         content_along_arms.content_place_shares(bins)
     )
@@ -5247,7 +5256,7 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     for word, is_swr, name in (("non_swr", False, "non-SWR"), ("swr", True, "SWR")):
         for column in event_statistics.OCCUPANCY_PLACES:
             values.append(
-                (make if column == "at_well" else make_by_animal)(
+                makers.get(column, make_by_animal)(
                     f"{word}_content_{column}_fraction",
                     statistics["means"].loc[is_swr, column],
                     "fraction",
@@ -5354,6 +5363,49 @@ def content_mass_along_arms(
     if n_events != len(events):
         raise ValueError(f"the rows of {folder} do not cover the event table's events")
     return pd.concat(tables, ignore_index=True), paths
+
+
+def with_event_place_shares(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """``events`` with each one's share of content time at a well, at a remote
+    well and at the animal's own (``content_at_well``, ``content_remote_well``
+    and ``content_own_well``: ``content_along_arms.event_place_shares`` of the
+    content-mass run; the event table's own ``at_well`` is where the animal is)
+    and its ``epoch_id``; and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row.
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    tables = []
+    for path in paths:
+        rows = select_events_in(
+            pd.read_parquet(
+                path,
+                columns=[
+                    "event_id",
+                    "epoch_id",
+                    "far",
+                    "weight",
+                    "distance_to_well_cm",
+                ],
+            ),
+            events["event_id"],
+        )
+        shares = content_along_arms.event_place_shares(rows).add_prefix("content_")
+        shares["epoch_id"] = path.stem
+        tables.append(shares.reset_index())
+    joined = events.merge(
+        pd.concat(tables, ignore_index=True), on="event_id", how="left", validate="1:1"
+    )
+    if joined["content_at_well"].isna().any():
+        raise ValueError("an event has no row in the content-mass run")
+    return joined, paths
 
 
 def content_along_arms_bins(

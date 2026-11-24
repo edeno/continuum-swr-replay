@@ -16,10 +16,12 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     distance_to_nearest_well,
     even_content,
     event_place_mass,
+    event_place_shares,
     leaf_and_trunk_profiles,
     log2_density_against_even,
     log2_density_ratio,
     place_share_statistics,
+    remote_well_share_by_extent,
 )
 
 
@@ -400,3 +402,45 @@ def test_place_and_distance_shares_weigh_rows_by_their_content_time():
     by_distance = distance_from_animal_shares(bins, np.array([0.0, 20.0, 200.0]), 20.0)
     np.testing.assert_allclose(by_distance.loc[False, "at_well"], [0.0, 0.75])
     np.testing.assert_allclose(by_distance.loc[False, "elsewhere"], [0.25, 0.0])
+
+
+def test_event_place_shares_split_each_events_time_at_a_well_by_the_animals_side():
+    """Event 1: 2 of its 4 time bins of content at a well far from the animal,
+    1 at a well near it, 1 off the wells. Event 2: all off the wells."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2],
+            "far": [True, False, True, True],
+            "weight": [2.0, 1.0, 1.0, 3.0],
+            "distance_to_well_cm": [5.0, 5.0, 60.0, 60.0],
+        }
+    )
+    shares = event_place_shares(rows)
+    assert shares.loc[1].to_dict() == {
+        "at_well": 0.75,
+        "remote_well": 0.5,
+        "own_well": 0.25,
+    }
+    assert shares.loc[2].tolist() == [0.0, 0.0, 0.0]
+
+
+def test_remote_well_share_by_extent_goes_event_then_epoch_then_animal():
+    """Animal a, no SWR, extents under 10 cm: epoch e1 has events with shares
+    1 and 0 (mean 0.5), e2 one event with share 1; a's value is 0.75, not the
+    pooled 2/3. Its one wide event (150 cm) is the last class."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": ["e1", "e1", "e2", "e2"],
+            "is_swr": False,
+            "spatial_extent_cm": [2.0, 9.9, 0.0, 150.0],
+            "remote_well": [1.0, 0.0, 1.0, 0.2],
+        }
+    )
+    shares = remote_well_share_by_extent(events)
+    assert shares.loc[(False, "a", 0), "remote_well"] == 0.75
+    assert shares.loc[(False, "a", 0), "n_events"] == 3
+    assert shares.loc[(False, "a", 4), "remote_well"] == 0.2
+    assert len(shares) == 2  # no row for a class with no event
+    with pytest.raises(ValueError, match="outside"):
+        remote_well_share_by_extent(events.assign(spatial_extent_cm=np.nan))
