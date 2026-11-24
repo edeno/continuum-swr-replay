@@ -118,7 +118,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -132,7 +131,6 @@ from continuum_swr_replay.analysis.decode_quality import (
 )
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
     STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
@@ -155,12 +153,10 @@ from continuum_swr_replay.analysis.event_evidence import (
 )
 from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
     read_tetrode_holdout,
-    require_trial_folds,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     ALL_CONTRASTS,
     FAMILY_SUFFIX,
-    FIT,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
@@ -215,50 +211,32 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 )
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
-    BRAIN_STATE_REFERENCE_DIR,
     CANONICAL_EVENTS_FOUND_NAME,
-    CONTENT_ALONG_ARMS_DIR,
-    CONTENT_MASS_ALONG_ARMS_DIR,
     CONTENT_PLACE_RATE_NAME,
-    DECODER_QUALITY_DIR,
-    EVENT_BIN_FACTS_DIR,
-    EVENT_CONTENT_PLACE_RATE_DIR,
-    EVENT_GAMMA_DIR,
-    EVENT_LIKELIHOOD_ADVANTAGE_DIR,
-    EVENT_NONLOCAL_RESTRICTION_DIR,
-    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-    EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
-    EVENT_PARTICIPATION_DIR,
-    EVENT_PROPERTY_BOOTSTRAP_DIR,
-    EVENT_RULE_SWEEP_DIR,
-    EVENT_SPEED_DIR,
-    EVENT_START_REST_THETA_DIR,
-    EVENT_TETRODE_HOLDOUT_DIR,
-    EXPOSURE_IN_VISITS_DIR,
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
-    NONLOCAL_BY_SIGNAL_DIR,
-    NONLOCAL_PROBABILITY_DIR,
     NONLOCAL_RESTRICTION_WINDOWS_NAME,
     PARTICIPATION_NAME,
-    RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
-    STATE_BY_SIGNAL_DIR,
-    STATE_CALIBRATION_IN_VISITS_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
     TETRODE_HOLDOUT_NAME,
-    event_features_root,
-    event_spike_evidence_dir,
-    processed_data_dir,
-    replay_content_dir,
-    table_path,
 )
 from continuum_swr_replay.reported.formatting import (
     MS_PER_S,
     format_number,
     milliseconds,
+)
+from continuum_swr_replay.reported.inputs import (
+    EventsInputs,
+    default_inputs,  # noqa: F401  (the builder's inputs, read by summarize.py)
+    event_table_staleness,
+    input_staleness,
+    participation_staleness,
+    read_heldout_restriction,
+    restriction_inputs_note,
+    run_staleness,
 )
 from continuum_swr_replay.reported.values import (
     Summary,
@@ -279,7 +257,7 @@ from continuum_swr_replay.runs.io import (
     read_complete_run,
     read_manifest,
 )
-from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
@@ -431,107 +409,6 @@ BOUT_SUBSET = (
 """What the values of the held-out test split by SWR are over."""
 
 
-@dataclass(frozen=True)
-class EventsInputs:
-    """The files the events summary reads."""
-
-    event_table: Path
-    event_features_run: Path
-    spike_evidence_dir: Path
-    heldout_by_swr: Path
-    content_along_arms: Path
-    content_mass_along_arms: Path
-    brain_state_reference: Path
-    event_gamma: Path
-    class_structure: Path
-    nonlocal_by_signal: Path
-    nonlocal_probability: Path
-    state_by_signal: Path
-    event_rule_sweep: Path
-    state_calibration_in_visits: Path
-    event_start_rest_theta: Path
-    event_speed: Path
-    property_bootstrap: Path
-    decoder_quality: Path
-    event_participation: Path
-    likelihood_advantage: Path
-    tetrode_holdout: Path
-    content_place_rate: Path
-    nonlocal_restriction: Path
-    nonlocal_restriction_windows: Path
-    nonlocal_restriction_heldout_events: Path
-    bin_facts: Path
-    exposure_in_visits: Path
-
-
-def default_inputs() -> EventsInputs:
-    return EventsInputs(
-        event_table=table_path("event_table", replay_content_dir()),
-        event_features_run=event_features_root() / EVENT_FEATURES_RUN,
-        spike_evidence_dir=event_spike_evidence_dir(),
-        heldout_by_swr=processed_data_dir()
-        / STATE_EVIDENCE_RUN
-        / STATE_EVIDENCE_DIR
-        / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
-        content_along_arms=processed_data_dir() / CONTENT_ALONG_ARMS_DIR,
-        content_mass_along_arms=processed_data_dir() / CONTENT_MASS_ALONG_ARMS_DIR,
-        brain_state_reference=processed_data_dir()
-        / BRAIN_STATE_REFERENCE_DIR
-        / "reference.parquet",
-        event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
-        class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
-        nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
-        nonlocal_probability=processed_data_dir() / NONLOCAL_PROBABILITY_DIR,
-        state_by_signal=processed_data_dir() / STATE_BY_SIGNAL_DIR,
-        event_rule_sweep=processed_data_dir() / EVENT_RULE_SWEEP_DIR,
-        state_calibration_in_visits=processed_data_dir()
-        / STATE_CALIBRATION_IN_VISITS_DIR,
-        event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
-        event_speed=processed_data_dir() / EVENT_SPEED_DIR,
-        property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
-        decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
-        event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
-        likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
-        tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
-        content_place_rate=processed_data_dir() / EVENT_CONTENT_PLACE_RATE_DIR,
-        nonlocal_restriction=processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR,
-        nonlocal_restriction_windows=processed_data_dir()
-        / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
-        nonlocal_restriction_heldout_events=processed_data_dir()
-        / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-        bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
-        exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
-    )
-
-
-def _input_staleness(
-    manifest: dict, name: str, current_sha256: str, what: str, adjective: str, noun: str
-) -> str | None:
-    """Why an output is stale for one of its inputs, or None.
-
-    ``manifest`` records the input's SHA-256 under ``name`` or ``inputs.<name>``
-    (``runs.staleness.recorded_sha256``); an output recording none cannot be
-    tied to the current input and is treated as stale.
-    """
-    recorded = recorded_sha256(manifest, name)
-    if recorded is None:
-        return f"{what} records no {adjective} SHA-256; rerun it before citing"
-    if recorded != current_sha256:
-        return (
-            f"{what} was made from another {noun} than the current one "
-            f"(sha256 {recorded[:12]}, current {current_sha256[:12]}); rerun it "
-            "before citing"
-        )
-    return None
-
-
-def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
-    """Why an output made from the canonical event table is stale, or None."""
-    return _input_staleness(
-        manifest, "event_table", current_sha256, what, "event-table", "event table"
-    )
-
-
 def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     """Why the restriction window run's values are pending for its note, or None.
 
@@ -552,39 +429,6 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     )
 
 
-def require_fold_fit(manifest: dict, what: str) -> None:
-    """Refuse a restriction run that is not the fold fit on folds of whole trials.
-
-    The values describe scores under a decoder fit on the other folds, five
-    folds of whole trials balanced by destination well; the fold-fit run's
-    settings record ``"fit": "folds"`` and ``"fold_design": "trials"``. A run of
-    the earlier design, which held out only the encodings and ran the models
-    with the transitions fit on the whole epoch, records no ``fit``; a run of
-    another fold design is refused by :func:`require_trial_folds`. Neither can
-    give these values.
-
-    Raises
-    ------
-    ValueError
-        If ``manifest``'s settings do not record ``"fit": "folds"`` and
-        ``"fold_design": "trials"``.
-    """
-    fit = manifest.get("settings", {}).get("fit")
-    rerun = (
-        "Put the fold-fit run (scripts/event_evidence/score_nonlocal_restriction.py) "
-        "in this folder, then rerun scripts/event_evidence/measure_bin_facts.py, "
-        "scripts/event_evidence/detect_heldout_events.py and "
-        "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
-    )
-    if fit != FIT:
-        raise ValueError(
-            f"{what} is not the fold fit (its settings record fit {fit!r}, not "
-            f"{FIT!r}): it is the earlier design, which held out only the "
-            f"encodings. {rerun}"
-        )
-    require_trial_folds(manifest, what, rerun)
-
-
 def spike_evidence_staleness(
     manifest: dict, current_sha256: str, what: str
 ) -> str | None:
@@ -594,7 +438,7 @@ def spike_evidence_staleness(
     (``runs.io.files_sha256``), which the output's manifest records under
     ``inputs.spike_evidence`` and this summary records for the same files.
     """
-    return _input_staleness(
+    return input_staleness(
         manifest,
         "spike_evidence",
         current_sha256,
@@ -1598,7 +1442,9 @@ def gamma_z_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 )
             )
@@ -1612,7 +1458,8 @@ def gamma_z_values(
                         levels.loc[(word, is_swr), regime],
                         "quantity",
                         "dec2",
-                        f"median over epochs of the epoch's z-scored {label} in "
+                        "mean over animals of each animal's median over its epochs "
+                        f"(those with such events) of the epoch's z-scored {label} in "
                         f"{words_of_regime} windows as long as its {name} events (the "
                         "median over the events of one window's mean each, averaged "
                         "over the draws)",
@@ -1662,7 +1509,8 @@ def _signal_values(
                 levels.loc[word, "running"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} while running",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} while running",
                 "z",
             ),
             make(
@@ -1670,7 +1518,8 @@ def _signal_values(
                 levels.loc[word, "rest"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} in quiet rest",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} in quiet rest",
                 "z",
             ),
         ]
@@ -1683,7 +1532,9 @@ def _signal_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 ),
                 make(
@@ -1713,7 +1564,9 @@ def _signal_values(
                         "fraction",
                         "pct",
                         f"share of immobile {name} non-local events whose theta power "
-                        "reaches their epoch's median running level",
+                        "reaches their epoch's median running level: each epoch's "
+                        "share, each animal's mean over its epochs, the mean over "
+                        "animals",
                     )
                 )
     return values
@@ -3084,287 +2937,6 @@ def _share_interval(
     ]
 
 
-def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str | None:
-    """Why the output in ``folder`` (its ``manifest``) is stale for the run
-    ``name`` in ``run_dir`` that it read, or None: it records no digest of that
-    run's manifest, or another than the current one."""
-    return _input_staleness(
-        manifest,
-        name,
-        file_record(run_dir / MANIFEST, ROOT_DIR)["sha256"],
-        rel(folder),
-        f"{name} run",
-        f"{name} run",
-    )
-
-
-@dataclass(frozen=True)
-class HeldoutRestriction:
-    """The held-out event run's inputs to the restriction values and Figure 2k
-    (:func:`read_heldout_restriction`), and why a value read from them is
-    pending (each None when it is not)."""
-
-    events: pd.DataFrame
-    """The events detected from the held-out decode that start inside a well
-    visit (``starts_in_well_visit``)."""
-    time_sums: pd.DataFrame
-    """The time sums of every epoch (``restriction_totals.restriction_time_sums``)."""
-    bin_s: pd.Series
-    """Each epoch's decode time step (s), indexed by ``epoch_id``, as the run read
-    it from the decode frame's time (checked there against the per-bin table's)."""
-    restriction_run: str | None
-    """The run was not made from the current restriction run."""
-    bin_facts_run: str | None
-    """The run was not made from the current per-bin facts run."""
-    session_cache: str | None
-    """The per-bin facts, which give the time sums, the events' start and the
-    windows' bins their well-visit flag, were not made from the current
-    session cache."""
-    event_table: str | None
-    """The run was not made from the current event table."""
-
-
-def restriction_inputs_note(
-    restriction_dir: Path,
-    epochs: Iterable[str],
-    label: str | None = None,
-    features_manifest: dict | None = None,
-) -> str | None:
-    """Why the restriction run in ``restriction_dir`` was not made from the
-    current decode frames and SWR source, or None: :func:`restriction_input_staleness`
-    with the decode frames the event features run records for each epoch
-    (``features_manifest``, read from the canonical run when None). ``label``
-    names the run in the note (by default ``the restriction run (<folder>)``).
-    The figures that draw the restriction run refuse it then
-    (:func:`heldout_restriction_refusal`)."""
-    if features_manifest is None:
-        features_manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    return restriction_input_staleness(
-        read_output_manifest(restriction_dir),
-        {
-            epoch_id: record.get("decode", {}).get("sha256")
-            for epoch_id, record in features_manifest["epochs"].items()
-        },
-        epochs,
-        f"the restriction run ({restriction_dir})" if label is None else label,
-    )
-
-
-def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
-    """A per-epoch measurement (the brain-state reference, the counts by signal
-    of Figure 2i and its supplement), if it was made over the time inside the well visits, from the
-    current session cache's visits and from the decodes the event features run
-    records for every analyzed epoch.
-
-    Parameters
-    ----------
-    reference : pd.DataFrame
-        The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
-    folder : Path
-        Its folder, whose ``manifest.json`` records the subset it is over and
-        the session-cache entries it read the visits from.
-    name : str
-        What it is, for the error.
-
-    Raises
-    ------
-    ValueError
-        If it was not made over the analyses' subset or from the current
-        session cache (``prepare_data.time_mask_staleness``), an analyzed epoch
-        is missing or extra, or its decode hash differs.
-    """
-    note = time_mask_staleness(
-        read_output_manifest(folder), reference["epoch_id"], f"the {name} ({folder})"
-    )
-    if note is not None:
-        raise ValueError(note)
-    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    expected = {
-        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
-        for epoch_id in analyzed_epoch_ids()
-    }
-    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
-    if recorded != expected:
-        differ = sorted(
-            epoch_id
-            for epoch_id in expected.keys() | recorded.keys()
-            if expected.get(epoch_id) != recorded.get(epoch_id)
-        )
-        raise ValueError(
-            f"the {name} was not made from the decodes of event "
-            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
-            f"e.g. {differ[:3]}"
-        )
-    return reference
-
-
-def read_checked(folder: Path, name: str, file: str = "counts.parquet") -> pd.DataFrame:
-    """A per-epoch measurement's table (``file`` in ``folder``), refused as
-    :func:`checked_reference` refuses it (``name`` says what it is)."""
-    return checked_reference(pd.read_parquet(folder / file), folder, name)
-
-
-def restriction_input_staleness(
-    manifest: dict,
-    decode_sha256: Mapping[str, str],
-    epoch_ids: Iterable[str],
-    what: str,
-) -> str | None:
-    """Why the restriction run was not made from the current decode frames and
-    SWR source, or None.
-
-    The run's settings record the SWR source by name (``swr_source``, which
-    names the SWR inventory run and the artifact run) and each epoch's record
-    the SHA-256 of the decode frame it read (``epoch_inputs.data_over_time``).
-    The current source is ``swr_source.swr_source_name()``. The current decode
-    frames are the ones the event features run records (``decode_sha256``),
-    which the figures also take as the decodes (:func:`checked_reference`); no decode frame is hashed here, so a decode remade
-    without a new event features run is not seen.
-
-    Parameters
-    ----------
-    manifest : dict
-        The restriction run's manifest.
-    decode_sha256 : Mapping of str to str
-        Each epoch's decode frame's SHA-256, as the event features run records it.
-    epoch_ids : iterable of str
-        The epochs read; one the run has no record of, or the features run no
-        digest of, counts as another decode.
-    what : str
-        The restriction run, for the note.
-    """
-    notes = []
-    recorded = manifest.get("settings", {}).get("swr_source")
-    current = swr_source.swr_source_name()
-    if recorded != current:
-        notes.append(
-            f"its settings record the SWR source {recorded!r}, not the current "
-            f"{current!r}"
-        )
-    records = manifest.get("epochs", {})
-
-    def recorded_decode(epoch_id: str) -> str | None:
-        inputs = records.get(epoch_id, {}).get("epoch_inputs", {})
-        return inputs.get("data_over_time", {}).get("sha256")
-
-    differ = sorted(
-        epoch_id
-        for epoch_id in epoch_ids
-        if recorded_decode(epoch_id) is None
-        or recorded_decode(epoch_id) != decode_sha256.get(epoch_id)
-    )
-    if differ:
-        notes.append(
-            f"{len(differ)} of its epochs record another decode frame than the "
-            f"one event features run {EVENT_FEATURES_RUN} records (e.g. "
-            f"{differ[:3]})"
-        )
-    if not notes:
-        return None
-    return (
-        f"{what} was not made from the current decodes and SWR source "
-        f"({'; '.join(notes)}); rerun scripts/event_evidence/"
-        "score_nonlocal_restriction.py and the runs made from it before citing"
-    )
-
-
-HELDOUT_EVENTS_RERUN = "scripts/event_evidence/detect_heldout_events.py"
-HELDOUT_RESTRICTION_RERUN = {
-    "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
-    "and the runs made from it",
-    "restriction_run": HELDOUT_EVENTS_RERUN,
-    "bin_facts_run": HELDOUT_EVENTS_RERUN,
-    "session_cache": "scripts/event_evidence/measure_bin_facts.py, then "
-    + HELDOUT_EVENTS_RERUN,
-}
-"""The runners to make again when a figure refuses the held-out event run, by
-what is not current (:func:`heldout_restriction_refusal`)."""
-
-
-def heldout_restriction_refusal(
-    heldout: HeldoutRestriction, restriction_inputs: str | None
-) -> tuple[str, str] | None:
-    """Why a figure drawing the held-out event run refuses it, or None.
-
-    Parameters
-    ----------
-    heldout : HeldoutRestriction
-        The run's inputs and reasons (:func:`read_heldout_restriction`); its
-        event-table reason is the summary's alone.
-    restriction_inputs : str or None
-        Why the restriction run was not made from the current decodes and SWR
-        source (:func:`restriction_inputs_note`).
-
-    Returns
-    -------
-    tuple of (str, str) or None
-        The first reason that is not None, without its closing advice to rerun
-        before citing, and the runners to make again
-        (:data:`HELDOUT_RESTRICTION_RERUN`).
-    """
-    for name, reason in (
-        ("restriction_inputs", restriction_inputs),
-        ("restriction_run", heldout.restriction_run),
-        ("bin_facts_run", heldout.bin_facts_run),
-        ("session_cache", heldout.session_cache),
-    ):
-        if reason is not None:
-            return reason.split("; rerun ")[0], HELDOUT_RESTRICTION_RERUN[name]
-    return None
-
-
-def read_heldout_restriction(
-    heldout_dir: Path,
-    restriction_dir: Path,
-    bin_facts_dir: Path,
-    epoch_ids: Iterable[str],
-    event_table_sha256: str,
-) -> HeldoutRestriction:
-    """The held-out event run's events, time sums and time steps, with the
-    reasons a value read from them is pending.
-
-    Parameters
-    ----------
-    heldout_dir, restriction_dir, bin_facts_dir : Path
-        The held-out event run, the restriction run and the per-bin facts run.
-    epoch_ids : iterable of str
-        The epochs read (every analyzed epoch with an event).
-    event_table_sha256 : str
-        The current event table's SHA-256.
-
-    Raises
-    ------
-    ValueError
-        If the restriction run is not the fold fit on folds of whole trials
-        (:func:`require_fold_fit`).
-    """
-    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
-    epoch_ids = list(epoch_ids)
-    manifest = read_output_manifest(heldout_dir)
-    events = read_complete_run(heldout_dir, HELDOUT_EVENTS_NAME, epoch_ids)
-    facts_manifest = read_output_manifest(bin_facts_dir)
-    return HeldoutRestriction(
-        events=events[events["starts_in_well_visit"].astype(bool)],
-        time_sums=read_complete_run(heldout_dir, HELDOUT_TIME_SUMS_NAME, epoch_ids),
-        bin_s=pd.Series(
-            {
-                epoch_id: record["bin_s"]
-                for epoch_id, record in manifest["epochs"].items()
-            }
-        ),
-        restriction_run=run_staleness(
-            manifest, heldout_dir, "nonlocal_restriction", restriction_dir
-        ),
-        bin_facts_run=run_staleness(manifest, heldout_dir, "bin_facts", bin_facts_dir),
-        session_cache=session_cache_staleness(
-            facts_manifest, ok_epochs(facts_manifest), rel(bin_facts_dir)
-        ),
-        event_table=event_table_staleness(
-            manifest, event_table_sha256, rel(heldout_dir)
-        ),
-    )
-
-
 class WindowValues(NamedTuple):
     """The restriction window values, by what they read."""
 
@@ -4185,13 +3757,14 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5: how much of the non-local time has ripple power below the
     Kay threshold (Figure 2i)?
 
-    Over the immobile time bins decoded non-local, each animal's bins pooled
-    over its epochs (``counts``: the stored per-epoch counts by signal and
-    non-local probability, ``nonlocal_by_signal.rest_signal_counts``).
+    Over the immobile time bins decoded non-local: each epoch's share, each
+    animal's mean over its epochs, the mean over animals (``counts``: the
+    stored per-epoch counts by signal and non-local probability,
+    ``nonlocal_by_signal.rest_signal_counts``).
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        nonlocal_by_signal.animal_nonlocal_counts(counts, "ripple_power"),
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "ripple_power"),
         KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
@@ -4203,15 +3776,17 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "pct",
             "share of the immobile time bins decoded non-local (non-local "
             f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
-            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
-            "animals of each animal's share of its bins",
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): each "
+            "epoch's share of its bins, each animal's mean over its epochs, the mean "
+            "over animals",
         ),
         make(
             f"{key}_animal_min",
             stats["fraction_animal_min"],
             "fraction",
             "pct",
-            "lowest per-animal share of non-local time bins below the Kay threshold",
+            "lowest per-animal share of non-local time bins below the Kay threshold "
+            "(the mean over its epochs)",
         ),
         make(
             f"{key}_animal_max",
@@ -4329,10 +3904,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     detection is independent of population bursts (the held-out tetrode values
     address whether the spikes point to the decoded place)."""
     make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
-    animals = nonlocal_by_signal.animal_nonlocal_counts(counts, "mua")
     level = nonlocal_by_signal.MUA_LEVEL_Z
-    above = event_statistics.nonlocal_share_above_statistics(animals, level)
-    below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
+    above = event_statistics.nonlocal_share_above_statistics(
+        nonlocal_by_signal.nonlocal_counts(counts, "mua"), level
+    )
+    below = event_statistics.nonlocal_below_threshold_statistics(
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "mua"), level
+    )
     nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
     level_words = (
         f"{level:g} z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded "
@@ -4360,12 +3938,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins with MUA at or above {level_words} "
-                f"that are decoded non-local ({nonlocal_}): mean over animals of each "
-                "animal's share of its bins. Nearly all time above the MUA level is "
+                f"that are decoded non-local ({nonlocal_}): each epoch's share of its "
+                "bins, each animal's mean over its epochs, the mean over animals. "
+                "Nearly all time above the MUA level is "
                 "decoded non-local: the decoder needs spikes, so this does not show "
                 "that non-local detection is independent of population bursts",
                 f"lowest per-animal share of the bins with MUA at or above {level:g} z "
-                "that are decoded non-local",
+                "that are decoded non-local (the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -4380,9 +3959,11 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
-                f"MUA is below {level_words}: mean over animals of each animal's share "
-                "of its bins. Most non-local time is below the MUA level",
-                f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+                f"MUA is below {level_words}: each epoch's share of its bins, each "
+                "animal's mean over its epochs, the mean over animals. Most non-local "
+                "time is below the MUA level",
+                f"lowest per-animal share of non-local time bins with MUA below {level:g} z "
+                "(the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -5936,29 +5517,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     participation_sha256 = files_sha256(participation_paths)
 
     # why the participation run's controls are not Local rest inside the
-    # current well visits, or None: its settings record no subset or another,
-    # or it read other visits than the current session cache's (read once)
-    participation_manifest = read_output_manifest(inputs.event_participation)
-    participation_off = (
-        "; ".join(
-            note
-            for note in (
-                subset_staleness(
-                    participation_manifest.get("settings", {}),
-                    rel(inputs.event_participation),
-                ),
-                session_cache_staleness(
-                    participation_manifest, analyzed, rel(inputs.event_participation)
-                ),
-            )
-            if note
-        )
-        or None
+    # current well visits, or None (read once)
+    participation_off = participation_staleness(
+        read_output_manifest(inputs.event_participation),
+        analyzed,
+        rel(inputs.event_participation),
     )
 
-    def participation_staleness(folder: Path) -> str | None:
+    def made_from_participation(folder: Path) -> str | None:
         """Why a run made from the participation tables is stale, or None."""
-        return _input_staleness(
+        return input_staleness(
             read_output_manifest(folder),
             "event_participation",
             participation_sha256,
@@ -5990,7 +5558,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "(scripts/event_evidence/score_event_likelihood_advantage.py)",
                 ),
                 stale(inputs.likelihood_advantage),
-                participation_staleness(inputs.likelihood_advantage),
+                made_from_participation(inputs.likelihood_advantage),
             ),
             EVENTS_SUBSET,
         )
@@ -6001,7 +5569,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     holdout_stale = (
         stale(inputs.tetrode_holdout),
-        participation_staleness(inputs.tetrode_holdout),
+        made_from_participation(inputs.tetrode_holdout),
     )
     summary.add(
         *over(
@@ -6118,7 +5686,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     windows_manifest = read_output_manifest(restriction_windows_dir)
     restriction_stale = (
         stale(restriction_windows_dir),
-        participation_staleness(restriction_windows_dir),
+        made_from_participation(restriction_windows_dir),
         run_staleness(
             windows_manifest,
             restriction_windows_dir,

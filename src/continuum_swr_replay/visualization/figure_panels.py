@@ -46,7 +46,7 @@ from continuum_swr_replay.visualization.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS, EVENT_KINDS
 
 
 def plot_event_duration_distribution(
@@ -323,12 +323,6 @@ def plot_swr_zscore_by_state(
 
 #: The two classes of immobile non-local events, as the event table's ``is_swr``,
 #: with the color and legend label each per-event panel gives them.
-_EVENT_CLASSES = (
-    (False, "non_swr", COLORS["No SWR"], "non-SWR"),
-    (True, "swr", COLORS["SWR"], "SWR"),
-)
-
-
 def _event_class_histograms(
     events: pd.DataFrame,
     column: str,
@@ -338,7 +332,9 @@ def _event_class_histograms(
 ) -> None:
     """Each class's per-event ``column`` as a density histogram, with a dashed
     line at the class median it is given (gid ``median_<class>``)."""
-    for is_swr, word, color, label in _EVENT_CLASSES:
+    for (is_swr, (label, color)), word in zip(
+        EVENT_KINDS.items(), ("non_swr", "swr"), strict=True
+    ):
         ax.hist(
             events.loc[events["is_swr"] == is_swr, column].dropna(),
             bins=bins,

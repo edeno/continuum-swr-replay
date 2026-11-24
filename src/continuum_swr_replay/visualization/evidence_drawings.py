@@ -31,7 +31,7 @@ from continuum_swr_replay.visualization.palettes import (
     REFERENCE_COLOR,
     readable_text_color,
 )
-from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
+from continuum_swr_replay.visualization.publication_style import SMALL_SIZE
 
 STRIP_LEFT, STRIP_RIGHT = 6.5, 10.0
 """The x extent of a drawn strip of :func:`draw_left_out_test` (data units);

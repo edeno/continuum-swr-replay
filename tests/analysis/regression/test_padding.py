@@ -5,8 +5,9 @@ The likelihoods' kernels run on padded rows (each row's terms times its
 weight) and on the same rows unpadded (every weight 1): the log-likelihood,
 the coefficient gradient, the information and its two directional
 derivatives agree, and every value is finite, also for a softmax with groups
-that have no rows. The profiled Gaussian's scale and score count the real rows
-only.
+that have no rows. So do REML's derivative kernels (the score, ``A^-1``, the
+edf, and the gradient and Hessian in the log penalties). The profiled
+Gaussian's scale and score count the real rows only.
 """
 
 from __future__ import annotations
@@ -355,28 +356,160 @@ def test_the_profiled_gaussian_counts_the_real_rows(step):
     """The scale ``D_p / (n - M_p)``, the score and the log-likelihood at the
     scale do not move with the padding."""
     lik, X, beta, y, _ = _diagonal_case("gaussian")
-    S = np.diag([0.0, 2.0, 2.0, 2.0, 2.0])
-    masks = np.zeros((1, N_COLUMNS))
-    masks[0, 1:] = 1.0
+    S_j = np.stack([np.diag([0.0, 2.0, 2.0, 0.0, 0.0]), np.diag([0.0] * 3 + [3.0] * 2)])
+    masks = (S_j.diagonal(axis1=1, axis2=2) > 0) * 1.0
 
     def summary(padded):
         with jax.enable_x64(True):
             return jax.device_get(
                 reml._profiled_gaussian(
                     padded.X,
-                    padded.y,
+                    padded.y[None],
                     padded.weight,
-                    S,
+                    S_j.sum(axis=0),
                     beta,
                     masks,
                     np.float64(0.0),
                     np.int64(y.size),
                     np.int64(y.size - 1),
+                    S_j,
+                    np.array([2.0, 2.0]),
                 )
             )
 
     _assert_equal(summary(pad_rows(X, y, step=step)), summary(pad_rows(X, y, step=300)))
     assert likelihoods.Gaussian.quadratic
+
+
+def _two_penalties() -> tuple[np.ndarray, np.ndarray]:
+    """Two penalties, on columns 1-2 and 3-4, shape ``(2, p, p)``, and their
+    column masks, shape ``(2, p)``."""
+    S_j = np.zeros((2, N_COLUMNS, N_COLUMNS))
+    S_j[0, 1:3, 1:3] = [[1.6, -0.8], [-0.8, 1.6]]
+    S_j[1, 3:, 3:] = 1.5 * np.eye(2)
+    return S_j, (S_j.diagonal(axis1=1, axis2=2) > 0) * 1.0
+
+
+def _reml_derivatives(lik, X, y, aux, weight, beta, A):
+    """The outputs of REML's derivative kernel at ``beta`` on the given rows
+    (score, covariance, edf, its total, gradient, Hessian), with the given
+    ``A``, so that only the rows differ between two calls."""
+    S_j, masks = _two_penalties()
+    with jax.enable_x64(True):
+        aux = jax.tree_util.tree_map(jnp.asarray, aux)
+        outputs = reml._laplace_derivatives(
+            lik,
+            jnp.asarray(X),
+            jnp.asarray(y)[None],
+            aux,
+            jnp.asarray(weight),
+            S_j,
+            A,
+            S_j.sum(axis=0),
+            beta,
+            masks,
+            np.float64(-3.0),
+            np.float64(0.5),
+            np.float64(1.0),
+            np.array([2.0, 2.0]),
+        )
+        return [np.asarray(v) for v in outputs]
+
+
+def _derivative_cases(family: str, step: int | None):
+    """``(lik, beta, A, unpadded, padded)``, each set of rows ``(X, y, aux,
+    weight)``. ``step`` is the row step; for the softmax None fills the row
+    bucket, so that the padding group has no rows."""
+    if family == "softmax":
+        X, beta, y, ids = _softmax_case(40)
+        lik = GroupedSoftmax()
+        padded = pad_groups(X, y, ids, row_step=step or y.size)
+        unpadded = pad_groups(X, y, ids, row_step=y.size, group_step=1)
+        rows = (X, y, Groups(unpadded.group, 40), np.ones(y.size))
+        aux = Groups(padded.group, padded.n_groups)
+        information = lik.information(X, X @ beta, y, ids)
+    else:
+        lik, X, beta, y, aux = _diagonal_case(family)
+        padded = pad_rows(X, y, aux if family == "poisson" else None, step=step)
+        rows = (X, y, aux, np.ones(y.size))
+        information = lik.information(X, X @ beta, y, aux)
+        aux = padded.offset if family == "poisson" else aux
+    # The first column is constant, which the softmax cannot see: a unit on
+    # its diagonal keeps A positive definite.
+    A = information + _two_penalties()[0].sum(axis=0) + np.diag(np.eye(N_COLUMNS)[0])
+    return lik, beta, A, rows, (padded.X, padded.y, aux, padded.weight)
+
+
+@pytest.mark.parametrize(
+    ("family", "step"),
+    [
+        ("poisson", ROW_BUCKET),
+        ("poisson", 7),
+        ("bernoulli", ROW_BUCKET),
+        ("bernoulli", 7),
+        ("softmax", SOFTMAX_ROW_BUCKET),
+        ("softmax", None),
+    ],
+)
+def test_the_reml_derivatives_do_not_move_with_the_padding(family, step):
+    """REML's derivative kernel on padded rows equals it on the rows unpadded,
+    for the score, ``A^-1``, the edf and the gradient and Hessian in ``rho``;
+    the softmax's cases have groups with no rows."""
+    lik, beta, A, rows, padded = _derivative_cases(family, step)
+    _assert_equal(
+        _reml_derivatives(lik, *padded, beta, A),
+        _reml_derivatives(lik, *rows, beta, A),
+    )
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "softmax", "gaussian"])
+def test_junk_in_the_padded_rows_changes_no_reml_derivative(family):
+    """Padded rows filled with junk (a random design, a response of 5, an
+    offset of 2) leave REML's derivative kernels exactly as they were: the
+    Laplace families' and the profiled Gaussian's."""
+    rng = np.random.default_rng(8)
+    if family == "gaussian":
+        lik, X, beta, y, _ = _diagonal_case(family)
+        padded = pad_rows(X, y)
+        rows = [padded.X, padded.y, None, padded.weight]
+        S_j, masks = _two_penalties()
+
+        def outputs(X, y, aux, weight):
+            with jax.enable_x64(True):
+                return jax.device_get(
+                    reml._profiled_gaussian(
+                        X,
+                        y[None],
+                        weight,
+                        S_j.sum(axis=0),
+                        beta,
+                        masks,
+                        np.float64(0.0),
+                        np.int64(padded.n_real),
+                        np.int64(padded.n_real - 1),
+                        S_j,
+                        np.array([2.0, 2.0]),
+                    )
+                )
+    else:
+        lik, beta, A, _, rows = _derivative_cases(family, ROW_BUCKET)
+        rows = list(rows)
+
+        def outputs(X, y, aux, weight):
+            return _reml_derivatives(lik, X, y, aux, weight, beta, A)
+
+    clean = outputs(*rows)
+    X, y, aux, weight = rows
+    n, n_bucket = int(weight.sum()), y.size
+    assert n < n_bucket
+    X, y = X.copy(), y.copy()
+    X[n:] = rng.normal(size=(n_bucket - n, N_COLUMNS))
+    y[n:] = 5.0
+    if family == "poisson":
+        aux = aux.copy()
+        aux[n:] = 2.0
+    for got, want in zip(outputs(X, y, aux, weight), clean, strict=True):
+        np.testing.assert_array_equal(got, want)
 
 
 def test_an_offset_of_minus_infinity_would_give_nan():

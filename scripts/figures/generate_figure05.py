@@ -95,7 +95,7 @@ from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.panel_layout import place_letters
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
     check_journal_limits,
     check_placement,
@@ -797,10 +797,7 @@ def assemble_figure(
     panels_by_letter = {
         "a": [ax_a_mod, ax_a_psth], "b": [*ax_b, ax_b_scale], "c": [ax_c], "d": ax_d,
     }  # fmt: skip
-    place_letters(
-        fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS, above=0.02,
-        left_of=0.004, ceiling=0.985,
-    )  # fmt: skip
+    place_letters(fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS)
     check_placement(fig, panels_by_letter)
     return fig
 

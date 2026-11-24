@@ -13,12 +13,17 @@ from scipy.stats import sem
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals,
 )
+from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
+    level_outside_periods,
+    no_spike_periods,
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id_of_session,
 )
 from continuum_swr_replay.analysis.event_properties.event_analysis import (
     get_event_start_end_times,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_medians
 from continuum_swr_replay.intervals import overlaps_intervals
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.columns import require_columns
@@ -307,10 +312,9 @@ def compute_triggered_average_curves(
         "overlap_mean", "overlap_sem", and for each class the animal-balanced
         quartiles "{class}_q25", "{class}_median", "{class}_q75"}}`` with
         numpy-array values. The mean and SEM are over every event; each
-        quartile is the mean over animals of each animal's quartile over its
-        events (:func:`animal_balanced_quartiles`), so the median is the mean
-        of :func:`animal_window_medians`' lines. A lag where no event has a
-        value is NaN.
+        quartile is event -> epoch -> animal (:func:`animal_balanced_quartiles`),
+        so the median is the mean of :func:`animal_window_medians`' lines. A
+        lag where no event has a value is NaN.
 
     """
     signal_types = list(signals)
@@ -329,7 +333,7 @@ def compute_triggered_average_curves(
             for name, windows in (("no_overlap", windows_no), ("overlap", windows_ov))
             for label, values in animal_balanced_quartiles(
                 windows.sel(signal=signal_type).values,
-                windows.indexes["event"].get_level_values("animal"),
+                *_window_animals_and_epochs(windows),
             ).items()
         }
         curves[signal_type] = {
@@ -401,9 +405,21 @@ def triggered_windows(
     }
 
 
+def _window_animals_and_epochs(
+    windows: xr.DataArray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Each window's animal and epoch (:func:`epoch_labels` of its ``day`` and
+    ``epoch``), from :func:`get_signal_windows`' event index."""
+    index = windows.indexes["event"]
+    return np.asarray(index.get_level_values("animal")), epoch_labels(
+        index.get_level_values("day"), index.get_level_values("epoch")
+    )
+
+
 def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
-    """Each animal's median over its events of one signal's windows, at each
-    lag (:func:`animal_quartiles`' median).
+    """Each animal's median window of one signal, at each lag: the median over
+    its epochs of each epoch's median over its events (:func:`animal_quartiles`'
+    median).
 
     Parameters
     ----------
@@ -417,11 +433,10 @@ def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
     -------
     pd.DataFrame, shape (n_lags, n_animals)
         Indexed by lag (s), a column per animal (sorted): the median over the
-        animal's events with a value at that lag (NaN where none has one).
+        animal's epochs with a value at that lag (NaN where none has one).
     """
     return animal_quartiles(
-        windows.sel(signal=signal).values,
-        windows.indexes["event"].get_level_values("animal"),
+        windows.sel(signal=signal).values, *_window_animals_and_epochs(windows)
     )["median"].set_axis(windows["time"].values)
 
 
@@ -429,6 +444,9 @@ def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
 #: (s, in all: half on each side), which Figure 2's supplement draws per animal.
 TRIGGERED_SIGNALS = ("SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed")
 TRIGGERED_WINDOW_S = 0.3
+WINDOW_KINDS = {"overlap": True, "no_overlap": False}
+"""The keys of :func:`triggered_windows`' windows and each one's ``is_swr``, in
+the figures' drawing order (the SWR events first, under the no-SWR events)."""
 
 #: The ``get_event_types`` entries :func:`compute_triggered_average_curves` reads:
 #: the immobile non-local events that do and do not overlap an SWR.
@@ -493,11 +511,27 @@ QUARTILES = (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
 """The quartiles a triggered trace draws, by name."""
 
 
+def epoch_labels(dates: Any, epochs: Any) -> np.ndarray:
+    """One label per row naming its epoch within its animal: the recording day
+    and the epoch name, joined (``"20200212/02_r1"``).
+
+    Parameters
+    ----------
+    dates, epochs : array_like, shape (n_rows,)
+        Each row's recording day (``session_date`` or ``day``) and epoch name.
+    """
+    return np.array(
+        [f"{date}/{epoch}" for date, epoch in zip(dates, epochs, strict=True)],
+        dtype=object,
+    )
+
+
 def animal_quartiles(
-    windows: np.ndarray, animals: np.ndarray | pd.Index
+    windows: np.ndarray, animals: np.ndarray | pd.Index, epochs: np.ndarray | pd.Index
 ) -> dict[str, pd.DataFrame]:
-    """Each animal's quartiles over its events of event-triggered windows, at
-    each lag.
+    """Each animal's quartiles of event-triggered windows, at each lag, event ->
+    epoch -> animal: each epoch's quartile over its events, then the median
+    over the animal's epochs.
 
     Parameters
     ----------
@@ -506,34 +540,40 @@ def animal_quartiles(
         no value.
     animals : array_like, shape (n_events,)
         Each window's animal.
+    epochs : array_like, shape (n_events,)
+        Each window's epoch within its animal (:func:`epoch_labels`).
 
     Returns
     -------
     dict of str to pd.DataFrame
         ``q25``, ``median`` and ``q75``, each shape (n_lags, n_animals), a
-        column per animal (sorted): the quartile over the animal's events with
-        a value at that lag (NaN where none has one).
+        column per animal (sorted): the median over the animal's epochs of
+        each epoch's quartile over its events with a value at that lag. An
+        epoch with no value at a lag is not one of the animal's epochs there;
+        NaN where the animal has none.
     """
-    animals = np.asarray(animals)
-    names = sorted(set(animals))
-    return {
-        label: pd.DataFrame(
-            {
-                name: np.nanquantile(windows[animals == name], q, axis=0)
-                for name in names
-            }
+    by_epoch = pd.DataFrame(np.asarray(windows, dtype=float)).groupby(
+        [np.asarray(animals), np.asarray(epochs)]
+    )
+    quartiles = {}
+    for label, q in QUARTILES:
+        # pandas' quantile leaves out NaN and interpolates linearly, as
+        # np.nanquantile; an epoch with no value at a lag gives NaN there
+        per_animal = by_epoch.quantile(q).groupby(level=0).median()
+        quartiles[label] = pd.DataFrame(
+            per_animal.T.to_numpy(), columns=list(per_animal.index)
         )
-        for label, q in QUARTILES
-    }
+    return quartiles
 
 
 def animal_balanced_quartiles(
-    windows: np.ndarray, animals: np.ndarray | pd.Index
+    windows: np.ndarray, animals: np.ndarray | pd.Index, epochs: np.ndarray | pd.Index
 ) -> dict[str, np.ndarray]:
     """The animal-balanced quartiles of event-triggered windows, at each lag:
-    the mean over animals of each animal's quartile over its events
-    (:func:`animal_quartiles`). The band between ``q25`` and ``q75`` stays a
-    spread over events, with every animal weighted the same.
+    the mean over animals of each animal's quartile (:func:`animal_quartiles`:
+    each epoch's quartile over its events, the median over the animal's
+    epochs). The band between ``q25`` and ``q75`` stays a spread over events,
+    with every epoch of an animal and every animal weighted the same.
 
     Parameters
     ----------
@@ -541,6 +581,8 @@ def animal_balanced_quartiles(
         One signal's windows, NaN where a window has no value.
     animals : array_like, shape (n_events,)
         Each window's animal.
+    epochs : array_like, shape (n_events,)
+        Each window's epoch within its animal (:func:`epoch_labels`).
 
     Returns
     -------
@@ -550,5 +592,268 @@ def animal_balanced_quartiles(
     """
     return {
         label: table.mean(axis=1).to_numpy()
-        for label, table in animal_quartiles(windows, animals).items()
+        for label, table in animal_quartiles(windows, animals, epochs).items()
+    }
+
+
+NO_SPIKE_SIGNAL = "MUA_zscore"
+"""The signal drawn around the start of No-Spike periods."""
+NO_SPIKE_KIND = "no_spike"
+"""The stored windows' kind of a No-Spike period's (:func:`epoch_trigger_windows`)."""
+WINDOW_ROW_KEYS = ("kind", "signal", "non_local_event")
+"""The stored windows' columns before their lags (:func:`epoch_trigger_windows`)."""
+
+
+def lag_column(offset: int) -> str:
+    """The stored windows' column of a lag of ``offset`` samples."""
+    return f"lag{offset:+04d}"
+
+
+def frame_event_counts(event_types: dict) -> dict[str, int]:
+    """The decode frames' immobile non-local events, by SWR overlap.
+
+    Parameters
+    ----------
+    event_types : dict
+        ``get_event_types`` of one or more decode frames.
+
+    Returns
+    -------
+    dict
+        ``swr``, ``non_swr`` and ``total``: the events (one per session and
+        label) that overlap an SWR, that do not, and all of them.
+    """
+
+    def n_events(frame: pd.DataFrame) -> int:
+        return len(
+            frame[["animal", "day", "epoch", "non_local_event"]].drop_duplicates()
+        )
+
+    return {
+        "swr": n_events(event_types["non_local_event_immobile_overlap_SWR_event"]),
+        "non_swr": n_events(
+            event_types["non_local_event_immobile_no_overlap_SWR_event"]
+        ),
+        "total": n_events(event_types["non_local_event_immobile"]),
+    }
+
+
+def _window_rows(
+    windows: np.ndarray, kind: str, signal: str, labels: np.ndarray
+) -> pd.DataFrame:
+    """Stored rows of one kind's and signal's windows ``(n, n_lags)``."""
+    half = windows.shape[1] // 2
+    rows = pd.DataFrame(
+        windows,
+        columns=[lag_column(offset) for offset in range(-half, half + 1)],
+    )
+    rows.insert(0, "non_local_event", np.asarray(labels, dtype=np.int64))
+    rows.insert(0, "signal", signal)
+    rows.insert(0, "kind", kind)
+    return rows
+
+
+def epoch_trigger_windows(
+    frame: pd.DataFrame,
+    event_types: dict,
+    arrival_times: np.ndarray,
+    departure_times: np.ndarray,
+    window_sec: float = TRIGGERED_WINDOW_S,
+) -> tuple[pd.DataFrame, dict]:
+    """One epoch's windows around event starts, as Figure 2g and its supplement
+    draw them, and its record.
+
+    Every immobile non-local event's window of each of :data:`TRIGGERED_SIGNALS`
+    around its start, by SWR overlap (:func:`triggered_windows`; kind
+    ``"overlap"`` or ``"no_overlap"``, ``non_local_event`` its frame label), and
+    each No-Spike period's window of :data:`NO_SPIKE_SIGNAL` around its start
+    (``no_spike_periods.no_spike_periods``: those that start inside a well
+    visit; kind :data:`NO_SPIKE_KIND`, ``non_local_event`` the period's place
+    in time order). A window that touches excluded time is left out
+    (:func:`get_signal_windows`).
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        One epoch's decode frame, read with the SWR source.
+    event_types : dict
+        ``nonlocal_events.get_event_types`` of ``frame``.
+    arrival_times, departure_times : np.ndarray, shape (n_visits,)
+        The epoch's well visits.
+    window_sec : float, optional
+        The window, in all (s).
+
+    Returns
+    -------
+    windows : pd.DataFrame
+        One row per window and signal: :data:`WINDOW_ROW_KEYS`, then one column
+        per lag (:func:`lag_column`; the lag in s is the offset over
+        ``SAMPLING_FREQUENCY``).
+    record : dict
+        ``n_events``: the frame's events by SWR overlap
+        (:func:`frame_event_counts`, every event, the ones outside a visit
+        too); ``no_spike_level``: the MUA level of immobile time outside the
+        periods (``no_spike_periods.level_outside_periods``);
+        ``n_no_spike_periods``: the periods.
+    """
+    rows = []
+    for kind, windows in triggered_windows(
+        frame, event_types, list(TRIGGERED_SIGNALS), window_sec=window_sec
+    ).items():
+        labels = windows.indexes["event"].get_level_values("non_local_event")
+        rows += [
+            _window_rows(windows.sel(signal=signal).values, kind, signal, labels)
+            for signal in TRIGGERED_SIGNALS
+        ]
+    periods = no_spike_periods(frame, arrival_times, departure_times)
+    if not periods.empty:
+        session = frame[["animal", "day", "epoch"]].iloc[0]
+        windows = get_signal_windows(
+            frame,
+            periods.assign(**session.to_dict(), period=np.arange(len(periods))),
+            [NO_SPIKE_SIGNAL],
+            window_sec=window_sec,
+            event_id_col="period",
+        )
+        rows.append(
+            _window_rows(
+                windows.sel(signal=NO_SPIKE_SIGNAL).values,
+                NO_SPIKE_KIND,
+                NO_SPIKE_SIGNAL,
+                windows.indexes["event"].get_level_values("period"),
+            )
+        )
+    record = {
+        "n_events": frame_event_counts(event_types),
+        "no_spike_level": level_outside_periods(
+            frame, periods, arrival_times, departure_times, NO_SPIKE_SIGNAL
+        ),
+        "n_no_spike_periods": len(periods),
+    }
+    return pd.concat(rows, ignore_index=True), record
+
+
+def _stored(
+    windows: pd.DataFrame, kind: str, signal: str
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """One kind's and signal's stored windows ``(n, n_lags)``, their animals,
+    their epochs (:func:`epoch_labels`) and the lags (s)."""
+    mine = windows[(windows["kind"] == kind) & (windows["signal"] == signal)]
+    lags = [column for column in windows.columns if column.startswith("lag")]
+    offsets = np.array([int(column.removeprefix("lag")) for column in lags])
+    return (
+        mine[lags].to_numpy(),
+        mine["animal"].to_numpy(),
+        epoch_labels(mine["session_date"], mine["epoch"]),
+        offsets * (1 / SAMPLING_FREQUENCY),
+    )
+
+
+def stored_windows_of(windows: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
+    """The stored windows of the selected events: an event's rows are kept when
+    its session and label are those of a row of ``events`` (as
+    :func:`triggering_events_in` keeps them); the No-Spike periods' rows are
+    kept whole.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        :func:`epoch_trigger_windows`' rows of every epoch, with ``animal``,
+        ``session_date`` and ``epoch``.
+    events : pd.DataFrame
+        The selected events, with ``animal``, ``session_date``, ``epoch`` and
+        ``non_local_event``.
+    """
+    keys = ["animal", "session_date", "epoch", "non_local_event"]
+    require_columns(events, keys, "the selected events")
+
+    def index(table: pd.DataFrame) -> pd.MultiIndex:
+        return pd.MultiIndex.from_arrays(
+            [
+                table["animal"].astype(str),
+                table["session_date"].astype(np.int64),
+                table["epoch"].astype(str),
+                table["non_local_event"].astype(np.int64),
+            ]
+        )
+
+    kept = (windows["kind"] == NO_SPIKE_KIND).to_numpy() | index(windows).isin(
+        index(events)
+    )
+    return windows.loc[kept]
+
+
+def stored_triggered_curves(windows: pd.DataFrame) -> dict:
+    """Figure 2g's curves from the stored windows: for each of
+    :data:`TRIGGERED_SIGNALS`, ``time`` (s) and, for each SWR-overlap kind,
+    its animal-balanced quartiles (:func:`animal_balanced_quartiles`: each
+    epoch's quartile, the median over the animal's epochs, the mean over
+    animals), as ``"{kind}_q25"``, ``"{kind}_median"`` and ``"{kind}_q75"``.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        :func:`stored_windows_of`' rows.
+    """
+    curves: dict = {}
+    for signal in TRIGGERED_SIGNALS:
+        curves[signal] = {}
+        for kind in ("no_overlap", "overlap"):
+            values, animals, epochs, time = _stored(windows, kind, signal)
+            for label, quartile in animal_balanced_quartiles(
+                values, animals, epochs
+            ).items():
+                curves[signal][f"{kind}_{label}"] = quartile
+            curves[signal]["time"] = time
+    return curves
+
+
+def stored_animal_window_medians(windows: pd.DataFrame) -> dict:
+    """Figure 2's supplement's traces from the stored windows: by SWR-overlap
+    kind, each signal's per-animal median windows (``pd.DataFrame (n_lags,
+    n_animals)``, as :func:`animal_window_medians` gives them: the median over
+    the animal's epochs of each epoch's median window), with ``time`` (s).
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        :func:`stored_windows_of`' rows.
+    """
+    traces: dict = {}
+    for kind in ("overlap", "no_overlap"):
+        traces[kind] = {}
+        for signal in TRIGGERED_SIGNALS:
+            values, animals, epochs, time = _stored(windows, kind, signal)
+            traces[kind][signal] = animal_quartiles(values, animals, epochs)[
+                "median"
+            ].set_axis(time)
+        traces["time"] = time
+    return traces
+
+
+def stored_no_spike_trace(windows: pd.DataFrame, epochs: pd.DataFrame) -> dict:
+    """The No-Spike panel's trace from the stored windows: ``time`` (s), and
+    ``q25``, ``median`` and ``q75`` animal-balanced over the periods
+    (:func:`animal_balanced_quartiles`: each epoch's quartile over its periods,
+    the median over the animal's epochs, the mean over animals; an epoch with
+    no period is not one of its animal's epochs); ``level``: the mean over animals of
+    each animal's median over its epochs of each epoch's MUA level outside its
+    periods.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The stored windows (their No-Spike rows are read).
+    epochs : pd.DataFrame
+        One row per epoch: ``animal`` and ``no_spike_level``.
+    """
+    values, animals, period_epochs, time = _stored(
+        windows, NO_SPIKE_KIND, NO_SPIKE_SIGNAL
+    )
+    return {
+        "time": time,
+        **animal_balanced_quartiles(values, animals, period_epochs),
+        "level": float(
+            animal_medians(epochs["no_spike_level"], epochs["animal"]).mean()
+        ),
     }

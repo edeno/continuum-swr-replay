@@ -1719,3 +1719,13 @@ def test_left_out_bins_must_be_one_flag_per_place_bin_and_leave_some():
             terms, windows, animal, distance, halves,
             left_out_bins=np.ones_like(left_out), **kwargs,
         )  # fmt: skip
+
+
+def test_each_probability_bin_is_centered_between_its_edges():
+    from continuum_swr_replay.analysis.event_evidence.state_evidence.summary import (
+        PROBABILITY_BIN_LABELS,
+        probability_bin_center,
+    )
+
+    centers = [probability_bin_center(label) for label in PROBABILITY_BIN_LABELS]
+    assert centers == pytest.approx([0.1, 0.3, 0.5, 0.7, 0.9])

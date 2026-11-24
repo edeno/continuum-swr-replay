@@ -31,6 +31,7 @@ them importable.
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
 - `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions (the immobile ones inside the well visits) and calibration curve, which the events summary reads.
+- `store_example_session.py` — one epoch's ripple trace (the SWR source's) and HPC spikes, read once from the lab database with `load_data` and stored whole (`Processed-Data/example_session/<epoch_id>`, default the example session of `parameters`), which Figure 2's panels a and b draw beside the epoch's decode.
 - `measure_nonlocal_probability.py` — each analyzed epoch's immobile time bins inside the well visits counted in 50 equal bins of non-local probability (`Processed-Data/nonlocal_probability`), for Figure 2's supplement, panel c, and the events summary's `nonlocal_probability_*` shares.
 
 ## `detection/` — the event detectors (Part 1)
@@ -78,6 +79,7 @@ Each is over the events that start inside a well visit and the time inside one
 - `sweep_event_rule.py` — each epoch's non-local events, and those with no SWR, at other settings of the event rule (the sensitivity check of Figure 2's supplement; the canonical events are not changed).
 - `measure_nonlocal_by_signal.py` — each epoch's immobile time bins by ripple power, by MUA and by non-local probability (Figure 2i and the MUA panel of Figure 2's supplement).
 - `measure_state_by_signal.py` — each epoch's immobile time bins inside the well visits by ripple power and by MUA and by decoder state class (Local, non-local or No-Spike probability above 0.8, or none; `Processed-Data/state_by_signal`), for the top strips of Figure 2i and of its supplement's MUA panel and the events summary's `*_share_at_detection_level` values.
+- `measure_trigger_windows.py` — each epoch's windows of ripple power, MUA, theta power and head speed around the start of every immobile non-local event (by SWR overlap) and of MUA around the start of every No-Spike period inside a well visit, one row per window and signal (`Processed-Data/event_trigger_windows`), for Figure 2g, its supplement's No-Spike and traces panels, and the frames' event counts Figure 2 checks the canonical table against.
 - `measure_content_place_rate.py` — the rank, among the track's real places, of the saved encoding model's summed ground intensity at each event's decoded place: the events decoded where the tetrodes fire little (CPU; reads the event table and the detectors, no database).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 

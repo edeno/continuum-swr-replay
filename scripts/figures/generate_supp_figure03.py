@@ -91,20 +91,20 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.reported.events import (
     content_mass_along_arms,
-    default_inputs,
     with_brain_state,
     with_event_place_shares,
     with_event_speed,
 )
+from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
     name_groups,
 )
-from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, COLORS
+from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, EVENT_KINDS
 from continuum_swr_replay.visualization.panel_layout import place_letters
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
     check_journal_limits,
     check_placement,
@@ -122,8 +122,6 @@ warnings.filterwarnings("ignore")
 WIDTH = 6.5
 HEIGHT = 4.4
 
-# The two kinds of event, named and colored as in Figures 2 and 3.
-KINDS = ((False, "No SWR", COLORS["No SWR"]), (True, "SWR", COLORS["SWR"]))
 # The rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
 C_RUN = "black"
@@ -193,7 +191,7 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
     for ax, (band, column, title) in zip(axes, SIGNALS, strict=True):
         levels = animal_signal_levels(events, reference, band, column, matched=True)
         centers = []
-        for k, (is_swr, _, color) in enumerate(KINDS):
+        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
             x = 3.7 * k + np.arange(3)
             values = levels.loc[is_swr, ["rest", "event", "running"]]
             for _, row in values.iterrows():
@@ -207,7 +205,7 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
         ax.set_title(title, fontsize=SMALL_SIZE)
         # One label per kind; the key says which dots are rest and running.
-        ax.set_xticks(centers, [name for _, name, _ in KINDS])
+        ax.set_xticks(centers, [name for name, _ in EVENT_KINDS.values()])
         ax.set_xlim(-0.7, centers[-1] + 1.7)
     axes[0].set_ylabel("Power (z)")
 
@@ -247,11 +245,11 @@ def draw_well_shares(ax: Axes, shares: pd.DataFrame) -> None:
     and the animals' mean as a bar (``shares``: :func:`read_inputs`'
     ``places``, indexed by ``is_swr`` and ``animal``)."""
     for k, (column, _) in enumerate(WELL_PLACES):
-        # one row per animal; columns no-SWR, SWR (the order of KINDS)
+        # one row per animal; columns no-SWR, SWR (the order of EVENT_KINDS)
         by_kind = 100 * shares[column].unstack("is_swr").to_numpy()
         x = 2.6 * k + np.arange(2)
         ax.plot(x, by_kind.T, color=ANIMAL_LINE_COLOR, lw=0.5, zorder=1)
-        for i, (_, _, color) in enumerate(KINDS):
+        for i, (_, color) in enumerate(EVENT_KINDS.values()):
             ax.scatter(
                 np.full(len(by_kind), x[i]), by_kind[:, i], s=9, color=color,
                 edgecolors="black", linewidths=0.5, zorder=2,
@@ -273,7 +271,7 @@ def draw_remote_well_by_extent(ax: Axes, by_extent: pd.DataFrame) -> None:
     each spatial-extent class, a thin line per animal and their mean in bold in
     the kind's color (``by_extent``: :func:`read_inputs`' ``by_extent``)."""
     n_classes = len(EXTENT_BIN_EDGES_CM) - 1
-    for is_swr, _, color in KINDS:
+    for is_swr, (_, color) in EVENT_KINDS.items():
         by_animal = (
             100 * by_extent.loc[is_swr, "remote_well"].unstack("animal")
         ).reindex(range(n_classes))
@@ -322,10 +320,7 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
     fig.draw_without_rendering()
     panels = dict(zip("abcde", ([ax] for ax in (*axes, ax_d, ax_e)), strict=True))
-    place_letters(
-        fig, panels, rows=["abc", "de"], columns=["ad", "be"], above=0.02,
-        left_of=0.004,
-    )  # fmt: skip
+    place_letters(fig, panels, rows=["abc", "de"], columns=["ad", "be"])
     check_placement(fig, panels)
     return fig
 

@@ -3,7 +3,8 @@ MUA counterpart on Figure 2's supplement draw it the same way.
 
 Top, how confident Local time and confident non-local time are spread over the
 signal (each class's percent of its time in each signal bin; the mean over
-animals of each animal's mean over its epochs, in the class's color), the part
+animals, ``shared_statistics.animal_mean``, of each animal's mean over its
+epochs, in the class's color), the part
 of the non-local curve below the threshold shaded and the share of non-local
 time below it written; bottom, the share of immobile bins decoded non-local at
 each level, one thin line per animal and their mean in bold. A dashed line at
@@ -17,8 +18,9 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 
+from continuum_swr_replay.analysis.shared_statistics import animal_mean
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
-from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
+from continuum_swr_replay.visualization.publication_style import SMALL_SIZE
 
 STATE_STYLES = {
     "local": ("Local", COLORS["Local"]),
@@ -69,7 +71,7 @@ SHADE_COLOR = COLORS["All Events"]
 def draw_share_by_signal(
     ax_spread: Axes,
     ax_share: Axes,
-    counts: pd.DataFrame,
+    shares: pd.DataFrame,
     *,
     threshold: float,
     threshold_label: str,
@@ -93,8 +95,8 @@ def draw_share_by_signal(
     Parameters
     ----------
     ax_spread, ax_share : Axes
-    counts : pd.DataFrame
-        ``event_statistics.animal_signal_counts`` of the stored per-epoch counts
+    shares : pd.DataFrame
+        ``event_statistics.animal_signal_shares`` of the stored per-epoch counts
         (the bottom axis).
     threshold : float
         z; an edge of the signal's bins.
@@ -105,23 +107,22 @@ def draw_share_by_signal(
         ``state_by_signal.state_distribution`` of the signal: ``state``,
         ``animal``, ``signal_low``, ``signal_high`` and ``percent``.
     """
-    drawn = counts[
-        np.isfinite(counts["signal_low"]) & np.isfinite(counts["signal_high"])
+    drawn = shares[
+        np.isfinite(shares["signal_low"]) & np.isfinite(shares["signal_high"])
     ]
     width = (drawn["signal_high"] - drawn["signal_low"]).iloc[0]
-    by_animal = 100 * drawn.pivot(index="signal_low", columns="animal", values="share")
+    percent = drawn.assign(percent=100 * drawn["share"])
+    by_animal = percent.pivot(index="signal_low", columns="animal", values="percent")
     center = by_animal.index + width / 2
     ax_share.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax_share.plot(center, by_animal.mean(axis=1), color="k", lw=1.0)
+    ax_share.plot(
+        center, animal_mean(percent, "signal_low", "percent"), color="k", lw=1.0
+    )
     finite = states[
         np.isfinite(states["signal_low"]) & np.isfinite(states["signal_high"])
     ]
     for state, (_, color) in STATE_STYLES.items():
-        mean = (
-            finite[finite["state"] == state]
-            .pivot(index="signal_low", columns="animal", values="percent")
-            .mean(axis=1)
-        )
+        mean = animal_mean(finite[finite["state"] == state], "signal_low", "percent")
         middle = mean.index + width / 2
         ax_spread.plot(middle, mean.to_numpy(), color=color, lw=1.0)
         if state == "non_local":
