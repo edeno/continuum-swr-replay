@@ -180,3 +180,166 @@ def test_the_calibrated_noise_takes_each_brackets_values(cohort) -> None:
     assert (rows.loc[short, rsim.NOISE_CONCENTRATION] == 2.0).all()
     assert (rows.loc[~short, rsim.NOISE_TRIALS] == rows.loc[~short, rsim.N_BINS]).all()
     assert (rows.loc[~short, rsim.NOISE_CONCENTRATION] == 5.0).all()
+
+
+@pytest.mark.parametrize("noise", ["categorical", "multinomial", "dirichlet_10"])
+def test_each_noise_draws_counts_over_the_events_bins(cohort, noise) -> None:
+    """A share is a count over the event's choices: 0 or 1 for one draw,
+    a whole number over the event's bins otherwise; an event's shares sum to
+    one."""
+    run = rsim.build_simulation(
+        cohort, model="role_content", kind="No SWR", noise=noise, prior_sds=(8.0,),
+        scenarios=["role_current_large"], n_data_sets=1, n_draws=50,
+    )  # fmt: skip
+    place = [s.name for s in run.scenarios].index("role_current_large")
+    data = engine.draw_data_set(
+        run.models[0], run.sessions, run.scenarios[place],
+        np.random.default_rng(engine.data_seed(run.seed, place, 0)),
+    )  # fmt: skip
+    for key, rows in run.sessions.items():
+        y = data[key][rc.RESPONSE].to_numpy()
+        n = 1.0 if noise == "categorical" else rows[rsim.N_BINS].to_numpy()
+        np.testing.assert_allclose(y * n, np.round(y * n), atol=1e-9)
+        total = pd.Series(y).groupby(rows[rc.UNIT].to_numpy()).sum()
+        np.testing.assert_allclose(total, 1.0)
+
+
+@pytest.mark.parametrize("a", rsim.CONCENTRATIONS)
+def test_the_dirichlet_noise_has_the_mean_and_variance_its_docstring_states(
+    a,
+) -> None:
+    """At 24 bins the Dirichlet-multinomial's mean share is the planted
+    probability and its variance that of 24 independent bins times
+    (24 + a) / (1 + a) (the docstring of CONCENTRATIONS)."""
+    from continuum_swr_replay.analysis.regression.likelihoods import (
+        GroupedSoftmax,
+        draw,
+    )
+
+    n_bins, n_groups = 24, 20000
+    p = np.array([0.4, 0.2, 0.15, 0.1, 0.05, 0.05, 0.03, 0.01, 0.01])
+    groups = np.repeat(np.arange(n_groups), p.size)
+    eta = np.tile(np.log(p), n_groups)
+    rng = np.random.default_rng(3)
+    y = draw(GroupedSoftmax(), eta, groups, rng, n_trials=n_bins, concentration=a)
+    y = y.reshape(n_groups, p.size)
+    np.testing.assert_allclose(y.mean(axis=0), p, atol=0.01)
+    multiple = y.var(axis=0) / (p * (1 - p) / n_bins)
+    np.testing.assert_allclose(multiple[:4], (n_bins + a) / (1 + a), rtol=0.06)
+
+
+def _big_cohort() -> rsim.SimulationCohort:
+    """Four sessions of many events, each of many bins (nearly noiseless
+    shares), the time until leaving spread over its whole range."""
+    table = synthetic_event_arm_table(
+        SESSIONS, n_visits=400, events_per_visit=3.0, swr_share=0.5, seed=5
+    )
+    events = table["event_id"].unique()
+    until = pd.Series(np.random.default_rng(0).uniform(0, 3.0, events.size), events)
+    return rsim.cohort_from_table(
+        table.assign(
+            n_nonlocal_bins=5000.0,
+            time_until_visit_end_s=table["event_id"].map(until),
+        )
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("model", "variant", "scenario", "estimand"),
+    [
+        ("role_content", "unadjusted", "role_current_large", "Q3a"),
+        ("role_content", "unadjusted", "role_previous_large", "Q3b"),
+        ("role_content", "unadjusted", "reward_curve_current_large", "Q4a"),
+        ("role_content", "unadjusted", "value_other_leaf_large", "Q4b"),
+        ("role_content", "unadjusted", "leaving_curve_large", "Q7b"),
+        ("role_content_uncertainty", "unadjusted", "recency_curve_large", "Q5a"),
+        ("role_content", "length_adjusted", "length_current", "Q3a"),
+    ],
+)
+def test_the_planted_values_are_what_the_engine_recovers(
+    model, variant, scenario, estimand
+) -> None:
+    """On large sessions with loose penalties the fit's estimate of each
+    planted estimand is its planted value."""
+    penalties = {rc.REWARD_FRACTION: -8.0, rc.RECENCY: -8.0, rc.LEAVING: -6.0}
+    run = rsim.build_simulation(
+        _big_cohort(), model=model, kind="No SWR", variant=variant,
+        prior_sds=(16.0,), smooth_log_penalties=penalties, scenarios=[scenario],
+        n_data_sets=2, n_draws=50,
+    )  # fmt: skip
+    summary = engine.run(run, 1, [scenario]).summary.set_index("estimand")
+    planted = summary.loc[estimand, "planted"]
+    assert abs(planted) > 0.1
+    assert summary.loc[estimand, "mean_estimate"] == pytest.approx(planted, rel=0.1)
+
+
+def test_truth_from_data_gives_the_known_levels_and_band_curves() -> None:
+    """Levels are the log ratio of a role's mean share to the other-leaf
+    role's; a band's curve value is the log of its shrunk mean over the
+    role's mean; a covariate with one value gives a flat zero curve."""
+    n = 20
+    current = pd.DataFrame(
+        {
+            rc.ROLE: "current",
+            rc.LEAVING: np.r_[np.full(n, 0.25), np.full(n, 2.0)],
+            rc.RESPONSE: np.r_[np.full(n, 0.6), np.full(n, 0.2)],
+        }
+    )
+    previous = pd.DataFrame({rc.ROLE: "previous", rc.RESPONSE: np.full(2 * n, 0.2)})
+    other = pd.DataFrame({rc.ROLE: rc.REFERENCE_ROLE, rc.RESPONSE: np.full(4 * n, 0.1)})
+    rows = pd.concat([current, previous, other], ignore_index=True).assign(
+        animal="a1", **{rc.REWARD_FRACTION: 0.5, rc.RECENCY: np.log(10.0)}
+    )
+    rows[rc.LEAVING] = rows[rc.LEAVING].fillna(1.0)
+    (truth,) = sc.truth_from_data(rows).values()
+    assert truth.role["current"] == pytest.approx(np.log(4.0))
+    assert truth.role["previous"] == pytest.approx(np.log(2.0))
+    leaving = truth.curves[(rc.LEAVING, "current")]
+    k = sc.DATA_PSEUDO_EVENTS
+    low = np.log((n * 0.6 + k * 0.4) / (n + k) / 0.4)
+    high = np.log((n * 0.2 + k * 0.4) / (n + k) / 0.4)
+    np.testing.assert_allclose(leaving(np.array([0.25, 1.0, 2.25])), [low, 0.0, high])
+    flat = truth.curves[(rc.REWARD_FRACTION, "current")]
+    np.testing.assert_allclose(flat(np.linspace(0, 1, 5)), 0.0, atol=1e-12)
+    assert truth.arm == {}
+
+
+def test_sessions_per_animal_keeps_evenly_spaced_sessions() -> None:
+    sessions = (
+        ("a1", "20200101", "02_r1"),
+        ("a1", "20200102", "02_r1"),
+        ("a1", "20200103", "02_r1"),
+        ("a2", "20200104", "02_r1"),
+    )
+    table = synthetic_event_arm_table(sessions, n_visits=20, seed=1).assign(
+        n_nonlocal_bins=10.0
+    )
+    kept = rsim.cohort_from_table(table, sessions_per_animal=2).rows
+    found = set(map(tuple, kept[list(rc.SESSION_COLUMNS)].drop_duplicates().values))
+    assert found == {sessions[0], sessions[2], sessions[3]}
+    one = rsim.cohort_from_table(table, sessions_per_animal=1).rows
+    assert set(one["animal"]) == {"a1", "a2"}
+    assert one.groupby("animal")["session_date"].nunique().eq(1).all()
+
+
+def test_the_unadjusted_length_scenario_has_no_planted_value(cohort) -> None:
+    run = rsim.build_simulation(
+        cohort, model="role_content", kind="No SWR", prior_sds=(8.0,),
+        scenarios=["length_current_unadjusted"], n_data_sets=1, n_draws=50,
+    )  # fmt: skip
+    scenario = next(s for s in run.scenarios if s.name == "length_current_unadjusted")
+    assert np.isnan(scenario.planted["Q3a"])
+
+
+@pytest.mark.slow
+def test_calibrate_smooth_penalties_reaches_its_targets(cohort) -> None:
+    targets = {rc.REWARD_FRACTION: 2.5, rc.LEAVING: 3.0}
+    found = rsim.calibrate_smooth_penalties(cohort, targets=targets)
+    assert set(found) == set(targets)
+    for covariate, entry in found.items():
+        assert entry["target_edf"] == targets[covariate]
+        assert entry["median_edf"] == pytest.approx(targets[covariate], abs=0.05)
+        assert entry["term"] == f"s({covariate}):{rc.ROLE}=current"
+        assert np.isfinite(entry["log_penalty"])
+        assert entry["n_sessions_used"] >= 1

@@ -99,9 +99,11 @@ N_BINS = "n_nonlocal_bins"
 
 CONCENTRATIONS: tuple[float, ...] = (300.0, 10.0, 1.0)
 """The Dirichlet-multinomial concentrations, from nearly independent bins to
-strongly clustered ones. At the median event of 32 bins the share variance is
-that of independent bins times 1.10, 3.8 and 16.5 (32 for one categorical
-choice)."""
+strongly clustered ones. The share variance is that of independent bins times
+``(n + a) / (1 + a)`` (``n`` for one categorical choice). At each kind's median
+event in the selected cohort (``select_visit_context``'s default, the real
+event-arm table of 2026-11-23: 24 bins No SWR, 47 SWR) that is 1.08, 3.09 and
+12.5 (24 for one choice) for No SWR, and 1.15, 5.18 and 24.0 (47) for SWR."""
 
 NOISE_TRIALS = "noise_n_trials"
 """The calibrated noise's choices per event: 1 (one draw) or its bins."""
