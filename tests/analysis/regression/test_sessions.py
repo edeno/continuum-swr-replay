@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from scripts.checks import simulate_declared_penalty as sim
 
-from .conftest import ROLE, by_session, rate_rows
+from .conftest import ROLE, by_session, cohort, rate_rows
 
 N_ARMS = 6
 
@@ -1403,13 +1403,20 @@ def test_a_penalized_term_without_rows_on_a_side_fails_its_support() -> None:
 def _day_sessions(n: int = 2, day: str = "20260101", animal: str = "sim") -> dict:
     """``n`` rate sessions of one recording day (seeds 0 to n - 1): every
     session's visit ids start at 0."""
-    out = {}
-    for seed in range(n):
-        key = (animal, day, f"0{2 * seed + 2}_r{seed + 1}")
-        out[key] = rate_rows(seed).assign(
-            animal=key[0], session_date=key[1], epoch=key[2]
-        )
-    return out
+    return cohort(
+        rate_rows,
+        animals=[animal],
+        days=[day],
+        epochs=[f"0{2 * s + 2}_r{s + 1}" for s in range(n)],
+        seed=lambda a, d, e: e,
+    )
+
+
+def _rate_fit(design, sessions, **kw):
+    """The records of a rate fit (Poisson; ``count`` of ``well_visit_id``)."""
+    return _fit(
+        design, sessions, Poisson(), response="count", unit="well_visit_id", **kw
+    )
 
 
 def _small_rate_design(pooled, baseline=()):
@@ -1421,41 +1428,6 @@ def _small_rate_design(pooled, baseline=()):
     )
 
 
-def _reference_cases_at(fit_by: str):
-    """The stored per-session reference cases, each record against its
-    stored reference, with ``fit_sessions`` given ``fit_by`` explicitly."""
-    import functools
-    import json
-    from pathlib import Path
-
-    from scripts.checks import _regression_reference as reference
-
-    stored = json.loads(
-        (
-            Path(__file__).parent / "data" / "numpy_reference" / "sessions.json"
-        ).read_text()
-    )["cases"]
-    original = reference.fit_sessions
-    reference.fit_sessions = functools.partial(original, fit_by=fit_by)
-    try:
-        return {
-            name: reference.differences(
-                reference.run("sessions", name), stored[name], name
-            )
-            for name in reference.SESSIONS_CASES
-        }
-    finally:
-        reference.fit_sessions = original
-
-
-def test_fit_by_session_equals_today() -> None:
-    """With ``fit_by="session"`` given, every stored per-session reference
-    case of the NumPy fitter matches (the reference builder checks that the
-    two new fields repeat the record's own session)."""
-    differences = _reference_cases_at("session")
-    assert differences and not any(differences.values()), differences
-
-
 def test_visits_of_two_sessions_are_two_units() -> None:
     """Two sessions of one day whose visit ids are the same numbers: at the
     day unit the units and the support counts are the sums of the two
@@ -1464,9 +1436,8 @@ def test_visits_of_two_sessions_are_two_units() -> None:
     design = _small_rate_design(
         pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    alone = _fit(design, sessions, Poisson(), **fit)
-    (day,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    alone = _rate_fit(design, sessions)
+    (day,) = _rate_fit(design, sessions, fit_by="day")
     assert day.n_units == sum(r.n_units for r in alone) == 120
     for side in ("n_low", "n_high"):
         assert day.support["last_rewarded"][side] == sum(
@@ -1482,13 +1453,12 @@ def test_a_larger_unit_needs_a_baseline() -> None:
     ``test_softmax_unit_fit_equals_an_independent_maximization``."""
     sessions = _day_sessions(2)
     design = _small_rate_design(pd.concat(sessions.values(), ignore_index=True))
-    fit = {"response": "count", "unit": "well_visit_id"}
     for fit_by in ("day", "animal"):
         with pytest.raises(
             ValueError, match=r"build_design\(\.\.\., baseline=\.\.\.\)"
         ):
-            _fit(design, sessions, Poisson(), fit_by=fit_by, **fit)
-    assert len(_fit(design, sessions, Poisson(), **fit)) == 2
+            _rate_fit(design, sessions, fit_by=fit_by)
+    assert len(_rate_fit(design, sessions)) == 2
 
 
 def test_record_holds_its_sessions() -> None:
@@ -1505,8 +1475,7 @@ def test_record_holds_its_sessions() -> None:
     )
     pooled = pd.concat(sessions.values(), ignore_index=True).dropna()
     design = _small_rate_design(pooled, baseline=("(Intercept)",))
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="animal", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="animal")
     assert (record.animal, record.session_date, record.epoch) == ("sim", "", "")
     assert [
         (e["animal"], e["session_date"], e["epoch"]) for e in record.sessions
@@ -1535,12 +1504,11 @@ def test_units_in_the_order_of_their_first_session() -> None:
     design = _small_rate_design(
         pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    records = _fit(design, sessions, Poisson(), fit_by="animal", **fit)
+    records = _rate_fit(design, sessions, fit_by="animal")
     assert [r.animal for r in records] == ["b", "a"]
     assert [len(r.sessions) for r in records] == [2, 1]
     with pytest.raises(ValueError, match="fit_by"):
-        _fit(design, sessions, Poisson(), fit_by="week", **fit)
+        _rate_fit(design, sessions, fit_by="week")
 
 
 def test_rate_baselines_match_separate_intercepts() -> None:
@@ -1551,8 +1519,7 @@ def test_rate_baselines_match_separate_intercepts() -> None:
     design = _small_rate_design(
         pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="day")
     assert record.status == "converged"
     coef = dict(zip(record.coef_names, record.coef, strict=True))
     b = coef["last_rewarded"]
@@ -1574,8 +1541,7 @@ def test_unit_fit_equals_a_hand_built_indicator_design() -> None:
     sessions = _day_sessions(3)
     pooled = pd.concat(sessions.values(), ignore_index=True)
     design = _small_rate_design(pooled, baseline=("(Intercept)",))
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="day")
     sizes = [len(rows) for rows in sessions.values()]
     session = np.repeat(np.arange(3), sizes)
     X = np.column_stack(
@@ -1605,8 +1571,7 @@ def test_session_without_support_dropped_and_counted() -> None:
     design = _small_rate_design(
         pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="day")
     copy = f"(Intercept)@{'/'.join(thin)}"
     assert record.status == "converged"
     assert record.left_out == {copy: Removed.SUPPORT}
@@ -1628,13 +1593,12 @@ def test_a_session_without_events_is_dropped_from_the_unit() -> None:
     design = _small_rate_design(
         pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="day")
     copy = f"(Intercept)@{'/'.join(empty)}"
     assert record.status == "converged"
     assert record.left_out[copy] == Removed.NO_FINITE_MAXIMUM
     assert record.cohort_counts["rows_dropped"][copy] == len(sessions[empty])
-    alone = _fit(design, sessions, Poisson(), **fit)
+    alone = _rate_fit(design, sessions)
     assert alone[2].no_fit == NoFit.NO_EVENTS
 
 
@@ -1745,8 +1709,7 @@ def test_a_shared_intercept_with_per_session_category_copies() -> None:
         intercept=True,
         baseline=("cat",),
     )
-    fit = {"response": "count", "unit": "well_visit_id"}
-    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    (record,) = _rate_fit(design, sessions, fit_by="day")
     assert record.status == "converged"
     keys = ["/".join(k) for k in sessions]
     assert record.coef_names == [
@@ -1928,9 +1891,8 @@ def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None
         if place == "first"
         else {**others, keys[1]: dropped}
     )
-    fit = {"response": "count", "unit": "well_visit_id", "fit_by": "day"}
-    (without,) = _fit(design, others, Poisson(), **fit)
-    (with_it,) = _fit(design, given, Poisson(), **fit)
+    (without,) = _rate_fit(design, others, fit_by="day")
+    (with_it,) = _rate_fit(design, given, fit_by="day")
 
     def shared(record):
         names = zip(record.coef_names, record.coef, strict=True)

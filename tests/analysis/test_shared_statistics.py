@@ -1011,21 +1011,6 @@ def test_session_value_statistics_of_equal_values_have_no_spread():
 # --- the mean over animals with the t interval -------------------------------------
 
 
-def test_animal_mean_interval_by_hand():
-    # Values 1, 2, 3, -4, 18 over five animals: mean 4, SD (ddof=1) and its
-    # standard error over sqrt(5), t(0.975, 4) = 2.7764451052. A missing
-    # animal value is left out; four of the five share the mean's sign.
-    values = pd.Series([1.0, 2.0, 3.0, -4.0, 18.0, NAN], index=list("abcdef"))
-    summary = stats.animal_mean_interval(values)
-    se = np.sqrt(((values.dropna() - 4.0) ** 2).sum() / 4 / 5)
-    assert summary["estimate"] == pytest.approx(4.0)
-    assert summary["se"] == pytest.approx(se)
-    assert summary["low"] == pytest.approx(4.0 - 2.7764451052 * se)
-    assert summary["high"] == pytest.approx(4.0 + 2.7764451052 * se)
-    assert summary["n_animals"] == 5
-    assert summary["n_animals_same_sign"] == 4
-
-
 def test_animal_mean_interval_needs_two_animals_for_an_interval():
     one = stats.animal_mean_interval(pd.Series([0.7], index=["a"]))
     assert one["estimate"] == pytest.approx(0.7)

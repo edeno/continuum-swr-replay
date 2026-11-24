@@ -65,7 +65,8 @@ def test_unit_summary_day_one_session_per_day():
 
 def test_unit_summary_animal_is_t_interval():
     # Five animal values 1, 2, 3, -4, 18 (one NaN left out): mean 4, the
-    # interval 4 +/- t(0.975, 4) SD / sqrt(5); no day-level test.
+    # interval 4 +/- t(0.975, 4) SD / sqrt(5), t(0.975, 4) = 2.7764451052; four
+    # of the five share the mean's sign; no day-level test.
     values = pd.Series(
         [1.0, 2.0, 3.0, -4.0, 18.0, NAN],
         index=pd.Index(list("abcdef"), name="animal"),
@@ -80,6 +81,11 @@ def test_unit_summary_animal_is_t_interval():
     assert np.isnan(got["day_p"])
     assert (got["n_animals"], got["n_units"], got["n_animals_same_sign"]) == (5, 5, 4)
     assert np.isnan(got["n_days"]) and np.isnan(got["n_sessions"])
+    # shared_statistics.animal_mean_interval behind it, the same hand values
+    found = stats.animal_mean_interval(values)
+    assert found["se"] == pytest.approx(sd / np.sqrt(5))
+    assert (found["low"], found["high"]) == (got["low"], got["high"])
+    assert (found["n_animals"], found["n_animals_same_sign"]) == (5, 4)
 
 
 def test_unit_summary_same_keys_at_every_unit():

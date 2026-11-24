@@ -59,7 +59,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     signed_rank_p,
 )
 
-from .conftest import ROLES, content_rows, rate_rows
+from .conftest import ROLES, cohort, content_rows, rate_rows
 
 #: The weak penalty of the tests: a prior SD of 2 on each simple coefficient.
 WEAK = log_penalty_from_prior_sd(2.0)
@@ -71,13 +71,13 @@ FIXTURE = Path(__file__).parent / "data" / "numpy_reference" / "simulation_engin
 def _cohort(make, n_animals: int = 5, n_sessions: int = 2) -> dict:
     """``n_animals`` animals of ``n_sessions`` sessions, each on its own day,
     their rows from ``make(seed)``."""
-    out = {}
-    for a in range(n_animals):
-        for e in range(n_sessions):
-            key = (f"animal{a}", f"2026{e + 1:04d}", "02_r1")
-            rows = make(n_sessions * a + e)
-            out[key] = rows.assign(animal=key[0], session_date=key[1], epoch=key[2])
-    return out
+    return cohort(
+        make,
+        animals=[f"animal{a}" for a in range(n_animals)],
+        days=[f"2026{e + 1:04d}" for e in range(n_sessions)],
+        epochs=["02_r1"],
+        seed=lambda a, d, e: n_sessions * a + d,
+    )
 
 
 def rate_model(sessions: dict) -> Model:
@@ -818,14 +818,13 @@ def test_matches_the_fixed_seed_fixture() -> None:
 
 def _day_cohort(n_animals: int = 3, n_days: int = 2, n_sessions: int = 2) -> dict:
     """``n_animals`` animals of ``n_days`` days of ``n_sessions`` sessions."""
-    out = {}
-    for a in range(n_animals):
-        for d in range(n_days):
-            for e in range(n_sessions):
-                key = (f"animal{a}", f"2026{d + 1:04d}", f"0{2 * e + 2}_r1")
-                rows = rate_rows(100 * a + 10 * d + e, n_visits=30)
-                out[key] = rows.assign(animal=key[0], session_date=key[1], epoch=key[2])
-    return out
+    return cohort(
+        lambda seed: rate_rows(seed, n_visits=30),
+        animals=[f"animal{a}" for a in range(n_animals)],
+        days=[f"2026{d + 1:04d}" for d in range(n_days)],
+        epochs=[f"0{2 * e + 2}_r1" for e in range(n_sessions)],
+        seed=lambda a, d, e: 100 * a + 10 * d + e,
+    )
 
 
 def unit_rate_model(sessions: dict, fit_by: str) -> Model:
@@ -858,6 +857,18 @@ def day_cohort() -> dict:
     return _day_cohort()
 
 
+@pytest.fixture(scope="module")
+def three_units(day_cohort) -> engine.SimulationResult:
+    """One run of the model at the session, the day and the animal unit on
+    the same data sets (2 data sets, 50 draws, seed 5)."""
+    models = [unit_rate_model(day_cohort, f) for f in ("session", "day", "animal")]
+    return engine.run(Simulation(models, day_cohort, [RATE_INSIDE], 2, 50, 5))
+
+
+def _of(table: pd.DataFrame, fit_by: str) -> pd.DataFrame:
+    return table[table["fit_by"] == fit_by]
+
+
 def test_same_seed_same_data_at_every_unit(monkeypatch, day_cohort) -> None:
     """One run of the model at the three units draws each data set once: the
     three fits of a data set see the same outcomes, and a run of one unit
@@ -875,11 +886,10 @@ def test_same_seed_same_data_at_every_unit(monkeypatch, day_cohort) -> None:
             assert seen_day[i][key]["count"].to_numpy().tobytes() == counts[0].tobytes()
 
 
-def test_unit_target_equals_planted_when_sessions_agree(day_cohort) -> None:
+def test_unit_target_equals_planted_when_sessions_agree(three_units) -> None:
     """Planted coefficients, the same in every session: at each unit the
     unit's own target equals the planted value (the model holds the truth)."""
-    models = [unit_rate_model(day_cohort, f) for f in ("session", "day", "animal")]
-    result = engine.run(Simulation(models, day_cohort, [RATE_INSIDE], 2, 50, 5))
+    result = three_units
     for _, row in result.data_sets.iterrows():
         assert row["planted"] == pytest.approx(0.5)
         assert row["planted_unit"] == pytest.approx(0.5, abs=1e-6), row["model"]
@@ -915,34 +925,28 @@ def test_two_targets_differ_when_information_differs() -> None:
     )
 
 
-def test_unit_rows_and_counts(day_cohort) -> None:
+def test_unit_rows_and_counts(three_units) -> None:
     """At the day unit the ``sessions`` table has one row per (estimand, day)
     with its sessions and events; a data set counts the units and sessions
     behind its estimate."""
-    result = engine.run(
-        Simulation(
-            [unit_rate_model(day_cohort, "day")], day_cohort, [RATE_INSIDE], 2, 50, 5
-        )
-    )
-    units = result.sessions[result.sessions["data_set"] == 0]
-    assert len(units) == 6 and set(units["fit_by"]) == {"day"}
+    sessions = _of(three_units.sessions, "day")
+    units = sessions[sessions["data_set"] == 0]
+    assert len(units) == 6 and set(units["model"]) == {"rate_day"}
     assert (units["epoch"] == "").all() and (units["n_sessions"] == 2).all()
     assert (units["n_events"] > 0).all()
-    assert (result.data_sets["n_units_used"] == 6).all()
-    assert (result.data_sets["n_sessions_used"] == 12).all()
-    assert result.summary.iloc[0]["n_units_used_mean"] == 6
+    data_sets = _of(three_units.data_sets, "day")
+    assert len(data_sets) == 2
+    assert (data_sets["n_units_used"] == 6).all()
+    assert (data_sets["n_sessions_used"] == 12).all()
+    assert _of(three_units.summary, "day").iloc[0]["n_units_used_mean"] == 6
 
 
-def test_animal_unit_has_no_day_test(day_cohort) -> None:
+def test_animal_unit_has_no_day_test(three_units) -> None:
     """At the animal unit no data set has a day-level p, and the interval is
     the t interval over the animals."""
-    result = engine.run(
-        Simulation(
-            [unit_rate_model(day_cohort, "animal")], day_cohort, [RATE_INSIDE], 2, 50, 5
-        )
-    )
-    assert result.data_sets["day_p"].isna().all()
-    row = result.summary.iloc[0]
+    data_sets = _of(three_units.data_sets, "animal")
+    assert len(data_sets) == 2 and data_sets["day_p"].isna().all()
+    row = _of(three_units.summary, "animal").iloc[0]
     assert row["n_data_sets_with_day_p"] == 0 and row["reject_day"] == 0.0
     assert row["n_data_sets_with_interval"] == 2
 

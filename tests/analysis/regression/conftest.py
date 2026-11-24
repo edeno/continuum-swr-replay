@@ -264,6 +264,33 @@ def draw_response(
     return np.concatenate([rng.dirichlet(total * row) for row in p])
 
 
+def cohort(make, *, animals, days, epochs, seed) -> dict:
+    """Sessions of ``animals`` x ``days`` x ``epochs``, in that order, each
+    with the rows ``make(seed(a, d, e))`` and its key in its session columns.
+
+    Parameters
+    ----------
+    make : callable
+        A seed -> one session's rows.
+    animals, days, epochs : sequence of str
+    seed : callable
+        ``(animal place, day place, epoch place) -> int``.
+
+    Returns
+    -------
+    dict of (animal, session_date, epoch) to pd.DataFrame
+    """
+    out = {}
+    for a, animal in enumerate(animals):
+        for d, day in enumerate(days):
+            for e, epoch in enumerate(epochs):
+                key = (animal, day, epoch)
+                out[key] = make(seed(a, d, e)).assign(
+                    animal=animal, session_date=day, epoch=epoch
+                )
+    return out
+
+
 def by_session(frames: list[pd.DataFrame]) -> dict[tuple[str, str, str], pd.DataFrame]:
     """Session key ``(animal, session_date, epoch)`` -> its rows."""
     return {
