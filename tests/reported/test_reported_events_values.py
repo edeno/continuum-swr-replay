@@ -1930,9 +1930,16 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # no figure draws them: Figure 2j compares the full and the SWR-only
-    # decoders inside and outside SWRs, not over all immobile time
-    assert {v.figures for v in values.values()} == {()}
+    # no panel of Figure 2 draws them (Figure 2k compares the full and the
+    # SWR-only decoders inside and outside SWRs); Figure 2's supplement, panel
+    # l, draws the SWR-only and full decoders' gains per spike, filter family
+    drawn = {
+        f"restriction_immobile_{contrast}_per_spike{end}"
+        for contrast in ("swr_minus_none", "full_minus_none")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    }
+    for name, value in values.items():
+        assert value.figures == (("S2l",) if name in drawn else ()), name
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # the summary says what they are over (``over``), once
     assert not any("inside a well visit" in v.description for v in values.values())

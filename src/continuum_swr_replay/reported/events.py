@@ -161,7 +161,6 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     ALL_CONTRASTS,
     FAMILY_SUFFIX,
     FIT,
-    SWR_ALLOWED_CONTRASTS,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
@@ -3954,10 +3953,15 @@ def restriction_immobile_values(
     decoder over all immobile time inside a well visit (time chosen by speed and
     the well visits, not by the decoder or the SWRs), per spike and per second,
     their difference, and the share of the full decoder's gain the SWR-only
-    decoder captures. No panel of Figure 2 draws these (Figure 2's supplement,
-    panel l, draws the decoders over the local-only decoder)."""
+    decoder captures. No panel of Figure 2 draws these; Figure 2's supplement,
+    panel l, draws the SWR-only and full decoders' gains over the local-only
+    decoder per spike (``restriction_totals.IMMOBILE_DECODER_GAINS``, in
+    :data:`RESTRICTION_FIGURE_FAMILY`), and those values carry its tag."""
     make_text = value_factory(
         restriction_immobile_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_figure = value_factory(
+        restriction_immobile_values, source, TAGS["nonlocal_restriction_swr_allowed"]
     )
     statistics = restriction_totals.immobile_gain_statistics(
         restriction_totals.epoch_immobile_gains(time_sums, bin_s)
@@ -3972,8 +3976,13 @@ def restriction_immobile_values(
             for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr"):
                 measure = f"{contrast}_{unit}"
                 a, b = restriction_windows.CONTRASTS[contrast]
+                drawn = (
+                    family == RESTRICTION_FIGURE_FAMILY
+                    and unit == "per_spike"
+                    and contrast in restriction_totals.IMMOBILE_DECODER_GAINS
+                )
                 values += _interval_and_animals_positive(
-                    make_text,
+                    make_figure if drawn else make_text,
                     f"restriction_immobile_{contrast}{suffix}_{unit}",
                     statistics.loc[(family, measure)],
                     f"{scored}, under {_RESTRICTION_MODELS[a]} minus under "
@@ -4065,7 +4074,7 @@ def restriction_swr_allowed_values(
             *SWR_ALLOWED_FIGURE_DIFFERENCES,
             *(SWR_ALLOWED_FIGURE_DECODERS if time == "immobile" else ()),
         )
-        for contrast in (c for c in contrasts if c in SWR_ALLOWED_CONTRASTS):
+        for contrast in contrasts:
             a, b = ALL_CONTRASTS[contrast]
             for family, suffix in FAMILY_SUFFIX.items():
                 for unit in _RESTRICTION_UNITS:

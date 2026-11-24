@@ -1147,17 +1147,16 @@ def restriction_figure_statistics(
 # --- the fourth decoder (Figure 2's supplement) --------------------------------
 
 SWR_ALLOWED_TIME_CONTRASTS = {
-    time: (
-        *SWR_ALLOWED_CONTRASTS,
-        *(("swr_minus_none", "full_minus_none") if time == "immobile" else ()),
-    )
-    for time in CONTRAST_TIMES
+    time: tuple(SWR_ALLOWED_CONTRASTS) for time in CONTRAST_TIMES
 }
-"""The contrasts of the fourth model's panel
-(:data:`.nonlocal_restriction.SWR_ALLOWED`), by the time they are read over
-(:data:`CONTRAST_TIMES`): the fourth model's three contrasts over each, and
-over all immobile time also the SWR-only and full decoders' gains over the
-local-only decoder."""
+"""The fourth model's contrasts
+(:data:`.nonlocal_restriction.SWR_ALLOWED_CONTRASTS`), by the time they are
+read over (:data:`CONTRAST_TIMES`)."""
+
+IMMOBILE_DECODER_GAINS = ("swr_minus_none", "full_minus_none")
+"""The SWR-only and full decoders' gains over the local-only decoder over all
+immobile time, which the fourth model's panel draws beside its own
+(:func:`immobile_gain_statistics`, the three-decoder values')."""
 SWR_ALLOWED_FIGURE_DECODERS = (
     "swr_minus_none_per_spike",
     "swr_allowed_minus_none_per_spike",
@@ -1183,7 +1182,9 @@ class SwrAllowedStatistics(NamedTuple):
 
     times: pd.DataFrame
     """:func:`contrast_gain_statistics` of :data:`SWR_ALLOWED_TIME_CONTRASTS`
-    over each time, indexed by ``time``, ``family`` and ``measure``."""
+    over each time, and over all immobile time the rows of
+    :data:`IMMOBILE_DECODER_GAINS` of :func:`immobile_gain_statistics`,
+    indexed by ``time``, ``family`` and ``measure``."""
     events: pd.DataFrame
     """``restriction_windows.restriction_window_statistics`` of
     :data:`OUTSIDE_SWR_EVENT_WINDOWS` with the contrast
@@ -1212,16 +1213,22 @@ def swr_allowed_statistics(
     ValueError
         If the time sums or the windows do not hold the fourth model.
     """
-    times = pd.concat(
-        [
-            contrast_gain_statistics(
-                epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
-                contrasts,
-            ).assign(time=time)
-            for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
-        ],
-        ignore_index=True,
-    ).set_index(["time", "family", "measure"])
+    contrast_rows = [
+        contrast_gain_statistics(
+            epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
+            contrasts,
+        ).assign(time=time)
+        for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
+    ]
+    immobile = immobile_gain_statistics(epoch_immobile_gains(time_sums, bin_s))
+    decoders = immobile[
+        immobile["measure"].isin(
+            [f"{c}_{u}" for c in IMMOBILE_DECODER_GAINS for u in ("per_spike", "per_s")]
+        )
+    ][list(contrast_rows[0].columns.drop("time"))].assign(time="immobile")
+    times = pd.concat([*contrast_rows, decoders], ignore_index=True).set_index(
+        ["time", "family", "measure"]
+    )
     events = restriction_window_statistics(
         windows,
         **{
