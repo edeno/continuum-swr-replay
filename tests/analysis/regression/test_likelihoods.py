@@ -7,11 +7,17 @@ the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
 coefficient gradient ``X' score_eta(X beta)`` in ``beta``; ``dinformation`` is
 the derivative of ``information`` along a direction of ``eta``; and
 ``d2information`` the derivative of ``dinformation`` along a second one.
-The draws (``draw``) have the family's mean.
+The hand-written derivatives the kernels compute also equal JAX's automatic
+derivatives of the kernels' log-likelihood. The draws (``draw``) have the
+family's mean.
 """
 
 from __future__ import annotations
 
+import functools
+
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -22,6 +28,8 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Poisson,
     draw,
 )
+from continuum_swr_replay.analysis.regression.newton import penalized_newton
+from continuum_swr_replay.analysis.regression.padding import pad_values
 
 TOLERANCE = 1e-6
 N_ROWS = 14
@@ -119,6 +127,55 @@ def test_derivatives_match_finite_differences(name: str) -> None:
     assert _relative_error(analytic_d2, numeric_d2) < TOLERANCE
     # Symmetric in its two directions.
     assert np.allclose(analytic_d2, lik.d2information(X, eta, y, aux, d2, d1))
+
+
+AUTODIFF_RTOL = 1e-12
+"""Relative to the largest entry of each quantity (the Gaussian's derivatives
+of the information are exactly zero)."""
+
+
+def _assert_close(hand, autodiff) -> None:
+    hand, autodiff = np.asarray(hand), np.asarray(autodiff)
+    scale = np.max(np.abs(autodiff))
+    np.testing.assert_allclose(hand, autodiff, rtol=0, atol=AUTODIFF_RTOL * scale)
+
+
+@pytest.mark.parametrize("name", CASES)
+def test_hand_derivatives_equal_autodiff(name: str) -> None:
+    """On the padded rows the kernels see: the score is ``jax.grad`` of the
+    log-likelihood in ``eta``, the information minus ``jax.hessian`` of it in
+    ``beta``, ``dinformation`` the ``jax.jvp`` of the information along a
+    direction of ``eta``, and ``d2information`` the nested ``jvp``."""
+    lik, X, y, aux, _ = _case(name)
+    rng = np.random.default_rng(13)
+    beta = rng.normal(scale=0.5, size=N_COLUMNS)
+    rows = lik.pad(X, y, aux)
+    d1, d2 = (
+        pad_values(rng.normal(size=N_ROWS), N_ROWS, rows.y.size) for _ in range(2)
+    )
+    with jax.enable_x64(True):
+        Xp, yp, w = jnp.asarray(rows.X), jnp.asarray(rows.y), jnp.asarray(rows.weight)
+        a = jax.tree_util.tree_map(jnp.asarray, rows.aux)
+        eta = Xp @ beta
+
+        def loglik_eta(e):
+            return lik._jax_loglik(e, yp, a, w)
+
+        def information(e):
+            return lik._jax_information(Xp, e, yp, a, w)
+
+        def dinformation(e):
+            return jax.jvp(information, (e,), (d1,))[1]
+
+        _assert_close(lik._jax_score(eta, yp, a, w), jax.grad(loglik_eta)(eta))
+        _assert_close(
+            information(eta), -jax.hessian(lambda b: loglik_eta(Xp @ b))(beta)
+        )
+        _assert_close(lik._jax_dinformation(Xp, eta, yp, a, w, d1), dinformation(eta))
+        _assert_close(
+            lik._jax_d2information(Xp, eta, yp, a, w, d1, d2),
+            jax.jvp(dinformation, (eta,), (d2,))[1],
+        )
 
 
 def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:
@@ -307,3 +364,122 @@ def test_a_draw_refuses_an_unknown_family() -> None:
 
     with pytest.raises(ValueError, match="no draw for the likelihood 'other'"):
         draw(Other(), np.zeros(2), None, np.random.default_rng(0))
+
+
+DIAGONAL = [("poisson", np.empty(0)), ("bernoulli", None), ("gaussian", 0.7)]
+FAMILIES = {"poisson": Poisson, "bernoulli": Bernoulli, "gaussian": Gaussian}
+
+
+@pytest.mark.parametrize(("name", "aux"), DIAGONAL)
+def test_no_rows_give_zeros(name, aux) -> None:
+    """With no rows the log-likelihood is 0, the score empty and the
+    information and its derivatives zero, as the NumPy formulas gave."""
+    lik, X, none = FAMILIES[name](), np.empty((0, 2)), np.empty(0)
+    assert lik.loglik(none, none, aux) == 0.0
+    assert lik.score_eta(none, none, aux).shape == (0,)
+    for information in (
+        lik.information(X, none, none, aux),
+        lik.dinformation(X, none, none, aux, none),
+        lik.d2information(X, none, none, aux, none, none),
+    ):
+        np.testing.assert_array_equal(information, np.zeros((2, 2)))
+
+
+def test_a_softmax_without_rows_is_refused() -> None:
+    none = np.empty(0)
+    with pytest.raises(ValueError, match="no rows"):
+        GroupedSoftmax().loglik(none, none, np.empty(0, dtype=int))
+
+
+@pytest.mark.parametrize("length", [5, 2 * N_ROWS])
+def test_a_vector_of_another_length_is_refused(length: int) -> None:
+    """``eta``, ``d``, ``d1`` and ``d2`` need one value per row; the error
+    names the argument and both lengths."""
+    lik, X, y, aux, eta = _case("poisson")
+    wrong = np.resize(eta, length)
+    with pytest.raises(ValueError, match=rf"eta of shape \({length},\) for 14 rows"):
+        lik.loglik(wrong, y, aux)
+    with pytest.raises(ValueError, match=rf"d of shape \({length},\) for 14 rows"):
+        lik.dinformation(X, eta, y, aux, wrong)
+    with pytest.raises(ValueError, match=rf"d2 of shape \({length},\) for 14 rows"):
+        lik.d2information(X, eta, y, aux, eta, wrong)
+
+
+@pytest.mark.parametrize("name", ["poisson", "bernoulli", "softmax_counts"])
+def test_a_per_row_vector_with_two_axes_is_refused(name: str) -> None:
+    """``eta``, ``d``, ``d1``, ``d2``, ``y`` and a per-row offset take one
+    axis: a column of shape (n, 1) broadcast against the padded rows and gave
+    a wrong number. The error names the argument and its shape."""
+    lik, X, y, aux, eta = _case(name)
+    column = rf"of shape \({N_ROWS}, 1\): one value per row, on one axis"
+    with pytest.raises(ValueError, match="eta " + column):
+        lik.loglik(eta[:, None], y, aux)
+    with pytest.raises(ValueError, match="eta " + column):
+        lik.score_eta(eta[:, None], y, aux)
+    with pytest.raises(ValueError, match="y " + column):
+        lik.loglik(eta, y[:, None], aux)
+    with pytest.raises(ValueError, match="d " + column):
+        lik.dinformation(X, eta, y, aux, eta[:, None])
+    with pytest.raises(ValueError, match="d1 " + column):
+        lik.d2information(X, eta, y, aux, eta[:, None], eta)
+    with pytest.raises(ValueError, match="d2 " + column):
+        lik.d2information(X, eta, y, aux, eta, eta[:, None])
+    if name == "poisson":
+        with pytest.raises(ValueError, match="offset " + column):
+            lik.loglik(eta, y, aux[:, None])
+
+
+def test_a_single_poisson_offset_is_every_rows() -> None:
+    """A scalar offset is the offset of every row; None is refused as before
+    (``TypeError``)."""
+    lik, X, y, _, eta = _case("poisson")
+    full = np.full(N_ROWS, 0.5)
+    assert lik.loglik(eta, y, 0.5) == lik.loglik(eta, y, full)
+    np.testing.assert_array_equal(
+        lik.score_eta(eta, y, 0.5), lik.score_eta(eta, y, full)
+    )
+    np.testing.assert_array_equal(
+        lik.information(X, eta, y, 0.0), lik.information(X, eta, y, np.zeros(N_ROWS))
+    )
+    with pytest.raises(TypeError, match="offset is None"):
+        lik.score_eta(eta, y, None)
+
+
+def test_a_family_class_that_can_keep_state_is_refused_before_any_call() -> None:
+    """A class with an ``__init__`` or a cached property could put a parameter
+    on its objects: it is refused at the first call, whatever was read
+    before, not only once the attribute exists."""
+
+    class _Cached(Poisson):
+        @functools.cached_property
+        def scale(self) -> float:
+            return 2.0
+
+    class _Initialized(Poisson):
+        def __init__(self) -> None:
+            pass
+
+    lik, X, y, aux, eta = _case("poisson")
+    for family in (_Cached(), _Initialized()):
+        with pytest.raises(TypeError, match="can keep state on its objects"):
+            family.loglik(eta, y, aux)
+        with pytest.raises(TypeError, match="can keep state on its objects"):
+            hash(family)
+
+
+def test_a_family_with_an_attribute_of_its_own_is_refused() -> None:
+    """The kernels are keyed on the family's class, so an attribute set on
+    the object would be ignored by a kernel compiled for another object of
+    the class: such an object is refused."""
+
+    class _Scaled(Poisson):
+        pass
+
+    lik, X, y, aux, eta = _case("poisson")
+    scaled = _Scaled()
+    assert scaled.loglik(eta, y, aux) == lik.loglik(eta, y, aux)
+    scaled.scale = 2.0
+    with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
+        scaled.loglik(eta, y, aux)
+    with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
+        penalized_newton(scaled, X, y, aux, np.zeros((3, 3)), np.zeros(3))

@@ -37,6 +37,13 @@ without a finite maximum, searches from a grid by Newton on ``rho`` with the
 exact Hessian, and refits the sessions set aside (its docstring states the
 rules) by :func:`refit_session`, which a per-session fit at given penalties
 calls too. :func:`fit_at_penalties` fits at given strengths without a search.
+
+The score at a converged fit, ``A^-1`` and the edf, and the profiled Gaussian,
+are jitted kernels in float64 (``runtime``), on the fit's ``A`` and, for the
+Gaussian, on its padded rows. The gradient and Hessian in ``rho`` are NumPy on
+SciPy's Cholesky factor of ``A``, with the information's directional
+derivatives from the likelihood's kernels (its public ``dinformation`` and
+``d2information``).
 """
 
 from __future__ import annotations
@@ -49,6 +56,9 @@ from enum import StrEnum
 from functools import cached_property
 from typing import NamedTuple
 
+import jax
+import jax.numpy as jnp
+import jax.scipy.linalg
 import numpy as np
 import scipy.linalg
 
@@ -68,7 +78,7 @@ from .constants import (
     REML_GRID_POINTS,
     REML_MAX_STEPS,
 )
-from .likelihoods import Gaussian, Likelihood
+from .likelihoods import Gaussian, Likelihood, _gram
 from .newton import (
     NO_FINITE_MAXIMUM,
     NOT_IDENTIFIED,
@@ -78,6 +88,7 @@ from .newton import (
     running_away_columns,
 )
 from .pspline import penalty_rank
+from .runtime import float64_kernel, in_float64
 
 __all__ = [
     "ALONG_THE_INTERCEPT",
@@ -637,11 +648,6 @@ def _null_dimension(blocks: Sequence[PenaltyBlock], n_columns: int) -> int:
     return n_columns - sum(block.rank for block in blocks)
 
 
-def _half_log_det(factor: tuple[np.ndarray, bool]) -> float:
-    """``log|A| / 2`` from the Cholesky ``factor`` of ``A``."""
-    return float(np.log(np.diag(factor[0])).sum())
-
-
 def _coefficient_derivatives(
     S_j: Sequence[np.ndarray], b: np.ndarray, factor: tuple[np.ndarray, bool]
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
@@ -651,23 +657,69 @@ def _coefficient_derivatives(
     return S_j_b, [-scipy.linalg.cho_solve(factor, Sjb) for Sjb in S_j_b]
 
 
-def _covariance_and_edf(
-    factor: tuple[np.ndarray, bool],
-    A: np.ndarray,
-    S: np.ndarray,
-    blocks: Sequence[PenaltyBlock],
-) -> tuple[np.ndarray, np.ndarray, float]:
-    """``A^-1``, the edf per block and in all, from the Cholesky ``factor`` of ``A``.
+def _block_masks(blocks: Sequence[PenaltyBlock], n_columns: int) -> np.ndarray:
+    """1 at each block's columns, shape ``(m, n_columns)``."""
+    masks = np.zeros((len(blocks), n_columns))
+    for j, block in enumerate(blocks):
+        masks[j, block.columns] = 1.0
+    return masks
 
-    ``A - S`` is ``H``; the edf of a block is the trace of its rows and
-    columns of ``A^-1 H``.
+
+def _inverse_and_edf(A, H, masks):
+    """``A^-1``, ``log|A| / 2``, the edf per block and in all, from the
+    Cholesky factor of ``A``; ``H`` is the information. The edf of a block is
+    the trace of its rows and columns of ``A^-1 H``."""
+    factor = jax.scipy.linalg.cho_factor(A, lower=True)
+    covariance = jax.scipy.linalg.cho_solve(factor, jnp.eye(A.shape[0]))
+    diagonal = jnp.diagonal(covariance @ H)
+    half_log_det = jnp.sum(jnp.log(jnp.diagonal(factor[0])))
+    return covariance, half_log_det, masks @ diagonal, jnp.sum(diagonal)
+
+
+@float64_kernel
+def _fixed_penalty_summary(A, S, b, masks, loglik, log_pdet, n_null):
+    """The REML score at a converged fit, ``A^-1`` and the edf.
+
+    ``V = -l + b' S b / 2 - log|S|_+ / 2 + log|A| / 2 - M_p log(2 pi) / 2``,
+    with ``loglik`` the fit's ``l``, ``log_pdet`` ``log|S|_+`` and ``n_null``
+    ``M_p``. ``masks`` is :func:`_block_masks`.
     """
-    covariance = scipy.linalg.cho_solve(factor, np.eye(A.shape[0]))
-    F = covariance @ (A - S)
-    edf = np.array([np.trace(F[np.ix_(b.columns, b.columns)]) for b in blocks])
-    return covariance, edf, float(np.trace(F))
+    covariance, half_log_det, edf, edf_total = _inverse_and_edf(A, A - S, masks)
+    score = (
+        -loglik
+        + 0.5 * b @ S @ b
+        - 0.5 * log_pdet
+        + half_log_det
+        - 0.5 * n_null * _LOG_2PI
+    )
+    return score, covariance, edf, edf_total
 
 
+@float64_kernel
+def _profiled_gaussian(X, y, weight, S, b, masks, log_pdet, n_real, dof):
+    """The Gaussian score with the scale profiled out, at the penalized least
+    squares fit ``b`` (:func:`_gaussian_profiled`), on padded rows.
+
+    Returns ``X'X + S``, ``D_p``, the scale ``D_p / dof``, the score, the
+    covariance ``scale (X'X + S)^-1``, the edf per block and in all, and the
+    log-likelihood at that scale (``n_real`` real rows).
+    """
+    gram = _gram(X, weight) + S
+    residual = y - X @ b
+    weighted_rss = (weight * residual) @ residual
+    D_p = weighted_rss + b @ (S @ b)
+    scale = D_p / dof
+    inverse, half_log_det, edf, edf_total = _inverse_and_edf(gram, gram - S, masks)
+    score = (
+        0.5 * dof * (1.0 + _LOG_2PI + jnp.log(scale)) - 0.5 * log_pdet + half_log_det
+    )
+    loglik = -weighted_rss / (2.0 * scale) - 0.5 * n_real * jnp.log(
+        2.0 * jnp.pi * scale
+    )
+    return gram, D_p, scale, score, scale * inverse, edf, edf_total, loglik
+
+
+@in_float64
 def reml_and_derivatives(
     lik: Likelihood,
     X: np.ndarray,
@@ -801,19 +853,28 @@ def _reml_in_basis(
     if not fit.converged:
         return RemlScore(np.inf, None, None, fit, 1.0)
     b, A = fit.beta, fit.A
-    factor = scipy.linalg.cho_factor(A, lower=True)
-    covariance, edf, edf_total = _covariance_and_edf(factor, A, S, blocks)
-    score = (
-        -fit.loglik
-        + 0.5 * b @ S @ b
-        - 0.5 * _log_pdet(blocks, rho)
-        + _half_log_det(factor)
-        - 0.5 * _null_dimension(blocks, n_columns) * _LOG_2PI
+    score, covariance, edf, edf_total = jax.device_get(
+        _fixed_penalty_summary(
+            A,
+            S,
+            b,
+            _block_masks(blocks, n_columns),
+            np.float64(fit.loglik),
+            np.float64(_log_pdet(blocks, rho)),
+            np.float64(_null_dimension(blocks, n_columns)),
+        )
     )
-    summary = {"covariance": covariance, "edf": edf, "edf_total": edf_total}
+    summary = {
+        "covariance": np.array(covariance),
+        "edf": np.array(edf),
+        "edf_total": float(edf_total),
+    }
     if not derivatives:
         return RemlScore(float(score), None, None, fit, 1.0, **summary)
 
+    # The derivatives in rho, on the information's derivatives (the
+    # likelihood's kernels) and a factor of A here.
+    factor = scipy.linalg.cho_factor(A, lower=True)
     eta = X @ b
     m = len(blocks)
     S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
@@ -888,29 +949,38 @@ def _gaussian_profiled(
     if not pls.converged:
         return RemlScore(np.inf, None, None, pls, np.nan)
     b = pls.beta
-    gram = X.T @ X + S
-    residual = y - X @ b
-    S_b = S @ b
-    D_p = float(residual @ residual + b @ S_b)
-    dof = n_rows - _null_dimension(blocks, n_columns)
-    scale = D_p / dof
-    factor = scipy.linalg.cho_factor(gram, lower=True)
-    score = (
-        0.5 * dof * (1.0 + _LOG_2PI + np.log(scale))
-        - 0.5 * _log_pdet(blocks, rho)
-        + _half_log_det(factor)
+    rows = Gaussian().pad(X, y, None)
+    gram, D_p, scale, score, covariance, edf, edf_total, loglik = jax.device_get(
+        _profiled_gaussian(
+            rows.X,
+            rows.y,
+            rows.weight,
+            S,
+            b,
+            _block_masks(blocks, n_columns),
+            np.float64(_log_pdet(blocks, rho)),
+            np.int64(n_rows),
+            np.int64(n_rows - _null_dimension(blocks, n_columns)),
+        )
     )
+    gram, D_p, scale = np.array(gram), float(D_p), float(scale)
+    dof = n_rows - _null_dimension(blocks, n_columns)
     fit = replace(
         pls,
         A=gram / scale,
         newton_decrement=pls.newton_decrement * working / scale,
-        loglik=Gaussian().loglik(X @ b, y, scale),
+        loglik=float(loglik),
     )
-    covariance, edf, edf_total = _covariance_and_edf(factor, gram, S, blocks)
-    summary = {"covariance": scale * covariance, "edf": edf, "edf_total": edf_total}
+    summary = {
+        "covariance": np.array(covariance),
+        "edf": np.array(edf),
+        "edf_total": float(edf_total),
+    }
     if not derivatives:
         return RemlScore(float(score), None, None, fit, scale, **summary)
 
+    # The derivatives in rho, on a factor of X'X + S here.
+    factor = scipy.linalg.cho_factor(gram, lower=True)
     m = len(blocks)
     S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
     Ainv_S_j = [scipy.linalg.cho_solve(factor, Sj) for Sj in S_j]

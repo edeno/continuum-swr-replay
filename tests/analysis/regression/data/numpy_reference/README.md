@@ -42,9 +42,13 @@ ratio the message prints before reading it as a fault.
 
 Two kinds of output did not reproduce across those kernels, and are not stored:
 
-- the coefficients, `A` and step of a fit with no finite maximum: along the direction of
-  unbounded increase they are set by the rounding (a coefficient of 22 moved by 3e-6, a step
-  of 1 by 2e-5). Its status, steps, log-likelihood and the columns running away are stored.
+- the coefficients, `A` and step of a fit with no finite maximum: they are a point on a
+  diverging path, set by the rounding (a coefficient of 22 moved by 3e-6, a step of 1 by
+  2e-5). Its status, steps, log-likelihood and the columns running away are stored.
+  Outside the stored cases only its status and its columns running away are stable:
+  between c169e039 and d42ad2a0 (51 such random fits) the status, steps and columns were
+  the same while a coefficient moved by up to 7e-5 of itself, the log-likelihood by up to
+  1e-4 and `step` by up to 5e-4.
 - a covariance where `A` is too badly conditioned. A P-spline of 40 columns gave
   covariances beyond the rule between the two kernels at log penalty -8 for the Poisson
   (condition number of `A` 9.5e8, 1.4e-7 apart relative) and the Gaussian (8e6, 2.7 times
@@ -107,6 +111,40 @@ comments in `_regression_reference.py` give the old margins): `select.poisson_tw
 `NO_MAXIMUM_ETA_STEP`). A search with a term stopping on the score's plateau was not kept:
 its log penalty there is set by the tolerance (a last decrement 0.93 times it), so
 `select.gaussian_two_smooths_six_steps` gives its second smooth an effect instead.
+
+## Differences from the NumPy fitter outside the stored cases
+
+Every stored case matches the JAX fitter by the rule above. Outside them the two fitters
+can differ by one Newton step, which then moves the outputs by about the convergence
+tolerance rather than by the rule.
+
+- **What differs.** In 216 fits drawn at random by a first independent review (2026-11-23:
+  200 Newton fits, 50 of each family, and 16 REML scores at fixed log penalties), 2 took
+  one step more than the NumPy fitter at 7959aca7: a Bernoulli fit of 2,500 rows (9 steps
+  to 10) and the inner fit of a Poisson REML score of 4,096 rows (4 to 5). In 970 random
+  fits of a second review (2026-11-23; the four families, 40 to 20,000 rows, 2 to 13
+  columns), 4 of 650 in one sample and 0 of 320 in another took one more step, all of them
+  Poisson (about 2.5 % of that sample's Poisson fits, none of the other three families).
+  No status differed. Where a step count differs the outputs differ by about the tolerance
+  of the stop, 1e-8 (the REML score, log-likelihood, gradient and Hessian of the Poisson
+  case by about 1.6e-8 absolute), not by `1e-11 + 1e-9 |b|`. The rate depends on the data,
+  the family and the platform, since it is set by rounding.
+- **Why.** At the stop the fit takes its last full step when `F` does not rise by more
+  than `8 eps max(1, |F|)` (`newton._last_step`). The NumPy fitter summed the
+  log-likelihood as two dot products (`y' log mu - 1' mu`), whose rounding moved `F` by
+  more than that allowance between two points a decrement of about 1e-15 apart: in the
+  Bernoulli case `F` rose 16.8 eps |F| with the step, and the step was refused. The JAX
+  fitter sums each row's terms once; its `F` is within 1.5 eps |F| of an exact sum
+  (`math.fsum`) on fits of 500 to 20,000 rows, and it takes the step. Under the exact
+  sum the step moves `F` by -0.99 eps |F| in the Bernoulli case and lowers it by
+  4.1 eps |F| in the Poisson case: the JAX fit is the better converged one.
+- **Where it is checked.** `tests/analysis/regression/test_newton.py`
+  (`test_a_last_step_the_numpy_sum_refused_is_decided_by_the_exact_sum`,
+  `test_a_reml_fits_last_step_is_decided_by_the_exact_sum`) rebuilds both cases from their
+  seeds and checks that the decision, whichever the platform's rounding makes it, agrees
+  with the exact sum: a step taken does not raise the exact `F` by more than the
+  allowance, a step refused does not lower it by more. The step counts (10 and 5 on the
+  CPU where they were written) are not asserted. No stored file was changed.
 
 ## The simulation engine's fixed-seed tables
 
