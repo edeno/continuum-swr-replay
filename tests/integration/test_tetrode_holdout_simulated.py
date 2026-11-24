@@ -19,7 +19,6 @@ window with missing bins and a silent window are scored as specified.
 """
 
 import copy
-import time as clock
 
 import numpy as np
 import pandas as pd
@@ -34,6 +33,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
+from tests.support._tetrode_holdout_tables import SCORE_COLUMNS
 from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
@@ -51,6 +51,42 @@ def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame
     return pd.DataFrame({"kind": "rest", "s": chosen, "e": chosen + length - 1})
 
 
+def _holdout_scores(
+    detector,
+    recording,
+    windows,
+    *,
+    is_missing=None,
+    folds=None,
+    margin_bins=TIME_BLOCK_MARGIN_BINS,
+    marks=None,
+) -> tuple[pd.DataFrame, dict]:
+    """``holdout_scores`` of ``windows`` (numbered in order, ``window_id``)
+    under ``folds`` and ``margin_bins`` (by default the recording's five time
+    blocks, a margin of two bins), the reference's donors drawn with seed 0.
+    Its columns are the first of the run's, in order."""
+    missing = (
+        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
+    )
+    scores, record = th.holdout_scores(
+        detector,
+        recording.time,
+        recording.position[:, None],
+        recording.position,
+        recording.spike_times,
+        recording.marks if marks is None else marks,
+        recording.is_running,
+        missing,
+        windows,
+        folds=time_blocks(recording.time) if folds is None else folds,
+        margin_bins=margin_bins,
+        null_seed=0,
+        log=sim.quiet,
+    )
+    assert tuple(scores.columns) == SCORE_COLUMNS
+    return scores, record
+
+
 def _score(
     detector,
     recording,
@@ -59,25 +95,18 @@ def _score(
     folds=None,
     margin_bins=TIME_BLOCK_MARGIN_BINS,
 ) -> pd.DataFrame:
-    """The held-out scores of ``windows`` under ``folds`` and ``margin_bins``
-    (by default the recording's five time blocks, a margin of two bins)."""
+    """The held-out scores of ``windows`` (:func:`_holdout_scores`) with each
+    window's ``kind``. No window is an event (``kind`` is the simulated
+    content), so none has a donor for the reference."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
-    missing = (
-        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
-    )
-    scores, _ = th.holdout_scores(
+    windows = windows.assign(group="no SWR")
+    scores, _ = _holdout_scores(
         detector,
-        recording.time,
-        recording.position[:, None],
-        recording.position,
-        recording.spike_times,
-        recording.marks,
-        recording.is_running,
-        missing,
+        recording,
         windows,
-        folds=time_blocks(recording.time) if folds is None else folds,
+        is_missing=is_missing,
+        folds=folds,
         margin_bins=margin_bins,
-        log=sim.quiet,
     )
     return scores.join(windows.set_index("window_id")["kind"], on="window_id")
 
@@ -362,7 +391,7 @@ def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypa
         recording.marks,
         is_training,
         np.zeros(recording.time.size, dtype=bool),
-        window.assign(window_id=0),
+        window.assign(window_id=0, group="no SWR"),
         folds=time_blocks(recording.time),
         margin_bins=TIME_BLOCK_MARGIN_BINS,
         refit=refit,
@@ -412,35 +441,18 @@ def test_trial_folds_change_only_the_encodings(inserted, inserted_trials):
     assert (bursts["gain_per_spike"].abs() < 0.02).all()
 
 
-# The extra scores (``holdout_scores`` with ``extras``): the HPD length, the
-# rate and mark parts, and the shuffled-window reference.
+# The extra scores: the HPD length, the rate and mark parts, and the
+# shuffled-window reference.
 
 
 def _score_extra(detector, recording, windows, *, is_missing=None, marks=None):
-    """``holdout_scores`` with ``extras`` of ``windows`` (each with the
-    simulated ``content`` and its ``group``; every window an event), the
-    recording's time blocks as folds; the per-window scores
-    (``window_scores``) with ``content``, and the record."""
+    """:func:`_holdout_scores` of ``windows`` (each with the simulated
+    ``content`` and its ``group``; every window an event); the per-window
+    scores (``window_scores``) with ``content``, and the record."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
     windows = windows.assign(kind="event", event_id=windows["window_id"])
-    missing = (
-        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
-    )
-    scores, record = th.holdout_scores(
-        detector,
-        recording.time,
-        recording.position[:, None],
-        recording.position,
-        recording.spike_times,
-        recording.marks if marks is None else marks,
-        recording.is_running,
-        missing,
-        windows,
-        folds=time_blocks(recording.time),
-        margin_bins=TIME_BLOCK_MARGIN_BINS,
-        extras=True,
-        null_seed=0,
-        log=sim.quiet,
+    scores, record = _holdout_scores(
+        detector, recording, windows, is_missing=is_missing, marks=marks
     )
     keyed = windows.set_index("window_id")[["event_id", "kind", "group", "content"]]
     scores = scores.join(keyed, on="window_id").assign(epoch_id="e", animal="a")
@@ -452,8 +464,8 @@ def _score_extra(detector, recording, windows, *, is_missing=None, marks=None):
 
 @pytest.fixture(scope="module")
 def extra(recording):
-    """The inserted events (and the missing bins) of :func:`inserted`, scored
-    with the extras: the remote events in one group, the local ones (local
+    """The inserted events (and the missing bins) of :func:`inserted`, scored: the
+    remote events in one group, the local ones (local
     bursts and silent windows) in the other, so the remote events' donors are
     other remote events of another place or time."""
     recording, detector = recording
@@ -462,14 +474,13 @@ def extra(recording):
     windows["group"] = np.where(
         windows["content"].isin(["local_burst", "silent"]), "SWR", "no SWR"
     )
-    started = clock.time()
     out = _score_extra(detector, recording, windows, is_missing=is_missing)
-    return (*out, windows, is_missing, clock.time() - started)
+    return (*out, windows, is_missing)
 
 
 @pytest.fixture(scope="module")
 def extra_chance(chance_recording):
-    """The chance recording's inserted bursts with the extras: the bursts whose
+    """The chance recording's inserted bursts, scored: the bursts whose
     tetrodes each follow their own random place (``nonspatial``) one group, the
     bursts they share (``shared_random``) the other."""
     recording, detector = chance_recording
@@ -478,36 +489,6 @@ def extra_chance(chance_recording):
     ].rename(columns={"kind": "content"})
     windows["group"] = np.where(windows["content"] == "nonspatial", "no SWR", "SWR")
     return _score_extra(detector, recording, windows)
-
-
-def test_the_extras_change_none_of_the_canonical_scores(recording, extra):
-    """The same pass without the extras gives every canonical column bit for
-    bit, so the extras are additions only. The time of each pass is printed
-    (``-s``) for the run's estimate."""
-    recording, detector = recording
-    scores, _, record, windows, is_missing, extra_s = extra
-    keyed = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
-    keyed = keyed.assign(kind="event")
-    started = clock.time()
-    plain, _ = th.holdout_scores(
-        detector,
-        recording.time,
-        recording.position[:, None],
-        recording.position,
-        recording.spike_times,
-        recording.marks,
-        recording.is_running,
-        is_missing,
-        keyed,
-        folds=time_blocks(recording.time),
-        margin_bins=TIME_BLOCK_MARGIN_BINS,
-        log=sim.quiet,
-    )
-    plain_s = clock.time() - started
-    print(f"holdout_scores: {plain_s:.1f} s without extras, {extra_s:.1f} s with")
-    assert not set(th.EXTRA_COLUMNS) & set(plain.columns)
-    pd.testing.assert_frame_equal(scores[list(plain.columns)], plain)
-    assert record["n_null_windows"] > 0
 
 
 def test_the_rate_and_mark_parts_add_up_and_silence_is_all_rate(extra):
@@ -705,7 +686,7 @@ def test_place_information_is_a_property_of_the_spike_and_its_encoding(
     distributions), those tetrodes' spikes carry the same place information,
     window by window, while their agreement changes."""
     recording, detector = recording
-    scores, _, _, windows, is_missing, _ = extra
+    scores, _, _, windows, is_missing = extra
     subset = copy.deepcopy(detector)
     fewer, _, _ = _score_extra(
         subset,

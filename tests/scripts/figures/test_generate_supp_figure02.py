@@ -14,6 +14,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
+from continuum_swr_replay.analysis.event_evidence import heldout_runs  # noqa: E402
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
 from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
@@ -26,6 +27,7 @@ from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     _outside_rows,
     assert_spread_about,
 )
+from tests.support._tetrode_holdout_tables import run_table  # noqa: E402
 
 TRIAL_FOLD_SETTINGS = {"n_folds": 5, "fold_design": "trials"}
 MARGINS = {0.1: [0.022, 0.019, 0.026, 0.030, 0.021]}
@@ -738,7 +740,6 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_swr_table": lambda path: stored["table"],
         "event_table_epochs": lambda table, analyzed: ["e"],
         "analyzed_epoch_ids": lambda: ["e"],
-        "read_complete_run": lambda folder, name, epochs: stored["scores"],
         "window_scores": lambda table: seen.setdefault("tetrode", []).append(table)
         or table,
         "holdout_statistics": lambda windows, kind, column: seen.setdefault(
@@ -774,12 +775,27 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         ),
     }.items():
         monkeypatch.setattr(figure, name, value)
+    # the held-out tetrode run is read by its own reader: every column the
+    # runner writes, the stored events' rows
+    monkeypatch.setattr(
+        heldout_runs,
+        "read_output_manifest",
+        lambda folder: {"settings": TRIAL_FOLD_SETTINGS},
+    )
+    monkeypatch.setattr(
+        heldout_runs,
+        "read_complete_run",
+        lambda folder, name, epochs: run_table(
+            event_id=stored["scores"]["event_id"],
+            kind=stored["scores"].get("kind", "event"),
+        ),
+    )
 
 
 def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visit(
     monkeypatch,
 ):
-    """The stored held-out tetrode run with its extra scores (held out in
+    """The stored held-out tetrode run (held out in
     folds of whole trials) scores every event; the figure, like the events
     summary, reads the rows (every tetrode's) of the events that start inside a
     well visit (panel h, the events alone), and the held-out event run's
@@ -795,7 +811,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     seen = {}
     _patch_reading(monkeypatch, stored, seen)
     inputs = figure.read_inputs()
-    # the canonical run (panel h)
+    # the held-out tetrode run (panel h)
     assert [list(t["event_id"]) for t in seen["tetrode"]] == [[0, 0, *range(1, 8)]]
     assert list(seen["split"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
@@ -868,18 +884,27 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
 def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     monkeypatch, settings, message
 ):
-    """A held-out tetrode run of an older fold design is refused before any
-    table is read, as the events summary refuses it."""
+    """A held-out tetrode run of an older fold design is refused by the
+    reader, as the events summary refuses it, and panel h is not drawn."""
+    stored = {
+        "table": _figure02_events().assign(event_id=range(8)),
+        "scores": pd.DataFrame({"event_id": [0]}),
+    }
+    _patch_reading(monkeypatch, stored, {})
     monkeypatch.setattr(
-        figure, "read_output_manifest", lambda folder: {"settings": settings}
+        heldout_runs, "read_output_manifest", lambda folder: {"settings": settings}
     )
 
-    def read_swr_table(path):
-        raise AssertionError("read before the refusal")
+    def drawn(*args):
+        raise AssertionError("panel h was computed from a run off trial folds")
 
-    monkeypatch.setattr(figure, "read_swr_table", read_swr_table)
-    with pytest.raises(ValueError, match=message):
+    monkeypatch.setattr(figure, "window_scores", drawn)
+    monkeypatch.setattr(figure, "holdout_statistics", drawn)
+    with pytest.raises(ValueError, match=message) as refused:
         figure.read_inputs()
+    assert "event_tetrode_holdout is not held out in folds of whole trials" in str(
+        refused.value
+    )
 
 
 def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):

@@ -20,6 +20,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_tetrode_holdout as runner
 from scripts.event_evidence._per_event_run import EpochInputs, trials_input
+from tests.support._tetrode_holdout_tables import SCORE_COLUMNS, run_table
 
 EPOCH = "wilbur20210329_02_r1_HPC"
 N = 12
@@ -87,7 +88,7 @@ def patched(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runner, "epoch_windows", epoch_windows)
 
-    def run(extras=None):
+    def run(null_seed=0):
         given = {}
 
         def epoch_inputs(epoch_id, data_dir, *, trials):
@@ -128,9 +129,9 @@ def patched(tmp_path, monkeypatch):
             assert missing is loaded["is_missing"]
             assert windows is WINDOWS
             given["folds"], given["margin_bins"] = folds, margin_bins
-            scores = pd.DataFrame(
-                {"window_id": [0, 1, 0, 1], "tetrode": [0, 0, 1, 1], "gain": 1.0}
-            )
+            scores = run_table(window_id=[0, 1, 0, 1], tetrode=[0, 0, 1, 1], gain=1.0)[
+                list(SCORE_COLUMNS)
+            ]
             return scores, {"refit_s": 1.0}
 
         monkeypatch.setattr(runner, "epoch_inputs", epoch_inputs)
@@ -141,10 +142,12 @@ def patched(tmp_path, monkeypatch):
             tmp_path / "event_table.parquet",
             tmp_path,
             output,
-            *(() if extras is None else (extras,)),
+            null_seed,
         )
         table = pd.read_parquet(output_path(EPOCH, output, TETRODE_HOLDOUT_NAME))
         assert list(table["kind"]) == ["event", "control", "event", "control"]
+        # the table written has the run's columns, in order
+        assert tuple(table.columns) == th.RUN_COLUMNS
         return record, given
 
     return run
@@ -194,42 +197,18 @@ def header(processed_data_root, monkeypatch):
     return gathered
 
 
-def test_the_header_names_the_fold_design_and_its_margin(header):
+def test_the_header_names_the_fold_design_its_margin_and_the_extra_scores(header):
     assert header()["settings"] == {
         "n_folds": fo.N_FOLDS,
         **th.fold_settings(),
+        "extra_scores": th.reference_settings(0),
     }
+    assert th.reference_settings(0)["hpd_coverage"] == 0.95
+    assert header("--null-seed", "3")["settings"]["extra_scores"]["null_seed"] == 3
 
 
-def test_extra_scores_ask_for_the_extras_with_the_seed(patched):
+def test_the_extra_scores_are_asked_for_with_the_seed(patched):
     _, given = patched()
-    assert given["options"] == {}
-    _, given = patched({"null_seed": 7, "hpd_coverage": 0.95, "null_donor_rule": "r"})
-    assert given["options"] == {"extras": True, "null_seed": 7}
-
-
-def test_extra_scores_record_their_settings_and_need_a_new_folder(
-    header, processed_data_root, tmp_path
-):
-    settings = header("--extra-scores", "--output-dir", str(tmp_path / "new"))[
-        "settings"
-    ]
-    assert settings["extra_scores"] == {
-        "hpd_coverage": 0.95,
-        "null_seed": 0,
-        "null_donor_rule": th.NULL_DONOR_RULE,
-    }
-    assert (
-        header("--extra-scores", "--null-seed", "3", "--output-dir", "x")["settings"][
-            "extra_scores"
-        ]["null_seed"]
-        == 3
-    )
-    with pytest.raises(SystemExit):
-        header("--extra-scores")
-    with pytest.raises(SystemExit):
-        header(
-            "--extra-scores",
-            "--output-dir",
-            str(processed_data_root / "event_tetrode_holdout"),
-        )
+    assert given["options"] == {"null_seed": 0}
+    _, given = patched(7)
+    assert given["options"] == {"null_seed": 7}

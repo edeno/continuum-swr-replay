@@ -49,6 +49,7 @@ from tests.support._swr_inventory_fixtures import (  # noqa: E402
     write_artifact_run,
     write_swr_inventory,
 )
+from tests.support._tetrode_holdout_tables import run_table  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -2067,7 +2068,7 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
         assert getattr(events, name) is getattr(restriction_totals, name), name
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2k",)
     # panel j: the gain over local coding (with its split in the supplement)
-    # and the agreement minus the reference of the run with its extra scores
+    # and the agreement minus the reference, of the same run
     assert events.TAGS["tetrode_holdout"].figures == ("2j", "S2h")
     assert events.TAGS["tetrode_holdout_extra_figure"].figures == ("2j",)
     # panel h, participation, and panel i, ripple power
@@ -2188,12 +2189,12 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     per-bin facts run made from the current session cache."""
     import joblib
 
+    from continuum_swr_replay.analysis.event_evidence import heldout_runs
     from continuum_swr_replay.analysis.event_tables import prepare_data
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
         EVENT_BIN_FACTS_DIR,
         EVENT_TETRODE_HOLDOUT_DIR,
-        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
         NONLOCAL_BY_SIGNAL_DIR,
         STATE_BY_SIGNAL_DIR,
         processed_data_dir,
@@ -2226,11 +2227,10 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)
     entry.write_bytes(b"the visits")
-    for folder in (EVENT_TETRODE_HOLDOUT_EXTRA_DIR, EVENT_TETRODE_HOLDOUT_DIR):
-        (tmp_path / folder).mkdir(parents=True)
-        (tmp_path / folder / "manifest.json").write_text(
-            json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
-        )
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+        json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
+    )
     (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
     (tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json").write_text(
         json.dumps(
@@ -2241,10 +2241,16 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         )
     )
     # each stored per-event table holds a row of every event, the ninth too;
-    # the held-out event run is read by the events summary's reader
+    # the held-out event run is read by the events summary's reader, the
+    # held-out tetrode run (with every column the runner writes) by its own
     rows = pd.DataFrame({"event_id": [*range(8), 99]})
     monkeypatch.setattr(
         events, "read_complete_run", lambda *args: rows.assign(starts_in_well_visit=1)
+    )
+    monkeypatch.setattr(
+        heldout_runs,
+        "read_complete_run",
+        lambda *args: run_table(event_id=[*range(8), 99]),
     )
     for name, value in {
         "parse_nwb_filename": lambda name: ("a", "d1"),
@@ -2263,9 +2269,6 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         "restriction_inputs_note": lambda folder, epochs: None,
     }.items():
         monkeypatch.setattr(figure02, name, value)
-    monkeypatch.setattr(
-        events.tetrode_holdout, "require_extra_columns", lambda table, what: None
-    )
     return figure02
 
 
@@ -2290,12 +2293,12 @@ def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
 def test_figure02_refuses_a_held_out_tetrode_run_not_on_trial_folds(
     offline, tmp_path, monkeypatch
 ):
-    """Panel i, as the events summary: a held-out tetrode run whose folds are
+    """Panel j, as the events summary: a held-out tetrode run whose folds are
     not whole trials is refused before it is read."""
-    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_EXTRA_DIR
+    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_DIR
 
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    (tmp_path / EVENT_TETRODE_HOLDOUT_EXTRA_DIR / "manifest.json").write_text(
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
         json.dumps({"settings": {"n_folds": 5, "fold_design": "blocks"}})
     )
     monkeypatch.setattr(figure02, "holdout_statistics", _refuse_drawing)
@@ -2423,8 +2426,6 @@ def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
     read = {
         "heldout_events": heldout,
         "heldout_time_sums": pd.DataFrame(range(9)),
-        # the held-out tetrode runs, read by the same reader
-        "tetrode_holdout": pd.DataFrame({"event_id": [*range(8), 99]}),
     }
     monkeypatch.setattr(
         events, "read_complete_run", lambda folder, name, epochs: read[name]
