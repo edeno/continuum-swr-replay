@@ -856,25 +856,35 @@ the fit with its problem, whose padded rows are on the device. The score, `A^-1`
 and the gradient and Hessian in `rho` are then one call of one kernel on those rows and on
 one Cholesky factor of `A` (`reml._laplace_derivatives`, the family a static argument;
 the profiled Gaussian's are in `reml._profiled_gaussian`, which needs no product with the
-design beyond its Gram and so always computes them). The rows are padded and moved once
+design beyond its Gram; it is given the stack of penalties only when the derivatives are
+asked for, so it has two programs per shape, the score alone and the score with its
+derivatives). The rows are padded and moved once
 for a fit and its derivatives; the NumPy loops called the public `dinformation` and
 `d2information` once for each penalty and pair, each padding and moving `X` again. The
 penalties are the leading axis of the kernel's arrays (`S_j` of shape `(m, p, p)`): a new
 number of penalties is a new shape and so a new program, and a model has one. With
 `b_j = -A^-1 S_j b` and `E = X [b_1 ... b_m]`, the `m` matrices `A_j = S_j + dH(E_j)` are
 made one at a time (`jax.lax.map`), and the Hessian is computed for `j <= k` and mirrored,
-so it is exactly symmetric. Its traces `tr(A^-1 A_jk)` are read by the family's
-`_jax_information_traces`. For the Poisson and the Bernoulli (the diagonal families) they
-come from `h_i = x_i' A^-1 x_i` without making the derivatives:
+so it is exactly symmetric. With `A_jk = d2H(E_j, E_k) + dH(X b_jk) + delta_jk S_j`, the
+Hessian's trace `tr(A^-1 A_jk)` is the sum of three terms: `tr(A^-1 S_j)` is its own term,
+and the traces of the two derivatives of the information, `tr(A^-1 d2H(E_j, E_k))` and
+`tr(A^-1 dH(X b_jk))`, are read by the family's `_jax_information_traces`; the cross term
+`tr(A^-1 A_k A^-1 A_j)` is computed from the `m` matrices `A^-1 A_j` in full. For the
+Poisson and the Bernoulli (the diagonal families) those two traces come from `h_i = x_i' A^-1 x_i` without making the derivatives:
 `tr(A^-1 X' diag(c) X) = sum_i c_i h_i`, so the traces of all pairs are
 `(weight w' h) @ (X b_jk)` and `E' diag(weight w'' h) E`. An evaluation with derivatives
 then makes `m + 1` products of the size of a Gram (the `A_j` and `X A^-1`) where the
-NumPy loops made `m + m (m + 1)` (8 for two penalties, now 3). For the grouped softmax
+NumPy loops made `m + m (m + 1)` (8 for two penalties, now 3), beside smaller products of
+the design with vectors, `X b_j` and `X b_jk` (`n p m` and `n p m (m + 1) / 2` multiplies).
+For the grouped softmax
 they come from the derivatives made in full, one at a time, as before. The hand-written
 gradient and Hessian equal `jax.grad` and `jax.hessian` of the score written in JAX
 (the information from `jax.hessian` of the log-likelihood, the fit as four Newton steps
-from the optimum) to 7e-15 to 3e-14 of their largest entry, two smooths on 120 rows, every
-family (`tests/analysis/regression/test_reml.py`); the central differences of the score
+from the optimum, written in the penalties' eigenbasis) to 7e-12 of their largest entry or
+less (most below 1e-13),
+one, two and three penalties (the third a ridge, without a null space) on 120 rows at
+moderate and strong log penalties, every family (`tests/analysis/regression/test_reml.py`);
+the central differences of the score
 check them as before. The kernels hold few copies of the design: XLA's memory analysis of
 the compiled programs (20,000 x 40 rows, CPU) gives temporaries of 1.1 to 1.2 times the
 padded design for the Poisson and the Bernoulli at two or three penalties (2.1 at one,
@@ -884,8 +894,14 @@ for their segment sums at once (as its information kernels do).
 
 The rotation of the design into the penalties' eigenbasis is a NumPy product, `X Q` with
 `Q` the block-diagonal rotation (identity off the blocks). Assigning each block's columns
-by index, as it was, cost 140 to 160 ms at 39,792 x 56 (two blocks); the product 24 ms,
-the same to the bit there. Moving it to the device would mean padding and moving the
+by index, as it was, cost 140 to 160 ms at 39,792 x 56 (two blocks); the product 24 ms.
+The two are equal to the bit when each block's columns are contiguous and ascending, as the
+designs of `terms` make them; with a block's columns permuted or interleaved with another's
+they differed by up to 8.9e-16 in 6 of 28 layouts tried (an independent review,
+2026-11-24), far inside the references' rule. A value of the design that is not finite
+would be spread by the product over its row's columns of the block, so the design is
+checked before it is rotated, and the count of entries not finite in the error is the
+design's own. Moving it to the device would mean padding and moving the
 design before the rotation and reading the rotated design back for the design check
 (`newton._unidentified`) and for the columns running away; on the CPU XLA's product is
 slower than BLAS's, so it would gain nothing there. What costs more at the rate model's
@@ -1127,9 +1143,10 @@ in its compilations, not its fits. Its slow test of penalty selections on small 
 (`test_simulation.py::test_coverage_and_size`, 2,000 selections of about 100 summed cells)
 took 415 s before and 183 s after, in the same minutes. What remains of a small fit is the
 host: the cost of each kernel call (about 0.3 ms for an iteration of 300 rows), the design
-check (`_unidentified`) and REML's rotations. At the rate size REML's copy of the design
-into the penalties' eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a
-refit, and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
+check (`_unidentified`) and REML's rotations. REML's copy of the design into the
+penalties' eigenbasis (`reml_and_derivatives`, in NumPy) is now one product, 24 ms at
+39,792 x 56 where assigning each block's columns took 140 to 160 ms (the 55 to 60 ms of a
+rate refit measured before it were of that older form, at 37,000 x 76), and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
 `X' X`, which XLA does not call.
 
 REML's gradient and Hessian in JAX, and the rotation by one product ("REML's
@@ -1139,7 +1156,9 @@ thread, each process pinned to one CPU, the versions in turn on the same CPU in 
 minutes, under heavy load (1-minute load average 70 to 82 on 96 CPUs; 2026-11-24). Each
 cell is the least time over all calls of all rounds, then the median of the rounds'
 medians. "Derivatives" is the derivatives in JAX alone (0bc534a0), "after" with the
-rotation as well (44d9ec2e):
+rotation as well (44d9ec2e). Under that load the table resolves differences of about
+25 %, and smaller ones are not to be read: `fit_rate` computes no derivatives, so its
+"derivatives" column, slower than "before", is noise.
 
 | Case | Rounds | Before: least, median | Derivatives: least, median | After: least, median | Traces before, after |
 |---|---|---|---|---|---|
@@ -1153,7 +1172,8 @@ calls) took 688 ms before and 418 ms with the derivatives in JAX; the score alon
 238 ms. The search spends most of its evaluations on the score alone (the grid), so the
 selection gains less than an evaluation; the rotation, which every evaluation pays, gave
 the rest (it took 140 to 160 ms of each, now 24 ms). Evaluations of 120 rows and two
-smooths with derivatives (200 calls each, two rounds): Poisson 3.7 to 2.3 ms, Bernoulli
+smooths with derivatives (200 calls each, only two rounds, so these few milliseconds are
+less certain than the table): Poisson 3.7 to 2.3 ms, Bernoulli
 3.6 to 2.3 ms, Gaussian 2.6 to 2.5 ms, grouped softmax 5.3 to 3.1 ms; what is left is
 the host (two Newton iterations, three evaluations of `F`, the design check, the
 transfers). The slow test of 2,000 small selections
