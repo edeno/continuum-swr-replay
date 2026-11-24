@@ -531,10 +531,30 @@ def penalized_newton(
         response, penalty or start that is not finite, or a response or
         ``aux`` the family does not take (``Likelihood.check``).
     """
+    return _fit_one(
+        lik, X, y, aux, S, beta0, free_basis, max_iter=max_iter, max_step=max_step
+    )[0]
+
+
+def _fit_one(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    S: np.ndarray,
+    beta0: np.ndarray,
+    free_basis: np.ndarray | None,
+    *,
+    max_iter: int = NEWTON_MAX_STEPS,
+    max_step: float = MAX_STEP_LENGTH,
+) -> tuple[NewtonFit, _Problem]:
+    """:func:`penalized_newton`, with the problem it fitted, whose padded rows
+    are on the device (what REML's kernels read after the fit). Run inside
+    ``runtime.in_float64``."""
     _check_inputs(lik, X, y, aux, S, beta0)
     problem = _Problem.of(lik, X, y, aux, S)
     beta = np.array(beta0, dtype=float)[None]
-    return _fit(problem, beta, free_basis, max_iter, max_step)[0]
+    return _fit(problem, beta, free_basis, max_iter, max_step)[0], problem
 
 
 def _fit(

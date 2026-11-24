@@ -178,6 +178,46 @@ def test_hand_derivatives_equal_autodiff(name: str) -> None:
         )
 
 
+@pytest.mark.parametrize("name", CASES)
+def test_information_traces_equal_the_traces_of_the_derivatives(name: str) -> None:
+    """``_jax_information_traces`` against a symmetric ``M``: each trace
+    equals ``sum(M * dinformation)`` (or ``d2information``) of that direction,
+    made in full, on the padded rows; for the diagonal families it is read
+    from ``h_i = x_i' M x_i`` without making them."""
+    lik, X, y, aux, _ = _case(name)
+    rng = np.random.default_rng(17)
+    beta = rng.normal(scale=0.5, size=N_COLUMNS)
+    rows = lik.pad(X, y, aux)
+    n = rows.y.size
+    D, E = (
+        np.column_stack(
+            [pad_values(rng.normal(size=N_ROWS), N_ROWS, n) for _ in range(k)]
+        )
+        for k in (3, 2)
+    )
+    root = rng.normal(size=(N_COLUMNS, N_COLUMNS))
+    M = root @ root.T
+    with jax.enable_x64(True):
+        Xp, yp, w = jnp.asarray(rows.X), jnp.asarray(rows.y), jnp.asarray(rows.weight)
+        a = jax.tree_util.tree_map(jnp.asarray, rows.aux)
+        eta = Xp @ beta
+        first, second = lik._jax_information_traces(Xp, eta, yp, a, w, M, D, E)
+        want_first = [
+            jnp.sum(M * lik._jax_dinformation(Xp, eta, yp, a, w, D[:, i]))
+            for i in range(3)
+        ]
+        want_second = [
+            [
+                jnp.sum(M * lik._jax_d2information(Xp, eta, yp, a, w, E[:, j], E[:, k]))
+                for k in range(2)
+            ]
+            for j in range(2)
+        ]
+    _assert_close(first, np.array(want_first))
+    _assert_close(second, np.array(want_second))
+    np.testing.assert_array_equal(second, second.T)
+
+
 def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:
     """The grouped information equals a direct second difference of loglik."""
     lik, X, y, groups, eta = _case("softmax_counts")

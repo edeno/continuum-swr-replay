@@ -7,6 +7,8 @@ import re
 from dataclasses import replace
 from types import SimpleNamespace
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 import scipy.optimize
@@ -21,6 +23,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
     GroupedSoftmax,
+    Groups,
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.newton import (
@@ -164,6 +167,90 @@ def test_gradient_and_hessian_finite_differences(family: str, n_smooths: int) ->
     np.testing.assert_array_equal(at.hessian, at.hessian.T)
 
 
+def _score_in_jax(lik, data: SessionData, blocks, beta):
+    """The REML score as a JAX function of ``rho``, on the unpadded rows, from
+    the log-likelihood alone: the information is ``-jax.hessian`` of it, and
+    the fit ``b(rho)`` is four Newton steps from ``beta``, the fit at the
+    point of differentiation. A Newton step's derivative in its start is zero
+    at the optimum, so the steps' derivatives in ``rho`` there are the
+    implicit derivatives of the optimum, to second order after two steps. The
+    Gaussian's profiled score is written in closed form. Called with JAX's
+    64-bit types on."""
+    X, y = jnp.asarray(data.X), jnp.asarray(data.y)
+    p = X.shape[1]
+    units = jnp.asarray(np.stack([reml._embedded(b, 1.0, p) for b in blocks]))
+    ranks = jnp.asarray([b.rank for b in blocks], dtype=float)
+    constant = sum(b.log_pdet for b in blocks)
+    n_null = p - sum(b.rank for b in blocks)
+
+    def penalty(rho):
+        return jnp.tensordot(jnp.exp(rho), units, axes=1)
+
+    if isinstance(lik, Gaussian):
+
+        def V(rho):
+            A = X.T @ X + penalty(rho)
+            b = jnp.linalg.solve(A, X.T @ y)
+            residual = y - X @ b
+            dof = y.size - n_null
+            D_p = residual @ residual + b @ penalty(rho) @ b
+            return (
+                0.5 * dof * (1.0 + jnp.log(2 * jnp.pi) + jnp.log(D_p / dof))
+                - 0.5 * (ranks @ rho + constant)
+                + 0.5 * jnp.linalg.slogdet(A)[1]
+            )
+
+        return V
+    aux = data.aux
+    if isinstance(lik, GroupedSoftmax):
+        aux = Groups(jnp.asarray(data.aux), int(data.aux.max()) + 1)
+    weight = jnp.ones(y.size)
+
+    def loglik(b):
+        return lik._jax_loglik(X @ b, y, aux, weight)
+
+    def V(rho):
+        S = penalty(rho)
+        b = jax.lax.stop_gradient(jnp.asarray(beta))
+        for _ in range(4):
+            A = -jax.hessian(loglik)(b) + S
+            b = b + jnp.linalg.solve(A, jax.grad(loglik)(b) - S @ b)
+        A = -jax.hessian(loglik)(b) + S
+        return (
+            -loglik(b)
+            + 0.5 * b @ S @ b
+            - 0.5 * (ranks @ rho + constant)
+            + 0.5 * jnp.linalg.slogdet(A)[1]
+            - 0.5 * n_null * jnp.log(2 * jnp.pi)
+        )
+
+    return V
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+def test_gradient_and_hessian_equal_autodiff_of_the_score(family: str) -> None:
+    """The hand-written gradient and Hessian in ``rho`` (the information's
+    directional derivatives, the traces against ``A^-1``, the profiled
+    Gaussian's own) equal ``jax.grad`` and ``jax.hessian`` of the score written
+    in JAX (:func:`_score_in_jax`), two smooths on 120 rows, unpadded. The
+    finite differences of the score check the same derivatives on the padded
+    rows (:func:`test_gradient_and_hessian_finite_differences`)."""
+    lik, data, blocks = _session(family, 2, seed=5, n_rows=120)
+    rho = np.array([0.5, 2.0])
+    at = _score(lik, data, blocks, rho)
+    assert at.fit.converged
+    with jax.enable_x64(True):
+        V = _score_in_jax(lik, data, blocks, at.fit.beta)
+        rho_jax = jnp.asarray(rho)
+        score = float(V(rho_jax))
+        gradient = np.asarray(jax.grad(V)(rho_jax))
+        hessian = np.asarray(jax.hessian(V)(rho_jax))
+    assert score == pytest.approx(at.score, rel=1e-12)
+    # 1e-12 of the largest entry: 7e-15 to 3e-14 measured.
+    for got, want in [(at.gradient, gradient), (at.hessian, hessian)]:
+        np.testing.assert_allclose(got, want, rtol=0, atol=1e-12 * np.abs(want).max())
+
+
 def test_block_rank_is_the_penalty_rank() -> None:
     """The constrained second-difference penalty has rank n_basis - 2."""
     _, data, blocks = _session("poisson", 1, seed=1)
@@ -248,14 +335,14 @@ def test_a_numerical_failure_at_the_reference_point_raises(
         lik, data, blocks = _session("poisson", 1, seed=4 + seed)
         sessions.append(data)
     sessions[1] = replace(sessions[1], name="peanut_02")
-    newton_fit = reml.penalized_newton
+    newton_fit = reml._fit_one
 
     def fails_for_one(*args, **kwargs):
-        fit = newton_fit(*args, **kwargs)
+        fit, problem = newton_fit(*args, **kwargs)
         mine = args[2] is sessions[1].y
-        return replace(fit, status=HALVING_FAILED) if mine else fit
+        return (replace(fit, status=HALVING_FAILED) if mine else fit), problem
 
-    monkeypatch.setattr(reml, "penalized_newton", fails_for_one)
+    monkeypatch.setattr(reml, "_fit_one", fails_for_one)
     with pytest.raises(ValueError, match=r"session 1 \(peanut_02\): step halving"):
         select_penalties(lik, sessions, blocks)
 
@@ -664,16 +751,16 @@ def test_grid_points_that_fail_are_counted_by_status(
     """A session whose inner fit fails at the weakest penalties only: the
     search goes on from the finite points and records how many failed and why."""
     lik, data, blocks = _session("poisson", 1, seed=4)
-    newton_fit = reml.penalized_newton
+    newton_fit = reml._fit_one
 
     def fails_when_weak(*args, **kwargs):
-        fit = newton_fit(*args, **kwargs)
+        fit, problem = newton_fit(*args, **kwargs)
         # The penalty's largest eigenvalue, whatever basis it is given in.
         strength = np.linalg.eigvalsh(args[4])[-1] / blocks[0].eigenvalues[-1]
         weak = strength < np.exp(-4.5)
-        return replace(fit, status=STEP_LIMIT) if weak else fit
+        return (replace(fit, status=STEP_LIMIT) if weak else fit), problem
 
-    monkeypatch.setattr(reml, "penalized_newton", fails_when_weak)
+    monkeypatch.setattr(reml, "_fit_one", fails_when_weak)
     result = select_penalties(lik, [data], blocks)
     assert result.search.n_grid_not_finite == 6  # log penalties -10 to -5
     assert result.search.grid_failures == {STEP_LIMIT: 6}
@@ -686,18 +773,18 @@ def test_grid_failures_of_two_sessions_with_one_status_are_summed(
     the count for that status is the sum over both, not the count of one."""
     lik, first, blocks = _session("poisson", 1, seed=4)
     _, second, _ = _session("poisson", 1, seed=5)
-    newton_fit = reml.penalized_newton
+    newton_fit = reml._fit_one
 
     def fails_at_one_end(*args, **kwargs):
-        fit = newton_fit(*args, **kwargs)
+        fit, problem = newton_fit(*args, **kwargs)
         strength = np.linalg.eigvalsh(args[4])[-1] / blocks[0].eigenvalues[-1]
         if args[2] is first.y:
             fails = strength < np.exp(-4.5)  # log penalties -10 to -5
         else:
             fails = strength > np.exp(17.5)  # log penalties 18 to 20
-        return replace(fit, status=STEP_LIMIT) if fails else fit
+        return (replace(fit, status=STEP_LIMIT) if fails else fit), problem
 
-    monkeypatch.setattr(reml, "penalized_newton", fails_at_one_end)
+    monkeypatch.setattr(reml, "_fit_one", fails_at_one_end)
     search = select_penalties(lik, [first, second], blocks).search
     assert search.grid_failures == {STEP_LIMIT: 9}
     assert search.n_grid_not_finite == 9
