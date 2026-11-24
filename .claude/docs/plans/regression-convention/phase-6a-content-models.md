@@ -75,7 +75,10 @@ real fit and state the answers in `docs/regression_models.md`):
 - The declared penalty of each per-session smooth term (gate item 2 below): the rule is decided (design,
   seventeenth round); the values found on this model's rows, with the targets, go to the lead with the
   gate's results.
-- (**call**, 2026-11-23) The collinearity rule of a tested coefficient is measured on the penalized problem:
+- (**call**, 2026-11-23; the author's call, under review: it departs from section 4.7 of the design, and
+  the lead has not approved it. Nothing reads its result yet, and its measure uses weights at the fitted
+  values, so dropping sessions by it would select on the response.) The collinearity rule of a tested
+  coefficient is measured on the penalized problem:
   the information at the fit plus the smooths' declared penalties, the weak penalties left out
   (`role_content.tested_coefficient_collinearity`). On the likelihood's information alone `role[current]`
   failed in 87 % of the recency simulation's session fits (R^2 0.9999994; `content_decisions/
