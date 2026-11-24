@@ -4,10 +4,11 @@
 Every number this script writes is a simulation number.
 
 ``--model`` names an entry of :data:`MODELS`: a module beside the model that
-holds its scenario list. The module has ``simulation(quick: bool) ->
-regression.simulation.Simulation`` (the models as the model's code builds
-them, their rows, the scenarios, the data sets, the bootstrap draws and the
-seed) and may have ``table(result, simulation) -> pd.DataFrame``, which
+holds its scenario list. The module has ``simulation(quick: bool, workers:
+int) -> regression.simulation.Simulation`` (the models as the model's code
+builds them, their rows, the scenarios, the data sets, the bootstrap draws
+and the seed; ``workers`` the processes it may use to build them) and may
+have ``table(result, simulation) -> pd.DataFrame``, which
 gives its own columns from the engine's tables; without it the table is the
 engine's summary (``regression.simulation.summarize``). The engine draws
 only the outcome and runs the real fit, estimands and reduction.
@@ -77,7 +78,7 @@ def run(
     """The table of model ``name`` with its ``attrs`` (module docstring)."""
     started = time.perf_counter()
     module = importlib.import_module(MODELS[name])
-    simulation = module.simulation(quick)
+    simulation = module.simulation(quick, workers)
     if n_data_sets is not None:
         simulation = replace(simulation, n_data_sets=n_data_sets)
     if seed is not None:

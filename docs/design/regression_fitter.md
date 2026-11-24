@@ -760,7 +760,7 @@ value for that cause; `share_not_converged` (of the session fits tried);
 data set and one per session.
 
 **How a phase adds a list.** A module beside the model, in
-`analysis/replay_models/<family>/`, defines `simulation(quick) -> Simulation` (the
+`analysis/replay_models/<family>/`, defines `simulation(quick, workers) -> Simulation` (the
 model's real rows, its models, its scenarios, the data sets and the seed) and, if the
 model needs its own columns, `table(result, simulation)`. The phase adds the module to
 `MODELS` in `scripts/checks/run_simulations.py`, which runs it

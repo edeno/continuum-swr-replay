@@ -103,6 +103,7 @@ per curve; its table is the fixed-seed fixture
 
 from __future__ import annotations
 
+import multiprocessing
 from dataclasses import dataclass
 from functools import partial
 
@@ -370,16 +371,25 @@ def model_name(target: float) -> str:
     return f"target_edf_{target:g}"
 
 
-def simulation(quick: bool, config: Config | None = None) -> Simulation:
+def simulation(
+    quick: bool, workers: int = 1, config: Config | None = None
+) -> Simulation:
     """The run: the cohort of ``config`` (by default :data:`QUICK` or the
     full :class:`Config`), one model per target at its declared penalty, and
-    the two curves. Each target's calibration is in ``attrs``."""
+    the two curves. The targets are calibrated in up to ``workers`` ``spawn``
+    processes; each target's calibration is in ``attrs``."""
     config = config or (QUICK if quick else Config())
     sessions = cohort(config)
     pooled = pd.concat(sessions.values(), ignore_index=True)
+    work = partial(calibrate, sessions=sessions)
+    if workers == 1:
+        found = [work(target) for target in TARGETS]
+    else:
+        context = multiprocessing.get_context("spawn")
+        with context.Pool(min(workers, len(TARGETS))) as pool:
+            found = pool.map(work, TARGETS, chunksize=1)
     calibration, models = {}, []
-    for target in TARGETS:
-        log_penalty, median_edf = calibrate(target, sessions)
+    for target, (log_penalty, median_edf) in zip(TARGETS, found, strict=True):
         name = model_name(target)
         calibration[name] = {
             "target_edf": target,
