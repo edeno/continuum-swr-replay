@@ -7,11 +7,15 @@ the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
 coefficient gradient ``X' score_eta(X beta)`` in ``beta``; ``dinformation`` is
 the derivative of ``information`` along a direction of ``eta``; and
 ``d2information`` the derivative of ``dinformation`` along a second one.
-The draws (``draw``) have the family's mean.
+The hand-written derivatives the kernels compute also equal JAX's automatic
+derivatives of the kernels' log-likelihood. The draws (``draw``) have the
+family's mean.
 """
 
 from __future__ import annotations
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -22,6 +26,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Poisson,
     draw,
 )
+from continuum_swr_replay.analysis.regression.padding import pad_values
 
 TOLERANCE = 1e-6
 N_ROWS = 14
@@ -119,6 +124,53 @@ def test_derivatives_match_finite_differences(name: str) -> None:
     assert _relative_error(analytic_d2, numeric_d2) < TOLERANCE
     # Symmetric in its two directions.
     assert np.allclose(analytic_d2, lik.d2information(X, eta, y, aux, d2, d1))
+
+
+AUTODIFF_RTOL = 1e-12
+"""Relative to the largest entry of each quantity (the Gaussian's derivatives
+of the information are exactly zero)."""
+
+
+def _assert_close(hand, autodiff) -> None:
+    hand, autodiff = np.asarray(hand), np.asarray(autodiff)
+    scale = np.max(np.abs(autodiff))
+    np.testing.assert_allclose(hand, autodiff, rtol=0, atol=AUTODIFF_RTOL * scale)
+
+
+@pytest.mark.parametrize("name", CASES)
+def test_hand_derivatives_equal_autodiff(name: str) -> None:
+    """On the padded rows the kernels see: the score is ``jax.grad`` of the
+    log-likelihood in ``eta``, the information minus ``jax.hessian`` of it in
+    ``beta``, ``dinformation`` the ``jax.jvp`` of the information along a
+    direction of ``eta``, and ``d2information`` the nested ``jvp``."""
+    lik, X, y, aux, _ = _case(name)
+    rng = np.random.default_rng(13)
+    beta = rng.normal(scale=0.5, size=N_COLUMNS)
+    rows = lik.pad(X, y, aux)
+    d1, d2 = (pad_values(rng.normal(size=N_ROWS), rows.y.size) for _ in range(2))
+    with jax.enable_x64(True):
+        Xp, yp, w = jnp.asarray(rows.X), jnp.asarray(rows.y), jnp.asarray(rows.weight)
+        a = jax.tree_util.tree_map(jnp.asarray, rows.aux)
+        eta = Xp @ beta
+
+        def loglik_eta(e):
+            return lik._jax_loglik(e, yp, a, w)
+
+        def information(e):
+            return lik._jax_information(Xp, e, yp, a, w)
+
+        def dinformation(e):
+            return jax.jvp(information, (e,), (d1,))[1]
+
+        _assert_close(lik._jax_score(eta, yp, a, w), jax.grad(loglik_eta)(eta))
+        _assert_close(
+            information(eta), -jax.hessian(lambda b: loglik_eta(Xp @ b))(beta)
+        )
+        _assert_close(lik._jax_dinformation(Xp, eta, yp, a, w, d1), dinformation(eta))
+        _assert_close(
+            lik._jax_d2information(Xp, eta, yp, a, w, d1, d2),
+            jax.jvp(dinformation, (eta,), (d2,))[1],
+        )
 
 
 def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:

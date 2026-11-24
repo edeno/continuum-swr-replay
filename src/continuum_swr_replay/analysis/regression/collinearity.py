@@ -41,7 +41,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .likelihoods import Gaussian, GroupedSoftmax, Likelihood
+from .likelihoods import Likelihood
 
 __all__ = [
     "MAX_EXPLAINED",
@@ -92,16 +92,7 @@ def weighted_design(
     np.ndarray, shape (n_rows, p)
         ``X~``, with ``X~' X~`` the information (the Gaussian's at unit scale).
     """
-    X = np.asarray(X, dtype=float)
-    if isinstance(lik, GroupedSoftmax):
-        starts, sizes, p, total = lik._parts(eta, y, aux)
-        means = np.add.reduceat(p[:, None] * X, starts, axis=0)
-        centered = X - np.repeat(means, sizes, axis=0)
-        return centered * np.sqrt(np.repeat(total, sizes) * p)[:, None]
-    if isinstance(lik, Gaussian):
-        return X
-    weights = lik._weights(eta, aux)[0]
-    return X * np.sqrt(weights)[:, None]
+    return lik.weighted_design(X, y, aux, eta)
 
 
 def concurvity(

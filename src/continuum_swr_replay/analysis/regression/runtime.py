@@ -15,7 +15,8 @@ kernels, and a log of the programs traced.
   persistent compilation cache is still traced. So the count is the number of
   programs this process needed, whatever the cache holds.
 
-This module imports JAX. The fitter's NumPy modules do not import it.
+This module imports JAX, and so does every module of the fitter that imports
+``likelihoods``, whose kernels it runs.
 """
 
 from __future__ import annotations

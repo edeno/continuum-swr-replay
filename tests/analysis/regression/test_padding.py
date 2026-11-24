@@ -1,11 +1,11 @@
 """``regression.padding``: padded rows and groups change no likelihood,
 gradient or information, and give no NaN.
 
-The reference is the present NumPy likelihood code on the unpadded rows. Two
-checks: the NumPy code itself on the padded rows (a design row of zeros adds
-nothing to a gradient or an information; for the grouped softmax nothing at
-all), and a weighted JAX form of each family on the padded rows, the form a
-kernel takes.
+The likelihoods' kernels run on padded rows (each row's terms times its
+weight) and on the same rows unpadded (every weight 1): the log-likelihood,
+the coefficient gradient, the information and its two directional
+derivatives agree, and every value is finite, also for a softmax with groups
+that have no rows.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
     GroupedSoftmax,
+    Groups,
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.padding import (
@@ -28,6 +29,7 @@ from continuum_swr_replay.analysis.regression.padding import (
     bucket_size,
     pad_groups,
     pad_rows,
+    pad_values,
 )
 
 RTOL = 1e-12
@@ -69,70 +71,36 @@ def _softmax_case(n_groups: int, seed: int = 3):
     return X, beta, y, ids
 
 
-# The weighted JAX form of each family: each row's term times its weight.
-
-
-def _diagonal_jax(family, X, eta, y, aux, weight):
-    """``(loglik, gradient, information)`` with each row weighted."""
-    if family == "poisson":
-        mu = jnp.exp(eta + aux)
-        terms = y * (eta + aux) - mu
-        score, w = y - mu, mu
-    elif family == "bernoulli":
-        mu = jax.nn.sigmoid(eta)
-        terms = y * eta - jnp.logaddexp(0.0, eta)
-        score, w = y - mu, mu * (1 - mu)
-    else:
-        terms = -((y - eta) ** 2) / (2 * aux) - 0.5 * jnp.log(2 * jnp.pi * aux)
-        score, w = (y - eta) / aux, jnp.full_like(eta, 1 / aux)
-    for values in (terms, score, w):
-        assert bool(jnp.all(jnp.isfinite(values)))
-    return (
-        jnp.sum(weight * terms),
-        X.T @ (weight * score),
-        (X.T * (weight * w)) @ X,
-    )
-
-
-def _softmax_jax(X, eta, y, group, weight, n_groups):
-    """``(loglik, gradient, information)`` of the grouped softmax by segment
-    sums, with the ``n_g log(sum exp)`` term guarded where ``n_g = 0``."""
-
-    def per_group(values):
-        return jax.ops.segment_sum(
-            values, group, num_segments=n_groups, indices_are_sorted=True
-        )
-
-    top = jax.ops.segment_max(
-        eta, group, num_segments=n_groups, indices_are_sorted=True
-    )
-    shifted = eta - top[group]
-    norm = per_group(jnp.exp(shifted))
-    total = per_group(weight * y)
-    p = jnp.exp(shifted) / norm[group]
-    for values in (shifted, p):
-        assert bool(jnp.all(jnp.isfinite(values)))
-    group_term = jnp.where(total > 0, total * jnp.log(jnp.where(norm > 0, norm, 1)), 0)
-    loglik = jnp.sum(weight * y * shifted) - jnp.sum(group_term)
-    score = weight * (y - total[group] * p)
-    Xp = per_group((weight * p)[:, None] * X)
-    information = (X.T * (weight * total[group] * p)) @ X - (Xp.T * total) @ Xp
-    return loglik, X.T @ score, information
-
-
-def _numpy_reference(lik, X, beta, y, aux):
-    eta = X @ beta
-    return (
-        lik.loglik(eta, y, aux),
-        X.T @ lik.score_eta(eta, y, aux),
-        lik.information(X, eta, y, aux),
-    )
+def _kernels(lik, X, y, aux, weight, beta, d1, d2):
+    """``(loglik, gradient, information, dinformation, d2information)`` from
+    the family's kernels on the given rows; every per-row value finite."""
+    with jax.enable_x64(True):
+        X, y, weight = jnp.asarray(X), jnp.asarray(y), jnp.asarray(weight)
+        aux = jax.tree_util.tree_map(jnp.asarray, aux)
+        eta = X @ beta
+        if isinstance(aux, Groups):
+            _, norm, p, total = lik._jax_parts(eta, y, aux, weight)
+            assert bool(jnp.all(jnp.isfinite(p)))
+            assert bool(jnp.all(jnp.isfinite(total)))
+        score = lik._jax_score(eta, y, aux, weight)
+        assert bool(jnp.all(jnp.isfinite(score)))
+        return [
+            np.asarray(v)
+            for v in (
+                lik._jax_loglik(eta, y, aux, weight),
+                X.T @ score,
+                lik._jax_information(X, eta, y, aux, weight),
+                lik._jax_dinformation(X, eta, y, aux, weight, d1),
+                lik._jax_d2information(X, eta, y, aux, weight, d1, d2),
+            )
+        ]
 
 
 def _assert_equal(padded, reference):
     for got, want in zip(padded, reference, strict=True):
+        assert np.all(np.isfinite(got))
         scale = np.max(np.abs(want))
-        np.testing.assert_allclose(np.asarray(got), want, rtol=0, atol=RTOL * scale)
+        np.testing.assert_allclose(got, want, rtol=0, atol=RTOL * scale)
 
 
 def test_bucket_size_is_the_next_multiple():
@@ -173,45 +141,27 @@ def test_padded_groups_number_the_groups_and_put_padding_in_one_more():
 
 @pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian"])
 @pytest.mark.parametrize("step", [ROW_BUCKET, 300, 7])
-def test_a_padded_diagonal_family_equals_the_unpadded_numpy_fit(family, step):
+def test_a_padded_diagonal_family_equals_the_unpadded_fit(family, step):
     """``step = 300`` pads nothing; 7 pads 1 row; the bucket pads 3,796."""
     lik, X, beta, y, aux = _diagonal_case(family)
+    rng = np.random.default_rng(1)
+    d1, d2 = rng.normal(size=(2, y.size))
     padded = pad_rows(X, y, aux if family == "poisson" else None, step=step)
     padded_aux = padded.offset if family == "poisson" else aux
-    reference = _numpy_reference(lik, X, beta, y, aux)
+    n = padded.y.size
 
-    with jax.enable_x64(True):
-        _assert_equal(
-            _diagonal_jax(
-                family,
-                jnp.asarray(padded.X),
-                jnp.asarray(padded.X @ beta),
-                jnp.asarray(padded.y),
-                None if padded_aux is None else jnp.asarray(padded_aux),
-                jnp.asarray(padded.weight),
-            ),
-            reference,
-        )
-
-    # The NumPy code itself: the zero design rows add nothing to the gradient
-    # or to the information and its derivatives (the log-likelihood needs the
-    # weights).
-    eta, padded_eta = X @ beta, padded.X @ beta
-    rng = np.random.default_rng(1)
-    d1, d2 = rng.normal(size=(2, padded.y.size))
     _assert_equal(
-        [
-            padded.X.T @ lik.score_eta(padded_eta, padded.y, padded_aux),
-            lik.information(padded.X, padded_eta, padded.y, padded_aux),
-            lik.dinformation(padded.X, padded_eta, padded.y, padded_aux, d1),
-            lik.d2information(padded.X, padded_eta, padded.y, padded_aux, d1, d2),
-        ],
-        [
-            reference[1],
-            reference[2],
-            lik.dinformation(X, eta, y, aux, d1[: y.size]),
-            lik.d2information(X, eta, y, aux, d1[: y.size], d2[: y.size]),
-        ],
+        _kernels(
+            lik,
+            padded.X,
+            padded.y,
+            padded_aux,
+            padded.weight,
+            beta,
+            pad_values(d1, n),
+            pad_values(d2, n),
+        ),
+        _kernels(lik, X, y, aux, np.ones(y.size), beta, d1, d2),
     )
 
 
@@ -223,48 +173,55 @@ def test_a_padded_diagonal_family_equals_the_unpadded_numpy_fit(family, step):
         (40, None),  # rows fill the bucket: the padding group has no rows
     ],
 )
-def test_a_padded_softmax_equals_the_unpadded_numpy_fit(n_groups, row_step):
+def test_a_padded_softmax_equals_the_unpadded_fit(n_groups, row_step):
+    """Every case has a group with no rows (``n_g = 0``, ``sum exp`` 0): the
+    groups after the padding group, or the padding group of the unpadded
+    rows. The guarded ``log`` keeps every value finite."""
     X, beta, y, ids = _softmax_case(n_groups)
     padded = pad_groups(X, y, ids, row_step=row_step or y.size)
     lik = GroupedSoftmax()
-    reference = _numpy_reference(lik, X, beta, y, ids)
     n_padded_rows = padded.y.size - padded.n_real
     assert (n_padded_rows == 0) == (row_step is None)
     assert padded.n_groups > padded.n_real_groups
-
-    with jax.enable_x64(True):
-        _assert_equal(
-            _softmax_jax(
-                jnp.asarray(padded.X),
-                jnp.asarray(padded.X @ beta),
-                jnp.asarray(padded.y),
-                jnp.asarray(padded.group),
-                jnp.asarray(padded.weight),
-                padded.n_groups,
-            ),
-            reference,
-        )
-
-    # The NumPy code itself, on the padded rows: the padding group has a total
-    # of 0, so it adds nothing to any term.
-    eta, padded_eta = X @ beta, padded.X @ beta
     rng = np.random.default_rng(2)
-    d1, d2 = rng.normal(size=(2, padded.y.size))
-    args = (padded_eta, padded.y, padded.group)
+    d1, d2 = rng.normal(size=(2, y.size))
+    n = padded.y.size
+    unpadded = pad_groups(X, y, ids, row_step=y.size, group_step=1)
+    assert unpadded.n_groups == n_groups + 1  # one padding group, with no rows
+
     _assert_equal(
-        [
-            lik.loglik(*args),
-            padded.X.T @ lik.score_eta(*args),
-            lik.information(padded.X, *args),
-            lik.dinformation(padded.X, *args, d1),
-            lik.d2information(padded.X, *args, d1, d2),
-        ],
-        [
-            *reference,
-            lik.dinformation(X, eta, y, ids, d1[: y.size]),
-            lik.d2information(X, eta, y, ids, d1[: y.size], d2[: y.size]),
-        ],
+        _kernels(
+            lik,
+            padded.X,
+            padded.y,
+            Groups(padded.group, padded.n_groups),
+            padded.weight,
+            beta,
+            pad_values(d1, n),
+            pad_values(d2, n),
+        ),
+        _kernels(
+            lik,
+            X,
+            y,
+            Groups(unpadded.group, n_groups),
+            np.ones(y.size),
+            beta,
+            d1,
+            d2,
+        ),
     )
+
+
+def test_the_public_methods_pad_and_return_the_real_rows():
+    """A public method pads to the bucket and returns one value per real row."""
+    lik, X, beta, y, aux = _diagonal_case("poisson")
+    eta = X @ beta
+    score = lik.score_eta(eta, y, aux)
+    assert score.shape == y.shape
+    np.testing.assert_allclose(score, y - np.exp(eta + aux), rtol=1e-14)
+    weighted = lik.weighted_design(X, y, aux, eta)
+    assert weighted.shape == X.shape
 
 
 def test_an_offset_of_minus_infinity_would_give_nan():

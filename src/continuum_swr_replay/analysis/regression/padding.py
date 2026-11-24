@@ -13,12 +13,12 @@ ones, and the number of groups is padded too; the extra groups beyond it have
 no rows. A group with a response total of 0 adds 0, provided a kernel guards
 its ``n_g log(sum exp)`` term, which is ``0 * -inf`` for a group with no rows.
 
-Everything here is NumPy; nothing imports JAX. The padding tests check the
-NumPy likelihoods and a weighted JAX stand-in for each kernel; run them again
-against the real JAX kernels when those exist (sub-phase 3), the guard for a
-softmax group with no rows included.
 Every quantity that depends on the number of rows (a degrees-of-freedom count,
 a mean, a dispersion) must use ``n_real``, not the padded count.
+
+Everything here is NumPy; nothing imports JAX. The likelihoods
+(``likelihoods.Likelihood.pad``) pad with these functions before they call a
+kernel.
 """
 
 from __future__ import annotations
@@ -27,8 +27,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from continuum_swr_replay.analysis.regression.likelihoods import group_starts
-
 __all__ = [
     "GROUP_BUCKET",
     "PaddedGroups",
@@ -36,8 +34,10 @@ __all__ = [
     "ROW_BUCKET",
     "SOFTMAX_ROW_BUCKET",
     "bucket_size",
+    "group_starts",
     "pad_groups",
     "pad_rows",
+    "pad_values",
 ]
 
 ROW_BUCKET = 4096
@@ -65,8 +65,37 @@ def bucket_size(n: int, step: int) -> int:
     return -(-n // step) * step
 
 
-def _padded(values: np.ndarray, n_rows: int) -> np.ndarray:
-    """`values` with zero rows appended to `n_rows` rows, as float64."""
+def group_starts(groups: np.ndarray) -> np.ndarray:
+    """Index of each group's first row, shape ``(n_groups,)``.
+
+    Raises
+    ------
+    ValueError
+        If ``groups`` is empty or not sorted (a group's rows must be
+        contiguous).
+    """
+    groups = np.asarray(groups)
+    if groups.size == 0:
+        raise ValueError("no rows")
+    if np.any(groups[1:] < groups[:-1]):
+        raise ValueError("group ids must be sorted so each group's rows are contiguous")
+    return np.flatnonzero(np.r_[True, groups[1:] != groups[:-1]])
+
+
+def pad_values(values: np.ndarray, n_rows: int) -> np.ndarray:
+    """`values` with zero rows appended to `n_rows` rows, as float64.
+
+    Parameters
+    ----------
+    values : np.ndarray, shape (n, ...)
+        One entry (or row) per real row, ``n <= n_rows``.
+    n_rows : int
+        The padded count.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows, ...)
+    """
     values = np.asarray(values, dtype=float)
     out = np.zeros((n_rows, *values.shape[1:]))
     out[: values.shape[0]] = values
@@ -130,10 +159,10 @@ def pad_rows(
         )
     n_bucket = bucket_size(n_rows, step)
     return PaddedRows(
-        X=_padded(X, n_bucket),
-        y=_padded(y, n_bucket),
-        offset=_padded(offset, n_bucket),
-        weight=_padded(np.ones(n_rows), n_bucket),
+        X=pad_values(X, n_bucket),
+        y=pad_values(y, n_bucket),
+        offset=pad_values(offset, n_bucket),
+        weight=pad_values(np.ones(n_rows), n_bucket),
         n_real=n_rows,
     )
 
