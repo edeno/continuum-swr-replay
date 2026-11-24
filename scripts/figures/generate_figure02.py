@@ -1123,7 +1123,7 @@ def draw_overview(
     )  # fmt: skip
     ax_sp.set_xlabel("Time (s)")
     for ax, label, x in (
-        (ax_pos, "Decoded\nposition (cm)", -0.1),
+        (ax_pos, "Decoded\nposition (cm)", -0.15),
         (ax_rip, "Ripple (z)", -0.05),
         (ax_st, "State prob.", -0.05),
         (ax_sp, "Speed (cm/s)", -0.05),
