@@ -958,8 +958,9 @@ What was shown to the lead: the realistic simulation of the weak penalty at prio
 a value, but the result on the reward coefficient depends on the SD more than on the data, because a
 session expects only 2 to 6 SWR events after an omitted reward); a toy calculation with two Poisson counts
 that gives the same pattern (`proto_rate_realistic/weak_penalty_toy/`); and the literature's advice to fit
-one model over sparse units (one reward coefficient per animal, shared by its sessions, unpenalized). The
-lead heard that advice and set it aside for consistency across the model families.
+one model over sparse units (one reward coefficient per animal, shared by its sessions, unpenalized).
+(The author's reading, not the lead's words: the lead heard that advice and set it aside for consistency
+across the model families.)
 
 The lead's words, in order:
 
@@ -970,15 +971,19 @@ The lead's words, in order:
 
 So:
 
-- The reward coefficient is fitted in each session with the weak penalty, like every simple tested
-  coefficient in every model. There is no per-animal coefficient as the method and no unpenalized fit.
-- (**call**, the author's, not a number the lead chose) The prior SD is 2 on the log rate ratio: a rate
-  ratio between about 1/50 and 50 is plausible (`exp(1.96 x 2)` is about 50). SD 1 and SD 4 are reported
-  beside it, as the stiffer and looser values the convention already asks for
-  (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`).
-- The consequence for every family: a family's simulation measures the error that the paper states beside
-  the number (bias, spread, coverage and false-positive rate at the declared SD and at the pair beside
-  it); it does not veto a term.
+- Decided by the lead: the reward coefficient keeps the weak penalty in each session, as every simple
+  tested coefficient does, at a reasonable declared value. There is no per-animal coefficient as the
+  method and no unpenalized fit.
+- (**call**, the author's, not values the lead chose) The values are declared per model, because the unit
+  of the coefficient differs: prior SD 2 on the rate model's log rate ratio (a rate ratio between about
+  1/50 and 50 is plausible, `exp(1.96 x 2)` is about 50), with SD 1 and 4 reported beside it
+  (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`); prior SD 8 on the content model's
+  coefficients, with 4 and 16 beside it (the author's pick from the content validation, told to the lead
+  on 2026-11-23). No single SD was decided for every family; the other families' values are not picked
+  yet.
+- (The author's text, not the lead's) A family's simulation measures the error that the paper states
+  beside the number (bias, spread, coverage and false-positive rate at the declared SD and at the pair
+  beside it); it does not veto a term.
 - The per-animal fit built for the comparison (`visit_rate.fit_animal_rewards`, `reward_level="animal"`)
   is a check, not the paper's method; whether it stays in the code is a question for the lead.
 
@@ -1010,8 +1015,9 @@ e. **The penalties of the mPFC models and of the history kernels.** Whether a pe
 f. **A support rule per grid point** for curves averaged over sessions (an idea of the author; not built,
    not decided). Simulation: few sessions have bins near the 20 s end of the arrival clock, and the
    average curve is far off there.
-g. *(Decided in the twenty-fifth round: the reward coefficient per session with the weak penalty; prior
-   SD 2 on the log rate ratio, the author's call, with SD 1 and 4 reported beside it.)* Each family reports
+g. *(Decided in the twenty-fifth round: the reward coefficient per session with the weak penalty. The
+   values are the author's, per model: SD 2 on the rate model's log rate ratio, with 1 and 4 beside it;
+   SD 8 on the content model's coefficients, with 4 and 16 beside it.)* Each family reports
    a sensitivity analysis over the strength (Greenland and Mansournia 2015).
 
 ## 10. Left to the builder

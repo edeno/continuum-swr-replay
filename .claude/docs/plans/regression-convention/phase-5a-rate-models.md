@@ -70,7 +70,9 @@ solver, this phase's fits are rerun once to confirm equality. CPU only.
   with the weak penalty; the prior SD is 2 on the log rate ratio (the author's call, not the lead's
   number: a rate ratio within a factor of about 50 either way is plausible), with SD 1 and 4 reported
   beside it (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`); the log penalty is `log(1 / SD^2)`.
-  The simulation measures the error the paper states beside the number; it does not veto the term.
+  The values are the author's, per model (rate SD 2, content SD 8 with 4 and 16 beside it); no single SD
+  was decided for every family. (The author's text, not the lead's:) the simulation measures the error the
+  paper states beside the number; it does not veto the term.
 - **OPEN (lead): rate model form** (b). Diagnostics on the real bins (pooled; not results): omission
   visits have a median of 0.9 s against 5.4 s; SWR events almost never start in the first second after
   arrival after either outcome (none in 93 % of sessions), so Q1's reference window `[0, 1] s` is empty

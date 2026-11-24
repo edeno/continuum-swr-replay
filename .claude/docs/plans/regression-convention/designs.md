@@ -176,8 +176,9 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   penalty, a Normal prior of mean 0 on the coefficient in the reported unit (a 0/1 step; one pooled SD),
   `rho = log(1 / SD^2)` (`terms.log_penalty_from_prior_sd`). Baselines are not penalized (the intercept, the
   arm effects, other nuisance categories). Each record holds the edf of each penalized simple coefficient.
-  The SD is one declared number for all models; **its value is open** (design, "Open after the
-  twenty-third round", g; a simulation with SD 1, 2 and 4 is running). Each family's simulation checks the
+  The rule is decided (the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"); the SD is
+  declared per model by the author from that model's simulation, with a stiffer and a looser value: rate 2
+  (1, 4), content 8 (4, 16), the other families not picked yet. Each family's simulation checks the
   penalty before the family's fit is used.
 - The guard (**call**, the author's, not the lead's words): each model module calls
   `support.require_tested_penalized(design, tested)` with the coefficients of its declared tests; it

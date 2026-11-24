@@ -177,10 +177,12 @@ The design's section 4. In short, with the phase that implements each piece:
 > Medicine 34:3133, doi 10.1002/sim.6537); the support rule reads the design only ("No rule reads the event
 > counts before a fit"): a term is absent in a session when its column does not vary enough there (fewer
 > than 5 units with a row on a side); each fit records the edf of each penalized simple coefficient; the
-> width is one declared Normal prior SD for all models, on the coefficient in the reported unit (a 0/1
+> width is a declared Normal prior SD per model, on the coefficient in the reported unit (a 0/1
 > step; one pooled SD of a continuous covariate), so the log penalty is `log(1 / SD^2)`
-> (`terms.log_penalty_from_prior_sd`). **The SD's value is open** (`OPEN (lead): penalty width`; a
-> simulation with SD 1, 2 and 4 is running). A penalized coefficient always has a finite maximum, so a
+> (`terms.log_penalty_from_prior_sd`). **The rule is decided** (the lead, 2026-11-23, 19:34, "lets just pick a
+> penalty that's reasonable"); **the value is declared per model** by the author from that model's simulation,
+> reported with a stiffer and a looser value: rate 2 (1, 4); content 8 (4, 16); the other families' values are
+> not picked yet. There is no one SD for all models. A penalized coefficient always has a finite maximum, so a
 > session with no event on one side of it keeps it. An unpenalized term has no finite maximum only as a
 > 0/1 slope or a level with no event on a side, and the no-finite-maximum rule leaves it out there; with
 > few events on a side (a level whose events are in one to four units), or as a continuous slope, it is

@@ -89,7 +89,7 @@ in-visit bins in epochs with mPFC units), [C5](shared-contracts.md#c5-the-conven
   batched IRLS. The support rule reads the design, never the spike counts (design, twenty-second round,
   **call**): a term is absent for a unit when its column does not vary enough on the unit's rows (fewer
   than `MIN_UNITS` of the design's units, the visits, with a row on a side), recorded, not fit. A simple
-  tested coefficient has the declared weak penalty (the lead, 2026-11-23, 13:02, "yes"; width `OPEN (lead): penalty width`), checked
+  tested coefficient has the declared weak penalty (the lead, 2026-11-23, 13:02, "yes"; width: the rule decided by the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"; the value declared per model by the author from its simulation, with a stiffer and a looser value: rate 2 (1, 4), content 8 (4, 16), the other families not picked yet), checked
   by the family's simulation before use; how it sits beside the kernels' penalties is part of
   `OPEN (lead): mPFC and history penalties`.
 - **Population statements**: each population number (called fractions, best-model fractions, peak

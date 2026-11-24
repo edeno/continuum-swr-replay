@@ -99,7 +99,7 @@ the whole pipeline of bias and coverage (port design, section 9).
 - Any scenario list but the rate model's first one. Each family phase writes its own.
 - The realistic rate scenarios themselves (Phase 5a turns them into the list).
 - Any change to the fitter. The engine runs on the present NumPy fitter.
-- A decision on the open questions (`OPEN (lead): rate model form`, `OPEN (lead): penalty width`). The
+- A decision on the open question `OPEN (lead): rate model form` (the penalty width is no longer open: the rule decided by the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"; the value declared per model by the author from its simulation, with a stiffer and a looser value: rate 2 (1, 4), content 8 (4, 16), the other families not picked yet). The
   engine reports what a scenario gives; it does not choose a rule. (The reward term's rule is decided: a
   weak penalty, and a support rule on the design; design, twenty-second round. The engine runs it, and
   each family's scenario list checks the penalty before the family's fit is used.)

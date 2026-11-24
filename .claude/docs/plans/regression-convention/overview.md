@@ -99,7 +99,7 @@ and after the port); the lead was told it and did not object (design, twenty-fir
     "The weak-penalty rule"): baselines are not penalized (the intercept, the arm effects, other nuisance
     categories; Greenland and Mansournia 2015); the support rule reads the design only, never the outcome
     ("No rule reads the event counts before a fit"); each fit records the edf of each penalized simple
-    coefficient; the width is one declared prior SD for all models, in the reported unit, log penalty
+    coefficient; the width is a declared prior SD per model (item g), in the reported unit, log penalty
     `log(1 / SD^2)`. Built: `weak-penalty`, aa8f8425.
 11. **The JAX port goes ahead without blocking Figure 4** (twenty-third round). The lead, 12:34: "I think I
     would in general prefer one fitter, but if there's a good reason not to, then that's fine". After the
@@ -122,8 +122,8 @@ depends on one names it with `OPEN (lead): <name>`):
 - f. `OPEN (lead): grid-point support`: a support rule per grid point for curves averaged over sessions
   (an author's idea; not built). Phases 9 and 10.
 - g. Decided (design, twenty-fifth round, 2026-11-23): the reward coefficient is fitted per session with
-  the weak penalty, like every simple tested coefficient; prior SD 2 on the reported unit (the author's
-  call), SD 1 and 4 reported beside it. No per-animal coefficient, no unpenalized fit. Each family's
+  the weak penalty, like every simple tested coefficient (the lead); the values are the author's, per model: rate SD 2 (1, 4), content SD 8 (4, 16), the others not picked yet.
+  No per-animal coefficient, no unpenalized fit. (The author's text:) each family's
   simulation measures the error the paper states beside the number; it does not veto a term. Every phase
   with a penalized simple term (5a, 5b, 6a, 7, 8, 11) reads it.
 
