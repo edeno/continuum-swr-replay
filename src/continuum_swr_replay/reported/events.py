@@ -1329,7 +1329,8 @@ def left_out_values(
                 stats[f"nonlocal_time_outside_{word}_fraction"],
                 "fraction",
                 "pct",
-                f"share of non-local event time that {label} do not cover",
+                f"share of non-local event time that {label} do not cover: "
+                "each epoch's share, each animal's mean over its epochs, the mean over animals",
             ),
         ]
     for word, label in (
@@ -1349,7 +1350,8 @@ def left_out_values(
                 stats[f"nonlocal_events_outside_{word}_fraction"],
                 "fraction",
                 "pct",
-                f"share of the non-local events with a known membership that {label}",
+                f"share of the non-local events with a known membership that {label}: "
+                "each epoch's share, each animal's mean over its epochs, the mean over animals",
             ),
             make(
                 f"nonlocal_events_outside_{word}_per_hour",
@@ -1357,7 +1359,7 @@ def left_out_values(
                 "quantity",
                 "sig2",
                 f"non-local events {label}, per hour of analyzed immobility inside a "
-                "well visit",
+                "well visit: each epoch's events per hour of its exposure, each animal's mean over its epochs, the mean over animals",
                 "per h",
             ),
         ]
@@ -1376,7 +1378,7 @@ def left_out_values(
             "fraction",
             "pct",
             "share of the non-local events with a known membership that no SWR "
-            "definition and no MUA event overlaps",
+            "definition and no MUA event overlaps: each epoch's share, each animal's mean over its epochs, the mean over animals",
         ),
         make(
             "nonlocal_events_outside_trigger_per_hour",
@@ -1384,7 +1386,7 @@ def left_out_values(
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
-            "analyzed immobility inside a well visit",
+            "analyzed immobility inside a well visit: each epoch's events per hour of its exposure, each animal's mean over its epochs, the mean over animals",
             "per h",
         ),
     ]

@@ -357,6 +357,9 @@ def _write_run(run_dir, inventory_dir) -> None:
     natives = [1, 2, 99, 1, 2, 1, 1, 1]
     features = pd.DataFrame(
         {
+            "animal": "a",
+            "day": 1,
+            "epoch": "a",
             "detector": detectors,
             "event_key": [
                 _key(d, "a", n) for d, n in zip(detectors, natives, strict=True)
@@ -370,6 +373,9 @@ def _write_run(run_dir, inventory_dir) -> None:
     # detector: 1 and 2 unmatched, 99 matched; 1 is unknown against Kay too
     membership = pd.DataFrame(
         {
+            "animal": "a",
+            "day": 1,
+            "epoch": "a",
             "detector": "state_space",
             "event_key": [_key("state_space", "a", n) for n in (1, 2, 99, 1, 1, 2, 99)],
             "other_detector": ["kay", "kay", "kay", "kay", *["memoryless"] * 3],
@@ -459,6 +465,52 @@ def test_left_out_statistics_count_the_selected_events_time_and_rates(tmp_path):
     assert result["nonlocal_events_outside_trigger"] == 4
     assert result["nonlocal_events_outside_trigger_fraction"] == 4 / 7
     assert result["nonlocal_events_outside_trigger_per_hour"] == 4.0
+
+
+def test_left_out_animal_shares_take_each_epoch_then_each_animal():
+    """Animal a: epoch e1 with 10 s of selected non-local time (5 s outside
+    each covering), 1 of 4 events outside Kay, 3 of 3 outside the Widloski
+    detector, 2 of 4 outside every trigger, 1 h of exposure; e2 with no
+    selected time and no event with a known membership, 2 h of exposure.
+    Animal b: e1 with 4 s (1 s outside), 2 of 2 outside Kay, no event against
+    the Widloski detector or the triggers, 0.5 h. An epoch with nothing to
+    measure is not one of its animal's epochs; b has none for the Widloski
+    detector and the triggers, so it is left out of those means."""
+    names = ("kay", "widloski", "trigger")
+    epochs = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b"],
+            "day": 1,
+            "epoch": ["e1", "e2", "e1"],
+            "nonlocal": [10.0, 0.0, 4.0],
+            **{f"outside_{name}": [5.0, 0.0, 1.0] for name in comparison.COVERINGS},
+            "hours": [1.0, 2.0, 0.5],
+            "kay_outside": [1, NAN, 2],
+            "kay_known": [4, NAN, 2],
+            "widloski_outside": [3, NAN, NAN],
+            "widloski_known": [3, NAN, NAN],
+            "trigger_outside": [2, NAN, NAN],
+            "trigger_known": [4, NAN, NAN],
+        }
+    )
+    shares = comparison.left_out_animal_shares(epochs)
+    # time: a's e1 1/2 (e2 has none), b 1/4 (pooled over the 14 s: 6/14)
+    assert shares["nonlocal_time_outside_kay_fraction"] == pytest.approx(0.375)
+    # events against Kay: a 1/4, b 1 (pooled over the 6 events: 1/2)
+    assert shares["nonlocal_events_outside_kay_fraction"] == pytest.approx(0.625)
+    # per hour: a's e1 1, its e2 0 (observed, none left out), b 4 (pooled over
+    # the 3.5 h: 3 / 3.5)
+    assert shares["nonlocal_events_outside_kay_per_hour"] == pytest.approx(2.25)
+    # the Widloski detector and the triggers: a alone
+    assert shares["nonlocal_events_outside_widloski_fraction"] == pytest.approx(1.0)
+    assert shares["nonlocal_events_outside_trigger_fraction"] == pytest.approx(0.5)
+    # a rate counts b's observed epoch as 0: a (3 + 0) / 2, b 0
+    assert shares["nonlocal_events_outside_widloski_per_hour"] == pytest.approx(0.75)
+    assert set(shares) == {
+        *(f"nonlocal_time_outside_{name}_fraction" for name in comparison.COVERINGS),
+        *(f"nonlocal_events_outside_{name}_fraction" for name in names),
+        *(f"nonlocal_events_outside_{name}_per_hour" for name in names),
+    }
 
 
 def test_left_out_statistics_refuse_an_exposure_without_an_observed_session(

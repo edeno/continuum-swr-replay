@@ -661,18 +661,23 @@ def _selected(table: pd.DataFrame, event_ids: Iterable[object]) -> np.ndarray:
     )
 
 
-def left_out_seconds(
+_LEFT_OUT_SESSION = ["animal", "day", "epoch"]
+"""The columns that name an epoch in the run's and the inventory run's tables."""
+
+
+def left_out_epoch_seconds(
     run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
-) -> dict[str, float]:
+) -> pd.DataFrame:
     """Seconds of the selected non-local events' time outside each other
-    inventory, summed over the run's ``ok`` epochs.
+    inventory, in each of the run's ``ok`` epochs.
 
     Each epoch's compared events (``*_features.parquet``: every inventory's
-    whole-event-immobile events): the time of the non-local events in
-    ``event_ids`` (``nonlocal``), the time the Kay SWRs whose first sample is
-    inside a well visit span (``kay``), and, for each of :data:`COVERINGS`,
-    the part of that non-local time that no event of those inventories covers,
-    wherever the covering event starts (``outside_<covering>``).
+    whole-event-immobile events, with ``animal``, ``day`` and ``epoch``): the
+    time of the non-local events in ``event_ids`` (``nonlocal``), the time the
+    Kay SWRs whose first sample is inside a well visit span (``kay``), and,
+    for each of :data:`COVERINGS`, the part of that non-local time that no
+    event of those inventories covers, wherever the covering event starts
+    (``outside_<covering>``).
 
     Parameters
     ----------
@@ -683,6 +688,11 @@ def left_out_seconds(
     visits : Mapping
         Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
 
+    Returns
+    -------
+    pd.DataFrame
+        One row per ok epoch: ``animal``, ``day``, ``epoch`` and the seconds.
+
     Raises
     ------
     ValueError
@@ -690,19 +700,24 @@ def left_out_seconds(
         ok epoch has no visits in ``visits``.
     """
     event_ids = list(event_ids)
-    totals = dict.fromkeys(
-        ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS)), 0.0
-    )
     identifiers = ok_epochs(read_manifest(run_dir))
     if missing := sorted(set(identifiers) - set(visits)):
         raise ValueError(
             f"no well visits for {len(missing)} epochs, e.g. {missing[:3]}"
         )
+    rows = []
     for identifier, path in zip(
         identifiers, _epoch_paths(run_dir, "features"), strict=True
     ):
         table = pd.read_parquet(
-            path, columns=["detector", "event_key", "event_start_s", "event_end_s"]
+            path,
+            columns=[
+                *_LEFT_OUT_SESSION,
+                "detector",
+                "event_key",
+                "event_start_s",
+                "event_end_s",
+            ],
         )
         is_nonlocal = (table["detector"] == STATE_SPACE).to_numpy()
         selected = np.zeros(len(table), dtype=bool)
@@ -714,12 +729,86 @@ def left_out_seconds(
                 kay["event_start_s"].to_numpy(dtype=np.float64), *visits[identifier]
             )
         ]
-        totals["nonlocal"] += intervals.total_duration(nonlocal_)
-        totals["kay"] += intervals.total_duration(_intervals(kay, ("kay",)))
+        row = dict(table[_LEFT_OUT_SESSION].iloc[0])
+        row["nonlocal"] = intervals.total_duration(nonlocal_)
+        row["kay"] = intervals.total_duration(_intervals(kay, ("kay",)))
         for name, detectors in COVERINGS.items():
             outside = intervals.subtract(nonlocal_, _intervals(table, detectors))
-            totals[f"outside_{name}"] += intervals.total_duration(outside)
-    return totals
+            row[f"outside_{name}"] = intervals.total_duration(outside)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def left_out_seconds(
+    run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
+) -> dict[str, float]:
+    """:func:`left_out_epoch_seconds`, summed over the run's ``ok`` epochs:
+    ``nonlocal``, ``kay`` and ``outside_<covering>`` for each of
+    :data:`COVERINGS`, in seconds.
+
+    Raises
+    ------
+    ValueError
+        As :func:`left_out_epoch_seconds`.
+    """
+    seconds = left_out_epoch_seconds(run_dir, event_ids, visits)
+    names = ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS))
+    return {name: float(seconds[name].sum()) for name in names}
+
+
+def left_out_animal_shares(epochs: pd.DataFrame) -> dict[str, float]:
+    """The shares and rates of :func:`left_out_statistics`, epoch -> animal ->
+    mean over animals, from one row per epoch.
+
+    A time share is each epoch's left-out seconds over its selected non-local
+    seconds (epochs with such time); an event share each epoch's left-out
+    events over its events with a known membership (epochs with such an
+    event); a rate each epoch's left-out events per hour of its exposure
+    inside the well visits (epochs the non-local detector observed, with an
+    exposure; an observed epoch with no left-out event has a rate of 0). Each
+    animal's mean over its epochs with a value, then the mean over the
+    animals with one: an animal with no such epoch is left out.
+
+    Parameters
+    ----------
+    epochs : pd.DataFrame, shape (n_epochs, n_columns)
+        ``animal``, ``day``, ``epoch``; ``nonlocal`` and ``outside_<covering>``
+        (s) for each of :data:`COVERINGS` (NaN for an epoch the run does not
+        hold); ``hours`` (NaN for an epoch not observed); and for each of
+        ``kay``, ``widloski`` and ``trigger``, ``<name>_outside`` (left-out
+        events) and ``<name>_known`` (events with a known membership).
+
+    Returns
+    -------
+    dict
+        ``nonlocal_time_outside_<covering>_fraction``,
+        ``nonlocal_events_outside_<name>_fraction`` and
+        ``nonlocal_events_outside_<name>_per_hour``.
+    """
+
+    def mean_over_animals(values: pd.Series, rows: pd.DataFrame) -> float:
+        return float(
+            animal_session_values(
+                values, rows["animal"], rows[["day", "epoch"]], "mean"
+            ).mean()
+        )
+
+    shares = {}
+    timed = epochs[epochs["nonlocal"] > 0]
+    for name in COVERINGS:
+        shares[f"nonlocal_time_outside_{name}_fraction"] = mean_over_animals(
+            timed[f"outside_{name}"] / timed["nonlocal"], timed
+        )
+    for name in ("kay", "widloski", "trigger"):
+        known = epochs[epochs[f"{name}_known"] > 0]
+        shares[f"nonlocal_events_outside_{name}_fraction"] = mean_over_animals(
+            known[f"{name}_outside"] / known[f"{name}_known"], known
+        )
+        observed = epochs[epochs["hours"] > 0]
+        shares[f"nonlocal_events_outside_{name}_per_hour"] = mean_over_animals(
+            observed[f"{name}_outside"].fillna(0) / observed["hours"], observed
+        )
+    return shares
 
 
 def left_out_statistics(
@@ -758,18 +847,21 @@ def left_out_statistics(
         - ``rest_hours``: hours of the non-local detector's exposure inside a
           well visit, summed over the sessions it observed.
         - ``nonlocal_time_s``, ``kay_time_s``: seconds the selected non-local
-          events, and the Kay SWRs that start inside a visit, span
-          (:func:`left_out_seconds`).
-        - For each of :data:`COVERINGS`, ``nonlocal_time_outside_<covering>_s``
-          and ``..._fraction``: the selected non-local event time it does not
-          cover, in seconds and as a share.
+          events, and the Kay SWRs that start inside a visit, span, summed
+          over the epochs (:func:`left_out_seconds`).
+        - For each of :data:`COVERINGS`, ``nonlocal_time_outside_<covering>_s``,
+          the selected non-local event time it does not cover (summed), and
+          ``..._fraction``, that time as a share of the selected non-local
+          time (:func:`left_out_animal_shares`: each epoch's, each animal's
+          mean over its epochs, the mean over animals).
         - For ``kay`` and ``widloski``, and for ``trigger`` (no SWR definition
           and no MUA event; the comparison's cell
           ``sequence_matched_by_no_trigger``): ``nonlocal_events_outside_<name>``,
           the selected non-local events none of its events overlaps (wherever
-          that event starts); ``..._fraction``, their share of the selected
-          events with a known membership; and ``..._per_hour``, per hour of
-          ``rest_hours``.
+          that event starts; summed); ``..._fraction``, their share of the
+          selected events with a known membership; and ``..._per_hour``, per
+          hour of exposure inside the visits (both
+          :func:`left_out_animal_shares`).
 
     Raises
     ------
@@ -779,7 +871,7 @@ def left_out_statistics(
         detector observed.
     """
     event_ids = list(event_ids)
-    session = ["animal", "day", "epoch"]
+    session = _LEFT_OUT_SESSION
     availability = detector_availability(
         typed_table(
             map(read_table, _epoch_paths(inventory_dir, "observations")),
@@ -797,18 +889,16 @@ def left_out_statistics(
     )
     if exposed["exposure_in_visit_s"].isna().any():
         raise ValueError("the exposure lacks a session the non-local detector observed")
-    hours = float(exposed["exposure_in_visit_s"].sum()) / 3600.0
-    seconds = left_out_seconds(run_dir, event_ids, visits)
+    exposed = exposed.assign(hours=exposed["exposure_in_visit_s"] / 3600.0)
+    seconds = left_out_epoch_seconds(run_dir, event_ids, visits)
     statistics = {
-        "rest_hours": hours,
-        "nonlocal_time_s": seconds["nonlocal"],
-        "kay_time_s": seconds["kay"],
+        "rest_hours": float(exposed["hours"].sum()),
+        "nonlocal_time_s": float(seconds["nonlocal"].sum()),
+        "kay_time_s": float(seconds["kay"].sum()),
     }
     for name in COVERINGS:
-        outside = seconds[f"outside_{name}"]
-        statistics[f"nonlocal_time_outside_{name}_s"] = outside
-        statistics[f"nonlocal_time_outside_{name}_fraction"] = (
-            outside / seconds["nonlocal"]
+        statistics[f"nonlocal_time_outside_{name}_s"] = float(
+            seconds[f"outside_{name}"].sum()
         )
 
     membership = _read_epochs(
@@ -816,12 +906,7 @@ def left_out_statistics(
     )
     known = membership[
         membership["membership"].isin(_KNOWN) & _selected(membership, event_ids)
-    ]
-    alone = (
-        known.assign(alone=known["membership"] == "unmatched")
-        .groupby("other_detector")["alone"]
-        .agg(["sum", "size"])
-    )
+    ].assign(alone=lambda t: t["membership"] == "unmatched")
     cells = typed_table(
         map(read_table, _epoch_paths(inventory_dir, "cells")), TABLE_DTYPES["cells"]
     )
@@ -829,20 +914,39 @@ def left_out_statistics(
         (cells["cell"] == "sequence_matched_by_no_trigger")
         & (cells["detector"] == STATE_SPACE)
     ].merge(observed, on=session, how="inner")
-    no_trigger = cells.loc[_selected(cells, event_ids), "membership"]
-    outside_events = {
-        "kay": (int(alone.loc["kay", "sum"]), int(alone.loc["kay", "size"])),
-        "widloski": (
-            int(alone.loc[MEMORYLESS, "sum"]),
-            int(alone.loc[MEMORYLESS, "size"]),
-        ),
-        "trigger": (
-            int((no_trigger == "unmatched").sum()),
-            int(no_trigger.isin(_KNOWN).sum()),
-        ),
+    cells = cells[_selected(cells, event_ids) & cells["membership"].isin(_KNOWN)]
+    cells = cells.assign(alone=cells["membership"] == "unmatched")
+    epochs = seconds.merge(exposed[[*session, "hours"]], on=session, how="outer")
+    for name, table in (
+        ("kay", known[known["other_detector"] == "kay"]),
+        ("widloski", known[known["other_detector"] == MEMORYLESS]),
+        ("trigger", cells),
+    ):
+        counts = (
+            table.groupby(session)["alone"]
+            .agg(["sum", "size"])
+            .set_axis([f"{name}_outside", f"{name}_known"], axis=1)
+            .reset_index()
+        )
+        epochs = epochs.merge(counts, on=session, how="outer")
+        statistics[f"nonlocal_events_outside_{name}"] = int(table["alone"].sum())
+    for key, value in left_out_animal_shares(epochs).items():
+        statistics[key] = value
+    return {
+        key: statistics[key]
+        for key in (
+            "rest_hours",
+            "nonlocal_time_s",
+            "kay_time_s",
+            *(
+                f"nonlocal_time_outside_{name}_{unit}"
+                for name in COVERINGS
+                for unit in ("s", "fraction")
+            ),
+            *(
+                f"nonlocal_events_outside_{name}{suffix}"
+                for name in ("kay", "widloski", "trigger")
+                for suffix in ("", "_fraction", "_per_hour")
+            ),
+        )
     }
-    for name, (n, n_known) in outside_events.items():
-        statistics[f"nonlocal_events_outside_{name}"] = n
-        statistics[f"nonlocal_events_outside_{name}_fraction"] = n / n_known
-        statistics[f"nonlocal_events_outside_{name}_per_hour"] = n / hours
-    return statistics
