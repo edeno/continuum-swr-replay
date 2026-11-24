@@ -75,9 +75,14 @@ Panels a, c and d mark each class's median (triangle;
 ``<property>_median_*`` values (``paper/reported/events.json``), and under it
 each animal's median (ticks; ``event_statistics.animal_class_medians``), the
 medians the summary's ``<property>_animals_in_direction`` counts compare. Panels
-e and f place every event time bin's MAP position on its arm
-(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
-draw ``content_along_arms.content_density_along_arms``, the animals' mean; f
+e and f place every event's content time on the arms: its position
+distribution at each time bin (the posterior of the two non-local states over
+the place bins), summed over its time bins
+(``measure_content_mass_along_arms.py``;
+``Processed-Data/content_mass_along_arms``), not each time bin's one most
+probable place, whose content piles on a single place bin beside each well and
+each junction. They draw ``content_along_arms.content_density_along_arms``, the
+animals' mean, and f each animal's under it (thin lines); f
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
 ``place_share_statistics``). Each weighs each epoch of an animal the same and
@@ -136,7 +141,7 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
-    content_along_arms_bins,
+    content_mass_along_arms,
     default_inputs,
     with_event_speed,
 )
@@ -211,24 +216,11 @@ HISTOGRAMS = {
 
 
 def read_inputs() -> dict:
-    """The events, their content's time bins, and the other inputs."""
+    """The events, their content time at each place, and the other inputs."""
     inputs = default_inputs()
     events = select_visit_context(read_swr_table(inputs.event_table))
     n_epochs = len(analyzed_epoch_ids())
-    along, _ = content_along_arms_bins(
-        events,
-        inputs.content_along_arms,
-        n_epochs,
-        [
-            "arm",
-            "fraction",
-            "arm_length_cm",
-            "place_bin",
-            "n_place_bins",
-            "distance_to_well_cm",
-            "distance_to_animal_cm",
-        ],
-    )
+    along, _ = content_mass_along_arms(events, inputs.content_mass_along_arms, n_epochs)
     # panel g: the selected events, as the events summary reads them
     distance = content_distance_distribution(events)
     events, _ = with_event_speed(events, inputs.event_speed, n_epochs)
@@ -240,6 +232,9 @@ def read_inputs() -> dict:
         "distance": distance,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "profiles": leaf_and_trunk_profiles(density),
+        "animal_profiles": leaf_and_trunk_profiles(
+            content_density_along_arms(along, N_SEGMENTS, by_animal=True)
+        ),
         "even": even,
         "against_even": log2_density_against_even(density, even["density_per_cm"]),
         "track_graph": env.track_graph,
@@ -505,12 +500,20 @@ def label_track(ax, track_graph) -> None:
     )
 
 
-def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) -> None:
+def draw_profiles(
+    ax,
+    profiles: pd.DataFrame,
+    shares: pd.DataFrame,
+    even: dict,
+    animal_profiles: pd.DataFrame | None = None,
+) -> None:
     """Content time per cm along the trunk arms (center to junction) and the
     leaf arms (junction to well), each kind, with its share at a well (the
     percents under the title, which says what they are); and what
     content spread evenly over the track would give (``even``:
-    ``content_along_arms.even_content``), a flat line and its share at a well."""
+    ``content_along_arms.even_content``), a flat line and its share at a well.
+    With ``animal_profiles`` (the profiles of each animal), a thin line per
+    animal under each kind's."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
     even_percent = 100 * even["density_per_cm"]
     ax.axhline(even_percent, color="0.5", lw=0.6, ls=(0, (4, 2)), zorder=0, gid="even")
@@ -527,6 +530,14 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
     for is_swr, name, color in KINDS:
         trunk = profiles.loc[(is_swr, "trunk"), "density_per_cm"].to_numpy()
         leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
+        if animal_profiles is not None:
+            for _, own in animal_profiles.loc[is_swr].groupby("animal"):
+                for offset, arm_type in ((0, "trunk"), (1, "leaf")):
+                    values = own.xs(arm_type, level="arm_type")["density_per_cm"]
+                    ax.plot(
+                        offset + x, 100 * values.to_numpy(), color=color, lw=0.5,
+                        alpha=0.45, gid="animal",
+                    )  # fmt: skip
         ax.plot(x, 100 * trunk, color=color)
         ax.plot(1 + x, 100 * leaf, color=color)
         ax.text(
@@ -670,7 +681,10 @@ def generate_figure(inputs: dict):
     # f and g share the right half: f the wider, for its two arms and its key
     f_g_grid = grid[1, 2:].subgridspec(1, 2, width_ratios=[1.5, 1.0], wspace=0.6)
     ax_f = fig.add_subplot(f_g_grid[0])
-    draw_profiles(ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"])
+    draw_profiles(
+        ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"],
+        inputs["animal_profiles"],
+    )  # fmt: skip
     ax_g = fig.add_subplot(f_g_grid[1])
     draw_content_distance(ax_g, inputs["distance"])
 

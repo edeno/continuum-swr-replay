@@ -1680,6 +1680,15 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     texts = [text.get_text() for text in ax.texts]
     assert "even" in texts
     assert "even: 25%" in texts
+    assert not [line for line in ax.lines if line.get_gid() == "animal"]
+    # with each animal's profiles: a thin line per animal, kind and arm type
+    animals = pd.concat(
+        dict.fromkeys(("a", "b", "c"), profiles), names=["animal"]
+    ).reorder_levels(["is_swr", "animal", "arm_type", "segment"])
+    figure03.draw_profiles(ax, profiles, shares, even, animals)
+    thin = [line for line in ax.lines if line.get_gid() == "animal"]
+    assert len(thin) == 3 * 2 * 2
+    np.testing.assert_allclose(thin[0].get_ydata(), 0.3)
     plt.close(fig)
 
 
@@ -2031,7 +2040,7 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
 
     monkeypatch.setattr(figure, "read_swr_table", lambda path: table)
     reader = (
-        "content_along_arms_bins"
+        "content_mass_along_arms"
         if module.endswith("generate_figure03")
         else "with_brain_state"
     )

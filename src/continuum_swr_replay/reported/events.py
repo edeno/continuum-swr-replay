@@ -218,6 +218,7 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CANONICAL_EVENTS_FOUND_NAME,
     CONTENT_ALONG_ARMS_DIR,
+    CONTENT_MASS_ALONG_ARMS_DIR,
     CONTENT_PLACE_RATE_NAME,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
@@ -438,6 +439,7 @@ class EventsInputs:
     spike_evidence_dir: Path
     heldout_by_swr: Path
     content_along_arms: Path
+    content_mass_along_arms: Path
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
@@ -471,6 +473,7 @@ def default_inputs() -> EventsInputs:
         / STATE_EVIDENCE_DIR
         / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
         content_along_arms=processed_data_dir() / CONTENT_ALONG_ARMS_DIR,
+        content_mass_along_arms=processed_data_dir() / CONTENT_MASS_ALONG_ARMS_DIR,
         brain_state_reference=processed_data_dir()
         / BRAIN_STATE_REFERENCE_DIR
         / "reference.parquet",
@@ -5213,13 +5216,14 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
 def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.1: where content sits against the animal and the wells.
 
-    ``bins``: each event time bin with its kind, its content's track distance
-    to the animal and to the nearest well (a track-graph end point) and its arm
-    with the arm's length, as :func:`content_along_arms_bins` reads them. The
-    shares at a remote well, at the animal's own well, on a remote path and near
-    the animal off the wells (``content_along_arms.content_place_shares``): each
-    epoch's share of its time bins, averaged over the animal's epochs, then over
-    animals. And the share at a well of content spread evenly over the track
+    ``bins``: the content time of each kind at each place of each epoch (the
+    events' position distributions summed over their time bins), with the
+    place's track distance to the animal and to the nearest well (a track-graph
+    end point) and its arm with the arm's length, as
+    :func:`content_mass_along_arms` reads them. The shares at a remote well, at
+    the animal's own well, on a remote path and near the animal off the wells
+    (``content_along_arms.content_place_shares``): each epoch's share of its
+    content time, averaged over the animal's epochs, then over animals. And the share at a well of content spread evenly over the track
     (``content_along_arms.even_content``), which those shares are read against.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
@@ -5237,7 +5241,7 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
             bins["epoch_id"].nunique(),
             "count",
             "count",
-            "epochs whose event time bins place content on the track",
+            "epochs whose events place content on the track",
         ),
     ]
     for word, is_swr, name in (("non_swr", False, "non-SWR"), ("swr", True, "SWR")):
@@ -5249,9 +5253,11 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
                     "fraction",
                     "pct",
                     f"share of {name} non-local content time "
-                    f"{column.replace('_', ' ')} (wells are the track graph's end "
-                    "points; each epoch's share, averaged over the animal's epochs, "
-                    "then over animals)",
+                    f"{column.replace('_', ' ')} (content time is the events' "
+                    "position distributions, the posterior of the two non-local "
+                    "states over the place bins, summed over their time bins; wells "
+                    "are the track graph's end points; each epoch's share, averaged "
+                    "over the animal's epochs, then over animals)",
                 )
             )
     values.append(
@@ -5278,6 +5284,76 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
         )
     )
     return values
+
+
+_MASS_PLACE = [
+    "arm",
+    "arm_length_cm",
+    "place_bin",
+    "n_place_bins",
+    "distance_to_well_cm",
+    "far",
+]
+"""What names a place, and its side of the animal, in the content-mass run."""
+
+
+def content_mass_along_arms(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """The content time of the events of ``events`` at each place, per epoch and
+    kind, from the content-mass run; and the files read.
+
+    The run holds every event of the table; the rows of the events in
+    ``events`` are read (``cohort_selection.select_events_in``) and summed per
+    epoch, kind (``is_swr``), place and side of the animal.
+
+    Returns
+    -------
+    bins : pd.DataFrame
+        One row per epoch, kind, place and side: ``epoch_id``, ``animal``,
+        ``is_swr``, the place (``arm``, ``arm_length_cm``, ``place_bin``,
+        ``n_place_bins``, ``distance_to_well_cm``), ``far``, ``weight`` (the
+        content time, in time bins) and ``distance_to_animal_cm`` (its
+        weighted mean), as ``content_along_arms``'s statistics take a weighted
+        table.
+    paths : list of Path
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or its rows do not
+        cover every event of ``events``.
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    kinds = events[["event_id", "animal", "is_swr"]]
+    tables, n_events = [], 0
+    for path in paths:
+        rows = select_events_in(
+            pd.read_parquet(
+                path,
+                columns=[
+                    "event_id",
+                    "epoch_id",
+                    *_MASS_PLACE,
+                    "weight",
+                    "distance_to_animal_cm",
+                ],
+            ),
+            events["event_id"],
+        ).merge(kinds, on="event_id", validate="m:1")
+        n_events += rows["event_id"].nunique()
+        rows["moment"] = rows["weight"].astype(float) * rows["distance_to_animal_cm"]
+        rows["weight"] = rows["weight"].astype(float)
+        summed = rows.groupby(
+            ["epoch_id", "animal", "is_swr", *_MASS_PLACE], as_index=False
+        )[["weight", "moment"]].sum()
+        summed["distance_to_animal_cm"] = summed.pop("moment") / summed["weight"]
+        tables.append(summed)
+    if n_events != len(events):
+        raise ValueError(f"the rows of {folder} do not cover the event table's events")
+    return pd.concat(tables, ignore_index=True), paths
 
 
 def content_along_arms_bins(
@@ -5758,34 +5834,25 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(heldout_provenance_path, ROOT_DIR),
     ]
 
-    along_bins, along_paths = content_along_arms_bins(
-        events,
-        inputs.content_along_arms,
-        n_epochs,
-        [
-            "distance_to_animal_cm",
-            "distance_to_well_cm",
-            "arm",
-            "arm_length_cm",
-            "n_place_bins",
-        ],
+    along_bins, along_paths = content_mass_along_arms(
+        events, inputs.content_mass_along_arms, n_epochs
     )
     summary.add(
         *over(
             pend(
                 content_occupancy_values(
                     along_bins,
-                    f"{rel(inputs.content_along_arms)} "
-                    "(scripts/event_properties/measure_content_along_arms.py)",
+                    f"{rel(inputs.content_mass_along_arms)} "
+                    "(scripts/event_properties/measure_content_mass_along_arms.py)",
                 ),
-                stale(inputs.content_along_arms),
+                stale(inputs.content_mass_along_arms),
             ),
             EVENTS_SUBSET,
         )
     )
     summary.inputs += [
         files_record("*.parquet", along_paths, ROOT_DIR),
-        file_record(inputs.content_along_arms / "manifest.json", ROOT_DIR),
+        file_record(inputs.content_mass_along_arms / "manifest.json", ROOT_DIR),
     ]
 
     # every analyzed epoch with an event: an epoch with none has no table

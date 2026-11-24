@@ -122,6 +122,49 @@ def test_content_bins_are_read_for_the_selected_events_only(tmp_path: Path):
         )
 
 
+def test_the_content_mass_is_summed_over_the_selected_events(tmp_path):
+    """Each event of the run has two rows on one place (weights 1 and 3, the
+    animal 10 and 30 cm away); the unselected event's rows are not read, and
+    the rows of an epoch, animal and kind are one row per place and side."""
+    events = select_visit_context(_labeled())
+    rows = [
+        {
+            "event_id": event_id,
+            "epoch_id": "e",
+            "arm": 1,
+            "arm_length_cm": 50.0,
+            "place_bin": 3,
+            "n_place_bins": 26,
+            "distance_to_well_cm": 40.0,
+            "far": True,
+            "weight": weight,
+            "distance_to_animal_cm": distance,
+        }
+        for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
+        for weight, distance in ((1.0, 10.0), (3.0, 30.0))
+    ]
+    pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
+
+    bins, paths = builder.content_mass_along_arms(events, tmp_path, 1)
+
+    assert [path.name for path in paths] == ["e.parquet"]
+    n_events = events.groupby(["animal", "is_swr"]).size()
+    by_kind = bins.set_index(["animal", "is_swr"])
+    # one place and one side, so one row per animal and kind
+    assert len(bins) == len(n_events)
+    for key, n in n_events.items():
+        assert by_kind.loc[key, "weight"] == 4.0 * n
+        assert by_kind.loc[key, "distance_to_animal_cm"] == pytest.approx(25.0)
+    with pytest.raises(ValueError, match="do not cover"):
+        builder.content_mass_along_arms(
+            events.iloc[:-1].assign(
+                event_id=lambda t: t["event_id"].where(t.index > 0, 999)
+            ),
+            tmp_path,
+            1,
+        )
+
+
 def test_an_output_not_made_over_the_subset_is_pending():
     assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
     assert "rerun it" in builder.subset_staleness({}, "out")
