@@ -338,6 +338,7 @@ TAGS = {
     "extent": Tags(("2d.3",), ("3c",)),
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
+    "transport_speed": Tags(("2d.2",), ("S3d",)),
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2k",)),
     "content_distance": Tags(("2d.1",), ("S3c",)),
@@ -4751,12 +4752,21 @@ _PROPERTIES = (
     ),
     (
         "speed",
-        "replay_speed_median_cm_s",
+        "map_line_fit_speed_cm_s",
         1.0,
         "cm/s",
         "sig2",
         "lower",
         TAGS["speed"],
+    ),
+    (
+        "transport_speed",
+        "transport_slope_speed_cm_s",
+        1.0,
+        "cm/s",
+        "sig2",
+        "lower",
+        TAGS["transport_speed"],
     ),
     (
         "peak",
@@ -4828,7 +4838,12 @@ _PROPERTIES = (
 _PROPERTY_NAMES = {
     "duration": "event duration",
     "extent": "spatial extent of the decoded content",
-    "speed": "replay speed (median over the event)",
+    "speed": "replay speed (the slope, at least 0, of the track distance from the "
+    "event's first decoded position against time)",
+    "transport_speed": "speed of the position distribution (the slope, at least 0, "
+    "of the earth mover's distance on the track between the Continuous-state "
+    "distributions of two time bins against their lag, 10 to 20 ms; over the "
+    "events with one: an event too short or too Fragmented has none)",
     "peak": "posterior peak (mean over the event)",
     "hpd": "highest-density-region coverage",
     "pause": "pause fraction",
@@ -4847,12 +4862,13 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
 
     Plain medians of all events, and the number of animals whose own medians
     differ in the claim's direction. Not duration-controlled. The properties
-    are the event table's own columns; the start distance, read from another
-    output, is made by :func:`start_distance_values`.
+    are the event table's own columns; the start distance and the two speeds,
+    read from other outputs, are made by :func:`start_distance_values` and
+    :func:`speed_values`.
     """
     values = []
     for prop in _PROPERTIES:
-        if prop[0] != "start_distance":
+        if prop[0] not in ("start_distance", *_SPEED_PROPERTIES):
             values += _class_median_values(
                 value_factory(property_values, source, prop[6]), events, prop
             )
@@ -4867,6 +4883,25 @@ def start_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
     return _class_median_values(
         value_factory(start_distance_values, source, prop[6]), events, prop
     )
+
+
+_SPEED_PROPERTIES = ("speed", "transport_speed")
+"""The properties read from the event-speed output."""
+
+
+def speed_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.2: how fast the events' content moves, non-SWR against SWR,
+    as :func:`property_values`: the MAP line-fit speed (Figure 3d) and the
+    transport-slope speed (the supplement's S3d), read from the event-speed
+    output (``analysis/event_properties/event_speed.py`` has the two
+    definitions)."""
+    values = []
+    for prop in _PROPERTIES:
+        if prop[0] in _SPEED_PROPERTIES:
+            values += _class_median_values(
+                value_factory(speed_values, source, prop[6]), events, prop
+            )
+    return values
 
 
 def _class_median_values(
@@ -5483,6 +5518,27 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.inputs += [
         files_record("*.parquet", extra_paths, ROOT_DIR),
         file_record(inputs.event_start_rest_theta / "manifest.json", ROOT_DIR),
+    ]
+    events_with_speed, speed_paths = with_event_speed(
+        events, inputs.event_speed, n_epochs
+    )
+    summary.add(
+        *over(
+            pend(
+                speed_values(
+                    events_with_speed,
+                    f"{source} and {rel(inputs.event_speed)} "
+                    "(scripts/event_properties/measure_event_speed.py)",
+                ),
+                stale(inputs.event_speed),
+                off_subset(inputs.event_speed),
+            ),
+            EVENTS_SUBSET,
+        )
+    )
+    summary.inputs += [
+        files_record("*.parquet", speed_paths, ROOT_DIR),
+        file_record(inputs.event_speed / "manifest.json", ROOT_DIR),
     ]
     intervals = pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0)
     summary.add(

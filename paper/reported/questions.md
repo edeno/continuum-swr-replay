@@ -2095,7 +2095,7 @@ Sources:
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
-Status: computed. Figures: 3d. Values: 9.
+Status: computed. Figures: 3d, S3d. Values: 9.
 
 Sources:
 
@@ -4330,7 +4330,7 @@ Panel l: `\EventsRestrictionHeldoutNonSwrEventsOutsideSwrFullMinusSwrAllowedPerS
 
 ### Figure S3: Slow and fast gamma during SWR and no-SWR events, how far their content lies from the animal, and how fast their position distribution moves
 
-Script: `scripts/figures/generate_supp_figure03.py`. Questions: 2d.1, 2d.8.
+Script: `scripts/figures/generate_supp_figure03.py`. Questions: 2d.1, 2d.2, 2d.8.
 
 Unlettered: `\EventsFastGammaAnimalsAboveRestNonSwr`, `\EventsFastGammaAnimalsAboveRestSwr`, `\EventsFastGammaAnimalsBelowRunningNonSwr`, `\EventsFastGammaAnimalsBelowRunningSwr`, `\EventsFastGammaMedianNonSwr`, `\EventsFastGammaMedianSwr`, `\EventsFastGammaRestMatchedReferenceNonSwr`, `\EventsFastGammaRestMatchedReferenceSwr`, `\EventsFastGammaRunningMatchedReferenceNonSwr`, `\EventsFastGammaRunningMatchedReferenceSwr`, `\EventsSlowGammaAnimalsAboveRestNonSwr`, `\EventsSlowGammaAnimalsAboveRestSwr`, `\EventsSlowGammaAnimalsBelowRunningNonSwr`, `\EventsSlowGammaAnimalsBelowRunningSwr`, `\EventsSlowGammaMedianNonSwr`, `\EventsSlowGammaMedianSwr`, `\EventsSlowGammaRestMatchedReferenceNonSwr`, `\EventsSlowGammaRestMatchedReferenceSwr`, `\EventsSlowGammaRunningMatchedReferenceNonSwr`, `\EventsSlowGammaRunningMatchedReferenceSwr`
 

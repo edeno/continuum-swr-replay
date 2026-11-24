@@ -922,6 +922,7 @@ def test_property_values_name_each_property_class_and_direction():
     values = _by_key(
         builder.property_values(_property_events(), "s")
         + builder.start_distance_values(_property_events(), "s")
+        + builder.speed_values(_property_events(), "s")
     )
     assert len(values) == 3 * len(builder._PROPERTIES)
     for i, (word, _, scale, unit, _, direction, _) in enumerate(builder._PROPERTIES):

@@ -86,6 +86,7 @@ EVENT_BUILDERS = (
     "state_composition_values",
     "property_values",
     "start_distance_values",
+    "speed_values",
     "rest_theta_values",
     "brain_state_values",
     "gamma_z_values",
@@ -295,6 +296,7 @@ class _Run:
         self.manifests = {}
         for folder in (
             EVENT_START_REST_THETA_DIR,
+            EVENT_SPEED_DIR,
             EVENT_PROPERTY_BOOTSTRAP_DIR,
             BRAIN_STATE_REFERENCE_DIR,
             EVENT_GAMMA_DIR,
@@ -463,6 +465,10 @@ class _Run:
             seen["with_start_and_rest_theta"] = (events,)
             return events, [Path(f"{epoch}.parquet") for epoch in EPOCHS]
 
+        def speeds(events, folder, n_epochs):
+            seen["with_event_speed"] = (events,)
+            return events, [Path(f"{epoch}.parquet") for epoch in EPOCHS]
+
         def brain_state(events, inputs, n_epochs):
             seen["with_brain_state"] = (events,)
             levels = pd.DataFrame({"epoch_id": EPOCHS})
@@ -497,6 +503,7 @@ class _Run:
             "class_step_values_with_staleness": class_steps,
             "left_out_values": left_out,
             "with_start_and_rest_theta": extras,
+            "with_event_speed": speeds,
             "with_brain_state": brain_state,
             "content_along_arms_bins": along,
             "check_visit_context_starts": check,
@@ -554,7 +561,12 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     # the label counts and the check against the visits see every event
     assert len(seen["visit_context_values"][0]) == 14
     assert len(seen["check_visit_context_starts"][0]) == 14
-    for name in (*EVENT_BUILDERS, "with_start_and_rest_theta", "with_brain_state"):
+    for name in (
+        *EVENT_BUILDERS,
+        "with_start_and_rest_theta",
+        "with_event_speed",
+        "with_brain_state",
+    ):
         assert PLANTED not in set(seen[name][0]["event_id"]), name
     assert PLANTED not in set(seen["content_along_arms_bins"][0]["event_id"])
     # the per-event runs' tables are read over the selected events, controls too
@@ -702,6 +714,8 @@ PENDING_CASES = [
         ("event_table", {"sha256": "old"}),
         {"rest_theta", "start_distance"},
     ),
+    (EVENT_SPEED_DIR, ("subset", None), {"speed"}),
+    (EVENT_SPEED_DIR, ("event_table", {"sha256": "old"}), {"speed"}),
     (
         EVENT_PROPERTY_BOOTSTRAP_DIR,
         ("subset", None),

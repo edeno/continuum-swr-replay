@@ -302,7 +302,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3d",),
+        figures=("3d", "S3d"),
     ),
     Question(
         "2d.3",
