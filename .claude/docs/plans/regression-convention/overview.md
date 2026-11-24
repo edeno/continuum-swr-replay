@@ -112,18 +112,20 @@ depends on one names it with `OPEN (lead): <name>`):
 
 - a. Decided (items 9 and 10 above): a weak penalty on the reward coefficient; the support rule reads the
   design.
-- b. `OPEN (lead): rate model form`: a declared time range, a reward effect that may change with time
-  since arrival, Q1's reference window (empty for SWR events), each clock's penalty. A realistic
-  simulation is running (scratch `proto_rate_realistic/`). Phase 5a.
+- b. `OPEN (lead): rate model form`: Q1's reference window (empty for SWR events), the flexibility of the
+  leaving clock (each clock's penalty), the reward effect as one coefficient or a contrast of two arrival
+  curves, a declared time range. The reward term itself is decided (g). Phase 5a.
 - c. Decided (item 6 above).
 - d. Decided (item 11 above).
 - e. `OPEN (lead): mPFC and history penalties`: a penalty chosen over the units of one session, or the
   declared-penalty rule. Phases 8 and 11.
 - f. `OPEN (lead): grid-point support`: a support rule per grid point for curves averaged over sessions
   (an author's idea; not built). Phases 9 and 10.
-- g. `OPEN (lead): penalty width`: the one declared prior SD of the weak penalty (in the reported unit). Not
-  chosen; a simulation with SD 1, 2 and 4 is running. Every phase with a penalized simple term (5a, 5b,
-  6a, 7, 8, 11) reads it; each family's simulation checks the penalty before use.
+- g. Decided (design, twenty-fifth round, 2026-11-23): the reward coefficient is fitted per session with
+  the weak penalty, like every simple tested coefficient; prior SD 2 on the reported unit (the author's
+  call), SD 1 and 4 reported beside it. No per-animal coefficient, no unpenalized fit. Each family's
+  simulation measures the error the paper states beside the number; it does not veto a term. Every phase
+  with a penalized simple term (5a, 5b, 6a, 7, 8, 11) reads it.
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
 on a stop's first sample, which the rate design does not count (about 0.2 % of the No SWR events, none of
@@ -160,7 +162,7 @@ reward-fraction smooth, and the trial number defined as the number of visits arr
 C3 ──> 3, 4;  other session's merge ──> 4         5a, 6a ──┘
 2c runs in parallel with the Figure 4 chain (5a, 5b, 6a, 6b, 7, 9, 10), on its own branch (twenty-third round);
 it replaces the solver at the end, and every fit is then rerun once to confirm that it is equal
-5a's real fits wait for open question b and the penalty width (g); 6a's for the uncertainty-measure gate
+5a's real fits wait for open question b; 6a's for the uncertainty-measure gate
 ```
 
 Parallel tracks: Phases 1, 3 and 4 can run at the same time (1 reads no table; 3 and 4 touch different

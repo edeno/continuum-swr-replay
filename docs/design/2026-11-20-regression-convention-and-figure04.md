@@ -949,6 +949,39 @@ The lead: "ok".
   The prototype had one coefficient near zero (about 4e-4) at a relative difference of 5.4e-9. The author
   told the lead, and the lead did not object.
 
+### Twenty-fifth round (lead, 2026-11-23, 19:19 to 19:34): the reward term of the rate model
+
+(The twenty-fourth round, the content model's recency decision, is recorded on another branch.)
+
+What was shown to the lead: the realistic simulation of the weak penalty at prior SD 4, 2 and 1
+(`.claude/research/2026-11-20-regression-prototypes/proto_rate_realistic/REPORT.md`: every session gets
+a value, but the result on the reward coefficient depends on the SD more than on the data, because a
+session expects only 2 to 6 SWR events after an omitted reward); a toy calculation with two Poisson counts
+that gives the same pattern (`proto_rate_realistic/weak_penalty_toy/`); and the literature's advice to fit
+one model over sparse units (one reward coefficient per animal, shared by its sessions, unpenalized). The
+lead heard that advice and set it aside for consistency across the model families.
+
+The lead's words, in order:
+
+- About one coefficient per animal (19:19): "I just feel like once we start this, then we have to do it
+  for every type of model".
+- About an unpenalized per-session fit (19:27): "it's not consistent to have no penalty".
+- (19:34): "lets just pick a penalty that's reasonable".
+
+So:
+
+- The reward coefficient is fitted in each session with the weak penalty, like every simple tested
+  coefficient in every model. There is no per-animal coefficient as the method and no unpenalized fit.
+- (**call**, the author's, not a number the lead chose) The prior SD is 2 on the log rate ratio: a rate
+  ratio between about 1/50 and 50 is plausible (`exp(1.96 x 2)` is about 50). SD 1 and SD 4 are reported
+  beside it, as the stiffer and looser values the convention already asks for
+  (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`).
+- The consequence for every family: a family's simulation measures the error that the paper states beside
+  the number (bias, spread, coverage and false-positive rate at the declared SD and at the pair beside
+  it); it does not veto a term.
+- The per-animal fit built for the comparison (`visit_rate.fit_animal_rewards`, `reward_level="animal"`)
+  is a check, not the paper's method; whether it stays in the code is a question for the lead.
+
 ### Open after the twenty-third round
 
 Each of these is open unless it says it is decided.
@@ -965,9 +998,10 @@ b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled;
    6 s and about 1 beyond 10 s, so it is not constant. Visits longer than 10 s are 705 of 44,435; ten
    sessions hold 72 % of that time, and that time holds 56 % of the SWR events after an omission. The two
    clocks add from 2 s on, but not between 1 and 2 s. A simulation with planted curves shaped like the
-   real ones is running (scratch `proto_rate_realistic/`). Open: whether the model covers a declared
-   time range; whether the reward effect may change with time since arrival; the reference window of
-   Q1; the value of each clock's penalty.
+   real ones is running (scratch `proto_rate_realistic/`). The reward term itself is decided (twenty-fifth
+   round). Open: the reference window of Q1; the flexibility (penalty) of the leaving clock, and of the
+   other clocks; the reward effect as one coefficient or as a contrast of two arrival curves (whether it
+   may change with time since arrival); whether the model covers a declared time range.
 c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
 d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
    has an absolute floor.)*
@@ -976,9 +1010,9 @@ e. **The penalties of the mPFC models and of the history kernels.** Whether a pe
 f. **A support rule per grid point** for curves averaged over sessions (an idea of the author; not built,
    not decided). Simulation: few sessions have bins near the 20 s end of the arrival clock, and the
    average curve is far off there.
-g. **The width of the weak penalty.** One declared prior SD for all models, in the reported unit. Not
-   chosen. A simulation with SD 1, 2 and 4 is running. Each family reports a sensitivity analysis over the
-   strength (Greenland and Mansournia 2015).
+g. *(Decided in the twenty-fifth round: the reward coefficient per session with the weak penalty; prior
+   SD 2 on the log rate ratio, the author's call, with SD 1 and 4 reported beside it.)* Each family reports
+   a sensitivity analysis over the strength (Greenland and Mansournia 2015).
 
 ## 10. Left to the builder
 
