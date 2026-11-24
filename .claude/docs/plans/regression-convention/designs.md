@@ -184,7 +184,9 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   raises an error that names every tested coefficient or term without a fixed penalty.
 - A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
   `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
-  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.
+  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead. (Not
+  applied: no fit read the share, and `support.terms_failing_share` was removed on 2026-11-24, the lead's
+  choice.)
 - A term that fails in a session is made inactive there (`SessionData.active`). When the term is a 0/1 role
   column (a role category, such as the previous arm), the rows with that role are dropped from that
   session's fit and counted, not merged into the reference role. Found by simulation (scratch

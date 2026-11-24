@@ -112,7 +112,7 @@ reported is decided (lead, 2026-11-21: with those terms missing).
   [designs.md#support-rule](designs.md#support-rule), evaluated before the fit from the design (units with
   a row on each side; never the events; built aa8f8425, which replaced the first rule on events); a
   `terms_failing_share(records)` that applies the 20 % rule over sessions (the value of the fitter's
-  `MAX_FAILING_SHARE`, imported, not copied). The minimum of 5 units each side is a constant defined in
+  `MAX_FAILING_SHARE`, imported, not copied; removed on 2026-11-24, unapplied: no fit read it). The minimum of 5 units each side is a constant defined in
   this module (new). A term that fails is made inactive in that session (`SessionData.active`); when it is
   a 0/1 role column, the session's rows with that role are dropped from its fit and counted in the
   record's `cohort_counts`, not merged into the reference role (found by simulation: merging inflated the

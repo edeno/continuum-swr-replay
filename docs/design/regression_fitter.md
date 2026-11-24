@@ -517,8 +517,7 @@ the event counts before a fit. A level of a category passes when `MIN_UNITS = 5`
 have a row of the level. A 0/1 slope passes when 5 units have a row where it is 1 and 5
 have a row where it is 0. A continuous slope passes when 5 units have a row above the
 median of its rows and 5 have a row below it; a constant column fails. The units and the
-rule are in the module docstring. A term that fails in more than `MAX_FAILING_SHARE`
-(20 %) of the sessions with a fit leaves the per-session model (`terms_failing_share`).
+rule are in the module docstring.
 A smooth and a lag functional have no counts; every term is judged by the design check.
 
 The rule replaced, on 2026-11-23, a rule that counted the units with an event on each

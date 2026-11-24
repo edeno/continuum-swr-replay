@@ -294,6 +294,8 @@ then we can filter, we can always choose to add them later or analyze them as gr
 - One rule for a term that cannot be estimated: decided from the data before the fit (the term varies in too
   few units with events on each side), stated per term and session, and stored. A term that fails it in more
   than a stated share of sessions leaves the per-session model and is asked in a pooled model instead.
+  (Not applied: no fit read that share, and its function, `support.terms_failing_share`, was removed on
+  2026-11-24, the lead's choice.)
 
 ### 4.4 Folds
 

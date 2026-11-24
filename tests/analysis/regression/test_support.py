@@ -1,14 +1,11 @@
-"""The support rule and its share over sessions."""
+"""The support rule."""
 
 from __future__ import annotations
-
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
 from continuum_swr_replay.analysis.regression.support import (
@@ -19,7 +16,6 @@ from continuum_swr_replay.analysis.regression.support import (
     design_support,
     require_tested_penalized,
     slope_support,
-    terms_failing_share,
 )
 from continuum_swr_replay.analysis.regression.terms import (
     Category,
@@ -174,22 +170,6 @@ def test_softmax_counts_are_those_of_the_event_rule(content_sessions) -> None:
             name: (entry["n_low"], entry["n_high"], entry["reason"])
             for name, entry in record.support.items()
         } == expected
-
-
-def test_failing_share_rule() -> None:
-    """A column failing in 21 % of the sessions with a fit is flagged, one
-    failing in 20 % is not; a session without a fit does not count."""
-
-    def record(status: str, a: bool, b: bool) -> SimpleNamespace:
-        return SimpleNamespace(
-            status=status,
-            support={"a": {"passes": a}, "b": {"passes": b}},
-        )
-
-    records = [record("converged", i >= 21, i >= 20) for i in range(100)]
-    records.append(record("no finite maximum", False, False))
-    assert MAX_FAILING_SHARE == 0.20
-    assert terms_failing_share(records) == {"a": 0.21}
 
 
 def test_a_tested_coefficient_without_a_penalty_is_refused(rate_sessions) -> None:
