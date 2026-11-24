@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Poisson,
     draw,
 )
+from continuum_swr_replay.analysis.regression.newton import penalized_newton
 from continuum_swr_replay.analysis.regression.padding import pad_values
 
 TOLERANCE = 1e-6
@@ -147,7 +148,9 @@ def test_hand_derivatives_equal_autodiff(name: str) -> None:
     rng = np.random.default_rng(13)
     beta = rng.normal(scale=0.5, size=N_COLUMNS)
     rows = lik.pad(X, y, aux)
-    d1, d2 = (pad_values(rng.normal(size=N_ROWS), rows.y.size) for _ in range(2))
+    d1, d2 = (
+        pad_values(rng.normal(size=N_ROWS), N_ROWS, rows.y.size) for _ in range(2)
+    )
     with jax.enable_x64(True):
         Xp, yp, w = jnp.asarray(rows.X), jnp.asarray(rows.y), jnp.asarray(rows.weight)
         a = jax.tree_util.tree_map(jnp.asarray, rows.aux)
@@ -359,3 +362,76 @@ def test_a_draw_refuses_an_unknown_family() -> None:
 
     with pytest.raises(ValueError, match="no draw for the likelihood 'other'"):
         draw(Other(), np.zeros(2), None, np.random.default_rng(0))
+
+
+DIAGONAL = [("poisson", np.empty(0)), ("bernoulli", None), ("gaussian", 0.7)]
+FAMILIES = {"poisson": Poisson, "bernoulli": Bernoulli, "gaussian": Gaussian}
+
+
+@pytest.mark.parametrize(("name", "aux"), DIAGONAL)
+def test_no_rows_give_zeros(name, aux) -> None:
+    """With no rows the log-likelihood is 0, the score empty and the
+    information and its derivatives zero, as the NumPy formulas gave."""
+    lik, X, none = FAMILIES[name](), np.empty((0, 2)), np.empty(0)
+    assert lik.loglik(none, none, aux) == 0.0
+    assert lik.score_eta(none, none, aux).shape == (0,)
+    for information in (
+        lik.information(X, none, none, aux),
+        lik.dinformation(X, none, none, aux, none),
+        lik.d2information(X, none, none, aux, none, none),
+    ):
+        np.testing.assert_array_equal(information, np.zeros((2, 2)))
+
+
+def test_a_softmax_without_rows_is_refused() -> None:
+    none = np.empty(0)
+    with pytest.raises(ValueError, match="no rows"):
+        GroupedSoftmax().loglik(none, none, np.empty(0, dtype=int))
+
+
+@pytest.mark.parametrize("length", [5, 2 * N_ROWS])
+def test_a_vector_of_another_length_is_refused(length: int) -> None:
+    """``eta``, ``d``, ``d1`` and ``d2`` need one value per row; the error
+    names the argument and both lengths."""
+    lik, X, y, aux, eta = _case("poisson")
+    wrong = np.resize(eta, length)
+    with pytest.raises(ValueError, match=rf"eta of shape \({length},\) for 14 rows"):
+        lik.loglik(wrong, y, aux)
+    with pytest.raises(ValueError, match=rf"d of shape \({length},\) for 14 rows"):
+        lik.dinformation(X, eta, y, aux, wrong)
+    with pytest.raises(ValueError, match=rf"d2 of shape \({length},\) for 14 rows"):
+        lik.d2information(X, eta, y, aux, eta, wrong)
+
+
+def test_a_single_poisson_offset_is_every_rows() -> None:
+    """A scalar offset is the offset of every row; None is refused as before
+    (``TypeError``)."""
+    lik, X, y, _, eta = _case("poisson")
+    full = np.full(N_ROWS, 0.5)
+    assert lik.loglik(eta, y, 0.5) == lik.loglik(eta, y, full)
+    np.testing.assert_array_equal(
+        lik.score_eta(eta, y, 0.5), lik.score_eta(eta, y, full)
+    )
+    np.testing.assert_array_equal(
+        lik.information(X, eta, y, 0.0), lik.information(X, eta, y, np.zeros(N_ROWS))
+    )
+    with pytest.raises(TypeError, match="offset is None"):
+        lik.score_eta(eta, y, None)
+
+
+def test_a_family_with_an_attribute_of_its_own_is_refused() -> None:
+    """The kernels are keyed on the family's class, so an attribute set on
+    the object would be ignored by a kernel compiled for another object of
+    the class: such an object is refused."""
+
+    class _Scaled(Poisson):
+        pass
+
+    lik, X, y, aux, eta = _case("poisson")
+    scaled = _Scaled()
+    assert scaled.loglik(eta, y, aux) == lik.loglik(eta, y, aux)
+    scaled.scale = 2.0
+    with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
+        scaled.loglik(eta, y, aux)
+    with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
+        penalized_newton(scaled, X, y, aux, np.zeros((3, 3)), np.zeros(3))

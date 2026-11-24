@@ -4,7 +4,11 @@ Each family is a small stateless class. ``eta`` is the linear predictor
 ``X @ beta``, shape ``(n_rows,)``; ``aux`` is the family's extra data (below),
 passed to every method so that one object serves every session and, for the
 Gaussian, every scale. Two families are equal when they are of the same class,
-so that a family can be a static argument of a jitted kernel.
+so that a family can be a static argument of a jitted kernel: the kernels of
+one class are compiled once and shared by its objects. A family therefore
+keeps no parameter on the object; anything that changes its result travels in
+``aux``. A family object with an attribute of its own is refused
+(``TypeError``) when a kernel would key on it.
 
 The public methods take and return NumPy arrays, and run in float64
 (``runtime.in_float64``):
@@ -235,43 +239,61 @@ class _Family:
     """The public methods of every family, on its JAX functions."""
 
     def __eq__(self, other: object) -> bool:
-        return type(other) is type(self)
+        return type(other) is type(self) and self._stateless()
 
     def __hash__(self) -> int:
+        self._stateless()
         return hash(type(self))
 
+    def _stateless(self) -> bool:
+        """True; raise ``TypeError`` when the object keeps an attribute of its
+        own, which the kernels, keyed on the class, would not see."""
+        attributes = sorted(vars(self))
+        if attributes:
+            raise TypeError(
+                f"{type(self).__name__} keeps {attributes} on the object: a family "
+                "is keyed on its class in the compiled kernels, so whatever changes "
+                "its result goes in aux"
+            )
+        return True
+
     def _padded(
-        self, X: np.ndarray | None, y: np.ndarray, aux: object, *rows: np.ndarray
+        self, X: np.ndarray | None, y: np.ndarray, aux: object, **rows: np.ndarray
     ) -> tuple[Rows, list[np.ndarray]]:
         """``pad`` of ``X`` (no columns when None), and each of ``rows``
-        padded to the same rows."""
+        (``eta``, ``d``...) padded to the same rows; each must have one value
+        per row of ``y``."""
+        self._stateless()
         y = np.asarray(y, dtype=float)
         X = np.empty((y.size, 0)) if X is None else X
         padded = self.pad(X, y, aux)
-        return padded, [pad_values(r, padded.y.size) for r in rows]
+        n = padded.y.size
+        return padded, [
+            pad_values(r, padded.n_real, n, name) for name, r in rows.items()
+        ]
 
     @in_float64
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float:
-        r, (eta,) = self._padded(None, y, aux, eta)
+        r, (eta,) = self._padded(None, y, aux, eta=eta)
         return float(_loglik_kernel(self, eta, r.y, r.aux, r.weight))
 
     @in_float64
     def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray:
-        r, (eta,) = self._padded(None, y, aux, eta)
+        r, (eta,) = self._padded(None, y, aux, eta=eta)
         return np.array(_score_kernel(self, eta, r.y, r.aux, r.weight))[: r.n_real]
 
     @in_float64
     def information(
         self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object
     ) -> np.ndarray:
-        r, (eta,) = self._padded(X, y, aux, eta)
+        r, (eta,) = self._padded(X, y, aux, eta=eta)
         return np.array(_information_kernel(self, r.X, eta, r.y, r.aux, r.weight))
 
     @in_float64
     def dinformation(
         self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object, d: np.ndarray
     ) -> np.ndarray:
-        r, (eta, d) = self._padded(X, y, aux, eta, d)
+        r, (eta, d) = self._padded(X, y, aux, eta=eta, d=d)
         return np.array(_dinformation_kernel(self, r.X, eta, r.y, r.aux, r.weight, d))
 
     @in_float64
@@ -284,7 +306,7 @@ class _Family:
         d1: np.ndarray,
         d2: np.ndarray,
     ) -> np.ndarray:
-        r, (eta, d1, d2) = self._padded(X, y, aux, eta, d1, d2)
+        r, (eta, d1, d2) = self._padded(X, y, aux, eta=eta, d1=d1, d2=d2)
         return np.array(
             _d2information_kernel(self, r.X, eta, r.y, r.aux, r.weight, d1, d2)
         )
@@ -311,7 +333,7 @@ class _Family:
             ``X~``, with ``X~' X~`` the information (the Gaussian's at unit
             scale, so ``X~ = X``).
         """
-        r, (eta,) = self._padded(X, y, aux, eta)
+        r, (eta,) = self._padded(X, y, aux, eta=eta)
         weighted = _weighted_design_kernel(self, r.X, eta, r.y, r.aux, r.weight)
         return np.array(weighted)[: r.n_real]
 
@@ -374,8 +396,13 @@ class Poisson(_DiagonalFamily):
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
         """The rows padded to a multiple of ``padding.ROW_BUCKET``, the offset
-        0 on a padded row."""
-        padded = pad_rows(X, y, np.asarray(aux, dtype=float))
+        0 on a padded row; a single offset is every row's."""
+        if aux is None:
+            raise TypeError("the Poisson offset is None: give log(exposure)")
+        offset = np.asarray(aux, dtype=float)
+        if offset.ndim == 0:  # one offset for every row
+            offset = np.full(np.shape(y), float(offset))
+        padded = pad_rows(X, y, offset)
         return Rows(padded.X, padded.y, padded.offset, padded.weight, padded.n_real)
 
     def _jax_loglik(self, eta, y, aux, weight):

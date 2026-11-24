@@ -82,20 +82,36 @@ def group_starts(groups: np.ndarray) -> np.ndarray:
     return np.flatnonzero(np.r_[True, groups[1:] != groups[:-1]])
 
 
-def pad_values(values: np.ndarray, n_rows: int) -> np.ndarray:
+def pad_values(
+    values: np.ndarray, n_real: int, n_rows: int, name: str = "values"
+) -> np.ndarray:
     """`values` with zero rows appended to `n_rows` rows, as float64.
 
     Parameters
     ----------
-    values : np.ndarray, shape (n, ...)
-        One entry (or row) per real row, ``n <= n_rows``.
+    values : np.ndarray, shape (n_real, ...)
+        One entry (or row) per real row.
+    n_real : int
+        The real rows, which `values` must have.
     n_rows : int
-        The padded count.
+        The padded count, at least `n_real`.
+    name : str, optional
+        What `values` is, for the error.
 
     Returns
     -------
     np.ndarray, shape (n_rows, ...)
+
+    Raises
+    ------
+    ValueError
+        When `values` does not have `n_real` rows.
     """
+    if np.ndim(values) == 0 or np.shape(values)[0] != n_real:
+        raise ValueError(
+            f"{name} of shape {np.shape(values)} for {n_real} rows: it needs one "
+            "value per row"
+        )
     values = np.asarray(values, dtype=float)
     out = np.zeros((n_rows, *values.shape[1:]))
     out[: values.shape[0]] = values
@@ -148,7 +164,8 @@ def pad_rows(
     Raises
     ------
     ValueError
-        When the inputs do not have one row each, or there are no rows.
+        When the inputs do not have one row each. No rows give one bucket
+        of padded rows.
     """
     n_rows = np.shape(y)[0]
     offset = np.zeros(n_rows) if offset is None else offset
@@ -157,12 +174,13 @@ def pad_rows(
             f"X {np.shape(X)}, y {np.shape(y)} and offset {np.shape(offset)} "
             "need one row each"
         )
-    n_bucket = bucket_size(n_rows, step)
+    # No rows pad to one bucket of padded rows, whose every sum is 0.
+    n_bucket = bucket_size(max(n_rows, 1), step)
     return PaddedRows(
-        X=pad_values(X, n_bucket),
-        y=pad_values(y, n_bucket),
-        offset=pad_values(offset, n_bucket),
-        weight=pad_values(np.ones(n_rows), n_bucket),
+        X=pad_values(X, n_rows, n_bucket, "X"),
+        y=pad_values(y, n_rows, n_bucket, "y"),
+        offset=pad_values(offset, n_rows, n_bucket, "offset"),
+        weight=pad_values(np.ones(n_rows), n_rows, n_bucket, "weight"),
         n_real=n_rows,
     )
 

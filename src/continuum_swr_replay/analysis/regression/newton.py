@@ -47,9 +47,14 @@ the step, the decrement, ``max |X step|`` and the step-halving search). The
 rules above, the statuses and the design check are a host loop in Python and
 NumPy around them. That loop is written for a batch of fits on one design (a
 leading axis of fits, one per fit; :func:`penalized_newton` fits one), and
-the kernels map over that axis. A rule constant is read on the host at each
-call and passed to a kernel as an argument, so a changed value takes effect
-in a kernel already compiled. A Cholesky factorization that fails gives NaN
+the kernels map over that axis. The rule constants ``NEWTON_DECREMENT_TOL``,
+``MAX_STEP_HALVINGS``, ``NO_MAXIMUM_ETA_STEP``, ``NO_MAXIMUM_CAPPED_STEPS``,
+``IDENTIFIABILITY_TOL`` and ``RUNNING_AWAY_TIE_DECIMALS`` are read from this
+module at each call (the first two, with the step cap ``max_step``, are passed
+to the iteration kernel as arguments), so a changed value takes effect in a
+kernel already compiled. The defaults of :func:`penalized_newton`'s
+``max_iter`` and ``max_step`` are ``NEWTON_MAX_STEPS`` and
+``MAX_STEP_LENGTH`` as they were when the module was imported. A Cholesky factorization that fails gives NaN
 in JAX rather than raising: ``A`` is not positive definite when ``A`` or its
 factor is not finite.
 """
@@ -368,6 +373,7 @@ class _Problem:
         cls, lik: Likelihood, X: np.ndarray, y: np.ndarray, aux: object, S: np.ndarray
     ) -> _Problem:
         """One fit's problem (a batch of one)."""
+        hash(lik)  # a family that cannot key a kernel fails here, as itself
         padded = lik.pad(X, y, aux)
         rows = Rows(
             jnp.asarray(padded.X),
@@ -376,6 +382,7 @@ class _Problem:
             jnp.asarray(padded.weight),
             padded.n_real,
         )
+        S = np.asarray(S, dtype=float)
         return cls(lik, X, aux, S, rows, jnp.asarray(padded.y)[None], jnp.asarray(S))
 
     def evaluate(self, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -442,10 +449,11 @@ def penalized_newton(
         (:func:`.reml.reml_and_derivatives` passes it). None: the columns
         where ``S`` is zero, which misses a penalty's null space.
     max_iter : int
-        Most Newton steps.
+        Most Newton steps; the default is ``NEWTON_MAX_STEPS`` as imported.
     max_step : float
         Longest step, as the largest change of any coefficient; not applied
-        to a quadratic likelihood, whose full step is the optimum.
+        to a quadratic likelihood, whose full step is the optimum The
+        default is ``MAX_STEP_LENGTH`` as imported.
 
     Returns
     -------
@@ -512,16 +520,16 @@ def _fit(
                 fits[b] = _no_finite_maximum(
                     problem.X,
                     beta[b].copy(),
-                    r["A"][b],
+                    r["A"][b].copy(),
                     float(decrement),
                     n_iter,
                     float(loglik[b]),
-                    r["step"][b],
+                    r["step"][b].copy(),
                 )
             else:
                 fits[b] = NewtonFit(
                     beta[b].copy(),
-                    r["A"][b],
+                    r["A"][b].copy(),
                     status,
                     float(decrement),
                     n_iter,
@@ -648,7 +656,7 @@ def _last_step(
         if take[b]:
             return NewtonFit(
                 moved[b].copy(),
-                landed["A"][b],
+                landed["A"][b].copy(),
                 CONVERGED,
                 float(landed["decrement"][b]),
                 n_iter + 1,
@@ -656,7 +664,7 @@ def _last_step(
             )
         return NewtonFit(
             beta[b].copy(),
-            r["A"][b],
+            r["A"][b].copy(),
             CONVERGED,
             float(r["decrement"][b]),
             n_iter,

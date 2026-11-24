@@ -160,8 +160,8 @@ def test_a_padded_diagonal_family_equals_the_unpadded_fit(family, step):
             padded_aux,
             padded.weight,
             beta,
-            pad_values(d1, n),
-            pad_values(d2, n),
+            pad_values(d1, y.size, n),
+            pad_values(d2, y.size, n),
         ),
         _kernels(lik, X, y, aux, np.ones(y.size), beta, d1, d2),
     )
@@ -199,8 +199,8 @@ def test_a_padded_softmax_equals_the_unpadded_fit(n_groups, row_step):
             Groups(padded.group, padded.n_groups),
             padded.weight,
             beta,
-            pad_values(d1, n),
-            pad_values(d2, n),
+            pad_values(d1, y.size, n),
+            pad_values(d2, y.size, n),
         ),
         _kernels(
             lik,
@@ -213,6 +213,88 @@ def test_a_padded_softmax_equals_the_unpadded_fit(n_groups, row_step):
             d2,
         ),
     )
+
+
+def _numpy_reference(family, X, beta, y, aux):
+    """``(loglik, gradient, information)`` on the unpadded rows, from the
+    formulas, in plain NumPy."""
+    eta = X @ beta
+    if family == "poisson":
+        mu = np.exp(eta + aux)
+        loglik, score, w = y @ (eta + aux) - mu.sum(), y - mu, mu
+    elif family == "bernoulli":
+        mu = 1.0 / (1.0 + np.exp(-eta))
+        loglik = y @ eta - np.log1p(np.exp(eta)).sum()
+        score, w = y - mu, mu * (1.0 - mu)
+    elif family == "gaussian":
+        r = y - eta
+        loglik = -(r @ r) / (2 * aux) - 0.5 * y.size * np.log(2 * np.pi * aux)
+        score, w = r / aux, np.full(y.size, 1.0 / aux)
+    else:  # grouped softmax, aux the group ids
+        starts = np.flatnonzero(np.r_[True, aux[1:] != aux[:-1]])
+        sizes = np.diff(starts, append=y.size)
+        e = np.exp(eta)
+        p = e / np.repeat(np.add.reduceat(e, starts), sizes)
+        total = np.add.reduceat(y, starts)
+        loglik = y @ np.log(p)
+        score = y - np.repeat(total, sizes) * p
+        Xp = np.add.reduceat(p[:, None] * X, starts)
+        information = (X.T * (np.repeat(total, sizes) * p)) @ X - (Xp.T * total) @ Xp
+        return loglik, X.T @ score, information
+    return loglik, X.T @ score, (X.T * w) @ X
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
+def test_the_padded_kernels_equal_the_numpy_formulas(family):
+    """The kernels on padded rows against the log-likelihood, gradient and
+    information written here in NumPy on the unpadded rows."""
+    rng = np.random.default_rng(5)
+    if family == "softmax":
+        X, beta, y, ids = _softmax_case(40)
+        padded = pad_groups(X, y, ids)
+        lik, aux, padded_aux = (
+            GroupedSoftmax(),
+            ids,
+            Groups(padded.group, padded.n_groups),
+        )
+    else:
+        lik, X, beta, y, aux = _diagonal_case(family)
+        padded = pad_rows(X, y, aux if family == "poisson" else None)
+        padded_aux = padded.offset if family == "poisson" else aux
+    d = pad_values(rng.normal(size=y.size), y.size, padded.y.size)
+    got = _kernels(lik, padded.X, padded.y, padded_aux, padded.weight, beta, d, d)
+    _assert_equal(got[:3], _numpy_reference(family, X, beta, y, aux))
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
+def test_junk_in_the_padded_rows_changes_nothing(family):
+    """Padded rows filled with junk (a random design, a response of 5, an
+    offset of 2; for the softmax, in the padding group) change no quantity:
+    each padded row is weighted 0."""
+    rng = np.random.default_rng(6)
+    if family == "softmax":
+        X, beta, y, ids = _softmax_case(40)
+        padded = pad_groups(X, y, ids)
+        lik, aux = GroupedSoftmax(), Groups(padded.group, padded.n_groups)
+    else:
+        lik, X, beta, y, aux = _diagonal_case(family)
+        padded = pad_rows(X, y, aux if family == "poisson" else None)
+        aux = padded.offset if family == "poisson" else aux
+    n, n_bucket = padded.n_real, padded.y.size
+    d1, d2 = (pad_values(rng.normal(size=n), n, n_bucket) for _ in range(2))
+    clean = _kernels(lik, padded.X, padded.y, aux, padded.weight, beta, d1, d2)
+
+    junk_X, junk_y = padded.X.copy(), padded.y.copy()
+    junk_X[n:] = rng.normal(size=(n_bucket - n, N_COLUMNS))
+    junk_y[n:] = 5.0
+    if family == "poisson":
+        aux = aux.copy()
+        aux[n:] = 2.0
+    junk_d1, junk_d2 = d1.copy(), d2.copy()
+    junk_d1[n:], junk_d2[n:] = rng.normal(size=(2, n_bucket - n))
+    junk = _kernels(lik, junk_X, junk_y, aux, padded.weight, beta, junk_d1, junk_d2)
+    for got, want in zip(junk, clean, strict=True):
+        np.testing.assert_array_equal(got, want)
 
 
 def test_the_public_methods_pad_and_return_the_real_rows():
