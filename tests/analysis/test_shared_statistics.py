@@ -1130,3 +1130,25 @@ def test_unit_summary_refuses_values_not_keyed_by_the_unit():
             n_draws=50,
             seed=1,
         )
+
+
+def test_same_sign_counted_by_one_rule_at_every_unit():
+    # Five animals, one session and one day each: 0, 1e-17, 1, 2, -1. The mean is
+    # 0.4. Read to 12 significant digits of the largest value (2), 1e-17 is zero,
+    # so neither it nor the exact zero has a sign: two animals share the mean's.
+    values = [0.0, 1e-17, 1.0, 2.0, -1.0]
+    animals = list("abcde")
+    session = pd.Series(
+        values,
+        index=pd.MultiIndex.from_tuples([(a, "d1", "e1") for a in animals]),
+    )
+    day = pd.Series(
+        values, index=pd.MultiIndex.from_tuples([(a, "d1") for a in animals])
+    )
+    animal = pd.Series(values, index=pd.Index(animals))
+    counts = [
+        stats.unit_summary(v, fit_by, n_draws=50, seed=1)["n_animals_same_sign"]
+        for v, fit_by in ((session, "session"), (day, "day"), (animal, "animal"))
+    ]
+    assert counts == [2, 2, 2]
+    assert stats.animal_mean_interval(animal)["n_animals_same_sign"] == 2

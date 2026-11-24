@@ -711,7 +711,8 @@ def animal_mean_interval(values: pd.Series) -> dict[str, float]:
     summary : dict
         ``estimate`` (the mean), ``se`` (``SD / sqrt(A)``), ``low``, ``high``,
         ``n_animals`` and ``n_animals_same_sign`` (the animals whose value
-        has the sign of the estimate). ``estimate`` is NaN without an animal;
+        has the sign of the estimate, by the rule of :func:`estimand_summary`:
+        :func:`_n_same_sign`). ``estimate`` is NaN without an animal;
         ``se``, ``low`` and ``high`` are NaN with fewer than two.
 
     Raises
@@ -733,9 +734,7 @@ def animal_mean_interval(values: pd.Series) -> dict[str, float]:
         "low": estimate - half,
         "high": estimate + half,
         "n_animals": int(n),
-        "n_animals_same_sign": int(np.sum(np.sign(finite) == np.sign(estimate)))
-        if n
-        else 0,
+        "n_animals_same_sign": _n_same_sign(finite, estimate),
     }
 
 
@@ -1117,6 +1116,20 @@ def animal_day_session_values(
     )
 
 
+def _n_same_sign(animal_values: NDArray[np.float64], estimate: float) -> int:
+    """The animals whose value has the sign of ``estimate``, the values read by
+    :func:`_snapped`: an animal at zero has no sign.
+
+    Parameters
+    ----------
+    animal_values : NDArray, shape (n_animals,)
+        Finite values.
+    estimate : float
+    """
+    signs = np.sign(_snapped(animal_values))
+    return int(((signs != 0) & (signs == np.sign(estimate))).sum())
+
+
 def day_level_test(values: pd.Series, animal: pd.Series, day: pd.Series) -> float:
     """The signed-rank p over recording days of a per-session number.
 
@@ -1221,7 +1234,6 @@ def estimand_summary(
     )
     estimate = float(estimate[0, 0])
     interval = bootstrap_interval(estimate, draws[:, 0], animal_values.size)
-    animal_signs = np.sign(_snapped(animal_values))
     return {
         "estimate": estimate,
         "low": interval.low,
@@ -1230,9 +1242,7 @@ def estimand_summary(
         "n_animals": animal_values.size,
         "n_days": day_values.size,
         "n_sessions": session_values.size,
-        "n_animals_same_sign": int(
-            ((animal_signs != 0) & (animal_signs == np.sign(estimate))).sum()
-        ),
+        "n_animals_same_sign": _n_same_sign(animal_values, estimate),
         "day_p": signed_rank_p(_snapped(day_values)),
         "n_draws": n_draws,
         "seed": seed,
@@ -1285,8 +1295,8 @@ def unit_summary(
         ``n_sessions`` and ``day_p`` are NaN; ``sd`` is
         ``SD / sqrt(A) / sqrt(A / (A - 1))``, so that the interval is
         ``estimate +/- t(0.975, A - 1) * sqrt(A / (A - 1)) * sd`` as at the
-        other units (:func:`bootstrap_interval`); ``n_animals_same_sign`` is
-        :func:`animal_mean_interval`'s.
+        other units (:func:`bootstrap_interval`). ``n_animals_same_sign``
+        follows one rule at every unit (:func:`_n_same_sign`).
 
     Raises
     ------
