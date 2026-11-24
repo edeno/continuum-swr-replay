@@ -136,8 +136,10 @@ One setting, three values (**call**, on the lead's 03:33 words):
   key, in `tables/session_keys.py` (`FitBy`, `FIT_BY_COLUMNS`, `unit_key`); the fitter reads them (the
   fitter's package may import that foundation module). The units at which every behavior model is
   fitted are declared once, in `analysis/replay_models/fit_by.py`: `BEHAVIOR_FIT_BY = ("day",
-  "animal")`, both units, in that order (decided, 09:55; section 11.1). The rate, content, choice,
-  stay-or-leave and ripple-power models read it. The mPFC models do not (decided, 02:14). `"session"`
+  "animal")`, both units, in that order (decided, 09:55; section 11.1). The rate and content models
+  read it ("rate, content, etc", decided, 02:10), and so do the choice, stay-or-leave and ripple-power
+  models (the author's reading of "etc", 11.1). The mPFC models do not (decided, 02:14). Nothing reads it
+  yet: the models read it from tasks 8 and 9 of the plan on. `"session"`
   stays a value of `FitBy` and of the mechanism, with today's behavior exactly: it is the earlier design,
   kept for the validation and for comparison, and it is the default of `fit_sessions`.
 - **One code path.** `fit_sessions` takes `fit_by` and groups the sessions it is given into units. Each
@@ -326,17 +328,27 @@ session arm effects and REML, a hand-built sparse fitter, 2,110 fits), `content_
 - 09:55: "I did say maybe, lets just make this the decision now and we can change if the evidence is
   against it"
 
-**Decided by the lead (09:55):** the behavior models are built as design C. There is one fit for each
-unit, a baseline for each session, the tested terms shared inside the unit, fixed declared penalties and
-the weak penalty on every simple tested coefficient. Every behavior model is fitted at the day unit and at
-the animal unit (`BEHAVIOR_FIT_BY = ("day", "animal")`), both are simulated and, after the lead has seen
-the validation, both are fitted to the real data and compared. Design D is a later check on the same
-mechanism (section 9), not part of this phase. The decision changes if the evidence is against it.
-Design C shares the tested terms, the curves included, inside a unit. That is the point the fourteenth
-round declined on 2026-11-21 for the per-session design; the lead has now seen design C described in those
-terms twice (the rate trial's "C-like" form, the content run's form B) and named it. The rate model's
-clock curves are the point that the running scenario with session-specific curves can still change
-(11.4; "we can change if the evidence is against it").
+**Decided by the lead (09:47 to 09:55):** design C, with a day model and an animal model, both run and
+compared (`BEHAVIOR_FIT_BY = ("day", "animal")`; both are simulated first and, after the lead has seen the
+validation, both are fitted to the real data); design D later, as a check on the same mechanism (section
+9), not part of this phase; the decision changes if the evidence is against it. It is consistent across
+the behavior models ("rate, content, etc", 02:10) and does not include the mPFC models for now (02:14).
+Design C is one fit for each unit, with a baseline for each session and the tested terms shared.
+
+What the lead's words do not carry, labeled:
+
+- **Fixed, declared penalties: the author's decision**, on the lead's "Should we keep the fixed
+  penalty?" / "Ok decide then" (03:18, 03:20), from the evidence in 11.2. The weak penalty on every
+  simple tested coefficient is the lead's decision of 2026-11-23.
+- **The curves are among the terms shared inside a unit: the author's reading.** The author's message to
+  the lead just before 09:55 said that design C shares the curves inside a unit, that the lead had
+  declined "one curve for each animal" on 2026-11-21 for the per-session design (the fourteenth round),
+  and that the author read the lead's messages of that morning as changing that for design C. The lead's
+  next message was "I did say maybe, lets just make this the decision now and we can change if the
+  evidence is against it". The author reads the decision as covering the shared curves. The rate model's
+  clock curves are the point that the running scenario with session-specific curves may change (11.4).
+- **Which models: the author's reading.** That "etc" means the choice, stay-or-leave and ripple-power
+  models is the author's reading, stated to the lead several times and not contradicted.
 
 ### 11.2 What the simulations settled
 

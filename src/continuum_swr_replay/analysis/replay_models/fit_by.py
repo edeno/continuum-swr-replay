@@ -16,17 +16,30 @@ The lead's words, 2026-11-24:
 - 09:55: "I did say maybe, lets just make this the decision now and we can change
   if the evidence is against it"
 
-What is decided: design C. There is one fit for each unit. Each session in the
-unit keeps a baseline of its own (the intercept of a rate model, the arm effects
-of a content model). The tested terms, the curves included, are shared inside
-the unit. The penalties are fixed and declared. The weak penalty stays on every
-simple tested coefficient. Every behavior model is fitted at the day unit and at
-the animal unit, and the two are compared.
+What the lead decided (09:47 to 09:55): design C, with a day model and an animal
+model, both run and compared; design D later, as a check; the decision changes
+if the evidence is against it. It is consistent across the behavior models
+("rate, content, etc", 02:10) and does not include the mPFC models for now
+(02:14). Design C is one fit for each unit, in which each session keeps a
+baseline of its own (the intercept of a rate model, the arm effects of a content
+model) and the tested terms are shared.
 
-The decision applies to the rate, content, choice, stay-or-leave and
-ripple-power models. It does not apply to the mPFC models (02:14). Design D (random
-session effects with strengths selected by REML) is a later check on the same
-mechanism. The decision changes if the evidence is against it (09:55).
+What the author decided or read, not the lead's words:
+
+- Fixed, declared penalties: the author's decision, on the lead's "Should we
+  keep the fixed penalty?" / "Ok decide then" (03:18, 03:20), from the evidence
+  in the design note, section 11.2. The weak penalty stays on every simple
+  tested coefficient (decided by the lead, 2026-11-23).
+- The curves are among the terms shared inside a unit: the author's reading.
+  The author's message to the lead just before 09:55 said that design C shares
+  the curves inside a unit, that the lead had declined "one curve for each
+  animal" on 2026-11-21 for the per-session design, and that the author read
+  the lead's messages of that morning as changing that for design C. The lead's
+  next message was the 09:55 one above. The rate model's clock curves are the
+  point the running scenario may change (design note, section 11.4).
+- Which models: that "etc" means the choice, stay-or-leave and ripple-power
+  models is the author's reading, stated to the lead several times and not
+  contradicted.
 
 ``"session"`` stays a value of :data:`~continuum_swr_replay.tables.session_keys.FitBy`
 (the earlier design, kept for the validation and for comparison); it is not a

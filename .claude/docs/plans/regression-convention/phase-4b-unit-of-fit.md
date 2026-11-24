@@ -19,9 +19,25 @@ session effects and REML penalties); "Maybe we make it easy in the code to do da
 author decides after the running simulations report. After the simulations: "I suspect with will end up
 doing design C for all. And then running both the day and animal model and compare" (09:47); "So maybe
 design C with day and animal model and then design D later to check." (09:49); "I did say maybe, lets
-just make this the decision now and we can change if the evidence is against it" (09:55). So design C is
-decided, at both the day and the animal unit. Still in force from 2026-11-23: no Firth fit; a
-regression model; the weak penalty on every simple tested coefficient; simulations use the real code.
+just make this the decision now and we can change if the evidence is against it" (09:55). So the lead
+decided: design C with the day and the animal model, both run and compared; design D later as a check;
+changeable if the evidence is against it; consistent across the behavior models; not the mPFC models for
+now. Still in force from 2026-11-23: no Firth fit; a regression model; the weak penalty on every simple
+tested coefficient; simulations use the real code.
+
+**Not the lead's words; labeled as the author's** (the design note, 11.1):
+
+- *Fixed, declared penalties*: the author's decision, on "Should we keep the fixed penalty?" / "Ok
+  decide then" (03:18, 03:20), from the evidence in the design note, 11.2.
+- *The curves are among the terms shared inside a unit*: the author's reading. The author's message to
+  the lead just before 09:55 said that design C shares the curves inside a unit, that the lead had
+  declined "one curve for each animal" on 2026-11-21 for the per-session design, and that the author
+  read the lead's messages of that morning as changing that for design C; the lead's next message was
+  the 09:55 one. The rate model's clock curves are the point the running scenario may change (design
+  note, 11.4).
+- *Which models*: the lead's words are "rate, content, etc" (02:10) and "Does not include the mpfc
+  models for now." (02:14); that "etc" means the choice, stay-or-leave and ripple-power models is the
+  author's reading (stated to the lead several times, not contradicted).
 
 **The gate stays:** simulation results go to the lead before any real fit at a new unit.
 
@@ -54,6 +70,12 @@ Each is OPEN. The phase builds what is needed to answer it; it does not answer i
 8. **A session without support for its baseline**: its rows dropped from the unit (the author's default,
    as a failing level is dropped today), or a baseline shared with the unit's other such sessions (the
    scratch driver's choice). Awaited: the counts of such sessions at each unit (task 3) and the slice.
+9. **The two forms of interval at the animal unit** (recorded, not changed): a scalar uses the
+   closed-form t interval over the animals (`unit_summary`), a curve the bootstrap band with the animal
+   as its own day (`bands.across_session_band`). They agree only approximately.
+10. **A session without rows of a baseline category's reference level** (recorded, not changed): today's
+   rule holds, so the unit's first fit is an error that stops the loop. At the animal unit one such
+   session stops an animal's fit.
 
 ## Inputs to read first
 
@@ -214,8 +236,8 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    baseline=(...))`: the intercept for the rate model, the arm category for content). In a fit of k
    sessions each baseline term is replaced by k copies, each zero outside its session's rows; the
    intercept becomes k session indicators; the arm category keeps its reference arm in each copy. A
-   copy's coefficient is named `<name>@<animal>/<session_date>/<epoch>`. A copy is unpenalized, never
-   tested, and counted by the support rule on its session's rows; a session whose copy fails has its rows
+   copy's coefficient is named `<name>@<animal>/<session_date>/<epoch>`. A copy keeps the term's
+   declared penalty (the intercept and the arm category have none; amended 2026-11-24), is never tested, and counted by the support rule on its session's rows; a session whose copy fails has its rows
    dropped from the unit and counted (question 8). In a fit of one session nothing changes. Tests:
    - `test_terms.py::test_baseline_copies_per_session` (names, columns, zeros outside the session);
    - `test_sessions.py::test_rate_baselines_match_separate_intercepts` (Poisson: k sessions sharing only a
@@ -247,7 +269,8 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
 7. **The simulation engine per unit, with both targets.** `Model` gains `fit_by` (from the model's
    settings). The engine fits each data set at that unit, writes one `sessions`-table row per unit (with
    `fit_by`, its sessions and events) and reduces with `unit_summary`. Each data set row carries two
-   planted values: `planted_session_mean` (today's target: the session -> day -> animal mean of the
+   planted values: `planted` (named `planted_session_mean` here before; the code keeps the name
+   `planted`, which the stored fixture has; today's target: the session -> day -> animal mean of the
    sessions' planted values) and `planted_unit` (the unit model fitted by the real fitter to the expected
    outcome, without noise and with the weak penalty off, reduced as the estimates are; design note,
    section 6). The summary gives bias and coverage against both. The animal-unit branch of the own fit
@@ -260,14 +283,20 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
 8. **The rate model reads the setting.** `VisitRateSettings.fit_by` and `clock_curves`; the intercept is
    the baseline; at `clock_curves="per_session"` the clock smooths are baseline terms too (dense; for an
    animal this exceeds memory, see task 12); model D's identifiability is judged on the unit's rows; the
-   statistics module reads `unit_summary`. Tests (`tests/analysis/replay_models/rate/`):
+   statistics module maps each contrast onto a fit's coefficients by name (as `simulation._unit_c`
+   does), reduces with `unit_summary`, and checks `record.fit_by` (it refuses a record of a larger unit
+   until then: `visit_rate_statistics._session_records`); the model builder declares its baseline from
+   `declared_tests.BASELINES`. Tests (`tests/analysis/replay_models/rate/`):
    `test_visit_rate.py::test_fit_by_from_the_one_setting` (the default is `BEHAVIOR_FIT_BY`),
    `::test_day_fit_has_one_intercept_per_session`, `::test_model_d_identified_on_the_unit`,
    `test_visit_rate_statistics.py::test_unit_estimands_at_each_unit`.
 9. **The content model reads the setting.** `RoleContentSettings.fit_by` and `arm_effects`
    (`"per_session"` or `"shared"`, question 2); the arm category is the baseline when per session; the
    collinearity and the statistics per unit; the calibration of the smooths over units;
-   `role_content.SESSION_COLUMNS` removed. Tests (`tests/analysis/replay_models/content/`):
+   `role_content.SESSION_COLUMNS` removed. As in task 8: the statistics map each contrast by
+   coefficient name, reduce with `unit_summary` and check `record.fit_by`, and the builder declares
+   the baseline from `declared_tests.BASELINES`. Nothing reads `BASELINES` or `BEHAVIOR_FIT_BY` before
+   tasks 8 and 9; that is expected. Tests (`tests/analysis/replay_models/content/`):
    `test_role_content.py::test_fit_by_from_the_one_setting`, `::test_arm_effects_per_session_and_shared`,
    `::test_collinearity_per_unit`, `test_role_content_statistics.py::test_unit_estimands_at_each_unit`.
 10. **Scenarios that plant session-to-session differences.** Rate: clock curves that differ by session (a

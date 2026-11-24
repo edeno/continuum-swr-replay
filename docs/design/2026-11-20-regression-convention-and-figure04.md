@@ -1008,22 +1008,35 @@ The lead's words, 2026-11-24:
 - 09:55: "I did say maybe, lets just make this the decision now and we can change if the evidence is
   against it"
 
-What is decided:
+What the lead decided (only what the quoted words carry):
 
-- **Design C for every behavior model** (rate, content, choice, stay or leave, ripple power; not the mPFC
-  models). There is one fit for each unit. Each session in the unit keeps a baseline of its own (the
-  intercept of a rate model, the arm effects of a content model). The tested terms, the curves included,
-  are shared inside the unit. The penalties are fixed and declared. The weak penalty stays on every simple
-  tested coefficient.
-- **Two units, compared**: one fit for each recording day and one for each animal
-  (`analysis/replay_models/fit_by.py`, `BEHAVIOR_FIT_BY = ("day", "animal")`). One fit for each session
-  stays in the code for the validation and for comparison.
-- Design D (random session effects, their strengths selected by REML) is a later check on the same
+- **Design C, with the day and the animal model, both run and compared**: one fit for each recording day
+  and one for each animal (`analysis/replay_models/fit_by.py`, `BEHAVIOR_FIT_BY = ("day", "animal")`).
+  In design C each session in the unit keeps a baseline of its own (the intercept of a rate model, the
+  arm effects of a content model) and the tested terms are shared. One fit for each session stays in the
+  code for the validation and for comparison.
+- Design D (random session effects, their strengths selected by REML) later, as a check on the same
   mechanism.
 - The decision changes if the evidence is against it.
+- Consistent across the behavior models ("rate, content, etc"); not the mPFC models for now.
+
+What the author decided or read (labeled; not the lead's words):
+
+- **Fixed, declared penalties: the author's decision**, on "Should we keep the fixed penalty?" / "Ok decide
+  then" (03:18, 03:20), from the evidence in the design note, section 11.2. The weak penalty on every
+  simple tested coefficient is the lead's decision of the twenty-second round.
+- **The curves are among the terms shared inside a unit: the author's reading.** The author's message to
+  the lead just before 09:55 said that design C shares the curves inside a unit, that the lead had
+  declined "one curve for each animal" on 2026-11-21 for the per-session design, and that the author read
+  the lead's messages of that morning as changing that for design C. The lead's next message was "I did
+  say maybe, lets just make this the decision now and we can change if the evidence is against it". The
+  rate model's clock curves are the point that the running scenario may change (the design note, 11.4).
+- **Which models: the author's reading.** That "etc" means the choice, stay-or-leave and ripple-power
+  models is the author's reading, stated to the lead several times and not contradicted.
 
 This round changes two earlier rounds. The fourteenth round kept one fit for each session and declined
-one curve for each animal (2026-11-21, for the per-session design). The seventeenth round kept one fit
+one curve for each animal (2026-11-21, for the per-session design); that the shared curves of design C
+replace that decline is the author's reading above. The seventeenth round kept one fit
 for each session for every model (2026-11-22).
 
 The evidence (simulation numbers; the design note, section 11.2): with nothing planted, the content
