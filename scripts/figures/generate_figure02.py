@@ -160,8 +160,7 @@ import argparse
 import hashlib
 import logging
 import warnings
-from collections.abc import Mapping, Sequence
-from numbers import Real
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -322,6 +321,7 @@ from continuum_swr_replay.visualization.palettes import (
     COLORS,
     readable_text_color,
 )
+from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.plots import (
     plot_linear_track_graph_strip,
     plot_ripple_consensus_trace_zscore,
@@ -335,7 +335,6 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     ANIMAL_POS_COLOR,
     LABEL_SIZE,
     LINE_WIDTH_LIMITS_PT,
-    PANEL_LETTER_SIZE,
     SMALL_SIZE,
     check_journal_limits,
     drawn_extent,
@@ -1743,50 +1742,6 @@ def draw_offsets(
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
-def place_letters(
-    fig: Figure,
-    panels: Mapping[str, Sequence[Axes]],
-    rows: Sequence[str],
-    columns: Sequence[str],
-    heights: Mapping[str, Sequence[Axes] | float] | None = None,
-) -> dict[str, tuple[float, float]]:
-    """Each panel letter's figure position, aligned by row and by column.
-
-    The letters of a row (each string of ``rows``, such as ``"cdef"``) share the
-    height just above the highest of their panels' drawn tops; the letters of a
-    column (each string of ``columns``, such as ``"dh"``) share the left edge of
-    the leftmost of their panels' drawn extents.
-
-    ``heights`` names, by letter, which part of its panel sets its row's
-    height in place of the panel's whole drawn extent: the axes whose drawn
-    tops count (none: the panel does not count, as when a legend above it
-    would lift the row's letters away from the others), or the letter's own
-    height in figure coordinates.
-    """
-    heights = heights or {}
-    y = {}
-    for row in rows:
-        tops = [
-            drawn_extent(fig, axes).y1
-            for axes in (heights.get(name, panels[name]) for name in row)
-            if not isinstance(axes, Real) and len(axes) > 0
-        ]
-        for name in row:
-            given = heights.get(name)
-            y[name] = (
-                given if isinstance(given, Real) else min(max(tops) + 0.002, 0.985)
-            )
-    x = {
-        name: max(
-            min(drawn_extent(fig, panels[n]).x0 for n in column) - 0.004,
-            0.0,
-        )
-        for column in columns
-        for name in column
-    }
-    return {name: (x[name], y[name]) for name in panels}
-
-
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
@@ -2042,7 +1997,7 @@ def generate_figure(
         box = ax.get_position()
         ax.set_position((decode_left, box.y0, box.x1 - decode_left, box.height))
     fig.draw_without_rendering()
-    positions = place_letters(
+    place_letters(
         fig,
         {
             "a": [ax_a],
@@ -2060,6 +2015,10 @@ def generate_figure(
             *("".join(BOTTOM_LETTERS[p] for p in row) for row in BOTTOM_ROWS),
         ],
         columns=LETTER_COLUMNS,
+        above=0.002,
+        left_of=0.004,
+        ceiling=0.985,
+        va="bottom",
         heights={
             # panel a's letter sits at the top of its decode, not of the track
             # drawing
@@ -2069,11 +2028,6 @@ def generate_figure(
             BOTTOM_LETTERS["traces"]: [],
         },
     )
-    for name, (x, y) in positions.items():
-        fig.text(
-            x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",
-            va="bottom",
-        )  # fmt: skip
     return fig
 
 

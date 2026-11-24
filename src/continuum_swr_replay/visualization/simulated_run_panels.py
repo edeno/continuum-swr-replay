@@ -3,9 +3,9 @@
 Figure 1 (``scripts/figures/generate_figure01.py``) and the memoryless
 comparison (``scripts/figures/generate_supp_figure01.py``) draw the same
 simulated run (``analysis.detection.simulated_run``) and read as one pair, so
-the state colors, the type sizes, the decoded-position panel and the hand
-layout (rows spaced from what they draw, letters on measured edges) are defined
-once, here.
+the state colors, the type sizes, the decoded-position panel and the rows
+spaced from what they draw are defined once, here; the panel letters are
+placed by ``visualization.panel_layout``.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -29,7 +29,6 @@ __all__ = [
     "drawn_extent",
     "drawn_texts",
     "example_badge",
-    "letter_panel",
     "overlapping_panels",
     "overlapping_texts",
     "plot_posterior",
@@ -517,16 +516,3 @@ def space_rows_evenly(
         row_top -= extent.height + gap
     fig.draw_without_rendering()
     return [drawn_extent(fig, row) for row in rows]
-
-
-def letter_panel(fig: Figure, letter: str, x: float, y: float) -> None:
-    """Write a panel letter with its top left corner at ``(x, y)``, figure fractions."""
-    fig.text(
-        x,
-        y,
-        letter,
-        fontsize=PANEL_LETTER_SIZE,
-        fontweight="bold",
-        ha="left",
-        va="top",
-    )

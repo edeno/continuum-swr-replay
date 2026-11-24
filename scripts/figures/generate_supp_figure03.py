@@ -78,12 +78,11 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     name_groups,
 )
 from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, COLORS
+from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
     check_placement,
-    drawn_extent,
-    letter_panel,
     set_publication_style,
 )
 
@@ -226,10 +225,9 @@ def generate_figure(inputs: dict):
         columnspacing=1.5,
     )  # fmt: skip
     fig.draw_without_rendering()
-    top = max(drawn_extent(fig, [ax]).y1 for ax in axes) + 0.02
-    for ax, letter in zip(axes, "abc", strict=True):
-        letter_panel(fig, letter, max(drawn_extent(fig, [ax]).x0 - 0.004, 0.0), top)
-    check_placement(fig, dict(zip("abc", ([ax] for ax in axes), strict=True)))
+    panels = dict(zip("abc", ([ax] for ax in axes), strict=True))
+    place_letters(fig, panels, rows=["abc"], above=0.02, left_of=0.004)
+    check_placement(fig, panels)
     return fig
 
 

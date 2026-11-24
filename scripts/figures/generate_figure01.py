@@ -62,6 +62,7 @@ from continuum_swr_replay.visualization.palettes import (
     readable_text_color,
     text_color_on,
 )
+from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.simulated_run_panels import (
     ANIMAL_POS_COLOR,
     DATA_LEFT,
@@ -77,7 +78,6 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     check_journal_limits,
     drawn_extent,
     example_badge,
-    letter_panel,
     plot_posterior,
     plot_raster,
     posterior_color_limit,
@@ -935,18 +935,17 @@ def generate_figure() -> Figure:
 
     # Equal gaps between the rows, measured from one row's drawing to the next's.
     rows = [[ax_a, *axes_b, *axes_c], axes_d, axes_e]
-    extents = space_rows_evenly(fig, rows)
+    space_rows_evenly(fig, rows)
 
     # Panel letters: a, d and e share a left edge; a, b and c share a top edge.
-    left = min(extent.x0 for extent in extents)
-    for letter, x, y in (
-        ("a", left, extents[0].y1),
-        ("b", drawn_extent(fig, axes_b).x0, extents[0].y1),
-        ("c", drawn_extent(fig, axes_c).x0, extents[0].y1),
-        ("d", left, extents[1].y1),
-        ("e", left, extents[2].y1),
-    ):
-        letter_panel(fig, letter, x, y)
+    place_letters(
+        fig,
+        {"a": [ax_a], "b": axes_b, "c": axes_c, "d": axes_d, "e": axes_e},
+        rows=["abc"],
+        columns=["ade"],
+        above=0.0,
+        floor=None,
+    )
 
     return fig
 

@@ -429,6 +429,7 @@ from continuum_swr_replay.visualization.palettes import (
     COLORS,
     readable_text_color,
 )
+from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
@@ -436,7 +437,6 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     check_journal_limits,
     check_placement,
     drawn_extent,
-    letter_panel,
     set_publication_style,
 )
 
@@ -1524,20 +1524,18 @@ def generate_figure(statistics: dict) -> Figure:
     for _ in range(ALIGN_PASSES):
         align_columns(fig, axes)
         fig.draw_without_rendering()
-    # convention 10: a row's letters at one height, just above its highest
-    # panel; a column's letters at one left edge, its leftmost panel's
-    extent = {
-        panel: drawn_extent(fig, panel_list) for panel, panel_list in axes.items()
-    }
-    left = {panel: max(e.x0 - 0.004, 0.0) for panel, e in extent.items()}
-    for _, column in LETTER_COLUMNS:
-        edge = min(left[panel] for panel in column)
-        left.update(dict.fromkeys(column, edge))
-    for _, row in ROWS:
-        top = max(extent[panel].y1 for panel in row) + LETTER_HEIGHT
-        for panel in row:
-            letter_panel(fig, LETTERS[panel], left[panel], top)
-    check_placement(fig, {LETTERS[p]: panel_list for p, panel_list in axes.items()})
+    panels = {LETTERS[panel]: panel_list for panel, panel_list in axes.items()}
+    place_letters(
+        fig,
+        panels,
+        rows=["".join(LETTERS[panel] for panel in row) for _, row in ROWS],
+        columns=[
+            "".join(LETTERS[panel] for panel in column) for _, column in LETTER_COLUMNS
+        ],
+        above=LETTER_HEIGHT,
+        left_of=0.004,
+    )
+    check_placement(fig, panels)
     return fig
 
 
