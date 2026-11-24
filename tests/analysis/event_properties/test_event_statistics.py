@@ -59,9 +59,14 @@ def test_overlap_class_statistics_count_events_animals_and_epochs():
         2,
         2,
     )
-    assert result["non_swr_fraction"] == pytest.approx(5 / 9)
-    assert result["swr_contained_fraction"] == pytest.approx(2 / 9)
-    assert result["swr_partial_fraction"] == pytest.approx(2 / 9)
+    # each animal's share, the mean over its epochs, then the mean over animals
+    # (pooled over the 9 events they would be 5/9, 2/9 and 2/9): a's e1 is all
+    # non-SWR, its e2 half non-SWR and half contained (a: 3/4, 1/4, 0); b's one
+    # epoch 2/5, 1/5, 2/5
+    assert result["non_swr_fraction"] == pytest.approx((3 / 4 + 2 / 5) / 2)
+    assert result["swr_contained_fraction"] == pytest.approx((1 / 4 + 1 / 5) / 2)
+    assert result["swr_partial_fraction"] == pytest.approx((0 + 2 / 5) / 2)
+    assert result["non_swr_fraction"] == result["non_swr_fraction_animal_mean"]
     assert result["non_swr_fraction_animal_min"] == pytest.approx(2 / 5)
     assert result["non_swr_fraction_animal_max"] == pytest.approx(3 / 4)
     assert (result["n_animals"], result["n_epochs"]) == (2, 3)
@@ -84,7 +89,8 @@ def test_overlap_class_statistics_take_an_animal_s_share_over_its_epochs():
         ]
     )
     result = stats.overlap_class_statistics(events)
-    assert result["non_swr_fraction"] == pytest.approx(3 / 9)
+    # a's epoch of one event weighs as its epoch of five (pooled: 3 / 9)
+    assert result["non_swr_fraction"] == pytest.approx((0.6 + 1 / 3) / 2)
     # a: the mean of 1 and 0.2 is 0.6 (pooled, 2 of 6 would be 1/3); b: 1/3
     assert result["non_swr_fraction_animal_min"] == pytest.approx(1 / 3)
     assert result["non_swr_fraction_animal_max"] == pytest.approx(0.6)
@@ -109,7 +115,8 @@ def test_overlap_class_statistics_count_an_absent_class_as_a_share_of_zero():
     )
     result = stats.overlap_class_statistics(pd.concat([EVENTS, only_swr]))
     assert (result["n_swr_contained"], result["n_swr_partial"]) == (4, 2)
-    assert result["non_swr_fraction"] == pytest.approx(5 / 11)
+    # c counts with a share of 0: (3/4 + 2/5 + 0) / 3 (pooled: 5 / 11)
+    assert result["non_swr_fraction"] == pytest.approx((3 / 4 + 2 / 5) / 3)
     assert result["non_swr_fraction_animal_min"] == 0.0
     assert result["non_swr_fraction_animal_max"] == pytest.approx(3 / 4)
     assert result["n_animals"] == 3
@@ -210,10 +217,10 @@ def test_boundary_offset_distribution_takes_each_animal_over_its_epochs():
 
 def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
     """Animal a: epoch 1 (earlier, later) and (together, together), epoch 2
-    (together, together); b: (earlier, later). Pooled over 4 events. a's
-    shares are the mean over its epochs: (earlier, later) (1/2 + 0) / 2 = 1/4,
-    (together, together) (1/2 + 1) / 2 = 3/4; b's 1 and 0. The cell is the
-    mean over animals."""
+    (together, together); b: (earlier, later). a's shares are the mean over
+    its epochs: (earlier, later) (1/2 + 0) / 2 = 1/4, (together, together)
+    (1/2 + 1) / 2 = 3/4; b's 1 and 0. The cell's share is the mean over animals
+    (pooled over the 4 events both cells would be 1/2)."""
     offsets = pd.DataFrame(
         {
             "start_offset_s": [-0.05, 0.0, 0.01, -0.04],
@@ -235,12 +242,12 @@ def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
     assert table["share"].sum() == pytest.approx(1.0)
     assert table["share_animal_mean"].sum() == pytest.approx(1.0)
     wide = table.loc[("earlier", "later")]
-    assert wide["share"] == pytest.approx(0.5) and wide["n_events"] == 2
+    assert wide["share"] == pytest.approx(5 / 8) and wide["n_events"] == 2
     assert wide["animal_min"] == pytest.approx(1 / 4)
     assert wide["animal_max"] == pytest.approx(1.0)
     assert wide["share_animal_mean"] == pytest.approx((1 / 4 + 1) / 2)
     together = table.loc[("together", "together")]
-    assert together["share"] == pytest.approx(0.5)
+    assert together["share"] == pytest.approx(3 / 8)
     assert together["animal_min"] == 0.0
     assert together["animal_max"] == pytest.approx(3 / 4)
     assert together["share_animal_mean"] == pytest.approx(3 / 8)

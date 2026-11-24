@@ -334,10 +334,10 @@ Widloski detector."""
 def _matched_shares(
     events: pd.DataFrame, by: str, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
-    """Each detector's share of its events matched: pooled over events, per
-    animal as the mean over the animal's epochs of each epoch's share (event ->
-    epoch -> animal), as :func:`content_class_animal_shares` takes it, and the
-    mean over animals of the animals' shares."""
+    """Each detector's share of its events matched: per animal the mean over
+    the animal's epochs of each epoch's share (event -> epoch -> animal), as
+    :func:`content_class_animal_shares` takes it, and the mean over animals of
+    the animals' shares."""
     shares = {}
     for detector in detectors:
         mine = events[events[by] == detector]
@@ -348,7 +348,6 @@ def _matched_shares(
             "mean",
         )
         shares[detector] = {
-            "pooled": mine["matched"].mean(),
             "animal_mean": animals.mean(),
             "animals": animals.to_numpy(),
         }
@@ -370,12 +369,11 @@ def nonlocal_events_overlapped(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 3)
-        Indexed by detector: ``pooled``, the matched non-local events over the
-        eligible ones; ``animals``, each animal's mean over its epochs of the
-        epoch's share (an array, in the animals' sorted order); and
-        ``animal_mean``, the mean over animals of those shares (Figure 2e's
-        bars).
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``animals``, each animal's mean over its epochs
+        of the epoch's share of the eligible non-local events it matches (an
+        array, in the animals' sorted order); and ``animal_mean``, the mean
+        over animals of those shares (Figure 2e's bars).
     """
     return _matched_shares(memberships, "other_detector", detectors)
 
@@ -398,9 +396,9 @@ def events_overlapping_nonlocal(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 3)
-        Indexed by detector: ``pooled``, ``animals`` and ``animal_mean``, as
-        for :func:`nonlocal_events_overlapped`.
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``animals`` and ``animal_mean``, as for
+        :func:`nonlocal_events_overlapped`.
     """
     return _matched_shares(events, "detector", detectors)
 

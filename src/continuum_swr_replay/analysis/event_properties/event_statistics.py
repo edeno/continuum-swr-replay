@@ -146,12 +146,13 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``n_events``: the events.
         - ``n_non_swr``, ``n_swr_contained``, ``n_swr_partial``: the events of
           each class.
-        - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
-        - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
-          lying inside an SWR and overlapping one in part, pooled the same way.
+        - ``non_swr_fraction``, ``swr_contained_fraction``,
+          ``swr_partial_fraction``: the share overlapping no SWR, lying inside
+          an SWR and overlapping one in part, event -> epoch -> animal: the
+          mean over animals of each animal's own share of the class (Figure
+          2d's bars).
         - ``non_swr_fraction_animal_mean``, ``swr_contained_fraction_animal_mean``,
-          ``swr_partial_fraction_animal_mean``: the mean over animals of each
-          animal's own share of the class (Figure 2d's bars).
+          ``swr_partial_fraction_animal_mean``: the same numbers.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -187,11 +188,9 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "n_non_swr": counts["non_swr"],
         "n_swr_contained": counts["swr_contained"],
         "n_swr_partial": counts["swr_partial"],
-        "non_swr_fraction": counts["non_swr"] / counts["total"],
-        "swr_contained_fraction": counts["swr_contained"] / counts["total"],
-        "swr_partial_fraction": counts["swr_partial"] / counts["total"],
         **{
-            f"{overlap_class}_fraction_animal_mean": shares[overlap_class].mean()
+            f"{overlap_class}_fraction{suffix}": shares[overlap_class].mean()
+            for suffix in ("", "_animal_mean")
             for overlap_class in OVERLAP_CLASSES
         },
         "non_swr_fraction_animal_min": non_swr.min(),
@@ -467,7 +466,8 @@ def boundary_timing_statistics(
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
         order): ``share_animal_mean``, the mean over animals of each animal's
         share; ``animal_min`` and ``animal_max``, the lowest and highest
-        animal's share; ``share``, pooled over every event; ``n_events``, the
+        animal's share; ``share``, the same number as ``share_animal_mean``
+        (the headline share is animal-first); ``n_events``, the
         events in the cell; ``animals`` and ``animal_names``, each animal's
         share and its name, in sorted order. An animal's share of a cell is
         the mean over its epochs of each epoch's share of its pairs (event ->
@@ -496,7 +496,7 @@ def boundary_timing_statistics(
             "share_animal_mean": per_animal.mean(axis=1),
             "animal_min": per_animal.min(axis=1),
             "animal_max": per_animal.max(axis=1),
-            "share": counts / counts.sum(),
+            "share": per_animal.mean(axis=1),
             "n_events": counts,
             "animals": [row.to_numpy() for _, row in per_animal.iterrows()],
             "animal_names": [per_animal.columns.to_numpy()] * len(per_animal),

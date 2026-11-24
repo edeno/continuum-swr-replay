@@ -87,9 +87,12 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
         "nonlocal_events_non_swr": 7,
         "nonlocal_events_swr_contained": 2,
         "nonlocal_events_swr_partial": 4,
-        "non_swr_fraction": pytest.approx(7 / 13),
-        "swr_contained_fraction": pytest.approx(2 / 13),
-        "swr_partial_fraction": pytest.approx(4 / 13),
+        # the headline shares are the animal-first shares (pooled over the 13
+        # events they would be 7/13, 2/13 and 4/13): a 3/4, b 2/5, c 1/2
+        # non-SWR; a 1/4, b 0, c 1/4 contained; a 0, b 3/5, c 1/4 partial
+        "non_swr_fraction": pytest.approx(0.55),
+        "swr_contained_fraction": pytest.approx(1 / 6),
+        "swr_partial_fraction": pytest.approx(0.85 / 3),
         # Figure 2d's bars: the mean over animals of each animal's shares
         "non_swr_fraction_animal_mean": pytest.approx(0.55),
         "swr_contained_fraction_animal_mean": pytest.approx(1 / 6),
@@ -284,9 +287,14 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_mean"
     ].value == pytest.approx(7 / 18)
-    assert values["timing_start_together_end_together_share"].value == 2 / 6
-    assert values["timing_start_later_end_earlier_share"].value == 3 / 6
-    assert values["timing_start_later_end_later_share"].value == 1 / 6
+    # the headline shares are the animals' means (pooled over the six events
+    # they would be 2/6, 3/6 and 1/6): together-together a 1, b 1/3, c 0
+    assert values["timing_start_together_end_together_share"].value == pytest.approx(
+        4 / 9
+    )
+    assert values["timing_start_later_end_earlier_share"].value == pytest.approx(7 / 18)
+    # later-later: a 0, b 0, c 1/2
+    assert values["timing_start_later_end_later_share"].value == pytest.approx(1 / 6)
     # later-earlier: a 0, b 2/3, c 1/2
     assert values["timing_start_later_end_earlier_share_animal_min"].value == 0.0
     assert values[
@@ -329,8 +337,9 @@ def _other_detector_events() -> pd.DataFrame:
 
 def test_nonlocal_found_values_are_figure_2es_right_bars():
     """For every detector Figure 2e draws, the share of the selected non-local
-    events its events overlap, pooled over events, with the lowest and highest
-    animal (an animal's share the mean over its epochs), from the function the
+    events its events overlap, the mean over animals (under the headline key
+    too), with the lowest and highest animal (an animal's share the mean over
+    its epochs), from the function the
     figure draws with; tagged with question 2b.3 and panel 2e."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
@@ -351,7 +360,7 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
     expected = {}
     for k, detector in enumerate(detectors):
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
-        expected[key] = (2 + k % 2) / 4
+        expected[key] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_mean"] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_min"] = min(0.75, k % 2)
         expected[f"{key}_animal_max"] = max(0.75, k % 2)
@@ -372,8 +381,8 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
     """The statistic of Figure 2e's left bars: for each detector the panel
     draws, the mean over animals of each animal's share of its events that
     overlap a non-local event and the lowest and highest animal, tagged to
-    the panel; for the criteria-only Widloski inventory, also pooled, for the
-    text."""
+    the panel; for the criteria-only Widloski inventory, also under the
+    headline key, for the text."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
     detectors = (*nonlocal_comparison.FIGURE_DETECTORS, "memoryless_criteria")
@@ -392,7 +401,7 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
     assert {k: v.value for k, v in values.items() if k.startswith(key)} == (
         pytest.approx(
             {
-                key: 0.5,
+                key: 0.375,
                 f"{key}_animal_mean": 0.375,
                 f"{key}_animal_min": 0.0,
                 f"{key}_animal_max": 0.75,
@@ -1727,14 +1736,17 @@ def test_restriction_agreement_values_are_the_shares_found_again():
     )
     values = _by_key(builder.restriction_agreement_values(heldout, canonical, "s"))
     numbers = {key: value.value for key, value in values.items()}
-    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(0.75)
+    # each epoch's share, each animal's mean, the mean over animals: a 2/3, b 1
+    # (pooled over the four events: 3/4)
+    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(5 / 6)
     assert numbers["restriction_canonical_non_swr_events_found_again"] == 1.0
     assert numbers["restriction_canonical_swr_events_found_again"] == 0.5
     assert numbers["restriction_canonical_events_found_again_animal_min"] == (
         pytest.approx(2 / 3)
     )
     assert numbers["restriction_canonical_events_found_again_animal_max"] == 1.0
-    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(2 / 3)
+    # a 1/2, b 1 (pooled: 2/3)
+    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(0.75)
     assert numbers["restriction_heldout_non_swr_events_with_canonical"] == 0.5
     assert numbers["restriction_heldout_swr_events_with_canonical"] == 1.0
     assert numbers["restriction_heldout_events"] == 3

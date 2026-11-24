@@ -73,8 +73,9 @@ def test_the_agreement_by_width_is_the_gain_statistic_per_bin():
     assert narrow["share_positive"] == pytest.approx((5 / 6 + 1 / 3) / 2)
     assert narrow["share_positive_animal_min"] == pytest.approx(1 / 3)
     assert narrow["share_positive_animal_max"] == pytest.approx(5 / 6)
-    # 8 of the 11 scored no-SWR events are narrow
-    assert narrow["share_of_events"] == pytest.approx(8 / 11)
+    # each epoch's share, each animal's mean, the mean over animals (pooled, 8
+    # of the 11 scored no-SWR events are narrow)
+    assert narrow["share_of_events"] == pytest.approx((7 / 8 + 3 / 5) / 2)
     # per epoch: a1 3 of 4, a2 2 of 2, b1 3 of 5; a's mean 7/8, b's 3/5
     np.testing.assert_allclose(narrow["share_of_events_animals"], [7 / 8, 3 / 5])
     assert narrow["share_of_events_animal_mean"] == pytest.approx((7 / 8 + 3 / 5) / 2)
@@ -83,7 +84,7 @@ def test_the_agreement_by_width_is_the_gain_statistic_per_bin():
     wide = stats.loc[("≥200", "no SWR")]
     # a: -1; b: median of -3 and 1 is -1
     assert wide["estimate"] == pytest.approx(-1.0)
-    assert wide["share_of_events"] == pytest.approx(3 / 11)
+    assert wide["share_of_events"] == pytest.approx((1 / 8 + 2 / 5) / 2)
     # a1 1 of 4 (a2 none: 0), so a's mean 1/8; b1 2 of 5
     assert wide["share_of_events_animal_mean"] == pytest.approx((1 / 8 + 2 / 5) / 2)
     assert wide["n_epochs"] == 2

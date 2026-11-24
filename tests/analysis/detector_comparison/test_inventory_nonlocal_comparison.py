@@ -481,7 +481,7 @@ def test_the_exposure_inside_the_visits_is_the_stored_exposure_cut_to_the_visits
     assert in_visit_s == pytest.approx(20.0, abs=0.01)
 
 
-def test_nonlocal_events_overlapped_pools_events_and_averages_each_animals_epochs():
+def test_nonlocal_events_overlapped_averages_each_animals_epochs_then_animals():
     # animal a: epoch 1 has 1 of 2 non-local events overlapped by Kay, epoch 2
     # has 1 of 1, so its share is the epochs' mean, 0.75, not the pooled 2/3
     memberships = pd.DataFrame(
@@ -495,7 +495,8 @@ def test_nonlocal_events_overlapped_pools_events_and_averages_each_animals_epoch
     )
     overlap = comparison.nonlocal_events_overlapped(memberships, ("kay", "mua"))
     assert list(overlap.index) == ["kay", "mua"]
-    assert overlap.loc["kay", "pooled"] == pytest.approx(2 / 5)
+    # no pooled share (2 / 5 over the events) is returned
+    assert list(overlap.columns) == ["animal_mean", "animals"]
     np.testing.assert_allclose(overlap.loc["kay", "animals"], [0.75, 0.0])
     # Figure 2e's bar: the mean of the animals' shares
     assert overlap.loc["kay", "animal_mean"] == pytest.approx(0.375)
@@ -522,7 +523,9 @@ def test_events_overlapping_nonlocal_gives_the_content_classes_animal_shares():
         }
     )
     shares = comparison.events_overlapping_nonlocal(events, ("kay",))
-    assert shares.loc["kay", "pooled"] == pytest.approx(2 / 4)
+    # a: epoch d1 1 of 2, epoch d2 1 of 1 -> 0.75; b: 0 -> the mean 0.375
+    # (pooled over the 4 events it would be 2 / 4)
+    assert shares.loc["kay", "animal_mean"] == pytest.approx(0.375)
     np.testing.assert_allclose(
         shares.loc["kay", "animals"],
         content_class_animal_shares(events, "kay")["with_nonlocal"].to_numpy(),
