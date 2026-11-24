@@ -58,9 +58,11 @@ Two planted values (``docs/design/2026-11-24-unit-of-fit.md``, section 6):
   at its ``fit_by`` to the expected outcome itself (no noise), with the weak
   penalty off (every simple term's fixed penalty removed; a smooth keeps its
   own), reduced over the units as the estimates are. It is computed once per
-  run for an inside scenario and once per data set for an outside one (whose
-  expected outcome may read the generator). The Bernoulli takes only 0/1
-  outcomes, so under it ``planted_unit`` is NaN.
+  worker process for an inside scenario and once per data set for an outside
+  one (whose expected outcome may read the generator). The Bernoulli takes
+  only 0/1 outcomes, so under it ``planted_unit`` is NaN. The noise-free
+  target never drops a unit for lack of events, and a drawn data set can, so
+  ``bias_unit`` can compare slightly different sets of units.
 
 The tables of a run (:class:`SimulationResult`):
 

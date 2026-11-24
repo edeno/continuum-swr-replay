@@ -779,7 +779,9 @@ session to day to animal mean of the sessions' values), and the unit's own targe
 with the weak penalty off, reduced over the units as the estimates are
 (`2026-11-24-unit-of-fit.md`, section 6). The summary gives the bias and the coverage
 against both (`bias`, `coverage`; `bias_unit`, `coverage_unit`). The target is fitted once
-per run for an inside scenario and once per data set for an outside one. The Bernoulli
+per worker process for an inside scenario and once per data set for an outside one. The
+noise-free target never drops a unit for lack of events, and a drawn data set can, so
+`bias_unit` can compare slightly different sets of units. The Bernoulli
 takes only 0/1 outcomes, so its `planted_unit` is NaN. The engine,
 `analysis/regression/simulation.py`, builds no model: the caller gives a `Model` (the
 `Design` as the model's own code builds it, the likelihood, the response and unit columns,
@@ -1157,7 +1159,8 @@ took 1.6 s against 1.1 s before (three runs each, under load, 2026-11-23).
 ## Cost
 
 **A fit of a larger unit** (measured 2026-11-24 on synthetic rows, CPU, one thread, a shared
-machine at a load near 32; timings, not results; scratch script `measure_mechanism.py`):
+machine at a load near 32; timings, not results; a scratch measurement of 2026-11-24, whose
+script is not in the repository):
 
 | Unit | Rows x columns | `fit_sessions` | of which the collinearity record | the fit (`refit_session`) | peak memory |
 |---|---|---|---|---|---|
