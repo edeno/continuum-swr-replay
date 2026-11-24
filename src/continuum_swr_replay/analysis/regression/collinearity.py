@@ -42,6 +42,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .likelihoods import Likelihood
+from .reml import _positions
 
 __all__ = [
     "MAX_EXPLAINED",
@@ -234,7 +235,7 @@ def term_collinearity(
     active = np.isfinite(beta)
     if intercept is not None and not active[intercept]:
         raise ValueError("the intercept is inactive")
-    index = np.cumsum(active) - 1  # a column's place among the active ones
+    index = _positions(active)
     kept = {
         name: index[cols[active[cols]]]
         for name, cols in terms.items()

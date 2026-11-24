@@ -1105,6 +1105,25 @@ def _check_active(
         )
 
 
+def _positions(active: np.ndarray) -> np.ndarray:
+    """Each column's index among the active ones (read at the active columns
+    only), shape ``(p,)``."""
+    return np.cumsum(active) - 1
+
+
+def _embed(values: np.ndarray, active: np.ndarray, axes: tuple[int, ...]) -> np.ndarray:
+    """``values`` of the active columns put back at full width along ``axes``,
+    NaN at the inactive columns."""
+    shape = [active.size if a in axes else n for a, n in enumerate(values.shape)]
+    out = np.full(shape, np.nan)
+    out[
+        np.ix_(
+            *(active if a in axes else np.ones(n, bool) for a, n in enumerate(shape))
+        )
+    ] = values
+    return out
+
+
 def _session_score(
     lik: Likelihood,
     data: SessionData,
@@ -1122,7 +1141,7 @@ def _session_score(
             lik, data.X, data.y, data.aux, blocks, rho, start, derivatives=derivatives
         )
     active = data.active
-    position = np.cumsum(active) - 1  # a column's index among the active ones
+    position = _positions(active)
     reduced = [block.at_columns(position[block.columns]) for block in blocks]
     session = reml_and_derivatives(
         lik,
@@ -1134,16 +1153,14 @@ def _session_score(
         None if start is None else start[active],
         derivatives=derivatives,
     )
-    p = active.size
-    beta = np.full(p, np.nan)
-    beta[active] = session.fit.beta
-    A = np.full((p, p), np.nan)
-    A[np.ix_(active, active)] = session.fit.A
     covariance = None
     if session.covariance is not None:
-        covariance = np.full((p, p), np.nan)
-        covariance[np.ix_(active, active)] = session.covariance
-    fit = replace(session.fit, beta=beta, A=A)
+        covariance = _embed(session.covariance, active, (0, 1))
+    fit = replace(
+        session.fit,
+        beta=_embed(session.fit.beta, active, (0,)),
+        A=_embed(session.fit.A, active, (0, 1)),
+    )
     columns = np.flatnonzero(active)
 
     def in_session(directions: tuple[FreeDirection, ...]) -> tuple[FreeDirection, ...]:
@@ -1153,13 +1170,13 @@ def _session_score(
         )
 
     if fit.step is not None:
-        step = np.full(p, np.nan)
-        step[active] = fit.step
-        fit = replace(fit, step=step, running_away=columns[fit.running_away])
+        fit = replace(
+            fit,
+            step=_embed(fit.step, active, (0,)),
+            running_away=columns[fit.running_away],
+        )
     if fit.unidentified is not None:
-        unidentified = np.full((p, fit.unidentified.shape[1]), np.nan)
-        unidentified[active] = fit.unidentified
-        fit = replace(fit, unidentified=unidentified)
+        fit = replace(fit, unidentified=_embed(fit.unidentified, active, (0,)))
     return replace(
         session,
         fit=fit,
