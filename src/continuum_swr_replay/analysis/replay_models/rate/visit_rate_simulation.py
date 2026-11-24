@@ -51,6 +51,11 @@ The planted values (each scenario's truth for each model):
   form's), reduced as at the session level.
 
 A scenario with no planted ratio (the later onset) has Q2 NaN in every truth.
+
+The joint run (:func:`joint_simulation`, ``config`` with ``kind="both"``)
+holds both kinds in each session's rows, each kind drawn from its own planted
+rate and fitted as its own run fits it, and adds each session's SWR minus No
+SWR difference of Q2, Q1b and Q7a (:func:`joint_fit`, the engine's own fit).
 """
 
 from __future__ import annotations
@@ -95,11 +100,21 @@ from . import visit_rate_scenarios as sc
 __all__ = [
     "CALIBRATION_SEED",
     "DATA_SEED",
+    "DIFFERENCE",
+    "JOINT_ESTIMANDS",
+    "JOINT_PRIOR_SDS",
+    "JOINT_SCENARIOS",
+    "KIND_COLUMN",
     "PRIOR_SDS",
     "SCENARIOS",
     "TARGETS",
     "Config",
+    "JointConfig",
     "calibrate_clocks",
+    "joint_estimand",
+    "joint_fit",
+    "joint_simulation",
+    "joint_table",
     "real_cohort",
     "shaped_clocks",
     "simulation",
@@ -966,6 +981,8 @@ def simulation(
         calibration.
     config : mapping, optional
         The fields of :class:`Config`; None is the default :class:`Config`.
+        ``kind="both"`` is the joint run (:func:`joint_simulation`), the
+        other fields those of :class:`JointConfig`.
 
     Returns
     -------
@@ -973,7 +990,11 @@ def simulation(
         Its ``attrs`` hold the run's configuration, the rows' record, the
         calibration, and each scenario's truths (``truths``).
     """
-    config = Config(**dict(config or {}))
+    fields = dict(config or {})
+    if fields.get("kind") == "both":
+        fields.pop("kind")
+        return joint_simulation(quick, workers, fields)
+    config = Config(**fields)
     if quick:
         config = replace(QUICK, kind=config.kind)
     kind = config.kind
@@ -1094,8 +1115,11 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     """The engine's summary with the run's kind, target and each model's
     level and prior SD, and Q2's truths beside the planted value:
     ``truth_session`` and ``truth_animal`` (each level's pooled truth) and
-    ``truth_omission_side`` (the time-varying form's)."""
+    ``truth_omission_side`` (the time-varying form's). A joint run's is
+    :func:`joint_table`."""
     config = simulation.attrs["config"]
+    if config["kind"] == "both":
+        return joint_table(result, simulation)
     truths = simulation.attrs["truths"]
     out = result.summary.copy()
     out.insert(0, "kind", config["kind"])
@@ -1110,4 +1134,427 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
             truths[s][name][e]
             for s, e in zip(out["scenario"], out["estimand"], strict=True)
         ]
+    return out
+
+
+# --- The joint run of both kinds -----------------------------------------------------
+#
+# One run in which each session's rows are its SWR rows and its No SWR rows, each
+# kind's counts drawn from its own planted rate and each kind fitted as its own
+# run fits it (per session and kind, by ``fit_sessions``), so that the SWR minus
+# No SWR difference of each session is read on the same data sets as the two
+# kinds' values (``joint_simulation``).
+
+#: The column of the joint rows that names their kind.
+KIND_COLUMN = "event_kind"
+#: The label of the SWR minus No SWR difference.
+DIFFERENCE = "SWR - No SWR"
+#: The estimands of the joint run, each read for both kinds and their difference.
+JOINT_ESTIMANDS: tuple[str, ...] = ("Q2", "Q1b", "Q7a")
+#: The joint scenarios, in order of importance (the order fixes the seeds):
+#: name -> (the SWR scenario, the No SWR scenario), each of :data:`SCENARIOS`.
+JOINT_SCENARIOS: dict[str, tuple[str, str]] = {
+    "no_effect": ("no_effect", "no_effect"),
+    "swr_ratio": ("constant_ratio", "no_effect"),
+    "both_ratios": ("constant_ratio", "constant_ratio"),
+    "swr_differing": ("differing_ratio", "no_effect"),
+    "swr_later_onset": ("later_onset", "no_effect"),
+}
+#: The joint run's prior SDs: the decided one, then the sensitivity pair.
+JOINT_PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
+
+
+def joint_estimand(estimand: str, kind: str) -> str:
+    """The joint run's name of an estimand of one kind or of
+    :data:`DIFFERENCE`, as ``"Q2 | SWR"``."""
+    return f"{estimand} | {kind}"
+
+
+@dataclass(frozen=True)
+class JointConfig:
+    """One joint run of both kinds.
+
+    Attributes
+    ----------
+    target_edf : float or None
+        The clocks' target median edf; None fits at the provisional values.
+    sessions_per_animal : int or None
+        As :class:`Config`.
+    n_data_sets, n_draws : int
+    prior_sds : tuple of float
+        The weak penalty's prior SDs, one joint model each.
+    calibration_paths : mapping of kind to str, or None
+        Where each kind's calibrated log penalties are kept (read when it
+        exists, as :class:`Config`'s ``calibration_path``).
+    quick : bool
+        Both kinds on the synthetic cohort, as :data:`QUICK`.
+    """
+
+    target_edf: float | None = None
+    sessions_per_animal: int | None = None
+    n_data_sets: int = 40
+    n_draws: int = 1000
+    prior_sds: tuple[float, ...] = JOINT_PRIOR_SDS
+    calibration_paths: Mapping[str, str] | None = None
+    quick: bool = False
+
+
+JOINT_QUICK = JointConfig(n_data_sets=2, n_draws=200, prior_sds=(2.0,), quick=True)
+
+
+class _KindRows(Mapping):
+    """One kind's rows of each session of a joint data set, made only when
+    the session is read."""
+
+    def __init__(self, data: Mapping[SessionKey, pd.DataFrame], kind: str) -> None:
+        self._data, self._kind = data, kind
+
+    def __getitem__(self, key: SessionKey) -> pd.DataFrame:
+        rows = self._data[key]
+        return rows[rows[KIND_COLUMN].to_numpy() == self._kind].reset_index(drop=True)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+
+def _kind_units(design, estimands: Mapping[str, np.ndarray], records) -> dict:
+    """Each estimand's value in each session of one kind, as the engine's
+    per-session path reads it: no value when the record has no fit or left
+    out a coefficient the estimand uses."""
+    out = {}
+    for name, c in estimands.items():
+        used = [design.coef_names[j] for j in np.flatnonzero(c)]
+        rows = []
+        for record in records:
+            left = [record.left_out[n] for n in used if n in record.left_out]
+            cause = record.no_fit or (left[0] if left else "")
+            estimate, se = np.nan, np.nan
+            if not cause:
+                value = evaluate_contrast(
+                    c, np.asarray(record.coef), np.asarray(record.vcov)
+                )
+                estimate, se = value.estimate, value.se
+            rows.append(
+                {
+                    "animal": record.animal,
+                    "session_date": record.session_date,
+                    "epoch": record.epoch,
+                    "status": record.status,
+                    "no_fit": record.no_fit,
+                    "without_value": cause,
+                    "estimate": estimate,
+                    "se": se,
+                    "edf": record.edf,
+                    "n_sessions": 1,
+                }
+            )
+        out[name] = rows
+    return out
+
+
+def joint_fit(
+    data: Mapping[SessionKey, pd.DataFrame],
+    *,
+    name: str,
+    designs: Mapping[str, object],
+    estimands: Mapping[str, Mapping[str, np.ndarray]],
+) -> pd.DataFrame:
+    """The joint model's own fit of one data set (the engine's
+    :data:`OwnFit`): each kind's rows fitted by ``fit_sessions`` with that
+    kind's design, each estimand of :data:`JOINT_ESTIMANDS` per session and
+    kind, and per session their SWR minus No SWR difference.
+
+    The difference's standard error is the root of the two variances (the
+    kinds' counts are drawn independently). A session has no difference when
+    either kind has no value (the SWR cause first); its status is the SWR
+    fit's unless that converged and the No SWR fit's did not.
+
+    Parameters
+    ----------
+    data : mapping of (animal, session_date, epoch) to pd.DataFrame
+        Each session's joint rows with the drawn counts.
+    name : str
+        The model's name in the records.
+    designs : mapping of kind to Design
+    estimands : mapping of kind to (mapping of str to np.ndarray)
+        Each kind's ``c`` of each estimand on its design.
+
+    Returns
+    -------
+    pd.DataFrame
+        The engine's :data:`UNIT_COLUMNS`, one row per estimand and session.
+    """
+    by_kind = {}
+    for kind, design in designs.items():
+        records = fit_sessions(
+            design,
+            _KindRows(data, kind),
+            Poisson(),
+            model=name,
+            kind=kind,
+            response=vr.RESPONSE,
+            unit=vr.UNIT,
+            table_sha256={},
+        )
+        by_kind[kind] = _kind_units(design, estimands[kind], records)
+    rows = []
+    for estimand in JOINT_ESTIMANDS:
+        swr, no_swr = by_kind["SWR"][estimand], by_kind["No SWR"][estimand]
+        for kind, units in (("SWR", swr), ("No SWR", no_swr)):
+            rows += [
+                {"estimand": joint_estimand(estimand, kind), **unit} for unit in units
+            ]
+        for a, b in zip(swr, no_swr, strict=True):
+            status = (
+                b["status"]
+                if a["status"] == CONVERGED and b["status"] != CONVERGED
+                else a["status"]
+            )
+            rows.append(
+                {
+                    **a,
+                    "estimand": joint_estimand(estimand, DIFFERENCE),
+                    "status": status,
+                    "no_fit": a["no_fit"] or b["no_fit"],
+                    "without_value": a["without_value"] or b["without_value"],
+                    "estimate": a["estimate"] - b["estimate"],
+                    "se": float(np.hypot(a["se"], b["se"])),
+                    "edf": None,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _joint_truths(
+    keys: Sequence[SessionKey], planted: Mapping[str, Mapping[SessionKey, dict]]
+) -> tuple[dict, dict]:
+    """Each joint scenario's planted values, reduced session -> day -> animal
+    (:func:`_balanced`), and each session's own (the difference the
+    difference of the kinds' session truths)."""
+    reduced, per_session = {}, {}
+    for name, (swr, no_swr) in JOINT_SCENARIOS.items():
+        own = {}
+        for estimand in JOINT_ESTIMANDS:
+            values = {
+                "SWR": {k: planted["SWR"][k][swr]["pooled"][estimand] for k in keys},
+                "No SWR": {
+                    k: planted["No SWR"][k][no_swr]["pooled"][estimand] for k in keys
+                },
+            }
+            values[DIFFERENCE] = {
+                k: values["SWR"][k] - values["No SWR"][k] for k in keys
+            }
+            for kind, by in values.items():
+                own[joint_estimand(estimand, kind)] = by
+        reduced[name] = {e: _balanced(by) for e, by in own.items()}
+        per_session[name] = {
+            e: {"/".join(k): float(v) for k, v in by.items()} for e, by in own.items()
+        }
+    return reduced, per_session
+
+
+def joint_simulation(
+    quick: bool, workers: int, config: Mapping[str, object] | None = None
+) -> Simulation:
+    """The joint run of both kinds (the section's comment above).
+
+    The rows, the planted curves, the calibration and each kind's truths are
+    those of the single-kind runs (:func:`simulation`) of the same cohort;
+    each scenario of :data:`JOINT_SCENARIOS` plants one single-kind scenario
+    in each kind. One model per prior SD fits both kinds (:func:`joint_fit`).
+
+    Parameters
+    ----------
+    quick : bool
+        The quick configuration (:data:`JOINT_QUICK`).
+    workers : int
+    config : mapping, optional
+        The fields of :class:`JointConfig`.
+
+    Returns
+    -------
+    Simulation
+        Its ``attrs`` hold the configuration, each kind's rows' record and
+        calibration, the reduced truths (``truths``) and each session's
+        (``session_truths``, keyed ``animal/session_date/epoch``).
+    """
+    config = JOINT_QUICK if quick else JointConfig(**dict(config or {}))
+    kinds = tuple(vr.EVENT_KINDS)
+    cohorts, records, clocks = {}, {}, {}
+    if not config.quick:
+        from continuum_swr_replay.paths import replay_content_dir
+
+        curves = pd.read_parquet(replay_content_dir() / DESCRIPTIVE)
+    for kind in kinds:
+        if config.quick:
+            cohorts[kind], records[kind] = (
+                _synthetic_cohort(kind),
+                {"rows": "synthetic"},
+            )
+            clocks[kind] = QUICK_CLOCKS
+        else:
+            cohorts[kind], records[kind] = real_cohort(
+                kind, config.sessions_per_animal, workers
+            )
+            clocks[kind] = shaped_clocks(kind, curves)
+    keys = list(cohorts["SWR"])
+    if list(cohorts["No SWR"]) != keys:
+        raise ValueError("the two kinds' cohorts hold different sessions")
+    sessions = {
+        kind: {key: rows.rows["A"] for key, rows in cohorts[kind].items()}
+        for kind in kinds
+    }
+    keys_frame = pd.DataFrame(keys, columns=["animal", "session_date", "epoch"])
+    planted, calibrated = {}, {}
+    for place, kind in enumerate(kinds):
+        names = tuple(dict.fromkeys(s[place] for s in JOINT_SCENARIOS.values()))
+        log_ratios = sc.session_log_ratios(
+            keys_frame,
+            mean=LOG_RATIO[kind],
+            animal_sd=DIFFERING_SD[0],
+            session_sd=DIFFERING_SD[1],
+            seed=DIFFERING_SEED,
+        )
+        tasks = [
+            (
+                rows,
+                names,
+                clocks[kind],
+                kind,
+                float(rows[vr.RESPONSE].sum()),
+                log_ratios,
+                None,
+            )
+            for rows in sessions[kind].values()
+        ]
+        if workers > 1 and not config.quick:
+            with pool_context().Pool(workers) as pool:
+                found = pool.map(_planted_task, tasks, chunksize=1)
+        else:
+            found = [_planted_task(task) for task in tasks]
+        planted[kind] = dict(zip(keys, found, strict=True))
+        path = (config.calibration_paths or {}).get(kind)
+        calibrated.update(
+            _calibrated(
+                cohorts[kind],
+                kind,
+                Config(kind=kind, target_edf=config.target_edf, calibration_path=path),
+                clocks[kind],
+                records[kind],
+                workers,
+            )
+            or {}
+        )
+    base = vr.VisitRateSettings(calibrated_penalties=calibrated or None)
+    pooled = {
+        kind: pd.concat(list(sessions[kind].values()), ignore_index=True)
+        for kind in kinds
+    }
+    models = []
+    for sd in config.prior_sds:
+        settings = replace(base, weak_prior_sd=sd)
+        designs = {
+            kind: vr.build_visit_rate_design("A", kind, pooled[kind], settings)
+            for kind in kinds
+        }
+        estimands = {
+            kind: {
+                e: c
+                for e, c in _estimands(designs[kind], settings).items()
+                if e in JOINT_ESTIMANDS
+            }
+            for kind in kinds
+        }
+        name = f"joint_sd{sd:g}"
+        models.append(
+            Model(
+                name,
+                designs["SWR"],
+                Poisson(),
+                vr.RESPONSE,
+                vr.UNIT,
+                {},
+                fit=partial(joint_fit, name=name, designs=designs, estimands=estimands),
+                fit_estimands=tuple(
+                    joint_estimand(e, kind)
+                    for e in JOINT_ESTIMANDS
+                    for kind in (*kinds, DIFFERENCE)
+                ),
+                fit_columns=(KIND_COLUMN, *designs["No SWR"].columns),
+            )
+        )
+    del pooled
+    rows_out = {}
+    for key in keys:
+        parts = []
+        for place, kind in enumerate(kinds):
+            parts.append(
+                sessions[kind][key].assign(
+                    **{
+                        KIND_COLUMN: kind,
+                        **{
+                            f"expected_{name}": planted[kind][key][s[place]]["expected"]
+                            for name, s in JOINT_SCENARIOS.items()
+                        },
+                    }
+                )
+            )
+        rows_out[key] = pd.concat(parts, ignore_index=True)
+    truths, session_truths = _joint_truths(keys, planted)
+    scenarios = [
+        OutsideScenario(
+            name,
+            partial(_expected_column, column=f"expected_{name}"),
+            planted=truths[name],
+            columns=(f"expected_{name}",),
+        )
+        for name in JOINT_SCENARIOS
+    ]
+    attrs = {
+        "config": {
+            **dict(config.__dict__),
+            "kind": "both",
+            "prior_sds": list(config.prior_sds),
+            "calibration_paths": dict(config.calibration_paths or {}),
+        },
+        "rows": records,
+        "calibration": {
+            f"{kind}|{c}": {"log_penalty": p.log_penalty, "target_edf": p.target_edf}
+            for (kind, c), p in calibrated.items()
+        },
+        "allow_provisional": None if calibrated else "simulation",
+        "joint_scenarios": {n: list(s) for n, s in JOINT_SCENARIOS.items()},
+        "truths": truths,
+        "session_truths": session_truths,
+        "planted_constants": {
+            "log_ratio": dict(LOG_RATIO),
+            "delay_s": DELAY_S,
+            "differing_sd": list(DIFFERING_SD),
+            "differing_seed": DIFFERING_SEED,
+        },
+    }
+    return Simulation(
+        models,
+        rows_out,
+        scenarios,
+        config.n_data_sets,
+        config.n_draws,
+        DATA_SEED,
+        attrs,
+    )
+
+
+def joint_table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
+    """The engine's summary of a joint run with each row's kind (or
+    :data:`DIFFERENCE`), its estimand of :data:`JOINT_ESTIMANDS`, the target
+    and the prior SD."""
+    out = result.summary.copy()
+    split = out["estimand"].str.split(" | ", n=1, regex=False)
+    out.insert(0, "kind", split.str[1])
+    out.insert(1, "target_edf", simulation.attrs["config"]["target_edf"])
+    out["base_estimand"] = split.str[0]
+    out["prior_sd"] = [float(m.removeprefix("joint_sd")) for m in out["model"]]
     return out
