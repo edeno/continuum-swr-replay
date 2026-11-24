@@ -1,4 +1,5 @@
-"""Synthetic sessions for the convention's tools (terms, support, the loop).
+"""Synthetic sessions for the convention's tools (terms, support, the loop),
+and the likelihoods' JAX functions called on NumPy rows (:func:`family_kernel`).
 
 Two kinds of rows, each built from a fixed seed:
 
@@ -18,6 +19,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.padding import pad_values
+from continuum_swr_replay.analysis.regression.runtime import float64_kernel, in_float64
 from continuum_swr_replay.analysis.regression.terms import Category
 from scripts.checks.compare_regression_to_mgcv import bins_of
 
@@ -25,6 +28,49 @@ N_LAGS = 10
 ROLES = ("current", "previous", "other", "trunk")
 #: The content rows' role category, the "other" leaf arm its reference.
 ROLE = Category("role", ROLES, reference="other", penalty="none")
+
+
+@float64_kernel(static_argnames=("lik", "name"))
+def jax_family(lik, name, *arrays):
+    """``lik._jax_<name>(*arrays)``, jitted as the fitter's kernels are."""
+    return getattr(lik, f"_jax_{name}")(*arrays)
+
+
+@in_float64
+def family_kernel(lik, name, X, eta, y, aux, *directions):
+    """A family's JAX function ``_jax_<name>`` on NumPy rows, in float64.
+
+    The rows are padded by ``lik.pad``; ``eta`` and each direction (``d``, or
+    ``d1`` and ``d2``) by ``padding.pad_values``.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    name : {"loglik", "score", "information", "dinformation", "d2information"}
+    X : np.ndarray, shape (n_rows, p), or None
+        None for ``loglik`` and ``score``, which take no design.
+    eta, y : np.ndarray, shape (n_rows,)
+    aux : object
+        The family's aux, as ``lik.pad`` takes it.
+    *directions : np.ndarray, shape (n_rows,)
+
+    Returns
+    -------
+    float or np.ndarray
+        The log-likelihood; the score on the real rows, shape ``(n_rows,)``;
+        or a matrix, shape ``(p, p)``.
+    """
+    rows = lik.pad(np.empty((np.size(y), 0)) if X is None else X, y, aux)
+    eta, *directions = (
+        pad_values(v, rows.n_real, rows.y.size) for v in (eta, *directions)
+    )
+    design = () if X is None else (rows.X,)
+    out = jax_family(
+        lik, name, *design, eta, rows.y, rows.aux, rows.weight, *directions
+    )
+    if name == "loglik":
+        return float(out)
+    return np.array(out)[: rows.n_real] if name == "score" else np.array(out)
 
 
 def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:

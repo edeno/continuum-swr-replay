@@ -36,6 +36,8 @@ from continuum_swr_replay.analysis.regression.padding import (
     pad_values,
 )
 
+from .conftest import family_kernel
+
 RTOL = 1e-12
 """Relative to the largest entry of each quantity: an entry that is 0 but for
 rounding (a gradient at a column's sum) cannot be compared on its own scale."""
@@ -340,11 +342,12 @@ def test_junk_in_the_padded_rows_changes_nothing(family):
         np.testing.assert_array_equal(got, want)
 
 
-def test_the_public_methods_pad_and_return_the_real_rows():
-    """A public method pads to the bucket and returns one value per real row."""
+def test_the_public_method_pads_and_returns_the_real_rows():
+    """The weighted design, and the score on padded rows, have one value per
+    real row."""
     lik, X, beta, y, aux = _diagonal_case("poisson")
     eta = X @ beta
-    score = lik.score_eta(eta, y, aux)
+    score = family_kernel(lik, "score", None, eta, y, aux)
     assert score.shape == y.shape
     np.testing.assert_allclose(score, y - np.exp(eta + aux), rtol=1e-14)
     weighted = lik.weighted_design(X, y, aux, eta)
@@ -427,12 +430,12 @@ def _derivative_cases(family: str, step: int | None):
         unpadded = pad_groups(X, y, ids, row_step=y.size, group_step=1)
         rows = (X, y, Groups(unpadded.group, 40), np.ones(y.size))
         aux = Groups(padded.group, padded.n_groups)
-        information = lik.information(X, X @ beta, y, ids)
+        information = family_kernel(lik, "information", X, X @ beta, y, ids)
     else:
         lik, X, beta, y, aux = _diagonal_case(family)
         padded = pad_rows(X, y, aux if family == "poisson" else None, step=step)
         rows = (X, y, aux, np.ones(y.size))
-        information = lik.information(X, X @ beta, y, aux)
+        information = family_kernel(lik, "information", X, X @ beta, y, aux)
         aux = padded.offset if family == "poisson" else aux
     # The first column is constant, which the softmax cannot see: a unit on
     # its diagonal keeps A positive definite.

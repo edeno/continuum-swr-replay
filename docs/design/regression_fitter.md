@@ -799,10 +799,10 @@ the refits, and REML's rotation of the design into the penalties' eigenbasis (be
 
 **The kernels and the host loop.** Each family has JAX functions of the padded rows and
 their weights (`_jax_loglik`, `_jax_score`, `_jax_information`, `_jax_dinformation`,
-`_jax_d2information`, `_jax_weighted_design`). The public methods (`loglik`,
-`score_eta`, `information`, `dinformation`, `d2information`, `weighted_design`) take
-NumPy arrays, pad them and run one jitted kernel on those functions; a likelihood made for
-a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
+`_jax_d2information`, `_jax_weighted_design`). The one public method on them,
+`weighted_design`, takes NumPy arrays, pads them and runs one jitted kernel; the tests call
+the other functions on NumPy rows the same way (`conftest.family_kernel`). A likelihood
+made for a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
 once and runs a host loop in Python and NumPy that holds every rule, status and count of
 "The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
@@ -860,7 +860,7 @@ design beyond its Gram; it is given the stack of penalties only when the derivat
 asked for, so it has two programs per shape, the score alone and the score with its
 derivatives). The rows are padded and moved once
 for a fit and its derivatives; the NumPy loops called the public `dinformation` and
-`d2information` once for each penalty and pair, each padding and moving `X` again. The
+`d2information` (since removed) once for each penalty and pair, each padding and moving `X` again. The
 penalties are the leading axis of the kernel's arrays (`S_j` of shape `(m, p, p)`): a new
 number of penalties is a new shape and so a new program, and a model has one. With
 `b_j = -A^-1 S_j b` and `E = X [b_1 ... b_m]`, the `m` matrices `A_j = S_j + dH(E_j)` are

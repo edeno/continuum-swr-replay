@@ -1,15 +1,16 @@
 """The likelihoods' derivatives against central finite differences, and
 their draws.
 
-Each level is checked against a finite difference of the level below it, and
-the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
-``loglik`` in ``eta``; ``information`` is minus the derivative of the
-coefficient gradient ``X' score_eta(X beta)`` in ``beta``; ``dinformation`` is
-the derivative of ``information`` along a direction of ``eta``; and
-``d2information`` the derivative of ``dinformation`` along a second one.
-The hand-written derivatives the kernels compute also equal JAX's automatic
-derivatives of the kernels' log-likelihood. The draws (``draw``) have the
-family's mean.
+Each level of a family's JAX functions (``_jax_<name>``, called on NumPy rows
+by ``conftest.family_kernel``) is checked against a finite difference of the
+level below it, and the lowest against the log-likelihood itself: the score is
+the gradient of the log-likelihood in ``eta``; the information is minus the
+derivative of the coefficient gradient ``X' score(X beta)`` in ``beta``;
+``dinformation`` is the derivative of the information along a direction of
+``eta``; and ``d2information`` the derivative of ``dinformation`` along a
+second one. The hand-written derivatives also equal JAX's automatic
+derivatives of the log-likelihood. The draws (``draw``) have the family's
+mean.
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
 )
 from continuum_swr_replay.analysis.regression.newton import penalized_newton
 from continuum_swr_replay.analysis.regression.padding import pad_values
+
+from .conftest import family_kernel
 
 TOLERANCE = 1e-6
 N_ROWS = 14
@@ -80,24 +83,35 @@ def test_derivatives_match_finite_differences(name: str) -> None:
     d1 = rng.normal(size=N_ROWS)
     d2 = rng.normal(size=N_ROWS)
 
-    # score_eta: the gradient of loglik in eta.
+    def loglik(e: np.ndarray) -> float:
+        return family_kernel(lik, "loglik", None, e, y, aux)
+
+    def score(e: np.ndarray) -> np.ndarray:
+        return family_kernel(lik, "score", None, e, y, aux)
+
+    def information(e: np.ndarray) -> np.ndarray:
+        return family_kernel(lik, "information", X, e, y, aux)
+
+    def dinformation(e: np.ndarray, d: np.ndarray) -> np.ndarray:
+        return family_kernel(lik, "dinformation", X, e, y, aux, d)
+
+    def d2information(e: np.ndarray, d: np.ndarray, d_: np.ndarray) -> np.ndarray:
+        return family_kernel(lik, "d2information", X, e, y, aux, d, d_)
+
+    # The score: the gradient of the log-likelihood in eta.
     h = 1e-5
     eye = np.eye(N_ROWS)
     numeric_score = np.array(
-        [
-            (lik.loglik(eta + h * e, y, aux) - lik.loglik(eta - h * e, y, aux))
-            / (2 * h)
-            for e in eye
-        ]
+        [(loglik(eta + h * e) - loglik(eta - h * e)) / (2 * h) for e in eye]
     )
-    assert _relative_error(lik.score_eta(eta, y, aux), numeric_score) < TOLERANCE
+    assert _relative_error(score(eta), numeric_score) < TOLERANCE
 
-    # information: minus the beta-derivative of X' score_eta(X beta).
+    # The information: minus the beta-derivative of X' score(X beta).
     beta = np.linalg.lstsq(X, eta, rcond=None)[0]
     eta = X @ beta  # on the column space, so eta is X beta exactly
 
     def gradient(b: np.ndarray) -> np.ndarray:
-        return X.T @ lik.score_eta(X @ b, y, aux)
+        return X.T @ score(X @ b)
 
     h = 1e-5
     numeric_information = -np.column_stack(
@@ -106,27 +120,22 @@ def test_derivatives_match_finite_differences(name: str) -> None:
             for e in np.eye(N_COLUMNS)
         ]
     )
-    information = lik.information(X, eta, y, aux)
-    assert information.shape == (N_COLUMNS, N_COLUMNS)
-    assert _relative_error(information, numeric_information) < TOLERANCE
+    assert information(eta).shape == (N_COLUMNS, N_COLUMNS)
+    assert _relative_error(information(eta), numeric_information) < TOLERANCE
 
-    # dinformation: the derivative of information along d1.
+    # dinformation: the derivative of the information along d1.
     h = 1e-5
-    numeric_d = (
-        lik.information(X, eta + h * d1, y, aux)
-        - lik.information(X, eta - h * d1, y, aux)
-    ) / (2 * h)
-    assert _relative_error(lik.dinformation(X, eta, y, aux, d1), numeric_d) < TOLERANCE
+    numeric_d = (information(eta + h * d1) - information(eta - h * d1)) / (2 * h)
+    assert _relative_error(dinformation(eta, d1), numeric_d) < TOLERANCE
 
     # d2information: the derivative of dinformation(d1) along d2.
-    numeric_d2 = (
-        lik.dinformation(X, eta + h * d2, y, aux, d1)
-        - lik.dinformation(X, eta - h * d2, y, aux, d1)
-    ) / (2 * h)
-    analytic_d2 = lik.d2information(X, eta, y, aux, d1, d2)
+    numeric_d2 = (dinformation(eta + h * d2, d1) - dinformation(eta - h * d2, d1)) / (
+        2 * h
+    )
+    analytic_d2 = d2information(eta, d1, d2)
     assert _relative_error(analytic_d2, numeric_d2) < TOLERANCE
     # Symmetric in its two directions.
-    assert np.allclose(analytic_d2, lik.d2information(X, eta, y, aux, d2, d1))
+    assert np.allclose(analytic_d2, d2information(eta, d2, d1))
 
 
 AUTODIFF_RTOL = 1e-12
@@ -222,14 +231,15 @@ def test_information_traces_equal_the_traces_of_the_derivatives(name: str) -> No
 
 
 def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:
-    """The grouped information equals a direct second difference of loglik."""
+    """The grouped information equals a direct second difference of the
+    log-likelihood."""
     lik, X, y, groups, eta = _case("softmax_counts")
     beta = np.linalg.lstsq(X, eta, rcond=None)[0]
     h = 1e-4
     eye = np.eye(N_COLUMNS)
 
     def loglik(b: np.ndarray) -> float:
-        return lik.loglik(X @ b, y, groups)
+        return family_kernel(lik, "loglik", None, X @ b, y, groups)
 
     hessian = np.array(
         [
@@ -246,21 +256,24 @@ def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:
             for ei in eye
         ]
     )
-    information = lik.information(X, X @ beta, y, groups)
+    information = family_kernel(lik, "information", X, X @ beta, y, groups)
     assert _relative_error(information, -hessian) < 1e-5
 
 
 def test_softmax_rejects_unsorted_groups() -> None:
     lik, X, y, groups, eta = _case("softmax_fractions")
     with pytest.raises(ValueError, match="sorted"):
-        lik.loglik(eta, y, groups[::-1])
+        family_kernel(lik, "loglik", None, eta, y, groups[::-1])
 
 
 def test_softmax_is_invariant_to_a_constant_within_each_group() -> None:
     """A group-level constant cancels: it is not identified, as the class says."""
     lik, X, y, groups, eta = _case("softmax_fractions")
     shift = np.array([3.0, -1.0, 0.5, 20.0])[groups]
-    assert np.isclose(lik.loglik(eta + shift, y, groups), lik.loglik(eta, y, groups))
+    assert np.isclose(
+        family_kernel(lik, "loglik", None, eta + shift, y, groups),
+        family_kernel(lik, "loglik", None, eta, y, groups),
+    )
 
 
 N_DRAWS = 20_000
@@ -418,12 +431,12 @@ def test_no_rows_give_zeros(name, aux) -> None:
     """With no rows the log-likelihood is 0, the score empty and the
     information and its derivatives zero, as the NumPy formulas gave."""
     lik, X, none = FAMILIES[name](), np.empty((0, 2)), np.empty(0)
-    assert lik.loglik(none, none, aux) == 0.0
-    assert lik.score_eta(none, none, aux).shape == (0,)
+    assert family_kernel(lik, "loglik", None, none, none, aux) == 0.0
+    assert family_kernel(lik, "score", None, none, none, aux).shape == (0,)
     for information in (
-        lik.information(X, none, none, aux),
-        lik.dinformation(X, none, none, aux, none),
-        lik.d2information(X, none, none, aux, none, none),
+        family_kernel(lik, "information", X, none, none, aux),
+        family_kernel(lik, "dinformation", X, none, none, aux, none),
+        family_kernel(lik, "d2information", X, none, none, aux, none, none),
     ):
         np.testing.assert_array_equal(information, np.zeros((2, 2)))
 
@@ -431,61 +444,54 @@ def test_no_rows_give_zeros(name, aux) -> None:
 def test_a_softmax_without_rows_is_refused() -> None:
     none = np.empty(0)
     with pytest.raises(ValueError, match="no rows"):
-        GroupedSoftmax().loglik(none, none, np.empty(0, dtype=int))
+        family_kernel(GroupedSoftmax(), "loglik", None, none, none, np.empty(0, int))
 
 
 @pytest.mark.parametrize("length", [5, 2 * N_ROWS])
 def test_a_vector_of_another_length_is_refused(length: int) -> None:
-    """``eta``, ``d``, ``d1`` and ``d2`` need one value per row; the error
-    names the argument and both lengths."""
+    """``eta`` needs one value per row; the error names the argument and both
+    lengths."""
     lik, X, y, aux, eta = _case("poisson")
     wrong = np.resize(eta, length)
     with pytest.raises(ValueError, match=rf"eta of shape \({length},\) for 14 rows"):
-        lik.loglik(wrong, y, aux)
-    with pytest.raises(ValueError, match=rf"d of shape \({length},\) for 14 rows"):
-        lik.dinformation(X, eta, y, aux, wrong)
-    with pytest.raises(ValueError, match=rf"d2 of shape \({length},\) for 14 rows"):
-        lik.d2information(X, eta, y, aux, eta, wrong)
+        lik.weighted_design(X, y, aux, wrong)
 
 
 @pytest.mark.parametrize("name", ["poisson", "bernoulli", "softmax_counts"])
 def test_a_per_row_vector_with_two_axes_is_refused(name: str) -> None:
-    """``eta``, ``d``, ``d1``, ``d2``, ``y`` and a per-row offset take one
-    axis: a column of shape (n, 1) broadcast against the padded rows and gave
-    a wrong number. The error names the argument and its shape."""
+    """``eta``, ``y`` and a per-row offset take one axis: a column of shape
+    (n, 1) broadcast against the padded rows and gave a wrong number. The
+    error names the argument and its shape."""
     lik, X, y, aux, eta = _case(name)
     column = rf"of shape \({N_ROWS}, 1\): one value per row, on one axis"
     with pytest.raises(ValueError, match="eta " + column):
-        lik.loglik(eta[:, None], y, aux)
-    with pytest.raises(ValueError, match="eta " + column):
-        lik.score_eta(eta[:, None], y, aux)
+        lik.weighted_design(X, y, aux, eta[:, None])
     with pytest.raises(ValueError, match="y " + column):
-        lik.loglik(eta, y[:, None], aux)
-    with pytest.raises(ValueError, match="d " + column):
-        lik.dinformation(X, eta, y, aux, eta[:, None])
-    with pytest.raises(ValueError, match="d1 " + column):
-        lik.d2information(X, eta, y, aux, eta[:, None], eta)
-    with pytest.raises(ValueError, match="d2 " + column):
-        lik.d2information(X, eta, y, aux, eta, eta[:, None])
+        lik.weighted_design(X, y[:, None], aux, eta)
     if name == "poisson":
         with pytest.raises(ValueError, match="offset " + column):
-            lik.loglik(eta, y, aux[:, None])
+            lik.weighted_design(X, y, aux[:, None], eta)
 
 
 def test_a_single_poisson_offset_is_every_rows() -> None:
-    """A scalar offset is the offset of every row; None is refused as before
-    (``TypeError``)."""
+    """A scalar offset is the offset of every row when the rows are padded;
+    None is refused (``TypeError``)."""
     lik, X, y, _, eta = _case("poisson")
-    full = np.full(N_ROWS, 0.5)
-    assert lik.loglik(eta, y, 0.5) == lik.loglik(eta, y, full)
+    for name, design, offset in (
+        ("loglik", None, 0.5),
+        ("score", None, 0.5),
+        ("information", X, 0.0),
+    ):
+        np.testing.assert_array_equal(
+            family_kernel(lik, name, design, eta, y, offset),
+            family_kernel(lik, name, design, eta, y, np.full(N_ROWS, offset)),
+        )
     np.testing.assert_array_equal(
-        lik.score_eta(eta, y, 0.5), lik.score_eta(eta, y, full)
-    )
-    np.testing.assert_array_equal(
-        lik.information(X, eta, y, 0.0), lik.information(X, eta, y, np.zeros(N_ROWS))
+        lik.weighted_design(X, y, 0.0, eta),
+        lik.weighted_design(X, y, np.zeros(N_ROWS), eta),
     )
     with pytest.raises(TypeError, match="offset is None"):
-        lik.score_eta(eta, y, None)
+        lik.pad(X, y, None)
 
 
 def test_a_family_class_that_can_keep_state_is_refused_before_any_call() -> None:
@@ -505,7 +511,7 @@ def test_a_family_class_that_can_keep_state_is_refused_before_any_call() -> None
     lik, X, y, aux, eta = _case("poisson")
     for family in (_Cached(), _Initialized()):
         with pytest.raises(TypeError, match="can keep state on its objects"):
-            family.loglik(eta, y, aux)
+            family.weighted_design(X, y, aux, eta)
         with pytest.raises(TypeError, match="can keep state on its objects"):
             hash(family)
 
@@ -520,9 +526,11 @@ def test_a_family_with_an_attribute_of_its_own_is_refused() -> None:
 
     lik, X, y, aux, eta = _case("poisson")
     scaled = _Scaled()
-    assert scaled.loglik(eta, y, aux) == lik.loglik(eta, y, aux)
+    np.testing.assert_array_equal(
+        scaled.weighted_design(X, y, aux, eta), lik.weighted_design(X, y, aux, eta)
+    )
     scaled.scale = 2.0
     with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
-        scaled.loglik(eta, y, aux)
+        scaled.weighted_design(X, y, aux, eta)
     with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
         penalized_newton(scaled, X, y, aux, np.zeros((3, 3)), np.zeros(3))
