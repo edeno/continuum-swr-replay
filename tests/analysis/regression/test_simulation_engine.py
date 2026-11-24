@@ -23,6 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import scipy.stats
 
 from continuum_swr_replay.analysis.regression import simulation as engine
 from continuum_swr_replay.analysis.regression.contrasts import (
@@ -52,6 +53,10 @@ from continuum_swr_replay.analysis.regression.terms import (
     Smooth,
     build_design,
     log_penalty_from_prior_sd,
+)
+from continuum_swr_replay.analysis.shared_statistics import (
+    estimand_summary,
+    signed_rank_p,
 )
 
 from .conftest import ROLES, content_rows, rate_rows
@@ -274,18 +279,62 @@ def test_same_seed_same_data(monkeypatch, rate_sessions_cohort) -> None:
 
 
 def test_only_the_outcome_changes(monkeypatch, rate_sessions_cohort) -> None:
-    """The rows given to ``fit_sessions`` equal the real rows, index and
-    every column but the outcome, which is drawn anew."""
+    """The rows given to ``fit_sessions`` are the real rows' columns the run
+    reads (the design's, the unit; :func:`.simulation.run_columns`), equal
+    to them with their index, and the outcome, drawn anew."""
     sessions = rate_sessions_cohort
     seen = _capture(monkeypatch)
-    engine.run(_simulation(rate_model(sessions), sessions, [RATE_INSIDE]))
+    simulation = _simulation(rate_model(sessions), sessions, [RATE_INSIDE])
+    kept = engine.run_columns(simulation)
+    assert set(kept) == {"time_since_s", REWARD, "exposure", "well_visit_id"}
+    engine.run(simulation)
     for data in seen:
         assert list(data) == list(sessions)
         for key, rows in sessions.items():
+            columns = [c for c in rows.columns if c in kept]
+            assert list(data[key].columns) == [*columns, "count"]
             pd.testing.assert_frame_equal(
-                data[key].drop(columns="count"), rows.drop(columns="count")
+                data[key].drop(columns="count"), rows[columns]
             )
             assert not np.array_equal(data[key]["count"], rows["count"])
+
+
+def test_run_columns_name_what_a_scenario_reads(content_sessions_cohort) -> None:
+    """A run keeps a column a scenario names for the softmax's noise and
+    one an outside scenario's expected outcome reads; a session without a
+    kept column is refused."""
+    sessions = content_sessions_cohort
+    model = content_model(sessions)
+    noise = InsideScenario("noise", CONTENT_INSIDE.coefficients, n_trials="n_bins")
+    outside = OutsideScenario("outside", _shares, columns=("clock_s",))
+    simulation = _simulation(model, sessions, [noise, outside])
+    assert engine.run_columns(simulation) == ("role", "event_id", "n_bins", "clock_s")
+    key = next(iter(sessions))
+    short = {**sessions, key: sessions[key].drop(columns="n_bins")}
+    with pytest.raises(ValueError, match=r"no columns \['n_bins'\]"):
+        engine.run(_simulation(model, short, [noise]))
+
+
+def test_prepared_draws_give_the_same_data_set(content_sessions_cohort) -> None:
+    """Prepared once and drawn twice, the data sets are those of the
+    one-call form at the same seeds; draws prepared for another scenario are
+    refused."""
+    sessions = content_sessions_cohort
+    model = content_model(sessions)
+    scenario = InsideScenario("noise", CONTENT_INSIDE.coefficients, n_trials="n_bins")
+    prepared = engine.prepare_draws(model, sessions, scenario)
+    for seed in (3, 4):
+        once = draw_data_set(model, sessions, scenario, np.random.default_rng(seed))
+        again = draw_data_set(
+            model, sessions, scenario, np.random.default_rng(seed), prepared
+        )
+        assert list(again) == list(once)
+        for key in once:
+            pd.testing.assert_frame_equal(again[key], once[key])
+    with pytest.raises(ValueError, match="another model, scenario"):
+        draw_data_set(
+            model, sessions, CONTENT_INSIDE, np.random.default_rng(0), prepared
+        )
 
 
 def test_planted_coefficients_recovered(rate_sessions_cohort) -> None:
@@ -541,6 +590,89 @@ def test_expected_shares_must_sum_to_one(content_sessions_cohort) -> None:
     scenario = OutsideScenario("near", partial(_shares, scale_first=near))
     drawn = draw_data_set(model, sessions, scenario, rng)
     assert all(np.isfinite(rows["share"]).all() for rows in drawn.values())
+
+
+def _fixed_rate(sessions, rng):
+    """Each row's expected count: its exposure times a rate that rises over
+    the visit and is 0.5 higher (log) after a reward. ``rng`` is not read."""
+    out = {}
+    for key, rows in sessions.items():
+        t = rows["time_since_s"].to_numpy()
+        log_rate = (
+            np.log(0.8)
+            + np.log(2.0) * (1.0 - np.exp(-t / 0.3))
+            + 0.5 * rows[REWARD].to_numpy()
+        )
+        out[key] = rows["exposure"].to_numpy() * np.exp(log_rate)
+    return out
+
+
+def test_outside_draws_have_the_expected_mean(rate_sessions_cohort) -> None:
+    """The mean count of 400 data sets drawn by ``draw_data_set`` under an
+    outside scenario is its expected count, the exposure (0.01 to 0.2 s) in
+    the model's offset counted once: summed over each session's rows in each
+    third of exposure, within 4 Poisson SEs. An exposure counted twice or not
+    at all would put the sums off by a factor of about 10."""
+    rng = np.random.default_rng(0)
+    sessions = {
+        key: rows.assign(exposure=rng.uniform(0.01, 0.2, len(rows)))
+        for key, rows in list(rate_sessions_cohort.items())[:4]
+    }
+    model = rate_model(sessions)
+    assert model.design.offset.column == "exposure"
+    scenario = OutsideScenario("fixed", _fixed_rate)
+    expected = _fixed_rate(sessions, None)
+    prepared = engine.prepare_draws(model, sessions, scenario)
+    n_data_sets = 400
+    total = {key: np.zeros(len(rows)) for key, rows in sessions.items()}
+    for _ in range(n_data_sets):
+        drawn = draw_data_set(model, sessions, scenario, rng, prepared)
+        for key in sessions:
+            total[key] += drawn[key]["count"].to_numpy()
+    for key, rows in sessions.items():
+        assert np.isfinite(total[key]).all()
+        third = np.digitize(
+            rows["exposure"], np.quantile(rows["exposure"], [1 / 3, 2 / 3])
+        )
+        for k in range(3):
+            want = n_data_sets * expected[key][third == k].sum()
+            got = total[key][third == k].sum()
+            assert abs(got - want) < 4 * np.sqrt(want), (key, k, got, want)
+
+
+def test_day_level_test_and_interval_on_nine_days() -> None:
+    """3 animals of 3 sessions, each on its own day (9 recording days): every
+    data set has a day-level p, and its estimate, interval and p are
+    ``estimand_summary``'s on the sessions table's values at the data set's
+    bootstrap seed. The interval's half width is ``t(0.975, 2) sqrt(3 / 2)``
+    times the draws' SD, the p the signed-rank p over the 9 day values (one
+    session each), and the summary's ``reject_day`` the share of p below
+    0.05 over the data sets."""
+    sessions = _cohort(rate_rows, n_animals=3, n_sessions=3)
+    model = rate_model(sessions)
+    result = engine.run(_simulation(model, sessions, [RATE_INSIDE], n_data_sets=3))
+    data_sets = result.data_sets.query("estimand == 'reward'")
+    fits = result.sessions.query("estimand == 'reward'")
+    t = scipy.stats.t.ppf(0.975, 2) * np.sqrt(3 / 2)
+    for row in data_sets.itertuples():
+        mine = fits[fits["data_set"] == row.data_set]
+        index = pd.MultiIndex.from_frame(mine[["animal", "session_date", "epoch"]])
+        values = pd.Series(mine["estimate"].to_numpy(), index=index)
+        labels = [pd.Series(index.get_level_values(k), index=index) for k in range(3)]
+        direct = estimand_summary(values, *labels, n_draws=200, seed=row.bootstrap_seed)
+        assert (row.estimate, row.low, row.high, row.day_p) == (
+            direct["estimate"],
+            direct["low"],
+            direct["high"],
+            direct["day_p"],
+        )
+        assert direct["n_days"] == 9 and np.isfinite(row.day_p)
+        assert (row.high - row.low) / 2 == pytest.approx(t * row.interval_sd)
+        assert row.day_p == pytest.approx(signed_rank_p(values.to_numpy()))
+    summary = result.summary.set_index("estimand").loc["reward"]
+    assert summary["n_data_sets_with_day_p"] == 3
+    assert summary["n_data_sets_with_interval"] == 3
+    assert summary["reject_day"] == pytest.approx(np.mean(data_sets["day_p"] < 0.05))
 
 
 def test_bootstrap_seeds_differ() -> None:

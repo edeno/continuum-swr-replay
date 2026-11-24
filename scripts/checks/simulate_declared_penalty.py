@@ -306,6 +306,7 @@ def scenarios() -> list[OutsideScenario]:
             curve,
             partial(expected_counts, curve=curve),
             planted={ESTIMAND: planted_contrast(curve)},
+            columns=("expected_events",),
         )
         for curve in CURVES
     ]

@@ -40,9 +40,12 @@ multinomial, or a Dirichlet-multinomial; :func:`.likelihoods.draw`).
 
 What depends only on the rows is computed once per run: each session's
 offset, its rows with a missing value, and its linear predictor under each
-inside scenario. Each data set is fitted by
-``fit_sessions``, which builds a session's design again from the rows; the
-fitter's interface has no way to pass a built design in.
+inside scenario (:func:`prepare_draws` does the same for a caller of
+:func:`draw_data_set`). A run keeps of each session's rows only the columns
+it reads (:func:`run_columns`), and a data set's rows with the drawn outcome
+are made one session at a time, as the fit reads them. Each data set is
+fitted by ``fit_sessions``, which builds a session's design again from the
+rows; the fitter's interface has no way to pass a built design in.
 
 The tables of a run (:class:`SimulationResult`):
 
@@ -64,7 +67,7 @@ The tables of a run (:class:`SimulationResult`):
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import NamedTuple
 
 import numpy as np
@@ -88,6 +91,7 @@ __all__ = [
     "InsideScenario",
     "Model",
     "OutsideScenario",
+    "PreparedDraws",
     "Scenario",
     "Simulation",
     "SimulationResult",
@@ -95,7 +99,9 @@ __all__ = [
     "data_seed",
     "draw_data_set",
     "planted_value",
+    "prepare_draws",
     "run",
+    "run_columns",
     "summarize",
 ]
 
@@ -223,6 +229,9 @@ class OutsideScenario:
         with workers); an estimand not named has the planted value NaN.
     scale, n_trials, concentration
         As :class:`InsideScenario`.
+    columns : tuple of str
+        The columns ``expected`` reads that the models do not (a run gives
+        it only the columns it keeps, :func:`run_columns`).
     """
 
     name: str
@@ -233,6 +242,7 @@ class OutsideScenario:
     scale: float | None = None
     n_trials: int | str = 1
     concentration: float | str | None = None
+    columns: tuple[str, ...] = ()
 
 
 Scenario = InsideScenario | OutsideScenario
@@ -454,8 +464,9 @@ def _draw(
     scenario: Scenario,
     place: int,
     rng: np.random.Generator,
-) -> dict[SessionKey, pd.DataFrame]:
-    """One data set of the scenario at ``place`` (module docstring)."""
+) -> dict[SessionKey, np.ndarray]:
+    """The outcomes of one data set of the scenario at ``place`` (module
+    docstring): each session's, shape ``(n_rows,)``."""
     if isinstance(scenario, InsideScenario):
         etas = {key: p.inside_eta[place] for key, p in prepared.items()}
     else:
@@ -475,15 +486,51 @@ def _draw(
             _check_expected(model.likelihood, mean[~p.missing], units, where)
             etas[key] = _linear_predictor(model.likelihood, mean, p.offset)
     return {
-        key: rows.assign(
-            **{
-                model.response: _draw_session(
-                    model, scenario, rows, prepared[key], etas[key], rng
-                )
-            }
-        )
+        key: _draw_session(model, scenario, rows, prepared[key], etas[key], rng)
         for key, rows in sessions.items()
     }
+
+
+class _DataSet(Mapping):
+    """A data set: each session's rows with its drawn outcome, made only when
+    the session is read, so that the rows of every session are not copied at
+    once."""
+
+    def __init__(
+        self,
+        sessions: Mapping[SessionKey, pd.DataFrame],
+        response: str,
+        outcomes: Mapping[SessionKey, np.ndarray],
+    ) -> None:
+        self._sessions, self._response, self._outcomes = sessions, response, outcomes
+
+    def __getitem__(self, key: SessionKey) -> pd.DataFrame:
+        return self._sessions[key].assign(**{self._response: self._outcomes[key]})
+
+    def __iter__(self):
+        return iter(self._sessions)
+
+    def __len__(self) -> int:
+        return len(self._sessions)
+
+
+@dataclass(frozen=True)
+class PreparedDraws:
+    """What the draws of one model under one scenario need from each
+    session's rows, computed once (:func:`prepare_draws`), so that many data
+    sets are drawn without building each session's design again."""
+
+    model: Model
+    scenario: Scenario
+    sessions: Mapping[SessionKey, _Prepared]
+
+
+def prepare_draws(
+    model: Model, sessions: Mapping[SessionKey, pd.DataFrame], scenario: Scenario
+) -> PreparedDraws:
+    """The :class:`PreparedDraws` of ``model`` and ``scenario`` on
+    ``sessions``, for :func:`draw_data_set`."""
+    return PreparedDraws(model, scenario, _prepare(model, sessions, [scenario]))
 
 
 def draw_data_set(
@@ -491,6 +538,7 @@ def draw_data_set(
     sessions: Mapping[SessionKey, pd.DataFrame],
     scenario: Scenario,
     rng: np.random.Generator,
+    prepared: PreparedDraws | None = None,
 ) -> dict[SessionKey, pd.DataFrame]:
     """One data set: each session's rows with the outcome drawn under
     ``scenario`` (module docstring).
@@ -503,14 +551,33 @@ def draw_data_set(
     scenario : Scenario
     rng : np.random.Generator
         Read session by session, in the order given.
+    prepared : PreparedDraws or None
+        :func:`prepare_draws` of this model, scenario and sessions, to draw
+        many data sets with one preparation; None prepares them here. The
+        draw is the same either way.
 
     Returns
     -------
     dict of (animal, session_date, epoch) to pd.DataFrame
         The rows, with ``model.response`` replaced (or added).
+
+    Raises
+    ------
+    ValueError
+        If ``prepared`` is of another model, scenario or set of sessions.
     """
-    prepared = _prepare(model, sessions, [scenario])
-    return _draw(model, sessions, prepared, scenario, 0, rng)
+    if prepared is None:
+        prepared = prepare_draws(model, sessions, scenario)
+    elif (
+        prepared.model is not model
+        or prepared.scenario is not scenario
+        or list(prepared.sessions) != list(sessions)
+    ):
+        raise ValueError(
+            "the prepared draws are of another model, scenario or set of sessions"
+        )
+    outcomes = _draw(model, sessions, prepared.sessions, scenario, 0, rng)
+    return dict(_DataSet(sessions, model.response, outcomes))
 
 
 def _session_rows(
@@ -609,7 +676,8 @@ def _run_task(
     scenario = simulation.scenarios[s]
     models = simulation.models
     rng = np.random.default_rng(data_seed(simulation.seed, s, i))
-    data = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
+    outcomes = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
+    data = _DataSet(simulation.sessions, models[0].response, outcomes)
     keys = list(data)
     n_estimands = [len(model.estimands) for model in models]
     seeds = iter(bootstrap_seeds(simulation.seed, s, i, sum(n_estimands)))
@@ -676,6 +744,37 @@ def _check(simulation: Simulation) -> None:
         raise ValueError("a simulation needs at least two data sets per scenario")
 
 
+def run_columns(simulation: Simulation) -> tuple[str, ...]:
+    """The columns of the rows a run keeps, each once: every model's design
+    columns (:attr:`.terms.Design.columns`) and unit, the columns a scenario
+    names for the softmax's noise, and an outside scenario's ``columns``. The
+    response is not kept: it is drawn."""
+    out = [c for model in simulation.models for c in model.design.columns]
+    out += [model.unit for model in simulation.models]
+    for scenario in simulation.scenarios:
+        out += [
+            value
+            for value in (scenario.n_trials, scenario.concentration)
+            if isinstance(value, str)
+        ]
+        out += list(getattr(scenario, "columns", ()))
+    response = simulation.models[0].response
+    return tuple(c for c in dict.fromkeys(out) if c != response)
+
+
+def _kept_rows(simulation: Simulation) -> dict[SessionKey, pd.DataFrame]:
+    """Each session's rows reduced to :func:`run_columns`, in the rows' own
+    column order."""
+    kept = set(run_columns(simulation))
+    out = {}
+    for key, rows in simulation.sessions.items():
+        absent = sorted(kept - set(rows.columns))
+        if absent:
+            raise ValueError(f"session {'/'.join(key)}: no columns {absent}")
+        out[key] = rows[[c for c in rows.columns if c in kept]]
+    return out
+
+
 def run(
     simulation: Simulation,
     workers: int = 1,
@@ -689,7 +788,8 @@ def run(
     simulation : Simulation
     workers : int
         Processes; above one, a ``spawn`` pool whose workers each receive the
-        run once. The tables do not depend on it.
+        run once, with each session's rows reduced to :func:`run_columns`.
+        The tables do not depend on it.
     scenarios : sequence of str or None
         Run only the scenarios of these names; each keeps its place in the
         list, so its data sets are those of a run of every scenario.
@@ -717,6 +817,7 @@ def run(
         if scenarios is None or name in scenarios
         for i in range(simulation.n_data_sets)
     ]
+    simulation = replace(simulation, sessions=_kept_rows(simulation))
     if workers == 1:
         prepared = _prepare(
             simulation.models[0], simulation.sessions, simulation.scenarios
