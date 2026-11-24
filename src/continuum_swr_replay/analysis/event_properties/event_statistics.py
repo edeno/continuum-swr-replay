@@ -1363,12 +1363,21 @@ def _class_distribution(
 ) -> pd.DataFrame:
     """Each animal's distribution of a per-event property, by class: one row
     per animal, class and bin, with ``animal``, ``group``, ``bin_low``,
-    ``bin_high`` and ``percent`` (the percent of the animal's events of the
-    class in the bin; a bin holds its low edge and not its high one)."""
+    ``bin_high`` and ``percent``.
+
+    An animal's percent in a bin is the mean over its epochs of each epoch's
+    percent of its events of the class in the bin (event -> epoch -> animal); an
+    epoch with no event of the class is not one of the animal's epochs for that
+    class. An epoch's percent counts all its events of the class, those beyond
+    the bins too. A bin holds its low edge and not its high one, the last bin
+    its high edge too (``np.histogram``'s bins)."""
     table = _class_table(events, column)
     rows = []
     for (animal, group), mine in table.groupby(["animal", "group"]):
-        counts, _ = np.histogram(mine[column], bins=edges)
+        per_epoch = [
+            100 * np.histogram(epoch[column], bins=edges)[0] / len(epoch)
+            for _, epoch in mine.groupby("epoch_id")
+        ]
         rows.append(
             pd.DataFrame(
                 {
@@ -1376,7 +1385,7 @@ def _class_distribution(
                     "group": group,
                     "bin_low": edges[:-1],
                     "bin_high": edges[1:],
-                    "percent": 100 * counts / len(mine),
+                    "percent": np.mean(per_epoch, axis=0),
                 }
             )
         )
@@ -1402,8 +1411,9 @@ def hpd_distribution(
     -------
     pd.DataFrame
         One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
-        ``bin_high`` and ``percent`` (the percent of the animal's events of the
-        class in the bin).
+        ``bin_high`` and ``percent`` (the mean over the animal's epochs of each
+        epoch's percent of its events of the class in the bin,
+        :func:`_class_distribution`).
     """
     return _class_distribution(events, "hpd_coverage_cm", edges)
 

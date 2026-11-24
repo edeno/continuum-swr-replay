@@ -798,18 +798,32 @@ def _hpd_events() -> pd.DataFrame:
     )  # fmt: skip
 
 
-def test_hpd_distribution_gives_each_animals_percent_per_bin():
-    """Per animal and class, the percent of its events (with a value) in each
-    bin of the edges."""
+def test_hpd_distribution_takes_each_animal_over_its_epochs():
+    """Per animal and class, the mean over its epochs of each epoch's percent
+    of its events (with a value) in each bin. a, no SWR: epoch 1 holds 10, 20,
+    300 cm (2/3 below 50 cm), epoch 2 30 (all below), so (200/3 + 100) / 2 =
+    250/3 below 50 cm and (100/3 + 0) / 2 = 50/3 above; a, SWR: epoch 1 400,
+    epoch 2 20 and 300, so (0 + 50) / 2 = 25 below and (100 + 50) / 2 = 75
+    above. b has one epoch; its SWR event without a value is left out, and an
+    event beyond the bins counts in its epoch's events (b, no SWR: 300, 400 and
+    600 cm, so 200/3 in the upper bin and the rest in no bin)."""
     edges = np.array([5.0, 50.0, 500.0])
-    table = stats.hpd_distribution(_hpd_events(), edges).set_index(
+    events = pd.concat(
+        [
+            _hpd_events(),
+            _hpd_events().iloc[[7]].assign(hpd_coverage_cm=600.0),
+        ],
+        ignore_index=True,
+    )
+    table = stats.hpd_distribution(events, edges).set_index(
         ["animal", "group", "bin_low"]
     )["percent"]
-    # a, no SWR: 10, 20, 30 below 50 and 300 above
-    assert table[("a", "no SWR", 5.0)] == pytest.approx(75.0)
-    assert table[("a", "no SWR", 50.0)] == pytest.approx(25.0)
-    assert table[("a", "SWR", 5.0)] == pytest.approx(100 / 3)
+    assert table[("a", "no SWR", 5.0)] == pytest.approx(250 / 3)
+    assert table[("a", "no SWR", 50.0)] == pytest.approx(50 / 3)
+    assert table[("a", "SWR", 5.0)] == pytest.approx(25.0)
+    assert table[("a", "SWR", 50.0)] == pytest.approx(75.0)
     assert table[("b", "no SWR", 5.0)] == 0.0
+    assert table[("b", "no SWR", 50.0)] == pytest.approx(200 / 3)
     assert table[("b", "SWR", 5.0)] == pytest.approx(100.0)
     assert len(table) == 2 * 2 * 2
 
