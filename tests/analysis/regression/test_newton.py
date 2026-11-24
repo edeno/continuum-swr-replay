@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import pandas as pd
 import pytest
@@ -28,6 +29,8 @@ from continuum_swr_replay.analysis.regression.newton import (
     NewtonFit,
     penalized_newton,
 )
+from continuum_swr_replay.analysis.regression.padding import ROW_BUCKET, bucket_size
+from continuum_swr_replay.analysis.regression.runtime import COMPILE_LOG
 from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
 
 
@@ -350,10 +353,11 @@ def test_each_status() -> None:
     assert overflow.status == NOT_POSITIVE_DEFINITE
 
     class _Uphill(Bernoulli):
-        """The Bernoulli with the score's sign flipped: no step lowers F."""
+        """The Bernoulli with the score's sign flipped (in the function the
+        kernels call): no step lowers F."""
 
-        def score_eta(self, eta, y, aux):
-            return -super().score_eta(eta, y, aux)
+        def _jax_score(self, eta, y, aux, weight):
+            return -super()._jax_score(eta, y, aux, weight)
 
     uphill = penalized_newton(_Uphill(), X, y, None, S, np.array([0.3, 1.0]))
     assert uphill.status == HALVING_FAILED and not uphill.converged
@@ -385,17 +389,19 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
     a decrement of 0.045, above the tolerance. Neither is taken."""
     X, y, offset, S = np.ones((1, 1)), np.ones(1), np.zeros(1), np.zeros((1, 1))
     lik = Poisson()
-    beta = np.array([-0.5])
-    eta = X @ beta
-    g = X.T @ lik.score_eta(eta, y, offset)
-    A = lik.information(X, eta, y, offset)
-    decrement = 0.5 * float(g @ np.linalg.solve(A, g))
-    fit = NewtonFit(beta, A, CONVERGED, decrement, 3, lik.loglik(eta, y, offset))
+    beta = np.array([[-0.5]])
+    with jax.enable_x64(True):
+        problem = newton._Problem.of(lik, X, y, offset, S)
+        F, loglik = problem.evaluate(beta)
+        r = problem.iterate(beta, F, newton.MAX_STEP_LENGTH)
+        assert r["decrement"][0] == pytest.approx(0.128, abs=1e-3)
+        r["step"] = np.array([[to + 0.5]])
+        fit = newton._last_step(
+            problem, beta, F, loglik, r, np.array([True]), 3, newton.MAX_STEP_LENGTH
+        )(0)
 
-    F = -fit.loglik  # no penalty
-    moved = newton._last_step(lik, X, y, offset, S, fit, F, np.array([to + 0.5]))
-
-    assert moved is fit
+    assert fit.n_iter == 3
+    np.testing.assert_array_equal(fit.beta, [-0.5])
 
 
 def _inputs(family: str) -> tuple:
@@ -493,3 +499,48 @@ def test_a_softmax_design_constant_within_groups_is_not_identified() -> None:
         GroupedSoftmax(), X, y, groups, np.zeros((2, 2)), np.zeros(2)
     )
     assert fit.status == NOT_IDENTIFIED
+
+
+def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
+    """Ten Poisson fits with ten row counts in two row buckets: each Newton
+    kernel is traced at most once per bucket."""
+    sizes = [500, 1500, 2500, 3500, 4000, 4100, 5000, 6500, 7000, 8190]
+    buckets = {bucket_size(n, ROW_BUCKET) for n in sizes}
+    assert len(buckets) == 2
+    COMPILE_LOG.clear()
+    for n in sizes:
+        rng = np.random.default_rng(n)
+        X = np.column_stack([np.ones(n), rng.normal(size=n)])
+        y = rng.poisson(np.exp(0.2 + 0.3 * X[:, 1])).astype(float)
+        fit = penalized_newton(
+            Poisson(), X, y, np.zeros(n), np.zeros((2, 2)), np.zeros(2)
+        )
+        assert fit.converged
+    for kernel in ("_evaluate", "_iterate"):
+        assert COMPILE_LOG.count(kernel) <= len(buckets), kernel
+
+
+def test_a_patched_rule_constant_takes_effect_after_the_kernel_compiled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rule constants are arguments of the compiled kernel, read at each
+    call: with no halvings allowed the same fit fails at its first step, and
+    with a loose decrement tolerance (and the step allowed to move the linear
+    predictor) it stops after the one last step, without a new trace."""
+    X, y = _logistic_data()
+    S = np.zeros((2, 2))
+    start = np.array([0.3, 1.0])
+    fit = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert fit.converged and fit.n_iter > 2
+    COMPILE_LOG.clear()
+
+    monkeypatch.setattr(newton, "MAX_STEP_HALVINGS", 0)
+    halted = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert (halted.status, halted.n_iter) == (HALVING_FAILED, 0)
+
+    monkeypatch.setattr(newton, "MAX_STEP_HALVINGS", 30)
+    monkeypatch.setattr(newton, "NEWTON_DECREMENT_TOL", 1e6)
+    monkeypatch.setattr(newton, "NO_MAXIMUM_ETA_STEP", 1e6)
+    early = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert early.converged and early.n_iter == 1
+    assert COMPILE_LOG.count() == 0
