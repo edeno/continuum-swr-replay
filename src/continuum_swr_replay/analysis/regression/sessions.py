@@ -153,8 +153,9 @@ class _Session:
         name: str,
     ) -> None:
         parts, units, offset = [], [], 0
+        read = list(dict.fromkeys([*design.columns, response, unit]))
         for frame in frames:
-            frame = frame.reset_index(drop=True)
+            frame = frame[read].reset_index(drop=True)
             if isinstance(lik, GroupedSoftmax):
                 frame = frame.sort_values(unit, kind="stable").reset_index(drop=True)
             codes = pd.factorize(frame[unit].to_numpy(), use_na_sentinel=False)[0]
