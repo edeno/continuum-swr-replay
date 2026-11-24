@@ -17,7 +17,6 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_mean_interval,
-    draws_sd_scale,
     estimand_summary,
 )
 from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns
@@ -111,9 +110,6 @@ def unit_summary(
             f"one value per {fit_by}: the index must have the levels {columns}, "
             f"not {values.index.nlevels}"
         )
-    if values.index.duplicated().any():
-        raise ValueError(f"a {fit_by} has more than one value")
-    n_units = int(np.isfinite(values.to_numpy(dtype=float)).sum())
     if fit_by == "animal":
         found = animal_mean_interval(values)
         if found["n_animals"] == 0:
@@ -123,7 +119,7 @@ def unit_summary(
             "estimate": found["estimate"],
             "low": found["low"],
             "high": found["high"],
-            "sd": found["se"] / draws_sd_scale(n) if n >= 2 else float("nan"),
+            "sd": found["sd"],
             "n_animals": n,
             "n_days": float("nan"),
             "n_sessions": float("nan"),
@@ -132,7 +128,7 @@ def unit_summary(
             "n_draws": n_draws,
             "seed": seed,
             "fit_by": fit_by,
-            "n_units": n_units,
+            "n_units": n,
         }
     index = values.index
     animal, day = (pd.Series(index.get_level_values(k), index=index) for k in (0, 1))
@@ -142,6 +138,7 @@ def unit_summary(
         else day
     )
     summary = estimand_summary(values, animal, day, session, n_draws=n_draws, seed=seed)
+    n_units = summary["n_sessions"] if fit_by == "session" else summary["n_days"]
     if fit_by == "day":
         summary["n_sessions"] = float("nan")
     return {**summary, "fit_by": fit_by, "n_units": n_units}

@@ -681,6 +681,19 @@ def bootstrap_interval(
     values = np.asarray(draws, dtype=float)
     values = values[np.isfinite(values)]
     sd = float(values.std(ddof=1)) if values.size >= 2 else float("nan")
+    return _t_interval(estimate, sd, n_top, bounds)
+
+
+def _t_interval(
+    estimate: float,
+    sd: float,
+    n_top: int,
+    bounds: tuple[float, float] | None = None,
+) -> BootstrapInterval:
+    """``estimate +/- t(0.975, n_top - 1) * sqrt(n_top / (n_top - 1)) * sd``,
+    clipped to ``bounds``: the interval of :func:`bootstrap_interval` from its
+    draws' SD, and of :func:`animal_mean_interval` from the animals' SD; NaN
+    bounds when the estimate or ``sd`` is not finite or ``n_top`` is below 2."""
     if n_top < 2 or not np.isfinite(estimate) or not np.isfinite(sd):
         return BootstrapInterval(float("nan"), float("nan"), sd)
     half = float(student_t.ppf(0.975, n_top - 1)) * draws_sd_scale(n_top) * sd
@@ -708,7 +721,9 @@ def animal_mean_interval(values: pd.Series) -> dict[str, float]:
     Returns
     -------
     summary : dict
-        ``estimate`` (the mean), ``se`` (``SD / sqrt(A)``), ``low``, ``high``,
+        ``estimate`` (the mean), ``se`` (``SD / sqrt(A)``), ``sd`` (``se /
+        sqrt(A / (A - 1))``, the SD of bootstrap draws that gives this
+        interval in :func:`bootstrap_interval`), ``low``, ``high``,
         ``n_animals`` and ``n_animals_same_sign`` (the animals whose value
         has the sign of the estimate, by the rule of :func:`estimand_summary`:
         :func:`_n_same_sign`). ``estimate`` is NaN without an animal;
@@ -720,18 +735,20 @@ def animal_mean_interval(values: pd.Series) -> dict[str, float]:
         If an animal has more than one value.
     """
     if values.index.duplicated().any():
-        raise ValueError("one value per animal: an animal is repeated")
+        raise ValueError("one value per animal: an animal has more than one value")
     finite = values.to_numpy(dtype=float)
     finite = finite[np.isfinite(finite)]
     n = finite.size
     estimate = float(finite.mean()) if n else float("nan")
     se = float(finite.std(ddof=1) / np.sqrt(n)) if n >= 2 else float("nan")
-    half = float(student_t.ppf(0.975, n - 1)) * se if n >= 2 else float("nan")
+    # The draws' SD that bootstrap_interval scales to this standard error.
+    interval = _t_interval(estimate, se / draws_sd_scale(n) if n >= 2 else se, n)
     return {
         "estimate": estimate,
         "se": se,
-        "low": estimate - half,
-        "high": estimate + half,
+        "sd": interval.sd,
+        "low": interval.low,
+        "high": interval.high,
         "n_animals": int(n),
         "n_animals_same_sign": _n_same_sign(finite, estimate),
     }
