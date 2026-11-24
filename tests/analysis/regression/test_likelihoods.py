@@ -183,7 +183,10 @@ def test_information_traces_equal_the_traces_of_the_derivatives(name: str) -> No
     """``_jax_information_traces`` against a symmetric ``M``: each trace
     equals ``sum(M * dinformation)`` (or ``d2information``) of that direction,
     made in full, on the padded rows; for the diagonal families it is read
-    from ``h_i = x_i' M x_i`` without making them."""
+    from ``h_i = x_i' M x_i`` without making them. For the grouped softmax
+    the function is the generic one, which runs the same loops as this test:
+    there it checks only the symmetry of the second traces; the check of the
+    traces' values is of the diagonal families' shortcut."""
     lik, X, y, aux, _ = _case(name)
     rng = np.random.default_rng(17)
     beta = rng.normal(scale=0.5, size=N_COLUMNS)
