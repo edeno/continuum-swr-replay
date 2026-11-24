@@ -49,6 +49,7 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TRIGGER_WINDOWS_DIR,
     EXPOSURE_IN_VISITS_DIR,
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
@@ -110,6 +111,7 @@ class EventsInputs:
     nonlocal_restriction_heldout_events: Path
     bin_facts: Path
     exposure_in_visits: Path
+    trigger_windows: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -147,6 +149,7 @@ def default_inputs() -> EventsInputs:
         / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
         bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
         exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
+        trigger_windows=processed_data_dir() / EVENT_TRIGGER_WINDOWS_DIR,
     )
 
 
@@ -572,3 +575,47 @@ def panel_refusal(figure: str, letter: str, cause: str, rerun: str) -> str:
     """Why a figure's panel is not drawn: ``"<figure>: panel <letter> is not
     drawn: <cause>. Rerun <rerun>."``"""
     return f"{figure}: panel {letter} is not drawn: {cause}. Rerun {rerun}."
+
+
+def read_trigger_windows(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The stored windows around event starts and No-Spike starts
+    (``scripts/event_properties/measure_trigger_windows.py``), and one row per
+    epoch of its record.
+
+    Parameters
+    ----------
+    folder : Path
+        The run's folder, with ``windows.parquet`` and ``manifest.json``.
+
+    Returns
+    -------
+    windows : pd.DataFrame
+        One row per window and signal
+        (``triggered_analysis.epoch_trigger_windows``), with ``epoch_id``,
+        ``animal``, ``session_date`` and ``epoch``.
+    epochs : pd.DataFrame
+        One row per epoch: ``epoch_id``, ``animal``, ``decode_sha256``,
+        ``no_spike_level``, and ``n_swr``, ``n_non_swr`` and ``n_events``, the
+        frame's events by SWR overlap.
+
+    Raises
+    ------
+    ValueError
+        As :func:`checked_reference` refuses a per-epoch measurement: not made
+        over the analyses' subset from the current well visits, an analyzed
+        epoch missing or extra, or another decode than the event features run's.
+    """
+    windows = pd.read_parquet(folder / "windows.parquet")
+    records = read_output_manifest(folder)["epochs"]
+    epochs = (
+        windows.groupby("epoch_id", sort=False)[["animal", "decode_sha256"]]
+        .first()
+        .reset_index()
+    )
+    epochs = epochs.assign(
+        no_spike_level=[records[e]["no_spike_level"] for e in epochs["epoch_id"]],
+        n_swr=[records[e]["n_events"]["swr"] for e in epochs["epoch_id"]],
+        n_non_swr=[records[e]["n_events"]["non_swr"] for e in epochs["epoch_id"]],
+        n_events=[records[e]["n_events"]["total"] for e in epochs["epoch_id"]],
+    )
+    return windows, checked_reference(epochs, folder, "trigger windows")

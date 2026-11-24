@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,7 +24,6 @@ from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
     analyzed_time,
-    swr_source,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (  # noqa: E402
     animal_signal_counts,
@@ -353,7 +351,6 @@ def test_the_figure_draws_its_panels_in_the_cited_order(figure02, drawn):
     assert list(figure02.read_inputs.__annotations__) == [
         "nwb_file_name",
         "epoch_name",
-        "use_cache",
         "return",
     ]
     letters = {t.get_text(): t.get_position() for t in drawn.texts}
@@ -687,28 +684,8 @@ def test_the_decoder_comparison_draws_its_test_and_two_axes(figure02):
 
 
 # ---------------------------------------------------------------------------
-# The inputs: the frames' counts and the render cache
+# The inputs: the frames' counts
 # ---------------------------------------------------------------------------
-
-
-def test_the_frames_events_are_counted_by_swr_overlap(figure02):
-    rows = pd.DataFrame(
-        {
-            "animal": "a",
-            "day": 1,
-            "epoch": "e",
-            # bins of three events; event 2 has two bins
-            "non_local_event": [1, 2, 2, 3],
-        }
-    )
-    counts = figure02.frame_event_counts(
-        {
-            "non_local_event_immobile": rows,
-            "non_local_event_immobile_overlap_SWR_event": rows.iloc[1:3],
-            "non_local_event_immobile_no_overlap_SWR_event": rows.iloc[[0, 3]],
-        }
-    )
-    assert counts == {"swr": 1, "non_swr": 2, "total": 3}
 
 
 def test_an_event_table_that_is_not_the_frames_is_refused(figure02):
@@ -727,24 +704,6 @@ def test_an_event_table_that_is_not_the_frames_is_refused(figure02):
         overlap_class_statistics(moving)
 
 
-def _register(path: Path, epochs: list[str]) -> Path:
-    pd.DataFrame(
-        [
-            ["wilbur20210329_.nwb", epoch, "analyzed", "", "", "False"]
-            for epoch in epochs
-        ],
-        columns=[
-            "nwb_file_name",
-            "epoch",
-            "status",
-            "reason",
-            "evidence",
-            "first_exposure",
-        ],
-    ).to_csv(path, index=False)
-    return path
-
-
 def _write_event_table(events: pd.DataFrame) -> None:
     """``events`` as the canonical event table of the data root."""
     path = stored_inputs.default_inputs().event_table
@@ -752,95 +711,43 @@ def _write_event_table(events: pd.DataFrame) -> None:
     write_table(analyzed_time.stamp_swr_source(events), path)
 
 
-def test_the_cache_is_keyed_on_its_version_the_source_and_its_inputs(
+def _stored_inputs(figure02, monkeypatch, frames: dict) -> None:
+    """The stored windows with ``frames`` as the frames' event counts (one
+    epoch), the example session and the detector comparison stubbed."""
+    epochs = pd.DataFrame(
+        {
+            "epoch_id": ["e"],
+            "animal": ["a"],
+            "no_spike_level": [0.0],
+            "n_swr": [frames["swr"]],
+            "n_non_swr": [frames["non_swr"]],
+            "n_events": [frames["total"]],
+        }
+    )
+    monkeypatch.setattr(figure02, "read_windows", lambda folder: (None, epochs))
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    monkeypatch.setattr(
+        figure02, "read_session", lambda *args: {"data": data, "results": None}
+    )
+    monkeypatch.setattr(
+        figure02,
+        "detector_comparison",
+        lambda events: dict.fromkeys(
+            ("kay", "kay_content_animals", "overlap", "with_nonlocal")
+        ),
+    )
+    monkeypatch.setattr(figure02, "stored_windows_of", lambda windows, events: None)
+    monkeypatch.setattr(figure02, "stored_triggered_curves", lambda windows: None)
+
+
+def test_the_event_table_is_checked_against_the_frames_counts(
     figure02, processed_data_root, monkeypatch
 ):
-    """The cache's name carries its version and the SWR source, and changes
-    with the analyzed epochs, a rewritten decode file and the event table,
-    without a code change."""
-    import joblib  # noqa: F401  (the cache's format)
-
-    from continuum_swr_replay.data_loaders import epoch_register
-
-    def name() -> str:
-        return figure02._figure02_cache_path("wilbur20210329_.nwb", "02_r1").name
-
-    path = figure02._figure02_cache_path("wilbur20210329_.nwb", "02_r1")
-    assert path.parent == processed_data_root / "intermediates"
-    assert f"_v{figure02.FIGURE02_CACHE_VERSION}_" in path.name
-    assert swr_source.swr_source_name() in path.name
-
-    monkeypatch.setattr(
-        epoch_register,
-        "REGISTER_PATH",
-        _register(processed_data_root / "register_1.csv", ["02_r1"]),
-    )
-    one = name()
-    monkeypatch.setattr(
-        epoch_register,
-        "REGISTER_PATH",
-        _register(processed_data_root / "register_2.csv", ["02_r1", "04_r2"]),
-    )
-    two = name()
-    assert one != two
-
-    dot = processed_data_root / "wilbur20210329_04_r2_HPC_80_data_over_time.pkl"
-    results = processed_data_root / "wilbur20210329_02_r1_HPC_results.nc"
-    for file in (dot, results):
-        file.write_bytes(b"a")
-        os.utime(file, ns=(1_000_000_000, 1_000_000_000))
-    before = name()
-    assert name() == before
-    dot.write_bytes(b"ab")
-    after_dot = name()
-    assert after_dot != before
-    os.utime(results, ns=(2_000_000_000, 2_000_000_000))
-    after_results = name()
-    assert after_results not in (before, after_dot)
-
-    _write_event_table(figure02_events())
-    with_table = name()
-    _write_event_table(figure02_events().iloc[:3])
-    assert name() not in (after_results, with_table)
-
-
-def _cache(figure02, frames: dict, epoch_name: str = "e1") -> None:
-    """A cached bundle with ``frames`` as its frame counts and nothing else
-    the tests read."""
-    import joblib
-
-    path = figure02._figure02_cache_path("wilbur20210329_.nwb", epoch_name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
-    joblib.dump(
-        {
-            "frame_event_counts": frames,
-            "data": data,
-            "results": None,
-            "detector": None,
-            "env": None,
-            **dict.fromkeys(
-                (
-                    "kay",
-                    "kay_content_animals",
-                    "overlap",
-                    "with_nonlocal",
-                    "triggered_curves",
-                )
-            ),
-        },
-        path,
-    )
-
-
-def test_the_event_table_is_checked_against_the_cached_frame_counts(
-    figure02, processed_data_root
-):
-    """With a cached bundle, the event table is still read when the inputs are
-    read, and checked against the bundle's frame counts."""
+    """The event table is checked against the frames' event counts the stored
+    windows record."""
     _write_event_table(figure02_events())
     # the frames give one more non-SWR event than the table holds
-    _cache(figure02, {**FRAME_COUNTS, "non_swr": 6, "total": 9})
+    _stored_inputs(figure02, monkeypatch, {**FRAME_COUNTS, "non_swr": 6, "total": 9})
     with pytest.raises(ValueError, match="counts by SWR overlap are not"):
         figure02.read_inputs(epoch_name="e1")
 
@@ -853,7 +760,7 @@ def test_the_whole_table_is_checked_and_the_selected_events_drawn(
     from the other eight, the events that start inside a well visit."""
     outside = figure02_events().iloc[[3, 4]].assign(visit_context="track_leaf_arm")
     _write_event_table(pd.concat([figure02_events(), outside], ignore_index=True))
-    _cache(figure02, {**FRAME_COUNTS, "non_swr": 7, "total": 10})
+    _stored_inputs(figure02, monkeypatch, {**FRAME_COUNTS, "non_swr": 7, "total": 10})
     seen = []
     counted = figure02.overlap_class_statistics
 
@@ -902,7 +809,7 @@ def _one_event_outside(figure02, root: Path, monkeypatch):
     inside = figure02_events().assign(event_id=range(8))
     outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
     _write_event_table(pd.concat([inside, outside]))
-    _cache(figure02, {**FRAME_COUNTS, "non_swr": 6, "total": 9})
+    _stored_inputs(figure02, monkeypatch, {**FRAME_COUNTS, "non_swr": 6, "total": 9})
     monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", root / "cache")
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)

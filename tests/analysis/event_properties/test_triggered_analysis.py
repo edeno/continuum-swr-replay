@@ -721,3 +721,27 @@ def test_the_stored_windows_of_the_selected_events_are_kept_with_every_period():
         ("a", ta.NO_SPIKE_KIND, 0),
         ("b", ta.NO_SPIKE_KIND, 0),
     }
+
+
+def test_the_frames_events_are_counted_by_swr_overlap():
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        frame_event_counts,
+    )
+
+    rows = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "e",
+            # bins of three events; event 2 has two bins
+            "non_local_event": [1, 2, 2, 3],
+        }
+    )
+    counts = frame_event_counts(
+        {
+            "non_local_event_immobile": rows,
+            "non_local_event_immobile_overlap_SWR_event": rows.iloc[1:3],
+            "non_local_event_immobile_no_overlap_SWR_event": rows.iloc[[0, 3]],
+        }
+    )
+    assert counts == {"swr": 1, "non_swr": 2, "total": 3}

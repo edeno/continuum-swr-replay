@@ -54,6 +54,7 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TRIGGER_WINDOWS_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
@@ -410,6 +411,7 @@ class _Run:
             / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
+            trigger_windows=root / EVENT_TRIGGER_WINDOWS_DIR,
         )
 
     def _spy(self, name: str, group=None, group_key: str | None = None):

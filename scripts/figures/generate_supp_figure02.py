@@ -8,8 +8,7 @@ question, and the analysis function it draws:
     a — do the decoder's states mean what they claim, by held-out spikes?
         (``state_evidence.calibration_statistics``)
     b — MUA around the start of No-Spike periods
-        (``no_spike_periods.no_spike_periods``,
-        ``triggered_analysis.animal_balanced_quartiles``).
+        (``triggered_analysis.stored_no_spike_trace``).
     c — how the immobile time is spread over non-local probability
         (``nonlocal_probability.animal_probability_distribution``).
     d — how far the decoded place is from the animal by Local probability
@@ -24,7 +23,7 @@ question, and the analysis function it draws:
     i — Figure 2k's gain outside SWRs, away from the SWRs
         (``restriction_totals.outside_swr_subset_statistics``).
     j — Figure 2g's traces, animal by animal
-        (``triggered_analysis.animal_window_medians``).
+        (``triggered_analysis.stored_animal_window_medians``).
     k — how concentrated the decoded position is, no-SWR against SWR events
         (``event_statistics.hpd_distribution``).
     l — Figure 2k against a fourth decoder, SWR-allowed
@@ -44,13 +43,11 @@ import logging
 import string
 import warnings
 from collections.abc import Iterable, Sequence
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
@@ -64,17 +61,11 @@ from continuum_swr_replay.analysis.decode_quality.nonlocal_probability import (
 from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     animal_distance_by_local_probability,
 )
-from continuum_swr_replay.analysis.detection.nonlocal_events import get_event_types
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    read_dot_with_swr_source,
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
-)
-from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
-    level_outside_periods,
-    no_spike_periods,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
@@ -125,29 +116,17 @@ from continuum_swr_replay.analysis.event_properties.state_by_signal import (
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     TRIGGERED_SIGNALS,
-    TRIGGERED_WINDOW_S,
     WINDOW_KINDS,
-    animal_balanced_quartiles,
-    animal_window_medians,
-    get_signal_windows,
-    triggered_windows,
-    triggering_events_in,
+    stored_animal_window_medians,
+    stored_no_spike_trace,
+    stored_windows_of,
 )
-from continuum_swr_replay.analysis.event_tables.prepare_data import (
-    well_visit_times,
-)
-from continuum_swr_replay.analysis.shared_statistics import animal_mean, animal_medians
+from continuum_swr_replay.analysis.shared_statistics import animal_mean
 from continuum_swr_replay.data_loaders.epoch_register import (
-    analyzed_decode_files,
     analyzed_epoch_ids,
     require_analyzed_epochs,
 )
-from continuum_swr_replay.decoding.files import data_over_time_suffix
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
-from continuum_swr_replay.paths import (
-    processed_data_dir,
-)
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.inputs import (
     default_inputs,
@@ -155,6 +134,7 @@ from continuum_swr_replay.reported.inputs import (
     panel_refusal,
     read_checked,
     read_figure_restriction,
+    read_trigger_windows,
 )
 from continuum_swr_replay.reported.values import rel
 from continuum_swr_replay.runs.staleness import read_output_manifest
@@ -215,10 +195,6 @@ warnings.filterwarnings("ignore")
 
 FIGURE = "Figure 2's supplement"
 """The figure's name in its refusals (``reported.inputs.panel_refusal``)."""
-NO_SPIKE_SIGNAL = "MUA_zscore"
-NO_SPIKE_WORKERS = 4
-"""The processes that read the decode frames for the No-Spike panel by
-default: each holds one frame at a time."""
 TIMING_CASES = (
     ("Same start and end", "together", "together"),
     ("Starts later", "later", "together"),
@@ -413,16 +389,15 @@ FOUR_DECODER_EVENTS_YLABEL = (
 # ---------------------------------------------------------------------------
 
 
-def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
-    """The figure's statistics, as the events summary reads them (the No-Spike
-    trace's decode frames read by ``workers`` processes).
+def read_inputs() -> dict:
+    """The figure's statistics, as the events summary reads them.
 
     Returns
     -------
     dict
         By panel, in :data:`PANELS`' order: ``state_calibration``,
         :func:`read_state_calibration`; ``no_spike_mua`` and ``event_traces``,
-        :func:`read_frame_traces`; ``nonlocal_probability``,
+        :func:`read_traces`; ``nonlocal_probability``,
         ``nonlocal_probability.animal_probability_distribution`` of the stored
         counts; ``decoded_distance``,
         ``quality_metrics.animal_distance_by_local_probability`` of the
@@ -489,8 +464,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
             heldout.events, heldout.time_sums, heldout.bin_s
         ),
     }
-    # the decode frames last: the slow read, after every refusal
-    read.update(read_frame_traces(events, workers))
+    read.update(read_traces(inputs.trigger_windows, events))
     return {panel: read[panel] for panel in PANELS}
 
 
@@ -534,129 +508,45 @@ def read_state_calibration(folder: Path) -> pd.DataFrame:
     return pd.read_csv(folder / "calibration_bins.csv")
 
 
-def read_frame_traces(
-    events: pd.DataFrame | None = None, workers: int = NO_SPIKE_WORKERS
-) -> dict:
-    """The traces read from every analyzed epoch's decode frame, in one pass
-    (the SWR source's reader), by ``workers`` processes (1 reads them in this
-    one), in the epochs' order.
-
-    Parameters
-    ----------
-    events : pd.DataFrame, optional
-        The selected events (``animal``, ``session_date``, ``epoch``,
-        ``non_local_event``); when None, only the No-Spike trace is read.
-    workers : int, optional
+def read_traces(folder: Path, events: pd.DataFrame) -> dict:
+    """The No-Spike panel's trace and the traces panel's, from the stored
+    windows around event starts and No-Spike starts
+    (``reported.inputs.read_trigger_windows``).
 
     Returns
     -------
     dict
-        ``no_spike_mua``, the No-Spike panel's trace: ``time`` (s from the
-        start), ``q25``, ``median`` and ``q75``, animal-balanced over the
-        periods with a window (``triggered_analysis.animal_balanced_quartiles``);
-        ``level``: the mean over animals of each animal's median over its
-        epochs of each epoch's MUA level outside its periods; ``periods``: the
-        periods with a window, by animal; ``median_duration``: their median
-        duration (s). ``event_traces`` (None without ``events``): by SWR class
-        (``"overlap"``, ``"no_overlap"``), each signal's per-animal median
-        windows (``triggered_analysis.animal_window_medians``), with ``time``.
+        ``no_spike_mua``: ``triggered_analysis.stored_no_spike_trace``,
+        ``time`` (s from the start), ``q25``, ``median`` and ``q75``
+        animal-balanced over the periods, and ``level``, the mean over animals
+        of each animal's median over its epochs of each epoch's MUA level
+        outside its periods; ``event_traces``:
+        ``triggered_analysis.stored_animal_window_medians`` of the selected
+        events' windows, by SWR class, each signal's per-animal median windows,
+        with ``time``.
+
+    Raises
+    ------
+    ValueError
+        If the stored windows are not current, as the events summary refuses a
+        per-epoch measurement.
     """
-    paths = analyzed_decode_files(
-        processed_data_dir(), data_over_time_suffix(), require_all=True
-    )
-    keys = [_epoch_keys(path, events) for path in paths]
-    if workers == 1:
-        epochs = list(map(_frame_epoch, paths, keys))
-    else:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            epochs = list(pool.map(_frame_epoch, paths, keys))
-    with_periods = [epoch for epoch in epochs if "windows" in epoch]
-    counts: dict = {}
-    for epoch in with_periods:
-        counts[epoch["animal"]] = counts.get(epoch["animal"], 0) + len(epoch["windows"])
-    levels = pd.Series([epoch["level"] for epoch in epochs])
-    no_spike = {
-        "time": with_periods[-1]["time"],
-        **animal_balanced_quartiles(
-            np.concatenate([e["windows"] for e in with_periods]),
-            np.concatenate([[e["animal"]] * len(e["windows"]) for e in with_periods]),
-        ),
-        "level": float(
-            animal_medians(levels, pd.Series([e["animal"] for e in epochs])).mean()
-        ),
-        "periods": pd.Series(counts, name="periods"),
-        "median_duration": float(
-            np.median(np.concatenate([e["durations"] for e in with_periods]))
-        ),
-    }
-    if events is None:
-        return {"no_spike_mua": no_spike, "event_traces": None}
-    traces: dict = {}
-    for kind in ("overlap", "no_overlap"):
-        windows = xr.concat(
-            [epoch["event_windows"][kind] for epoch in epochs], dim="event"
-        )
-        traces[kind] = {
-            signal: animal_window_medians(windows, signal)
-            for signal in TRIGGERED_SIGNALS
-        }
-        traces["time"] = windows["time"].values
-    return {"no_spike_mua": no_spike, "event_traces": traces}
-
-
-def _epoch_keys(path: Path, events: pd.DataFrame | None) -> pd.DataFrame | None:
-    """The selected events' keys (``animal``, ``session_date``, ``epoch`` and
-    ``non_local_event``) of the epoch of a decode frame, so that each epoch's
-    task carries its own rows only (None without ``events``)."""
-    if events is None:
-        return None
-    key = parse_epoch_identifier(path.name.removesuffix(data_over_time_suffix()))
-    mine = (
-        (events["animal"].astype(str) == key.animal)
-        & (events["session_date"].astype(np.int64) == key.date)
-        & (events["epoch"].astype(str) == key.epoch_name)
-    )
-    return events.loc[mine, ["animal", "session_date", "epoch", "non_local_event"]]
-
-
-def _frame_epoch(path: Path, keys: pd.DataFrame | None = None) -> dict:
-    """One epoch's part of :func:`read_frame_traces`: its MUA level outside
-    its No-Spike periods, and, when it has periods, their windows
-    ``(n_periods, n_lags)``, their lags, its animal and the periods'
-    durations; and, when ``keys`` (the selected events' ``animal``,
-    ``session_date``, ``epoch`` and ``non_local_event``) are given, the
-    windows of Figure 2g's signals around its selected events' starts
-    (``triggered_analysis.triggered_windows``, as Figure 2g reads them)."""
-    frame = read_dot_with_swr_source(path)
-    arrival, departure = well_visit_times(
-        path.name.removesuffix(data_over_time_suffix())
-    )
-    periods = no_spike_periods(frame, arrival, departure)
-    session = frame[["animal", "day", "epoch"]].iloc[0]
-    epoch = {
-        "level": level_outside_periods(
-            frame, periods, arrival, departure, NO_SPIKE_SIGNAL
-        ),
-        "animal": session["animal"],
-    }
-    if keys is not None:
-        epoch["event_windows"] = triggered_windows(
-            frame,
-            triggering_events_in(get_event_types(frame), keys),
-            list(TRIGGERED_SIGNALS),
-            window_sec=TRIGGERED_WINDOW_S,
-        )
-    if periods.empty:
-        return epoch
-    windows = get_signal_windows(
-        frame, periods.assign(**session.to_dict()), [NO_SPIKE_SIGNAL],
-        window_sec=TRIGGERED_WINDOW_S,
-    )  # fmt: skip
+    try:
+        windows, epochs = read_trigger_windows(folder)
+    except ValueError as error:
+        raise ValueError(
+            panel_refusal(
+                FIGURE,
+                LETTERS["no_spike_mua"],
+                str(error),
+                "scripts/event_properties/measure_trigger_windows.py",
+            )
+        ) from error
     return {
-        **epoch,
-        "windows": windows.sel(signal=NO_SPIKE_SIGNAL).values,
-        "time": windows["time"].values,
-        "durations": periods["duration"].to_numpy(),
+        "no_spike_mua": stored_no_spike_trace(windows, epochs),
+        "event_traces": stored_animal_window_medians(
+            stored_windows_of(windows, events)
+        ),
     }
 
 
@@ -811,7 +701,7 @@ def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
 
 def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     """The No-Spike panel: MUA around No-Spike starts (``trace``:
-    :func:`read_frame_traces`' ``no_spike_mua``), the animal-balanced median
+    :func:`read_traces`' ``no_spike_mua``), the animal-balanced median
     with its band as Figure 2g draws its rows, a dotted line at the start and a
     dashed line at the MUA level of immobile time outside the periods. A period
     is the non-local events' rule applied to the No-Spike state
@@ -1066,7 +956,7 @@ def draw_outside_swr_series(
 def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
     """The traces panel: Figure 2g's signals around event starts, one axis per
     signal, a thin line per animal and class (each animal's median over its
-    events, ``traces``: :func:`read_frame_traces`' ``event_traces``), the
+    events, ``traces``: :func:`read_traces`' ``event_traces``), the
     classes in Figure 2g's colors and named past the last axis, a dotted line
     at the start."""
     t_ms = 1000 * np.asarray(traces["time"])
@@ -1285,16 +1175,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/supp_figure02")
     )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=NO_SPIKE_WORKERS,
-        help="processes that read the decode frames for the No-Spike panel "
-        f"(default {NO_SPIKE_WORKERS}; 1 reads them in this process)",
-    )
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    fig = generate_figure(read_inputs(args.workers))
+    fig = generate_figure(read_inputs())
     check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
     save_figure(fig, "supp_figure02", base_dir=args.output_dir)

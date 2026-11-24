@@ -59,8 +59,6 @@ def _no_spike_trace() -> dict:
         "median": median,
         "q75": median + 0.5,
         "level": 0.2,
-        "periods": pd.Series({"a": 3, "b": 2}),
-        "median_duration": 0.018,
     }
 
 
@@ -650,49 +648,33 @@ def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts(drawn):
     assert ax.get_title() == "No-Spike state"
 
 
-def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
-    """Each analyzed epoch's frame read once: its periods (the rule, with its
-    well visits) give the windows, and its level outside them; the periods
-    are counted by animal."""
-    import xarray as xr
+def test_the_traces_are_read_from_the_stored_windows(monkeypatch):
+    """The No-Spike trace and the traces panel's lines come from the stored
+    windows (the selected events' windows, every period's); stored windows
+    that are not current are refused, naming the panel and the runner."""
+    from tests.analysis.event_properties.test_triggered_analysis import _stored_rows
 
-    from tests.analysis.event_definition.test_no_spike_periods import _frame
-
-    frame, arrival, departure = _frame()
-    frame = frame.assign(animal="a", day=1, epoch=2)
-    suffix = figure.data_over_time_suffix()
-    paths = [Path(f"a1_02_r1_HPC{suffix}"), Path(f"a2_02_r1_HPC{suffix}")]
-    read, visits = [], []
-    monkeypatch.setattr(figure, "processed_data_dir", lambda: Path("."))
-    monkeypatch.setattr(
-        figure, "analyzed_decode_files", lambda folder, suffix, require_all: paths
+    rows = _stored_rows()
+    epochs = pd.DataFrame({"animal": ["a", "b"], "no_spike_level": [0.0, 2.0]})
+    monkeypatch.setattr(figure, "read_trigger_windows", lambda folder: (rows, epochs))
+    events = pd.DataFrame(
+        {"animal": ["a"], "session_date": 1, "epoch": "02_r1", "non_local_event": [3]}
     )
-    monkeypatch.setattr(
-        figure, "read_dot_with_swr_source", lambda path: read.append(path) or frame
-    )
-    monkeypatch.setattr(
-        figure,
-        "well_visit_times",
-        lambda epoch_id: visits.append(epoch_id) or (arrival, departure),
-    )
+    traces = figure.read_traces(Path("windows"), events)
+    np.testing.assert_allclose(traces["no_spike_mua"]["median"], [3.0, 1.0, -1.0])
+    assert traces["no_spike_mua"]["level"] == pytest.approx(1.0)
+    # only a's SWR event 3 is selected
+    assert list(traces["event_traces"]["overlap"]["MUA_zscore"].columns) == ["a"]
 
-    def windows(data, event_times, signals, window_sec):
-        assert window_sec == figure.TRIGGERED_WINDOW_S
-        values = np.tile(np.array([2.0, 0.0]), (len(event_times), 1))[..., None]
-        return xr.DataArray(
-            values,
-            dims=("event", "time", "signal"),
-            coords={"time": [-0.002, 0.0], "signal": signals},
-        )
+    def stale(folder):
+        raise ValueError("the trigger windows were made from other visits")
 
-    monkeypatch.setattr(figure, "get_signal_windows", windows)
-    trace = figure.read_frame_traces(workers=1)["no_spike_mua"]
-    assert read == paths
-    assert visits == ["a1_02_r1_HPC", "a2_02_r1_HPC"]
-    np.testing.assert_allclose(trace["median"], [2.0, 0.0])
-    assert trace["periods"].to_dict() == {"a": 2}  # one period per epoch
-    assert trace["level"] == pytest.approx(1.0)
-    assert trace["median_duration"] == pytest.approx(9 * 0.002)
+    monkeypatch.setattr(figure, "read_trigger_windows", stale)
+    with pytest.raises(
+        ValueError, match="panel b is not drawn: the trigger"
+    ) as refused:
+        figure.read_traces(Path("windows"), events)
+    assert "measure_trigger_windows.py" in str(refused.value)
 
 
 def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
@@ -764,7 +746,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "outside_swr_statistics": lambda sums, bin_s, events: seen.setdefault(
             "restriction", (sums, bin_s, events)
         ),
-        "read_frame_traces": lambda events, workers: {
+        "read_traces": lambda folder, events: {
             "no_spike_mua": "trace",
             "event_traces": "traces",
         },
