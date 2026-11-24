@@ -4,8 +4,10 @@ Each case of ``scripts/checks/_regression_reference.py`` is run again and its
 outputs compared with ``data/numpy_reference/<group>.json``, written by
 ``scripts/checks/write_regression_reference.py`` (the commit and the command
 are in each file). The rule: a float within ``1e-11 + 1e-9 |b|`` of its
-reference ``b``; statuses, reasons, step counts, the columns left out and every
-count equal.
+reference ``b``, and a float where the reference has one; statuses, reasons,
+step counts, the columns left out and every count equal, of the same type. The
+README beside the files says where they were verified and which cases sit
+close to a tolerance.
 """
 
 from __future__ import annotations
