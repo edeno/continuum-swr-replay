@@ -861,3 +861,36 @@ and `Processed-Data/event_nonlocal_restriction_swr_allowed_windows/`, were made 
 | `score_tetrode_holdout.py --extra-scores` (removed) | every run computes the extra scores; `--null-seed` stays |
 | `tetrode_holdout.require_extra_columns`, `EXTRA_COLUMNS` (removed) | `tetrode_holdout.require_run_columns`, `RUN_COLUMNS` |
 | `reported.events.require_trial_folds`, `require_tetrode_holdout_folds`, `read_tetrode_holdout` | `analysis.event_evidence.heldout_runs` |
+
+## The restriction run is one run, 2026-11-23
+
+The restriction run in `Processed-Data/event_nonlocal_restriction/` is, since 2026-11-23,
+the run that scores all four decoders (local-only, SWR-only, full and SWR-allowed). It was
+made with `score_nonlocal_restriction.py --from-stored-fit` from the fold-fit run of the
+three decoders: each fold's decoder rebuilt from that run's records, no EM. Its header
+records `settings.fit_source: stored` and `inputs.stored_fit`, the deleted run's folder name
+and manifest digest, kept as the record of where the fit came from; every fold's fit facts
+(transitions, initial distribution, convergence, the checks) are in this run's own records.
+The run therefore cannot be resumed or gathered again under its own header; a decoder is
+added later with `--from-stored-fit Processed-Data/event_nonlocal_restriction --output-dir
+<new folder>`. The three-decoder run and its two derived outputs
+(`event_nonlocal_restriction_heldout_events/`, `event_nonlocal_restriction_windows/`) were
+deleted; the four-decoder run's derived outputs took their names
+(they were `event_nonlocal_restriction_swr_allowed_heldout_events/` and
+`event_nonlocal_restriction_swr_allowed_windows/`, folder names that no longer exist).
+
+The three decoders' scores in this run differ from the deleted run's by about 3e-5 nats per
+bin (each fold's `stored_score_difference`), which moves the full model's non-local
+probability across 0.8 in a few bins: the held-out events are 88,370 instead of 88,373
+(238 of 242 epochs have the same count). In the events summary 225 values moved, 16 by more
+than 1e-4 relative, the largest by 1.9e-3 (an interval bound); no formatted value changed.
+The 42 values `restriction_swr_allowed_run_*` and `restriction_heldout_swr_allowed_run_*`
+(the second run's copies of three-decoder values and its held-out event counts) were
+removed. `event_bin_facts`' records keep the deleted run's record digest
+(`epoch_inputs.restriction_record`), which nothing checks.
+
+| Old place | New place |
+|---|---|
+| `paths.EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR`, `..._SWR_ALLOWED_HELDOUT_EVENTS_DIR`, `..._SWR_ALLOWED_WINDOWS_DIR` (removed) | `paths.EVENT_NONLOCAL_RESTRICTION_DIR`, `..._HELDOUT_EVENTS_DIR`, `..._WINDOWS_DIR` |
+| `EventsInputs.nonlocal_restriction_swr_allowed`, `nonlocal_restriction_swr_allowed_heldout_events` (removed) | `EventsInputs.nonlocal_restriction`, `nonlocal_restriction_heldout_events` |
+| `REFUSED_FOUR` in `scripts/figures/generate_supp_figure02.py` (removed) | panel l reads panel i's runs |
