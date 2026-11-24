@@ -24,7 +24,8 @@ package may import it.
   without a finite maximum.
 - ``calibration``: the declared log penalty of a per-session smooth, the one
   at which its median edf over the sessions is a target.
-- ``record``: the fit-row record and its parquet storage.
+- ``record``: the fit-row record and the causes of a session without a
+  kept fit.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
 - ``folds``: the one fold rule, five folds of whole trials balanced by

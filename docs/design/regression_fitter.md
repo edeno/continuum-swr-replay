@@ -19,7 +19,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
 | `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
-| `record.py` | the fit-row record and its parquet storage |
+| `record.py` | the fit-row record and the closed set of causes of a session without a kept fit |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
@@ -601,9 +601,7 @@ in `sessions.py`'s docstring). A record
 whose status is not "converged" is kept; its readers flag it. Every cause is a code of a
 closed set, so that sessions can be counted by cause: `support.Removed` for a term left
 out (`left_out`, with the refit's round in `left_out_round`), `record.NoFit` for a
-session without a kept fit (`no_fit`); `record.describe` gives their words. `write_records` and
-`read_records` store the records through `tables.io` (`write_table`, `read_table`), the
-structured fields as JSON strings.
+session without a kept fit (`no_fit`).
 
 ## Contrasts
 

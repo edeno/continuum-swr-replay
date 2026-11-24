@@ -49,8 +49,7 @@ other status, keeps the last fit's status and the true counts, with NaN
 coefficients and its cause. Its ``left_out`` and ``left_out_round`` hold what
 the refit had left out before it ended, as a record of what was tried; no rows
 are dropped for it. Every cause is a code of a closed set
-(:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term;
-:func:`.record.describe` gives their words).
+(:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term).
 
 A session with columns left out keeps its other terms: those columns'
 coefficients and covariance are NaN and ``left_out`` says why (with the
