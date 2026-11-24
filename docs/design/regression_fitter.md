@@ -1024,11 +1024,13 @@ or a null space) it is "design not identified" at the start, log-likelihood 0, n
 where the penalty has full rank it is "converged" at its minimum, `beta = 0` whatever the
 start, with `A = S`, a decrement of 0 and a log-likelihood of 0 (the NumPy fitter raised
 there, by accident); a grouped softmax without rows is refused (`ValueError`, no groups).
-A per-row argument (`eta`, `d`, `d1`, `d2`, `y`, a per-row offset) needs one value per row
-on one axis: a column of shape (n, 1) is refused with its name and shape, since it would
-broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out -1536.6 for
--5.82). So is a scalar or a one-element array given for a per-row vector, which the NumPy
-code broadcast: that narrowing is intended. A single Poisson offset is still every row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
+A per-row argument of the weighted design (`eta`, `y`, a per-row offset) needs one value per
+row on one axis: a column of shape (n, 1) is refused with its name and shape, since it
+would broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out
+-1536.6 for -5.82). So is a scalar or a one-element array given for a per-row vector, which
+the NumPy code broadcast: that narrowing is intended. When the rows are padded
+(`Poisson.pad`) a single Poisson offset is every row's, but a fit refuses it:
+`Poisson.check`, which `penalized_newton` calls at its entry, needs one offset per row. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
 every quantity unchanged, exactly, and the kernels equal the formulas written in NumPy in
 the test. The padded and unpadded log-likelihood, gradient, information and its two
 directional derivatives agree to 1e-12 of their largest entry for each family, the kernels

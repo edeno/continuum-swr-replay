@@ -56,9 +56,9 @@ module at each call (the first two, with the step cap ``max_step``, are passed
 to the iteration kernel as arguments), so a changed value takes effect in a
 kernel already compiled. The defaults of :func:`penalized_newton`'s
 ``max_iter`` and ``max_step`` are ``NEWTON_MAX_STEPS`` and
-``MAX_STEP_LENGTH`` as they were when the module was imported. A Cholesky factorization that fails gives NaN
-in JAX rather than raising: ``A`` is not positive definite when ``A`` or its
-factor is not finite.
+``MAX_STEP_LENGTH`` as they were when the module was imported. A Cholesky
+factorization that fails gives NaN in JAX rather than raising: ``A`` is not
+positive definite when ``A`` or its factor is not finite.
 """
 
 from __future__ import annotations
@@ -534,7 +534,7 @@ def penalized_newton(
         Most Newton steps; the default is ``NEWTON_MAX_STEPS`` as imported.
     max_step : float
         Longest step, as the largest change of any coefficient; not applied
-        to a quadratic likelihood, whose full step is the optimum The
+        to a quadratic likelihood, whose full step is the optimum. The
         default is ``MAX_STEP_LENGTH`` as imported.
 
     Returns

@@ -13,7 +13,8 @@ dimension of the penalty's null space. Because the blocks are disjoint,
 ``S_j``. ``V`` is mgcv's REML score less the constants the likelihoods leave
 out (for the Poisson, ``sum log y!``), given the same ``S_j``. The gradient and
 Hessian in ``rho`` are exact (they differentiate ``b`` and ``H`` through the
-optimum, with the likelihood's ``dinformation`` and ``d2information``).
+optimum, with the likelihood's ``_jax_dinformation`` and
+``_jax_d2information``).
 
 The Gaussian scale is profiled: its penalty is on the scale of the residual sum
 of squares, so the fit minimizes ``||y - X b||^2 + b' S b`` (``lam_j`` are
@@ -663,7 +664,9 @@ def _inverse_and_edf(factor, H, masks):
 
 
 def _laplace_summary(A, S, b, masks, loglik, log_pdet, n_null):
-    """The Cholesky factor of ``A``, and :func:`_fixed_penalty_summary` on it."""
+    """The Cholesky factor of ``A``, and the score, ``A^-1`` and the edf on it
+    (what :func:`_fixed_penalty_summary` returns, and what
+    :func:`_laplace_derivatives` adds its derivatives to)."""
     factor = jax.scipy.linalg.cho_factor(A, lower=True)
     covariance, half_log_det, edf, edf_total = _inverse_and_edf(factor, A - S, masks)
     score = (
@@ -2004,8 +2007,9 @@ def select_penalties(
     columns are made inactive and it is fitted again, by :func:`refit_session`
     (its docstring states the rule; a direction through a penalty block or the
     intercept cannot be left out, and the session stays without a fit).
-    ``PenaltySearch.set_aside`` records every step. More than ``MAX_FAILING_SHARE`` of the sessions without a fit at the
-    end is an error.
+    ``PenaltySearch.set_aside`` records every step. More than
+    ``MAX_FAILING_SHARE`` of the sessions without a fit at the end is an
+    error.
 
     The search starts from the best point of a grid over the log penalties
     (the score can have two optima; the grid is described beside
