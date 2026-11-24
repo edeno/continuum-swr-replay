@@ -50,6 +50,28 @@ def name_groups(ax: Axes, x: float, top: float, step: float, ha: str) -> None:
         )  # fmt: skip
 
 
+def draw_cumulative_by_animal(ax: Axes, distribution: pd.DataFrame) -> None:
+    """For each group of :data:`GROUP_COLORS`, the percent of its events at or
+    below each bin's high edge: a thin line per animal and their mean in bold,
+    in the group's color.
+
+    Parameters
+    ----------
+    ax : Axes
+    distribution : pd.DataFrame
+        One row per animal, group and bin, with ``animal``, ``group``,
+        ``bin_high`` and ``percent`` (``event_statistics.property_distribution``).
+    """
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        within = mine.pivot(
+            index="bin_high", columns="animal", values="percent"
+        ).cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+
+
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
     """A statistics row's per-animal values, indexed by animal."""
     return scale * pd.Series(row[column], index=row["animal_names"])

@@ -1137,7 +1137,7 @@ def test_the_gamma_panels_draw_each_kind_s_trace_and_the_two_levels(offline):
     figure = offline("scripts.figures.generate_supp_figure03")
     time = np.array([-0.002, 0.0, 0.002])
     curves, levels = {}, {}
-    for k, (band, _, _) in enumerate(figure.SIGNALS):
+    for k, (band, _) in enumerate(figure.SIGNALS):
         curves[band] = {"time": time}
         for j, kind in enumerate(figure.WINDOW_KINDS):
             for i, label in enumerate(("q25", "median", "q75")):
@@ -1193,7 +1193,7 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
     reader = (
         "content_mass_along_arms"
         if module.endswith("generate_figure03")
-        else "with_brain_state"
+        else "with_event_speed"
     )
     monkeypatch.setattr(figure, reader, stop)
     with pytest.raises(Read):
@@ -1203,13 +1203,12 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
 
 
 @pytest.mark.parametrize("problem", ["subset", "session_cache"])
-@pytest.mark.parametrize("folder", ["brain_state_reference", "event_gamma"])
-def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
-    offline, monkeypatch, tmp_path, folder, problem
+def test_the_gamma_levels_refuse_a_reference_not_made_over_the_subset(
+    offline, monkeypatch, tmp_path, problem
 ):
-    """Quiet rest is the rest inside a well visit: a brain-state or gamma
-    reference whose manifest records another subset, or none, or another
-    session cache's visits than the current one, is refused."""
+    """Quiet rest is the rest inside a well visit: a gamma reference whose
+    manifest records another subset, or none, or another session cache's
+    visits than the current one, is refused."""
     import dataclasses
 
     from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -1223,59 +1222,26 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     entry.parent.mkdir(parents=True)
     entry.write_bytes(b"the visits")
     current = prepare_data.session_cache_record(["e"])
-    inputs = dataclasses.replace(
-        figure.default_inputs(),
-        brain_state_reference=tmp_path / "brain_state_reference" / "reference.parquet",
-        event_gamma=tmp_path / "event_gamma",
-    )
-    for name in ("brain_state_reference", "event_gamma"):
-        (tmp_path / name).mkdir()
-        manifest = {"subset": ANALYZED_SUBSET, "session_cache": current}
-        if name == folder:
-            manifest.pop(problem)
-        (tmp_path / name / "manifest.json").write_text(json.dumps(manifest))
-    monkeypatch.setattr(figure, "default_inputs", lambda: inputs)
-    monkeypatch.setattr(figure, "read_swr_table", lambda path: figure02_events())
-    levels = pd.DataFrame({"epoch_id": ["e"]})
-    monkeypatch.setattr(
-        figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
-    )
-    # panel c's distribution is the analysis layer's, tested there
-    monkeypatch.setattr(figure, "with_event_speed", lambda events, *_: (events, []))
-    monkeypatch.setattr(figure, "transport_speed_distribution", lambda events: None)
-    # panels d and e read the content-mass run, tested with its reader
-    monkeypatch.setattr(
-        figure, "content_mass_along_arms", lambda events, *_: (None, [])
-    )
-    monkeypatch.setattr(
-        figure, "with_event_place_shares", lambda events, *_: (events, [])
-    )
-    monkeypatch.setattr(figure, "content_place_shares", lambda along: None)
-    monkeypatch.setattr(figure, "place_share_intervals", lambda along: None)
-    monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
-    monkeypatch.setattr(figure, "well_count_shares", lambda e, **_: None)
-    monkeypatch.setattr(figure, "patch_count_shares", lambda e, **_: None)
-    monkeypatch.setattr(figure, "content_mass_by_patch", lambda e, *_: (None, []))
-    monkeypatch.setattr(figure, "patch_content_shares", lambda rows: None)
-    monkeypatch.setattr(figure, "with_event_start_end", lambda e, *_: (e, []))
-    monkeypatch.setattr(figure, "start_end_shares", lambda events: None)
-    monkeypatch.setattr(figure, "gamma_triggered_curves", lambda e, *_: (None, []))
+    folder = tmp_path / "event_gamma"
+    folder.mkdir()
+    inputs = dataclasses.replace(figure.default_inputs(), event_gamma=folder)
+    pd.DataFrame({"epoch_id": ["e"]}).to_parquet(folder / "reference.parquet")
     monkeypatch.setattr(figure, "reference_medians", lambda table, signals: table)
-    # panel a's session and examples are read after the references are checked
-    monkeypatch.setattr(figure, "read_example_decode", lambda *_: None)
-    monkeypatch.setattr(figure, "example_windows", lambda events: None)
+
+    def record(**manifest):
+        (folder / "manifest.json").write_text(json.dumps(manifest))
+
+    manifest = {"subset": ANALYZED_SUBSET, "session_cache": current}
+    record(**{k: v for k, v in manifest.items() if k != problem})
     note = "was not made over" if problem == "subset" else "records no session-cache"
-    with pytest.raises(ValueError, match=f"{folder}.* {note}"):
-        figure.read_inputs()
+    with pytest.raises(ValueError, match=f"event_gamma.* {note}"):
+        figure.read_gamma_levels(inputs)
+    record(**manifest)
+    assert figure.read_gamma_levels(inputs)["epoch_id"].tolist() == ["e"]
     # a cache refreshed since the reference was made is refused too
-    if problem == "session_cache":
-        (tmp_path / folder / "manifest.json").write_text(
-            json.dumps({"subset": ANALYZED_SUBSET, "session_cache": current})
-        )
-        assert figure.read_inputs()["gamma_levels"] is levels
-        entry.write_bytes(b"other visits")
-        with pytest.raises(ValueError, match="other well visits than the current"):
-            figure.read_inputs()
+    entry.write_bytes(b"other visits")
+    with pytest.raises(ValueError, match="other well visits than the current"):
+        figure.read_gamma_levels(inputs)
 
 
 def _distance() -> pd.DataFrame:
@@ -1417,7 +1383,7 @@ def test_supp_figure03_draws_how_many_wells_an_event_represents(offline):
         index=index,
     )
     fig, ax = plt.subplots()
-    figure.draw_well_counts(ax, shares)
+    figure.draw_class_bars(ax, shares, *figure.CLASS_PANELS["d"][1:])
     heights = [round(bar.get_height(), 6) for bar in ax.patches]
     assert heights == [45.0, 47.5, 7.5, 65.0, 31.5, 3.5]
     colors = {to_rgba(bar.get_facecolor()) for bar in ax.patches[:3]}
@@ -1455,36 +1421,37 @@ def test_supp_figure03_examples_are_checked_against_the_event_table(offline):
 
 
 @pytest.mark.parametrize(
-    ("draw", "classes", "labels"),
+    ("panel", "classes", "groups"),
     [
         (
-            "draw_patch_content",
+            "e",
             (
                 "own_patch_wells",
                 "own_patch_elsewhere",
                 "other_patch_wells",
                 "other_patch_elsewhere",
             ),
-            ["wells", "other", "wells", "other"],
+            ["own patch", "other patches"],
         ),
-        ("draw_patch_counts", ("one", "two", "three"), ["one", "two", "three"]),
+        ("f", ("one", "two", "three"), []),
         (
-            "draw_start_end",
+            "g",
             (
                 "starts_near_animal",
                 "ends_near_animal",
                 "starts_at_remote_well",
                 "ends_at_remote_well",
             ),
-            ["starts", "ends", "starts", "ends"],
+            ["near the animal", "at a remote well"],
         ),
     ],
 )
 def test_supp_figure03_class_panels_draw_a_bar_per_class_and_kind(
-    offline, draw, classes, labels
+    offline, panel, classes, groups
 ):
     """Panels e, f and g: per class a bar per kind at the animals' mean, with a
-    dot per animal, and the classes named under the axis."""
+    dot per animal, the classes named under the axis and, where the classes
+    are two groups, the groups named under them."""
     import matplotlib.pyplot as plt
 
     figure = offline("scripts.figures.generate_supp_figure03")
@@ -1495,8 +1462,10 @@ def test_supp_figure03_class_panels_draw_a_bar_per_class_and_kind(
     shares = pd.DataFrame(
         {name: values + 0.1 * k for k, name in enumerate(classes)}, index=index
     )
+    labels = figure.CLASS_PANELS[panel][1]
     fig, ax = plt.subplots()
-    getattr(figure, draw)(ax, shares)
+    figure.draw_class_bars(ax, shares, *figure.CLASS_PANELS[panel][1:])
+    assert [t.get_text() for t in ax.texts] == groups
     assert len(ax.patches) == 2 * len(classes)
     assert ax.patches[0].get_height() == pytest.approx(100 * values[:2].mean())
     assert [t.get_text() for t in ax.get_xticklabels()] == labels

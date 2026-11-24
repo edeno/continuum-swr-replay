@@ -127,6 +127,9 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     log2_density_against_even,
     place_share_statistics,
 )
+from continuum_swr_replay.analysis.event_properties.event_speed import (
+    with_event_speed,
+)
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
     DISTANCE_BIN_EDGES_CM,
@@ -144,13 +147,13 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.reported.events import (
     content_mass_along_arms,
-    with_event_speed,
 )
 from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    GROUP_COLORS,
+    GROUP_NAMES,
     REFERENCE_COLOR,
+    draw_cumulative_by_animal,
     name_groups,
 )
 from continuum_swr_replay.visualization.palettes import EVENT_KINDS
@@ -309,13 +312,9 @@ def _mean_percent(events: pd.DataFrame, column: str, edges) -> pd.DataFrame:
     distribution = property_distribution(events, column, np.asarray(edges))
     mean = distribution.groupby(["group", "bin_low"])["percent"].mean()
     return pd.DataFrame(
-        {name: mean[_GROUP_NAMES[is_swr]].sort_index().to_numpy()
-         for is_swr, (name, _) in EVENT_KINDS.items()}
+        {name: mean[group].sort_index().to_numpy()
+         for group, name in GROUP_NAMES.items()}
     )  # fmt: skip
-
-
-#: the statistics' names of the two kinds
-_GROUP_NAMES = {False: "no SWR", True: "SWR"}
 
 
 def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
@@ -653,13 +652,7 @@ def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
     classes named in their colors, and dotted lines at 20 cm (near) and
     100 cm (remote), where the heights are the shares under 20 cm and under
     100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
-    for group, color in GROUP_COLORS.items():
-        mine = distribution[distribution["group"] == group]
-        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
-        within = by_animal.cumsum()
-        edges = within.index.to_numpy()
-        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
-        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    draw_cumulative_by_animal(ax, distribution)
     for cut in (NEAR_CM, REMOTE_CM):
         ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
     name_groups(ax, 0.02, 1.0, 0.1, "left")

@@ -687,9 +687,6 @@ def place_share_statistics(shares: pd.DataFrame) -> dict:
     }
 
 
-EVENT_PLACES = ("at_well", "remote_well", "own_well")
-"""The shares :func:`event_place_shares` gives each event."""
-
 EXTENT_BIN_EDGES_CM = (0.0, 10.0, 20.0, 50.0, 100.0, np.inf)
 """The spatial-extent classes of :func:`remote_well_share_by_extent` (cm); a
 class holds its low edge and not its high one."""
@@ -708,7 +705,7 @@ def event_place_shares(rows: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     shares : pd.DataFrame, shape (n_events, 3)
-        :data:`EVENT_PLACES`, indexed by ``event_id``: the share of the event's
+        :data:`INTERVAL_PLACES`, indexed by ``event_id``: the share of the event's
         content time within ``AT_WELL_CM`` of a well; of that, the part far
         from the animal (``remote_well``) and the part near it (``own_well``).
     """
@@ -725,7 +722,7 @@ def event_place_shares(rows: pd.DataFrame) -> pd.DataFrame:
         }
     )
     summed = parts.groupby("event_id").sum()
-    return summed[list(EVENT_PLACES)].div(summed["total"], axis=0)
+    return summed[list(INTERVAL_PLACES)].div(summed["total"], axis=0)
 
 
 WELL_CONTENT_SHARE = 0.1
@@ -758,19 +755,26 @@ def event_well_counts(
         Indexed by ``event_id``: the wells holding at least ``share`` of the
         event's content time (0 for an event with none).
     """
-    weight = rows[WEIGHT].astype(float)
-    total = weight.groupby(rows["event_id"]).sum()
     at_well = rows["distance_to_well_cm"] < AT_WELL_CM
-    by_well = (
-        weight[at_well]
-        .groupby([rows.loc[at_well, "event_id"], rows.loc[at_well, "arm"]])
-        .sum()
+    return _places_holding(rows[at_well], rows[at_well]["arm"], rows, share).rename(
+        "n_wells"
     )
+
+
+def _places_holding(
+    inside: pd.DataFrame, place: pd.Series, rows: pd.DataFrame, share: float
+) -> pd.Series:
+    """Per event of ``rows``, how many places hold at least ``share`` of the
+    event's content time: ``inside`` are the rows that lie in a place (a subset
+    of ``rows``), ``place`` each one's place. Indexed by ``event_id``; 0 for an
+    event with no such place."""
+    total = rows[WEIGHT].astype(float).groupby(rows["event_id"]).sum()
+    by_place = inside[WEIGHT].astype(float).groupby([inside["event_id"], place]).sum()
     held = (
-        by_well / total.reindex(by_well.index.get_level_values("event_id")).to_numpy()
+        by_place / total.reindex(by_place.index.get_level_values("event_id")).to_numpy()
     )
     counted = (held >= share).groupby(level="event_id").sum()
-    return counted.reindex(total.index, fill_value=0).astype(int).rename("n_wells")
+    return counted.reindex(total.index, fill_value=0).astype(int)
 
 
 def well_count_shares(events: pd.DataFrame, column: str = "n_wells") -> pd.DataFrame:
@@ -829,16 +833,8 @@ def event_patch_counts(
         Indexed by ``event_id``: the patches holding at least ``share`` of the
         event's content time (1 to 3 for a share of a third or less).
     """
-    weight = rows[WEIGHT].astype(float)
     patch = rows["arm"].map(TRACK_SEGMENT_TO_PATCH)
-    by_patch = weight.groupby([rows["event_id"], patch]).sum()
-    total = by_patch.groupby(level="event_id").sum()
-    held = (
-        by_patch / total.reindex(by_patch.index.get_level_values("event_id")).to_numpy()
-    )
-    return (
-        (held >= share).groupby(level="event_id").sum().astype(int).rename("n_patches")
-    )
+    return _places_holding(rows, patch, rows, share).rename("n_patches")
 
 
 def patch_count_shares(events: pd.DataFrame, column: str = "n_patches") -> pd.DataFrame:

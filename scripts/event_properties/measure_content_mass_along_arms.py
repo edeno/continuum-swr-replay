@@ -66,6 +66,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.runs.threads import pool_context
+from continuum_swr_replay.tables.io import write_atomically
 
 
 def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
@@ -191,9 +192,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     ) as pool:
         for table in pool.map(measure_epoch, jobs):
             identifier = table.epoch_id.iloc[0]
-            tmp = folder / f"{identifier}.parquet.tmp"
-            table.to_parquet(tmp, index=False)
-            tmp.replace(folder / f"{identifier}.parquet")
+            write_atomically(
+                folder / f"{identifier}.parquet",
+                lambda path, table=table: table.to_parquet(path, index=False),
+            )
             print(f"{identifier}: {table.event_id.nunique()} events", flush=True)
     if not args.epochs:
         write_json(

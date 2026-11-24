@@ -1625,31 +1625,6 @@ TRANSPORT_SPEED_BIN_EDGES_CM_S = np.arange(0.0, 1001.0, 25.0)
 last edge is in no bin, so the percents of a class sum to less than 100."""
 
 
-def transport_speed_distribution(
-    events: pd.DataFrame, edges: np.ndarray = TRANSPORT_SPEED_BIN_EDGES_CM_S
-) -> pd.DataFrame:
-    """Each animal's distribution of the events' transport-slope speed
-    (:data:`TRANSPORT_SPEED_COLUMN`), by class, as :func:`hpd_distribution`
-    takes the HPD coverage.
-
-    Parameters
-    ----------
-    events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``animal``, the session columns, ``is_swr`` and
-        :data:`TRANSPORT_SPEED_COLUMN` (an event without one is left out).
-    edges : np.ndarray, shape (n_edges,)
-        Ascending bin edges (cm/s).
-
-    Returns
-    -------
-    pd.DataFrame
-        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
-        ``bin_high`` and ``percent`` (of the animal's events of the class that
-        have a speed).
-    """
-    return _class_distribution(events, TRANSPORT_SPEED_COLUMN, edges)
-
-
 def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """The share of each class's events whose content lies in each distance
     band from the animal (:data:`DISTANCE_BANDS_CM`).
@@ -1668,11 +1643,9 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
-        of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
-        mean over animals of the animals' shares; ``animal_min`` and
-        ``animal_max``; ``share``, the same number as ``share_animal_mean``
-        (the headline share is animal-first); ``n_animals`` and ``n_events``
-        (the class's events).
+        of :data:`DISTANCE_BANDS_CM`, in order): ``share``, the mean over
+        animals of the animals' shares; ``animal_min`` and ``animal_max``;
+        ``n_animals`` and ``n_events`` (the class's events).
     """
     table = _class_table(events, DISTANCE_COLUMN)
     rows = []
@@ -1687,10 +1660,9 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
                 {
                     "group": group,
                     "band": band,
-                    "share_animal_mean": float(per_animal.mean()),
+                    "share": float(per_animal.mean()),
                     "animal_min": float(per_animal.min()),
                     "animal_max": float(per_animal.max()),
-                    "share": float(per_animal.mean()),
                     "n_animals": len(per_animal),
                     "n_events": len(mine),
                 }

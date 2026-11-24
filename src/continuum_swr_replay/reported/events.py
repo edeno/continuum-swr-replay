@@ -24,9 +24,10 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   the state-evidence run the detection summary reads, from
   ``scripts/event_evidence/split_state_evidence_by_swr.py``), over the bouts
   that start inside a well visit, which its provenance records;
-- each event time bin's content placed on the track, with its track distance to
-  the animal and to the nearest well (``Processed-Data/content_along_arms``, from
-  ``scripts/event_properties/measure_content_along_arms.py``);
+- each event's content time (posterior mass) at each place of the track, with
+  its track distance to the animal and to the nearest well
+  (``Processed-Data/content_mass_along_arms``, from
+  ``scripts/event_properties/measure_content_mass_along_arms.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
   ``scripts/event_properties/measure_ripple_class_structure.py``);
 - each event's start distance and duration-matched quiet-rest theta
@@ -117,7 +118,7 @@ medians, a mean of its epochs' means).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -192,6 +193,9 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
 )
 from continuum_swr_replay.analysis.event_properties.content_place_rate import (
     LOW_RATE_RANK,
+)
+from continuum_swr_replay.analysis.event_properties.event_speed import (
+    with_event_speed,
 )
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
@@ -325,7 +329,6 @@ TAGS = {
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2k",)),
     "content_distance": Tags(("2d.1",), ("3g",)),
-    "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
 }
@@ -4497,8 +4500,9 @@ _PROPERTY_NAMES = {
 def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2d.1–2d.6: per-event properties, non-SWR against SWR.
 
-    Plain medians of all events, and the number of animals whose own medians
-    differ in the claim's direction. Not duration-controlled. The properties
+    Each class's median, the mean over animals of each animal's median (the
+    median over its epochs of the epoch's median), and the number of animals
+    whose own medians differ in the claim's direction. Not duration-controlled. The properties
     are the event table's own columns; the start distance and the two speeds,
     read from other outputs, are made by :func:`start_distance_values` and
     :func:`speed_values`.
@@ -4658,8 +4662,8 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
     100 cm, and 100 cm or more from the animal (the mean over the event's bins
     of the absolute distance along the track of the decoded place from the
     animal's; ``event_statistics.content_distance_band_statistics``): the mean
-    over animals of each animal's share with the lowest and highest animal,
-    tagged to the panel; the headline share is the same number."""
+    over animals of each animal's share (the mean over its epochs of the
+    epoch's share), with the lowest and highest animal."""
     make = value_factory(content_distance_values, source, TAGS["content_distance"])
     table = event_statistics.content_distance_band_statistics(events)
     values = []
@@ -4680,18 +4684,11 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
                 (row["share"], row["animal_min"], row["animal_max"]),
                 (
                     f"{what}: the mean over animals of each animal's share (the "
-                    "mean over its epochs of the epoch's share), the same number "
-                    f"as content_distance_{band_word}_{word}_fraction_animal_mean",
+                    "mean over its epochs of the epoch's share)",
                     f"lowest animal's {what} (an animal's share is the mean over "
                     "its epochs of the epoch's share)",
                     f"highest animal's {what} (the mean over its epochs)",
                 ),
-                animal_mean=(
-                    row["share_animal_mean"],
-                    f"{what}, the mean over animals of each animal's share (the "
-                    "mean over its epochs of the epoch's share)",
-                ),
-                pooled_tags=TAGS["content_distance_pooled"],
             )
     values += [
         make(
@@ -5002,6 +4999,69 @@ _MASS_PLACE = [
 """What names a place, and its side of the animal, in the content-mass run."""
 
 
+def _epoch_files(folder: Path, n_epochs: int, pattern: str = "*.parquet") -> list[Path]:
+    """The per-epoch files of a run, sorted; refused when they are not
+    ``n_epochs``."""
+    paths = sorted(folder.glob(pattern))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    return paths
+
+
+def _content_mass_rows(
+    events: pd.DataFrame, paths: list[Path]
+) -> Iterator[tuple[Path, pd.DataFrame]]:
+    """Each epoch file of the content-mass run with its rows of the events of
+    ``events`` (``cohort_selection.select_events_in``; the run holds every
+    event of the table), each row with its event's ``animal``, ``is_swr`` and,
+    when ``events`` has it, ``current_patch``."""
+    kinds = events[
+        [
+            "event_id",
+            "animal",
+            "is_swr",
+            *events.columns.intersection(["current_patch"]),
+        ]
+    ]
+    columns = ["event_id", "epoch_id", *_MASS_PLACE, "weight", "distance_to_animal_cm"]
+    for path in paths:
+        rows = select_events_in(
+            pd.read_parquet(path, columns=columns), events["event_id"]
+        ).merge(kinds, on="event_id", validate="m:1")
+        rows["weight"] = rows["weight"].astype(float)
+        yield path, rows
+
+
+def _mass_by_place(rows: pd.DataFrame) -> pd.DataFrame:
+    """One epoch's content time per kind, place and side of the animal, with
+    its weighted mean distance from the animal."""
+    rows = rows.assign(moment=rows["weight"] * rows["distance_to_animal_cm"])
+    summed = rows.groupby(
+        ["epoch_id", "animal", "is_swr", *_MASS_PLACE], as_index=False
+    )[["weight", "moment"]].sum()
+    summed["distance_to_animal_cm"] = summed.pop("moment") / summed["weight"]
+    return summed
+
+
+def _mass_by_event(rows: pd.DataFrame, epoch_id: str) -> pd.DataFrame:
+    """One epoch's events with their shares of content time at the wells and
+    the wells and patches they hold."""
+    shares = content_along_arms.event_place_shares(rows).add_prefix("content_")
+    shares["content_n_wells"] = content_along_arms.event_well_counts(rows)
+    shares["content_n_patches"] = content_along_arms.event_patch_counts(rows)
+    shares["epoch_id"] = epoch_id
+    return shares.reset_index()
+
+
+def _mass_by_patch(rows: pd.DataFrame) -> pd.DataFrame:
+    """One epoch's content time per kind, patch of the animal, arm and distance
+    to the well."""
+    return rows.groupby(
+        ["epoch_id", "animal", "is_swr", "current_patch", "arm", "distance_to_well_cm"],
+        as_index=False,
+    )["weight"].sum()
+
+
 def content_mass_along_arms(
     events: pd.DataFrame, folder: Path, n_epochs: int
 ) -> tuple[pd.DataFrame, list[Path]]:
@@ -5029,73 +5089,65 @@ def content_mass_along_arms(
         If ``folder`` does not hold ``n_epochs`` epochs, or its rows do not
         cover every event of ``events``.
     """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
-    kinds = events[["event_id", "animal", "is_swr"]]
+    paths = _epoch_files(folder, n_epochs)
     tables, n_events = [], 0
-    for path in paths:
-        rows = select_events_in(
-            pd.read_parquet(
-                path,
-                columns=[
-                    "event_id",
-                    "epoch_id",
-                    *_MASS_PLACE,
-                    "weight",
-                    "distance_to_animal_cm",
-                ],
-            ),
-            events["event_id"],
-        ).merge(kinds, on="event_id", validate="m:1")
+    for _, rows in _content_mass_rows(events, paths):
         n_events += rows["event_id"].nunique()
-        rows["moment"] = rows["weight"].astype(float) * rows["distance_to_animal_cm"]
-        rows["weight"] = rows["weight"].astype(float)
-        summed = rows.groupby(
-            ["epoch_id", "animal", "is_swr", *_MASS_PLACE], as_index=False
-        )[["weight", "moment"]].sum()
-        summed["distance_to_animal_cm"] = summed.pop("moment") / summed["weight"]
-        tables.append(summed)
+        tables.append(_mass_by_place(rows))
     if n_events != len(events):
         raise ValueError(f"the rows of {folder} do not cover the event table's events")
     return pd.concat(tables, ignore_index=True), paths
 
 
-def content_mass_by_patch(
+def content_mass_tables(
     events: pd.DataFrame, folder: Path, n_epochs: int
-) -> tuple[pd.DataFrame, list[Path]]:
-    """The content time of the events of ``events`` on each arm, at the wells
-    and off them, with the patch the animal is in, per epoch and kind, from the
-    content-mass run; and the files read
-    (``content_along_arms.patch_content_shares`` takes the rows).
+) -> tuple[dict[str, pd.DataFrame], list[Path]]:
+    """The content-mass run read once for the supplement's panels; and the
+    files read.
+
+    Returns
+    -------
+    tables : dict
+        ``along``: :func:`content_mass_along_arms`' table. ``events``:
+        ``events`` with each one's share of content time at a well, at a
+        remote well and at the animal's own (``content_at_well``,
+        ``content_remote_well``, ``content_own_well``:
+        ``content_along_arms.event_place_shares``; the event table's own
+        ``at_well`` is where the animal is), the wells it represents and the
+        patches it spans (``content_n_wells``, ``content_n_patches``:
+        ``event_well_counts``, ``event_patch_counts``) and its ``epoch_id``.
+        ``by_patch``: the content time per epoch, kind, patch of the animal
+        (``current_patch``), arm and distance to the well, as
+        ``content_along_arms.patch_content_shares`` takes it.
+    paths : list of Path
 
     Raises
     ------
     ValueError
-        If ``folder`` does not hold ``n_epochs`` epochs, or an event of
-        ``events`` has no patch (``current_patch``).
+        If ``folder`` does not hold ``n_epochs`` epochs, an event of
+        ``events`` has no patch (``current_patch``), or an event has no row.
     """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs)
     if events["current_patch"].isna().any():
         raise ValueError("an event has no current patch")
-    kinds = events[["event_id", "animal", "is_swr", "current_patch"]]
-    place = ["arm", "distance_to_well_cm"]
-    tables = []
-    for path in paths:
-        rows = select_events_in(
-            pd.read_parquet(path, columns=["event_id", "epoch_id", *place, "weight"]),
-            events["event_id"],
-        ).merge(kinds, on="event_id", validate="m:1")
-        rows["weight"] = rows["weight"].astype(float)
-        tables.append(
-            rows.groupby(
-                ["epoch_id", "animal", "is_swr", "current_patch", *place],
-                as_index=False,
-            )["weight"].sum()
-        )
-    return pd.concat(tables, ignore_index=True), paths
+    along, by_event, by_patch = [], [], []
+    for path, rows in _content_mass_rows(events, paths):
+        along.append(_mass_by_place(rows))
+        by_event.append(_mass_by_event(rows, path.stem))
+        by_patch.append(_mass_by_patch(rows))
+    joined = events.merge(
+        pd.concat(by_event, ignore_index=True),
+        on="event_id",
+        how="left",
+        validate="1:1",
+    )
+    if joined["content_at_well"].isna().any():
+        raise ValueError("an event has no row in the content-mass run")
+    return {
+        "along": pd.concat(along, ignore_index=True),
+        "events": joined,
+        "by_patch": pd.concat(by_patch, ignore_index=True),
+    }, paths
 
 
 def with_event_start_end(
@@ -5114,55 +5166,6 @@ def with_event_start_end(
     return events.join(places, on="event_id"), paths
 
 
-def with_event_place_shares(
-    events: pd.DataFrame, folder: Path, n_epochs: int
-) -> tuple[pd.DataFrame, list[Path]]:
-    """``events`` with each one's share of content time at a well, at a remote
-    well and at the animal's own (``content_at_well``, ``content_remote_well``
-    and ``content_own_well``: ``content_along_arms.event_place_shares`` of the
-    content-mass run; the event table's own ``at_well`` is where the animal is),
-    the number of wells it represents and of patches it spans
-    (``content_n_wells``, ``content_n_patches``:
-    ``content_along_arms.event_well_counts`` and ``event_patch_counts``) and
-    its ``epoch_id``; and the files read.
-
-    Raises
-    ------
-    ValueError
-        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row.
-    """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
-    tables = []
-    for path in paths:
-        rows = select_events_in(
-            pd.read_parquet(
-                path,
-                columns=[
-                    "event_id",
-                    "epoch_id",
-                    "arm",
-                    "far",
-                    "weight",
-                    "distance_to_well_cm",
-                ],
-            ),
-            events["event_id"],
-        )
-        shares = content_along_arms.event_place_shares(rows).add_prefix("content_")
-        shares["content_n_wells"] = content_along_arms.event_well_counts(rows)
-        shares["content_n_patches"] = content_along_arms.event_patch_counts(rows)
-        shares["epoch_id"] = path.stem
-        tables.append(shares.reset_index())
-    joined = events.merge(
-        pd.concat(tables, ignore_index=True), on="event_id", how="left", validate="1:1"
-    )
-    if joined["content_at_well"].isna().any():
-        raise ValueError("an event has no row in the content-mass run")
-    return joined, paths
-
-
 def content_along_arms_bins(
     events: pd.DataFrame, folder: Path, n_epochs: int, columns: list[str]
 ) -> tuple[pd.DataFrame, list[Path]]:
@@ -5177,9 +5180,7 @@ def content_along_arms_bins(
         If ``folder`` does not hold ``n_epochs`` epochs, or its bins do not cover
         every event of ``events``.
     """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs)
     bins = select_events_in(
         pd.concat(
             pd.read_parquet(path, columns=["event_id", "epoch_id", *columns])
@@ -5210,9 +5211,7 @@ def with_start_and_rest_theta(
     ValueError
         If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row.
     """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs)
     extras = pd.concat(map(pd.read_parquet, paths), ignore_index=True)
     joined = events.merge(
         extras.drop(columns=["epoch_id", "decode_sha256"]),
@@ -5222,37 +5221,6 @@ def with_start_and_rest_theta(
     )
     if joined.n_bins.isna().any():
         raise ValueError("an event has no start-distance and rest-theta row")
-    return joined, paths
-
-
-EVENT_SPEED_COLUMNS = ("map_line_fit_speed_cm_s", "transport_slope_speed_cm_s")
-"""The speeds read from the event-speed output
-(``analysis/event_properties/event_speed.py``)."""
-
-
-def with_event_speed(
-    events: pd.DataFrame, folder: Path, n_epochs: int
-) -> tuple[pd.DataFrame, list[Path]]:
-    """``events`` with each one's :data:`EVENT_SPEED_COLUMNS`
-    (``Processed-Data/event_speed``), and the files read.
-
-    Raises
-    ------
-    ValueError
-        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row
-        or no MAP line-fit speed (the transport-slope speed may be missing: an
-        event too short or too Fragmented has none).
-    """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
-    speeds = pd.concat(
-        (pd.read_parquet(p, columns=["event_id", *EVENT_SPEED_COLUMNS]) for p in paths),
-        ignore_index=True,
-    )
-    joined = events.merge(speeds, on="event_id", how="left", validate="1:1")
-    if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
-        raise ValueError("an event has no MAP line-fit speed")
     return joined, paths
 
 
@@ -5271,20 +5239,11 @@ def gamma_triggered_curves(
         If ``folder`` does not hold ``n_epochs`` epochs' traces, or an event's
         epoch has none.
     """
-    paths = sorted(folder.glob("*_gamma_z.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs' gamma, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs, "*_gamma_z.parquet")
     n_each_side = int(
         round(triggered_analysis.TRIGGERED_WINDOW_S / 2 * SAMPLING_FREQUENCY)
     )
-    # the gamma pass's own table names each epoch's file
-    keys = ["animal", "session_date", "epoch"]
-    named = pd.read_parquet(folder / "reference.parquet", columns=["epoch_id", *keys])
-    epoch_id = events[keys].merge(named, on=keys, how="left", validate="m:1")[
-        "epoch_id"
-    ]
-    if epoch_id.isna().any():
-        raise ValueError(f"{folder} has no gamma for an event's epoch")
+    epoch_id = swr_source.event_epoch_ids(events)
     by_path = {path.name.removesuffix("_gamma_z.parquet"): path for path in paths}
     if not set(epoch_id).issubset(by_path):
         raise ValueError(f"{folder} has no gamma for an event's epoch")
