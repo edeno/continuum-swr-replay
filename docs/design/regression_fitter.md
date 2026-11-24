@@ -789,13 +789,13 @@ set, since its interface takes rows, not a built design.
 
 ## Precision, devices, threads and padding
 
-The fit at fixed penalties runs in JAX, one fitter for every model: the likelihoods'
-kernels (`likelihoods.py`), the Newton iteration and the evaluation of the objective
-(`newton.py`), and REML's fixed-penalty summary and profiled Gaussian (`reml.py`). What is
-still NumPy: the design check, the columns running away, the penalty search and the
-refits, and REML's gradient and Hessian in the log penalties, which factor `A` with SciPy
-and read the information's derivatives from the likelihoods' JAX kernels through their
-public methods (they move to JAX next).
+The fit at fixed penalties and REML's score with its gradient and Hessian in the log
+penalties run in JAX, one fitter for every model: the likelihoods' kernels
+(`likelihoods.py`), the Newton iteration and the evaluation of the objective (`newton.py`),
+and REML's fixed-penalty summary, its derivatives and the profiled Gaussian (`reml.py`).
+What is still NumPy: the design check, the columns running away, the penalty search and
+the refits, and REML's rotation of the design into the penalties' eigenbasis (below,
+"REML's derivatives").
 
 **The kernels and the host loop.** Each family has JAX functions of the padded rows and
 their weights (`_jax_loglik`, `_jax_score`, `_jax_information`, `_jax_dinformation`,
@@ -850,6 +850,48 @@ row count. It is not a proof: XLA can write the same copy as a `copy` to another
 (the old `X.T @ score` compiled to a `transpose` and then a `copy`), which it would not
 see if the `transpose` went away, and a form whose copy appears only in some programs is
 caught only in those it compiles.
+
+**REML's derivatives.** `reml_and_derivatives` fits by `newton._fit_one`, which returns
+the fit with its problem, whose padded rows are on the device. The score, `A^-1`, the edf
+and the gradient and Hessian in `rho` are then one call of one kernel on those rows and on
+one Cholesky factor of `A` (`reml._laplace_derivatives`, the family a static argument;
+the profiled Gaussian's are in `reml._profiled_gaussian`, which needs no product with the
+design beyond its Gram and so always computes them). The rows are padded and moved once
+for a fit and its derivatives; the NumPy loops called the public `dinformation` and
+`d2information` once for each penalty and pair, each padding and moving `X` again. The
+penalties are the leading axis of the kernel's arrays (`S_j` of shape `(m, p, p)`): a new
+number of penalties is a new shape and so a new program, and a model has one. With
+`b_j = -A^-1 S_j b` and `E = X [b_1 ... b_m]`, the `m` matrices `A_j = S_j + dH(E_j)` are
+made one at a time (`jax.lax.map`), and the Hessian is computed for `j <= k` and mirrored,
+so it is exactly symmetric. Its traces `tr(A^-1 A_jk)` are read by the family's
+`_jax_information_traces`. For the Poisson and the Bernoulli (the diagonal families) they
+come from `h_i = x_i' A^-1 x_i` without making the derivatives:
+`tr(A^-1 X' diag(c) X) = sum_i c_i h_i`, so the traces of all pairs are
+`(weight w' h) @ (X b_jk)` and `E' diag(weight w'' h) E`. An evaluation with derivatives
+then makes `m + 1` products of the size of a Gram (the `A_j` and `X A^-1`) where the
+NumPy loops made `m + m (m + 1)` (8 for two penalties, now 3). For the grouped softmax
+they come from the derivatives made in full, one at a time, as before. The hand-written
+gradient and Hessian equal `jax.grad` and `jax.hessian` of the score written in JAX
+(the information from `jax.hessian` of the log-likelihood, the fit as four Newton steps
+from the optimum) to 7e-15 to 3e-14 of their largest entry, two smooths on 120 rows, every
+family (`tests/analysis/regression/test_reml.py`); the central differences of the score
+check them as before. The kernels hold few copies of the design: XLA's memory analysis of
+the compiled programs (20,000 x 40 rows, CPU) gives temporaries of 1.1 to 1.2 times the
+padded design for the Poisson and the Bernoulli at two or three penalties (2.1 at one,
+where XLA keeps the one weighted copy and `X A^-1` at once), 1.0 for the Gaussian, and 3.4
+to 4.0 for the grouped softmax, whose sandwich forms keep several weighted copies `u X`
+for their segment sums at once (as its information kernels do).
+
+The rotation of the design into the penalties' eigenbasis is a NumPy product, `X Q` with
+`Q` the block-diagonal rotation (identity off the blocks). Assigning each block's columns
+by index, as it was, cost 140 to 160 ms at 39,792 x 56 (two blocks); the product 24 ms,
+the same to the bit there. Moving it to the device would mean padding and moving the
+design before the rotation and reading the rotated design back for the design check
+(`newton._unidentified`) and for the columns running away; on the CPU XLA's product is
+slower than BLAS's, so it would gain nothing there. What costs more at the rate model's
+size is that each REML evaluation of a session rotates, checks, pads and moves its design
+again; keeping a session's rotated design on the device from one evaluation to the next
+is the step that would remove it.
 
 **How the log-likelihood is summed.** The last step of a fit is taken when `F` does not
 rise by more than `8 eps max(1, |F|)`, which only the rounding of `F` decides at the
@@ -1089,3 +1131,40 @@ check (`_unidentified`) and REML's rotations. At the rate size REML's copy of th
 into the penalties' eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a
 refit, and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
 `X' X`, which XLA does not call.
+
+REML's gradient and Hessian in JAX, and the rotation by one product ("REML's
+derivatives", above), against the code before them (2e0ea0d0), by the `--child` cases of
+`scripts/checks/time_regression_fitter.py` run in one process per version and round. One
+thread, each process pinned to one CPU, the versions in turn on the same CPU in the same
+minutes, under heavy load (1-minute load average 70 to 82 on 96 CPUs; 2026-11-24). Each
+cell is the least time over all calls of all rounds, then the median of the rounds'
+medians. "Derivatives" is the derivatives in JAX alone (0bc534a0), "after" with the
+rotation as well (44d9ec2e):
+
+| Case | Rounds | Before: least, median | Derivatives: least, median | After: least, median | Traces before, after |
+|---|---|---|---|---|---|
+| select_cost, 2 sessions of 39,792 x 56 | 3 | 23.0 s, 25.0 s | 21.9 s, 24.8 s | 15.7 s, 18.9 s | 5, 4 |
+| fit_sessions_30 | 3 | 15.6 s, 18.3 s | 16.9 s, 17.5 s | 11.4 s, 11.9 s | 16, 16 |
+| fit_rate (37,000 x 76) | 8, 4, 8 | 430, 544 ms | 468, 693 ms | 342, 491 ms | 3, 3 |
+| calibration_30 | 1 | 247 to 254 s | | 238 s | 16, 16 |
+
+One REML evaluation of one `select_cost` session with its derivatives (warm start, seven
+calls) took 688 ms before and 418 ms with the derivatives in JAX; the score alone 245 and
+238 ms. The search spends most of its evaluations on the score alone (the grid), so the
+selection gains less than an evaluation; the rotation, which every evaluation pays, gave
+the rest (it took 140 to 160 ms of each, now 24 ms). Evaluations of 120 rows and two
+smooths with derivatives (200 calls each, two rounds): Poisson 3.7 to 2.3 ms, Bernoulli
+3.6 to 2.3 ms, Gaussian 2.6 to 2.5 ms, grouped softmax 5.3 to 3.1 ms; what is left is
+the host (two Newton iterations, three evaluations of `F`, the design check, the
+transfers). The slow test of 2,000 small selections
+(`test_simulation.py::test_coverage_and_size`) took 406 s before and 343 s after, run at
+the same time on two CPUs (290 s before, alone, earlier the same day: the load moves it
+more than the change does). `tests/analysis/regression` without its slow tests, over the
+464 tests both versions have, took 605 s before and 591 s after (at the same time) and
+traced 610 and 519 programs: a Laplace family's REML derivatives are one program where the
+public `dinformation` and `d2information` were two, and a selection's traces fell from 5
+to 4. The 19 tests added with the change (the derivatives against automatic
+differentiation, the padding of the new kernels, the traces, the canary) bring the whole
+to 583 programs and about 820 s. The calibration and the per-session fits compute no
+derivatives; they gain from the rotation alone, and calibration_30's single calls are
+within the noise.
