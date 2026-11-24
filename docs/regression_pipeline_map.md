@@ -398,7 +398,7 @@ Stable row identities: the ``event_id`` and ``stop_id`` hashes.
 
 The natural key for one recording session: (animal, session_date, epoch).
 
-`unit_key`, `session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `one_session`, `present_session_columns`, `require_session_unique_ids`
+`unit_key`, `fit_by_columns`, `unit_fields`, `session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `one_session`, `present_session_columns`, `require_session_unique_ids`
 
 ## Covariates
 
@@ -644,7 +644,13 @@ The support rule: whether a session's design can estimate a simple term.
 
 Model terms and the design they build, the same for every session.
 
-`log_penalty_from_prior_sd`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+`copy_name`, `log_penalty_from_prior_sd`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+
+### `src/continuum_swr_replay/analysis/regression/units.py`
+
+The reduction of one estimate per unit of a fit, and the values of a fit's records.
+
+`unit_values`, `unit_estimate`, `unit_summary`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
