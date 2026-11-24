@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.event_definition import cohort_selection
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
 )
+from continuum_swr_replay.analysis.event_evidence import heldout_runs
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
 )
@@ -67,6 +68,7 @@ from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Tags, pend, value_factory
 from tests.reported.test_reported_events_values import _events
 from tests.support._session_cache_fixtures import write_session_cache_entries
+from tests.support._tetrode_holdout_tables import run_table
 
 PLANTED = 999
 """The event that starts outside every visit (on the track, at 50 s)."""
@@ -222,8 +224,16 @@ def _time_sums() -> pd.DataFrame:
     return pd.DataFrame({"epoch_id": EPOCHS, "n_bins": 1})
 
 
+def _tetrode_run() -> pd.DataFrame:
+    """The held-out tetrode run's rows: a per-event run's, with every column
+    the runner writes."""
+    rows = _per_event_run()
+    return run_table(event_id=rows["event_id"], kind=rows["kind"])
+
+
 def _read_complete_run(folder, name, epochs) -> pd.DataFrame:
     return {
+        "tetrode_holdout": _tetrode_run,
         "nonlocal_restriction_windows": _restriction_windows,
         "heldout_events": _heldout_events,
         "canonical_events_found": _canonical_found,
@@ -518,6 +528,13 @@ class _Run:
             "read_complete_run": _read_complete_run,
         }.items():
             monkeypatch.setattr(builder, name, value)
+        # the held-out tetrode run's reader, beside the scoring code
+        monkeypatch.setattr(heldout_runs, "read_complete_run", _read_complete_run)
+        monkeypatch.setattr(
+            heldout_runs,
+            "read_output_manifest",
+            lambda folder: self.manifests[folder.name],
+        )
         monkeypatch.setattr(builder.nonlocal_comparison, "read_comparison", comparison)
         # the inputs' epoch check reads the register where it is defined
         monkeypatch.setattr(epoch_register, "analyzed_epoch_ids", lambda: EPOCHS)
@@ -530,11 +547,6 @@ class _Run:
             builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
         )
         monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
-        # the planted run's rows have not the run's columns; the check is the
-        # held-out tetrode module's own (tested there)
-        monkeypatch.setattr(
-            builder.tetrode_holdout, "require_run_columns", lambda table, what: None
-        )
 
     def summarize(self) -> dict:
         builder.summarize(self.inputs(), "by")

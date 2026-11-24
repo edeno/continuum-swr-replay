@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
+from tests.support._tetrode_holdout_tables import SCORE_COLUMNS
 from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
@@ -50,6 +51,42 @@ def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame
     return pd.DataFrame({"kind": "rest", "s": chosen, "e": chosen + length - 1})
 
 
+def _holdout_scores(
+    detector,
+    recording,
+    windows,
+    *,
+    is_missing=None,
+    folds=None,
+    margin_bins=TIME_BLOCK_MARGIN_BINS,
+    marks=None,
+) -> tuple[pd.DataFrame, dict]:
+    """``holdout_scores`` of ``windows`` (numbered in order, ``window_id``)
+    under ``folds`` and ``margin_bins`` (by default the recording's five time
+    blocks, a margin of two bins), the reference's donors drawn with seed 0.
+    Its columns are the first of the run's, in order."""
+    missing = (
+        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
+    )
+    scores, record = th.holdout_scores(
+        detector,
+        recording.time,
+        recording.position[:, None],
+        recording.position,
+        recording.spike_times,
+        recording.marks if marks is None else marks,
+        recording.is_running,
+        missing,
+        windows,
+        folds=time_blocks(recording.time) if folds is None else folds,
+        margin_bins=margin_bins,
+        null_seed=0,
+        log=sim.quiet,
+    )
+    assert tuple(scores.columns) == SCORE_COLUMNS
+    return scores, record
+
+
 def _score(
     detector,
     recording,
@@ -58,28 +95,18 @@ def _score(
     folds=None,
     margin_bins=TIME_BLOCK_MARGIN_BINS,
 ) -> pd.DataFrame:
-    """The held-out scores of ``windows`` under ``folds`` and ``margin_bins``
-    (by default the recording's five time blocks, a margin of two bins). No
-    window is an event (``kind`` is the simulated content), so none has a
-    donor for the reference."""
+    """The held-out scores of ``windows`` (:func:`_holdout_scores`) with each
+    window's ``kind``. No window is an event (``kind`` is the simulated
+    content), so none has a donor for the reference."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
     windows = windows.assign(group="no SWR")
-    missing = (
-        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
-    )
-    scores, _ = th.holdout_scores(
+    scores, _ = _holdout_scores(
         detector,
-        recording.time,
-        recording.position[:, None],
-        recording.position,
-        recording.spike_times,
-        recording.marks,
-        recording.is_running,
-        missing,
+        recording,
         windows,
-        folds=time_blocks(recording.time) if folds is None else folds,
+        is_missing=is_missing,
+        folds=folds,
         margin_bins=margin_bins,
-        log=sim.quiet,
     )
     return scores.join(windows.set_index("window_id")["kind"], on="window_id")
 
@@ -419,29 +446,13 @@ def test_trial_folds_change_only_the_encodings(inserted, inserted_trials):
 
 
 def _score_extra(detector, recording, windows, *, is_missing=None, marks=None):
-    """``holdout_scores`` of ``windows`` (each with the
-    simulated ``content`` and its ``group``; every window an event), the
-    recording's time blocks as folds; the per-window scores
-    (``window_scores``) with ``content``, and the record."""
+    """:func:`_holdout_scores` of ``windows`` (each with the simulated
+    ``content`` and its ``group``; every window an event); the per-window
+    scores (``window_scores``) with ``content``, and the record."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
     windows = windows.assign(kind="event", event_id=windows["window_id"])
-    missing = (
-        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
-    )
-    scores, record = th.holdout_scores(
-        detector,
-        recording.time,
-        recording.position[:, None],
-        recording.position,
-        recording.spike_times,
-        recording.marks if marks is None else marks,
-        recording.is_running,
-        missing,
-        windows,
-        folds=time_blocks(recording.time),
-        margin_bins=TIME_BLOCK_MARGIN_BINS,
-        null_seed=0,
-        log=sim.quiet,
+    scores, record = _holdout_scores(
+        detector, recording, windows, is_missing=is_missing, marks=marks
     )
     keyed = windows.set_index("window_id")[["event_id", "kind", "group", "content"]]
     scores = scores.join(keyed, on="window_id").assign(epoch_id="e", animal="a")

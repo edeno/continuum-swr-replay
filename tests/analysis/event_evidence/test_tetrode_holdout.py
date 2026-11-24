@@ -235,7 +235,7 @@ def _window_rows() -> pd.DataFrame:
     """Two windows of two tetrodes each, with the columns
     :func:`~continuum_swr_replay.analysis.event_evidence.tetrode_holdout.window_scores`
     reads: window 0 has donor window 1, window 1 (a control) none."""
-    rows = pd.DataFrame(
+    return pd.DataFrame(
         {
             "epoch_id": "e1",
             "animal": "a",
@@ -266,7 +266,6 @@ def _window_rows() -> pd.DataFrame:
             "n_information_spikes": [3, 1, 0, 0],
         }
     )
-    return rows
 
 
 def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
@@ -284,6 +283,22 @@ def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
     assert event["spread_cm"] == pytest.approx(50.0)
     assert np.isnan(windows.loc[1, "gain_per_spike"])
     assert windows.loc[1, "gain"] == pytest.approx(0.0)
+    # the extra scores: rate part 2 of the gain 4, mark part 2, over 4 spikes
+    assert event["gain_rate_per_spike"] == pytest.approx(0.5)
+    assert event["gain_mark_per_spike"] == pytest.approx(0.5)
+    assert event["agreement_rate_per_spike"] == pytest.approx(0.0)
+    assert event["agreement_mark_per_spike"] == pytest.approx(0.5)
+    assert event["agreement_null"] == -3.0 and event["n_null_spikes"] == 3
+    assert event["agreement_null_per_spike"] == pytest.approx(-1.0)
+    assert event["hpd_cm"] == pytest.approx(40.0)
+    assert event["hpd_null_cm"] == pytest.approx(100.0)
+    assert event["null_window_id"] == 1
+    assert event["mark_information_per_spike"] == pytest.approx(1.0)
+    assert event["spike_information_per_spike"] == pytest.approx(1.5)
+    assert np.isnan(windows.loc[1, "mark_information_per_spike"])
+    # no donor: the reference is NaN, not 0
+    assert np.isnan(windows.loc[1, "agreement_null"])
+    assert np.isnan(windows.loc[1, "agreement_null_per_spike"])
 
 
 def test_add_rows_is_np_add_at_to_the_bit():
@@ -461,35 +476,13 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
     }
 
 
-def test_window_scores_carry_the_extra_scores():
-    windows = th.window_scores(_window_rows()).set_index("window_id")
-    event = windows.loc[0]
-    # rate part 2 of the gain 4, mark part 2, over 4 spikes
-    assert event["gain_rate_per_spike"] == pytest.approx(0.5)
-    assert event["gain_mark_per_spike"] == pytest.approx(0.5)
-    assert event["agreement_rate_per_spike"] == pytest.approx(0.0)
-    assert event["agreement_mark_per_spike"] == pytest.approx(0.5)
-    assert event["agreement_null"] == -3.0 and event["n_null_spikes"] == 3
-    assert event["agreement_null_per_spike"] == pytest.approx(-1.0)
-    assert event["hpd_cm"] == pytest.approx(40.0)
-    assert event["hpd_null_cm"] == pytest.approx(100.0)
-    assert event["null_window_id"] == 1
-    assert event["mark_information_per_spike"] == pytest.approx(1.0)
-    assert event["spike_information_per_spike"] == pytest.approx(1.5)
-    assert np.isnan(windows.loc[1, "mark_information_per_spike"])
-    # no donor: the reference is NaN, not 0
-    assert np.isnan(windows.loc[1, "agreement_null"])
-    assert np.isnan(windows.loc[1, "agreement_null_per_spike"])
-
-
-def test_a_table_without_the_extra_scores_is_refused_naming_the_runner():
-    """A table made before the run computed the extra scores is refused, not
-    half-read."""
-    old = _window_rows().drop(columns=["hpd_cm", "agreement_null"])
+def test_a_table_without_a_column_of_the_run_is_refused_naming_the_runner():
+    """A table that lacks a column the computation reads is refused, not
+    half-read; the reader's contract is every column the runner writes."""
+    short = _window_rows().drop(columns=["hpd_cm", "agreement_null"])
     with pytest.raises(ValueError, match=r"score_tetrode_holdout\.py") as error:
-        th.window_scores(old)
+        th.window_scores(short)
     assert "hpd_cm" in str(error.value) and "agreement_null" in str(error.value)
-    # the reader's contract is every column of the run
     with pytest.raises(ValueError, match="'population'"):
         th.require_run_columns(_window_rows(), "the run")
     th.require_run_columns(_window_rows(), "a window", ["hpd_cm"])
