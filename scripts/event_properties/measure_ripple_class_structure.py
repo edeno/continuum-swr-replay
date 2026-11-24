@@ -57,9 +57,6 @@ from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
 from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
 )
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa: E402
     _grid_rows,
 )
@@ -84,6 +81,7 @@ from continuum_swr_replay.analysis.event_properties import (
 )
 from continuum_swr_replay.paths import (
     RIPPLE_CLASS_STRUCTURE_DIR,
+    STATE_SPACE_FEATURES_RUN,
     # noqa: E402
     event_features_root,
     event_spike_evidence_dir,

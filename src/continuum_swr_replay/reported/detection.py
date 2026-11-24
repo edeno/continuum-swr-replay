@@ -24,7 +24,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_supp_figure01.py``);
-- the pilot epoch of the main memoryless run (:data:`MEMORYLESS_PILOT_RUN`, a
+- the pilot epoch of the main memoryless run (``paths.MEMORYLESS_PILOT_RUN``, a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
   stray-window note.
@@ -61,6 +61,7 @@ from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     TILING_FOLDS,
 )
 from continuum_swr_replay.paths import (
+    MEMORYLESS_PILOT_RUN,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
@@ -77,12 +78,6 @@ from continuum_swr_replay.reported.values import (
     value_factory,
 )
 from continuum_swr_replay.runs.io import read_manifest
-
-MEMORYLESS_PILOT_RUN = "e2331f976fd1-seed20260922"
-"""The memoryless run whose pilot epoch (chimi20200225_02_r1, the epoch of the
-detector's first real-data pilot) the caption's stray-window note reads: the main
-cohort run, at the 5 ms step on its own running-only encoding model. The note
-first read the October pilot, ``0c2548cacf2d-seed20260922``."""
 
 MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 

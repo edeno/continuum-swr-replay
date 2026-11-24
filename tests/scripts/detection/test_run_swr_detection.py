@@ -36,6 +36,7 @@ from ripple_detection import Kay_ripple_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_swr_detection as runner
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detection import swr_detectors
 from continuum_swr_replay.analysis.detection.swr_detectors import (
     NoUsableChannelError,
@@ -1633,7 +1634,7 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
     assert record["artifacts"]["run_id"] == ARTIFACT_RUN_ID
     assert record["artifacts"]["n_intervals"] == 1
 
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", None)
     with pytest.raises(SystemExit, match="other settings"):
         _cli(tmp_path, "--overwrite")
     assert ran == [EPOCH_NAME]

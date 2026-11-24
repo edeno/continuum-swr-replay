@@ -13,11 +13,11 @@ never the reverse.
 
 What this module fixes
 ----------------------
-- **Which inventory**: :data:`SWR_INVENTORY_RUN_ID`, the run folder, and
-  :data:`SWR_DETECTOR`, the detector, under ``paths.swr_inventory_root()``. They are
-  the only place either is written; rerunning the SWR runner is a change of
-  :data:`SWR_INVENTORY_RUN_ID` and nothing else.
-- **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
+- **Which inventory**: ``paths.SWR_INVENTORY_RUN``, the run folder, under
+  ``paths.swr_inventory_root()``, and :data:`SWR_DETECTOR`, the detector. They
+  are the only place either is written; rerunning the SWR runner is a change of
+  ``paths.SWR_INVENTORY_RUN`` and nothing else.
+- **Which artifacts**: ``paths.ARTIFACT_INTERVALS_RUN`` under
   ``paths.artifact_intervals_root()``, the artifact detector's run
   (``scripts/detection/run_artifact_detection.py``). It is set (the pinned
   run of 2026-10-10); None would mean no artifact is masked. Every function here resolves an
@@ -29,11 +29,12 @@ What this module fixes
   uses *excluded time*, the mask widened by ``eligibility.ARTIFACT_REACH_S``
   (``analyzed_time.excluded_intervals``).
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
-  run and the artifact run, such as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Every
-  table built from these labels is stamped with it
-  (``analyzed_time.stamp_swr_source``), and a reader that combines a table's
-  SWR columns with this source's live labels refuses a table stamped with
-  another name (``analyzed_time.require_swr_source``).
+  run and the artifact run, ``kay@<inventory run>+artifacts@<artifact run>``
+  (the pinned runs' name is in ``paths.SWR_INVENTORY_RUN``). Every table built
+  from these labels is stamped with it (``analyzed_time.stamp_swr_source``),
+  and a reader that combines a table's SWR columns with this source's live
+  labels refuses a table stamped with another name
+  (``analyzed_time.require_swr_source``).
 - **Which epochs it serves**: one whose manifest status is ``ok``, or
   ``partial`` with the Kay inventory written. Anything else raises
   :class:`SwrSourceError`. The event and observed files are checked against
@@ -57,6 +58,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     ArtifactRunError,
     epoch_artifact_intervals,
@@ -75,9 +77,7 @@ from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_ro
 from continuum_swr_replay.runs.io import read_manifest, recorded_output
 
 __all__ = [
-    "ARTIFACT_INTERVALS_RUN_ID",
     "SWR_DETECTOR",
-    "SWR_INVENTORY_RUN_ID",
     "SWR_LABEL_COLUMN",
     "EpochSource",
     "SwrSourceError",
@@ -101,46 +101,10 @@ __all__ = [
 ]
 
 
-SWR_INVENTORY_RUN_ID = "056eee0dcb5a"
-"""The SWR runner's run folder every analysis reads its SWRs from.
-
-The run of ``scripts/detection/run_swr_detection.py`` made on 2026-10-10 at
-commit ``056eee0dcb5a`` (the runner names a run by its commit's first 12
-characters): all 255 epochs ``ok`` (the register's 242 analyzed and its 13
-``SUSTAINED_NOISE``), masked by the artifact run
-:data:`ARTIFACT_INTERVALS_RUN_ID`, with each detector's pinned
-``swr_detectors.DETECTOR_SETTINGS`` and, for all four detectors, the CA1
-tetrodes kept by rule R-T (``ripple_tetrodes.select_ripple_tetrodes``). The
-run's ``manifest.json`` records its settings and each epoch's provenance. To
-replace it, rerun the runner (``python scripts/detection/run_swr_detection.py
---n-workers 8``) and set this constant to the new run's id; changing this
-constant is the whole switch to another run.
-"""
-
-
 SWR_DETECTOR = "kay"
 """The detector whose inventory is the paper's SWRs: ripple_detection 2.0's
 ``Kay_ripple_detector``, at least 15 ms continuously above z = 2 (Kay et al.
 2016), with the runner's pinned ``DETECTOR_SETTINGS["kay"]``."""
-
-
-ARTIFACT_INTERVALS_RUN_ID: str | None = "fbbff144a123"
-"""The artifact detector's run whose intervals drop overlapping SWRs and leave
-the coverage.
-
-The run of ``scripts/detection/run_artifact_detection.py`` made on 2026-10-10
-at commit ``fbbff144a123`` over all 255 epochs (the run id is the commit's first
-12 characters), with the detector's constants in
-``analysis/detection/artifacts/detect.py`` at that commit; the run's
-``manifest.json`` records them. To replace it, rerun that script, set this
-constant to the new run's id, then rerun the SWR runner (which reads this
-constant when it starts) and set :data:`SWR_INVENTORY_RUN_ID` to its run, so
-the SWRs are masked by the same artifact run. None would mean no artifact is masked (``artifacts@none``). The folder,
-``paths.artifact_intervals_root() / <run id>``, holds ``manifest.json`` and one
-``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
-cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing
-file is an error, not an epoch without artifacts.
-"""
 
 
 SWR_LABEL_COLUMN = "SWR_event"
@@ -180,32 +144,31 @@ def __getattr__(name: str) -> Path:
 
 
 def swr_inventory_dir() -> Path:
-    """The run folder of :data:`SWR_INVENTORY_RUN_ID` under
+    """The run folder of ``paths.SWR_INVENTORY_RUN`` under
     ``paths.swr_inventory_root()``, both read when called."""
-    return swr_inventory_root() / SWR_INVENTORY_RUN_ID
+    return swr_inventory_root() / paths.SWR_INVENTORY_RUN
 
 
 def artifact_intervals_dir() -> Path | None:
-    """The artifact run folder, or None while :data:`ARTIFACT_INTERVALS_RUN_ID`
+    """The artifact run folder, or None while ``paths.ARTIFACT_INTERVALS_RUN``
     is unset.
 
-    The folder is :data:`ARTIFACT_INTERVALS_RUN_ID` under
-    ``paths.artifact_intervals_root()``, both read when called; the run id is
-    this module's global, so a patch on ``swr_source.ARTIFACT_INTERVALS_RUN_ID``
-    reaches every reader."""
-    if ARTIFACT_INTERVALS_RUN_ID is None:
+    The folder is ``paths.ARTIFACT_INTERVALS_RUN`` under
+    ``paths.artifact_intervals_root()``, both read when called, so a patch on
+    ``paths.ARTIFACT_INTERVALS_RUN`` reaches every reader."""
+    if paths.ARTIFACT_INTERVALS_RUN is None:
         return None
-    return artifact_intervals_root() / ARTIFACT_INTERVALS_RUN_ID
+    return artifact_intervals_root() / paths.ARTIFACT_INTERVALS_RUN
 
 
 def swr_source_name() -> str:
     """The source as one string, the stamp of every table built from it.
 
-    ``<detector>@<inventory run id>+artifacts@<artifact run id or none>``, such
-    as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Read when called.
+    ``<detector>@<inventory run id>+artifacts@<artifact run id or none>``; the
+    pinned runs give the name in ``paths.SWR_INVENTORY_RUN``. Read when called.
     """
-    artifacts = ARTIFACT_INTERVALS_RUN_ID or "none"
-    return f"{SWR_DETECTOR}@{SWR_INVENTORY_RUN_ID}+artifacts@{artifacts}"
+    artifacts = paths.ARTIFACT_INTERVALS_RUN or "none"
+    return f"{SWR_DETECTOR}@{paths.SWR_INVENTORY_RUN}+artifacts@{artifacts}"
 
 
 def artifact_run_of(source_name: str) -> str | None:
@@ -255,12 +218,12 @@ def swr_inventory_paths(
         then ``"swr_observed"``: ``{epoch_id}_swr_observed.parquet``; the keys
         are the manifest's output names.
     """
-    paths = {
+    files = {
         detector: run_dir / f"{epoch_id}_{detector}_events.parquet"
         for detector in detectors
     }
-    paths["swr_observed"] = run_dir / f"{epoch_id}_swr_observed.parquet"
-    return paths
+    files["swr_observed"] = run_dir / f"{epoch_id}_swr_observed.parquet"
+    return files
 
 
 def inventory_manifest() -> dict[str, Any]:
@@ -476,7 +439,7 @@ def artifact_intervals(epoch_id: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Columns ``start_time`` and ``end_time`` (seconds), closed, disjoint and
-        in time order; no rows while :data:`ARTIFACT_INTERVALS_RUN_ID` is unset.
+        in time order; no rows while ``paths.ARTIFACT_INTERVALS_RUN`` is unset.
 
     Raises
     ------

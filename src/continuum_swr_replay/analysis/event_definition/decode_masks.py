@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.artifact_masks import PADDING_S
 from continuum_swr_replay.decoding.identifiers import TrainingType
@@ -32,8 +33,8 @@ def require_hpc_decode_sources() -> None:
     its inventory was masked with its artifact run.
 
     The decode's ``is_missing``, encoding exclusion, MUA detection and
-    ``SWR_event`` read ``swr_source.SWR_INVENTORY_RUN_ID`` (the Kay inventory)
-    and ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` (the artifact run). Either
+    ``SWR_event`` read ``paths.SWR_INVENTORY_RUN`` (the Kay inventory)
+    and ``paths.ARTIFACT_INTERVALS_RUN`` (the artifact run). Either
     left unset would decode without the masks, so it is refused (fail closed).
     The inventory's manifest names the artifact run the SWR runner masked its
     events with (``settings.artifacts.run_id``; absent from a run made before
@@ -50,9 +51,9 @@ def require_hpc_decode_sources() -> None:
         (``swr_source.inventory_manifest``).
     """
     unset = [
-        f"swr_source.{name}"
-        for name in ("SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID")
-        if getattr(swr_source, name) is None
+        f"paths.{name}"
+        for name in ("SWR_INVENTORY_RUN", "ARTIFACT_INTERVALS_RUN")
+        if getattr(paths, name) is None
     ]
     if unset:
         raise ValueError(
@@ -62,17 +63,17 @@ def require_hpc_decode_sources() -> None:
         )
     manifest = swr_source.inventory_manifest()
     masked_with = manifest.get("settings", {}).get("artifacts", {}).get("run_id")
-    if masked_with != swr_source.ARTIFACT_INTERVALS_RUN_ID:
+    if masked_with != paths.ARTIFACT_INTERVALS_RUN:
         recorded = (
             "no artifact run"
             if masked_with is None
             else f"artifact run {masked_with!r}"
         )
         raise ValueError(
-            f"The SWR inventory {swr_source.SWR_INVENTORY_RUN_ID!r} was masked with "
+            f"The SWR inventory {paths.SWR_INVENTORY_RUN!r} was masked with "
             f"{recorded}, but the configured artifact run is "
-            f"{swr_source.ARTIFACT_INTERVALS_RUN_ID!r}: rerun the SWR runner with the "
-            "configured artifact run and set swr_source.SWR_INVENTORY_RUN_ID to it; "
+            f"{paths.ARTIFACT_INTERVALS_RUN!r}: rerun the SWR runner with the "
+            "configured artifact run and set paths.SWR_INVENTORY_RUN to it; "
             "refusing to decode."
         )
 
@@ -107,8 +108,8 @@ def require_saved_decode_masks(attrs: Mapping[str, Any], what: str) -> None:
         )
     record = json.loads(stamp)
     configured = {
-        "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr_inventory_run_id": paths.SWR_INVENTORY_RUN,
+        "artifact_run_id": paths.ARTIFACT_INTERVALS_RUN,
     }
     saved = {name: record.get(name) for name in configured}
     if saved != configured:
@@ -243,8 +244,8 @@ def hpc_decode_masks(
     n_removed = int(np.count_nonzero(~is_training))
     record = {
         "swr_source": swr_source.swr_source_name(),
-        "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr_inventory_run_id": paths.SWR_INVENTORY_RUN,
+        "artifact_run_id": paths.ARTIFACT_INTERVALS_RUN,
         "padding_s": dict(PADDING_S),
         "training_type": training_type.value,
         "n_bins": int(time.size),

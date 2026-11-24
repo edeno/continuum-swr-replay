@@ -53,7 +53,7 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
     SWR-source fixtures in `support/_swr_inventory_fixtures.py` write their run
     folders where `paths` puts them under a root and point the variable at it.
     That one variable is the patch point: no test patches a module's root.
-    And `continuum_swr_replay.analysis.event_definition.swr_source.ARTIFACT_INTERVALS_RUN_ID`
+    And `continuum_swr_replay.paths.ARTIFACT_INTERVALS_RUN`
     is None. A `real_data` test gets the live root and the committed run back,
     so the canonical tables pass their SWR-source check. Those restores are
     function-scoped fixtures: a module- or session-scoped fixture in a

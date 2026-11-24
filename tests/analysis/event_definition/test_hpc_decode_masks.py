@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition import decode_masks, swr_source
 from continuum_swr_replay.analysis.event_definition.decode_masks import (
     hpc_artifact_intervals,
@@ -137,10 +138,10 @@ def test_the_record_names_the_sources_and_the_seconds(sources):
     assert record["encoding_removed_s"] == pytest.approx(removed.sum() * 0.002)
 
 
-@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID"])
+@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN", "ARTIFACT_INTERVALS_RUN"])
 def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
     """Fail closed: an HPC decode needs both runs named."""
-    monkeypatch.setattr(swr_source, unset, None)
+    monkeypatch.setattr(paths, unset, None)
 
     with pytest.raises(ValueError, match=unset):
         require_hpc_decode_sources()
@@ -149,15 +150,13 @@ def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
 
 
 def test_both_run_ids_unset_are_named(monkeypatch):
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", None)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(paths, "SWR_INVENTORY_RUN", None)
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", None)
 
     with pytest.raises(ValueError) as refused:
         decode_masks.require_hpc_decode_sources()
 
-    assert "SWR_INVENTORY_RUN_ID and swr_source.ARTIFACT_INTERVALS_RUN_ID" in str(
-        refused.value
-    )
+    assert "SWR_INVENTORY_RUN and paths.ARTIFACT_INTERVALS_RUN" in str(refused.value)
 
 
 @pytest.mark.parametrize("recorded", [None, "otherartifacts"])

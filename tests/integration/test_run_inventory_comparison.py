@@ -29,6 +29,7 @@ import pandas as pd
 import pytest
 
 import scripts.detector_comparison.run_inventory_comparison as runner
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detector_comparison import (
     epoch_comparison,
     inventory_run,
@@ -699,10 +700,10 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
 
     settings = manifest["settings"]
     assert settings["input_runs"] == {
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "swr": paths.SWR_INVENTORY_RUN,
         "carey": CAREY_RUN,
         "memoryless": MEMORYLESS_RUN,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "artifacts": paths.ARTIFACT_INTERVALS_RUN,
     }
     assert settings["swr_source"] == swr_source.swr_source_name()
     assert settings["roster"]["memoryless"] == "published"

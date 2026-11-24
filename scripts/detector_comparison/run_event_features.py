@@ -97,6 +97,7 @@ import pandas as pd  # noqa: E402
 from dask.distributed import LocalCluster  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
+from continuum_swr_replay import paths  # noqa: E402
 from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
 from continuum_swr_replay.analysis.detection.detection_inputs import (  # noqa: E402
     MARKS_RULE,
@@ -791,8 +792,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     inventory = read_manifest(inventory_dir)
     input_runs = inventory["settings"]["input_runs"]
     current = {
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr": paths.SWR_INVENTORY_RUN,
+        "artifacts": paths.ARTIFACT_INTERVALS_RUN,
     }
     if {name: input_runs[name] for name in current} != current:
         sys.exit(

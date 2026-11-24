@@ -948,3 +948,19 @@ pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
 | `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
 | `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
 | `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |
+
+## The pinned runs, 2026-11-24
+
+The constants that pin which stored run of each analysis is the canonical one moved to
+one block of `src/continuum_swr_replay/paths.py`, beside the roots they select, with one
+naming, `<WHAT>_RUN`. No value changed. Code that a test patches reads a pin as
+`paths.<PIN>` when called, so a test patches `paths`, not `swr_source`.
+
+| Old place | New place |
+|---|---|
+| `analysis/event_definition/swr_source.py`: `SWR_INVENTORY_RUN_ID` | `paths.SWR_INVENTORY_RUN` |
+| `analysis/event_definition/swr_source.py`: `ARTIFACT_INTERVALS_RUN_ID` | `paths.ARTIFACT_INTERVALS_RUN` |
+| `analysis/detector_comparison/feature_run.py`: `EVENT_FEATURES_RUN` | `paths.EVENT_FEATURES_RUN` |
+| `analysis/detector_comparison/feature_run.py`: `STATE_SPACE_FEATURES_RUN` | `paths.STATE_SPACE_FEATURES_RUN` |
+| `paths.STATE_EVIDENCE_RUN` (among the folder names) | `paths.STATE_EVIDENCE_RUN` (in the pinned-run block) |
+| `reported/detection.py`: `MEMORYLESS_PILOT_RUN` | `paths.MEMORYLESS_PILOT_RUN` |
