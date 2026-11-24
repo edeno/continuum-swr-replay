@@ -1196,8 +1196,9 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     two rows of two strips (ripple and MUA above theta and speed).
 
     Every row is animal-balanced: the line is the mean over animals of each
-    animal's median over its events, the band the mean over animals of each
-    animal's quartiles (``triggered_analysis.animal_balanced_quartiles``), so
+    animal's median (the median over its epochs of each epoch's median over its
+    events), the band the same of the quartiles
+    (``triggered_analysis.animal_balanced_quartiles``), so
     the spread over events is seen, not only the center: ripple and MUA rise
     at the start, theta stays at
     its level between events, far below running, and the animal is still. The

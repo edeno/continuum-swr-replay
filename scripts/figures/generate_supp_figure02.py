@@ -956,7 +956,8 @@ def draw_outside_swr_series(
 def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
     """The traces panel: Figure 2g's signals around event starts, one axis per
     signal, a thin line per animal and class (each animal's median over its
-    events, ``traces``: :func:`read_traces`' ``event_traces``), the
+    epochs of each epoch's median over its events, ``traces``:
+    :func:`read_traces`' ``event_traces``), the
     classes in Figure 2g's colors and named past the last axis, a dotted line
     at the start."""
     t_ms = 1000 * np.asarray(traces["time"])
