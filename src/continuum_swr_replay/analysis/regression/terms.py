@@ -12,10 +12,12 @@ A model is a list of terms and, for the diagonal families, an intercept:
   and the same required ``penalty``.
 - :class:`Category`: one 0/1 column for each level but the reference. A
   missing value (None or NaN) makes its row missing; any other value outside
-  the levels is an error. The reference level must have rows in every
-  session: without them the intercept (or, under the grouped softmax, the
-  other levels) and the levels' columns are collinear, and the session's
-  first fit is an error naming them.
+  the levels is an error. The reference level must have rows in every fit:
+  without them the intercept (or, under the grouped softmax, the other
+  levels) and the levels' columns are collinear, and the fit's first fit is
+  an error naming them. For a category that is a baseline (below), each
+  session of a fit keeps the reference level, so the reference level must
+  have rows in every session of the fit.
 - :class:`Slope`: one column, or one for each level of a category.
 
 A :class:`Category` and a :class:`Slope` take the same required ``penalty``
@@ -78,6 +80,27 @@ inactive.
 Each term of a built design is described once, by a :class:`DesignTerm`: its
 kind, columns, level, covariate, penalty block and the terms that leave a
 session with it. The fitting loop and the support rule read these.
+
+Baselines (design C, ``docs/design/2026-11-24-unit-of-fit.md``, section 4.1).
+A model declares its baseline terms to :func:`build_design` (``baseline``):
+the intercept (``(Intercept)``) or a :class:`Category` by its column. In a fit
+of several sessions (:meth:`Design.for_sessions`) each baseline term is
+replaced by one copy for each session, zero on the rows of the other sessions:
+the intercept becomes one 0/1 column for each session, and each coded level of
+a category one column for each session, so each session keeps the category's
+reference level. A copy is named ``<name>@<animal>/<session_date>/<epoch>``
+(``(Intercept)@a/20260101/02_r1``, ``arm[3]@a/20260101/02_r1``) and is a
+``level`` term whose level is the base level and the session key
+(``("(Intercept)", key)`` for the intercept, ``(column, value, key)`` for a
+level), with no dependents and its ``session`` set to the key. So the loop
+judges and drops it as a level, on its session's rows: an intercept copy that
+fails the support rule, or that the refit leaves out, drops its session's rows
+from the fit; a level copy that fails drops that level's rows in its session
+only. A copy keeps the base term's declared penalty (the intercept has none).
+A baseline is never tested and never read by a contrast. The collinearity
+record projects the copies out, as it does the intercept, and neither the edf
+nor :attr:`Design.term_columns` holds them. In a fit of one session nothing is
+copied.
 """
 
 from __future__ import annotations
@@ -97,6 +120,7 @@ from .reml import PenaltyBlock
 __all__ = [
     "INTERCEPT",
     "SMALLEST_COLUMN_SIZE",
+    "SessionKey",
     "Category",
     "Design",
     "DesignTerm",
@@ -123,6 +147,9 @@ SMALLEST_COLUMN_SIZE = 1e-2
 
 #: The intercept's coefficient and term name.
 INTERCEPT = "(Intercept)"
+
+#: A session's key, ``(animal, session_date, epoch)``.
+SessionKey = tuple[str, str, str]
 
 Penalty = Literal["none"] | float
 
@@ -413,6 +440,9 @@ class DesignTerm:
         For a level, the names of the terms fitted for it: when the level is
         removed from a session, its rows are dropped (not merged into the
         reference level) and these terms leave with it.
+    session : tuple or None
+        For a session's copy of a baseline term (module docstring), the
+        session's key; None otherwise.
     """
 
     name: str
@@ -423,6 +453,7 @@ class DesignTerm:
     covariate: str | None = None
     block: int | None = None
     dependents: tuple[str, ...] = ()
+    session: tuple | None = None
 
     @property
     def reads(self) -> tuple | None:
@@ -786,6 +817,12 @@ class Design:
     log_penalties : np.ndarray, shape (n_blocks,)
         Each block's fixed log penalty.
     offset : Offset or None
+    baseline : tuple of str
+        The baseline terms (module docstring): ``(Intercept)`` or a category's
+        column.
+    sessions : tuple of SessionKey
+        The sessions of a fit whose baselines are copied
+        (:meth:`for_sessions`); empty for the design of the pooled rows.
     """
 
     terms: tuple[DesignTerm, ...]
@@ -794,6 +831,13 @@ class Design:
     log_penalties: np.ndarray
     offset: Offset | None
     _built: tuple[_Built, ...] = field(repr=False)
+    baseline: tuple[str, ...] = ()
+    sessions: tuple[SessionKey, ...] = ()
+    # A design with copies: the design of the pooled rows, and for each column
+    # the base column it copies and the session it is not zero on (-1: all).
+    _base: Design | None = field(default=None, repr=False)
+    _source: np.ndarray | None = field(default=None, repr=False)
+    _copy_session: np.ndarray | None = field(default=None, repr=False)
 
     @cached_property
     def by_name(self) -> dict[str, DesignTerm]:
@@ -813,12 +857,99 @@ class Design:
     @property
     def term_columns(self) -> dict[str, np.ndarray]:
         """Model term name -> its column indices, in column order (the
-        intercept is not a term)."""
+        intercept and the baseline copies are not terms)."""
         out: dict[str, list[np.ndarray]] = {}
         for term in self.terms:
-            if term.kind != "intercept":
+            if term.kind != "intercept" and term.session is None:
                 out.setdefault(term.term, []).append(term.columns)
         return {name: np.concatenate(parts) for name, parts in out.items()}
+
+    @property
+    def projected_columns(self) -> list[int]:
+        """The columns the collinearity record projects out, in column order:
+        the intercept's, or every baseline copy's (module docstring)."""
+        return [
+            int(j)
+            for term in self.terms
+            if term.kind == "intercept" or term.session is not None
+            for j in term.columns
+        ]
+
+    def session_baselines(self) -> dict[tuple, list[str]]:
+        """Session key -> the coefficient names of its baseline copies, in
+        column order; empty without copies."""
+        out: dict[tuple, list[str]] = {key: [] for key in self.sessions}
+        for term in self.terms:
+            if term.session is not None:
+                out[term.session] += [self.coef_names[j] for j in term.columns]
+        return out
+
+    def for_sessions(self, keys: Sequence[SessionKey]) -> Design:
+        """The design of one fit of the sessions ``keys``: each baseline term
+        copied for each session (module docstring); this design itself for
+        one session or without a baseline.
+
+        Parameters
+        ----------
+        keys : sequence of SessionKey
+            The fit's sessions, in the order of their rows.
+
+        Returns
+        -------
+        Design
+            Its :meth:`build` takes each row's place in ``keys``.
+        """
+        if len(keys) < 2 or not self.baseline:
+            return self
+        if self._base is not None:
+            raise ValueError("the design already holds the copies of a fit")
+        terms, source, copy_session, blocks, rho, names = [], [], [], [], [], []
+
+        def place(term: DesignTerm, session: int, key: tuple | None) -> None:
+            columns = np.arange(len(source), len(source) + term.columns.size)
+            source.extend(term.columns.tolist())
+            copy_session.extend([session] * term.columns.size)
+            block = None
+            if term.block is not None:
+                block = len(blocks)
+                blocks.append(PenaltyBlock(columns, self.blocks[term.block].S))
+                rho.append(self.log_penalties[term.block])
+            if key is None:
+                names.extend(self.coef_names[j] for j in term.columns)
+                terms.append(replace(term, columns=columns, block=block))
+                return
+            name = f"{term.name}@{'/'.join(key)}"
+            level = (INTERCEPT, key) if term.level is None else (*term.level, key)
+            names.append(name)
+            terms.append(
+                DesignTerm(
+                    name,
+                    term.term,
+                    "level",
+                    columns,
+                    level=level,
+                    block=block,
+                    session=tuple(key),
+                )
+            )
+
+        for term in self.terms:
+            if term.term in self.baseline:
+                for s, key in enumerate(keys):
+                    place(term, s, key)
+            else:
+                place(term, -1, None)
+        return replace(
+            self,
+            terms=tuple(terms),
+            coef_names=tuple(names),
+            blocks=tuple(blocks),
+            log_penalties=np.array(rho, dtype=float),
+            sessions=tuple(tuple(key) for key in keys),
+            _base=self,
+            _source=np.array(source, dtype=int),
+            _copy_session=np.array(copy_session, dtype=int),
+        )
 
     @property
     def columns(self) -> tuple[str, ...]:
@@ -876,14 +1007,26 @@ class Design:
                     entry["centered"].append(b.name)
         return out
 
-    def build(self, rows: pd.DataFrame) -> SessionDesign:
+    def build(
+        self, rows: pd.DataFrame, session: np.ndarray | None = None
+    ) -> SessionDesign:
         """The design at ``rows``, missing values included (as NaN).
+
+        Parameters
+        ----------
+        rows : pd.DataFrame
+        session : np.ndarray of int, shape (n_rows,), or None
+            Each row's place in :attr:`sessions`; required for a design with
+            copies (:meth:`for_sessions`), not read otherwise.
 
         Raises
         ------
         ValueError
-            If a category holds a value outside its levels.
+            If a category holds a value outside its levels, or a design with
+            copies is built without ``session``.
         """
+        if self._base is not None:
+            return self._build_copies(rows, session)
         levels = _Levels(rows)
         X = np.empty((len(rows), len(self.coef_names)))
         if self.intercept_column is not None:
@@ -901,6 +1044,32 @@ class Design:
         if offset is not None:
             missing |= ~np.isfinite(offset)
         return SessionDesign(X, offset, missing, level_rows)
+
+    def _build_copies(
+        self, rows: pd.DataFrame, session: np.ndarray | None
+    ) -> SessionDesign:
+        """:meth:`build` of a design with copies: the base design's columns,
+        each copy zero outside its session's rows."""
+        if session is None or len(session) != len(rows):
+            raise ValueError("a design with baseline copies needs each row's session")
+        base = self._base.build(rows)
+        X = base.X[:, self._source]
+        copies = np.flatnonzero(self._copy_session >= 0)
+        outside = session[:, None] != self._copy_session[copies][None, :]
+        part = X[:, copies]
+        part[outside] = 0.0
+        X[:, copies] = part
+        level_rows = dict(base.level_rows)
+        for term in self.terms:
+            if term.session is not None:
+                s = self.sessions.index(term.session)
+                own = session == s
+                level_rows[term.level] = (
+                    own
+                    if term.level[0] == INTERCEPT
+                    else own & level_rows[term.level[:2]]
+                )
+        return SessionDesign(X, base.offset, base.missing, level_rows)
 
     def _offset(self, rows: pd.DataFrame) -> np.ndarray | None:
         """``log`` of the exposure, NaN where it is not positive; None without
@@ -994,7 +1163,11 @@ def _refuse_small(small: dict[str, float]) -> None:
 
 
 def build_design(
-    terms: Sequence[Term], pooled_rows: pd.DataFrame, *, intercept: bool
+    terms: Sequence[Term],
+    pooled_rows: pd.DataFrame,
+    *,
+    intercept: bool,
+    baseline: Sequence[str] = (),
 ) -> Design:
     """Build a model's terms on its pooled rows.
 
@@ -1009,6 +1182,10 @@ def build_design(
     intercept : bool
         Put an intercept in column 0 (not for the grouped softmax, which
         cannot see a column constant within a group).
+    baseline : sequence of str
+        The model's baseline terms, copied for each session in a fit of
+        several sessions (module docstring): ``(Intercept)`` (with
+        ``intercept``) or the column of a :class:`Category` term.
 
     Returns
     -------
@@ -1018,7 +1195,8 @@ def build_design(
     ------
     ValueError
         If a term fails the design check on the pooled rows that are not
-        missing (a units problem), naming it.
+        missing (a units problem), naming it; if a baseline is not the
+        intercept or a category term of the design.
     """
     offsets = [term for term in terms if isinstance(term, Offset)]
     if len(offsets) > 1:
@@ -1082,5 +1260,14 @@ def build_design(
         offset=offsets[0] if offsets else None,
         _built=tuple(pieces),
     )
+    categories = [t.column for t in terms if isinstance(t, Category)]
+    allowed = [INTERCEPT] * intercept + categories
+    wrong = [name for name in baseline if name not in allowed]
+    if wrong or len(set(baseline)) != len(baseline):
+        raise ValueError(
+            f"a baseline is the intercept or a category term, once: {list(baseline)} "
+            f"(the design's: {allowed})"
+        )
+    design = replace(design, baseline=tuple(baseline))
     design._check_pooled(pooled_rows, levels)
     return design

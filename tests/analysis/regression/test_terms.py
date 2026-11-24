@@ -601,3 +601,77 @@ def test_the_columns_a_design_reads(rate_sessions, content_sessions) -> None:
         np.testing.assert_array_equal(full.missing, only.missing)
         if full.offset is not None:
             np.testing.assert_array_equal(full.offset, only.offset)
+
+
+def test_baseline_copies_per_session() -> None:
+    """In a fit of two sessions the intercept and each coded level of a
+    baseline category have one copy per session, named by the session, zero
+    on the other session's rows; the shared terms are the design's own. In a
+    fit of one session nothing is copied."""
+    rows = pd.DataFrame(
+        {
+            "arm": ["a", "b", "c", "a", "b", "c"],
+            "x": [0.5, 1.0, 2.0, 1.5, -1.0, 0.0],
+        }
+    )
+    arm = Category("arm", ("a", "b", "c"), reference="a", penalty="none")
+    design = build_design(
+        [arm, Slope("x", 0.0)], rows, intercept=True, baseline=("(Intercept)", "arm")
+    )
+    keys = [("an", "d1", "e1"), ("an", "d1", "e2")]
+    assert design.for_sessions(keys[:1]) is design
+    unit = design.for_sessions(keys)
+    s1, s2 = "an/d1/e1", "an/d1/e2"
+    assert unit.coef_names == (
+        f"(Intercept)@{s1}",
+        f"(Intercept)@{s2}",
+        f"arm[b]@{s1}",
+        f"arm[b]@{s2}",
+        f"arm[c]@{s1}",
+        f"arm[c]@{s2}",
+        "x",
+    )
+    session = np.array([0, 0, 0, 1, 1, 1])
+    built = unit.build(rows, session)
+    base = design.build(rows).X
+    expected = np.column_stack(
+        [
+            session == 0,
+            session == 1,
+            base[:, 1] * (session == 0),
+            base[:, 1] * (session == 1),
+            base[:, 2] * (session == 0),
+            base[:, 2] * (session == 1),
+            base[:, 3],
+        ]
+    ).astype(float)
+    np.testing.assert_array_equal(built.X, expected)
+    copies = [t for t in unit.terms if t.session is not None]
+    assert [t.kind for t in copies] == ["level"] * 6
+    assert all(t.dependents == () for t in copies)
+    np.testing.assert_array_equal(
+        built.level_rows[("arm", "b", keys[1])],
+        [False, False, False, False, True, False],
+    )
+    np.testing.assert_array_equal(
+        built.level_rows[("(Intercept)", keys[0])], session == 0
+    )
+    assert {k: v.tolist() for k, v in unit.term_columns.items()} == {"x": [6]}
+    assert unit.projected_columns == [0, 1, 2, 3, 4, 5]
+    assert unit.session_baselines() == {
+        keys[0]: [f"(Intercept)@{s1}", f"arm[b]@{s1}", f"arm[c]@{s1}"],
+        keys[1]: [f"(Intercept)@{s2}", f"arm[b]@{s2}", f"arm[c]@{s2}"],
+    }
+    assert [b.columns.tolist() for b in unit.blocks] == [[6]]
+    with pytest.raises(ValueError, match="session"):
+        unit.build(rows)
+
+
+def test_a_baseline_is_the_intercept_or_a_category() -> None:
+    rows = pd.DataFrame({"arm": ["a", "b"], "x": [0.5, 1.0]})
+    arm = Category("arm", ("a", "b"), reference="a", penalty="none")
+    for baseline, intercept in ((("x",), True), (("(Intercept)",), False)):
+        with pytest.raises(ValueError, match="a baseline is the intercept"):
+            build_design(
+                [arm, Slope("x", 0.0)], rows, intercept=intercept, baseline=baseline
+            )

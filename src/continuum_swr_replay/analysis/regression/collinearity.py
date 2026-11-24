@@ -10,7 +10,8 @@ the information ``H`` (:func:`weighted_design`):
   probabilities ``p_g``, ``X~_g = sqrt(n_g) diag(sqrt(p_g)) (X_g - 1 p_g' X_g)``.
 
 When the design has an intercept it is projected out of every other column
-first, so a term's measures are about the variation the intercept does not
+first (in a fit of several sessions, the baseline copies of each session,
+``terms.py``, in its place), so a term's measures are about the variation the intercept does not
 explain (else a 0/1 column whose mean is 0.85 would count as 85 % explained by
 the intercept alone). Then, for each term ``i`` with columns ``Xi`` and the
 other terms' columns ``X0``, QR of ``[X0, Xi]`` gives
@@ -102,7 +103,7 @@ def concurvity(
     terms: Mapping[str, np.ndarray],
     beta: np.ndarray,
     *,
-    intercept: int | None,
+    intercept: int | list[int] | None,
 ) -> dict[str, dict[str, float]]:
     """mgcv's three concurvity measures of each term, on a given design.
 
@@ -115,9 +116,11 @@ def concurvity(
         column once.
     beta : np.ndarray, shape (p,)
         The fitted coefficients (``observed`` reads them).
-    intercept : int or None
-        The intercept's column, projected out of the others first; None
-        without one.
+    intercept : int, list of int or None
+        The intercept's column (or the columns of the sessions' baseline
+        copies), projected out of the others first, one after another (each
+        on what the ones before it left, so the projection is onto their
+        span); None without one.
 
     Returns
     -------
@@ -130,14 +133,13 @@ def concurvity(
     """
     columns = [np.asarray(c, dtype=int) for c in terms.values()]
     used = np.concatenate(columns) if columns else np.empty(0, int)
-    expected = np.setdiff1d(
-        np.arange(X.shape[1]), [] if intercept is None else [intercept]
-    )
+    projected = [] if intercept is None else np.atleast_1d(intercept).tolist()
+    expected = np.setdiff1d(np.arange(X.shape[1]), projected)
     if np.sort(used).tolist() != expected.tolist():
         raise ValueError("the terms and the intercept must cover every column once")
     size = np.sum(X**2, axis=0)  # each column's own size, before the projection
-    if intercept is not None:
-        q = X[:, intercept] / np.linalg.norm(X[:, intercept])
+    for column in projected:
+        q = X[:, column] / np.linalg.norm(X[:, column])
         X = X - np.outer(q, q @ X)
     R = np.linalg.qr(X[:, used], mode="r")  # R'R = X'X over the terms' columns
     position = {int(c): k for k, c in enumerate(used)}
@@ -223,8 +225,9 @@ def term_collinearity(
         The fit; NaN at its inactive columns.
     terms : mapping of str to np.ndarray of int
         Each term's columns; with ``intercept`` they cover every column once.
-    intercept : int or None
-        The intercept's column; None without one.
+    intercept : int, list of int or None
+        The intercept's column, or the columns of the baseline copies
+        (:func:`concurvity`); None without one.
 
     Returns
     -------
@@ -235,7 +238,8 @@ def term_collinearity(
         with the reason.
     """
     active = np.isfinite(beta)
-    if intercept is not None and not active[intercept]:
+    projected = [] if intercept is None else np.atleast_1d(intercept).tolist()
+    if not active[projected].all():
         raise ValueError("the intercept is inactive")
     index = _positions(active)
     kept = {
@@ -246,7 +250,16 @@ def term_collinearity(
     Xa, ba = X[:, active], beta[active]
     weighted = weighted_design(lik, Xa, y, aux, Xa @ ba)
     measures = concurvity(
-        weighted, kept, ba, intercept=None if intercept is None else index[intercept]
+        weighted,
+        kept,
+        ba,
+        intercept=(
+            None
+            if intercept is None
+            else index[intercept]
+            if np.ndim(intercept) == 0
+            else [int(index[c]) for c in projected]
+        ),
     )
     out = {}
     for name, cols in kept.items():

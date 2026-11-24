@@ -1,4 +1,4 @@
-"""The fit-row record: one row per (model, kind, session) of every stored fit.
+"""The fit-row record: one row per (model, kind, unit of the fit) of every fit.
 
 :class:`FitRecord` holds what a fit's readers need to use it and to judge it:
 its identity, what the likelihood saw, the coefficients with their Bayesian
@@ -42,14 +42,14 @@ class NoFit(StrEnum):
 
 @dataclass(frozen=True)
 class FitRecord:
-    """One fit of one session.
+    """One fit of one unit: a session, a recording day or an animal.
 
     Attributes
     ----------
     model, kind : str
         The model's name and the event kind it is fitted for.
     animal, session_date, epoch : str
-        The session.
+        The unit's key (``fit_by``).
     likelihood : str
         ``poisson``, ``bernoulli``, ``gaussian`` or ``grouped_softmax``.
     n_rows, n_units : int
@@ -113,6 +113,19 @@ class FitRecord:
     no_fit : str
         Why the session has no kept fit, a ``NoFit`` code; empty for a kept
         fit.
+    fit_by : str
+        The unit of the fit: ``"session"``, ``"day"`` or ``"animal"``. At
+        ``"day"`` the record's ``epoch`` is ``""``; at ``"animal"`` its
+        ``session_date`` and ``epoch`` are ``""``.
+    sessions : list of dict
+        One entry per session in the fit, in the order of its rows:
+        ``animal``, ``session_date``, ``epoch``; ``n_rows``, ``n_units`` and
+        ``n_events`` the fit saw of it; ``rows_missing_values``,
+        ``rows_dropped`` (a dropped level or baseline copy -> its rows in
+        the session, where above zero) and, under the grouped softmax,
+        ``events_emptied_by_dropped_rows`` and ``events_without_response``;
+        and ``baseline``, the coefficient names of the session's baseline
+        copies (empty in a fit of one session, where nothing is copied).
     """
 
     model: str
@@ -141,3 +154,5 @@ class FitRecord:
     standardization: dict
     table_sha256: dict
     no_fit: str
+    fit_by: str
+    sessions: list
