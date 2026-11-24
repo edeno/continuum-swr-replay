@@ -208,7 +208,7 @@ class _Session:
             kept = self.kept
             self.support = design_support(
                 self.design,
-                self.X[kept],
+                self._kept_design(kept),
                 {level: rows[kept] for level, rows in self.level_rows.items()},
                 self.unit[kept],
             )
@@ -291,6 +291,11 @@ class _Session:
                 counts["events_without_response"] = self._units(_NO_RESPONSE)
         return counts
 
+    def _kept_design(self, kept: np.ndarray) -> np.ndarray:
+        """The design's ``kept`` rows: the design itself, not a copy, when
+        every row is kept."""
+        return self.X if kept.all() else self.X[kept]
+
     def _units(self, reason: int) -> int:
         """The units with a row removed for ``reason``."""
         return int(np.unique(self.unit[self.reason == reason]).size)
@@ -302,7 +307,7 @@ class _Session:
         kept = self.kept
         left_out = self.left_out()
         inactive = np.array([c in left_out for c in self.design.coef_names])
-        X, y = self.X[kept], self.y[kept]
+        X, y = self._kept_design(kept), self.y[kept]
         if isinstance(self.lik, GroupedSoftmax):
             aux = np.unique(self.unit[kept], return_inverse=True)[1]
         elif isinstance(self.lik, Poisson):
