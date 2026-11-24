@@ -15,8 +15,18 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
     count_visit_context,
     select_visit_context,
+    subset_staleness,
 )
 from continuum_swr_replay.reported import events as builder
+from continuum_swr_replay.reported.events import (
+    cohort,
+    common,
+    content,
+    properties,
+    signals,
+    spike_evidence,
+)
+from continuum_swr_replay.reported.values import Summary
 from tests.reported.test_reported_events_values import _by_key, _events
 
 
@@ -37,7 +47,7 @@ def _labeled() -> pd.DataFrame:
 
 def test_the_label_counts_are_count_visit_context():
     table = _labeled()
-    values = _by_key(builder.visit_context_values(table, "s"))
+    values = _by_key(cohort.visit_context_values(table, "s"))
     counts = count_visit_context(table)
     for label in VISIT_CONTEXTS:
         assert values[f"events_label_{label}"].value == counts.loc[label, "n"]
@@ -71,19 +81,17 @@ def test_summary_reads_the_selected_events(monkeypatch):
     monkeypatch.setattr(
         builder, "file_record", lambda path, root: {"path": "p", "sha256": "0"}
     )
-    monkeypatch.setattr(builder, "with_start_and_rest_theta", stop)
+    monkeypatch.setattr(properties, "with_start_and_rest_theta", stop)
     # (the label check against the visits is tested in cohort_selection)
     monkeypatch.setattr(builder, "read_manifest", lambda run: {"epochs": {}})
     monkeypatch.setattr(builder, "check_visit_context_starts", lambda t, v: None)
     # (the state shares, the HPD coverage and the content distance are not
     # columns of these events)
-    monkeypatch.setattr(builder, "state_composition_values", lambda events, s: [])
-    monkeypatch.setattr(builder, "hpd_tight_values", lambda events, s: [])
-    monkeypatch.setattr(builder, "content_distance_values", lambda events, s: [])
+    monkeypatch.setattr(properties, "state_composition_values", lambda events, s: [])
+    monkeypatch.setattr(properties, "hpd_tight_values", lambda events, s: [])
+    monkeypatch.setattr(properties, "content_distance_values", lambda events, s: [])
     added = []
-    monkeypatch.setattr(
-        builder.Summary, "add", lambda self, *values: added.extend(values)
-    )
+    monkeypatch.setattr(Summary, "add", lambda self, *values: added.extend(values))
     with pytest.raises(_Read):
         builder.summarize(builder.default_inputs(), "by")
 
@@ -97,7 +105,7 @@ def test_summary_reads_the_selected_events(monkeypatch):
     assert values["nonlocal_events_swr_partial"].value == 6
     assert values["events_label_before_first_visit"].value == 1
     for key in ("nonlocal_events", "swr_overlapping_events"):
-        assert values[key].description.endswith(f"; over {builder.EVENTS_SUBSET}")
+        assert values[key].description.endswith(f"; over {common.EVENTS_SUBSET}")
     assert "; over" not in values["events_label_in_visit"].description
 
 
@@ -108,12 +116,12 @@ def test_content_bins_are_read_for_the_selected_events_only(tmp_path: Path):
         rows += [{"event_id": event_id, "epoch_id": "e", "arm": 1}] * 2
     pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
 
-    bins, _ = builder.content_along_arms_bins(events, tmp_path, 1, ["arm"])
+    bins, _ = content.content_along_arms_bins(events, tmp_path, 1, ["arm"])
 
     assert set(bins["event_id"]) == set(events["event_id"])
     assert len(bins) == 2 * len(events)
     with pytest.raises(ValueError, match="do not cover"):
-        builder.content_along_arms_bins(
+        content.content_along_arms_bins(
             events.iloc[:-1].assign(
                 event_id=lambda t: t["event_id"].where(t.index > 0, 999)
             ),
@@ -146,7 +154,7 @@ def test_the_content_mass_is_summed_over_the_selected_events(tmp_path):
     ]
     pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
 
-    bins, paths = builder.content_mass_along_arms(events, tmp_path, 1)
+    bins, paths = content.content_mass_along_arms(events, tmp_path, 1)
 
     assert [path.name for path in paths] == ["e.parquet"]
     n_events = events.groupby(["animal", "is_swr"]).size()
@@ -157,7 +165,7 @@ def test_the_content_mass_is_summed_over_the_selected_events(tmp_path):
         assert by_kind.loc[key, "weight"] == 4.0 * n
         assert by_kind.loc[key, "distance_to_animal_cm"] == pytest.approx(25.0)
     with pytest.raises(ValueError, match="do not cover"):
-        builder.content_mass_along_arms(
+        content.content_mass_along_arms(
             events.iloc[:-1].assign(
                 event_id=lambda t: t["event_id"].where(t.index > 0, 999)
             ),
@@ -195,7 +203,7 @@ def test_the_content_mass_run_is_read_once_for_the_selected_events(tmp_path):
     ]
     pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
 
-    tables, paths = builder.content_mass_tables(events, tmp_path, 1)
+    tables, paths = content.content_mass_tables(events, tmp_path, 1)
 
     assert [path.name for path in paths] == ["e.parquet"]
     joined = tables["events"]
@@ -207,7 +215,7 @@ def test_the_content_mass_run_is_read_once_for_the_selected_events(tmp_path):
     assert (joined["content_n_wells"] == 1).all()
     assert (joined["content_n_patches"] == 1).all()
     assert (joined["epoch_id"] == "e").all()
-    along, _ = builder.content_mass_along_arms(events, tmp_path, 1)
+    along, _ = content.content_mass_along_arms(events, tmp_path, 1)
     pd.testing.assert_frame_equal(tables["along"], along)
     by_patch = tables["by_patch"]
     assert set(by_patch["current_patch"]) == {1}
@@ -218,9 +226,9 @@ def test_the_content_mass_run_is_read_once_for_the_selected_events(tmp_path):
     assert (at_well == 2.0 * n).all()
     assert by_patch["weight"].sum() == 4.0 * len(events)
     with pytest.raises(ValueError, match="no current patch"):
-        builder.content_mass_tables(events.assign(current_patch=np.nan), tmp_path, 1)
+        content.content_mass_tables(events.assign(current_patch=np.nan), tmp_path, 1)
     with pytest.raises(ValueError, match="no row"):
-        builder.content_mass_tables(
+        content.content_mass_tables(
             pd.concat([events, events.iloc[[0]].assign(event_id=999)]), tmp_path, 1
         )
 
@@ -242,7 +250,7 @@ def test_each_selected_event_gets_where_its_content_starts_and_ends(tmp_path):
     ]
     pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
 
-    joined, _ = builder.with_event_start_end(events, tmp_path, 1)
+    joined, _ = content.with_event_start_end(events, tmp_path, 1)
 
     assert len(joined) == len(events)
     assert joined["starts_near_animal"].all() and joined["ends_at_remote_well"].all()
@@ -263,7 +271,7 @@ def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
         {"time": sample * 0.002, "slow_gamma_z": sample, "fast_gamma_z": -sample}
     ).to_parquet(tmp_path / f"{epoch_id}_gamma_z.parquet")
 
-    curves, paths = builder.gamma_triggered_curves(events, tmp_path, 1)
+    curves, paths = signals.gamma_triggered_curves(events, tmp_path, 1)
 
     assert [path.name for path in paths] == [f"{epoch_id}_gamma_z.parquet"]
     np.testing.assert_allclose(
@@ -277,15 +285,15 @@ def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
             curves["fast_gamma"][f"{kind}_q75"], -np.arange(125.0, 276.0)
         )
     with pytest.raises(ValueError, match="not 2"):
-        builder.gamma_triggered_curves(events, tmp_path, 2)
+        signals.gamma_triggered_curves(events, tmp_path, 2)
     with pytest.raises(ValueError, match="no gamma for an event's epoch"):
-        builder.gamma_triggered_curves(events.assign(epoch="04_r2"), tmp_path, 1)
+        signals.gamma_triggered_curves(events.assign(epoch="04_r2"), tmp_path, 1)
 
 
 def test_an_output_not_made_over_the_subset_is_pending():
-    assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
-    assert "rerun it" in builder.subset_staleness({}, "out")
-    assert "rerun it" in builder.subset_staleness({"subset": "every event"}, "out")
+    assert subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
+    assert "rerun it" in subset_staleness({}, "out")
+    assert "rerun it" in subset_staleness({"subset": "every event"}, "out")
 
 
 def test_the_spike_evidence_left_out_are_counted_per_group():
@@ -293,7 +301,7 @@ def test_the_spike_evidence_left_out_are_counted_per_group():
         {"group": ["baseline", "baseline", "SWR-remote", "nonSWR-close", "SWR-remote"]}
     )
     kept = np.array([True, False, False, True, True])
-    values = _by_key(builder.spike_evidence_visit_values(metrics, kept, "s"))
+    values = _by_key(spike_evidence.spike_evidence_visit_values(metrics, kept, "s"))
     assert values["baseline_left_out"].value == 1
     assert values["swr_remote_left_out"].value == 1
     assert values["non_swr_close_left_out"].value == 0
@@ -316,7 +324,7 @@ def test_the_held_out_bouts_read_and_left_out_are_the_split_s_counts():
             "n_kept_matched_outside_visit": [2, 3, 0],
         }
     )
-    values = _by_key(builder.heldout_bout_values(bouts, "s"))
+    values = _by_key(spike_evidence.heldout_bout_values(bouts, "s"))
     assert values["heldout_swr_bouts_in_subset"].value == 9
     assert values["heldout_swr_bouts_left_out"].value == 1
     assert values["heldout_non_swr_bouts_in_subset"].value == 15

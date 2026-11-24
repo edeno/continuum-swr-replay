@@ -145,9 +145,7 @@ from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events import (
-    content_mass_along_arms,
-)
+from continuum_swr_replay.reported.events.content import content_mass_along_arms
 from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (

@@ -36,7 +36,8 @@ class BuilderCalls:
     Attributes
     ----------
     file : str
-        The file that defines it, relative to the package (``reported/events.py``).
+        The file that defines it, relative to the package
+        (``reported/events/cohort.py``).
     analysis : tuple of str
         The ``analysis`` functions it calls, directly or through a helper that
         makes no value, as dotted names without the package

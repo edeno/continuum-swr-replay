@@ -139,11 +139,11 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
-from continuum_swr_replay.reported.events import (
+from continuum_swr_replay.reported.events.content import (
     content_mass_tables,
-    gamma_triggered_curves,
     with_event_start_end,
 )
+from continuum_swr_replay.reported.events.signals import gamma_triggered_curves
 from continuum_swr_replay.reported.inputs import (
     EventsInputs,
     default_inputs,
@@ -255,7 +255,7 @@ def draw_gamma(axes, curves: dict, levels: pd.DataFrame) -> None:
     band), as Figure 2g draws ripple power and theta: the line is the mean over
     animals of each animal's median (the median over its epochs of each
     epoch's median over its events), the band the same of the quartiles
-    (``curves``: ``reported.events.gamma_triggered_curves``). The dashed lines
+    (``curves``: ``reported.events.signals.gamma_triggered_curves``). The dashed lines
     are the band's level in quiet rest (gray) and while running (black),
     each animal's median over its epochs, then the mean over animals
     (``levels``: ``event_statistics.reference_medians``)."""

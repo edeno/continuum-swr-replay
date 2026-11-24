@@ -15,16 +15,20 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 )
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported import inputs as stored_inputs
-from continuum_swr_replay.reported.events import (
-    _PROPERTIES,
+from continuum_swr_replay.reported.events.class_structure import (
     class_step_values_with_staleness,
-    gamma_db_values,
+    spike_evidence_staleness,
+)
+from continuum_swr_replay.reported.events.properties import (
+    _PROPERTIES,
     property_interval_values,
     rest_theta_values,
+)
+from continuum_swr_replay.reported.events.restriction import (
     restriction_window_values,
-    spike_evidence_staleness,
     window_run_note_staleness,
 )
+from continuum_swr_replay.reported.events.signals import gamma_db_values
 from continuum_swr_replay.reported.inputs import (
     default_inputs,
     event_table_staleness,
