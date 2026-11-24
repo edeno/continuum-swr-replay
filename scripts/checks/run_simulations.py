@@ -58,6 +58,9 @@ from continuum_swr_replay.tables.io import write_table  # noqa: E402
 #: Model name -> the module of its scenario list.
 MODELS = {
     "declared_penalty": "scripts.checks.simulate_declared_penalty",
+    "role_content": (
+        "continuum_swr_replay.analysis.replay_models.content.role_content_simulation"
+    ),
 }
 
 

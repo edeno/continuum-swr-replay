@@ -24,6 +24,8 @@ the validation depend on that choice, which is open.
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from . import role_content as rc
@@ -48,10 +50,14 @@ MEASURE_SIZE = 0.25
 RECENCY_AMPLITUDE = 0.6
 
 
+def _u(x: np.ndarray, amplitude: float) -> np.ndarray:
+    return amplitude * 4.0 * (np.asarray(x) - 0.5) ** 2
+
+
 def _u_shape(amplitude: float):
     """A U-shaped reward-fraction curve, 0 at 0.5 and ``amplitude`` at the
     ends; its change over a pooled SD about a mean near 0.5 is near 0."""
-    return lambda x: amplitude * 4.0 * (np.asarray(x) - 0.5) ** 2
+    return partial(_u, amplitude=amplitude)
 
 
 def uncertainty_scenarios(*, noise: ShareNoise) -> list[Scenario]:

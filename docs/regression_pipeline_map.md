@@ -1592,6 +1592,12 @@ Planted truths for the role content models, as functions of a session's rows.
 
 `ShareNoise`, `Truth`, `ScenarioReference`, `expected_shares`, `planted_values`, `planted_target`, `arm_effects`, `recency_curve`, `reward_curve`, `leaving_curve`, `Scenario`, `role_content_scenarios`, `truth_from_data`, `spread_truths`, `thin_events`
 
+### `src/continuum_swr_replay/analysis/replay_models/content/role_content_simulation.py`
+
+The role content models in simulation: their scenario list for the engine.
+
+`load_table`, `SimulationCohort`, `cohort_from_table`, `model_settings`, `engine_model`, `scenario_list`, `build_simulation`, `calibrate_smooth_penalties`, `simulation`
+
 ### `src/continuum_swr_replay/analysis/replay_models/content/role_content_statistics.py`
 
 The declared content estimands of the role models, per session and summarized.

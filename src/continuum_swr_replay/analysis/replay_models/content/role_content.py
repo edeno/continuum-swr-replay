@@ -174,7 +174,7 @@ __all__ = [
 # is made with it before the lead answers.
 # ---------------------------------------------------------------------------
 
-PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0)
+PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 16.0)
 """OPEN (lead): penalty width. The Normal prior SD of every simple tested
 coefficient (each role level, each role slope), in the reported unit (a 0/1
 step; one pooled SD of a continuous covariate): the log penalty is

@@ -51,6 +51,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -384,22 +385,36 @@ def arm_effects() -> dict[int, float]:
     return {0: 0.0, 1: 0.2, 2: -0.3, 3: 0.1, 4: 0.3, 5: -0.2, 6: -1.0, 7: -1.2, 8: -0.8}
 
 
+def _recency(x: np.ndarray, amplitude: float) -> np.ndarray:
+    return amplitude * (1.0 - np.exp(-(np.asarray(x) - np.log(3.0)) / 1.2))
+
+
+def _reward(x: np.ndarray, amplitude: float) -> np.ndarray:
+    return amplitude * np.tanh(3.0 * (np.asarray(x) - 0.5)) / np.tanh(1.5)
+
+
+def _leaving(u: np.ndarray, amplitude: float) -> np.ndarray:
+    return amplitude * np.exp(-np.asarray(u) / 0.3)
+
+
 def recency_curve(amplitude: float) -> Curve:
     """A concave recency curve over log trials: rises from 3 trials and
-    flattens, ``amplitude * (1 - exp(-(x - log 3) / 1.2))``."""
-    return lambda x: amplitude * (1.0 - np.exp(-(np.asarray(x) - np.log(3.0)) / 1.2))
+    flattens, ``amplitude * (1 - exp(-(x - log 3) / 1.2))``. Each curve here
+    is a partial of a module-level function, so that a process pool can send
+    it."""
+    return partial(_recency, amplitude=amplitude)
 
 
 def reward_curve(amplitude: float) -> Curve:
     """A monotone S-shaped reward-fraction curve over [0, 1], from
     ``-amplitude`` to ``amplitude``."""
-    return lambda x: amplitude * np.tanh(3.0 * (np.asarray(x) - 0.5)) / np.tanh(1.5)
+    return partial(_reward, amplitude=amplitude)
 
 
 def leaving_curve(amplitude: float) -> Curve:
     """A rise toward leaving: ``amplitude * exp(-u / 0.3)``, ``u`` the time
     until the final poke-out (s)."""
-    return lambda u: amplitude * np.exp(-np.asarray(u) / 0.3)
+    return partial(_leaving, amplitude=amplitude)
 
 
 # ---------------------------------------------------------------------------
@@ -681,9 +696,13 @@ DATA_BANDS: Mapping[tuple[str, str], tuple[float, ...]] = {
 DATA_PSEUDO_EVENTS = 5.0
 
 
+def _interp(x: np.ndarray, centers: np.ndarray, values: np.ndarray) -> np.ndarray:
+    return np.interp(np.asarray(x, dtype=float), centers, values)
+
+
 def _band_curve(centers: np.ndarray, values: np.ndarray) -> Curve:
     """The piecewise-linear curve through the band centers, flat beyond."""
-    return lambda x: np.interp(np.asarray(x, dtype=float), centers, values)
+    return partial(_interp, centers=centers, values=values)
 
 
 def truth_from_data(
