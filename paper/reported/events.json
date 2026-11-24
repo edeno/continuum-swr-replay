@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "c8cecb1776a9",
+ "commit": "4e793986f2da",
  "code": {
-  "head": "c8cecb1776a918d40525ad2e19caec7d168c9310",
+  "head": "4e793986f2da965c877cd60b83385c882d7981a4",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -182,14 +182,6 @@
     "sha256": "0ab368c8332680a7050baecdb969539ef4b50d0da7b5a2eff8e2125579cd3cce",
     "code_sha256": "45791bed04e5ae9d8ce05825baf7e48c7526ade6e75ad518cbefc1a890313338"
    },
-   "src/continuum_swr_replay/analysis/detector_comparison/evidence.py": {
-    "sha256": "10ecfe6d6c7c01d544d447f267133cd7a18ba0fea8ba6463d9c0e3eb0db83322",
-    "code_sha256": "f06009713a2ba288fd4db8ee3b81d34098ff12ca437c2565b2d60cf8cb8266b8"
-   },
-   "src/continuum_swr_replay/analysis/detector_comparison/feature_run.py": {
-    "sha256": "fc22a08b465531105283c15c119c9364be5d05a748fc4c73f664090f5077ee56",
-    "code_sha256": "9169bf69f1bdfd79482b64f4e5857b9f2e94acd4677dfa9ac211be1c308ca61b"
-   },
    "src/continuum_swr_replay/analysis/detector_comparison/features.py": {
     "sha256": "7e5c05852904f17a81e936bbc43a9ef51744fd1084dc33f4d4c6bb95d41a35cb",
     "code_sha256": "07e2adba88aed4ad873bfc2385ba5b7c5c7e80390a7bba20fd8c25e2c33cb1e2"
@@ -199,8 +191,8 @@
     "code_sha256": "bb64ffe554f873854a27ff88324f1f0a6c3551122d060c8307b63306f6d64043"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/nonlocal_comparison.py": {
-    "sha256": "3911cac31066fdf7ec23084a95475517162afc00d0a227bea68c21ca304d6bd8",
-    "code_sha256": "0664de13ebd41e3f877f217a82066e869ab8e5d884ee496a40f0de9258275781"
+    "sha256": "38782cfd785b8ee22c29e8b299cb99b84a5d2de0a117ae3f4cdef1b6b9903656",
+    "code_sha256": "2a9bf28609ae2517f30c27374d3aa8f65e0cca29198c67c6b6c29e490930782f"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/overlap.py": {
     "sha256": "3ee0b0212ce7d78bf9ef525428ed0ed14614bc7a153e477faf8fa154408d9445",
@@ -210,21 +202,13 @@
     "sha256": "26e10190534232304940026d51142d875101aeb37e87b59f05cd65295cca28d0",
     "code_sha256": "98e080b53219c712f33f525fad72fb1f7376a5e8d3087daf2152f75dc97541d4"
    },
-   "src/continuum_swr_replay/analysis/detector_comparison/populations.py": {
-    "sha256": "5b5bcf8d036903f4102b2f93e8d463da697366b766088890d7314a173fbb0d5f",
-    "code_sha256": "449620d01311992d08f7cb773dae6cbcf838cadc702b9cdfe2d60928b6e844a1"
-   },
    "src/continuum_swr_replay/analysis/detector_comparison/recount.py": {
     "sha256": "ec65b46a54927f0588a2593241f6917eec0c03fc2ede56aa42d4f96e27ab0138",
     "code_sha256": "4de66cd0bd4fcc4ddc9898acc902d5296dceced1fa680ca2cea50e4fba623abb"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/schema.py": {
-    "sha256": "d78d129841803221af760536ccf2d0d44993cc9398a3982551de61af42e2ecc3",
-    "code_sha256": "9208af86b2eccbb0a8a72bba0dc3cb040436e93c75ce9b31c8f26f4a73b56380"
-   },
-   "src/continuum_swr_replay/analysis/detector_comparison/selection.py": {
-    "sha256": "040dc5c3636fcdc463435ca9c6331ff424cd8c39cad1557ff580656263014cbf",
-    "code_sha256": "c63f9b74a643e4d59492720b87db7844919d954bcb43f2a1dd4712a499d467e6"
+    "sha256": "b7da7367c4e21c935ed1c66f80465275bb0db709105f781fe3a9f001f4cc4687",
+    "code_sha256": "cad6f402512b51e40242583a8868a7430633a52134d431dc4ed9c77cc3af594d"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/swr_matrix.py": {
     "sha256": "4c77455e68e9bb026f75b29a91d7e4b7edb3813e0479baa31a8ef26089231ea9",
@@ -235,7 +219,7 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_definition/analyzed_time.py": {
-    "sha256": "2a2e87d9ab8b959c14f6b7f876ed7a3c62368b1c20c4e905934298ffd2b74c9f",
+    "sha256": "a1bc6f7b586ccf9c0e93af0374afde67dc54276494e5e56c8303f1f905f3184f",
     "code_sha256": "029d5d53ced38de888f564a09d527522ea75e61929136ba6ce5a6b13f63be39c"
    },
    "src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py": {
@@ -255,8 +239,8 @@
     "code_sha256": "9c3a6a93b38c609335f1dd6e15185516bab6c5e679d33ea881a4aedc4cda108a"
    },
    "src/continuum_swr_replay/analysis/event_definition/decode_masks.py": {
-    "sha256": "d30724316889f6dc7e44cd02de961782abf3e29bf1eb50155468ce4f662dea26",
-    "code_sha256": "c902f40dcc5772e7b7322b05b26a4b0cb65400222e5c05515b1ca04e72d40532"
+    "sha256": "e78d20ef1b879d19fa1ce9570c31444c5043398d91e1b71f7944f6e2a4ad2273",
+    "code_sha256": "80d122b02d23164156467f59c18dc09ca3c76c0a34628fa5b4a5b08d64d2f5dd"
    },
    "src/continuum_swr_replay/analysis/event_definition/eligibility.py": {
     "sha256": "47d0554e6cbc4f0b5c1a61fe00fcedb162a5e2e860ae742dd30d417df21835c4",
@@ -275,8 +259,8 @@
     "code_sha256": "be09b1fa67df01a4faf4ca21340980e7e555b58a7ad69b2336ced412b0b90fcf"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
-    "sha256": "f357bff572df4493cda9c27ff958f8aabc88fb36a0e73741e18cd3688f03fae7",
-    "code_sha256": "aba746ee78c27e2e431f17cb73b31124b6b3ae922ae6e128c6bf4b15899e00b2"
+    "sha256": "a3cc55f4971b85520ab38a00ba9a9ac39d9867419fa5dabf3387a0f755eee59f",
+    "code_sha256": "f60df8298b18b6d55c968c64a606d513c716290da51cb81d1d516e37748d9cb6"
    },
    "src/continuum_swr_replay/analysis/event_definition/well_visits.py": {
     "sha256": "c1b31c4e10b8585ef0a01d341bdd4a075dc31f90e35790fcf57f9567ee5564c4",
@@ -335,8 +319,8 @@
     "code_sha256": "0880993f761940075e5a19e9b67bfa5866ac587f98c49d42fae68e8f5ab07e12"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/io.py": {
-    "sha256": "daa81f9d8700155b476f033992ed8a41f55e65a39720f2a7c3d9c0564cb0ff23",
-    "code_sha256": "bc5234303fc14c6e17855f10f14cb60af613dd0d1f2dd009acabdf9a823e3824"
+    "sha256": "2475c15464bebfe2874c09a53ace8113e674c62327875ffa48a4341c7471cd96",
+    "code_sha256": "3b0d1a06e47b667c5539e41492d1e5b0447ee2befeca4e1653ec03cb4725fc9c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/summary.py": {
     "sha256": "2344a85d69bf26bbc8f44dd9d44669dc7b493dd73afd3d575c0b5ef2f84f9b58",
@@ -539,24 +523,24 @@
     "code_sha256": "7ef51ebf420d76aa0e66421990ab89f51f0b93b666c843926a652b8c7ec2de16"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "389bcb6da46d4809167ca46acb930d5ff57558c6b8c990b5ab076d119c16cc63",
-    "code_sha256": "ce88f35a99cf693593be51df29db9a25bcfaeb39ba3fe72c31f4a5d837a1591b"
+    "sha256": "f97a57f2c73a51897af6441993610ffaaf8e895cbab48b3dfd51d0fd6b98ba59",
+    "code_sha256": "9bdbacc71af27c6de45824119b9b07eb10a34a216807dc28a2771543a1d50e6f"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "f8014196abdff6a9fb47492d4e5fcbb31fe2d0b8f3b9185b8c1aca4ff6b2444f",
-    "code_sha256": "a44ec34d72c1711f01bc1c8e3b079dfa04fda73b154cf92d75b40ced18e346cc"
+    "sha256": "db9ed2ead348255593a897a8e653c3f310283b8b2d8efdc5365c288982b3c214",
+    "code_sha256": "6ad7f75ac7ac813f9a0e3c5ade27815d86b903027521bb02ea0999cc26741e66"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
     "code_sha256": "d866ba8479cbc8d226b4737d5d51dae5a5cdfa8fb1b34d523c3e89ba9735001a"
    },
    "src/continuum_swr_replay/reported/inputs.py": {
-    "sha256": "3e329d161a681fff4c5b588f55fd5f11c404617a8478b6f459f01ca63bb7946c",
-    "code_sha256": "5807b62ca23c4ca8316fd46f78e7ddd6483f45aeb8952ab96dfb22e5e0374ee8"
+    "sha256": "143f88a6db7f3103554e9c6a22b6e9db480323aa3aa14ceb10a4cfadd0f85fc6",
+    "code_sha256": "17e0b504c9b9dfdfbce5dd0a5e7b06cca5b65bc55f20be83f1388c7a70d76596"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "080c01c30eaaa88a8ab66a8545e6e5930b59b390d8606dd452e749a2a2b48183",
