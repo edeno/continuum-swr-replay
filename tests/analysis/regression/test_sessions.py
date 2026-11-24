@@ -10,7 +10,6 @@ import pytest
 from scipy.optimize import brentq
 
 from continuum_swr_replay.analysis.regression import runtime
-
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
