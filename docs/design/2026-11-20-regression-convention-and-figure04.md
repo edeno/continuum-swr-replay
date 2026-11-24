@@ -954,29 +954,40 @@ The lead: "ok".
 The author explained the two options for the rows of the content models' recency curve and its
 never-visited indicator: option A, one curve over every leaf arm (current and previous included); option
 B, the curve and the indicator on the other leaf arms only, with the role terms carrying everything for
-the current and previous arms. What was shown:
+the current and previous arms. What was shown (the simulation is
+`.claude/research/2026-11-20-regression-prototypes/content_decisions/recency_options/REPORT.md`: 40 real
+sessions, planted truths, the real response not read; every number below is a simulation number):
 
 - On the real event-arm table every current-arm row has recency 1 trial and every previous-arm row has
   recency 2 (counts of the input table, not results). Under option A the curve's values at 1 and 2 trials
   are therefore the same columns as the current and previous levels.
-- The literature on a covariate with a spike at one value recommends an indicator for the spike plus a
-  curve for the rest (Royston, Sauerbrei and Becher 2010, Statistics in Medicine, doi 10.1002/sim.3864;
-  Lorenz et al. 2017, American Journal of Epidemiology, doi 10.1093/aje/kww122).
-- A simulation on 40 real sessions (planted truths; the real response not read;
-  `.claude/research/2026-11-20-regression-prototypes/content_decisions/recency_options/REPORT.md`): under
-  option B the role terms were recovered (planted +1.50 and -0.80; estimates +1.46 to +1.50 and -0.78 to
-  -0.83) and did not move with the penalties; under option A the penalties set them (the current-arm
-  estimate went from +0.02 to +2.05 over the recency penalty and the prior SD, on the same data).
+- The author cited, from their abstracts only (the full texts were not read), two papers that recommend an
+  indicator for a spike at one value plus a curve for the rest (Royston, Sauerbrei and Becher 2010,
+  Statistics in Medicine, doi 10.1002/sim.3864; Lorenz et al. 2017, American Journal of Epidemiology, doi
+  10.1093/aje/kww122).
+- Under option B the role terms were recovered (planted +1.50 and -0.80; estimates +1.46 to +1.50 and
+  -0.78 to -0.83) and did not move with the penalties; under option A the penalties set them (the
+  current-arm estimate went from +0.02 to +2.05 over the recency penalty and the prior SD, on the same
+  data).
+- Neither option tells "recency alone" from "a role effect": when recency alone is planted (no role
+  effect), option B returns +1.12 to +1.17 for the current-arm term, the same as a true role effect would
+  give.
+- The recency test (Q5a) under option B is not stable across settings: planted +0.50, it comes back +0.50
+  to +0.51 at prior SD 8 with a flexible curve, +0.64 to +0.67 at prior SD 2, and +0.33 to +0.40 at the
+  stiff recency penalty.
 
 The lead: "do option B".
+
+The rest of this round is the author's reading of that decision and the author's text, not the lead's
+words:
 
 - The recency curve and the never-visited indicator cover the other leaf arms only. The role terms carry
   everything for the current and previous arms. The declared recency test (Q5a) reads the curve at its two
   points among other leaf arms. The setting that offered option A (`recency_rows`, commit 9d8488b2) is
   removed with its code.
-- What the paper must say: Q3a and Q3b compare the current and the previous arm with an average other
-  leaf arm. In this task the current arm is always the most recently visited arm, so "current arm" cannot
-  be separated from "most recently visited arm".
+- What the author proposes the paper says (not the lead's words): Q3a and Q3b compare the current and the
+  previous arm with an average other leaf arm. In this task the current arm is always the most recently
+  visited arm, so "current arm" cannot be separated from "most recently visited arm".
 
 The other content questions stay open as they are (Phase 6a's list).
 

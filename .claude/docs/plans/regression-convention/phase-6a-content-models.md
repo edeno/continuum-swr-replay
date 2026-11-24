@@ -51,12 +51,17 @@ tested together in one model with the trial number
 well's arm), ASK-1 (lead: "Move them": the ContFrag SWR- and MUA-sourced events are two more event sources of
 this runner), C14.
 
-**Decided at this phase** (design, twenty-fourth round): the lead, 2026-11-23, 18:17, "do option B". The
-recency curve and the never-visited indicator cover the other leaf arms only; the role terms carry
-everything for the current and previous arms (every current-arm row has recency 1 trial and every
-previous-arm row 2); Q5a reads the curve at its two points among other leaf arms. The paper says that Q3a
+**Decided at this phase** (design, twenty-fourth round): the lead's words, 2026-11-23, 18:17: "do option
+B". The rest of this paragraph is the author's reading and text, not the lead's words. The recency curve
+and the never-visited indicator cover the other leaf arms only; the role terms carry everything for the
+current and previous arms (every current-arm row has recency 1 trial and every previous-arm row 2); Q5a
+reads the curve at its two points among other leaf arms. The author proposes that the paper says that Q3a
 and Q3b compare with an average other leaf arm, and that in this task "current arm" cannot be separated
-from "most recently visited arm". The setting `recency_rows`, built to inform the decision, is removed.
+from "most recently visited arm". What was shown before the decision includes two limits (simulation,
+`content_decisions/recency_options/REPORT.md`): with recency alone planted the current-arm term comes
+back +1.12 to +1.17, as a true role effect would, so neither option tells the two apart; and Q5a (planted
++0.50) is +0.50 to +0.51 at prior SD 8 with a flexible curve, +0.64 to +0.67 at SD 2 and +0.33 to +0.40 at
+the stiff penalty. The setting `recency_rows`, built to inform the decision, is removed.
 
 **Questions for the lead at this phase** (calls of the plan's author, not decided; ask before the first
 real fit and state the answers in `docs/regression_models.md`):
@@ -73,7 +78,9 @@ real fit and state the answers in `docs/regression_models.md`):
 - (**call**, 2026-11-23) The collinearity rule of a tested coefficient is measured on the penalized problem:
   the information at the fit plus the smooths' declared penalties, the weak penalties left out
   (`role_content.tested_coefficient_collinearity`). On the likelihood's information alone `role[current]`
-  failed in 87 % of the recency simulation's session fits (R^2 0.9999994) while the fits recovered it:
+  failed in 87 % of the recency simulation's session fits (R^2 0.9999994; `content_decisions/
+  recency_options/REPORT.md`, 40 sessions under option B) while the fits recovered it (the content
+  validation's part 2, a different run on 40 sessions, found 90 %):
   each by-role smooth's sum-to-zero constraint is computed on the scale rows, so in a session that does
   not see one of its basis functions the curve's columns hold the role's indicator, and only the curve's
   penalty fixes that direction (the weak penalties do not). Evidence and the remaining failures (arm

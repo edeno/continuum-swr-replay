@@ -334,10 +334,13 @@ Per session and kind, one row per (event, candidate arm), all nine arms (lead's 
   rows by a target median edf and a simulation (above, "Smooth terms and bases").
 - Recency: a smooth of `log(trials since last visit)` on the other-leaf rows only, not centered within the
   event (lead: absolute recency), with the never-visited indicator on the same rows; recency is clamped at
-  200 trials. The rows are decided (design, twenty-fourth round; the lead, 2026-11-23, 18:17, "do option
-  B"): the current arm is always 1 trial since its last visit and the previous arm 2, so the role terms
-  carry everything for them, and Q3a and Q3b compare with an average other leaf arm. "Current arm" cannot
-  be separated from "most recently visited arm" in this task; the paper says so. The shipped
+  200 trials. The rows are decided (design, twenty-fourth round; the lead's words, 2026-11-23, 18:17: "do
+  option B"). The author's reading, not the lead's words: the current arm is always 1 trial since its last
+  visit and the previous arm 2, so the role terms carry everything for them, and Q3a and Q3b compare with
+  an average other leaf arm; "current arm" cannot be separated from "most recently visited arm" in this
+  task, and the author proposes that the paper says so. Under this option the current-arm term cannot tell
+  recency alone from a role effect, and the recency test Q5a moves with the settings (design,
+  twenty-fourth round). The shipped
   within-event centering (`behavior/covariates/history/visit_recency.py:23`) is not used.
 - Q7b: a smooth of time until leaving (`u` at the event start) for the current role, per kind.
 - Length-adjusted comparison of kinds: every role slope and role category also interacts with
