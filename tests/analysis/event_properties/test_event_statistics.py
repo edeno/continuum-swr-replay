@@ -143,16 +143,18 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert len(offsets) == 4
     np.testing.assert_allclose(offsets["start_offset_s"], [0.02, 0.01, -0.05, 0.04])
     np.testing.assert_allclose(offsets["end_offset_s"], [-0.02, -0.05, 0.10, 0.20])
-    result = stats.boundary_offset_statistics(offsets)
+    result = stats.boundary_offset_statistics(offsets, EVENTS)
     assert result["n_overlapping"] == 4
-    assert result["start_offset_median_s"] == pytest.approx(0.015)
-    assert result["end_offset_median_s"] == pytest.approx(0.04)
-    # |start| 0.02, 0.01, 0.05, 0.04 and |end| 0.02, 0.05, 0.10, 0.20 s: beyond
-    # 10 ms (strictly), 3 and 4 of 4; beyond 50 ms (strictly), 0 and 2 of 4
-    assert result["start_offset_beyond_ten_ms_fraction"] == pytest.approx(3 / 4)
-    assert result["end_offset_beyond_ten_ms_fraction"] == pytest.approx(4 / 4)
+    # a's one event (0.02, -0.02); b's one epoch, medians 0.01 and 0.10
+    assert result["start_offset_median_s"] == pytest.approx((0.02 + 0.01) / 2)
+    assert result["end_offset_median_s"] == pytest.approx((-0.02 + 0.10) / 2)
+    # beyond 10 ms (strictly): start a 1, b 2/3 (0.05, 0.04, not 0.01); end
+    # a 1, b 1. Beyond 50 ms: start 0, 0; end a 0, b 2/3 (0.10, 0.20). Each the
+    # mean over animals (pooled over the 4 events: 3/4, 1, 0, 1/2)
+    assert result["start_offset_beyond_ten_ms_fraction"] == pytest.approx(5 / 6)
+    assert result["end_offset_beyond_ten_ms_fraction"] == pytest.approx(1.0)
     assert result["start_offset_beyond_fifty_ms_fraction"] == pytest.approx(0)
-    assert result["end_offset_beyond_fifty_ms_fraction"] == pytest.approx(2 / 4)
+    assert result["end_offset_beyond_fifty_ms_fraction"] == pytest.approx(1 / 3)
     # events none of which overlaps an SWR: no row, and the two columns
     none = stats.boundary_offsets(EVENTS[EVENTS["overlap_class"] == "non_swr"])
     assert none.empty
@@ -538,6 +540,34 @@ def test_event_signal_statistics_refuse_an_event_without_a_value():
         stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
 
 
+def test_boundary_offset_statistics_take_each_epoch_then_each_animal():
+    """a: epoch e1 with three SWR-overlapping events (start offsets 0, 0.02,
+    0.04 s: median 0.02), e2 with one (0.10), and e3 with none, which is not
+    one of its epochs; b: one event (0). a's median is that of 0.02 and 0.10,
+    0.06; the mean over animals 0.03 (pooled over the five events: 0.02). Its
+    share of starts beyond 50 ms: e1 0, e2 1 -> 0.5; b 0 -> 0.25 (pooled 1/5)."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [0.0, 0.02, 0.04, 0.10, 0.0],
+            "end_offset_s": 0.0,
+        },
+        index=[1, 2, 3, 4, 5],
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b", "a"],
+            "session_date": 1,
+            "epoch": ["e1", "e1", "e1", "e2", "e1", "e3"],
+        },
+        index=[1, 2, 3, 4, 5, 6],
+    )
+    result = stats.boundary_offset_statistics(offsets, events)
+    assert result["n_overlapping"] == 5
+    assert result["start_offset_median_s"] == pytest.approx(0.03)
+    assert result["start_offset_beyond_fifty_ms_fraction"] == pytest.approx(0.25)
+    assert result["end_offset_beyond_ten_ms_fraction"] == 0.0
+
+
 def test_power_change_statistics_count_animals_above_rest():
     reference = pd.DataFrame(
         {
@@ -547,7 +577,9 @@ def test_power_change_statistics_count_animals_above_rest():
         }
     )
     result = stats.power_change_statistics(reference, ["slow_gamma"])
-    assert result.loc[("slow_gamma", False), "median"] == 0.0
+    # a's median 2, b's -1.5: their mean (the median over the four epochs: 0)
+    assert result.loc[("slow_gamma", False), "median"] == pytest.approx(0.25)
+    assert result.loc[("slow_gamma", True), "median"] == pytest.approx(0.5)
     assert result.loc[("slow_gamma", False), "n_animals_above_rest"] == 1
     assert result.loc[("slow_gamma", True), "n_animals_above_rest"] == 2
     reference.loc[0, "slow_gamma_db_swr"] = np.nan
@@ -570,8 +602,9 @@ def test_rest_matched_theta_statistics_average_events_not_windows():
         }
     )
     result = stats.rest_matched_theta_statistics(events)
-    # the mean of the three events' shares; over their 25 windows it would be 0.2
-    assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.7 / 3)
+    # a's epoch: the mean of its events' shares, 0.3; b's 0.1; their mean 0.2
+    # (pooled over the three events: 0.7 / 3)
+    assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.2)
     assert result.loc[True, "rest_theta_like_fraction"] == pytest.approx(0.3)
     # a: half its events are theta-like against 0.3 of its windows; b: none against 0.1
     assert result.loc[False, "n_animals_above_rest"] == 1
@@ -609,8 +642,8 @@ def test_rest_matched_theta_statistics_take_an_animal_s_shares_over_its_epochs()
     result = stats.rest_matched_theta_statistics(
         pd.concat([events, events.iloc[[0]].assign(is_swr=True)], ignore_index=True)
     )
-    # pooled over the events: 0.35
-    assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.35)
+    # a's epochs 0.5 and 0.3 (pooled over the events it would be 0.35)
+    assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.4)
     # a: the mean of its epochs' shares, 0.5 (1 and 0), against 0.4 (0.5 and
     # 0.3): above. Pooled, 1 of 4 against 0.35 would not be.
     assert result.loc[False, "n_animals_above_rest"] == 1
@@ -653,10 +686,16 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
     result = stats.spike_evidence_statistics(metrics, "baseline")
     remote = result.loc["remote"]
     assert remote["n_scored"] == 6
-    assert remote["spikes_median"] == 3.5  # the mean is 7.5
-    assert remote["tetrodes_median"] == 4.0  # the mean is 4.5
-    assert remote["dll_per_spike_median"] == 2.0  # the mean is 2.5
-    assert remote["gpi_distance_median_cm"] == 35.0  # the mean is 50
+    # each epoch's median, each animal's median over its epochs, the mean over
+    # animals (pooled over the six events: 3.5, 4, 2 and 35). Spikes: a (1, 2)
+    # 1.5, b 3.5, c (5, 30) 17.5
+    assert remote["spikes_median"] == pytest.approx(22.5 / 3)
+    # tetrodes: a 3, b 4, c 6.5
+    assert remote["tetrodes_median"] == pytest.approx(13.5 / 3)
+    # dll: a 0.5, b 5, c 2
+    assert remote["dll_per_spike_median"] == pytest.approx(7.5 / 3)
+    # distance: a 15, b 35, c 100
+    assert remote["gpi_distance_median_cm"] == pytest.approx(150 / 3)
     assert remote["n_epochs_scored"] == 5
     # a1 and a2 equal their baselines (0.0, 1.0), which is not above; b1: 5.0
     # against 3.0; c1: 1.0 against 0.0; c2: 3.0 against 10.0
@@ -665,9 +704,10 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
     assert remote["n_animals_above_baseline"] == 1
     baseline = result.loc["baseline"]
     assert baseline["n_scored"] == 6
-    assert baseline["spikes_median"] == 35.0
-    assert baseline["tetrodes_median"] == 2.0
-    assert baseline["dll_per_spike_median"] == 1.5
+    # spikes a 15, b 35, c 70; tetrodes 1, 2, 3.5; dll 0.5, 3, 5
+    assert baseline["spikes_median"] == pytest.approx(40.0)
+    assert baseline["tetrodes_median"] == pytest.approx(6.5 / 3)
+    assert baseline["dll_per_spike_median"] == pytest.approx(8.5 / 3)
     assert baseline["gpi_distance_median_cm"] == 5.0
     assert baseline["n_epochs_scored"] == 5
     assert np.isnan(baseline["n_epochs_above_baseline"])
@@ -689,7 +729,8 @@ def test_spike_evidence_statistics_take_an_animal_s_median_over_its_epochs():
         }
     )
     remote = stats.spike_evidence_statistics(metrics, "baseline").loc["remote"]
-    assert remote["dll_per_spike_median"] == 1.0
+    # the median of a's epochs' medians 1 and -3 (pooled over its events: 1)
+    assert remote["dll_per_spike_median"] == -1.0
     assert remote["n_epochs_above_baseline"] == 1
     # a: the median of its epochs' medians 1 and -3 is -1, against 0: not
     # above (pooled, its events' median 1 would be)

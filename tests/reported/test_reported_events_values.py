@@ -260,16 +260,18 @@ def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range
 def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
     values = _by_key(builder.boundary_offset_values(_events(), "s"))
     assert values["swr_overlapping_events"].value == 6
-    # starts 5, 10, 30, 50, 60, 300 ms; ends -50, -40, -30, -10, -5, 900 ms
-    assert values["start_offset_median_ms"].value == pytest.approx(40.0)
-    assert values["end_offset_median_ms"].value == pytest.approx(-20.0)
+    # one epoch per animal: starts a 10; b 5, 30, 50 (median 30); c 60, 300
+    # (180) ms -> (10 + 30 + 180) / 3 (pooled over the six: 40); ends a -10; b
+    # -5, -30, -40 (-30); c -50, 900 (425) -> 385 / 3 (pooled: -20)
+    assert values["start_offset_median_ms"].value == pytest.approx(220 / 3)
+    assert values["end_offset_median_ms"].value == pytest.approx(385 / 3)
     assert values["start_offset_median_ms"].unit == "ms"
-    # starts beyond 10 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
-    assert values["start_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["start_offset_beyond_fifty_ms_fraction"].value == 2 / 6
-    # ends beyond 10 ms: -50, -40, -30, 900; beyond 50: 900
-    assert values["end_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
+    # starts beyond 10 ms (strictly): a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1
+    assert values["start_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["start_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 3)
+    # ends beyond 10 ms: a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1/2
+    assert values["end_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["end_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 6)
 
 
 def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
@@ -586,13 +588,18 @@ def test_gamma_db_values_name_each_band_and_class():
         }
     )
     assert _numbers(builder.gamma_db_values(reference, "s")) == {
-        "slow_gamma_db_median_non_swr": 1.0,
+        # each animal's median over its epochs, then the mean over animals: a
+        # (1, 3) 2, b -1 (the median over the three epochs would be 1)
+        "slow_gamma_db_median_non_swr": pytest.approx(0.5),
         "slow_gamma_db_animals_above_rest_non_swr": 1,
-        "slow_gamma_db_median_swr": 4.0,
+        # a (2, 4) 3, b 6 (over the epochs: 4)
+        "slow_gamma_db_median_swr": pytest.approx(4.5),
         "slow_gamma_db_animals_above_rest_swr": 2,
-        "fast_gamma_db_median_non_swr": -2.0,
+        # a (-3, -1) -2, b -2
+        "fast_gamma_db_median_non_swr": pytest.approx(-2.0),
         "fast_gamma_db_animals_above_rest_non_swr": 0,
-        "fast_gamma_db_median_swr": 0.5,
+        # a (0.5, 0.7) 0.6, b -0.2 (over the epochs: 0.5)
+        "fast_gamma_db_median_swr": pytest.approx(0.2),
         "fast_gamma_db_animals_above_rest_swr": 1,
     }
 
@@ -631,15 +638,17 @@ def test_spike_evidence_values_name_each_group_and_each_count():
         "evidence_epochs": 3,
         "evidence_animals": 2,
         "baseline_scored": 3,
-        "baseline_spikes_median": 15.0,
-        "baseline_tetrodes_median": 2.0,
-        "baseline_dll_per_spike_median": 0.2,
-        "baseline_gpi_distance_median_cm": 5.0,
+        # each epoch's median, each animal's median over its epochs, the mean
+        # over animals: a (10, 15) 12.5, b 20 (pooled over the rows: 15)
+        "baseline_spikes_median": pytest.approx(16.25),
+        "baseline_tetrodes_median": pytest.approx(3.0),
+        "baseline_dll_per_spike_median": pytest.approx(0.55),
+        "baseline_gpi_distance_median_cm": pytest.approx(6.0),
         "swr_remote_scored": 3,
-        "swr_remote_spikes_median": 35.0,
-        "swr_remote_tetrodes_median": 6.0,
-        "swr_remote_dll_per_spike_median": 2.2,
-        "swr_remote_gpi_distance_median_cm": 55.0,
+        "swr_remote_spikes_median": pytest.approx(36.25),
+        "swr_remote_tetrodes_median": pytest.approx(7.0),
+        "swr_remote_dll_per_spike_median": pytest.approx(2.55),
+        "swr_remote_gpi_distance_median_cm": pytest.approx(61.25),
         "swr_remote_epochs_above_baseline": 3,
         "swr_remote_epochs_scored": 3,
         "swr_remote_animals_above_baseline": 2,
@@ -1064,7 +1073,8 @@ def test_rest_theta_values_name_each_class():
         }
     )
     assert _numbers(builder.rest_theta_values(events, "s")) == {
-        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.7 / 3),
+        # a's epoch 0.3 (0.2, 0.4), b's 0.1: their mean (pooled: 0.7 / 3)
+        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.2),
         # a: half its events against 0.3 of its windows; b: none against 0.1
         "theta_like_animals_above_rest_matched_non_swr": 1,
         "theta_like_fraction_rest_matched_swr": pytest.approx(0.6),

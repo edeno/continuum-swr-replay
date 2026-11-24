@@ -790,7 +790,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2f)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
     stats = event_statistics.boundary_offset_statistics(
-        event_statistics.boundary_offsets(events)
+        event_statistics.boundary_offsets(events), events
     )
     return [
         make(
@@ -805,7 +805,8 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             milliseconds(stats["start_offset_median_s"]),
             "quantity",
             "int",
-            "median of event start minus matched SWR start",
+            "median of event start minus matched SWR start: each epoch's median, "
+            "each animal's median over its epochs, the mean over animals",
             "ms",
         ),
         make(
@@ -813,7 +814,8 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             milliseconds(stats["end_offset_median_s"]),
             "quantity",
             "int",
-            "median of event end minus matched SWR end",
+            "median of event end minus matched SWR end: each epoch's median, each "
+            "animal's median over its epochs, the mean over animals",
             "ms",
         ),
         *(
@@ -823,7 +825,9 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of SWR-overlapping events whose {bound} differs from the "
-                f"matched SWR's {bound} by more than {1000 * tail_s:g} ms",
+                f"matched SWR's {bound} by more than {1000 * tail_s:g} ms: each "
+                "epoch's share, each animal's mean over its epochs, the mean over "
+                "animals",
             )
             for bound in ("start", "end")
             for name, tail_s in event_statistics.OFFSET_TAILS_S.items()
@@ -1586,9 +1590,9 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     For each epoch and class: ``10 log10(mean band power over the class's event
     samples / mean band power over quiet rest)`` (below 4 cm/s, in no non-local,
     SWR or MUA event, outside excluded time), on the same band power the z
-    values are made from (``scripts/event_properties/measure_event_gamma.py``). The
-    median over epochs, and the animals whose median over their epochs is above
-    0 dB. The z values (``gamma_z_values``) stay as they are.
+    values are made from (``scripts/event_properties/measure_event_gamma.py``). Each
+    animal's median over its epochs, the mean over animals, and the animals
+    whose median over their epochs is above 0 dB. The z values (``gamma_z_values``) stay as they are.
     """
     make = value_factory(gamma_db_values, source, TAGS["brain_state"])
     bands = ["slow_gamma", "fast_gamma"]
@@ -1605,9 +1609,9 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
                     stats["median"],
                     "quantity",
                     "sig2s",
-                    f"median over epochs of the change in {label} during {name} events "
-                    "against the epoch's quiet rest: 10 log10 of the ratio of mean band "
-                    "powers",
+                    f"change in {label} during {name} events against the epoch's quiet "
+                    "rest (10 log10 of the ratio of mean band powers): each animal's "
+                    "median over its epochs, then the mean over animals",
                     "dB",
                 ),
                 make(
@@ -1663,8 +1667,9 @@ def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
 
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2c.3, 2c.4 and 2d.9: each event group's spike evidence against matched
-    quiet windows (``baseline``), the negative control. Event-level medians, pooled
-    over epochs; the run scores every event and every quiet window with at least one
+    quiet windows (``baseline``), the negative control. Each median is event ->
+    epoch -> animal (each epoch's median, each animal's median over its epochs,
+    the mean over animals); the run scores every event and every quiet window with at least one
     spike (no cap; the evidence is per spike, so a quiet window without spikes has
     none)."""
     make = value_factory(spike_evidence_values, source, TAGS["spike"])
@@ -1696,7 +1701,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 stats["spikes_median"],
                 "quantity",
                 "int",
-                f"median spike count of {label}",
+                f"median spike count of {label}: each epoch's median, each animal's "
+                "median over its epochs, the mean over animals",
                 "spikes",
                 tags=TAGS["spike_count"],
             ),
@@ -1705,7 +1711,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 stats["tetrodes_median"],
                 "quantity",
                 "int",
-                f"median number of tetrodes with a spike in {label}",
+                f"median number of tetrodes with a spike in {label}: each epoch's "
+                "median, each animal's median over its epochs, the mean over animals",
                 "tetrodes",
                 tags=TAGS["spike_count"],
             ),
@@ -1715,7 +1722,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"median log-likelihood ratio per spike, decoded location against the "
-                f"animal's, of {label}",
+                f"animal's, of {label}: each epoch's median, each animal's median over "
+                "its epochs, the mean over animals",
                 "nats per spike",
                 tags=TAGS["spike_evidence"],
             ),
@@ -1725,7 +1733,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "int",
                 f"median track distance from the MAP of {label} to the ground-process "
-                "intensity peak",
+                "intensity peak: each epoch's median, each animal's median over its "
+                "epochs, the mean over animals",
                 "cm",
                 tags=TAGS["spike_gpi"],
             ),
@@ -4753,7 +4762,9 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of quiet-rest windows, matched in duration to the {name} events, "
-                "whose theta reaches the epoch's median running theta",
+                "whose theta reaches the epoch's median running theta: each epoch's "
+                "mean over its events, each animal's mean over its epochs, the mean "
+                "over animals",
             ),
             make(
                 f"theta_like_animals_above_rest_matched_{group}",
