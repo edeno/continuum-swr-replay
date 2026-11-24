@@ -954,6 +954,53 @@ def test_an_estimand_on_a_baseline_is_refused(day_cohort) -> None:
         Model("m", model.design, Poisson(), "count", "well_visit_id", {"b": c})
 
 
+def test_the_unit_target_is_the_unpenalized_fit_by_hand() -> None:
+    """Two sessions of 120 and 15 visits with reward effects 0.2 and 1.0 at
+    the animal unit, a model of per-session intercepts and one slope:
+    ``planted_unit`` is the slope of the unpenalized fit to the expected
+    counts, by Newton's method by hand, to 1e-8, and not the weakly penalized
+    one."""
+    sessions = {
+        ("animal0", "20260001", "02_r1"): rate_rows(0, n_visits=120),
+        ("animal0", "20260001", "04_r2"): rate_rows(1, n_visits=15),
+    }
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [Slope(REWARD, WEAK), Offset("exposure")],
+        pooled,
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    model = Model(
+        "rate_animal",
+        design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+        fit_by="animal",
+    )
+    scenario = OutsideScenario("unequal", _unequal_effects, planted={"reward": 0.6})
+    result = engine.run(Simulation([model], sessions, [scenario], 2, 50, 5))
+    session = np.repeat([0, 1], [len(r) for r in sessions.values()])
+    reward = pooled[REWARD].to_numpy()
+    X = np.column_stack([session == 0, session == 1, reward]).astype(float)
+    offset = np.log(pooled["exposure"].to_numpy())
+    y = np.concatenate(list(_unequal_effects(sessions, None).values()))
+
+    def slope(lam):
+        b = np.zeros(3)
+        for _ in range(100):
+            mu = np.exp(X @ b + offset)
+            g = X.T @ (y - mu) - lam * np.r_[0.0, 0.0, b[2]]
+            H = X.T @ (X * mu[:, None]) + np.diag([0.0, 0.0, lam])
+            b = b + np.linalg.solve(H, g)
+        return b[2]
+
+    np.testing.assert_allclose(result.data_sets["planted_unit"], slope(0.0), atol=1e-8)
+    assert abs(slope(np.exp(WEAK)) - slope(0.0)) > 1e-4
+
+
 if __name__ == "__main__":
     from continuum_swr_replay.runs.provenance import described_commit
 
