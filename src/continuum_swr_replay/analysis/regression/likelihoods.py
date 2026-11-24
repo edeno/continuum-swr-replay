@@ -230,6 +230,17 @@ def _weighted_design_kernel(lik, X, eta, y, aux, weight):
     return lik._jax_weighted_design(X, eta, y, aux, weight)
 
 
+def _one_axis(values: object, name: str) -> np.ndarray:
+    """`values` as float64, refused (``ValueError``) unless it has one axis: a
+    column of shape ``(n, 1)`` would broadcast against the padded rows."""
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1:
+        raise ValueError(
+            f"{name} of shape {values.shape}: one value per row, on one axis"
+        )
+    return values
+
+
 def _gram(X: Any, weights: Any) -> Any:
     """``X' diag(weights) X``, shape ``(p, p)``, for weights of either sign.
 
@@ -267,14 +278,15 @@ class _Family:
     ) -> tuple[Rows, list[np.ndarray]]:
         """``pad`` of ``X`` (no columns when None), and each of ``rows``
         (``eta``, ``d``...) padded to the same rows; each must have one value
-        per row of ``y``."""
+        per row of ``y``, on one axis, as ``y`` must."""
         self._stateless()
-        y = np.asarray(y, dtype=float)
+        y = _one_axis(y, "y")
         X = np.empty((y.size, 0)) if X is None else X
         padded = self.pad(X, y, aux)
         n = padded.y.size
         return padded, [
-            pad_values(r, padded.n_real, n, name) for name, r in rows.items()
+            pad_values(_one_axis(r, name), padded.n_real, n, name)
+            for name, r in rows.items()
         ]
 
     @in_float64
@@ -407,7 +419,7 @@ class Poisson(_DiagonalFamily):
         offset = np.asarray(aux, dtype=float)
         if offset.ndim == 0:  # one offset for every row
             offset = np.full(np.shape(y), float(offset))
-        padded = pad_rows(X, y, offset)
+        padded = pad_rows(X, y, _one_axis(offset, "offset"))
         return Rows(padded.X, padded.y, padded.offset, padded.weight, padded.n_real)
 
     def _jax_loglik(self, eta, y, aux, weight):

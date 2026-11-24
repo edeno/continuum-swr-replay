@@ -403,6 +403,30 @@ def test_a_vector_of_another_length_is_refused(length: int) -> None:
         lik.d2information(X, eta, y, aux, eta, wrong)
 
 
+@pytest.mark.parametrize("name", ["poisson", "bernoulli", "softmax_counts"])
+def test_a_per_row_vector_with_two_axes_is_refused(name: str) -> None:
+    """``eta``, ``d``, ``d1``, ``d2``, ``y`` and a per-row offset take one
+    axis: a column of shape (n, 1) broadcast against the padded rows and gave
+    a wrong number. The error names the argument and its shape."""
+    lik, X, y, aux, eta = _case(name)
+    column = rf"of shape \({N_ROWS}, 1\): one value per row, on one axis"
+    with pytest.raises(ValueError, match="eta " + column):
+        lik.loglik(eta[:, None], y, aux)
+    with pytest.raises(ValueError, match="eta " + column):
+        lik.score_eta(eta[:, None], y, aux)
+    with pytest.raises(ValueError, match="y " + column):
+        lik.loglik(eta, y[:, None], aux)
+    with pytest.raises(ValueError, match="d " + column):
+        lik.dinformation(X, eta, y, aux, eta[:, None])
+    with pytest.raises(ValueError, match="d1 " + column):
+        lik.d2information(X, eta, y, aux, eta[:, None], eta)
+    with pytest.raises(ValueError, match="d2 " + column):
+        lik.d2information(X, eta, y, aux, eta, eta[:, None])
+    if name == "poisson":
+        with pytest.raises(ValueError, match="offset " + column):
+            lik.loglik(eta, y, aux[:, None])
+
+
 def test_a_single_poisson_offset_is_every_rows() -> None:
     """A scalar offset is the offset of every row; None is refused as before
     (``TypeError``)."""
