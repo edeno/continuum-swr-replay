@@ -1338,13 +1338,14 @@ def most_steps(
 def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     """A per-event property's median in non-SWR and in SWR events.
 
-    Plain medians of all events with a value, pooled over epochs and animals;
-    not duration-controlled.
+    Event -> epoch -> animal: the mean over animals of each animal's median
+    of the class (:func:`animal_class_medians`: the median over its epochs of
+    the epoch's median); not duration-controlled.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``is_swr`` and ``column``.
+        As :func:`animal_class_medians` takes them.
     column : str
         The property.
 
@@ -1353,8 +1354,11 @@ def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     statistics : dict
         ``median_non_swr`` and ``median_swr``.
     """
-    median = events.dropna(subset=[column]).groupby("is_swr")[column].median()
-    return {"median_non_swr": median[False], "median_swr": median[True]}
+    medians = animal_class_medians(events, column)
+    return {
+        "median_non_swr": float(medians["non_swr"].mean()),
+        "median_swr": float(medians["swr"].mean()),
+    }
 
 
 def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -1448,6 +1452,31 @@ def _class_distribution(
             )
         )
     return pd.concat(rows, ignore_index=True)
+
+
+def property_distribution(
+    events: pd.DataFrame, column: str, edges: np.ndarray
+) -> pd.DataFrame:
+    """Each animal's distribution of a per-event property, by class, as
+    :func:`hpd_distribution` takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        ``column`` (an event without a value is left out).
+    column : str
+        The property.
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges, in the property's unit.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent``.
+    """
+    return _class_distribution(events, column, edges)
 
 
 def hpd_distribution(
@@ -1588,6 +1617,39 @@ def content_distance_distribution(
     return _class_distribution(events, DISTANCE_COLUMN, edges)
 
 
+TRANSPORT_SPEED_COLUMN = "transport_slope_speed_cm_s"
+"""Each event's transport-slope speed (``event_speed.transport_slope_speed``)."""
+
+TRANSPORT_SPEED_BIN_EDGES_CM_S = np.arange(0.0, 1001.0, 25.0)
+"""The speed bins of the transport-speed panel (cm/s); an event faster than the
+last edge is in no bin, so the percents of a class sum to less than 100."""
+
+
+def transport_speed_distribution(
+    events: pd.DataFrame, edges: np.ndarray = TRANSPORT_SPEED_BIN_EDGES_CM_S
+) -> pd.DataFrame:
+    """Each animal's distribution of the events' transport-slope speed
+    (:data:`TRANSPORT_SPEED_COLUMN`), by class, as :func:`hpd_distribution`
+    takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        :data:`TRANSPORT_SPEED_COLUMN` (an event without one is left out).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (cm/s).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent`` (of the animal's events of the class that
+        have a speed).
+    """
+    return _class_distribution(events, TRANSPORT_SPEED_COLUMN, edges)
+
+
 def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """The share of each class's events whose content lies in each distance
     band from the animal (:data:`DISTANCE_BANDS_CM`).
@@ -1608,8 +1670,9 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
         Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
         of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
         mean over animals of the animals' shares; ``animal_min`` and
-        ``animal_max``; ``share``, pooled over the class's events;
-        ``n_animals`` and ``n_events`` (the class's events).
+        ``animal_max``; ``share``, the same number as ``share_animal_mean``
+        (the headline share is animal-first); ``n_animals`` and ``n_events``
+        (the class's events).
     """
     table = _class_table(events, DISTANCE_COLUMN)
     rows = []
@@ -1627,7 +1690,7 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
                     "share_animal_mean": float(per_animal.mean()),
                     "animal_min": float(per_animal.min()),
                     "animal_max": float(per_animal.max()),
-                    "share": float(inside.mean()),
+                    "share": float(per_animal.mean()),
                     "n_animals": len(per_animal),
                     "n_events": len(mine),
                 }
@@ -1688,7 +1751,9 @@ AT_WELL_CM = 20.0
 at a well."""
 
 
-def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, float]:
+def quadrant_fractions(
+    d_animal: np.ndarray, d_well: np.ndarray, weights: np.ndarray | None = None
+) -> dict[str, float]:
     """Fraction of content *timebins* in each (far × at-well) quadrant.
 
     Timebin-weighted (where the decoded content spends its time), not
@@ -1704,19 +1769,27 @@ def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, fl
     d_well : np.ndarray, shape (n_bins,)
         The same bins' track distance (cm) from the content to the nearest
         reward well. At a well means below :data:`AT_WELL_CM`.
+    weights : np.ndarray, shape (n_bins,), optional
+        How much content time each row stands for (the posterior mass of a
+        place, summed over time bins); every row counts once when None.
 
     Returns
     -------
     dict of str to float
-        The share of the bins in each of :data:`OCCUPANCY_QUADRANTS`.
+        The share of the bins (of the weight) in each of
+        :data:`OCCUPANCY_QUADRANTS`.
     """
     far = d_animal > FAR_CM
     at_well = d_well < AT_WELL_CM
+
+    def share(mask: np.ndarray) -> float:
+        return float(np.average(mask, weights=weights))
+
     return {
-        "remote_well": float((far & at_well).mean()),
-        "own_well": float((~far & at_well).mean()),
-        "remote_path": float((far & ~at_well).mean()),
-        "near_off": float((~far & ~at_well).mean()),
+        "remote_well": share(far & at_well),
+        "own_well": share(~far & at_well),
+        "remote_path": share(far & ~at_well),
+        "near_off": share(~far & ~at_well),
     }
 
 

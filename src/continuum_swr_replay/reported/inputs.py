@@ -18,7 +18,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
+    decode_path,
+)
 from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    read_dot_with_swr_source,
+    swr_intervals,
+)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     subset_staleness,
 )
@@ -31,9 +38,12 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
+    CONTENT_MASS_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
     EVENT_CONTENT_PLACE_RATE_DIR,
@@ -46,9 +56,11 @@ from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_RULE_SWEEP_DIR,
+    EVENT_SPEED_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EVENT_TRIGGER_WINDOWS_DIR,
+    EXAMPLE_SESSION_DIR,
     EXPOSURE_IN_VISITS_DIR,
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
@@ -90,6 +102,7 @@ class EventsInputs:
     spike_evidence_dir: Path
     heldout_by_swr: Path
     content_along_arms: Path
+    content_mass_along_arms: Path
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
@@ -99,6 +112,7 @@ class EventsInputs:
     event_rule_sweep: Path
     state_calibration_in_visits: Path
     event_start_rest_theta: Path
+    event_speed: Path
     property_bootstrap: Path
     decoder_quality: Path
     event_participation: Path
@@ -123,6 +137,7 @@ def default_inputs() -> EventsInputs:
         / STATE_EVIDENCE_DIR
         / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
         content_along_arms=processed_data_dir() / CONTENT_ALONG_ARMS_DIR,
+        content_mass_along_arms=processed_data_dir() / CONTENT_MASS_ALONG_ARMS_DIR,
         brain_state_reference=processed_data_dir()
         / BRAIN_STATE_REFERENCE_DIR
         / "reference.parquet",
@@ -135,6 +150,7 @@ def default_inputs() -> EventsInputs:
         state_calibration_in_visits=processed_data_dir()
         / STATE_CALIBRATION_IN_VISITS_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
+        event_speed=processed_data_dir() / EVENT_SPEED_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
@@ -681,3 +697,53 @@ def read_example_session(
         for k in range(manifest["n_tetrodes"])
     ]
     return trace, by_tetrode
+
+
+EXAMPLE_POSITION_COLUMNS = (
+    "head_position_x",
+    "head_position_y",
+    "head_speed",
+    "linear_position",
+)
+"""The position an example session's panels draw, from its decode frame."""
+
+
+def read_example_decode(nwb_file_name: str, epoch_name: str) -> dict:
+    """An example session for the example-event columns
+    (``visualization.example_event_panels``), from stored outputs alone.
+
+    ``data``: the position (:data:`EXAMPLE_POSITION_COLUMNS`) and the SWR
+    source's SWRs (``ripple_times``) from the epoch's decode frame; the track
+    graph, its edge order and spacing from the decode's environment; the ripple
+    trace of the SWR source and the HPC tetrodes' spikes stored by
+    ``scripts/decoding/store_example_session.py``
+    (:func:`read_example_session`). ``results``, ``detector`` and ``env``: the
+    decode's (``load_results``). Figure 2's ``read_session`` reads the same
+    things, with its own refusal.
+
+    Raises
+    ------
+    ValueError
+        If the stored session is not current (:func:`read_example_session`).
+    """
+    identifier = format_epoch_identifier(nwb_file_name, epoch_name, "HPC")
+    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    trace, spikes = read_example_session(
+        processed_data_dir() / EXAMPLE_SESSION_DIR / identifier,
+        identifier,
+        features["epochs"][identifier]["decode"]["sha256"],
+    )
+    frame = read_dot_with_swr_source(decode_path(identifier))
+    results, detector, env = load_results(
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", root=processed_data_dir()
+    )
+    data = {
+        "position_info": frame[list(EXAMPLE_POSITION_COLUMNS)],
+        "track_graph": env.track_graph,
+        "linear_edge_order": env.edge_order,
+        "linear_edge_spacing": env.edge_spacing,
+        "zscored_ripple_consensus_trace": trace,
+        "ripple_times": swr_intervals(frame),
+        "spike_times": {"HPC": spikes},
+    }
+    return {"data": data, "results": results, "detector": detector, "env": env}

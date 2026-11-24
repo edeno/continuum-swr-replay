@@ -790,7 +790,7 @@ def _figure03_events(n: int = 400) -> pd.DataFrame:
             "is_swr": np.arange(n) % 2 == 0,
             "event_duration_s": np.r_[rng.uniform(0.02, 0.3, n - 2), 0.45, 0.6],
             "spatial_extent_cm": rng.uniform(0, 220, n),
-            "replay_speed_median_cm_s": np.r_[
+            "map_line_fit_speed_cm_s": np.r_[
                 np.zeros(4), rng.lognormal(6, 2, n - 4)
             ].clip(0, 9e4),
         }
@@ -896,7 +896,7 @@ def test_figure03_cumulative_is_the_share_of_events_at_or_below(offline):
     assert ax.get_xlim() == (edges[0], edges[-1])
 
     missing = events.assign(
-        replay_speed_median_cm_s=events[column].where(events.index > 0)
+        map_line_fit_speed_cm_s=events[column].where(events.index > 0)
     )
     with pytest.raises(ValueError, match="an event has no value"):
         figure03.draw_cumulative(ax, missing, "speed")
@@ -1084,84 +1084,87 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     )
     profiles = pd.DataFrame({"density_per_cm": 0.003}, index=index)
     shares = pd.DataFrame({"at_well": [0.5, 0.2]}, index=[False, True])
-    even = {"density_per_cm": 0.002, "at_well_fraction": 0.25}
+    even = {
+        "density_per_cm": 0.002,
+        "at_well_fraction": 0.25,
+        "leaf_arm_fraction": 0.4,
+        "trunk_arm_fraction": 0.3,
+    }
     fig, ax = plt.subplots()
     figure03.draw_profiles(ax, profiles, shares, even)
+    # the zones 20 cm from the center, from a patch junction and from a well
+    zones = [patch for patch in ax.patches if patch.get_gid() == "zone"]
+    spans = [(round(p.get_x(), 6), round(p.get_x() + p.get_width(), 6)) for p in zones]
+    assert spans == [(0, 0.3), (0.7, 1.4), (1.6, 2.0)]
     (line,) = [line for line in ax.lines if line.get_gid() == "even"]
     np.testing.assert_allclose(line.get_ydata(), 0.2)  # % per cm
     texts = [text.get_text() for text in ax.texts]
     assert "even" in texts
-    assert "even: 25% at a well" in texts
+    assert "even: 25%" in texts
+    assert not [line for line in ax.lines if line.get_gid() == "animal"]
+    # with each animal's profiles: a thin line per animal, kind and arm type
+    animals = pd.concat(
+        dict.fromkeys(("a", "b", "c"), profiles), names=["animal"]
+    ).reorder_levels(["is_swr", "animal", "arm_type", "segment"])
+    figure03.draw_profiles(ax, profiles, shares, even, animals)
+    thin = [line for line in ax.lines if line.get_gid() == "animal"]
+    assert len(thin) == 3 * 2 * 2
+    np.testing.assert_allclose(thin[0].get_ydata(), 0.3)
     plt.close(fig)
 
 
-def test_figure03_draws_six_panels_from_the_decode_and_the_track(offline):
-    """Figure 3 is a to f, and the script's letters are the question list's.
-    Gamma during the events is the supplementary figure's, and content against
-    the animal is the behavior figure's: neither is drawn here."""
+def test_figure03_draws_seven_panels(offline):
+    """Figure 3 is a to g, and the script's letters are the question list's.
+    Gamma during the events is the supplementary figure's; how far the content
+    lies from the animal is panel g (the lead, 2026-11-24)."""
     from continuum_swr_replay.reported.questions import FIGURES
 
     figure03 = offline("scripts.figures.generate_figure03")
-    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdef"
+    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdefg"
+    # g is alone in its column: every other letter shares a column's left edge
     assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdef")
     assert not hasattr(figure03, "draw_brain_state")
-    assert not hasattr(figure03, "draw_distance_from_animal")
+    assert hasattr(figure03, "draw_content_distance")
 
 
-def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
-    offline,
-):
-    """The supplementary gamma figure: per band and kind, each animal's event
-    level (``event_statistics.animal_signal_levels`` with ``matched``) between
-    its quiet-rest and running levels, in the kind's color."""
+def test_the_gamma_panels_draw_each_kind_s_trace_and_the_two_levels(offline):
+    """The supplement's gamma panels: per band, each kind's median trace
+    around event starts in the kind's color over its quartile band, and the
+    band's quiet-rest and running levels as dashed lines."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
-    from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        animal_signal_levels,
-    )
-
     figure = offline("scripts.figures.generate_supp_figure03")
-    rng = np.random.default_rng(0)
-    epochs = [("a", "e1"), ("a", "e2"), ("b", "e1")]
-    events = pd.DataFrame(
-        [
-            {"animal": animal, "session_date": "d1", "epoch": epoch, "is_swr": is_swr}
-            for animal, epoch in epochs
-            for is_swr in (False, True)
-            for _ in range(4)
-        ]
-    )
-    reference = pd.DataFrame(epochs, columns=["animal", "epoch"]).assign(
-        session_date="d1"
-    )
-    for band, column, _ in figure.SIGNALS:
-        events[column] = rng.normal(size=len(events))
-        for regime in ("rest", "running"):
-            for group in ("non_swr", "swr"):
-                reference[f"{band}_{regime}_matched_{group}"] = rng.normal(size=3)
+    time = np.array([-0.002, 0.0, 0.002])
+    curves, levels = {}, {}
+    for k, (band, _, _) in enumerate(figure.SIGNALS):
+        curves[band] = {"time": time}
+        for j, kind in enumerate(figure.WINDOW_KINDS):
+            for i, label in enumerate(("q25", "median", "q75")):
+                curves[band][f"{kind}_{label}"] = np.full(3, k + j + 0.1 * i)
+        levels[band] = {"rest": -1.0 - k, "running": 3.0 + k}
+    levels = pd.DataFrame(levels).T
 
     fig, axes = plt.subplots(1, 2)
-    figure.draw_gamma(axes, events, reference)
+    figure.draw_gamma(axes, curves, levels)
     assert [ax.get_title() for ax in axes] == [
         "Slow gamma (25–55 Hz)",
         "Fast gamma (65–100 Hz)",
     ]
-    for ax, (band, column, _) in zip(axes, figure.SIGNALS, strict=True):
-        levels = animal_signal_levels(events, reference, band, column, matched=True)
-        # per kind, three sets of dots: rest, events, running
-        dots = ax.collections
-        assert len(dots) == 6
-        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
-            rest, event, running = dots[3 * k : 3 * k + 3]
-            for drawn, word in ((rest, "rest"), (event, "event"), (running, "running")):
-                np.testing.assert_allclose(
-                    drawn.get_offsets()[:, 1], levels.loc[is_swr, word]
-                )
-            np.testing.assert_allclose(event.get_facecolors()[0], to_rgba(color))
-            np.testing.assert_allclose(rest.get_facecolors()[0], to_rgba("white"))
-            np.testing.assert_allclose(running.get_facecolors()[0], to_rgba("black"))
-        assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    for k, ax in enumerate(axes):
+        traces = [line for line in ax.lines if len(line.get_xdata()) == 3]
+        assert len(traces) == 2 and len(ax.collections) == 2
+        for (kind, is_swr), line in zip(
+            figure.WINDOW_KINDS.items(), traces, strict=True
+        ):
+            band = figure.SIGNALS[k][0]
+            np.testing.assert_allclose(line.get_xdata(), [-2.0, 0.0, 2.0])
+            np.testing.assert_allclose(line.get_ydata(), curves[band][f"{kind}_median"])
+            assert to_rgba(line.get_color()) == to_rgba(EVENT_KINDS[is_swr][1])
+        dashed = sorted(
+            line.get_ydata()[0] for line in ax.lines if line.get_linestyle() == "--"
+        )
+        assert dashed == [-1.0 - k, 3.0 + k]
     plt.close(fig)
 
 
@@ -1188,7 +1191,7 @@ def test_figure03_and_the_gamma_figure_read_the_events_that_start_in_a_visit(
 
     monkeypatch.setattr(figure, "read_swr_table", lambda path: table)
     reader = (
-        "content_along_arms_bins"
+        "content_mass_along_arms"
         if module.endswith("generate_figure03")
         else "with_brain_state"
     )
@@ -1238,7 +1241,29 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
         figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
     )
     # panel c's distribution is the analysis layer's, tested there
-    monkeypatch.setattr(figure, "content_distance_distribution", lambda events: None)
+    monkeypatch.setattr(figure, "with_event_speed", lambda events, *_: (events, []))
+    monkeypatch.setattr(figure, "transport_speed_distribution", lambda events: None)
+    # panels d and e read the content-mass run, tested with its reader
+    monkeypatch.setattr(
+        figure, "content_mass_along_arms", lambda events, *_: (None, [])
+    )
+    monkeypatch.setattr(
+        figure, "with_event_place_shares", lambda events, *_: (events, [])
+    )
+    monkeypatch.setattr(figure, "content_place_shares", lambda along: None)
+    monkeypatch.setattr(figure, "place_share_intervals", lambda along: None)
+    monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
+    monkeypatch.setattr(figure, "well_count_shares", lambda e, **_: None)
+    monkeypatch.setattr(figure, "patch_count_shares", lambda e, **_: None)
+    monkeypatch.setattr(figure, "content_mass_by_patch", lambda e, *_: (None, []))
+    monkeypatch.setattr(figure, "patch_content_shares", lambda rows: None)
+    monkeypatch.setattr(figure, "with_event_start_end", lambda e, *_: (e, []))
+    monkeypatch.setattr(figure, "start_end_shares", lambda events: None)
+    monkeypatch.setattr(figure, "gamma_triggered_curves", lambda e, *_: (None, []))
+    monkeypatch.setattr(figure, "reference_medians", lambda table, signals: table)
+    # panel a's session and examples are read after the references are checked
+    monkeypatch.setattr(figure, "read_example_decode", lambda *_: None)
+    monkeypatch.setattr(figure, "example_windows", lambda events: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()
@@ -1247,7 +1272,7 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
         (tmp_path / folder / "manifest.json").write_text(
             json.dumps({"subset": ANALYZED_SUBSET, "session_cache": current})
         )
-        assert figure.read_inputs()["reference"] is levels
+        assert figure.read_inputs()["gamma_levels"] is levels
         entry.write_bytes(b"other visits")
         with pytest.raises(ValueError, match="other well visits than the current"):
             figure.read_inputs()
@@ -1265,10 +1290,10 @@ def _distance() -> pd.DataFrame:
     return content_distance_distribution(_distance_events())
 
 
-def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_class(
+def test_the_figure03_distance_panel_draws_the_content_distance_of_each_class(
     offline,
 ):
-    """Figure 3's supplement, panel c: for each class, the percent of events within each distance (the bins
+    """Figure 3, panel g: for each class, the percent of events within each distance (the bins
     summed), a thin line per animal and their mean in bold, in the class's
     color, on a log x axis; dotted lines at 20 cm and 100 cm; the classes
     named in their colors; a y axis from 0 to 100."""
@@ -1277,7 +1302,7 @@ def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_cla
 
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
-    figure = offline("scripts.figures.generate_supp_figure03")
+    figure = offline("scripts.figures.generate_figure03")
     distribution = _distance()
     fig, ax = plt.subplots()
     figure.draw_content_distance(ax, distribution)
@@ -1301,3 +1326,198 @@ def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_cla
     assert cuts == [20.0, 100.0]
     assert {"No SWR", "SWR"} <= {t.get_text() for t in ax.texts}
     plt.close(fig)
+
+
+def test_supp_figure03_draws_the_shares_at_a_remote_and_at_the_own_well(offline):
+    """Panel d: per place, each animal's no-SWR and SWR share joined by a line,
+    dots in the kinds' colors, and the animals' mean as a bar."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b", "c"]], names=["is_swr", "animal"]
+    )
+    shares = pd.DataFrame(
+        {
+            "remote_well": [0.4, 0.3, 0.5, 0.2, 0.1, 0.3],
+            "own_well": [0.1, 0.1, 0.1, 0.05, 0.05, 0.05],
+        },
+        index=index,
+    )
+    fig, ax = plt.subplots()
+    figure.draw_well_shares(ax, shares)
+    joined = [line for line in ax.lines if len(line.get_xdata()) == 2]
+    # three animals and two mean bars, per place
+    assert len(joined) == 2 * (3 + 2)
+    means = sorted(
+        round(float(line.get_ydata()[0]), 6)
+        for line in joined
+        if line.get_linewidth() == 1.5
+    )
+    assert means == [5.0, 10.0, 20.0, 40.0]
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["remote well", "own well"]
+    # with the intervals: one line per place and kind, from low to high
+    intervals = pd.DataFrame(
+        {"ci_low": 0.1, "ci_high": 0.6},
+        index=pd.MultiIndex.from_product(
+            [["non_swr", "swr"], ["remote_well", "own_well"]], names=["group", "place"]
+        ),
+    )
+    figure.draw_well_shares(ax, shares, intervals)
+    drawn = [line for line in ax.lines if line.get_gid() == "interval"]
+    assert len(drawn) == 4
+    np.testing.assert_allclose(drawn[0].get_ydata(), [10.0, 60.0])
+    plt.close(fig)
+
+
+def test_supp_figure03_draws_the_remote_well_share_by_extent(offline):
+    """Panel e: per kind a thin line per animal and their mean in bold, over
+    the extent classes; a class an animal has no event in leaves a gap."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    rows = [
+        (is_swr, animal, k, 0.1 * (k + 1) + 0.1 * (animal == "b"))
+        for is_swr in (False, True)
+        for animal in ("a", "b")
+        for k in range(5)
+        if not (animal == "b" and k == 4)
+    ]
+    by_extent = pd.DataFrame(
+        rows, columns=["is_swr", "animal", "extent_class", "remote_well"]
+    ).set_index(["is_swr", "animal", "extent_class"])
+    fig, ax = plt.subplots()
+    figure.draw_remote_well_by_extent(ax, by_extent)
+    bold = [line for line in ax.lines if line.get_linewidth() == 1.2]
+    assert len(bold) == 2 and len(ax.lines) == 2 * (2 + 1)
+    np.testing.assert_allclose(bold[0].get_ydata(), [15, 25, 35, 45, 50])
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == ["<10", "10–20", "20–50", "50–100", "≥100"]
+    plt.close(fig)
+
+
+def test_supp_figure03_draws_how_many_wells_an_event_represents(offline):
+    """Panel f: per class (none, one, two or more) a bar per kind at the
+    animals' mean, in the kind's color, with a dot per animal."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.visualization.palettes import EVENT_KINDS
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b"]], names=["is_swr", "animal"]
+    )
+    shares = pd.DataFrame(
+        {
+            "none": [0.4, 0.5, 0.6, 0.7],
+            "one": [0.5, 0.45, 0.35, 0.28],
+            "two or more": [0.1, 0.05, 0.05, 0.02],
+        },
+        index=index,
+    )
+    fig, ax = plt.subplots()
+    figure.draw_well_counts(ax, shares)
+    heights = [round(bar.get_height(), 6) for bar in ax.patches]
+    assert heights == [45.0, 47.5, 7.5, 65.0, 31.5, 3.5]
+    colors = {to_rgba(bar.get_facecolor()) for bar in ax.patches[:3]}
+    assert colors == {to_rgba(EVENT_KINDS[False][1])}
+    assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 3 * 2
+    assert ax.get_ylim() == (0, 100)
+    plt.close(fig)
+
+
+def test_supp_figure03_examples_are_checked_against_the_event_table(offline):
+    """Panel a's examples: three events with no SWR, then three with one, each
+    titled with its kind and duration and drawn over its own start and end; an
+    example missing from the table, or of the other kind, is refused."""
+    figure = offline("scripts.figures.generate_supp_figure03")
+    ids = [*figure.EXAMPLES[False], *figure.EXAMPLES[True]]
+    events = pd.DataFrame(
+        {
+            "event_id": ids,
+            "is_swr": [False] * 3 + [True] * 3,
+            "event_start_s": np.arange(6, dtype=float),
+            "event_duration_s": 0.05 + 0.01 * np.arange(6),
+        }
+    )
+    events["event_end_s"] = events["event_start_s"] + events["event_duration_s"]
+    windows = figure.example_windows(events)
+    assert list(windows) == [
+        "No SWR, 50 ms", "No SWR, 60 ms", "No SWR, 70 ms",
+        "SWR, 80 ms", "SWR, 90 ms", "SWR, 100 ms",
+    ]  # fmt: skip
+    assert windows["SWR, 80 ms"] == (3.0, 3.08)
+    with pytest.raises(AssertionError, match="matches 0 rows"):
+        figure.example_windows(events.iloc[1:])
+    with pytest.raises(AssertionError, match="not of its kind"):
+        figure.example_windows(events.assign(is_swr=True))
+
+
+@pytest.mark.parametrize(
+    ("draw", "classes", "labels"),
+    [
+        (
+            "draw_patch_content",
+            (
+                "own_patch_wells",
+                "own_patch_elsewhere",
+                "other_patch_wells",
+                "other_patch_elsewhere",
+            ),
+            ["wells", "other", "wells", "other"],
+        ),
+        ("draw_patch_counts", ("one", "two", "three"), ["one", "two", "three"]),
+        (
+            "draw_start_end",
+            (
+                "starts_near_animal",
+                "ends_near_animal",
+                "starts_at_remote_well",
+                "ends_at_remote_well",
+            ),
+            ["starts", "ends", "starts", "ends"],
+        ),
+    ],
+)
+def test_supp_figure03_class_panels_draw_a_bar_per_class_and_kind(
+    offline, draw, classes, labels
+):
+    """Panels e, f and g: per class a bar per kind at the animals' mean, with a
+    dot per animal, and the classes named under the axis."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b"]], names=["is_swr", "animal"]
+    )
+    values = np.linspace(0.1, 0.4, 4)
+    shares = pd.DataFrame(
+        {name: values + 0.1 * k for k, name in enumerate(classes)}, index=index
+    )
+    fig, ax = plt.subplots()
+    getattr(figure, draw)(ax, shares)
+    assert len(ax.patches) == 2 * len(classes)
+    assert ax.patches[0].get_height() == pytest.approx(100 * values[:2].mean())
+    assert [t.get_text() for t in ax.get_xticklabels()] == labels
+    assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 2 * len(classes)
+    plt.close(fig)
+
+
+def test_figure03_histograms_are_the_mean_of_the_animals_distributions(offline):
+    """Animal a has one epoch with 9 no-SWR events at 10 ms and 1 at 30 ms;
+    animal b one epoch with 1 event at 30 ms. Pooled, 82 % lie in the first
+    bin; each animal weighing the same, (90 + 0) / 2 = 45 %."""
+    figure = offline("scripts.figures.generate_figure03")
+    events = pd.DataFrame(
+        {
+            "animal": ["a"] * 11 + ["b"] * 2,
+            "session_date": "d",
+            "epoch": "e",
+            "is_swr": [False] * 10 + [True] + [False, True],
+            "duration": [10.0] * 9 + [30.0, 10.0, 30.0, 30.0],
+        }
+    )
+    percent = figure._mean_percent(events, "duration", [0.0, 20.0, 40.0])
+    assert percent["No SWR"].tolist() == pytest.approx([45.0, 55.0])
+    assert percent["SWR"].tolist() == pytest.approx([50.0, 50.0])

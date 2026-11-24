@@ -12,14 +12,18 @@ Each row asks one thing:
 
     Size and movement
         a — Duration.
-        b — The mean share of an event in Non-Local Continuous and in Non-Local
-            Fragmented (each event's mean state probability, each event weighted
+        b — The mean probability of the Non-Local Continuous and of the Non-Local
+            Fragmented state over an event's time bins (each event weighted
             alike); bars the animals' mean, dots the animals
             (``event_statistics.state_composition_statistics``).
         c — Spatial extent of the decoded content.
-        d — Replay speed (each event's median over its time bins), twice on
-            one axis: the distribution, and under it the share of events at
-            or below each speed.
+        d — Replay speed, twice on one axis: the distribution, and under it
+            the share of events at or below each speed. An event's speed is
+            the MAP line-fit speed: the slope, at least 0, of the track
+            distance from its first decoded position against time
+            (``event_speed.map_line_fit_speed``; the event-speed run,
+            ``scripts/event_properties/measure_event_speed.py``). A position
+            that stays put has a speed of 0, the first bin.
     Where on the track the content is
         e — Where each kind's content is: its content time per cm along every
             arm, drawn on the track once per kind, against what content spread
@@ -30,33 +34,56 @@ Each row asks one thing:
             arms) and from the junctions out to the wells (leaf arms), against
             what content spread evenly over the track would give (the dashed
             line; ``content_along_arms.even_content``).
+        g — How far the content lies from the animal, no-SWR against SWR events. Each event's distance is the mean over
+        its bins of the absolute distance (cm along the track) of the decoded
+        place from the animal's (``mean_abs_ahead_behind_cm`` of the canonical
+        event table). Its cumulative distribution on a log axis, the percent of a
+        class's events whose content lies within each distance (the bins of
+        ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per animal
+        and their mean in bold (``event_statistics.content_distance_distribution``,
+        each animal's distribution), with dotted lines at 20 cm (near) and 100 cm
+        (remote, ``constants.REMOTE_CM``): the heights there are the shares under
+        20 cm and under 100 cm. The events summary reports each class's share under
+        20 cm, 20 to 100 cm and 100 cm or more
+        (``event_statistics.content_distance_band_statistics``: the mean over
+        animals of each animal's share, the mean over its epochs of each epoch's
+        share; the ``content_distance_*`` values, tagged 3g).
 
-The figure describes the content from the decode and the track alone. What needs
-the animal's behavior to say is left to the behavior figure: content by distance
-from the animal and by which well it is at
-(``content_along_arms.distance_from_animal_shares``, once a panel here), by the
-animal's choices and rewards, and when the events happen. The state the events
+The animal is at a well in every one of these events, so g answers what e and f
+leave open: whether the content at wells is at the animal's own. What needs the
+animal's choices and rewards to say, and when the events happen, is left to the
+behavior figure (content by which well the animal is at:
+``content_along_arms.distance_from_animal_shares``). The state the events
 occur in is not drawn here either: ripple power, MUA, theta and head speed
 around the events are Figure 2's, and slow and fast gamma during them are a
 supplementary figure (``generate_supp_figure03.py``).
 
 b comes before c and d because the far mode of c and the fastest events of d
-(its end bin) are the events with Fragmented time. d's axis is linear: a decoded
-position that moves one place bin in one time bin has a speed of 1,000 cm/s,
-which the smoothing spreads over the bins around it, so the values an event's
-median takes below about 100 cm/s are the smoother's, and a log axis would give
-them two fifths of its length. The number of arms the decoded position touches is
+(its end bin) are the events with Fragmented time. d's speed is not the median
+of the smoothed MAP speed over the event's bins (``replay_speed_median_cm_s``
+of the event table): a position that moves one 2 cm place bin in one 2 ms time
+bin has a speed of 1,000 cm/s, which the smoothing spreads over the bins around
+it as 319, 232 and 89 cm/s, and an event's median took those values; on
+simulated replays it returned about 0 for ones drawn at 20 to 150 cm/s. The
+speed of the position distribution, the transport-slope speed, is the
+supplement's (``generate_supp_figure03.py``). The number of arms the decoded position touches is
 not drawn: it restates c in arms, and an arm counts when one time bin's position
 is on it. Its values stay in the events summary.
 
 Panels a, c and d mark each class's median (triangle;
-``event_statistics.class_medians``), the events summary's
+``event_statistics.class_medians``, the mean of the animals' medians; the
+distributions are the mean over animals of each animal's), the events summary's
 ``<property>_median_*`` values (``paper/reported/events.json``), and under it
 each animal's median (ticks; ``event_statistics.animal_class_medians``), the
 medians the summary's ``<property>_animals_in_direction`` counts compare. Panels
-e and f place every event time bin's MAP position on its arm
-(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
-draw ``content_along_arms.content_density_along_arms``, the animals' mean; f
+e and f place every event's content time on the arms: its position
+distribution at each time bin (the posterior of the two non-local states over
+the place bins), summed over its time bins
+(``measure_content_mass_along_arms.py``;
+``Processed-Data/content_mass_along_arms``), not each time bin's one most
+probable place, whose content piles on a single place bin beside each well and
+each junction. They draw ``content_along_arms.content_density_along_arms``, the
+animals' mean, and f each animal's under it (thin lines); f
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
 ``place_share_statistics``). Each weighs each epoch of an animal the same and
@@ -78,11 +105,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
@@ -99,8 +129,12 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
+    DISTANCE_BIN_EDGES_CM,
+    NEAR_CM,
     animal_class_medians,
     class_medians,
+    content_distance_distribution,
+    property_distribution,
     state_composition_statistics,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
@@ -108,9 +142,15 @@ from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events.content import content_along_arms_bins
+from continuum_swr_replay.reported.events.content import content_mass_along_arms
+from continuum_swr_replay.reported.events.properties import with_event_speed
 from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.visualization.figure_utilities import save_figure
+from continuum_swr_replay.visualization.heldout_gain_panels import (
+    GROUP_COLORS,
+    REFERENCE_COLOR,
+    name_groups,
+)
 from continuum_swr_replay.visualization.palettes import EVENT_KINDS
 from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.publication_style import (
@@ -143,6 +183,12 @@ N_SEGMENTS = 13
 # and its tick labels: a segment beyond an end is drawn in the end's color.
 DENSITY_LIMIT_LOG2 = 2
 DENSITY_TICK_LABELS = ("≤¼×", "even", "≥4×")
+# Panel f: the top of the y axis (% of content time per cm), above every
+# animal's curve, so that the shares written in the panel clear them.
+PROFILE_TOP_PERCENT_PER_CM = 4.0
+# Panel f: the height of the bars that mark the zones by the center, a patch
+# junction and a well along the x axis, as a part of the axes' height.
+ZONE_BAR_HEIGHT = 0.03
 # Panel e: the color of content sparser than even content, for either kind.
 C_BELOW_EVEN = "#6e6e6e"
 
@@ -159,8 +205,8 @@ HISTOGRAMS = {
         np.linspace(0, 240, 41), {0: "0", 100: "100", 200: "200"},
     ),
     "speed": (
-        "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
-        np.arange(0, 1501, 100),
+        "map_line_fit_speed_cm_s", "Replay speed (cm/s)", 1.0,
+        np.arange(0, 1501, 50),
         {0: "0", 500: "500", 1000: "1000", 1500: "≥1500"},
     ),
 }  # fmt: skip
@@ -172,31 +218,25 @@ HISTOGRAMS = {
 
 
 def read_inputs() -> dict:
-    """The events, their content's time bins, and the other inputs."""
+    """The events, their content time at each place, and the other inputs."""
     inputs = default_inputs()
     events = select_visit_context(read_swr_table(inputs.event_table))
     n_epochs = len(analyzed_epoch_ids())
-    along, _ = content_along_arms_bins(
-        events,
-        inputs.content_along_arms,
-        n_epochs,
-        [
-            "arm",
-            "fraction",
-            "arm_length_cm",
-            "place_bin",
-            "n_place_bins",
-            "distance_to_well_cm",
-            "distance_to_animal_cm",
-        ],
-    )
+    along, _ = content_mass_along_arms(events, inputs.content_mass_along_arms, n_epochs)
+    # panel g: the selected events, as the events summary reads them
+    distance = content_distance_distribution(events)
+    events, _ = with_event_speed(events, inputs.event_speed, n_epochs)
     density = content_density_along_arms(along, N_SEGMENTS)
     even = even_content(along, AT_WELL_CM)
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
+        "distance": distance,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "profiles": leaf_and_trunk_profiles(density),
+        "animal_profiles": leaf_and_trunk_profiles(
+            content_density_along_arms(along, N_SEGMENTS, by_animal=True)
+        ),
         "even": even,
         "against_even": log2_density_against_even(density, even["density_per_cm"]),
         "track_graph": env.track_graph,
@@ -218,8 +258,11 @@ def kind_labels(events: pd.DataFrame) -> list[str]:
 
 
 def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
-    """A property's distribution for each kind, % of the kind's events per bin,
-    with each kind's median (triangle) and, under it, each animal's (ticks).
+    """A property's distribution for each kind, % of the kind's events per bin
+    (the mean over animals of each animal's percent, itself the mean over its
+    epochs: ``event_statistics.property_distribution``), with each kind's
+    median (triangle: the mean of the animals' medians) and, under it, each
+    animal's (ticks).
 
     The events beyond an end of the axis are counted in its end bin, whose tick
     then says so (≤ or ≥). An event beyond an end that is not marked raises, and
@@ -233,14 +276,15 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     marked_below = ticks.get(edges[0], "").startswith("≤")
     marked_above = ticks.get(edges[-1], "").startswith("≥")
     top = 0.0
-    for is_swr, (_, color) in EVENT_KINDS.items():
-        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
-        below, above = (values < edges[0]).any(), (values > edges[-1]).any()
-        if (below and not marked_below) or (above and not marked_above):
-            raise ValueError(f"{label}: an event lies beyond the axis, unmarked")
-        values = np.clip(values, edges[0], edges[-1])
-        counts, _ = np.histogram(values, bins=edges)
-        share = 100 * counts / counts.sum()
+    values = scale * events[column]
+    below, above = (values < edges[0]).any(), (values > edges[-1]).any()
+    if (below and not marked_below) or (above and not marked_above):
+        raise ValueError(f"{label}: an event lies beyond the axis, unmarked")
+    percent = _mean_percent(
+        events.assign(**{column: values.clip(edges[0], edges[-1])}), column, edges
+    )
+    for name, color in EVENT_KINDS.values():
+        share = percent[name].to_numpy()
         ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
         ax.stairs(share, edges, color=color, lw=0.8)
         top = max(top, share.max())
@@ -256,20 +300,41 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
+def _mean_percent(events: pd.DataFrame, column: str, edges) -> pd.DataFrame:
+    """Each kind's percent of its events in each bin, the mean over animals of
+    each animal's (``event_statistics.property_distribution``): one column per
+    kind's name, one row per bin in the order of ``edges``."""
+    distribution = property_distribution(events, column, np.asarray(edges))
+    mean = distribution.groupby(["group", "bin_low"])["percent"].mean()
+    return pd.DataFrame(
+        {name: mean[_GROUP_NAMES[is_swr]].sort_index().to_numpy()
+         for is_swr, (name, _) in EVENT_KINDS.items()}
+    )  # fmt: skip
+
+
+#: the statistics' names of the two kinds
+_GROUP_NAMES = {False: "no SWR", True: "SWR"}
+
+
 def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
     """The share of each kind's events at or below each value, on the
-    histogram's axis. A curve crosses the 50 % line at the kind's median, and
-    what it lacks of 100 % at the end of the axis is the share of events beyond
-    it (the histogram's end bin)."""
+    histogram's axis: the mean over animals of each animal's share (the mean
+    over its epochs), from bins a 300th of the axis wide. What a curve lacks
+    of 100 % at the end of the axis is the share of events beyond it (the
+    histogram's end bin)."""
     column, label, scale, edges, ticks = HISTOGRAMS[key]
     if events[column].isna().any():
         raise ValueError(f"{label}: an event has no value")
     grid = np.linspace(edges[0], edges[-1], 301)
     ax.axhline(50, color="0.8", lw=0.5)
-    for is_swr, (_, color) in EVENT_KINDS.items():
-        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
-        at_or_below = np.searchsorted(np.sort(values), grid, side="right")
-        ax.plot(grid, 100 * at_or_below / len(values), color=color, lw=0.8)
+    # an event below the axis counts from its start; one above it in no bin
+    percent = _mean_percent(
+        events.assign(**{column: (scale * events[column]).clip(lower=edges[0])}),
+        column,
+        grid,
+    )
+    for name, color in EVENT_KINDS.values():
+        ax.plot(grid[1:], percent[name].cumsum(), color=color, lw=0.8)
     ax.set_xlim(edges[0], edges[-1])
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
@@ -462,11 +527,24 @@ def label_track(ax, track_graph) -> None:
     )
 
 
-def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) -> None:
+def draw_profiles(
+    ax,
+    profiles: pd.DataFrame,
+    shares: pd.DataFrame,
+    even: dict,
+    animal_profiles: pd.DataFrame | None = None,
+) -> None:
     """Content time per cm along the trunk arms (center to junction) and the
-    leaf arms (junction to well), each kind, with its share at a well; and what
-    content spread evenly over the track would give (``even``:
-    ``content_along_arms.even_content``), a flat line and its share at a well."""
+    leaf arms (junction to well), each kind; and what content spread evenly
+    over the track would give (``even``: ``content_along_arms.even_content``),
+    a flat line. The parts of the arms within ``AT_WELL_CM`` of the center, of a
+    patch junction and of a well are marked by a bar along the x axis, over the
+    name of each place,
+    and each kind's share of content time at a well is written under the
+    heading "At a well", with even content's, in the room above the curves.
+    With
+    ``animal_profiles`` (the profiles of each animal), a thin line per animal
+    under each kind's."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
     even_percent = 100 * even["density_per_cm"]
     ax.axhline(even_percent, color="0.5", lw=0.6, ls=(0, (4, 2)), zorder=0, gid="even")
@@ -475,24 +553,43 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
         xytext=(0, -1.5), textcoords="offset points", ha="left", va="top",
         color="0.4", fontsize=SMALL_SIZE,
     )  # fmt: skip
+    trunk, leaf = even["trunk_arm_fraction"], even["leaf_arm_fraction"]
+    for low, high in ((0, trunk), (1 - trunk, 1 + leaf), (2 - leaf, 2)):
+        ax.axvspan(
+            low, high, ymin=0, ymax=ZONE_BAR_HEIGHT, color="0.55", lw=0, gid="zone"
+        )
     ax.text(
-        0.03, 0.79, f"even: {100 * even['at_well_fraction']:.0f}% at a well",
+        0.03, 0.97, "At a well:", transform=ax.transAxes, color="0.25",
+        ha="left", va="top", fontsize=SMALL_SIZE,
+    )  # fmt: skip
+    ax.text(
+        0.03, 0.70, f"even: {100 * even['at_well_fraction']:.0f}%",
         transform=ax.transAxes, color="0.4", ha="left", va="top",
         fontsize=SMALL_SIZE,
     )  # fmt: skip
     for is_swr, (name, color) in EVENT_KINDS.items():
         trunk = profiles.loc[(is_swr, "trunk"), "density_per_cm"].to_numpy()
         leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
+        if animal_profiles is not None:
+            for _, own in animal_profiles.loc[is_swr].groupby("animal"):
+                for offset, arm_type in ((0, "trunk"), (1, "leaf")):
+                    values = own.xs(arm_type, level="arm_type")["density_per_cm"]
+                    ax.plot(
+                        offset + x, 100 * values.to_numpy(), color=color, lw=0.5,
+                        alpha=0.45, gid="animal",
+                    )  # fmt: skip
         ax.plot(x, 100 * trunk, color=color)
         ax.plot(1 + x, 100 * leaf, color=color)
         ax.text(
-            0.03, 0.97 - 0.09 * is_swr,
-            f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}% at a well",
+            0.03, 0.88 - 0.09 * is_swr,
+            f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}%",
             transform=ax.transAxes, color=color, ha="left", va="top",
             fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax.set_yscale("log")
     ax.set_yticks([0.1, 0.2, 0.5, 1], ["0.1", "0.2", "0.5", "1"])
+    # room above the curves for the shares at a well
+    ax.set_ylim(top=PROFILE_TOP_PERCENT_PER_CM)
     ax.axvline(1, color="0.8", lw=0.5, zorder=0)
     ax.set_xticks([0, 1, 2], ["center", "junction", "well"])
     ax.set_xlim(0, 2)
@@ -502,13 +599,13 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
             va="top", fontsize=SMALL_SIZE, color="0.35",
         )  # fmt: skip
     ax.set_ylabel("% content time per cm")
-    ax.set_title(
-        f"at a well: <{AT_WELL_CM:.0f} cm from one", fontsize=SMALL_SIZE, pad=8
-    )
+    ax.set_title("Content time along the arms", fontsize=SMALL_SIZE, pad=8)
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
-    """Panel b: the mean share of an event in Continuous and in Fragmented.
+    """Panel b: the mean probability of the Continuous and of the Fragmented
+    state over an event's time bins (not time classified into a state; the two
+    do not sum to 100, the rest being the Local and No-Spike states).
 
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
@@ -527,16 +624,57 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     ax.set_xlim(-0.55, 1.55)
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
-    ax.set_ylabel("% of event\n(mean over events)")
+    ax.set_ylabel("Mean state\nprobability (%)")
 
 
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
 
+
+DISTANCE_XLABEL = "Distance from\nthe animal (cm)"
+"""The distance panel's x label, under its title "Content distance": each
+event's mean over its bins of the distance along the track of the decoded place
+from the animal's."""
+DISTANCE_YLABEL = "Cumulative %\nof events"
+"""The distance panel's y label: the curve is cumulative, the percent of a
+class's events whose content lies at most as far from the animal as the x
+value."""
+DISTANCE_TICKS_CM = (5, 20, 100)
+
+
+def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
+    """Panel g, the distance panel: for no-SWR and SWR events, the percent of the
+    class's events whose content lies within each distance of the animal (the
+    distribution's bins summed up to each bin's high edge) on a log axis, a
+    thin line per animal and their mean in bold in the class's color, the
+    classes named in their colors, and dotted lines at 20 cm (near) and
+    100 cm (remote), where the heights are the shares under 20 cm and under
+    100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
+        within = by_animal.cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    for cut in (NEAR_CM, REMOTE_CM):
+        ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+    name_groups(ax, 0.02, 1.0, 0.1, "left")
+    ax.set_xscale("log")
+    ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
+    ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlabel(DISTANCE_XLABEL)
+    ax.set_ylabel(DISTANCE_YLABEL)
+    ax.set_title("Content distance", fontsize=SMALL_SIZE, pad=8)
+
+
 # The panel letters as they sit in the figure: the letters of a row share a
 # height, the letters of a column a left edge.
-LETTER_ROWS = ("abcd", "ef")
+LETTER_ROWS = ("abcd", "efg")
 LETTER_COLUMNS = ("ae", "b", "cf", "d")
 
 
@@ -584,13 +722,20 @@ def generate_figure(inputs: dict):
         ax_e, inputs["track_graph"], inputs["edge_order"], inputs["against_even"]
     )
     label_track(ax_e[0], inputs["track_graph"])
-    ax_f = fig.add_subplot(grid[1, 2:])
-    draw_profiles(ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"])
+    # f and g share the right half: f the wider, for its two arms and its key
+    f_g_grid = grid[1, 2:].subgridspec(1, 2, width_ratios=[1.5, 1.0], wspace=0.6)
+    ax_f = fig.add_subplot(f_g_grid[0])
+    draw_profiles(
+        ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"],
+        inputs["animal_profiles"],
+    )  # fmt: skip
+    ax_g = fig.add_subplot(f_g_grid[1])
+    draw_content_distance(ax_g, inputs["distance"])
 
     fig.draw_without_rendering()
     panels_by_letter = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
-        "e": [ax_e_frame, *ax_e], "f": [ax_f],
+        "e": [ax_e_frame, *ax_e], "f": [ax_f], "g": [ax_g],
     }  # fmt: skip
     place_letters(fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS)
     check_placement(fig, panels_by_letter)

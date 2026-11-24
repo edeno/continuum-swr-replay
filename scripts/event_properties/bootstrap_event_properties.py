@@ -48,11 +48,13 @@ from continuum_swr_replay.decoding import identifiers
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_SPEED_DIR,
     EVENT_START_REST_THETA_DIR,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events.properties import with_event_speed
 from continuum_swr_replay.runs.io import files_sha256, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
@@ -64,7 +66,8 @@ MIN_PER_CLASS = 20
 PROPERTIES = {
     "duration": ("event_duration_s", 1000.0),
     "extent": ("spatial_extent_cm", 1.0),
-    "speed": ("replay_speed_median_cm_s", 1.0),
+    "speed": ("map_line_fit_speed_cm_s", 1.0),
+    "transport_speed": ("transport_slope_speed_cm_s", 1.0),
     "peak": ("posterior_peak_mean", 1.0),
     "hpd": ("hpd_coverage_cm", 1.0),
     "pause": ("pause_fraction", 1.0),
@@ -76,9 +79,11 @@ PROPERTIES = {
 }
 
 
-def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path]]:
-    """The events that start inside a well visit, with their start distance; the
-    counts per well-visit label (``count_visit_context``); the files read."""
+def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path], list[Path]]:
+    """The events that start inside a well visit, with their start distance and
+    their two speeds (``reported.events.properties.with_event_speed``); the counts per
+    well-visit label (``count_visit_context``); the start-distance and the
+    event-speed files read."""
     table = read_swr_table(table_path("event_table", replay_content_dir()))
     events = select_visit_context(table)
     paths = sorted(
@@ -89,6 +94,9 @@ def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path]]:
         ignore_index=True,
     )
     events = events.merge(start, on="event_id", how="left", validate="1:1")
+    events, speed_paths = with_event_speed(
+        events, processed_data_dir() / EVENT_SPEED_DIR, len(paths)
+    )
     if events.start_distance_cm.isna().all():
         raise ValueError(
             f"no start distance in {processed_data_dir() / EVENT_START_REST_THETA_DIR}"
@@ -99,7 +107,7 @@ def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path]]:
             events.animal, events.session_date, events.epoch, strict=True
         )
     ]
-    return events, count_visit_context(table), paths
+    return events, count_visit_context(table), paths, speed_paths
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -108,7 +116,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--properties", nargs="*", default=list(PROPERTIES))
     parser.add_argument("--out-name", default=EVENT_PROPERTY_BOOTSTRAP_DIR)
     args = parser.parse_args(argv)
-    events, visit_counts, start_paths = load_events()
+    events, visit_counts, start_paths, speed_paths = load_events()
     values = {
         word: events[PROPERTIES[word][0]].to_numpy(dtype=float) * PROPERTIES[word][1]
         for word in args.properties
@@ -145,6 +153,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "folder": EVENT_START_REST_THETA_DIR,
                 "n_files": len(start_paths),
                 "sha256": files_sha256(start_paths),
+            },
+            "event_speed": {
+                "folder": EVENT_SPEED_DIR,
+                "n_files": len(speed_paths),
+                "sha256": files_sha256(speed_paths),
             },
             "subset": ANALYZED_SUBSET,
             "visit_context_counts": {

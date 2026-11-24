@@ -2034,7 +2034,7 @@ Status: dropped; its values are the content's location classes, which answer que
 
 ### 2d.1. Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?
 
-Status: partly computed; the own-well share waits for the wider-Local-kernel re-decode (question 2c.6). Figures: 3e, 3f, S3c. Values: 47.
+Status: partly computed; the own-well share waits for the wider-Local-kernel re-decode (question 2c.6). Figures: 3e, 3f, 3g, S3c. Values: 47.
 
 Sources:
 
@@ -2095,7 +2095,7 @@ Sources:
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
-Status: computed. Figures: 3d. Values: 9.
+Status: computed. Figures: 3d, S3b. Values: 9.
 
 Sources:
 
@@ -4328,9 +4328,9 @@ Panel k: `\EventsHpdTightCutCm`, `\EventsHpdTightShareAnimalsNonSwrHigher`, `\Ev
 
 Panel l: `\EventsRestrictionHeldoutNonSwrEventsOutsideSwrFullMinusSwrAllowedPerSpikeAnimalsPositive`, `\EventsRestrictionHeldoutNonSwrEventsOutsideSwrFullMinusSwrAllowedPerSpikeCiHigh`, `\EventsRestrictionHeldoutNonSwrEventsOutsideSwrFullMinusSwrAllowedPerSpikeCiLow`, `\EventsRestrictionHeldoutNonSwrEventsOutsideSwrFullMinusSwrAllowedPerSpike`, `\EventsRestrictionImmobileFullMinusNonePerSpikeAnimalsPositive`, `\EventsRestrictionImmobileFullMinusNonePerSpikeCiHigh`, `\EventsRestrictionImmobileFullMinusNonePerSpikeCiLow`, `\EventsRestrictionImmobileFullMinusNonePerSpike`, `\EventsRestrictionImmobileFullMinusSwrAllowedPerSpikeAnimalsPositive`, `\EventsRestrictionImmobileFullMinusSwrAllowedPerSpikeCiHigh`, `\EventsRestrictionImmobileFullMinusSwrAllowedPerSpikeCiLow`, `\EventsRestrictionImmobileFullMinusSwrAllowedPerSpike`, `\EventsRestrictionImmobileSwrAllowedMinusNonePerSpikeAnimalsPositive`, `\EventsRestrictionImmobileSwrAllowedMinusNonePerSpikeCiHigh`, `\EventsRestrictionImmobileSwrAllowedMinusNonePerSpikeCiLow`, `\EventsRestrictionImmobileSwrAllowedMinusNonePerSpike`, `\EventsRestrictionImmobileSwrAllowedMinusSwrPerSpikeAnimalsPositive`, `\EventsRestrictionImmobileSwrAllowedMinusSwrPerSpikeCiHigh`, `\EventsRestrictionImmobileSwrAllowedMinusSwrPerSpikeCiLow`, `\EventsRestrictionImmobileSwrAllowedMinusSwrPerSpike`, `\EventsRestrictionImmobileSwrMinusNonePerSpikeAnimalsPositive`, `\EventsRestrictionImmobileSwrMinusNonePerSpikeCiHigh`, `\EventsRestrictionImmobileSwrMinusNonePerSpikeCiLow`, `\EventsRestrictionImmobileSwrMinusNonePerSpike`, `\EventsRestrictionInsideSwrFullMinusSwrAllowedPerSpikeAnimalsPositive`, `\EventsRestrictionInsideSwrFullMinusSwrAllowedPerSpikeCiHigh`, `\EventsRestrictionInsideSwrFullMinusSwrAllowedPerSpikeCiLow`, `\EventsRestrictionInsideSwrFullMinusSwrAllowedPerSpike`, `\EventsRestrictionInsideSwrSwrAllowedMinusSwrPerSpikeAnimalsPositive`, `\EventsRestrictionInsideSwrSwrAllowedMinusSwrPerSpikeCiHigh`, `\EventsRestrictionInsideSwrSwrAllowedMinusSwrPerSpikeCiLow`, `\EventsRestrictionInsideSwrSwrAllowedMinusSwrPerSpike`, `\EventsRestrictionOutsideSwrFullMinusSwrAllowedPerSpikeAnimalsPositive`, `\EventsRestrictionOutsideSwrFullMinusSwrAllowedPerSpikeCiHigh`, `\EventsRestrictionOutsideSwrFullMinusSwrAllowedPerSpikeCiLow`, `\EventsRestrictionOutsideSwrFullMinusSwrAllowedPerSpike`, `\EventsRestrictionOutsideSwrSwrAllowedMinusSwrPerSpikeAnimalsPositive`, `\EventsRestrictionOutsideSwrSwrAllowedMinusSwrPerSpikeCiHigh`, `\EventsRestrictionOutsideSwrSwrAllowedMinusSwrPerSpikeCiLow`, `\EventsRestrictionOutsideSwrSwrAllowedMinusSwrPerSpike`
 
-### Figure S3: Slow and fast gamma during SWR and no-SWR events, and how far their content lies from the animal
+### Figure S3: Example SWR and no-SWR events, how fast their position distribution moves, which of their content is at a well far from the animal and in which patch, how many wells an event represents and patches it spans, where its content starts and ends, and slow and fast gamma during them
 
-Script: `scripts/figures/generate_supp_figure03.py`. Questions: 2d.1, 2d.8.
+Script: `scripts/figures/generate_supp_figure03.py`. Questions: 2d.1, 2d.2, 2d.8.
 
 Unlettered: `\EventsFastGammaAnimalsAboveRestNonSwr`, `\EventsFastGammaAnimalsAboveRestSwr`, `\EventsFastGammaAnimalsBelowRunningNonSwr`, `\EventsFastGammaAnimalsBelowRunningSwr`, `\EventsFastGammaMedianNonSwr`, `\EventsFastGammaMedianSwr`, `\EventsFastGammaRestMatchedReferenceNonSwr`, `\EventsFastGammaRestMatchedReferenceSwr`, `\EventsFastGammaRunningMatchedReferenceNonSwr`, `\EventsFastGammaRunningMatchedReferenceSwr`, `\EventsSlowGammaAnimalsAboveRestNonSwr`, `\EventsSlowGammaAnimalsAboveRestSwr`, `\EventsSlowGammaAnimalsBelowRunningNonSwr`, `\EventsSlowGammaAnimalsBelowRunningSwr`, `\EventsSlowGammaMedianNonSwr`, `\EventsSlowGammaMedianSwr`, `\EventsSlowGammaRestMatchedReferenceNonSwr`, `\EventsSlowGammaRestMatchedReferenceSwr`, `\EventsSlowGammaRunningMatchedReferenceNonSwr`, `\EventsSlowGammaRunningMatchedReferenceSwr`
 
@@ -4378,7 +4378,7 @@ without being called, is not listed.
 | `events.class_step_evidence_values` | `reported/events.py` | `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
 | `events.class_step_values` | `reported/events.py` | `analysis.event_properties.event_statistics.most_steps`, `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
 | `events.content_distance_values` | `reported/events.py` | `analysis.event_properties.event_statistics.content_distance_band_statistics` |  |
-| `events.content_occupancy_values` | `reported/events.py` | `analysis.event_properties.content_along_arms.content_place_shares`, `analysis.event_properties.content_along_arms.even_content`, `analysis.event_properties.content_along_arms.place_share_statistics` |  |
+| `events.content_occupancy_values` | `reported/events.py` | `analysis.event_properties.content_along_arms.content_place_shares`, `analysis.event_properties.content_along_arms.even_content`, `analysis.event_properties.content_along_arms.place_share_intervals`, `analysis.event_properties.content_along_arms.place_share_statistics` |  |
 | `events.decoding_error_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.local_decoding_error_statistics` |  |
 | `events.detections_with_nonlocal_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.events_overlapping_nonlocal` |  |
 | `events.detector_visit_values` | `reported/events.py` | none |  |

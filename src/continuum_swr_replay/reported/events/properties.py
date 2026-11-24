@@ -1,5 +1,5 @@
-"""The events summary's event properties (part 2d): duration, extent, speed,
-certainty, stillness and location by SWR class, the state composition, the HPD
+"""The events summary's event properties (part 2d): duration, extent, the two
+speeds, certainty, stillness and location by SWR class, the state composition, the HPD
 and content-distance values, the start distance and rest theta, and the nested
 bootstrap intervals of the property contrasts. The statistics are computed in
 ``analysis.event_properties.event_statistics``."""
@@ -84,12 +84,21 @@ _PROPERTIES = (
     ),
     (
         "speed",
-        "replay_speed_median_cm_s",
+        "map_line_fit_speed_cm_s",
         1.0,
         "cm/s",
         "sig2",
         "lower",
         TAGS["speed"],
+    ),
+    (
+        "transport_speed",
+        "transport_slope_speed_cm_s",
+        1.0,
+        "cm/s",
+        "sig2",
+        "lower",
+        TAGS["transport_speed"],
     ),
     (
         "peak",
@@ -161,7 +170,12 @@ _PROPERTIES = (
 _PROPERTY_NAMES = {
     "duration": "event duration",
     "extent": "spatial extent of the decoded content",
-    "speed": "replay speed (median over the event)",
+    "speed": "replay speed (the slope, at least 0, of the track distance from the "
+    "event's first decoded position against time)",
+    "transport_speed": "speed of the position distribution (the slope, at least 0, "
+    "of the earth mover's distance on the track between the Continuous-state "
+    "distributions of two time bins against their lag, 10 to 20 ms; over the "
+    "events with one: an event too short or too Fragmented has none)",
     "peak": "posterior peak (mean over the event)",
     "hpd": "highest-density-region coverage",
     "pause": "pause fraction",
@@ -180,12 +194,13 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
 
     Plain medians of all events, and the number of animals whose own medians
     differ in the claim's direction. Not duration-controlled. The properties
-    are the event table's own columns; the start distance, read from another
-    output, is made by :func:`start_distance_values`.
+    are the event table's own columns; the start distance and the two speeds,
+    read from other outputs, are made by :func:`start_distance_values` and
+    :func:`speed_values`.
     """
     values = []
     for prop in _PROPERTIES:
-        if prop[0] != "start_distance":
+        if prop[0] not in ("start_distance", *_SPEED_PROPERTIES):
             values += _class_median_values(
                 value_factory(property_values, source, prop[6]), events, prop
             )
@@ -202,6 +217,25 @@ def start_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
     )
 
 
+_SPEED_PROPERTIES = ("speed", "transport_speed")
+"""The properties read from the event-speed output."""
+
+
+def speed_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.2: how fast the events' content moves, non-SWR against SWR,
+    as :func:`property_values`: the MAP line-fit speed (Figure 3d) and the
+    transport-slope speed (the supplement's S3b), read from the event-speed
+    output (``analysis/event_properties/event_speed.py`` has the two
+    definitions)."""
+    values = []
+    for prop in _PROPERTIES:
+        if prop[0] in _SPEED_PROPERTIES:
+            values += _class_median_values(
+                value_factory(speed_values, source, prop[6]), events, prop
+            )
+    return values
+
+
 def _class_median_values(
     make: Callable[..., Value], events: pd.DataFrame, prop: tuple
 ) -> list[Value]:
@@ -216,7 +250,9 @@ def _class_median_values(
             scale * stats["median_non_swr"],
             "quantity",
             style,
-            f"median {name} of immobile non-SWR non-local events",
+            f"median {name} of immobile non-SWR non-local events: the mean over "
+            "animals of each animal's median (the median over its epochs of the "
+            "epoch's median)",
             unit,
         ),
         make(
@@ -224,7 +260,9 @@ def _class_median_values(
             scale * stats["median_swr"],
             "quantity",
             style,
-            f"median {name} of immobile SWR-overlapping non-local events",
+            f"median {name} of immobile SWR-overlapping non-local events: the "
+            "mean over animals of each animal's median (the median over its "
+            "epochs of the epoch's median)",
             unit,
         ),
         make(
@@ -310,14 +348,13 @@ _DISTANCE_BANDS = {
 
 
 def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.1 and the distance panel of Figure 3's supplement (S3c): for
+    """Question 2d.1 and the distance panel of Figure 3 (3g): for
     each class, the share of the events whose content lies under 20 cm, 20 to
     100 cm, and 100 cm or more from the animal (the mean over the event's bins
     of the absolute distance along the track of the decoded place from the
     animal's; ``event_statistics.content_distance_band_statistics``): the mean
     over animals of each animal's share with the lowest and highest animal,
-    tagged to the panel, and the share pooled over events (no figure draws
-    it)."""
+    tagged to the panel; the headline share is the same number."""
     make = value_factory(content_distance_values, source, TAGS["content_distance"])
     table = event_statistics.content_distance_band_statistics(events)
     values = []
@@ -337,7 +374,9 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
                 f"content_distance_{band_word}_{word}_fraction",
                 (row["share"], row["animal_min"], row["animal_max"]),
                 (
-                    f"{what}, pooled over events",
+                    f"{what}: the mean over animals of each animal's share (the "
+                    "mean over its epochs of the epoch's share), the same number "
+                    f"as content_distance_{band_word}_{word}_fraction_animal_mean",
                     f"lowest animal's {what} (an animal's share is the mean over "
                     "its epochs of the epoch's share)",
                     f"highest animal's {what} (the mean over its epochs)",
@@ -422,7 +461,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 "quantity",
                 "sig2s",
                 f"lower bound of the {interval} of the SWR minus non-SWR difference "
-                f"of median {name}",
+                f"of median {name} (each class's median the mean over animals of "
+                "each animal's median over its epochs of the epoch's median)",
                 unit,
             ),
             make(
@@ -443,7 +483,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 "quantity",
                 "sig2s",
                 f"SWR minus non-SWR difference of median {name} at matched duration "
-                "(within ten duration-quantile strata, averaged by stratum size)",
+                "(within ten duration-quantile strata of the pooled events, "
+                "averaged by stratum size; pooled over events by design)",
                 unit,
             ),
             make(
@@ -534,6 +575,37 @@ def with_start_and_rest_theta(
     return joined, paths
 
 
+EVENT_SPEED_COLUMNS = ("map_line_fit_speed_cm_s", "transport_slope_speed_cm_s")
+"""The speeds read from the event-speed output
+(``analysis/event_properties/event_speed.py``)."""
+
+
+def with_event_speed(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """``events`` with each one's :data:`EVENT_SPEED_COLUMNS`
+    (``Processed-Data/event_speed``), and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row
+        or no MAP line-fit speed (the transport-slope speed may be missing: an
+        event too short or too Fragmented has none).
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    speeds = pd.concat(
+        (pd.read_parquet(p, columns=["event_id", *EVENT_SPEED_COLUMNS]) for p in paths),
+        ignore_index=True,
+    )
+    joined = events.merge(speeds, on="event_id", how="left", validate="1:1")
+    if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
+        raise ValueError("an event has no MAP line-fit speed")
+    return joined, paths
+
+
 def add_properties(reads: SummaryReads) -> None:
     """Add the event properties, start distance, rest theta and their intervals."""
     summary = reads.summary
@@ -584,6 +656,27 @@ def add_properties(reads: SummaryReads) -> None:
     summary.inputs += [
         files_record("*.parquet", extra_paths, ROOT_DIR),
         file_record(inputs.event_start_rest_theta / "manifest.json", ROOT_DIR),
+    ]
+    events_with_speed, speed_paths = with_event_speed(
+        events, inputs.event_speed, n_epochs
+    )
+    summary.add(
+        *over(
+            pend(
+                speed_values(
+                    events_with_speed,
+                    f"{source} and {rel(inputs.event_speed)} "
+                    "(scripts/event_properties/measure_event_speed.py)",
+                ),
+                stale(inputs.event_speed),
+                off_subset(inputs.event_speed),
+            ),
+            EVENTS_SUBSET,
+        )
+    )
+    summary.inputs += [
+        files_record("*.parquet", speed_paths, ROOT_DIR),
+        file_record(inputs.event_speed / "manifest.json", ROOT_DIR),
     ]
     intervals = pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0)
     summary.add(
