@@ -316,7 +316,6 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
-    select_events_in,
     select_visit_context,
     subset_staleness,
 )
@@ -326,6 +325,9 @@ from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
+)
+from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
+    read_tetrode_holdout,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_MARGINS_S,
@@ -387,7 +389,6 @@ from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
-    TETRODE_HOLDOUT_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
@@ -396,12 +397,11 @@ from continuum_swr_replay.reported.events import (
     heldout_restriction_refusal,
     read_checked,
     read_heldout_restriction,
-    require_tetrode_holdout_folds,
     restriction_inputs_note,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import rel
-from continuum_swr_replay.runs.io import read_complete_run, sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.evidence_drawings import draw_boundary_cases
 from continuum_swr_replay.visualization.figure_utilities import save_figure
@@ -641,7 +641,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics`` of the
         events of the held-out tetrode run that start inside a well
         visit, indexed by group (a run not held out in folds of whole trials is
-        refused, ``reported.events.require_tetrode_holdout_folds``);
+        refused, ``heldout_runs.read_tetrode_holdout``);
         ``outside`` (i): ``outside_swr_statistics``
         over the held-out event run, indexed by family and measure; ``parts``
         (i): ``outside_swr_subset_statistics`` of the margins over its time
@@ -657,20 +657,17 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
-    # panel h: the held-out tetrode run, refused before anything is
-    # read when it was not held out in folds of whole trials
-    canonical_dir = inputs.tetrode_holdout
-    require_tetrode_holdout_folds(
-        read_output_manifest(canonical_dir), rel(canonical_dir)
-    )
     table = read_swr_table(inputs.event_table)
     epochs = event_table_epochs(table, analyzed_epoch_ids())
     events = select_visit_context(table)
-    # panel h's run over the selected events
-    canonical = window_scores(
-        select_events_in(
-            read_complete_run(canonical_dir, TETRODE_HOLDOUT_NAME, epochs),
+    # panel h: the held-out tetrode run over the selected events, as the events
+    # summary reads it (refused when not held out in folds of whole trials)
+    holdout = window_scores(
+        read_tetrode_holdout(
+            inputs.tetrode_holdout,
+            epochs,
             events["event_id"],
+            rel(inputs.tetrode_holdout),
         )
     )
     event_table_sha256 = sha256_file(inputs.event_table)
@@ -711,7 +708,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         "hpd": hpd_distribution(events),
         "timing": boundary_timing_statistics(boundary_offsets(events), events),
         "split": {
-            column: holdout_statistics(canonical, "event", column)
+            column: holdout_statistics(holdout, "event", column)
             for column in SPLIT_LABELS
         },
         "outside": outside_swr_statistics(

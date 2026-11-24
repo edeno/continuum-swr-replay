@@ -207,6 +207,9 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
+from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
+    read_tetrode_holdout,
+)
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
@@ -286,7 +289,6 @@ from continuum_swr_replay.reported.events import (
     heldout_restriction_refusal,
     read_checked,
     read_heldout_restriction,
-    read_tetrode_holdout,
     restriction_inputs_note,
 )
 from continuum_swr_replay.reported.formatting import format_number
@@ -1862,7 +1864,10 @@ def generate_figure(
     # folds of whole trials, over the selected events
     holdout = window_scores(
         read_tetrode_holdout(
-            data_dir / EVENT_TETRODE_HOLDOUT_DIR, event_epochs, events["event_id"]
+            data_dir / EVENT_TETRODE_HOLDOUT_DIR,
+            event_epochs,
+            events["event_id"],
+            rel(data_dir / EVENT_TETRODE_HOLDOUT_DIR),
         )
     )
     participation = read_participation(
