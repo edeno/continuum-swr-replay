@@ -624,6 +624,13 @@ class BootstrapInterval(NamedTuple):
     sd: float
 
 
+def draws_sd_scale(n_top: int) -> float:
+    """``sqrt(n_top / (n_top - 1))``: the factor that turns the nested bootstrap
+    draws' SD of a mean over ``n_top`` animals into its standard error
+    (:func:`bootstrap_interval`)."""
+    return np.sqrt(n_top / (n_top - 1))
+
+
 def bootstrap_interval(
     estimate: float,
     draws: ArrayLike,
@@ -673,7 +680,7 @@ def bootstrap_interval(
     sd = float(values.std(ddof=1)) if values.size >= 2 else float("nan")
     if n_top < 2 or not np.isfinite(estimate) or not np.isfinite(sd):
         return BootstrapInterval(float("nan"), float("nan"), sd)
-    half = float(student_t.ppf(0.975, n_top - 1)) * np.sqrt(n_top / (n_top - 1)) * sd
+    half = float(student_t.ppf(0.975, n_top - 1)) * draws_sd_scale(n_top) * sd
     low, high = float(estimate - half), float(estimate + half)
     if bounds is not None:
         low, high = max(low, bounds[0]), min(high, bounds[1])

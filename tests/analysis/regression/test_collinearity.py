@@ -36,7 +36,7 @@ from scripts.checks.compare_regression_to_mgcv import (
     make_data,
 )
 
-from .conftest import draw_response
+from .conftest import draw_response, family_kernel
 
 
 def _poisson_design(seed: int = 0, n: int = 800):
@@ -101,10 +101,10 @@ def test_softmax_weighting(family: str) -> None:
     if family == "softmax":
         lik, aux = GroupedSoftmax(), np.repeat(np.arange(n // 4), 4)
         y = rng.uniform(0.0, 3.0, n)
-        information = lik.information(X, eta, y, aux)
+        information = family_kernel(lik, "information", X, eta, y, aux)
     elif family == "gaussian":
         lik, aux, y = Gaussian(), None, rng.normal(size=n)
-        information = lik.information(X, eta, y, 1.0)
+        information = family_kernel(lik, "information", X, eta, y, 1.0)
     else:
         aux = np.log(rng.uniform(0.5, 2.0, n)) if family == "poisson" else None
         lik = Poisson() if family == "poisson" else Bernoulli()
@@ -113,7 +113,7 @@ def test_softmax_weighting(family: str) -> None:
             if family == "poisson"
             else (eta > 0) * 1.0
         )
-        information = lik.information(X, eta, y, aux)
+        information = family_kernel(lik, "information", X, eta, y, aux)
     weighted = weighted_design(lik, X, y, aux, eta)
     np.testing.assert_allclose(
         weighted.T @ weighted, information, rtol=1e-12, atol=1e-12

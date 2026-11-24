@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import reml
+from continuum_swr_replay.analysis.regression import reml, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     LOG_PENALTY_BOUNDS,
     NULL_SPACE_EDF_TOL,
@@ -23,7 +23,6 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
     GroupedSoftmax,
-    Groups,
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.newton import (
@@ -34,6 +33,7 @@ from continuum_swr_replay.analysis.regression.newton import (
     STEP_LIMIT,
     penalized_newton,
 )
+from continuum_swr_replay.analysis.regression.padding import Groups
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
@@ -57,15 +57,23 @@ from scripts.checks.compare_regression_to_mgcv import (
     stop_bins,
 )
 
-from .conftest import draw_response
+from .conftest import (
+    draw_response,
+    numeric_gradient,
+    numeric_hessian,
+    relative_error,
+    stack_smooths,
+)
 
 FAMILIES = ("poisson", "bernoulli", "gaussian", "grouped_softmax")
 N_BASIS = 7  # 6 constrained columns per smooth
 
 
-def _relative_error(analytic: np.ndarray, numeric: np.ndarray) -> float:
-    """``||analytic - numeric|| / ||numeric||``."""
-    return float(np.linalg.norm(analytic - numeric) / np.linalg.norm(numeric))
+def _share_without_fit(search) -> float:
+    """The share of the sessions given (in the choice and set aside) that end
+    without a fit: set aside and not fitted by their refits."""
+    n_sessions = search.in_choice.size + len(search.set_aside)
+    return sum(not r.fitted for r in search.set_aside) / n_sessions
 
 
 def _smooth(x: np.ndarray, n_basis: int = N_BASIS) -> tuple[np.ndarray, np.ndarray]:
@@ -86,14 +94,7 @@ def _session(
     x = rng.uniform(size=(n_smooths, n_rows))
     truth = sum(0.7 * np.sin(2 * np.pi * (j + 1) * x[j] / 2) for j in range(n_smooths))
     parts = [] if family == "grouped_softmax" else [np.ones((n_rows, 1))]
-    blocks = []
-    start = len(parts)
-    for j in range(n_smooths):
-        design, penalty = _smooth(x[j])
-        parts.append(design)
-        blocks.append(PenaltyBlock(np.arange(start, start + design.shape[1]), penalty))
-        start += design.shape[1]
-    X = np.hstack(parts)
+    X, blocks = stack_smooths(*parts, *(_smooth(x[j]) for j in range(n_smooths)))
     if family == "poisson":
         offset = np.log(rng.uniform(0.5, 2.0, size=n_rows))
         y = draw_response(rng, "poisson", 0.7 + truth + offset)
@@ -107,33 +108,6 @@ def _session(
     groups = np.repeat(np.arange(n_rows // 4), 4)
     y = draw_response(rng, "shares", truth, total=30.0)
     return GroupedSoftmax(), SessionData(X, y, groups), blocks
-
-
-def _numeric_gradient(V, point: np.ndarray, h: float) -> np.ndarray:
-    """Central differences of ``V`` at ``point`` with step ``h``, shape ``(m,)``."""
-    unit = np.eye(point.size)
-    return np.array([(V(point + h * e) - V(point - h * e)) / (2 * h) for e in unit])
-
-
-def _numeric_hessian(V, point: np.ndarray, h: float) -> np.ndarray:
-    """Central second differences of ``V`` at ``point`` with step ``h``, shape
-    ``(m, m)``."""
-    unit = np.eye(point.size)
-    return np.array(
-        [
-            [
-                (
-                    V(point + h * (a + c))
-                    - V(point + h * (a - c))
-                    - V(point - h * (a - c))
-                    + V(point - h * (a + c))
-                )
-                / (4 * h * h)
-                for c in unit
-            ]
-            for a in unit
-        ]
-    )
 
 
 def _score(lik, data, blocks, rho, beta0=None):
@@ -159,11 +133,11 @@ def test_gradient_and_hessian_finite_differences(family: str, n_smooths: int) ->
     def V(r: np.ndarray) -> float:
         return _score(lik, data, blocks, r, warm).score
 
-    numeric_gradient = _numeric_gradient(V, rho, 1e-4)
-    numeric_hessian = _numeric_hessian(V, rho, 1e-3)
+    gradient = numeric_gradient(V, rho, 1e-4)
+    hessian = numeric_hessian(V, rho, 1e-3)
 
-    assert _relative_error(at.gradient, numeric_gradient) < 1e-5
-    assert _relative_error(at.hessian, numeric_hessian) < 1e-5
+    assert relative_error(at.gradient, gradient) < 1e-5
+    assert relative_error(at.hessian, hessian) < 1e-5
     np.testing.assert_array_equal(at.hessian, at.hessian.T)
 
 
@@ -180,11 +154,11 @@ def _score_in_jax(lik, data: SessionData, blocks, beta):
     derivatives by up to 8e-7 of themselves at log penalties 8 to 12. Called
     with JAX's 64-bit types on."""
     p = data.X.shape[1]
-    vectors, blocks = reml._eigenbasis(blocks, p)
-    Q = reml._rotate(blocks, vectors, np.eye(p))
+    Q = reml._rotate(blocks, np.eye(p))
+    blocks = reml._eigenbasis(blocks, p)
     X, y = jnp.asarray(data.X @ Q), jnp.asarray(data.y)
     beta = Q.T @ beta
-    units = jnp.asarray(np.stack([reml._embedded(b, 1.0, p) for b in blocks]))
+    units = jnp.asarray(reml._penalty_stack(blocks, np.zeros(len(blocks)), p))
     ranks = jnp.asarray([b.rank for b in blocks], dtype=float)
     constant = sum(b.log_pdet for b in blocks)
     n_null = p - sum(b.rank for b in blocks)
@@ -341,7 +315,7 @@ def test_the_profiled_gaussian_flags_a_gram_it_cannot_factor() -> None:
     factored; the host raises on False (as for the Laplace families)."""
     _, data, blocks = _session("gaussian", 1, seed=2)
     p = data.X.shape[1]
-    S_j = reml._embedded(blocks[0], 1.0, p)[None]
+    S_j = reml._penalty_stack(blocks[:1], np.zeros(1), p)
     rows = Gaussian().pad(data.X, data.y, None)
     with jax.enable_x64(True):
 
@@ -396,6 +370,17 @@ def test_block_rank_is_the_penalty_rank() -> None:
     assert blocks[0].log_pdet == pytest.approx(np.log(positive).sum(), rel=1e-12)
 
 
+def test_a_block_moved_to_other_columns_keeps_its_size() -> None:
+    """``at_columns`` copies the decomposition to other columns and refuses a
+    column set of another length, as building the block again would."""
+    block = PenaltyBlock(np.arange(2, 5), np.diag([1.0, 2.0, 0.0]))
+    moved = block.at_columns(np.array([0, 3, 7]))
+    np.testing.assert_array_equal(moved.columns, [0, 3, 7])
+    assert moved.S is block.S and moved.rank == block.rank == 2
+    with pytest.raises(ValueError, match="the penalty has 3 columns"):
+        block.at_columns(np.array([0, 3]))
+
+
 def test_overlapping_blocks_are_refused() -> None:
     lik, data, blocks = _session("poisson", 2, seed=2)
     overlapping = [blocks[0], PenaltyBlock(blocks[1].columns - 1, blocks[1].S)]
@@ -448,10 +433,9 @@ def test_a_session_whose_design_is_not_identified_raises() -> None:
         design, penalty, _ = basis.constrained(x)
         has_reward = index != 3  # session 3 has no rewarded row
         reward = (rng.uniform(size=600) < 0.5).astype(float) * has_reward
-        X = np.column_stack([np.ones(600), reward, design])
+        X, blocks = stack_smooths(np.ones(600), reward, (design, penalty))
         y = draw_response(rng, "poisson", -1.0 + np.sin(x) + 0.3 * reward)
         sessions.append(SessionData(X, y, np.zeros(600), name=f"s{index}"))
-    blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     message = (
         r"session 3 \(s3\): design not identified .*cannot see .*: "
         r"\[1\]\).*inactive \(SessionData.active\)"
@@ -521,9 +505,9 @@ def _one_clock_counts(
     cell_exposure = np.bincount(cell, weights=exposure)
     cell_clock = np.bincount(cell, weights=clock * exposure) / cell_exposure
     design, penalty, _ = PSplineBasis(0.0, 4.0, 15).constrained(cell_clock)
-    X = np.column_stack([np.ones(cell_clock.size), design])
+    X, blocks = stack_smooths(np.ones(cell_clock.size), (design, penalty))
     data = SessionData(X, np.bincount(cell, weights=y), np.log(cell_exposure))
-    return data, [PenaltyBlock(np.arange(1, 15), penalty)]
+    return data, blocks
 
 
 def test_grid_start_finds_better_optimum() -> None:
@@ -630,10 +614,8 @@ def test_at_boundary() -> None:
     rng = np.random.default_rng(0)
     n_rows = 400
     x = rng.uniform(size=n_rows)
-    design, penalty = _smooth(x)
-    X = np.column_stack([np.ones(n_rows), design])
+    X, blocks = stack_smooths(np.ones(n_rows), _smooth(x))
     noise = rng.normal(size=n_rows)
-    blocks = [PenaltyBlock(np.arange(1, 7), penalty)]
 
     line = select_penalties(Gaussian(), [SessionData(X, 0.8 * x + noise)], blocks)
     wiggle = select_penalties(
@@ -661,9 +643,7 @@ def test_shrunk_to_null_space() -> None:
     rng = np.random.default_rng(2)
     n_rows = 400
     x = rng.uniform(size=n_rows)
-    design, penalty = _smooth(x, n_basis=10)
-    X = np.column_stack([np.ones(n_rows), design])
-    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
+    X, blocks = stack_smooths(np.ones(n_rows), _smooth(x, n_basis=10))
     line_y = (x - 0.5) + rng.normal(size=n_rows)
     curve_y = np.sin(2 * np.pi * x) + rng.normal(size=n_rows)
 
@@ -768,8 +748,7 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
     n_rows = 400
     s = rng.uniform(0.0, 4.0, n_rows)
     design, penalty, _ = PSplineBasis(0.0, 4.0, 15).constrained(s)
-    X = np.column_stack([np.ones(n_rows), design])
-    blocks = [PenaltyBlock(np.arange(1, 15), penalty)]
+    X, blocks = stack_smooths(np.ones(n_rows), (design, penalty))
     base = np.sin(2.0 * s) + rng.normal(scale=0.5, size=n_rows)
     S = assemble_penalty(blocks, [2.0], X.shape[1])
 
@@ -783,7 +762,7 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
         np.testing.assert_allclose(fit.beta / scale, unit.beta, rtol=1e-10)
 
         result = select_penalties(Gaussian(), [SessionData(X, scale * base)], blocks)
-        assert result.search.n_grid_not_finite == 0
+        assert sum(result.search.grid_failures.values()) == 0
         np.testing.assert_allclose(result.rho, reference.rho, rtol=0, atol=1e-9)
         np.testing.assert_allclose(
             result.sessions[0].fit.beta / scale,
@@ -799,10 +778,8 @@ def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
     apart, at every penalty strength."""
     rng = np.random.default_rng(0)
     x = rng.uniform(size=500)
-    design, penalty = _smooth(x, n_basis=10)
-    X = np.column_stack([np.ones(500), x, design])
+    X, blocks = stack_smooths(np.ones(500), x, _smooth(x, n_basis=10))
     y = draw_response(rng, "poisson", 0.5 + np.sin(3.0 * x))
-    blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
     score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
     assert score.score == np.inf
     assert score.fit.status == NOT_IDENTIFIED
@@ -898,7 +875,7 @@ def test_grid_points_that_fail_are_counted_by_status(
 
     monkeypatch.setattr(reml, "_fit_one", fails_when_weak)
     result = select_penalties(lik, [data], blocks)
-    assert result.search.n_grid_not_finite == 6  # log penalties -10 to -5
+    assert sum(result.search.grid_failures.values()) == 6  # log penalties -10 to -5
     assert result.search.grid_failures == {STEP_LIMIT: 6}
 
 
@@ -923,7 +900,7 @@ def test_grid_failures_of_two_sessions_with_one_status_are_summed(
     monkeypatch.setattr(reml, "_fit_one", fails_at_one_end)
     search = select_penalties(lik, [first, second], blocks).search
     assert search.grid_failures == {STEP_LIMIT: 9}
-    assert search.n_grid_not_finite == 9
+    assert sum(search.grid_failures.values()) == 9
 
 
 def test_an_inactive_column_is_left_out_of_its_session() -> None:
@@ -1046,7 +1023,7 @@ def test_three_penalties_over_several_sessions() -> None:
         sessions.append(data)
     selected = select_penalties(lik, sessions, blocks)
     assert selected.search.n_grid_points == 125
-    assert selected.search.n_grid_not_finite == 0
+    assert sum(selected.search.grid_failures.values()) == 0
     assert not selected.search.at_boundary.any()
     pooled = pooled_reml(lik, sessions, blocks, selected.rho)
     assert np.all(np.linalg.eigvalsh(pooled.hessian) > 0)
@@ -1153,7 +1130,7 @@ def test_a_flat_pooled_score_ends_converged_in_the_null_space() -> None:
         sessions.append(data)
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
 
-    assert result.search.n_grid_not_finite == 0
+    assert sum(result.search.grid_failures.values()) == 0
     assert result.rho[0] > 15.0
     for session in result.sessions:
         assert session.edf[0] == pytest.approx(1.0, abs=1e-5)
@@ -1238,13 +1215,13 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     (left_out,) = result.search.set_aside
     assert (left_out.index, left_out.name) == (4, "s4")
     assert left_out.reference.fit.status == NO_FINITE_MAXIMUM
-    assert sorted(left_out.running_away.tolist()) == [arm, role]
+    assert sorted(left_out.reference.fit.running_away.tolist()) == [arm, role]
     assert [r.fit.status for r in left_out.refits] == [NO_FINITE_MAXIMUM, CONVERGED]
     assert sorted(left_out.left_out.tolist()) == [arm, role]
     assert left_out.fitted and "inactive" in left_out.reason
     np.testing.assert_array_equal(result.search.reference_rho, [6.0])
     np.testing.assert_array_equal(result.search.in_choice, [0, 1, 2, 3, 5, 6, 7, 8, 9])
-    assert result.search.share_without_fit == 0.0
+    assert _share_without_fit(result.search) == 0.0
 
     without = select_penalties(GroupedSoftmax(), sessions[:4] + sessions[5:], blocks)
     np.testing.assert_array_equal(result.rho, without.rho)
@@ -1296,10 +1273,9 @@ def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
     design, penalty, _ = basis.constrained(x)
     indicator = (rng.uniform(size=600) < 0.2).astype(float)
     copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
-    X = np.column_stack([np.ones(600), design, *copies])
+    X, blocks = stack_smooths(np.ones(600), (design, penalty), *copies)
     y = draw_response(rng, "bernoulli", np.sin(x))
     y[indicator == 1] = 1.0
-    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     with np.errstate(over="ignore"):
         refit = refit_session(Bernoulli(), SessionData(X, y), blocks, [6.0])
     assert refit.fitted and len(refit.refits) > 2
@@ -1353,7 +1329,7 @@ def test_the_search_never_refits_a_session_without_its_intercept() -> None:
     assert left_out.reason.startswith("no finite maximum along the intercept")
     assert left_out.refits[-1].fit.status == NO_FINITE_MAXIMUM
     assert np.isnan(result.sessions[0].fit.beta).all()
-    assert result.search.share_without_fit == pytest.approx(1 / 6)
+    assert _share_without_fit(result.search) == pytest.approx(1 / 6)
     np.testing.assert_array_equal(result.rho, [20.0])
     assert result.sessions[1].fit.beta[3] == pytest.approx(
         -0.1197006834685946, rel=1e-12
@@ -1422,7 +1398,7 @@ def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:
     assert left_out.refits[-1].fit.status == NO_FINITE_MAXIMUM
     assert left_out.left_out.size == 0
     assert "block 0's null space" in left_out.reason
-    assert result.search.share_without_fit == pytest.approx(0.1)
+    assert _share_without_fit(result.search) == pytest.approx(0.1)
     assert np.all(np.isnan(result.sessions[6].fit.beta))
     assert 6 not in result.search.in_choice
 
@@ -1452,12 +1428,11 @@ def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
         design, penalty, _ = basis.constrained(x)
         indicator = (rng.uniform(size=600) < 0.2).astype(float)
         copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
-        X = np.column_stack([np.ones(600), design, *copies])
+        X, blocks = stack_smooths(np.ones(600), (design, penalty), *copies)
         y = draw_response(rng, "bernoulli", np.sin(x))
         if seed == 2:
             y[indicator == 1] = 1.0
         sessions.append(SessionData(X, y, name=f"s{seed}"))
-    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
     with np.errstate(over="ignore"):
         result = select_penalties(Bernoulli(), sessions, blocks)
     (left_out,) = result.search.set_aside
@@ -1465,7 +1440,7 @@ def test_a_direction_spread_over_near_copies_is_left_out_in_rounds() -> None:
     assert len(left_out.refits) > 2  # more than one round
     assert set(left_out.left_out.tolist()) <= set(range(10, 20))
     assert len(set(left_out.left_out.tolist())) == left_out.left_out.size
-    assert result.search.share_without_fit == 0.0
+    assert _share_without_fit(result.search) == 0.0
 
 
 def _two_smooth_session(seed: int) -> tuple[SessionData, list[PenaltyBlock]]:
@@ -1491,7 +1466,7 @@ def test_two_smooths_in_their_null_spaces_return() -> None:
         sessions.append(data)
     result = select_penalties(GroupedSoftmax(), sessions, blocks)
 
-    assert result.search.n_grid_not_finite == 0
+    assert sum(result.search.grid_failures.values()) == 0
     assert result.search.set_aside == ()
     assert np.all(result.rho > 15.0)
     for session in result.sessions:
@@ -1546,7 +1521,7 @@ def test_a_stack_with_inactive_columns_is_the_stack_without_them() -> None:
     reference = select_penalties(GroupedSoftmax(), animals, blocks)
     (left_out,) = reference.search.set_aside
     assert left_out.index == 2
-    assert sorted(left_out.running_away.tolist()) == [arm, role]
+    assert sorted(left_out.reference.fit.running_away.tolist()) == [arm, role]
     assert left_out.fitted
     assert sorted(left_out.left_out.tolist()) == [arm, role]
 
@@ -1585,8 +1560,7 @@ def test_a_separation_by_a_smooths_line_is_named_as_its_null_space(rho: float) -
     rng = np.random.default_rng(0)
     x = rng.uniform(0.0, 4.0, 300)
     design, penalty, _ = PSplineBasis(0.0, 4.0, 10).constrained(x)
-    X = np.column_stack([np.ones(300), design])
-    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
+    X, blocks = stack_smooths(np.ones(300), (design, penalty))
     y = (x > 2.0).astype(float)
     with np.errstate(over="ignore"):
         score = reml_and_derivatives(Bernoulli(), X, y, None, blocks, [rho])
@@ -1701,15 +1675,17 @@ def test_gradient_and_hessian_at_strong_penalties(rho: float) -> None:
         ).score
 
     def gradient(h: float) -> np.ndarray:
-        return _numeric_gradient(value, point, h)
+        return numeric_gradient(value, point, h)
 
     def hessian(h: float) -> np.ndarray:
-        return _numeric_hessian(value, point, h)
+        return numeric_hessian(value, point, h)
 
-    numeric_gradient = (4 * gradient(0.025) - gradient(0.05)) / 3
-    numeric_hessian = (4 * hessian(0.025) - hessian(0.05)) / 3
-    np.testing.assert_allclose(at.gradient, numeric_gradient, rtol=1e-4, atol=1e-11)
-    np.testing.assert_allclose(at.hessian, numeric_hessian, rtol=1e-3, atol=1e-10)
+    extrapolated_gradient = (4 * gradient(0.025) - gradient(0.05)) / 3
+    extrapolated_hessian = (4 * hessian(0.025) - hessian(0.05)) / 3
+    np.testing.assert_allclose(
+        at.gradient, extrapolated_gradient, rtol=1e-4, atol=1e-11
+    )
+    np.testing.assert_allclose(at.hessian, extrapolated_hessian, rtol=1e-3, atol=1e-10)
 
 
 def test_a_softmax_design_collinear_within_events_is_named() -> None:
@@ -1733,3 +1709,17 @@ def test_a_softmax_design_collinear_within_events_is_named() -> None:
     )
     with pytest.raises(ValueError, match=message):
         select_penalties(GroupedSoftmax(), sessions, blocks)
+
+
+def test_a_search_clears_the_caches_at_most_once_at_its_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the program limit patched to 0, every outermost call of the fitter
+    clears JAX's caches at its entry: a penalty search, an outer entry, clears
+    once, never between two of its evaluations."""
+    lik, data, blocks = _session("poisson", 2, 3)
+    clears = []
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 0)
+    monkeypatch.setattr(jax, "clear_caches", lambda: clears.append(True))
+    select_penalties(lik, [data], blocks)
+    assert len(clears) == 1

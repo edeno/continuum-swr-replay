@@ -42,6 +42,8 @@ from collections.abc import Mapping
 import numpy as np
 
 from .likelihoods import Likelihood
+from .reml import _positions
+from .runtime import in_float64
 
 __all__ = [
     "MAX_EXPLAINED",
@@ -193,6 +195,7 @@ def _largest_ratio(cross: np.ndarray, whole: np.ndarray) -> float:
     return float(np.linalg.eigvalsh(W.T @ cross @ W)[-1])
 
 
+@in_float64
 def term_collinearity(
     lik: Likelihood,
     X: np.ndarray,
@@ -234,7 +237,7 @@ def term_collinearity(
     active = np.isfinite(beta)
     if intercept is not None and not active[intercept]:
         raise ValueError("the intercept is inactive")
-    index = np.cumsum(active) - 1  # a column's place among the active ones
+    index = _positions(active)
     kept = {
         name: index[cols[active[cols]]]
         for name, cols in terms.items()
