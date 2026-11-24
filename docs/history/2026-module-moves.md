@@ -965,5 +965,14 @@ naming, `<WHAT>_RUN`. No value changed. Code that a test patches reads a pin as
 | `paths.STATE_EVIDENCE_RUN` (among the folder names) | `paths.STATE_EVIDENCE_RUN` (in the pinned-run block) |
 | `reported/detection.py`: `MEMORYLESS_PILOT_RUN` | `paths.MEMORYLESS_PILOT_RUN` |
 
+## The unit of the fit, 2026-11-24
+
+`fit_sessions` fits one model for each unit of the fit (a session, a day or an animal:
+`fit_by`), with a baseline for each session of a unit. At `fit_by="session"` every record is
+the one of before, with two new fields (`fit_by`, `sessions`). Paths are under
+`src/continuum_swr_replay/analysis/regression/`.
+
+| Old place | New place | Commit |
+|---|---|---|
 | `sessions._fit_session` (renamed) | `sessions._fit_unit`: one fit of a unit of the fit (a session, a day or an animal; `fit_sessions(..., fit_by=...)`) | fa7a43ac |
 | `sessions.SessionKey` (moved) | `terms.SessionKey`; `sessions` imports it, so `from ...regression.sessions import SessionKey` still works | fa7a43ac |
