@@ -21,9 +21,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    immobile_analyzed_bins,
-)
+from continuum_swr_replay.analysis.detection.swr_detectors import DETECTOR_SETTINGS
+from continuum_swr_replay.analysis.event_definition.analyzed_time import rest_bins
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
@@ -61,8 +60,40 @@ edge and up to its high edge (the first also holds 0, the last anything above
 0.8). The non-local threshold, 0.8, is an edge, so the last bin is the bins
 decoded non-local."""
 
+DETECTION_LEVELS = {
+    "ripple_power": float(DETECTOR_SETTINGS["kay"]["zscore_threshold"]),
+    "mua": MUA_LEVEL_Z,
+}
+"""Each signal's detection level (z), an edge of its bins: the SWR threshold
+(Kay's detector, 2 z) and :data:`MUA_LEVEL_Z`."""
+
 assert DEFAULT_NON_LOCAL_THRESHOLD in PROBABILITY_EDGES
 assert MUA_LEVEL_Z in MUA_EDGES
+assert DETECTION_LEVELS["ripple_power"] in RIPPLE_POWER_EDGES
+
+
+def signal_bin_index(signal: NDArray, edges: NDArray) -> NDArray[np.int64]:
+    """Each time bin's signal bin: the bin of ascending ``edges`` that holds
+    its level, each bin holding its low edge and not its high one (the last
+    also its high edge); -1 for a level outside the edges or not finite.
+
+    Parameters
+    ----------
+    signal : ndarray, shape (n_bins,)
+    edges : ndarray, shape (n_edges,)
+
+    Returns
+    -------
+    ndarray of int, shape (n_bins,)
+    """
+    signal = np.asarray(signal, dtype=float)
+    edges = np.asarray(edges, dtype=float)
+    inside = np.isfinite(signal) & (signal >= edges[0]) & (signal <= edges[-1])
+    index = np.full(signal.shape, -1, dtype=np.int64)
+    index[inside] = np.clip(
+        np.searchsorted(edges, signal[inside], side="right") - 1, 0, edges.size - 2
+    )
+    return index
 
 
 def count_by_signal_and_probability(
@@ -89,20 +120,13 @@ def count_by_signal_and_probability(
         ``signal_high``, ``probability_low``, ``probability_high`` and
         ``n_bins``.
     """
-    signal = np.asarray(signal, dtype=float)
     probability = np.asarray(probability, dtype=float)
     edges = np.asarray(edges, dtype=float)
-    keep = (
-        np.isfinite(signal)
-        & np.isfinite(probability)
-        & (signal >= edges[0])
-        & (signal <= edges[-1])
-    )
+    index = signal_bin_index(signal, edges)
+    keep = (index >= 0) & np.isfinite(probability)
     n_signal = edges.size - 1
     n_probability = PROBABILITY_EDGES.size - 1
-    which_signal = np.clip(
-        np.searchsorted(edges, signal[keep], side="right") - 1, 0, n_signal - 1
-    )
+    which_signal = index[keep]
     # above a low edge, up to and including the high edge
     which_probability = np.searchsorted(
         PROBABILITY_EDGES[1:-1], probability[keep], side="left"
@@ -154,13 +178,7 @@ def rest_signal_counts(dot: pd.DataFrame, in_visit: NDArray[np.bool_]) -> pd.Dat
     ValueError
         If ``in_visit`` is not one bool per bin.
     """
-    in_visit = np.asarray(in_visit)
-    if in_visit.dtype != bool or in_visit.shape != (len(dot),):
-        raise ValueError(
-            f"in_visit must be one bool per bin, shape ({len(dot)},); got "
-            f"{in_visit.dtype} of shape {in_visit.shape}"
-        )
-    rest = immobile_analyzed_bins(dot) & in_visit
+    rest = rest_bins(dot, in_visit)
     probability = nonlocal_probability(dot).to_numpy()[rest]
     return pd.concat(
         [

@@ -730,3 +730,119 @@ def test_the_decodes_missing_bins_score_zero_in_every_fold(fold_fit):
     )
     observed = scores[~is_missing & np.isin(folds, [0, 3])]
     assert np.isfinite(observed).all() and (observed != 0).all(axis=1).mean() > 0.99
+
+
+@pytest.fixture(scope="module")
+def from_stored(fold_fit):
+    """The fold-fit scores again, every fold's decoder rebuilt from the run's
+    record as the runner writes and reads it (``runs.io.json_ready``, then
+    ``json``) instead of fit by EM, with all four models."""
+    import json
+
+    from continuum_swr_replay.runs.io import json_ready
+
+    recording, canonical, folds, margin, in_swr, _, record, _, training, missing, *_ = (
+        fold_fit
+    )
+    stored = json.loads(json.dumps(json_ready(record["folds"]), allow_nan=False))
+    table, again = nr.fold_fit_scores(
+        canonical,
+        recording.time,
+        recording.position[:, None],
+        recording.spike_times,
+        recording.marks,
+        training,
+        missing,
+        in_swr,
+        folds=folds,
+        margin_bins=margin,
+        linear_position=recording.position,
+        fit=nr.stored_fold_fit(stored),
+        models=nr.ALL_MODELS,
+        log=sim.quiet,
+    )
+    return stored, table, again
+
+
+def test_the_stored_record_keeps_the_fit_to_the_bit(fold_fit, from_stored):
+    """What the rebuild reads: the discrete transitions round-trip through the
+    record's JSON bit for bit; the initial distribution is on Local alone, the
+    one state bin of its state, and need not sum to 1 (float32)."""
+    *_, fits, _, _, _, _ = fold_fit
+    stored, _, again = from_stored
+    for k, fold in enumerate(stored):
+        detector = fits[k][2]
+        np.testing.assert_array_equal(
+            np.asarray(fold["discrete_transition"]),
+            np.asarray(detector.discrete_state_transitions_),
+        )
+        initial = np.asarray(fold["initial_discrete"])
+        np.testing.assert_array_equal(
+            initial, np.asarray(detector.discrete_initial_conditions)
+        )
+        assert initial[0] > 0 and (initial[1:] == 0).all()
+        assert again["folds"][k]["fit_from_stored"] is True
+    assert nr.fold_check_failures(again, nr.ALL_MODELS) == []
+
+
+@bit_for_bit
+def test_a_pass_from_the_stored_record_is_the_em_fit_pass(fold_fit, from_stored):
+    """Each fold's decoder rebuilt from the stored record (the encoding fit as
+    the fold fit fits it, the stored transitions and initial distribution, no
+    EM) gives the EM-fit run's scores, state probabilities and place bins bit
+    for bit, except at the first bins of the epoch: the record keeps Local's
+    initial mass but not where in Local EM put it (the smoothed first bin), so
+    the rebuild starts Local as configured, and the two differ until the
+    spikes fix the place. Printed (``-s``): how far that reaches and how
+    large it is; the fourth model's scores are finite."""
+    table = fold_fit[5]
+    _, again, _ = from_stored
+    columns = [
+        *nr.SCORE_COLUMNS,
+        *nr.STATE_PROBABILITY_COLUMNS.values(),
+        nr.NONLOCAL_PLACE_BIN_COLUMN,
+    ]
+    for column in ("place_sampling_s", "block", "in_swr", "time"):
+        np.testing.assert_array_equal(again[column], table[column], err_msg=column)
+    differ = np.zeros(len(table), dtype=bool)
+    for column in columns:
+        a = again[column].to_numpy(np.float64)
+        b = table[column].to_numpy(np.float64)
+        differ |= a != b
+    reach = int(np.flatnonzero(differ).max()) + 1 if differ.any() else 0
+    largest = max(
+        float(
+            np.abs(again[c].to_numpy(np.float64) - table[c].to_numpy(np.float64)).max()
+        )
+        for c in nr.SCORE_COLUMNS
+    )
+    folds = nr.stored_score_differences(again, table, nr.ALL_MODELS)
+    print(
+        f"stored-fit pass: {int(differ.sum())} of {len(table)} bins differ, the "
+        f"last at bin {reach - 1} ({reach * BIN_S:.2f} s); largest score "
+        f"difference {largest:.3g} nats; per fold "
+        f"{[max(f[c] for c in nr.SCORE_COLUMNS) for f in folds]}"
+    )
+    # only at the start of the epoch: within its first 5 %
+    assert reach <= 0.05 * len(table)
+    assert np.isfinite(again[["swr_allowed", "swr_allowed_two_sided"]]).all().all()
+
+
+def test_the_fourth_model_sits_between_the_others(fold_fit, from_stored):
+    """Here every SWR is a remote event. Inside SWRs ``swr_allowed`` allows
+    what ``full`` allows, so it gains over ``none`` there about as ``full``
+    does; outside SWRs it allows what ``none`` allows, so ``full`` gains over
+    it there about what ``full`` gains over ``swr``."""
+    in_swr = fold_fit[4]
+    _, again, _ = from_stored
+    rest = ~fold_fit[0].is_running
+    for suffix in ("", "_two_sided"):
+        score = {m: again[f"{m}{suffix}"].to_numpy(np.float64) for m in nr.ALL_MODELS}
+        inside = in_swr & rest
+        outside = ~in_swr & rest
+        allowed_gain = (score["swr_allowed"] - score["none"])[inside].sum()
+        full_gain = (score["full"] - score["none"])[inside].sum()
+        assert allowed_gain > 0.9 * full_gain > 0
+        outside_allowed = (score["full"] - score["swr_allowed"])[outside].sum()
+        outside_swr = (score["full"] - score["swr"])[outside].sum()
+        assert abs(outside_allowed - outside_swr) < 0.1 * abs(full_gain)

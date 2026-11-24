@@ -42,20 +42,26 @@ from continuum_swr_replay.paths import (
     CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
+    EVENT_CONTENT_PLACE_RATE_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
+    NONLOCAL_PROBABILITY_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
+    STATE_BY_SIGNAL_DIR,
     STATE_CALIBRATION_IN_VISITS_DIR,
 )
 from continuum_swr_replay.reported import events as builder
@@ -76,6 +82,7 @@ EVENT_BUILDERS = (
     "boundary_offset_values",
     "boundary_timing_values",
     "hpd_tight_values",
+    "content_distance_values",
     "state_composition_values",
     "property_values",
     "start_distance_values",
@@ -86,6 +93,9 @@ EVENT_BUILDERS = (
     "likelihood_advantage_values",
     "tetrode_holdout_values",
     "shared_content_values",
+    "tetrode_holdout_extra_values",
+    "low_rate_values",
+    "resolved_content_values",
     "content_occupancy_values",
 )
 #: The restriction builders, by the argument holding the canonical windows
@@ -98,10 +108,12 @@ RESTRICTION_BUILDERS = {
     "restriction_immobile_values": None,
     "restriction_outside_swr_part_values": None,
     "restriction_inside_swr_values": None,
+    "restriction_swr_allowed_values": None,
 }
 #: The builders given the held-out events, by the argument holding them.
 HELDOUT_BUILDERS = {
     "restriction_heldout_event_values": 0,
+    "restriction_swr_allowed_values": 0,
     "restriction_agreement_values": 0,
     "restriction_outside_swr_values": 2,
 }
@@ -117,6 +129,7 @@ OTHER_BUILDERS = (
     "property_interval_values",
     "gamma_db_values",
     "other_detector_values",
+    "detections_with_nonlocal_values",
     "nonlocal_found_values",
     "detector_visit_values",
     "spike_evidence_values",
@@ -130,6 +143,8 @@ OTHER_BUILDERS = (
     "class_distribution_values",
     "nonlocal_power_values",
     "nonlocal_mua_values",
+    "nonlocal_probability_values",
+    "state_by_signal_values",
     "rule_sweep_values",
     "state_calibration_values",
 )
@@ -277,6 +292,8 @@ class _Run:
             EVENT_GAMMA_DIR,
             RIPPLE_CLASS_STRUCTURE_DIR,
             NONLOCAL_BY_SIGNAL_DIR,
+            NONLOCAL_PROBABILITY_DIR,
+            STATE_BY_SIGNAL_DIR,
             EVENT_RULE_SWEEP_DIR,
             STATE_CALIBRATION_IN_VISITS_DIR,
             DECODER_QUALITY_DIR,
@@ -285,8 +302,11 @@ class _Run:
             EVENT_PARTICIPATION_DIR,
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             EVENT_TETRODE_HOLDOUT_DIR,
+            EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+            EVENT_CONTENT_PLACE_RATE_DIR,
             EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
             EVENT_BIN_FACTS_DIR,
             "state_evidence",
         ):
@@ -294,17 +314,20 @@ class _Run:
             self.manifests[folder] = json.loads(json.dumps(fresh))
         # the restriction run is the fold fit: its settings record the fit and
         # the current SWR source, its records the current decode frames
-        (root / EVENT_NONLOCAL_RESTRICTION_DIR).mkdir(parents=True, exist_ok=True)
-        self.manifests[EVENT_NONLOCAL_RESTRICTION_DIR] = {
-            **json.loads(json.dumps(fresh)),
-            "settings": _restriction_settings(),
-            "epochs": _restriction_records(),
-        }
+        # and so is the run that scored the fourth decoder from its stored fits
+        for folder in (
+            EVENT_NONLOCAL_RESTRICTION_DIR,
+            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+        ):
+            (root / folder).mkdir(parents=True, exist_ok=True)
+            self.manifests[folder] = {
+                **json.loads(json.dumps(fresh)),
+                "settings": _restriction_settings(),
+                "epochs": _restriction_records(),
+            }
         # the held-out tetrode run is held out in folds of whole trials
-        self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
-            "n_folds": 5,
-            "fold_design": "trials",
-        }
+        for folder in (EVENT_TETRODE_HOLDOUT_DIR, EVENT_TETRODE_HOLDOUT_EXTRA_DIR):
+            self.manifests[folder]["settings"] = {"n_folds": 5, "fold_design": "trials"}
         for folder, (key, value) in (changes or {}).items():
             if value is None:
                 self.manifests[folder].pop(key)
@@ -337,7 +360,12 @@ class _Run:
             pd.DataFrame({"a": [1]}).to_csv(
                 root / STATE_CALIBRATION_IN_VISITS_DIR / f"{name}.csv", index=False
             )
-        for folder in (NONLOCAL_BY_SIGNAL_DIR, EVENT_RULE_SWEEP_DIR):
+        for folder in (
+            NONLOCAL_BY_SIGNAL_DIR,
+            NONLOCAL_PROBABILITY_DIR,
+            STATE_BY_SIGNAL_DIR,
+            EVENT_RULE_SWEEP_DIR,
+        ):
             pd.DataFrame({"epoch_id": EPOCHS}).to_parquet(
                 root / folder / "counts.parquet"
             )
@@ -361,6 +389,8 @@ class _Run:
             event_gamma=root / EVENT_GAMMA_DIR,
             class_structure=root / RIPPLE_CLASS_STRUCTURE_DIR,
             nonlocal_by_signal=root / NONLOCAL_BY_SIGNAL_DIR,
+            nonlocal_probability=root / NONLOCAL_PROBABILITY_DIR,
+            state_by_signal=root / STATE_BY_SIGNAL_DIR,
             event_rule_sweep=root / EVENT_RULE_SWEEP_DIR,
             state_calibration_in_visits=root / STATE_CALIBRATION_IN_VISITS_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
@@ -369,10 +399,16 @@ class _Run:
             event_participation=root / EVENT_PARTICIPATION_DIR,
             likelihood_advantage=root / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             tetrode_holdout=root / EVENT_TETRODE_HOLDOUT_DIR,
+            tetrode_holdout_extra=root / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+            content_place_rate=root / EVENT_CONTENT_PLACE_RATE_DIR,
             nonlocal_restriction=root / EVENT_NONLOCAL_RESTRICTION_DIR,
             nonlocal_restriction_windows=root / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             nonlocal_restriction_heldout_events=root
             / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+            nonlocal_restriction_swr_allowed=root
+            / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+            nonlocal_restriction_swr_allowed_heldout_events=root
+            / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
         )
@@ -495,6 +531,11 @@ class _Run:
             builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
         )
         monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
+        # the planted run's rows have no extra columns; the check is the
+        # held-out tetrode module's own (tested there)
+        monkeypatch.setattr(
+            builder.tetrode_holdout, "require_extra_columns", lambda table, what: None
+        )
 
     def summarize(self) -> dict:
         builder.summarize(self.inputs(), "by")
@@ -520,8 +561,13 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "likelihood_advantage_values",
         "tetrode_holdout_values",
         "shared_content_values",
+        "tetrode_holdout_extra_values",
+        "low_rate_values",
     ):
         assert len(seen[name][0]) == 2 * 13, name
+    # the low-rate values: the selected events and the extra run's windows
+    assert len(seen["low_rate_values"][1]) == 13
+    assert len(seen["low_rate_values"][2]) == 2 * 13
     # the restriction windows too; the time sums and the time steps are whole
     for name, at in RESTRICTION_BUILDERS.items():
         if at is not None:
@@ -543,6 +589,11 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     ):
         assert seen[name][0]["epoch_id"].tolist() == EPOCHS
         assert seen[name][1].to_dict() == dict.fromkeys(EPOCHS, BIN_S)
+    # the fourth decoder's builder: its run's events, time sums and time steps
+    assert seen["restriction_swr_allowed_values"][1]["epoch_id"].tolist() == EPOCHS
+    assert seen["restriction_swr_allowed_values"][2].to_dict() == dict.fromkeys(
+        EPOCHS, BIN_S
+    )
     # the other detectors' events are selected by the comparison, given the visits
     assert _same_visits(seen["read_comparison"][0])
     assert seen["other_detector_values"][0]["planted"].tolist() == [PLANTED]
@@ -587,6 +638,9 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         OUTSIDE_EVENTS,
     ):
         assert values[key].description.endswith(f"; over {builder.TIME_SUBSET}")
+    assert values["restriction_swr_allowed"].description.endswith(
+        f"; over {builder.TIME_SUBSET}, and {builder.HELDOUT_EVENTS_SUBSET}"
+    )
 
 
 def _same_visits(visits) -> bool:
@@ -616,10 +670,28 @@ HELDOUT_RUN_VALUES = HELDOUT_EVENT_VALUES | {
     "restriction_outside_swr_part",
     "restriction_inside_swr",
 }
-RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES) - {"restriction_window"}
+#: The fourth decoder's values, which read their own restriction and held-out
+#: event runs and the canonical per-bin facts
+SWR_ALLOWED_VALUES = {"restriction_swr_allowed"}
+RESTRICTION_VISIT_VALUES = (WINDOW_VALUES | HELDOUT_RUN_VALUES | SWR_ALLOWED_VALUES) - {
+    "restriction_window"
+}
 _NOTE = {"event_table_sha256": "c" * 64, "tetrode_holdout_event_table_sha256": None}
 #: The values against the participation run's Local-rest controls
-CONTROL_VALUES = {"participation", "tetrode_holdout", "restriction_window", AFTER_VISIT}
+CONTROL_VALUES = {
+    "participation",
+    "tetrode_holdout",
+    "tetrode_holdout_extra",
+    "restriction_window",
+    AFTER_VISIT,
+}
+#: The values that read the held-out tetrode run with its extra scores
+EXTRA_VALUES = {
+    "shared_content",
+    "tetrode_holdout_extra",
+    "low_rate",
+    "resolved_content",
+}
 
 #: (folder, (manifest key, value or None to drop it)) -> the values made pending
 PENDING_CASES = [
@@ -665,6 +737,13 @@ PENDING_CASES = [
         ("session_cache", _other_cache()),
         {"nonlocal_power", "nonlocal_mua"},
     ),
+    (STATE_BY_SIGNAL_DIR, ("subset", None), {"state_by_signal"}),
+    (NONLOCAL_PROBABILITY_DIR, ("subset", None), {"nonlocal_probability"}),
+    (
+        NONLOCAL_PROBABILITY_DIR,
+        ("session_cache", _other_cache()),
+        {"nonlocal_probability"},
+    ),
     (DECODER_QUALITY_DIR, ("subset", None), {"immobile_state_fraction"}),
     (
         DECODER_QUALITY_DIR,
@@ -706,13 +785,20 @@ PENDING_CASES = [
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_table", {"sha256": "old"}),
-        {"tetrode_holdout", "shared_content"},
+        {"tetrode_holdout"},
     ),
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_participation", {"sha256": "old"}),
-        {"tetrode_holdout", "shared_content"},
+        {"tetrode_holdout"},
     ),
+    (EVENT_TETRODE_HOLDOUT_EXTRA_DIR, ("event_table", {"sha256": "old"}), EXTRA_VALUES),
+    (
+        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
+        ("event_participation", {"sha256": "old"}),
+        EXTRA_VALUES,
+    ),
+    (EVENT_CONTENT_PLACE_RATE_DIR, ("event_table", {"sha256": "old"}), {"low_rate"}),
     ("state_evidence", ("subset", None), {"heldout_by_swr"}),
     ("state_evidence", ("session_cache", _other_cache()), {"heldout_by_swr"}),
     *(
@@ -744,6 +830,20 @@ PENDING_CASES = [
             ("nonlocal_restriction", HELDOUT_RUN_VALUES),
             ("bin_facts", HELDOUT_RUN_VALUES),
         )
+    ),
+    # the fourth decoder's held-out event run: the same checks, its values only
+    *(
+        (
+            EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR,
+            (name, {"sha256": "old"}),
+            SWR_ALLOWED_VALUES,
+        )
+        for name in ("event_table", "nonlocal_restriction", "bin_facts")
+    ),
+    (
+        EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
+        ("settings", _restriction_settings(swr_source="kay@old+artifacts@none")),
+        SWR_ALLOWED_VALUES,
     ),
     # the visits reach the restriction values through the bin facts only: a run
     # made from another session cache, or before it recorded one, makes the
