@@ -978,8 +978,8 @@ median of 5; 2026-11-21) 18 ms to the score alone (54 to 72 ms) and 26 ms with t
 gradient and Hessian (165 to 191 ms).
 
 The fit at fixed penalties in JAX, against the NumPy solver before it, by
-`scripts/checks/time_regression_fitter.py` (its `--child` cases) and two small Bernoulli fits
-of 23 columns through `reml.refit_session` (300 and 1,500 rows, 200 calls each). One
+`scripts/checks/time_regression_fitter.py` (its `--child` cases) and two small Bernoulli
+fits of 23 columns through `reml.refit_session` (300 and 1,500 rows, 200 calls each). One
 thread, each process pinned to one CPU, the code versions run in turn in the same minutes
 (NumPy, JAX before, JAX after each change, then again), on a machine under heavy load
 (1-minute load average 60 to 130 on 96 CPUs, no idle core; 2026-11-23). Each cell is the
@@ -1021,10 +1021,10 @@ after). `tests/analysis/regression` without its slow tests traced 373 programs b
 435 after (44 of them the new buckets, 16 the test of the compiled programs, two the test
 of a batch of fits) and took 402 and 418 s on one CPU in the same minutes, so its time is
 in its compilations, not its fits. Its slow test of penalty selections on small cells
-(`test_simulation.py::test_coverage_and_size`, 2,000 selections of about 100 summed
-cells) took 415 s before and 183 s after, in the same minutes. What remains of a small fit
-is the host: the cost of each kernel call (about 0.3 ms for an iteration of 300 rows),
-the design check (`_unidentified`) and REML's rotations. At the rate size REML's copy of the design into the penalties'
-eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a refit, and XLA's
-product for the Gram is slower than BLAS's `syrk` for an unweighted `X' X`, which XLA does
-not call.
+(`test_simulation.py::test_coverage_and_size`, 2,000 selections of about 100 summed cells)
+took 415 s before and 183 s after, in the same minutes. What remains of a small fit is the
+host: the cost of each kernel call (about 0.3 ms for an iteration of 300 rows), the design
+check (`_unidentified`) and REML's rotations. At the rate size REML's copy of the design
+into the penalties' eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a
+refit, and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
+`X' X`, which XLA does not call.
