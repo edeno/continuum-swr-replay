@@ -351,7 +351,7 @@ class _DiagonalFamily(_Family):
         return X
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
-        """The rows padded to a multiple of ``padding.ROW_BUCKET``."""
+        """The rows padded to their bucket (``padding.pad_rows``)."""
         padded = pad_rows(X, y)
         return Rows(padded.X, padded.y, aux, padded.weight, padded.n_real)
 
@@ -400,7 +400,7 @@ class Poisson(_DiagonalFamily):
             )
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
-        """The rows padded to a multiple of ``padding.ROW_BUCKET``, the offset
+        """The rows padded to their bucket (``padding.pad_rows``), the offset
         0 on a padded row; a single offset is every row's."""
         if aux is None:
             raise TypeError("the Poisson offset is None: give log(exposure)")
@@ -441,7 +441,7 @@ class Bernoulli(_DiagonalFamily):
             )
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
-        """The rows padded to a multiple of ``padding.ROW_BUCKET``; no aux."""
+        """The rows padded to their bucket (``padding.pad_rows``); no aux."""
         padded = pad_rows(X, y)
         return Rows(padded.X, padded.y, None, padded.weight, padded.n_real)
 
@@ -474,7 +474,7 @@ class Gaussian(_DiagonalFamily):
             )
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: float | None) -> Rows:
-        """The rows padded to a multiple of ``padding.ROW_BUCKET``; the scale
+        """The rows padded to their bucket (``padding.pad_rows``); the scale
         as a float64 (None stays None: the weighted design does not read it)."""
         padded = pad_rows(X, y)
         scale = None if aux is None else np.float64(aux)

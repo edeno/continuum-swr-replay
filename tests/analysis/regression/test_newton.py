@@ -32,7 +32,11 @@ from continuum_swr_replay.analysis.regression.newton import (
     NewtonFit,
     penalized_newton,
 )
-from continuum_swr_replay.analysis.regression.padding import ROW_BUCKET, bucket_size
+from continuum_swr_replay.analysis.regression.padding import (
+    ROW_BUCKET,
+    SMALLEST_ROW_BUCKET,
+    bucket_size,
+)
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
     reml_and_derivatives,
@@ -515,16 +519,16 @@ def test_a_softmax_design_constant_within_groups_is_not_identified() -> None:
 
 
 def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
-    """Ten fits with ten row counts in two row buckets trace each Newton
-    kernel exactly once per bucket. The family is a class made here, so no
-    earlier test can have traced its kernels."""
+    """Ten fits with ten row counts in four row buckets (512, 2,048, 4,096 and
+    8,192 rows) trace each Newton kernel exactly once per bucket. The family
+    is a class made here, so no earlier test can have traced its kernels."""
 
     class _Counted(Poisson):
         pass
 
-    sizes = [500, 1500, 2500, 3500, 4000, 4100, 5000, 6500, 7000, 8190]
-    buckets = {bucket_size(n, ROW_BUCKET) for n in sizes}
-    assert len(buckets) == 2
+    sizes = [300, 500, 1500, 2500, 3500, 4000, 4100, 5000, 6500, 8190]
+    buckets = {bucket_size(n, ROW_BUCKET, SMALLEST_ROW_BUCKET) for n in sizes}
+    assert buckets == {512, 2048, 4096, 8192}
     COMPILE_LOG.clear()
     for n in sizes:
         rng = np.random.default_rng(n)

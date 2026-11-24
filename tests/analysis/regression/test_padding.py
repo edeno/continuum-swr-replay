@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
 from continuum_swr_replay.analysis.regression.padding import (
     GROUP_BUCKET,
     ROW_BUCKET,
+    SMALLEST_ROW_BUCKET,
     SOFTMAX_ROW_BUCKET,
     bucket_size,
     pad_groups,
@@ -105,10 +106,53 @@ def _assert_equal(padded, reference):
         np.testing.assert_allclose(got, want, rtol=0, atol=RTOL * scale)
 
 
-def test_bucket_size_is_the_next_multiple():
-    assert [bucket_size(n, 4) for n in (1, 3, 4, 5, 8, 9)] == [4, 4, 4, 8, 8, 12]
-    with pytest.raises(ValueError):
-        bucket_size(0, 4)
+def test_bucket_size_is_a_power_of_two_below_the_step_then_the_next_multiple():
+    sizes = (1, 3, 4, 5, 8, 9, 16, 17)
+    assert [bucket_size(n, 16, 4) for n in sizes] == [4, 4, 4, 8, 8, 16, 16, 32]
+    assert [bucket_size(n, 12, 1) for n in (1, 3, 7, 9, 12, 13)] == [
+        1,
+        4,
+        8,
+        12,
+        12,
+        24,
+    ]
+    assert [bucket_size(n, 4, 4) for n in (1, 3, 4, 5, 8, 9)] == [4, 4, 4, 8, 8, 12]
+    for bad in [(0, 4, 4), (1, 0, 4), (1, 4, 0)]:
+        with pytest.raises(ValueError):
+            bucket_size(*bad)
+
+
+def test_the_row_buckets_of_each_family():
+    """Diagonal families: 256, 512, 1,024, 2,048, then multiples of 4,096; the
+    softmax's rows: 256, 512, then multiples of 1,024; its groups: multiples
+    of 64."""
+    assert (ROW_BUCKET, SOFTMAX_ROW_BUCKET, SMALLEST_ROW_BUCKET) == (4096, 1024, 256)
+    rows = (1, 256, 257, 600, 2049, 4096, 4097, 36724)
+    assert [bucket_size(n, ROW_BUCKET, SMALLEST_ROW_BUCKET) for n in rows] == [
+        256,
+        256,
+        512,
+        1024,
+        4096,
+        4096,
+        8192,
+        36864,
+    ]
+    assert [bucket_size(n, SOFTMAX_ROW_BUCKET, SMALLEST_ROW_BUCKET) for n in rows] == [
+        256,
+        256,
+        512,
+        1024,
+        3072,
+        4096,
+        5120,
+        36864,
+    ]
+    assert [pad_rows(np.zeros((n, 1)), np.zeros(n)).y.size for n in (0, 300)] == [
+        256,
+        512,
+    ]
 
 
 def test_padded_rows_follow_the_real_ones_with_zeros():
@@ -124,7 +168,6 @@ def test_padded_rows_follow_the_real_ones_with_zeros():
     np.testing.assert_array_equal(padded.weight, [1, 1, 1, 1, 1, 0, 0, 0])
     assert not padded.X[5:].any() and not padded.y[5:].any()
     assert not padded.offset[5:].any()
-    assert ROW_BUCKET == 4096
     with pytest.raises(ValueError, match="one row each"):
         pad_rows(X, y[:4])
 
@@ -136,7 +179,6 @@ def test_padded_groups_number_the_groups_and_put_padding_in_one_more():
     np.testing.assert_array_equal(padded.group, [0, 0, 1, 2, 2, 3, 3, 3])
     assert (padded.n_real_groups, padded.n_groups) == (3, GROUP_BUCKET)
     np.testing.assert_array_equal(padded.weight, [1] * 5 + [0] * 3)
-    assert SOFTMAX_ROW_BUCKET == 1024
     with pytest.raises(ValueError, match="sorted"):
         pad_groups(X, np.ones(5), np.array([1, 0, 0, 2, 2]))
 
@@ -144,7 +186,7 @@ def test_padded_groups_number_the_groups_and_put_padding_in_one_more():
 @pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian"])
 @pytest.mark.parametrize("step", [ROW_BUCKET, 300, 7])
 def test_a_padded_diagonal_family_equals_the_unpadded_fit(family, step):
-    """``step = 300`` pads nothing; 7 pads 1 row; the bucket pads 3,796."""
+    """``step = 300`` pads nothing; 7 pads 1 row; the bucket pads 212 (to 512)."""
     lik, X, beta, y, aux = _diagonal_case(family)
     rng = np.random.default_rng(1)
     d1, d2 = rng.normal(size=(2, y.size))

@@ -1,6 +1,13 @@
 """Rows padded to a few bucket sizes, so that a jitted kernel compiles once per
 bucket rather than once per session.
 
+A bucket (:func:`bucket_size`) is the next power of two, at least
+``SMALLEST_ROW_BUCKET``, below a step, and the next multiple of the step from
+the step up: rows of the Poisson, Bernoulli and Gaussian families go to 256,
+512, 1,024, 2,048, then multiples of 4,096 (``ROW_BUCKET``); rows of the
+grouped softmax to 256, 512, then multiples of 1,024
+(``SOFTMAX_ROW_BUCKET``); its groups to multiples of 64 (``GROUP_BUCKET``).
+
 A padded row has a design row of zeros, a response of 0, an offset of 0
 (exposure 1) and a weight of 0; the real rows come first and keep their order.
 A kernel multiplies each row's term of the log-likelihood, its gradient and its
@@ -32,6 +39,7 @@ __all__ = [
     "PaddedGroups",
     "PaddedRows",
     "ROW_BUCKET",
+    "SMALLEST_ROW_BUCKET",
     "SOFTMAX_ROW_BUCKET",
     "bucket_size",
     "group_starts",
@@ -41,27 +49,40 @@ __all__ = [
 ]
 
 ROW_BUCKET = 4096
-"""Rows of a Poisson, Bernoulli or Gaussian fit are padded to a multiple of
-this (at most 11 % more rows on a 37,000-row session)."""
+"""Rows of a Poisson, Bernoulli or Gaussian fit from this many up are padded to
+a multiple of this (at most 11 % more rows on a 37,000-row session)."""
 
 SOFTMAX_ROW_BUCKET = 1024
-"""Rows of a grouped-softmax fit are padded to a multiple of this."""
+"""Rows of a grouped-softmax fit from this many up are padded to a multiple of
+this."""
+
+SMALLEST_ROW_BUCKET = 256
+"""Fewer rows than a row step are padded to the next power of two, and to at
+least this. A Bernoulli fit of 40 rows took the same time padded to 64, 128 or
+256 rows, so a smaller bucket would add compiled shapes and gain nothing."""
 
 GROUP_BUCKET = 64
 """Groups of a grouped-softmax fit, the padding group included, are padded to
 a multiple of this."""
 
 
-def bucket_size(n: int, step: int) -> int:
-    """The smallest multiple of `step` that is at least `n`.
+def bucket_size(n: int, step: int, smallest: int) -> int:
+    """The padded size of `n`: below `step`, the next power of two that is at
+    least `n` and `smallest` (and at most `step`); from `step` up, the next
+    multiple of `step`.
 
     Raises
     ------
     ValueError
-        When `n` is below 1 or `step` is below 1.
+        When `n`, `step` or `smallest` is below 1.
     """
-    if n < 1 or step < 1:
-        raise ValueError(f"need n >= 1 and step >= 1, not n={n}, step={step}")
+    if n < 1 or step < 1 or smallest < 1:
+        raise ValueError(
+            f"need n, step and smallest >= 1, not n={n}, step={step}, "
+            f"smallest={smallest}"
+        )
+    if n < step:
+        return min(step, max(smallest, 1 << (n - 1).bit_length()))
     return -(-n // step) * step
 
 
@@ -146,8 +167,9 @@ def pad_rows(
     y: np.ndarray,
     offset: np.ndarray | None = None,
     step: int = ROW_BUCKET,
+    smallest: int = SMALLEST_ROW_BUCKET,
 ) -> PaddedRows:
-    """Pad a session's rows to the next multiple of `step`.
+    """Pad a session's rows to their bucket (:func:`bucket_size`).
 
     Parameters
     ----------
@@ -155,7 +177,8 @@ def pad_rows(
     y : np.ndarray, shape (n_rows,)
     offset : np.ndarray, shape (n_rows,), optional
         The Poisson offset, log exposure.
-    step : int, optional
+    step, smallest : int, optional
+        The bucket's step and its smallest size.
 
     Returns
     -------
@@ -175,7 +198,7 @@ def pad_rows(
             "need one row each"
         )
     # No rows pad to one bucket of padded rows, whose every sum is 0.
-    n_bucket = bucket_size(max(n_rows, 1), step)
+    n_bucket = bucket_size(max(n_rows, 1), step, smallest)
     return PaddedRows(
         X=pad_values(X, n_rows, n_bucket, "X"),
         y=pad_values(y, n_rows, n_bucket, "y"),
@@ -232,6 +255,8 @@ def pad_groups(
         Each row's group id, sorted so that a group's rows are contiguous (the
         ``aux`` of ``likelihoods.GroupedSoftmax``).
     row_step, group_step : int, optional
+        The steps of the rows' bucket (whose smallest is ``SMALLEST_ROW_BUCKET``)
+        and of the groups' (a multiple of `group_step`, whatever the count).
 
     Returns
     -------
@@ -260,6 +285,6 @@ def pad_groups(
         group=group,
         weight=padded.weight,
         n_real=padded.n_real,
-        n_groups=bucket_size(n_real_groups + 1, group_step),
+        n_groups=bucket_size(n_real_groups + 1, group_step, group_step),
         n_real_groups=n_real_groups,
     )
