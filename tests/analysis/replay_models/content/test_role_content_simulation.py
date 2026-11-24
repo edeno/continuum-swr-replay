@@ -121,3 +121,62 @@ def test_a_thin_run_keeps_that_many_events(cohort) -> None:
         scenarios=["null_role_content"], thin=12, n_data_sets=2, n_draws=50,
     )  # fmt: skip
     assert all(rows[rc.UNIT].nunique() <= 12 for rows in run.sessions.values())
+
+
+def _one_arm_share(data, sessions) -> float:
+    shares = pd.concat(
+        [rows.assign(y=data[key][rc.RESPONSE]) for key, rows in sessions.items()]
+    )
+    return float((shares.groupby(rc.UNIT)["y"].max() >= 1 - 1e-9).mean())
+
+
+def test_the_calibrated_noise_draws_its_stated_share_of_one_draw_events(
+    cohort,
+) -> None:
+    """Under the calibrated clustering an event is one draw with probability
+    pi: with a large concentration and many bins, the rest almost never put
+    all their bins on one arm, so the one-arm share is about pi."""
+    clustering = {"No SWR": ((np.inf, 0.6, 1e4),)}
+    run = rsim.build_simulation(
+        cohort, model="role_content", kind="No SWR", noise=rsim.CALIBRATED_NOISE,
+        prior_sds=(8.0,), scenarios=["null_role_content"], n_data_sets=1,
+        n_draws=50, clustering=clustering,
+    )  # fmt: skip
+    for rows in run.sessions.values():
+        per_event = rows.groupby(rc.UNIT)[[rsim.NOISE_TRIALS, rsim.NOISE_CONCENTRATION]]
+        assert (per_event.nunique() == 1).all().all()
+        trials = per_event.first()[rsim.NOISE_TRIALS]
+        bins = rows.groupby(rc.UNIT)[rsim.N_BINS].first()
+        assert ((trials == 1) | (trials == bins)).all()
+    events = pd.concat(
+        [
+            rows.groupby(rc.UNIT)[rsim.NOISE_TRIALS].first()
+            for rows in run.sessions.values()
+        ]
+    )
+    assert (events == 1).mean() == pytest.approx(0.6, abs=0.05)
+    place = [s.name for s in run.scenarios].index("null_role_content")
+    data = engine.draw_data_set(
+        run.models[0], run.sessions, run.scenarios[place],
+        np.random.default_rng(engine.data_seed(run.seed, place, 0)),
+    )  # fmt: skip
+    share = _one_arm_share(data, run.sessions)
+    assert share == pytest.approx(0.6, abs=0.05)
+    assert share >= (events == 1).mean()
+
+
+def test_the_calibrated_noise_takes_each_brackets_values(cohort) -> None:
+    """Events are given the pi and the concentration of their length
+    bracket (upper edges exclusive)."""
+    clustering = {"SWR": ((30.0, 1.0, 2.0), (np.inf, 0.0, 5.0))}
+    run = rsim.build_simulation(
+        cohort, model="role_content", kind="SWR", noise=rsim.CALIBRATED_NOISE,
+        prior_sds=(8.0,), scenarios=["null_role_content"], n_data_sets=1,
+        n_draws=50, clustering=clustering,
+    )  # fmt: skip
+    rows = pd.concat(run.sessions.values())
+    short = rows[rsim.N_BINS] < 30
+    assert (rows.loc[short, rsim.NOISE_TRIALS] == 1).all()
+    assert (rows.loc[short, rsim.NOISE_CONCENTRATION] == 2.0).all()
+    assert (rows.loc[~short, rsim.NOISE_TRIALS] == rows.loc[~short, rsim.N_BINS]).all()
+    assert (rows.loc[~short, rsim.NOISE_CONCENTRATION] == 5.0).all()

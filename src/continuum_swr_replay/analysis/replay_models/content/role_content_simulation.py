@@ -20,7 +20,9 @@ The noise of the shares (:data:`NOISES`) is the run's: one categorical
 choice per event; a multinomial over the event's decode bins
 (``n_nonlocal_bins``); or a Dirichlet-multinomial over them at a stated
 concentration ``a``, whose share variance is that of the multinomial times
-``(n + a) / (1 + a)`` for an event of ``n`` bins.
+``(n + a) / (1 + a)`` for an event of ``n`` bins; or the calibrated
+clustering (:data:`CALIBRATED_CLUSTERING`): one draw with probability
+``pi``, else a Dirichlet-multinomial, by kind and event length.
 
 The smooths' declared log penalties are :data:`CALIBRATED_LOG_PENALTIES`,
 found by :func:`calibrate_smooth_penalties` (``regression.calibration
@@ -64,11 +66,15 @@ from . import uncertainty_scenarios as uc
 
 __all__ = [
     "CALIBRATED_LOG_PENALTIES",
+    "CALIBRATED_CLUSTERING",
+    "CALIBRATED_NOISE",
     "CENTRAL_NOISE",
     "CENTRAL_PRIOR_SD",
     "CONCENTRATIONS",
-    "N_BINS",
     "NOISES",
+    "NOISE_CONCENTRATION",
+    "NOISE_TRIALS",
+    "N_BINS",
     "PRIOR_SDS",
     "Q5A_LOW5",
     "SEED",
@@ -78,6 +84,7 @@ __all__ = [
     "SimulationCohort",
     "build_simulation",
     "calibrate_smooth_penalties",
+    "clustering_columns",
     "cohort_from_table",
     "engine_model",
     "load_table",
@@ -96,13 +103,46 @@ strongly clustered ones. At the median event of 32 bins the share variance is
 that of independent bins times 1.10, 3.8 and 16.5 (32 for one categorical
 choice)."""
 
+NOISE_TRIALS = "noise_n_trials"
+"""The calibrated noise's choices per event: 1 (one draw) or its bins."""
+NOISE_CONCENTRATION = "noise_concentration"
+"""The calibrated noise's Dirichlet concentration of each event."""
+CALIBRATED_NOISE = "calibrated"
+
 #: Noise name -> (n_trials, concentration), as the engine's scenarios take them.
-NOISES: Mapping[str, tuple[int | str, float | None]] = {
+NOISES: Mapping[str, tuple[int | str, float | str | None]] = {
     "categorical": (1, None),
     "multinomial": (N_BINS, None),
     **{f"dirichlet_{a:g}": (N_BINS, a) for a in CONCENTRATIONS},
+    CALIBRATED_NOISE: (NOISE_TRIALS, NOISE_CONCENTRATION),
 }
 CENTRAL_NOISE = "multinomial"
+
+#: Kind -> its length brackets, each (upper bin edge, exclusive; pi; a).
+CALIBRATED_CLUSTERING: Mapping[str, tuple[tuple[float, float, float], ...]] = {
+    "No SWR": ((np.inf, 0.683, 0.631),),
+    "SWR": (
+        (10.0, 0.611, 1.0),
+        (30.0, 0.581, 1.122),
+        (50.0, 0.410, 1.0),
+        (100.0, 0.156, 1.122),
+        (np.inf, 0.046, 1.778),
+    ),
+}
+"""The calibrated clustering noise (:func:`clustering_columns`): an event is
+one draw with probability ``pi``, else a Dirichlet-multinomial over its bins
+at concentration ``a``, by kind and length bracket. Found by
+``calibrate_noise.py`` (``.claude/research/2026-11-20-regression-prototypes/
+content_validation/realistic_noise/``) so that the shares drawn under the
+truth from the data reproduce three statistics of the real table per kind
+and bracket: the share of events with all content on one arm, the share with
+three or more arms above 5 % and the mean sum of squared shares (a on a
+grid of 41 values from 0.1 to 10, pi by least squares at each; 2026-11-24).
+No SWR takes one bracket (its one-arm share hardly changes with length); SWR
+takes five, since its one-arm share falls from 0.67 to 0.04 with length. It
+is a
+calibration of the noise to a description of the real response; no
+coefficient of the model is estimated by it."""
 
 PRIOR_SDS: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0)
 CENTRAL_PRIOR_SD = 8.0
@@ -226,6 +266,50 @@ def cohort_from_table(
             truths[kind][model] = sc.truth_from_data(kept[kept[rc.KIND] == kind])
     return SimulationCohort(
         rows.drop(columns=[rc.RESPONSE]), cohort.reference_log_duration, truths
+    )
+
+
+def clustering_columns(
+    rows: pd.DataFrame,
+    kind: str,
+    rng: np.random.Generator,
+    clustering: Mapping[str, tuple[tuple[float, float, float], ...]] | None = None,
+) -> pd.DataFrame:
+    """One session's rows with the calibrated noise's columns.
+
+    Each event is given its length bracket's ``pi`` and ``a``
+    (:data:`CALIBRATED_CLUSTERING`). It is one draw (:data:`NOISE_TRIALS` 1)
+    with probability ``pi``, read from ``rng`` once per event in order of
+    the event ids, else its bins; :data:`NOISE_CONCENTRATION` is ``a``. A
+    Dirichlet-multinomial of one choice is one categorical draw, so the
+    engine draws both kinds of event from these two columns. The choice of
+    which events are one draw is made when the run is built: the same
+    events are one draw in every data set of a run, and the data sets differ
+    in the draws themselves.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        One session's rows of one kind, with :data:`N_BINS`.
+    kind : str
+    rng : np.random.Generator
+    clustering : mapping or None
+        :data:`CALIBRATED_CLUSTERING` when None.
+    """
+    brackets = (clustering or CALIBRATED_CLUSTERING)[kind]
+    bins = rows.groupby(rc.UNIT, sort=True)[N_BINS].first()
+    edges = np.array([edge for edge, _, _ in brackets])
+    place = np.searchsorted(edges, bins.to_numpy(), side="right")
+    pi = np.array([p for _, p, _ in brackets])[place]
+    a = np.array([c for _, _, c in brackets])[place]
+    one = rng.random(bins.size) < pi
+    trials = pd.Series(np.where(one, 1.0, bins.to_numpy()), index=bins.index)
+    concentration = pd.Series(a, index=bins.index)
+    return rows.assign(
+        **{
+            NOISE_TRIALS: rows[rc.UNIT].map(trials).to_numpy(),
+            NOISE_CONCENTRATION: rows[rc.UNIT].map(concentration).to_numpy(),
+        }
     )
 
 
@@ -372,6 +456,7 @@ def build_simulation(
     n_data_sets: int = 20,
     n_draws: int = 1000,
     seed: int = SEED,
+    clustering: Mapping[str, tuple[tuple[float, float, float], ...]] | None = None,
 ) -> engine.Simulation:
     """One run (module docstring).
 
@@ -396,6 +481,9 @@ def build_simulation(
         Keep this many events of each session (``thin_events``); the design
         stays built on every row.
     n_data_sets, n_draws, seed : int
+    clustering : mapping or None
+        The calibrated noise's brackets (:func:`clustering_columns`); read
+        under :data:`CALIBRATED_NOISE` only.
     """
     n_trials, concentration = NOISES[noise]
     scale = cohort.model_rows(model)
@@ -418,7 +506,11 @@ def build_simulation(
     ):
         if thin is not None:
             rows = sc.thin_events(rows, thin, seed + i)
-        sessions[key] = rc.design_rows(rows, model, variant, reference)
+        rows = rc.design_rows(rows, model, variant, reference)
+        if noise == CALIBRATED_NOISE:
+            rng = np.random.default_rng(np.random.SeedSequence([seed, 7, i]))
+            rows = clustering_columns(rows, kind, rng, clustering)
+        sessions[key] = rows
     truth_reference = sc.ScenarioReference(scale, l0)
     settings = model_settings(prior_sds[0], smooth_log_penalties)
     out = []
