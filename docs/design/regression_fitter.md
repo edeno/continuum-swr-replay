@@ -529,6 +529,15 @@ On the mgcv fixtures, at unit weights, the smooths' three measures equal mgcv's 
 3.5e-12 (measured 2026-11-21, `test_collinearity.py::test_matches_mgcv_concurvity`).
 mgcv's "para" term keeps the intercept, so it is not compared.
 
+In a fit of several sessions the intercept and every active baseline copy are projected out
+first. A copy is zero on the other sessions' rows, also once weighted, so each session's copies
+are projected out of its own rows: one QR per session, the blocks stacked and reduced, the same
+per-term measures on them (`term_collinearity`, `session_copies`). It equals the projection of
+every copy out of the whole design to 1e-10 (`test_collinearity.py::
+test_copies_by_session_equal_the_sequential_projection`); a copy that its session's other copies
+explain wholly adds no direction there
+(`::test_a_copy_with_nothing_left_is_skipped_by_session`).
+
 ## The support rule
 
 `support.py` decides from the design, before the fit, whether a session can estimate a
@@ -1163,22 +1172,23 @@ took 1.6 s against 1.1 s before (three runs each, under load, 2026-11-23).
 
 ## Cost
 
-**A fit of a larger unit** (measured 2026-11-24 on synthetic rows, CPU, one thread, a shared
-machine at a load near 32; timings, not results; a scratch measurement of 2026-11-24, whose
-script is not in the repository):
+**A fit of a larger unit** (scratch measurements of 2026-11-24, whose script is not in the
+repository: synthetic rows, CPU, one thread, a shared machine at a load near 32; timings, not
+results; `fit_sessions` at the day unit with baseline copies, before and after the collinearity
+record was made one session at a time):
 
-| Unit | Rows x columns | `fit_sessions` | of which the collinearity record | the fit (`refit_session`) | peak memory |
+| Unit | Rows x columns | `fit_sessions`, before / after | collinearity record, before / after (its peak memory) | the fit | peak memory of the process, before / after |
 |---|---|---|---|---|---|
-| content-like, 60 sessions x 110 events x 9 arms, arm baselines | 59,400 x 494 | 140 s | 133 s | 5.5 s | 2.6 GB |
-| rate-like, 5 sessions x 40,000 bins, intercept baselines, 3 smooths | 200,000 x 97 | 5.4 s | 2.9 s | 1.9 s | 2.1 GB |
-| rate-like, 58 sessions x 40,000 bins | 2,320,000 x 150 | 252 s | 216 s | 21 s | 20.9 GB |
+| content-like, 60 sessions x 110 events x 9 arms, arm baselines | 59,400 x 494 | 115 s / 6.8 s | 109 s (1.4 GB) / 0.34 s (1.5 MB) | 5.3 s | 2.6 / 2.2 GB |
+| rate-like, 5 sessions x 40,000 bins, intercept baselines, 3 smooths | 200,000 x 97 | 6.0 s / 4.2 s | 3.2 s (0.94 GB) / 1.6 s (0.15 GB) | 1.9 s | 2.1 / 1.5 GB |
+| rate-like, 58 sessions x 40,000 bins | 2,320,000 x 150 | 203 s / 47 s | 172 s (16.8 GB) / 15 s (0.16 GB) | 19 s | 20.8 / 14.6 GB |
 
-The dense design fits at the animal size. The collinearity record takes most of the time:
-it projects each baseline copy out of the weighted design one column at a time
-(`collinearity.concurvity`), so its cost grows with the copies times the size of the design.
-The copies, the support count and the record of the sessions take at most 15 s (the animal-size rate unit).
-A loop over 45 content-like day units and 5 animal units took 321 s and left at most 48
-live programs (the limit is 256).
+The dense design fits at the animal size. Before, the collinearity record projected each
+baseline copy out of the whole weighted design; now each session's copies are projected out of
+its own rows (`collinearity.term_collinearity`, `session_copies`). The copies, the support count
+and the record of the sessions take at most 12 s (the animal-size rate unit). A loop over 45
+content-like day units and 5 animal units took 32 s and left at most 37 live programs (the
+limit is 256; 48 before, when the whole unit was weighted at once).
 
 Measured on 2026-11-20 on synthetic sessions of the real size: 242 sessions of 40,000
 bins, a Poisson model with two smooths and 56 coefficients. One pooled evaluation took

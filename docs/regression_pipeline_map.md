@@ -584,7 +584,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `mean`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
