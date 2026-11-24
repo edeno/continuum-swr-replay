@@ -426,21 +426,31 @@ class SetAsideSession:
         ``SessionData.name``.
     reference : RemlScore
         Its score and fit at the reference point.
-    refits : tuple of RemlScore
-        Its fits at the chosen log penalties, in order: as given, then after
-        each round of columns made inactive.
-    left_out : np.ndarray of int, shape (k,)
-        The columns made inactive in its last refit, in the order they were.
-    reason : str
-        How it ended, in words.
+    refit : SessionRefit
+        Its refit at the chosen log penalties (:func:`refit_session`).
     """
 
     index: int
     name: str | None
     reference: RemlScore
-    refits: tuple[RemlScore, ...]
-    left_out: np.ndarray
-    reason: str
+    refit: SessionRefit
+
+    @property
+    def refits(self) -> tuple[RemlScore, ...]:
+        """Its fits at the chosen log penalties, in order: as given, then
+        after each round of columns made inactive."""
+        return self.refit.refits
+
+    @property
+    def left_out(self) -> np.ndarray:
+        """The columns made inactive in its last refit, in the order they
+        were, shape ``(k,)``."""
+        return self.refit.left_out
+
+    @property
+    def reason(self) -> str:
+        """How it ended, in words."""
+        return self.refit.reason
 
     @property
     def fitted(self) -> bool:
@@ -1858,21 +1868,6 @@ def refit_session(
     )
 
 
-def _refit(
-    lik: Likelihood,
-    data: SessionData,
-    index: int,
-    blocks: Sequence[PenaltyBlock],
-    rho: np.ndarray,
-    reference: RemlScore,
-) -> SetAsideSession:
-    """A set-aside session fitted at the chosen ``rho`` (:func:`refit_session`)."""
-    refit = refit_session(lik, data, blocks, rho, index=index)
-    return SetAsideSession(
-        index, data.name, reference, refit.refits, refit.left_out, refit.reason
-    )
-
-
 def _refit_set_aside(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -1880,7 +1875,7 @@ def _refit_set_aside(
     rho: np.ndarray,
     set_aside: Sequence[tuple[int, RemlScore]],
 ) -> tuple[SetAsideSession, ...]:
-    """Each set-aside session refitted at ``rho`` (:func:`_refit`).
+    """Each set-aside session refitted at ``rho`` (:func:`refit_session`).
 
     Raises
     ------
@@ -1889,7 +1884,13 @@ def _refit_set_aside(
         session without a fit, its statuses and why.
     """
     records = tuple(
-        _refit(lik, sessions[i], i, blocks, rho, score) for i, score in set_aside
+        SetAsideSession(
+            i,
+            sessions[i].name,
+            score,
+            refit_session(lik, sessions[i], blocks, rho, index=i),
+        )
+        for i, score in set_aside
     )
     unfitted = [r for r in records if not r.fitted]
     share = len(unfitted) / len(sessions)
