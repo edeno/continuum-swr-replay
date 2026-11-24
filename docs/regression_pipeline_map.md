@@ -92,7 +92,7 @@ The simulated run of Figure 1, decoded by the switching state-space model.
 
 The analyzed-time read point: a decode frame held to the one analyzed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `rest_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py`
 
@@ -212,7 +212,7 @@ The non-local restriction contrasts over all immobile time, and outside SWRs.
 
 The non-local restriction models summed over event windows.
 
-`outside_swr_columns`, `bin_fact_columns`, `outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+`bin_fact_columns`, `outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/shared_content.py`
 
@@ -242,7 +242,7 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `peak_power_densities`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_along_arms.py`
 
@@ -290,7 +290,7 @@ The held-out tetrode evidence of events decoded at low-rate places, and the plac
 
 Where the non-local time sits in ripple power and in MUA, per time bin.
 
-`count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
+`signal_bin_index`, `count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
@@ -714,7 +714,7 @@ Measure each analyzed epoch's decoder quality: Local-state error, state fraction
 
 Count each epoch's immobile time bins inside the well visits by non-local probability.
 
-`main`
+`measure`, `main`
 
 ### `scripts/decoding/run_decoding_bandit.py`
 
@@ -1120,6 +1120,12 @@ Summarize the held-out state calibration over the immobile windows inside the we
 
 `epoch_windows`, `main`
 
+### `scripts/event_properties/_epoch_counts.py`
+
+The skeleton the per-epoch counts runners share.
+
+`run`
+
 ### `scripts/event_properties/bootstrap_event_properties.py`
 
 Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
@@ -1160,7 +1166,7 @@ Measure each event's start distance and the theta-like share of duration-matched
 
 Count each epoch's immobile time bins by ripple power, by MUA and by non-local probability.
 
-`main`
+`measure`, `main`
 
 ### `scripts/event_properties/measure_ripple_class_structure.py`
 
@@ -1172,7 +1178,7 @@ One class or two: do SWR-coupled and non-SWR non-local events differ by kind or 
 
 Count each epoch's immobile time bins by ripple power, by MUA and by decoder state.
 
-`main`
+`measure`, `main`
 
 ### `scripts/event_properties/sweep_event_rule.py`
 
