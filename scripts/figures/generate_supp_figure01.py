@@ -863,8 +863,6 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
         },
         rows=["bcd"],
         columns=["ab"],
-        above=0.0,
-        floor=None,
     )
     return fig, decoded
 

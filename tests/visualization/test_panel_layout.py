@@ -37,70 +37,79 @@ def _positions(letters):
     return {name: text.get_position() for name, text in letters.items()}
 
 
-def test_a_rows_letters_share_its_highest_top_and_a_columns_its_leftmost_edge(grid):
-    fig, panels = grid
-    extent = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
-    letters = place_letters(
-        fig, panels, ["abc", "def"], ["ad", "be", "cf"], above=0.01, left_of=0.004
+def _gaps(fig) -> tuple[float, float]:
+    """The letters' distances above and left of their panels, as figure
+    fractions of ``fig``."""
+    width_in, height_in = fig.get_size_inches()
+    return (
+        panel_layout.LETTER_GAP_PT / 72 / height_in,
+        panel_layout.LETTER_LEFT_PT / 72 / width_in,
     )
+
+
+def test_a_rows_letters_share_its_highest_top_and_a_columns_its_leftmost_edge(grid):
+    """A row's letters' bottom edge stands the gap above its highest drawn top,
+    a column's letters' left edge the gap left of its leftmost drawn extent,
+    the same distances in points in every figure."""
+    fig, panels = grid
+    above, left_of = _gaps(fig)
+    extent = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
+    letters = place_letters(fig, panels, ["abc", "def"], ["ad", "be", "cf"])
     assert list(letters) == list("abcdef")
     at = _positions(letters)
     for row in ("abc", "def"):
-        assert {at[n][1] for n in row} == {max(extent[n].y1 for n in row) + 0.01}
+        assert {at[n][1] for n in row} == {max(extent[n].y1 for n in row) + above}
     for column in ("ad", "be", "cf"):
-        assert {at[n][0] for n in column} == {min(extent[n].x0 for n in column) - 0.004}
+        assert {at[n][0] for n in column} == {
+            min(extent[n].x0 for n in column) - left_of
+        }
     # e's label sets its column's edge, left of b's own
     assert at["b"][0] < extent["b"].x0 - 0.01
     for text in letters.values():
-        assert (text.get_ha(), text.get_va()) == ("left", "top")
+        assert (text.get_ha(), text.get_va()) == ("left", "bottom")
         assert text.get_fontweight() == "bold"
+    assert (panel_layout.LETTER_GAP_PT, panel_layout.LETTER_LEFT_PT) == (1.0, 2.0)
 
 
 def test_a_letter_in_no_row_or_column_is_placed_by_its_own_panel(grid):
     fig, panels = grid
+    above, left_of = _gaps(fig)
     extent = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
-    at = _positions(place_letters(fig, panels, ["ab"], ["ad"], above=0.0))
-    assert at["a"][1] == at["b"][1] == max(extent["a"].y1, extent["b"].y1)
-    assert at["c"] == (extent["c"].x0, extent["c"].y1)
-    assert at["e"] == (extent["e"].x0, extent["e"].y1)
-    assert at["a"][0] == at["d"][0] == min(extent["a"].x0, extent["d"].x0)
+    at = _positions(place_letters(fig, panels, ["ab"], ["ad"]))
+    assert at["a"][1] == at["b"][1] == max(extent["a"].y1, extent["b"].y1) + above
+    assert at["e"] == (extent["e"].x0 - left_of, extent["e"].y1 + above)
+    assert at["a"][0] == at["d"][0] == min(extent["a"].x0, extent["d"].x0) - left_of
 
 
 def test_the_named_parts_set_a_rows_height(grid):
     """A panel named with no axes does not count (its title would lift the
-    row), a panel named with axes counts by those, and a letter given a height
-    sits there."""
+    row), and a panel named with axes counts by those."""
     fig, panels = grid
+    above, _ = _gaps(fig)
     extent = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
     rows = ["abc", "def"]
-    plain = _positions(place_letters(fig, panels, rows, above=0.002))
-    assert {plain[n][1] for n in "abc"} == {extent["c"].y1 + 0.002}
-    named = _positions(
-        place_letters(fig, panels, rows, above=0.002, heights={"c": [], "d": 0.3})
-    )
-    top = max(extent[n].y1 for n in "ab") + 0.002
-    assert top < extent["c"].y1
+    plain = _positions(place_letters(fig, panels, rows))
+    assert {plain[n][1] for n in "abc"} == {extent["c"].y1 + above}
+    named = _positions(place_letters(fig, panels, rows, heights={"c": []}))
+    top = max(extent[n].y1 for n in "ab") + above
+    assert top < extent["c"].y1 + above
     assert {named[n][1] for n in "abc"} == {top}
-    assert named["d"][1] == 0.3
-    assert {named[n][1] for n in "ef"} == {max(extent[n].y1 for n in "ef") + 0.002}
 
 
-def test_the_letters_stay_under_the_ceiling_and_inside_the_left_edge(grid):
+def test_the_letters_stay_on_the_page(grid):
+    """A letter's top no higher than the figure's top, its left edge no further
+    left than the figure's left edge."""
     fig, panels = grid
-    letters = place_letters(
-        fig, panels, ["abc"], above=0.5, left_of=1.0, ceiling=0.985, va="bottom"
-    )
-    at = _positions(letters)
-    assert {at[n][1] for n in "abc"} == {0.985}
-    assert {x for x, _ in at.values()} == {0.0}
-    assert {text.get_va() for text in letters.values()} == {"bottom"}
-
-
-def test_without_a_floor_a_letter_sits_at_its_column_even_past_the_left_edge(grid):
-    fig, panels = grid
-    extent = drawn_extent(fig, panels["a"])
-    letters = place_letters(fig, panels, ["abc"], above=0.0, left_of=1.0, floor=None)
-    assert letters["a"].get_position()[0] == extent.x0 - 1.0
+    for ax in panels["a"]:
+        ax.set_title("a title\nof\nmany\nlines\nreaching\npast\nthe top")
+        ax.set_ylabel("a label far to the left", labelpad=60)
+    fig.draw_without_rendering()
+    letters = place_letters(fig, panels, ["abc"], ["ad"])
+    fig.draw_without_rendering()
+    figure = fig.bbox
+    for name in "abc":
+        assert letters[name].get_window_extent().y1 == pytest.approx(figure.y1)
+    assert letters["a"].get_position()[0] == 0.0
 
 
 def _panel(n_columns: int, ylabel: str = "a label"):
@@ -180,3 +189,16 @@ def test_the_spans_and_letters_follow_from_the_layouts_rows():
     letter_rows, columns = letter_layout(rows, {"p": "a", "q": "b", "r": "c"})
     assert letter_rows == ["ab", "c"]
     assert columns == {"left": "ac", "middle": "b"}
+
+
+def test_a_named_ceiling_keeps_the_letters_tops_under_it(grid):
+    """A figure at the journal's full height names its highest drawn top as
+    the ceiling, so that no letter adds to its height."""
+    fig, panels = grid
+    top = drawn_extent(fig, panels["c"]).y1
+    letters = place_letters(fig, panels, ["abc"], ceiling=top)
+    fig.draw_without_rendering()
+    to_figure = fig.transFigure.inverted()
+    for name in "abc":
+        box = letters[name].get_window_extent().transformed(to_figure)
+        assert box.y1 == pytest.approx(top)

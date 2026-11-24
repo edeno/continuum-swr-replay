@@ -1642,14 +1642,10 @@ def generate_figure(inputs: dict) -> Figure:
         lettered,
         rows=LETTER_ROWS,
         columns=LETTER_COLUMNS,
-        above=0.002,
-        left_of=0.004,
-        ceiling=0.985,
-        va="bottom",
         heights={
-            # panel a's letter sits at the top of its decode, not of the track
+            # panel a's letter stands above its decode, not above the track
             # drawing
-            LETTERS["overview"]: decode_axes[0].get_position().y1 + 0.004,
+            LETTERS["overview"]: decode_axes[:1],
             # the legend drawn above the traces' axes would lift the row's
             # letters away from the row's other panels
             LETTERS["event_traces"]: [],

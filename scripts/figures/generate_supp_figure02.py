@@ -277,9 +277,6 @@ the order the text cites them, so their letters follow from it."""
 PANELS = tuple(panel for _, row in LAYOUT for panel, _, _ in row)
 """The panels in the order the text cites them."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
-LETTER_HEIGHT = 0.0268
-"""A panel letter's height (figure height): the letters' tops sit this far
-above the highest drawn top of their row."""
 PANEL_GRIDS = {
     "boundary_timing": (1, 2),
     "nonlocal_mua": (2, 1),
@@ -1160,8 +1157,6 @@ def generate_figure(inputs: dict) -> Figure:
         panels,
         rows=letter_rows,
         columns=list(letter_columns.values()),
-        above=LETTER_HEIGHT,
-        left_of=0.004,
     )
     check_placement(fig, panels)
     return fig

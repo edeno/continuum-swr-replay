@@ -797,10 +797,7 @@ def assemble_figure(
     panels_by_letter = {
         "a": [ax_a_mod, ax_a_psth], "b": [*ax_b, ax_b_scale], "c": [ax_c], "d": ax_d,
     }  # fmt: skip
-    place_letters(
-        fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS, above=0.02,
-        left_of=0.004, ceiling=0.985,
-    )  # fmt: skip
+    place_letters(fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS)
     check_placement(fig, panels_by_letter)
     return fig
 

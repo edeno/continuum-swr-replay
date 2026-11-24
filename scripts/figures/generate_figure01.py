@@ -940,13 +940,13 @@ def generate_figure() -> Figure:
     space_rows_evenly(fig, rows)
 
     # Panel letters: a, d and e share a left edge; a, b and c share a top edge.
+    # The figure is at the journal's full height: no letter adds to it.
     place_letters(
         fig,
         {"a": [ax_a], "b": axes_b, "c": axes_c, "d": axes_d, "e": axes_e},
         rows=["abc"],
         columns=["ade"],
-        above=0.0,
-        floor=None,
+        ceiling=drawn_extent(fig, rows[0]).y1,
     )
 
     return fig

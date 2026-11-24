@@ -592,10 +592,7 @@ def generate_figure(inputs: dict):
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
         "e": [ax_e_frame, *ax_e], "f": [ax_f],
     }  # fmt: skip
-    place_letters(
-        fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS, above=0.02,
-        left_of=0.004, ceiling=0.985,
-    )  # fmt: skip
+    place_letters(fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS)
     check_placement(fig, panels_by_letter)
     return fig
 

@@ -225,7 +225,7 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
     fig.draw_without_rendering()
     panels = dict(zip("abc", ([ax] for ax in axes), strict=True))
-    place_letters(fig, panels, rows=["abc"], above=0.02, left_of=0.004)
+    place_letters(fig, panels, rows=["abc"])
     check_placement(fig, panels)
     return fig
 
