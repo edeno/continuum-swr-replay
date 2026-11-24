@@ -607,7 +607,7 @@ def _fit(
         stop(runs_away, r, NO_FINITE_MAXIMUM, n_iter)
         at_maximum = small & ~runs_away
         if at_maximum.any():
-            last = _last_step(problem, beta, F, loglik, r, at_maximum, n_iter, cap)
+            last = _last_step(problem, beta, r, at_maximum, n_iter, cap)
             for b in np.flatnonzero(at_maximum):
                 fits[b] = last(b)
         stepping &= r["ok"] & ~(r["decrement"] < NEWTON_DECREMENT_TOL)
@@ -687,8 +687,6 @@ def _runs_away_at_the_cap(
 def _last_step(
     problem: _Problem,
     beta: np.ndarray,
-    F: np.ndarray,
-    loglik: np.ndarray,
     r: dict,
     members: np.ndarray,
     n_iter: int,
@@ -697,9 +695,12 @@ def _last_step(
     """The converged fits of ``members`` (a mask over the batch), each moved
     by its full Newton step ``r["step"]`` when that is safe.
 
-    ``beta``, ``F`` and ``loglik`` are the batch's coefficients, objectives
-    and log-likelihoods, and ``r`` the iteration at ``beta``, whose decrement
-    is below ``NEWTON_DECREMENT_TOL`` for every member. A member's step is
+    ``beta`` are the batch's coefficients and ``r`` the iteration at
+    ``beta``, whose decrement is below ``NEWTON_DECREMENT_TOL`` for every
+    member. ``F`` is evaluated afresh at ``beta`` and at the moved point, by
+    the evaluation kernel on ``X @ beta`` both times (not on the iteration's
+    carried linear predictor), so that the comparison is of like with like,
+    and the log-likelihood returned is that evaluation's. A member's step is
     taken when ``F`` does not rise by more than its rounding,
     ``8 eps max(1, |F|)``, and it lands where ``A`` is positive definite and
     the decrement is below ``NEWTON_DECREMENT_TOL``; otherwise the fit stays
@@ -713,6 +714,7 @@ def _last_step(
     callable
         The member's index to its ``NewtonFit``.
     """
+    F, loglik, _ = problem.evaluate(beta)
     moved = np.where(members[:, None], beta + r["step"], beta)
     F_new, loglik_new, eta_moved = problem.evaluate(moved)
     rounding = 8.0 * np.finfo(float).eps * np.maximum(1.0, np.abs(F))
