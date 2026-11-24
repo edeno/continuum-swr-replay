@@ -4,6 +4,8 @@ choice of scenarios."""
 from __future__ import annotations
 
 import json
+import sys
+import types
 
 import pytest
 
@@ -84,3 +86,29 @@ def test_a_config_file_is_passed_to_the_list(tmp_path) -> None:
     assert table.attrs["scenarios"] == ["no_effect"]
     assert set(table["kind"]) == {"No SWR"}
     assert set(table["model"]) == {"session_sd2", "animal"}
+
+
+def test_a_config_for_a_list_without_configurations_is_refused(monkeypatch) -> None:
+    """``--config`` for a module whose ``simulation`` takes no ``config`` is
+    refused with a message that says so, before the list is built."""
+    module = types.ModuleType("no_config_list")
+    module.simulation = lambda quick, workers: pytest.fail("built the list")
+    monkeypatch.setitem(sys.modules, "no_config_list", module)
+    monkeypatch.setitem(run_simulations.MODELS, "no_config", "no_config_list")
+    with pytest.raises(ValueError, match="takes no configuration"):
+        run_simulations.run("no_config", quick=True, config={"n_data_sets": 2})
+
+
+def test_the_declared_penalty_list_reads_a_config_mapping(monkeypatch) -> None:
+    """The declared-penalty list takes ``--config``'s JSON object as its
+    ``Config``."""
+    seen = []
+
+    def cohort(config):
+        seen.append(config)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(sim, "cohort", cohort)
+    with pytest.raises(RuntimeError, match="stop"):
+        sim.simulation(True, 1, {"n_data_sets": 3})
+    assert seen == [sim.Config(n_data_sets=3)]

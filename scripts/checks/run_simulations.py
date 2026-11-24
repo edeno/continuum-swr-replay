@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import inspect
 import json
 import sys
 import time
@@ -85,6 +86,14 @@ def run(
     """The table of model ``name`` with its ``attrs`` (module docstring)."""
     started = time.perf_counter()
     module = importlib.import_module(MODELS[name])
+    if (
+        config is not None
+        and "config" not in inspect.signature(module.simulation).parameters
+    ):
+        raise ValueError(
+            f"model {name!r}: its scenario list ({MODELS[name]}) takes no "
+            "configuration; run it without --config"
+        )
     simulation = (
         module.simulation(quick, workers)
         if config is None

@@ -68,7 +68,7 @@ the per-session loop does not give, such as one coefficient shared by an
 animal's sessions. The engine draws the data set as for any model and hands it
 to that fit, which returns one row per unit of inference and estimand
 (:data:`UNIT_COLUMNS`): a session (all three labels) or an animal (the animal
-only). Its rows are the ``sessions`` table's rows of the model. An estimand
+only), each at most once per estimand. Its rows are the ``sessions`` table's rows of the model. An estimand
 whose units are sessions is reduced session -> recording day -> animal as
 above; one whose units are animals is the mean over the animals with a value,
 with the t interval over them (``shared_statistics.animal_mean_interval``;
@@ -333,7 +333,9 @@ class Simulation:
     models : sequence of Model
         Fitted to the same data sets: the same coefficient names, likelihood,
         response and unit (they may differ in their penalties or estimands).
-        An :class:`InsideScenario` is drawn on the first model's design.
+        Every data set is drawn on the first model's design (its offset, its
+        rows with a missing value and, under an :class:`InsideScenario`, its
+        coefficients), whether or not that model has its own fit.
     sessions : mapping of (animal, session_date, epoch) to pd.DataFrame
         The model's real rows of each session; a missing response column is
         added.
@@ -801,6 +803,14 @@ def _own_units(model: Model, data: Mapping[SessionKey, pd.DataFrame]) -> pd.Data
                 f"model {model.name!r}, estimand {name!r}: units of both levels "
                 "(sessions and animals)"
             )
+        level = ["animal", "session_date", "epoch"] if labeled.all() else ["animal"]
+        repeated = part[part.duplicated(level, keep=False)]
+        if not repeated.empty:
+            first = "/".join(str(v) for v in repeated.iloc[0][level])
+            raise ValueError(
+                f"model {model.name!r}, estimand {name!r}: the own fit gives the "
+                f"unit {first} more than once"
+            )
     return units
 
 
@@ -900,8 +910,10 @@ def _worker_task(task: tuple[int, int]) -> tuple[list[dict], list[dict]]:
 
 
 def _check(simulation: Simulation) -> None:
-    """Refuse a run whose models cannot share data sets or whose names repeat.
-    A model with its own fit need not have the first model's coefficients."""
+    """Refuse a run whose models cannot share data sets or whose names repeat,
+    and an inside scenario that names a coefficient the first model's design
+    lacks (it is drawn on that design). A model with its own fit need not
+    have the first model's coefficients."""
     models = simulation.models
     if not models or not simulation.scenarios:
         raise ValueError("a simulation needs a model and a scenario")
@@ -916,6 +928,16 @@ def _check(simulation: Simulation) -> None:
                 f"model {model.name!r} cannot share data sets with {first.name!r}: "
                 "the coefficient names, likelihood, response and unit must agree"
             )
+    known = set(first.design.coef_names)
+    for scenario in simulation.scenarios:
+        if isinstance(scenario, InsideScenario):
+            unknown = sorted(set(scenario.coefficients) - known)
+            if unknown:
+                raise ValueError(
+                    f"scenario {scenario.name!r}: {unknown} not coefficients of the "
+                    f"design of the first model ({first.name!r}), on which the "
+                    "scenario is drawn"
+                )
     for what, names in (
         ("model", [m.name for m in models]),
         ("scenario", [s.name for s in simulation.scenarios]),
@@ -1077,7 +1099,9 @@ def summarize(
     p is below :data:`REJECTION_LEVEL`, over every data set with an
     estimate, a NaN p (fewer than six non-zero day values) counting as no
     rejection; ``n_data_sets_with_day_p`` says how many had a p, so that a
-    rate of zero without any is not read as a test that never rejects.
+    rate of zero without any is not read as a test that never rejects. An
+    estimand whose units are animals has no day test: its ``reject_day`` is
+    NaN.
     Each share has its binomial standard error (``*_se``). Under a planted
     value of zero ``excludes_zero`` and ``reject_day`` are false-positive
     rates, otherwise power.
@@ -1122,9 +1146,13 @@ def summarize(
                     else {"coverage": np.nan, "coverage_se": np.nan}
                 ),
                 **_share(found["excludes_zero"].to_numpy(), "excludes_zero"),
-                **_share(
-                    (found["day_p"] < REJECTION_LEVEL).to_numpy(dtype=float),
-                    "reject_day",
+                **(
+                    {"reject_day": np.nan, "reject_day_se": np.nan}
+                    if "session_date" in fits and fits["session_date"].isna().all()
+                    else _share(
+                        (found["day_p"] < REJECTION_LEVEL).to_numpy(dtype=float),
+                        "reject_day",
+                    )
                 ),
                 "share_without_value": float(np.mean(cause != "")),
                 **{

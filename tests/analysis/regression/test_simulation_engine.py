@@ -884,6 +884,7 @@ def test_an_own_fit_at_the_animal_level_is_reduced_over_the_animals(
     assert summary["without_value_no_events"] == pytest.approx(0.2)
     assert summary["n_sessions_used_min"] == 8
     assert summary["n_data_sets_with_day_p"] == 0
+    assert np.isnan(summary["reject_day"]) and np.isnan(summary["reject_day_se"])
 
 
 def test_own_fit_refusals(rate_sessions_cohort) -> None:
@@ -942,6 +943,83 @@ def test_own_fit_refusals(rate_sessions_cohort) -> None:
     )
     with pytest.raises(ValueError, match="both"):
         engine.run(_simulation(both, sessions, [scenario]))
+
+
+def test_an_own_fit_that_gives_a_session_twice_is_refused(rate_sessions_cohort) -> None:
+    """An own fit whose table holds one session's value of an estimand twice
+    is refused, as one with an animal twice is."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+
+    def twice(data):
+        table = own_session_fit(data, design=plain.design, estimands=plain.estimands)
+        return pd.concat([table, table.iloc[:1]], ignore_index=True)
+
+    def animal_twice(data):
+        table = own_animal_fit(data)
+        return pd.concat([table, table.iloc[:1]], ignore_index=True)
+
+    scenario = OutsideScenario("outside", expected_rate)
+    for fit, names in ((twice, tuple(plain.estimands)), (animal_twice, ("log_rate",))):
+        model = Model(
+            "x",
+            plain.design,
+            Poisson(),
+            "count",
+            "well_visit_id",
+            {},
+            fit=fit,
+            fit_estimands=names,
+        )
+        with pytest.raises(ValueError, match="more than once"):
+            engine.run(_simulation(model, sessions, [scenario]))
+
+
+def test_an_own_fit_may_be_the_first_model(rate_sessions_cohort) -> None:
+    """The draws use the first model's design (its offset, missing rows and,
+    under an inside scenario, its coefficients), whether or not that model
+    has its own fit: an own fit that does what the engine does, first, gives
+    the plain model's estimates on the same data sets."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+    own = Model(
+        "own",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=partial(own_session_fit, design=plain.design, estimands=plain.estimands),
+        fit_estimands=tuple(plain.estimands),
+    )
+    result = engine.run(Simulation([own, plain], sessions, [RATE_INSIDE], 2, 200, 5))
+    sets = result.data_sets.set_index(["data_set", "estimand", "model"])["estimate"]
+    for _, part in sets.groupby(level=[0, 1]):
+        values = part.droplevel([0, 1])
+        assert values["own"] == values["rate"]
+
+
+def test_an_inside_coefficient_must_be_in_the_first_design(
+    rate_sessions_cohort,
+) -> None:
+    """A planted coefficient that the first model's design lacks (a typo) is
+    refused before any draw, with an own-fit model in the run or not."""
+    sessions = rate_sessions_cohort
+    plain = rate_model(sessions)
+    own = Model(
+        "own",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=partial(own_session_fit, design=plain.design, estimands=plain.estimands),
+        fit_estimands=tuple(plain.estimands),
+    )
+    typo = InsideScenario("typo", {"(Intercept)": np.log(0.8), "rewrd": 0.5})
+    for models in ([plain, own], [own, plain]):
+        with pytest.raises(ValueError, match="rewrd.*first model"):
+            engine.run(Simulation(models, sessions, [typo], 2, 200, 5))
 
 
 def reference_tables() -> dict[str, list[dict]]:
