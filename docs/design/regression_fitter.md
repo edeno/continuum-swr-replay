@@ -779,8 +779,11 @@ model's real rows, its models, its scenarios, the data sets and the seed) and, i
 model needs its own columns, `table(result, simulation)`. The phase adds the module to
 `MODELS` in `scripts/checks/run_simulations.py`, which runs it
 (`--model`, `--scenarios`, `--n-data-sets`, `--seed`, `--workers` in a `spawn` pool,
-`--output-dir`, `--quick`) and writes `<model>.parquet` with the seed, the commit and
-each model's declared penalties in its `attrs`. The first list is the declared-penalty
+`--output-dir`, `--quick`, and `--config`, a JSON object passed to the module's
+`simulation` as `config` for a list of several runs) and writes `<model>.parquet` (or
+`<model>_<config stem>.parquet`) with the seed, the commit and each model's declared
+penalties in its `attrs`. The visit rate model's list is
+`analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`). The first list is the declared-penalty
 check, `scripts/checks/simulate_declared_penalty.py` (a synthetic cohort; one model per
 target edf). Fixed-seed tables are stored in
 `tests/analysis/regression/data/numpy_reference/simulation_*.json`, so that a change of

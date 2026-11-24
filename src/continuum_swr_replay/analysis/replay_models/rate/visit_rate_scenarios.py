@@ -60,6 +60,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from typing import NamedTuple
 
 import numpy as np
@@ -99,6 +100,7 @@ __all__ = [
     "rate_table_from_bins",
     "rate_table_truth",
     "session_log_ratios",
+    "shared_ratio_projection",
 ]
 
 LogCurve = Callable[[np.ndarray], np.ndarray]
@@ -135,13 +137,15 @@ def interpolated_curve(x: np.ndarray, log_rate: np.ndarray) -> LogCurve:
     Returns
     -------
     callable
-        Clock values -> log rate, the same shape.
+        Clock values -> log rate, the same shape. It can be pickled (a
+        ``functools.partial`` of ``numpy.interp``), so a process pool can
+        send it.
     """
     x = np.asarray(x, dtype=float)
     log_rate = np.asarray(log_rate, dtype=float)
     if x.ndim != 1 or x.shape != log_rate.shape or np.any(np.diff(x) <= 0):
         raise ValueError("x ascending, one log rate per point")
-    return lambda values: np.interp(np.asarray(values, dtype=float), x, log_rate)
+    return partial(np.interp, xp=x, fp=log_rate)
 
 
 @dataclass(frozen=True)
@@ -347,6 +351,28 @@ def poisson_projection(
     ]
     if not by_outcome:
         groups.append((rewarded, 2))
+    planted, steps = _proportional_fit(expected, reference, groups)
+    arrival = np.where(planted[0] > 0, steps[0], np.nan).reshape(n_outcomes, n_arrival)
+    leaving = np.where(planted[1] > 0, steps[1], np.nan)
+    beta = np.nan if by_outcome else float(steps[2][1])
+    return Projection(arrival, leaving, beta, arrival_edges, leaving_edges)
+
+
+def _proportional_fit(
+    expected: np.ndarray,
+    reference: np.ndarray,
+    groups: list[tuple[np.ndarray, int]],
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Iterative proportional fitting of ``reference * exp(sum of steps)`` to
+    ``expected``: one step per level of each group (codes, number of
+    levels), the third group, if any, the 0/1 reward whose level 0 is held at
+    zero. Returns each group's planted expected events and its steps.
+
+    Raises
+    ------
+    RuntimeError
+        If the fit does not converge in the sweeps allowed.
+    """
     planted = [np.bincount(g, expected, n) for g, n in groups]
     steps = [np.zeros(n) for _, n in groups]
     for _ in range(_PROJECTION_MAX_SWEEPS):
@@ -364,13 +390,59 @@ def poisson_projection(
             steps[k] += update
             largest = max(largest, float(np.max(np.abs(update))))
         if largest < _PROJECTION_TOL:
-            break
-    else:
-        raise RuntimeError("the projection did not converge")
-    arrival = np.where(planted[0] > 0, steps[0], np.nan).reshape(n_outcomes, n_arrival)
-    leaving = np.where(planted[1] > 0, steps[1], np.nan)
-    beta = np.nan if by_outcome else float(steps[2][1])
-    return Projection(arrival, leaving, beta, arrival_edges, leaving_edges)
+            return planted, steps
+    raise RuntimeError("the projection did not converge")
+
+
+def shared_ratio_projection(
+    rows: pd.DataFrame,
+    expected: np.ndarray,
+    reference: np.ndarray,
+    sessions: np.ndarray,
+    *,
+    arrival_cell_s: float = ARRIVAL_CELL_S,
+    leaving_cell_s: float = LEAVING_CELL_S,
+) -> float:
+    """The reward coefficient of the Poisson projection of several sessions'
+    planted expected counts onto the coefficient form with ONE coefficient
+    shared by the sessions: the truth of ``reward_level="animal"``.
+
+    As :func:`poisson_projection` with ``by_outcome=False`` for one session,
+    with each session's own arrival and leaving steps: ``mu = reference *
+    exp(a_session(arrival cell) + b_session(leaving cell) + beta *
+    rewarded)``, fitted to ``expected`` by maximum likelihood. It is the
+    limit of the animal-level fit on unlimited data, with each session's
+    curves as flexible as the cells.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        The sessions' rows, concatenated: the two clocks and
+        ``last_outcome_rewarded``.
+    expected, reference : np.ndarray, shape (n_rows,)
+        As :func:`poisson_projection` takes them.
+    sessions : np.ndarray of int, shape (n_rows,)
+        Each row's session, coded ``0 .. n_sessions - 1``.
+    arrival_cell_s, leaving_cell_s : float
+
+    Returns
+    -------
+    float
+        ``beta``.
+    """
+    expected = np.asarray(expected, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    sessions = np.asarray(sessions, dtype=int)
+    n_sessions = int(sessions.max()) + 1
+    groups = []
+    for clock, cell_s in ((ARRIVAL, arrival_cell_s), (LEAVING, leaving_cell_s)):
+        edges = _cell_edges(clock, cell_s)
+        n_cells = edges.size - 1
+        cell = _cell(edges, rows[clock].to_numpy(dtype=float))
+        groups.append((sessions * n_cells + cell, n_sessions * n_cells))
+    groups.append((_rewarded(rows).astype(int), 2))
+    _, steps = _proportional_fit(expected, reference, groups)
+    return float(steps[2][1])
 
 
 def _projected_contrasts(

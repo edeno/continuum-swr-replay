@@ -58,3 +58,29 @@ def test_one_scenario_keeps_its_data_sets(monkeypatch) -> None:
     )
     with pytest.raises(ValueError, match="not scenarios of the run"):
         run_simulations.run("declared_penalty", quick=True, scenarios=["none"])
+
+
+def test_a_config_file_is_passed_to_the_list(tmp_path) -> None:
+    """``--config`` passes its JSON to the module's ``simulation`` and names
+    the table after the file: the visit rate list's quick configuration of
+    the No SWR kind, one scenario."""
+    config = tmp_path / "no_swr_quick.json"
+    config.write_text(json.dumps({"kind": "No SWR"}))
+    run_simulations.main(
+        [
+            "--model",
+            "visit_rate",
+            "--quick",
+            "--scenarios",
+            "no_effect",
+            "--config",
+            str(config),
+            "--output-dir",
+            str(tmp_path),
+        ]
+    )
+    table = read_table(tmp_path / "visit_rate_no_swr_quick.parquet")
+    assert table.attrs["config"]["kind"] == "No SWR"
+    assert table.attrs["scenarios"] == ["no_effect"]
+    assert set(table["kind"]) == {"No SWR"}
+    assert set(table["model"]) == {"session_sd2", "animal"}

@@ -1662,7 +1662,13 @@ The visit rate model: event starts on the three visit clocks, models A and D.
 
 Planted scenarios of the visit rate model, as pure functions of the rows.
 
-`interpolated_curve`, `PlantedClocks`, `Planted`, `Projection`, `poisson_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `drop_before_small_movements`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
+`interpolated_curve`, `PlantedClocks`, `Planted`, `Projection`, `poisson_projection`, `shared_ratio_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `drop_before_small_movements`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_simulation.py`
+
+The visit rate model's scenario list for the simulation engine.
+
+`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `animal_level_fit`, `calibrate_clocks`, `simulation`, `table`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
 
