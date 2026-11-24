@@ -379,7 +379,7 @@ class _Session:
                 removal.rounds += [min(removal.rounds)] * len(rest)
                 whole = True
         self.rounds += len(refit.refits) - 1
-        self.no_fit = "" if refit.fitted else NoFit(refit.ended.value)
+        self.no_fit = "" if refit.fitted else NoFit[refit.ended.name]
         return (refit.fitted and level_left) or whole
 
 

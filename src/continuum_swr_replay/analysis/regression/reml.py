@@ -1676,12 +1676,17 @@ def _unidentified_text(session: RemlScore) -> str:
 
 
 class RefitEnd(StrEnum):
-    """How :func:`refit_session` ended: with a fit, or why without one."""
+    """How :func:`refit_session` ended: with a fit, or why without one
+    (``record.NoFit`` takes the members but ``CONVERGED``)."""
 
     CONVERGED = "converged"
+    #: No finite maximum along the intercept.
     ALONG_THE_INTERCEPT = "along_the_intercept"
+    #: No finite maximum along a penalty block.
     ALONG_A_PENALTY = "along_a_penalty"
+    #: Still no finite maximum after ``REFIT_MAX_ROUNDS`` rounds.
     TOO_MANY_ROUNDS = "too_many_rounds"
+    #: Another status than converged or no finite maximum.
     OTHER_STATUS = "other_status"
 
 

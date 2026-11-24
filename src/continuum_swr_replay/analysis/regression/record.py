@@ -17,25 +17,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from .reml import RefitEnd
+
 __all__ = ["FitRecord", "NoFit"]
 
 
-class NoFit(StrEnum):
-    """Why a session has no kept fit (a record's ``no_fit``)."""
+NoFit = StrEnum(
+    "NoFit",
+    {
+        "NO_ROWS": "no_rows",
+        "NO_EVENTS": "no_events",
+        **{end.name: end.value for end in RefitEnd if end is not RefitEnd.CONVERGED},
+    },
+    module=__name__,
+)
+NoFit.__doc__ = """Why a session has no kept fit (a record's ``no_fit``).
 
-    #: No rows left to fit: none given, all missing, or all dropped.
-    NO_ROWS = "no_rows"
-    #: No events of the kind in the rows left to fit.
-    NO_EVENTS = "no_events"
-    #: The refit's fit has no finite maximum along the intercept.
-    ALONG_THE_INTERCEPT = "along_the_intercept"
-    #: The refit's fit has no finite maximum along a penalty block.
-    ALONG_A_PENALTY = "along_a_penalty"
-    #: Still no finite maximum after ``REFIT_MAX_ROUNDS`` rounds.
-    TOO_MANY_ROUNDS = "too_many_rounds"
-    #: The refit's fit ended with another status than converged or no finite
-    #: maximum.
-    OTHER_STATUS = "other_status"
+``NO_ROWS``: no rows left to fit (none given, all missing, or all dropped).
+``NO_EVENTS``: no events of the kind in the rows left to fit. The others are
+the ways :func:`.reml.refit_session` ends without a fit, its
+:class:`.reml.RefitEnd` but ``CONVERGED``, of the same names and values:
+``ALONG_THE_INTERCEPT``, ``ALONG_A_PENALTY``, ``TOO_MANY_ROUNDS`` and
+``OTHER_STATUS``.
+"""
 
 
 @dataclass(frozen=True)
