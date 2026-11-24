@@ -841,3 +841,23 @@ own drawing, fitting and reduction code was removed. In `scripts/checks/simulate
 | `summarize` (removed: replaced) | `table`, from the engine's tables |
 | `report` (removed: replaced) | the runner prints the table and its warnings (`run_simulations.warnings`) |
 | `OUTPUT_NAME` (removed: replaced) | the runner writes `<model>.parquet` |
+
+## The held-out tetrode run is one run, 2026-11-23
+
+The stored held-out tetrode run in `Processed-Data/event_tetrode_holdout/` was replaced
+on 2026-11-23 by the run that also holds the extra scores (the HPD length, the
+shuffled-event reference, the rate and mark parts, the place information). That run was
+made with the same settings and null seed 0, and until then it was in
+`Processed-Data/event_tetrode_holdout_extra/`, a folder name that no longer exists. The
+old run was deleted. The two runs had the same rows, and their shared columns differed by
+run-to-run numerical noise of the GPU pass: the largest row difference in `gain` was
+0.044 nats, and the cohort sum of `gain` differed by 0.76 nats in 5.65 million. The two
+windows outputs that record the run's files, `Processed-Data/event_nonlocal_restriction_windows/`
+and `Processed-Data/event_nonlocal_restriction_swr_allowed_windows/`, were made again.
+
+| Old place | New place |
+|---|---|
+| `paths.EVENT_TETRODE_HOLDOUT_EXTRA_DIR` (removed) | `paths.EVENT_TETRODE_HOLDOUT_DIR` |
+| `score_tetrode_holdout.py --extra-scores` (removed) | every run computes the extra scores; `--null-seed` stays |
+| `tetrode_holdout.require_extra_columns`, `EXTRA_COLUMNS` (removed) | `tetrode_holdout.require_run_columns`, `RUN_COLUMNS` |
+| `reported.events.require_trial_folds`, `require_tetrode_holdout_folds`, `read_tetrode_holdout` | `analysis.event_evidence.heldout_runs` |
