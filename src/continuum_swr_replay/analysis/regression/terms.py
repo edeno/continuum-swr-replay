@@ -91,7 +91,7 @@ import numpy as np
 import pandas as pd
 
 from .constants import LOG_PENALTY_BOUNDS
-from .pspline import PSplineBasis
+from .pspline import PSplineBasis, sum_to_zero_constraint
 from .reml import PenaltyBlock
 
 __all__ = [
@@ -464,16 +464,22 @@ class _Built:
 
     def values(self, rows: pd.DataFrame, levels: _Levels) -> np.ndarray:
         """The term's columns at ``rows``, shape ``(n_rows, k)``; NaN where a
-        value it reads is missing."""
+        value it reads is missing (a missing level of the category it codes
+        or is fitted by, among them)."""
+        out = self._values(rows, levels)
+        if self.category is not None:
+            out[levels.index(self.category) < 0] = np.nan
+        return out
+
+    def _values(self, rows: pd.DataFrame, levels: _Levels) -> np.ndarray:
+        """:meth:`values` before the rows of a missing level are set to NaN."""
         term = self.term
         n = len(rows)
         if isinstance(term, Category):
             index = levels.index(term)
-            out = np.column_stack(
+            return np.column_stack(
                 [index == term.levels.index(level) for level in _coded(term)]
             ).astype(float)
-            out[index < 0] = np.nan
-            return out
         if isinstance(term, LinearFunctional):
             lags = rows[list(term.lag_columns)].to_numpy(dtype=float)
             return lags @ self.basis.design(np.log(np.asarray(term.lags, float)))
@@ -487,7 +493,6 @@ class _Built:
             # signed zeros the rows of the level do not change.
             out[~inside] = 0.0 * self._spline(np.zeros(1))
             out[inside] = self._spline(x[inside])
-            out[levels.index(term.by) < 0] = np.nan
             return out
         mask = (
             np.ones(n, dtype=bool)
@@ -497,11 +502,8 @@ class _Built:
         x = np.where(mask, x, 0.0)
         if self.scale is not None:
             reference = self.scale.reference if self.centered else 0.0
-            x = np.where(mask, (x - reference) / self.scale.sd, 0.0)
-        out = x[:, None]
-        if self.level is not None:
-            out[levels.index(term.by) < 0] = np.nan
-        return out
+            x[mask] = (x[mask] - reference) / self.scale.sd
+        return x[:, None]
 
     def _spline(self, x: np.ndarray) -> np.ndarray:
         """The constrained basis at ``x``, shape ``(n, k)``; NaN where ``x`` is
@@ -591,76 +593,85 @@ def _build_term(
     """The built pieces of one term (one per level of a ``by``), their design
     terms' columns numbered from 0 within the piece."""
     if isinstance(term, Category):
-        levels.index(term)
-        kinds = tuple(
-            DesignTerm(
-                f"{term.column}[{level}]",
-                term.column,
-                "level",
-                np.array([j]),
-                level=(term.column, level),
-            )
-            for j, level in enumerate(_coded(term))
-        )
-        return [_Built(term.column, term, kinds, penalty=_identity(term))]
+        return [_build_category(term, levels)]
     if isinstance(term, LinearFunctional):
-        name = f"lf({term.lag_columns[0]}..{term.lag_columns[-1]})"
-        basis = PSplineBasis(term.lo, term.hi, term.n_basis)
-        kind = DesignTerm(name, name, "lag", np.arange(term.n_basis))
-        penalty = None if term.penalty == "none" else basis.penalty()
-        return [_Built(name, term, (kind,), basis=basis, penalty=penalty)]
+        return [_build_lag(term)]
     by_levels = term.levels if term.by is not None else (None,)
-    out = []
-    for level in by_levels:
-        level_key = None if level is None else (term.by.column, level)
-        if isinstance(term, Smooth):
-            base = f"s({term.column})"
-            name = base if level is None else _level_name(term, base, level)
-            x = pooled[term.column].to_numpy(dtype=float)
-            if level is not None:
-                x = x[levels.rows(term.by, level)]
-            x = _finite(x, name)
-            basis = PSplineBasis(term.lo, term.hi, term.n_basis)
-            smooth = basis.constrained(x)
-            kind = DesignTerm(
-                name,
-                name,
-                "smooth",
-                np.arange(term.n_basis - 1),
-                level=level_key,
-                covariate=term.column,
-            )
-            fixed = term.penalty != "none"
-            out.append(
-                _Built(
-                    name,
-                    term,
-                    (kind,),
-                    level_key,
-                    basis=basis,
-                    constraint=smooth.constraint,
-                    penalty=smooth.penalty if fixed else None,
-                )
-            )
-        else:
-            name = (
-                term.column if level is None else _level_name(term, term.column, level)
-            )
-            scale = scales[term.column]
-            kind = DesignTerm(
-                name,
-                name,
-                "binary" if scale is None else "slope",
-                np.arange(1),
-                level=level_key,
-                covariate=term.column,
-            )
-            out.append(
-                _Built(
-                    name, term, (kind,), level_key, scale=scale, penalty=_identity(term)
-                )
-            )
-    return out
+    if isinstance(term, Smooth):
+        return [_build_smooth(term, level, pooled, levels) for level in by_levels]
+    return [_build_slope(term, level, scales) for level in by_levels]
+
+
+def _build_category(term: Category, levels: _Levels) -> _Built:
+    """A category: one level column for each coded level."""
+    levels.index(term)
+    kinds = tuple(
+        DesignTerm(
+            f"{term.column}[{level}]",
+            term.column,
+            "level",
+            np.array([j]),
+            level=(term.column, level),
+        )
+        for j, level in enumerate(_coded(term))
+    )
+    return _Built(term.column, term, kinds, penalty=_identity(term))
+
+
+def _build_lag(term: LinearFunctional) -> _Built:
+    """A lag functional: its basis over the log lags."""
+    name = f"lf({term.lag_columns[0]}..{term.lag_columns[-1]})"
+    basis = PSplineBasis(term.lo, term.hi, term.n_basis)
+    kind = DesignTerm(name, name, "lag", np.arange(term.n_basis))
+    penalty = None if term.penalty == "none" else basis.penalty()
+    return _Built(name, term, (kind,), basis=basis, penalty=penalty)
+
+
+def _build_smooth(
+    term: Smooth, level: object, pooled: pd.DataFrame, levels: _Levels
+) -> _Built:
+    """A smooth, or its piece on one level of its ``by``: the sum-to-zero
+    constraint on the pooled rows (of the level) and the penalty ``Z' P Z``."""
+    base = f"s({term.column})"
+    name = base if level is None else _level_name(term, base, level)
+    x = pooled[term.column].to_numpy(dtype=float)
+    if level is not None:
+        x = x[levels.rows(term.by, level)]
+    x = _finite(x, name)
+    basis = PSplineBasis(term.lo, term.hi, term.n_basis)
+    Z = sum_to_zero_constraint(basis.design(x))
+    level_key = None if level is None else (term.by.column, level)
+    kind = DesignTerm(
+        name,
+        name,
+        "smooth",
+        np.arange(term.n_basis - 1),
+        level=level_key,
+        covariate=term.column,
+    )
+    penalty = None if term.penalty == "none" else Z.T @ basis.penalty() @ Z
+    return _Built(
+        name, term, (kind,), level_key, basis=basis, constraint=Z, penalty=penalty
+    )
+
+
+def _build_slope(
+    term: Slope, level: object, scales: dict[str, Standardization | None]
+) -> _Built:
+    """A slope, or its piece on one level of its ``by``: 0/1 unscaled, a
+    continuous column standardized."""
+    name = term.column if level is None else _level_name(term, term.column, level)
+    scale = scales[term.column]
+    level_key = None if level is None else (term.by.column, level)
+    kind = DesignTerm(
+        name,
+        name,
+        "binary" if scale is None else "slope",
+        np.arange(1),
+        level=level_key,
+        covariate=term.column,
+    )
+    return _Built(name, term, (kind,), level_key, scale=scale, penalty=_identity(term))
 
 
 def _identity(term: Category | Slope) -> np.ndarray | None:
