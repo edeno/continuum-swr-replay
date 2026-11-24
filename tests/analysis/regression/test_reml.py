@@ -187,8 +187,8 @@ def _score_in_jax(lik, data: SessionData, blocks, beta):
     derivatives by up to 8e-7 of themselves at log penalties 8 to 12. Called
     with JAX's 64-bit types on."""
     p = data.X.shape[1]
-    vectors, blocks = reml._eigenbasis(blocks, p)
-    Q = reml._rotate(blocks, vectors, np.eye(p))
+    Q = reml._rotate(blocks, np.eye(p))
+    blocks = reml._eigenbasis(blocks, p)
     X, y = jnp.asarray(data.X @ Q), jnp.asarray(data.y)
     beta = Q.T @ beta
     units = jnp.asarray(np.stack([reml._embedded(b, 1.0, p) for b in blocks]))

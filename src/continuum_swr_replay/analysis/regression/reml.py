@@ -243,6 +243,17 @@ class PenaltyBlock:
         once per block, when first read."""
         return PenaltyBlock(self.columns, np.diag(self.eigenvalues))
 
+    def at_columns(self, columns: np.ndarray) -> PenaltyBlock:
+        """The same penalty on other ``columns``, its decomposition (and its
+        block in the eigenbasis, once read) copied, not computed again."""
+        block = object.__new__(PenaltyBlock)
+        for name in ("S", "rank", "log_pdet", "eigenvalues", "eigenvectors"):
+            object.__setattr__(block, name, getattr(self, name))
+        object.__setattr__(block, "columns", np.asarray(columns, dtype=int))
+        if "in_eigenbasis" in self.__dict__:
+            block.__dict__["in_eigenbasis"] = self.in_eigenbasis.at_columns(columns)
+        return block
+
 
 @dataclass(frozen=True)
 class SessionData:
@@ -584,44 +595,35 @@ def _log_pdet(blocks: Sequence[PenaltyBlock], rho: np.ndarray) -> float:
     return float(sum(b.rank * r + b.log_pdet for b, r in zip(blocks, rho, strict=True)))
 
 
-def _eigenbasis(
-    blocks: Sequence[PenaltyBlock], n_columns: int
-) -> tuple[list[np.ndarray], list[PenaltyBlock]]:
-    """Each block's eigenvectors, and the blocks in that basis (diagonal).
+def _eigenbasis(blocks: Sequence[PenaltyBlock], n_columns: int) -> list[PenaltyBlock]:
+    """The blocks in the eigenbasis of their penalties (diagonal).
 
     The coefficients ``gamma = V_j' beta_j`` of a block are an orthogonal
     change of its coefficients in which its penalty is
     ``diag(PenaltyBlock.eigenvalues)``, exactly zero on its null space.
     """
     _check_blocks(blocks, n_columns)
-    vectors = [block.eigenvectors for block in blocks]
-    rotated = [block.in_eigenbasis for block in blocks]
-    return vectors, rotated
+    return [block.in_eigenbasis for block in blocks]
 
 
 def _rotate(
-    blocks: Sequence[PenaltyBlock],
-    vectors: Sequence[np.ndarray],
-    M: np.ndarray,
-    *,
-    inverse: bool = False,
+    blocks: Sequence[PenaltyBlock], M: np.ndarray, *, inverse: bool = False
 ) -> np.ndarray:
     """``Q M``, or ``Q' M`` when ``inverse``, with ``Q`` the block-diagonal
-    rotation (identity off the blocks).
+    rotation by the blocks' eigenvectors (identity off the blocks).
 
     ``M`` has shape ``(p,)`` or ``(p, k)``.
     """
     out = np.array(M, dtype=float)
-    for block, V in zip(blocks, vectors, strict=True):
+    for block in blocks:
+        V = block.eigenvectors
         out[block.columns] = (V.T if inverse else V) @ M[block.columns]
     return out
 
 
-def _rotate_both(
-    blocks: Sequence[PenaltyBlock], vectors: Sequence[np.ndarray], M: np.ndarray
-) -> np.ndarray:
+def _rotate_both(blocks: Sequence[PenaltyBlock], M: np.ndarray) -> np.ndarray:
     """``Q M Q'`` for a symmetric ``M`` of shape ``(p, p)``."""
-    return _rotate(blocks, vectors, _rotate(blocks, vectors, M).T)
+    return _rotate(blocks, _rotate(blocks, M).T)
 
 
 def _null_dimension(blocks: Sequence[PenaltyBlock], n_columns: int) -> int:
@@ -891,7 +893,7 @@ def reml_and_derivatives(
     n_columns = X.shape[1]
     if isinstance(lik, Gaussian) and aux is not None:
         raise ValueError("the Gaussian scale is profiled; pass aux=None")
-    vectors, rotated = _eigenbasis(blocks, n_columns)
+    rotated = _eigenbasis(blocks, n_columns)
     if rho.shape != (len(blocks),):
         raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
     # Counted before the rotation, which spreads a value that is not finite
@@ -899,7 +901,7 @@ def reml_and_derivatives(
     _check_design_finite(np.asarray(X))
     # X Q as one product: assigning each block's columns by index took 3 to 6
     # times as long (fancy indexing copies) at the rate model's size.
-    X_rotated = X @ _rotate(blocks, vectors, np.eye(n_columns))
+    X_rotated = X @ _rotate(blocks, np.eye(n_columns))
     start = np.zeros(n_columns) if beta0 is None else np.asarray(beta0, dtype=float)
     session = _reml_in_basis(
         lik,
@@ -908,23 +910,21 @@ def reml_and_derivatives(
         aux,
         rotated,
         rho,
-        _rotate(blocks, vectors, start, inverse=True),
+        _rotate(blocks, start, inverse=True),
         derivatives,
     )
     fit = replace(
         session.fit,
-        beta=_rotate(blocks, vectors, session.fit.beta),
-        A=_rotate_both(blocks, vectors, session.fit.A),
+        beta=_rotate(blocks, session.fit.beta),
+        A=_rotate_both(blocks, session.fit.A),
     )
     covariance = (
-        None
-        if session.covariance is None
-        else _rotate_both(blocks, vectors, session.covariance)
+        None if session.covariance is None else _rotate_both(blocks, session.covariance)
     )
     directions: tuple[FreeDirection, ...] = ()
     if fit.step is not None:
         directions = _directions(rotated, fit.running_away)
-        step = _rotate(blocks, vectors, fit.step)
+        step = _rotate(blocks, fit.step)
         fit = replace(fit, step=step, running_away=running_away_columns(X, step))
     unidentified: tuple[FreeDirection, ...] = ()
     if fit.unidentified is not None:
@@ -935,7 +935,7 @@ def reml_and_derivatives(
                 key=lambda d: (d.block is not None, d.block or 0, d.index),
             )
         )
-        fit = replace(fit, unidentified=_rotate(blocks, vectors, fit.unidentified))
+        fit = replace(fit, unidentified=_rotate(blocks, fit.unidentified))
     return replace(
         session,
         fit=fit,
@@ -1139,7 +1139,7 @@ def _session_score(
         )
     active = data.active
     position = np.cumsum(active) - 1  # a column's index among the active ones
-    reduced = [replace(block, columns=position[block.columns]) for block in blocks]
+    reduced = [block.at_columns(position[block.columns]) for block in blocks]
     session = reml_and_derivatives(
         lik,
         data.X[:, active],
