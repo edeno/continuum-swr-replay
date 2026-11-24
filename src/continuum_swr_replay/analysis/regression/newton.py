@@ -264,6 +264,18 @@ def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
     return columns[np.argsort(-size, kind="stable")]
 
 
+def _factored(A: Any, factor: Any) -> Any:
+    """Whether ``A`` and its Cholesky ``factor`` are finite: JAX's factor is
+    NaN where SciPy's raises, so ``A`` is positive definite exactly then."""
+    return jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(factor[0]))
+
+
+def _rounding_slack(F: float | np.ndarray) -> np.ndarray:
+    """The rounding of an objective ``F``: ``8 eps max(1, |F|)``, a change
+    no comparison of ``F`` can resolve."""
+    return 8.0 * np.finfo(float).eps * np.maximum(1.0, np.abs(F))
+
+
 def _objective_one(lik, X, y, aux, weight, S, beta):
     """``F(beta) = -l(beta) + beta' S beta / 2``, ``l(beta)`` and
     ``eta = X @ beta``, of one fit."""
@@ -320,7 +332,7 @@ def _iteration_one(
     g = lik._jax_score(eta, y, aux, weight) @ X - S @ beta
     A = lik._jax_information(X, eta, y, aux, weight) + S
     factor = jax.scipy.linalg.cho_factor(A, lower=True)
-    ok = jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(factor[0]))
+    ok = _factored(A, factor)
     step = jax.scipy.linalg.cho_solve(factor, g)
     decrement = 0.5 * (g @ step)
     # initial=0: a fit with no columns has no step to shorten.
@@ -743,7 +755,7 @@ def _last_step(
     F, loglik, _ = problem.evaluate(beta)
     moved = np.where(members[:, None], beta + r["step"], beta)
     F_new, loglik_new, eta_moved = problem.evaluate(moved)
-    rounding = 8.0 * np.finfo(float).eps * np.maximum(1.0, np.abs(F))
+    rounding = _rounding_slack(F)
     take = members & np.isfinite(F_new) & (F_new <= F + rounding)
     if take.any():
         landed = problem.iterate(moved, eta_moved, F_new, cap)

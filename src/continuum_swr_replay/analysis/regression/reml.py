@@ -77,14 +77,16 @@ from .constants import (
     REML_GRID_POINTS,
     REML_MAX_STEPS,
 )
-from .likelihoods import Gaussian, Likelihood, _gram
+from .likelihoods import Gaussian, Likelihood, _gram, _mirrored, _upper_pairs
 from .newton import (
     NO_FINITE_MAXIMUM,
     NOT_IDENTIFIED,
     FitStatus,
     NewtonFit,
     _check_design_finite,
+    _factored,
     _fit_one,
+    _rounding_slack,
     running_away_columns,
 )
 from .pspline import penalty_rank
@@ -681,12 +683,6 @@ def _fixed_penalty_summary(A, S, b, masks, loglik, log_pdet, n_null):
     return _laplace_summary(A, S, b, masks, loglik, log_pdet, n_null)[1]
 
 
-def _factored(A, factor):
-    """Whether ``A`` and its Cholesky ``factor`` are finite: JAX's factor is
-    NaN where SciPy's raises."""
-    return jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(factor[0]))
-
-
 def _require_factored(factored: bool) -> None:
     """Raise ``numpy.linalg.LinAlgError`` unless the derivative kernel could
     factor ``A`` (a converged fit's ``A`` is positive definite, so this is a
@@ -696,18 +692,6 @@ def _require_factored(factored: bool) -> None:
             "A = H + S is not positive definite at the converged fit: its "
             "Cholesky factor is not finite, so the score has no derivatives"
         )
-
-
-def _upper_pairs(m: int):
-    """The pairs ``j <= k`` of ``m`` penalties, as two index arrays, and
-    whether each is a diagonal pair."""
-    j, k = jnp.triu_indices(m)
-    return j, k, j == k
-
-
-def _mirrored(upper, j, k, m: int):
-    """The symmetric ``(m, m)`` matrix whose entries ``j <= k`` are ``upper``."""
-    return jnp.zeros((m, m), upper.dtype).at[j, k].set(upper).at[k, j].set(upper)
 
 
 @float64_kernel(static_argnames=("lik",))
@@ -1535,7 +1519,7 @@ def _search(
     while True:
         curvature = _Curvature.at(rho, current)
         step = curvature.newton_step(current.gradient)
-        rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
+        rounding = _rounding_slack(current.score)
         small = -0.5 * float(current.gradient @ step) < max(
             REML_DECREMENT_TOL, rounding
         )

@@ -207,6 +207,18 @@ def _gram(X: Any, weights: Any) -> Any:
     return X.T @ (weights[:, None] * X)
 
 
+def _upper_pairs(m: int) -> tuple[Any, Any, Any]:
+    """The pairs ``j <= k`` of ``m`` items, as two index arrays, and whether
+    each is a diagonal pair."""
+    j, k = jnp.triu_indices(m)
+    return j, k, j == k
+
+
+def _mirrored(upper: Any, j: Any, k: Any, m: int) -> Any:
+    """The symmetric ``(m, m)`` matrix whose entries ``j <= k`` are ``upper``."""
+    return jnp.zeros((m, m), upper.dtype).at[j, k].set(upper).at[k, j].set(upper)
+
+
 @functools.cache
 def _can_keep_state(cls: type) -> bool:
     """Whether a family class defines ``__init__`` or a
@@ -298,7 +310,7 @@ class _Family:
             return against_M(self._jax_dinformation(X, eta, y, aux, weight, d))
 
         m = E.shape[1]
-        rows, columns = jnp.triu_indices(m)
+        rows, columns, _ = _upper_pairs(m)
 
         def second(pair):
             j, k = pair
@@ -307,10 +319,9 @@ class _Family:
             return against_M(self._jax_d2information(X, eta, y, aux, weight, e_j, e_k))
 
         upper = jax.lax.map(second, (rows, columns))
-        pairs = jnp.zeros((m, m), M.dtype).at[rows, columns].set(upper)
         return (
             jax.lax.map(first, jnp.arange(D.shape[1])),
-            pairs.at[columns, rows].set(upper),
+            _mirrored(upper, rows, columns, m),
         )
 
 
