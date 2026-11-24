@@ -34,7 +34,7 @@ once and blocks every run after it.
 
 The prerequisites, not run here (GPUs or hours each), are listed in order in
 ``PREREQUISITES``: artifact detection, SWR detection, pinning both run IDs in
-``analysis/event_definition/swr_source.py``, then the HPC and ContFrag decodes.
+``paths.py``, then the HPC and ContFrag decodes.
 
 Before a table run starts, a preflight checks they are on disk: both pinned run
 folders, the inventory masked with the pinned artifact run
@@ -317,8 +317,8 @@ PREREQUISITES = (
         "the SWR inventories, masked with that artifact run",
     ),
     (
-        "pin ARTIFACT_INTERVALS_RUN_ID and SWR_INVENTORY_RUN_ID",
-        "in analysis/event_definition/swr_source.py",
+        "pin ARTIFACT_INTERVALS_RUN and SWR_INVENTORY_RUN",
+        "in src/continuum_swr_replay/paths.py",
     ),
     ("scripts/decoding/run_decoding_bandit.py", "the HPC non-local decodes"),
     (

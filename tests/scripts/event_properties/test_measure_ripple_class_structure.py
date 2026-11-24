@@ -9,9 +9,6 @@ import pandas as pd
 import pytest
 
 import scripts.event_properties.measure_ripple_class_structure as structure
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
@@ -19,6 +16,7 @@ from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.paths import (
+    STATE_SPACE_FEATURES_RUN,
     event_features_root,
     event_spike_evidence_dir,
     replay_content_dir,
