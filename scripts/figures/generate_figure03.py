@@ -183,6 +183,9 @@ N_SEGMENTS = 13
 # and its tick labels: a segment beyond an end is drawn in the end's color.
 DENSITY_LIMIT_LOG2 = 2
 DENSITY_TICK_LABELS = ("≤¼×", "even", "≥4×")
+# Panel f: the top of the y axis (% of content time per cm), above every
+# animal's curve, so that the shares written in the panel clear them.
+PROFILE_TOP_PERCENT_PER_CM = 4.0
 # Panel e: the color of content sparser than even content, for either kind.
 C_BELOW_EVEN = "#6e6e6e"
 
@@ -504,12 +507,15 @@ def draw_profiles(
     animal_profiles: pd.DataFrame | None = None,
 ) -> None:
     """Content time per cm along the trunk arms (center to junction) and the
-    leaf arms (junction to well), each kind, with its share at a well (the
-    percents under the title, which says what they are); and what
-    content spread evenly over the track would give (``even``:
-    ``content_along_arms.even_content``), a flat line and its share at a well.
-    With ``animal_profiles`` (the profiles of each animal), a thin line per
-    animal under each kind's."""
+    leaf arms (junction to well), each kind; and what content spread evenly
+    over the track would give (``even``: ``content_along_arms.even_content``),
+    a flat line. The parts of the arms within ``AT_WELL_CM`` of the center, of a
+    patch junction and of a well are shaded (the three places the axis names),
+    and each kind's share of content time at a well is written under the
+    heading "At a well", with even content's, in the room above the curves.
+    With
+    ``animal_profiles`` (the profiles of each animal), a thin line per animal
+    under each kind's."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
     even_percent = 100 * even["density_per_cm"]
     ax.axhline(even_percent, color="0.5", lw=0.6, ls=(0, (4, 2)), zorder=0, gid="even")
@@ -518,8 +524,15 @@ def draw_profiles(
         xytext=(0, -1.5), textcoords="offset points", ha="left", va="top",
         color="0.4", fontsize=SMALL_SIZE,
     )  # fmt: skip
+    trunk, leaf = even["trunk_arm_fraction"], even["leaf_arm_fraction"]
+    for low, high in ((0, trunk), (1 - trunk, 1 + leaf), (2 - leaf, 2)):
+        ax.axvspan(low, high, color="0.93", lw=0, zorder=-1, gid="zone")
     ax.text(
-        0.03, 0.79, f"even: {100 * even['at_well_fraction']:.0f}%",
+        0.03, 0.97, "At a well:", transform=ax.transAxes, color="0.25",
+        ha="left", va="top", fontsize=SMALL_SIZE,
+    )  # fmt: skip
+    ax.text(
+        0.03, 0.70, f"even: {100 * even['at_well_fraction']:.0f}%",
         transform=ax.transAxes, color="0.4", ha="left", va="top",
         fontsize=SMALL_SIZE,
     )  # fmt: skip
@@ -537,13 +550,15 @@ def draw_profiles(
         ax.plot(x, 100 * trunk, color=color)
         ax.plot(1 + x, 100 * leaf, color=color)
         ax.text(
-            0.03, 0.97 - 0.09 * is_swr,
+            0.03, 0.88 - 0.09 * is_swr,
             f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}%",
             transform=ax.transAxes, color=color, ha="left", va="top",
             fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax.set_yscale("log")
     ax.set_yticks([0.1, 0.2, 0.5, 1], ["0.1", "0.2", "0.5", "1"])
+    # room above the curves for the shares at a well
+    ax.set_ylim(top=PROFILE_TOP_PERCENT_PER_CM)
     ax.axvline(1, color="0.8", lw=0.5, zorder=0)
     ax.set_xticks([0, 1, 2], ["center", "junction", "well"])
     ax.set_xlim(0, 2)
@@ -553,9 +568,7 @@ def draw_profiles(
             va="top", fontsize=SMALL_SIZE, color="0.35",
         )  # fmt: skip
     ax.set_ylabel("% content time per cm")
-    ax.set_title(
-        f"% at a well (<{AT_WELL_CM:.0f} cm from one)", fontsize=SMALL_SIZE, pad=8
-    )
+    ax.set_title("Content time along the arms", fontsize=SMALL_SIZE, pad=8)
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:

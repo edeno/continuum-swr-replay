@@ -1084,9 +1084,18 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     )
     profiles = pd.DataFrame({"density_per_cm": 0.003}, index=index)
     shares = pd.DataFrame({"at_well": [0.5, 0.2]}, index=[False, True])
-    even = {"density_per_cm": 0.002, "at_well_fraction": 0.25}
+    even = {
+        "density_per_cm": 0.002,
+        "at_well_fraction": 0.25,
+        "leaf_arm_fraction": 0.4,
+        "trunk_arm_fraction": 0.3,
+    }
     fig, ax = plt.subplots()
     figure03.draw_profiles(ax, profiles, shares, even)
+    # the zones 20 cm from the center, from a patch junction and from a well
+    zones = [patch for patch in ax.patches if patch.get_gid() == "zone"]
+    spans = [(round(p.get_x(), 6), round(p.get_x() + p.get_width(), 6)) for p in zones]
+    assert spans == [(0, 0.3), (0.7, 1.4), (1.6, 2.0)]
     (line,) = [line for line in ax.lines if line.get_gid() == "even"]
     np.testing.assert_allclose(line.get_ydata(), 0.2)  # % per cm
     texts = [text.get_text() for text in ax.texts]

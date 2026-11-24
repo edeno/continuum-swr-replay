@@ -143,6 +143,9 @@ def test_even_content_is_one_over_the_track_and_the_tracks_share_at_wells():
     even = even_content(bins, at_well_cm=20.0)
     assert even["density_per_cm"] == pytest.approx(1 / 160)
     assert even["at_well_fraction"] == pytest.approx(40 / 160)
+    # 20 cm is two fifths of a 50 cm leaf arm and a third of the 60 cm trunk arm
+    assert even["leaf_arm_fraction"] == pytest.approx(0.4)
+    assert even["trunk_arm_fraction"] == pytest.approx(1 / 3)
     # one time bin on every place bin is even content: that density everywhere
     density = content_density_along_arms(bins, n_segments=5)["density_per_cm"]
     np.testing.assert_allclose(density.to_numpy(), even["density_per_cm"])

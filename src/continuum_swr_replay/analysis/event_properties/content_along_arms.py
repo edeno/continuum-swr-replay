@@ -299,7 +299,11 @@ def even_content(bins: pd.DataFrame, at_well_cm: float) -> dict[str, float]:
         segment; ``at_well_fraction``: the share of the track within
         ``at_well_cm`` of a well, which is ``at_well_cm`` of each leaf arm (a
         leaf arm ends at one well), on each animal's own track and averaged
-        over animals, as the shares of :func:`content_place_shares` are.
+        over animals, as the shares of :func:`content_place_shares` are;
+        ``leaf_arm_fraction`` and ``trunk_arm_fraction``: ``at_well_cm`` as a
+        part of the mean leaf arm and of the mean trunk arm, the width on a
+        profile drawn along the arms of a zone that far from an arm's end (a
+        well, a junction, the center).
 
     Raises
     ------
@@ -318,9 +322,12 @@ def even_content(bins: pd.DataFrame, at_well_cm: float) -> dict[str, float]:
         if (leaf < at_well_cm).any():
             raise ValueError(f"at_well_cm ({at_well_cm}) is longer than a leaf arm")
         at_well.append(len(leaf) * at_well_cm / own.sum())
+    is_leaf = lengths.index.isin(LEAF_ARMS)
     return {
         "density_per_cm": 1.0 / float(lengths.sum()),
         "at_well_fraction": float(np.mean(at_well)),
+        "leaf_arm_fraction": at_well_cm / float(lengths[is_leaf].mean()),
+        "trunk_arm_fraction": at_well_cm / float(lengths[~is_leaf].mean()),
     }
 
 
