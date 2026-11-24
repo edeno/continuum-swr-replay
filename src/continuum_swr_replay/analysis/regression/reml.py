@@ -54,7 +54,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cached_property
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -960,7 +960,7 @@ def _reml_in_basis(
     )
     if derivatives:
         r = problem.rows
-        score, covariance, edf, edf_total, gradient, hessian, factored = jax.device_get(
+        outputs = jax.device_get(
             _laplace_derivatives(
                 lik,
                 r.X,
@@ -972,19 +972,32 @@ def _reml_in_basis(
                 _ranks(blocks),
             )
         )
+        return _score_of(fit, 1.0, outputs[:4], outputs[4:])
+    return _score_of(fit, 1.0, jax.device_get(_fixed_penalty_summary(*common)), None)
+
+
+def _score_of(
+    fit: NewtonFit,
+    scale: float,
+    summary: Sequence[Any],
+    derivatives: Sequence[Any] | None,
+) -> RemlScore:
+    """The :class:`RemlScore` of a kernel's outputs on the host: ``summary``
+    the score, the covariance, the edf per block and in all; ``derivatives``
+    the gradient, the Hessian and whether ``A`` could be factored
+    (:func:`_require_factored`), or None when they were not asked for."""
+    score, covariance, edf, edf_total = summary
+    gradient = hessian = None
+    if derivatives is not None:
+        gradient, hessian, factored = derivatives
         _require_factored(bool(factored))
         gradient, hessian = np.array(gradient), np.array(hessian)
-    else:
-        score, covariance, edf, edf_total = jax.device_get(
-            _fixed_penalty_summary(*common)
-        )
-        gradient = hessian = None
     return RemlScore(
         float(score),
         gradient,
         hessian,
         fit,
-        1.0,
+        scale,
         covariance=np.array(covariance),
         edf=np.array(edf),
         edf_total=float(edf_total),
@@ -1061,11 +1074,6 @@ def _gaussian_profiled(
         )
     )
     gram, D_p, scale, score, covariance, edf, edf_total, loglik = outputs[:8]
-    gradient = hessian = None
-    if derivatives:
-        gradient, hessian, factored = outputs[8:]
-        _require_factored(bool(factored))
-        gradient, hessian = np.array(gradient), np.array(hessian)
     scale = float(scale)
     fit = replace(
         pls,
@@ -1073,15 +1081,11 @@ def _gaussian_profiled(
         newton_decrement=pls.newton_decrement * working / scale,
         loglik=float(loglik),
     )
-    return RemlScore(
-        float(score),
-        gradient,
-        hessian,
+    return _score_of(
         fit,
         scale,
-        covariance=np.array(covariance),
-        edf=np.array(edf),
-        edf_total=float(edf_total),
+        (score, covariance, edf, edf_total),
+        outputs[8:] if derivatives else None,
     )
 
 
