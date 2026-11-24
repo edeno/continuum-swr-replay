@@ -304,38 +304,20 @@ def compute_triggered_average_curves(
     -------
     dict
         ``{signal: {"time", "no_overlap_mean", "no_overlap_sem",
-        "overlap_mean", "overlap_sem", and for each class the quartiles over
-        events "{class}_q25", "{class}_median", "{class}_q75"}}`` with
-        numpy-array values (a lag where no event has a value is NaN).
+        "overlap_mean", "overlap_sem", and for each class the animal-balanced
+        quartiles "{class}_q25", "{class}_median", "{class}_q75"}}`` with
+        numpy-array values. The mean and SEM are over every event; each
+        quartile is the mean over animals of each animal's quartile over its
+        events (:func:`animal_balanced_quartiles`), so the median is the mean
+        of :func:`animal_window_medians`' lines. A lag where no event has a
+        value is NaN.
 
     """
     signal_types = list(signals)
-    no_overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_no_overlap_SWR_event"],
-        event_col="non_local_event",
+    windows = triggered_windows(
+        data_over_time, event_types, signal_types, time_col, window_sec
     )
-    overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_overlap_SWR_event"],
-        event_col="non_local_event",
-    )
-    windows_no = get_signal_windows(
-        data=data_over_time,
-        event_times=no_overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
-    windows_ov = get_signal_windows(
-        data=data_over_time,
-        event_times=overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
+    windows_no, windows_ov = windows["no_overlap"], windows["overlap"]
     no_mean_all = windows_no.mean(dim="event")
     ov_mean_all = windows_ov.mean(dim="event")
 
@@ -345,8 +327,9 @@ def compute_triggered_average_curves(
         quartiles = {
             f"{name}_{label}": values
             for name, windows in (("no_overlap", windows_no), ("overlap", windows_ov))
-            for label, values in window_quartiles(
-                windows.sel(signal=signal_type).values
+            for label, values in animal_balanced_quartiles(
+                windows.sel(signal=signal_type).values,
+                windows.indexes["event"].get_level_values("animal"),
             ).items()
         }
         curves[signal_type] = {
@@ -367,6 +350,85 @@ def compute_triggered_average_curves(
         }
     return curves
 
+
+def triggered_windows(
+    data_over_time: pd.DataFrame,
+    event_types: dict,
+    signals: list[str],
+    time_col: str = "start_time",
+    window_sec: float = 2.0,
+) -> dict[str, xr.DataArray]:
+    """The signal windows around the immobile non-local events, by SWR overlap:
+    what :func:`compute_triggered_average_curves` reduces.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        Per-timebin decode frames (one epoch's or the aggregated ones).
+    event_types : dict
+        Output of :func:`get_event_types` of the same frames.
+    signals : list of str
+        Signal columns, in order.
+    time_col : str
+        Alignment column (``"start_time"`` or ``"end_time"``).
+    window_sec : float
+        The window around each event, in seconds (half on each side).
+
+    Returns
+    -------
+    dict of str to xr.DataArray
+        ``"no_overlap"`` (events with no SWR) and ``"overlap"`` (events that
+        overlap one): :func:`get_signal_windows`' windows, dims ``(event,
+        time, signal)``, the event index carrying ``animal``, ``day``,
+        ``epoch`` and ``non_local_event``.
+    """
+    return {
+        key: get_signal_windows(
+            data=data_over_time,
+            event_times=get_event_start_end_times(
+                event_types[name], event_col="non_local_event"
+            ),
+            signal_cols=list(signals),
+            time_col=time_col,
+            window_sec=window_sec,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            event_id_col="non_local_event",
+        )
+        for key, name in (
+            ("no_overlap", "non_local_event_immobile_no_overlap_SWR_event"),
+            ("overlap", "non_local_event_immobile_overlap_SWR_event"),
+        )
+    }
+
+
+def animal_window_medians(windows: xr.DataArray, signal: str) -> pd.DataFrame:
+    """Each animal's median over its events of one signal's windows, at each
+    lag (:func:`animal_quartiles`' median).
+
+    Parameters
+    ----------
+    windows : xr.DataArray, dims (event, time, signal)
+        :func:`get_signal_windows`' windows, the event index carrying
+        ``animal``.
+    signal : str
+        The signal.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_lags, n_animals)
+        Indexed by lag (s), a column per animal (sorted): the median over the
+        animal's events with a value at that lag (NaN where none has one).
+    """
+    return animal_quartiles(
+        windows.sel(signal=signal).values,
+        windows.indexes["event"].get_level_values("animal"),
+    )["median"].set_axis(windows["time"].values)
+
+
+#: Figure 2g's signals around event starts, in its rows' order, and its window
+#: (s, in all: half on each side), which Figure 2's supplement draws per animal.
+TRIGGERED_SIGNALS = ("SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed")
+TRIGGERED_WINDOW_S = 0.3
 
 #: The ``get_event_types`` entries :func:`compute_triggered_average_curves` reads:
 #: the immobile non-local events that do and do not overlap an SWR.
@@ -427,23 +489,66 @@ def triggering_events_in(event_types: dict, events: pd.DataFrame) -> dict:
     return kept
 
 
-def window_quartiles(windows: np.ndarray) -> dict[str, np.ndarray]:
-    """The quartiles over events of event-triggered windows, at each lag, as
-    :func:`compute_triggered_average_curves` gives them for its classes.
+QUARTILES = (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+"""The quartiles a triggered trace draws, by name."""
+
+
+def animal_quartiles(
+    windows: np.ndarray, animals: np.ndarray | pd.Index
+) -> dict[str, pd.DataFrame]:
+    """Each animal's quartiles over its events of event-triggered windows, at
+    each lag.
 
     Parameters
     ----------
     windows : np.ndarray, shape (n_events, n_lags)
         One signal's windows (``get_signal_windows``), NaN where a window has
         no value.
+    animals : array_like, shape (n_events,)
+        Each window's animal.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame
+        ``q25``, ``median`` and ``q75``, each shape (n_lags, n_animals), a
+        column per animal (sorted): the quartile over the animal's events with
+        a value at that lag (NaN where none has one).
+    """
+    animals = np.asarray(animals)
+    names = sorted(set(animals))
+    return {
+        label: pd.DataFrame(
+            {
+                name: np.nanquantile(windows[animals == name], q, axis=0)
+                for name in names
+            }
+        )
+        for label, q in QUARTILES
+    }
+
+
+def animal_balanced_quartiles(
+    windows: np.ndarray, animals: np.ndarray | pd.Index
+) -> dict[str, np.ndarray]:
+    """The animal-balanced quartiles of event-triggered windows, at each lag:
+    the mean over animals of each animal's quartile over its events
+    (:func:`animal_quartiles`). The band between ``q25`` and ``q75`` stays a
+    spread over events, with every animal weighted the same.
+
+    Parameters
+    ----------
+    windows : np.ndarray, shape (n_events, n_lags)
+        One signal's windows, NaN where a window has no value.
+    animals : array_like, shape (n_events,)
+        Each window's animal.
 
     Returns
     -------
     dict
-        ``q25``, ``median`` and ``q75``, each shape (n_lags,); NaN at a lag where
-        no event has a value.
+        ``q25``, ``median`` and ``q75``, each shape (n_lags,): the mean over
+        the animals with a value at that lag; NaN where no animal has one.
     """
     return {
-        label: np.nanquantile(windows, q, axis=0)
-        for label, q in (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+        label: table.mean(axis=1).to_numpy()
+        for label, table in animal_quartiles(windows, animals).items()
     }

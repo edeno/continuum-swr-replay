@@ -149,6 +149,14 @@ RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 NONLOCAL_BY_SIGNAL_DIR = "nonlocal_by_signal"
 """Each epoch's immobile time bins by ripple power, by MUA and by non-local
 probability (``scripts/event_properties/measure_nonlocal_by_signal.py``)."""
+STATE_BY_SIGNAL_DIR = "state_by_signal"
+"""Each epoch's immobile time bins inside the well visits by ripple power and
+by MUA and by decoder state class
+(``scripts/event_properties/measure_state_by_signal.py``)."""
+NONLOCAL_PROBABILITY_DIR = "nonlocal_probability"
+"""Each epoch's immobile time bins inside the well visits by non-local
+probability, in 50 equal bins
+(``scripts/decoding/measure_nonlocal_probability.py``)."""
 EVENT_RULE_SWEEP_DIR = "event_rule_sweep"
 """Each epoch's events, and those with no SWR, at other settings of the event
 rule (``scripts/event_properties/sweep_event_rule.py``)."""
@@ -186,6 +194,12 @@ EVENT_TETRODE_HOLDOUT_DIR = "event_tetrode_holdout"
 """The held-out tetrode score of the canonical non-local events and their
 Local-rest controls, under the processed-data root
 (``scripts/event_evidence/score_tetrode_holdout.py``)."""
+EVENT_TETRODE_HOLDOUT_EXTRA_DIR = "event_tetrode_holdout_extra"
+"""The held-out tetrode run of ``EVENT_TETRODE_HOLDOUT_DIR`` made again with its
+extra scores (``tetrode_holdout.EXTRA_COLUMNS``: the 95 % HPD length, the
+shuffled-event reference, the rate and mark parts, the place information),
+under the processed-data root (``scripts/event_evidence/score_tetrode_holdout.py
+--extra-scores --null-seed 0``)."""
 EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
 """The per-bin scores of the three non-local restriction models (``none``,
 ``swr``, ``full``) on every analyzed epoch, each fold scored under a decoder
@@ -193,6 +207,13 @@ whose place-field encodings were fit on the decode's training bins of the other
 folds (more than 1 s from the fold) and whose discrete transitions and initial
 conditions were fit by EM with the fold's bins missing, under the processed-data
 root (``scripts/event_evidence/score_nonlocal_restriction.py``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR = "event_nonlocal_restriction_swr_allowed"
+"""The restriction models scored again with the fourth model (``swr_allowed``:
+every state inside SWRs, the local states outside them), each fold under the
+fold fit a stored restriction run recorded (no EM), under the processed-data
+root (``scripts/event_evidence/score_nonlocal_restriction.py
+--from-stored-fit``). Its tables are the restriction run's, with the fourth
+model's columns."""
 EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
 """The non-local restriction models' per-bin scores summed over each canonical
 non-local event and its Local-rest control (the windows of the held-out tetrode
@@ -206,6 +227,22 @@ held-out state probabilities, the restriction scores summed over each, which
 events of it and of the canonical table share a bin, and each epoch's time sums
 with those events' windows, under the processed-data root
 (``scripts/event_evidence/detect_heldout_events.py``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR = (
+    "event_nonlocal_restriction_swr_allowed_heldout_events"
+)
+"""The held-out events and time sums of
+``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``, made from the restriction run
+with the fourth model (``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), so they
+carry its columns, under the processed-data root
+(``scripts/event_evidence/detect_heldout_events.py --restriction-dir``)."""
+EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_WINDOWS_DIR = (
+    "event_nonlocal_restriction_swr_allowed_windows"
+)
+"""The window sums of ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``, made from the
+restriction run with the fourth model
+(``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), under the processed-data root
+(``scripts/event_evidence/sum_nonlocal_restriction_windows.py
+--restriction-dir``)."""
 EVENT_BIN_FACTS_DIR = "event_bin_facts"
 """Each analyzed epoch's per-decode-bin facts, under the processed-data root: the
 spikes of every tetrode in the bin and whether it is inside a well visit
@@ -242,6 +279,12 @@ HELDOUT_TIME_SUMS_NAME = "heldout_time_sums"
 ``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``."""
 BIN_FACTS_NAME = "bin_facts"
 """The per-bin facts run's tables and records, in ``EVENT_BIN_FACTS_DIR``."""
+EVENT_CONTENT_PLACE_RATE_DIR = "event_content_place_rate"
+"""The rank, among the track's places, of the encoding model's summed ground
+intensity at each canonical non-local event's decoded place, under the
+processed-data root (``scripts/event_properties/measure_content_place_rate.py``)."""
+CONTENT_PLACE_RATE_NAME = "content_place_rate"
+"""The place-rate run's tables and records, in ``EVENT_CONTENT_PLACE_RATE_DIR``."""
 EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
 """Each epoch's non-local detector exposure inside the well visits, under the
 processed-data root (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""

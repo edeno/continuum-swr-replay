@@ -88,6 +88,11 @@ def test_overlap_class_statistics_take_an_animal_s_share_over_its_epochs():
     # a: the mean of 1 and 0.2 is 0.6 (pooled, 2 of 6 would be 1/3); b: 1/3
     assert result["non_swr_fraction_animal_min"] == pytest.approx(1 / 3)
     assert result["non_swr_fraction_animal_max"] == pytest.approx(0.6)
+    # Figure 2d's bars, the mean over animals: non-SWR (0.6 + 1/3) / 2, partial
+    # (0.4 + 0) / 2, contained (0 + 2/3) / 2; they add to 1
+    assert result["non_swr_fraction_animal_mean"] == pytest.approx((0.6 + 1 / 3) / 2)
+    assert result["swr_partial_fraction_animal_mean"] == pytest.approx(0.2)
+    assert result["swr_contained_fraction_animal_mean"] == pytest.approx(1 / 3)
     # a's shares: non-SWR 0.6, partial 0.4, contained 0 (pooled, its 4 partial
     # events would outnumber its 2 non-SWR ones)
     assert result["n_animals_non_swr_plurality"] == 1
@@ -136,9 +141,9 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert result["start_offset_median_s"] == pytest.approx(0.015)
     assert result["end_offset_median_s"] == pytest.approx(0.04)
     # |start| 0.02, 0.01, 0.05, 0.04 and |end| 0.02, 0.05, 0.10, 0.20 s: beyond
-    # 25 ms, 2 and 3 of 4; beyond 50 ms (strictly), 0 and 2 of 4
-    assert result["start_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(2 / 4)
-    assert result["end_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(3 / 4)
+    # 10 ms (strictly), 3 and 4 of 4; beyond 50 ms (strictly), 0 and 2 of 4
+    assert result["start_offset_beyond_ten_ms_fraction"] == pytest.approx(3 / 4)
+    assert result["end_offset_beyond_ten_ms_fraction"] == pytest.approx(4 / 4)
     assert result["start_offset_beyond_fifty_ms_fraction"] == pytest.approx(0)
     assert result["end_offset_beyond_fifty_ms_fraction"] == pytest.approx(2 / 4)
     # events none of which overlaps an SWR: no row, and the two columns
@@ -148,12 +153,12 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
 
 
 def test_boundary_timing_classes_each_bound_against_the_tolerance():
-    """Event minus SWR, ms: below -25 earlier, above +25 later, within (the
+    """Event minus SWR, ms: below -10 earlier, above +10 later, within (the
     edges included) together."""
     offsets = pd.DataFrame(
         {
-            "start_offset_s": [-0.030, -0.025, 0.0, 0.025, 0.026],
-            "end_offset_s": [0.030, 0.025, -0.0251, 0.0, -0.025],
+            "start_offset_s": [-0.012, -0.010, 0.0, 0.010, 0.011],
+            "end_offset_s": [0.012, 0.010, -0.0101, 0.0, -0.010],
         }
     )
     classes = stats.boundary_timing_classes(offsets)
@@ -163,12 +168,15 @@ def test_boundary_timing_classes_each_bound_against_the_tolerance():
     assert classes["end"].tolist() == [
         "later", "together", "earlier", "together", "together",
     ]  # fmt: skip
-    assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.025
+    assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.010
 
 
-def test_boundary_timing_statistics_pool_the_events_and_range_the_animals():
-    """Animal a: (earlier, later), (together, together), (together, together);
-    b: (earlier, later). Pooled over 4 events; a's shares 1/3 and 2/3, b's 1."""
+def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
+    """Animal a: epoch 1 (earlier, later) and (together, together), epoch 2
+    (together, together); b: (earlier, later). Pooled over 4 events. a's
+    shares are the mean over its epochs: (earlier, later) (1/2 + 0) / 2 = 1/4,
+    (together, together) (1/2 + 1) / 2 = 3/4; b's 1 and 0. The cell is the
+    mean over animals."""
     offsets = pd.DataFrame(
         {
             "start_offset_s": [-0.05, 0.0, 0.01, -0.04],
@@ -176,21 +184,62 @@ def test_boundary_timing_statistics_pool_the_events_and_range_the_animals():
         },
         index=[10, 11, 12, 13],
     )
-    animal = pd.Series(["a", "a", "a", "b", "c"], index=[10, 11, 12, 13, 99])
-    table = stats.boundary_timing_statistics(offsets, animal)
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "c"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e1", "e1"],
+        },
+        index=[10, 11, 12, 13, 99],
+    )
+    table = stats.boundary_timing_statistics(offsets, events)
     assert len(table) == 9
     assert list(table.index.get_level_values("start")[:3]) == ["earlier"] * 3
     assert table["share"].sum() == pytest.approx(1.0)
+    assert table["share_animal_mean"].sum() == pytest.approx(1.0)
     wide = table.loc[("earlier", "later")]
     assert wide["share"] == pytest.approx(0.5) and wide["n_events"] == 2
-    assert wide["animal_min"] == pytest.approx(1 / 3)
+    assert wide["animal_min"] == pytest.approx(1 / 4)
     assert wide["animal_max"] == pytest.approx(1.0)
+    assert wide["share_animal_mean"] == pytest.approx((1 / 4 + 1) / 2)
     together = table.loc[("together", "together")]
     assert together["share"] == pytest.approx(0.5)
     assert together["animal_min"] == 0.0
-    assert together["animal_max"] == pytest.approx(2 / 3)
+    assert together["animal_max"] == pytest.approx(3 / 4)
+    assert together["share_animal_mean"] == pytest.approx(3 / 8)
     empty = table.loc[("later", "earlier")]
     assert empty["share"] == 0.0 and empty["animal_max"] == 0.0
+
+
+def test_both_ends_differ_is_the_four_corner_classes_by_the_same_rule():
+    """Animal a: epoch 1 (earlier, later) and (later, together), epoch 2
+    (later, earlier) and (together, together): epoch shares 1/2 and 1/2, a's
+    share 1/2; b: (earlier, earlier), share 1. Mean over animals 3/4; three
+    pairs with both ends apart. The same as summing the four corner cells of
+    the nine-class table, unrounded."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.05, 0.05, 0.04, 0.0, -0.03],
+            "end_offset_s": [0.05, 0.0, -0.06, 0.01, -0.03],
+        },
+        index=[10, 11, 12, 13, 14],
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e2", "e1"],
+        },
+        index=[10, 11, 12, 13, 14],
+    )
+    both = stats.boundary_both_ends_differ_statistics(offsets, events)
+    assert both["share_animal_mean"] == pytest.approx(3 / 4)
+    assert both["animal_min"] == pytest.approx(1 / 2)
+    assert both["animal_max"] == pytest.approx(1.0)
+    assert both["n_events"] == 3
+    table = stats.boundary_timing_statistics(offsets, events)
+    corners = [(s, e) for s in ("earlier", "later") for e in ("earlier", "later")]
+    assert table.loc[corners, "share_animal_mean"].sum() == pytest.approx(3 / 4)
 
 
 def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
@@ -609,6 +658,16 @@ def test_threshold_step_statistics_use_the_main_setting_only():
         stats.threshold_step_statistics(_steps(), n_knots=8, window_z=1.5, n_animals=5)
 
 
+def test_main_step_fits_are_the_main_settings_rows_one_per_animal():
+    fits = stats.main_step_fits(_steps(), n_knots=8, window_z=1.5, n_animals=3)
+    assert len(fits) == 9
+    assert (fits["step_share_overall"] != 9.0).all()
+    assert list(fits["property"].unique()) == ["duration", "evidence", "speed"]
+    evidence = fits[fits["property"] == "evidence"]
+    assert list(evidence["animal"]) == [0, 1, 2]
+    assert list(evidence["step_share_overall"]) == [0.5, -0.1, 0.3]
+
+
 def test_threshold_step_statistics_refuse_an_animal_fitted_twice():
     steps = _steps()
     # duration: animal 0 twice and animal 2 not at all, still three fits
@@ -716,6 +775,40 @@ def test_hpd_distribution_gives_each_animals_percent_per_bin():
     assert table[("b", "no SWR", 5.0)] == 0.0
     assert table[("b", "SWR", 5.0)] == pytest.approx(100.0)
     assert len(table) == 2 * 2 * 2
+
+
+def _distance_events() -> pd.DataFrame:
+    """:func:`_hpd_events` with its values as the content's distance."""
+    return _hpd_events().rename(columns={"hpd_coverage_cm": stats.DISTANCE_COLUMN})
+
+
+def test_content_distance_distribution_gives_each_animals_percent_per_bin():
+    """As the HPD distribution: per animal and class, the percent of its
+    events in each bin."""
+    edges = np.array([5.0, 50.0, 500.0])
+    table = stats.content_distance_distribution(_distance_events(), edges)
+    expected = stats.hpd_distribution(_hpd_events(), edges)
+    pd.testing.assert_frame_equal(table, expected)
+    assert (stats.DISTANCE_BIN_EDGES_CM[[0, -1]] == (2.0, 256.0)).all()
+
+
+def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
+    """No SWR: a's epoch 1 holds 10, 20, 300 cm, its epoch 2 30; b's 300,
+    400. Under 20 cm: a (1/3 + 0) / 2, b 0, so the mean over animals is 1/12
+    (pooled, 1 of 6); 20 to 100 cm: a (1/3 + 1) / 2, b 0; 100 cm or more: a
+    (1/3 + 0) / 2, b 1. SWR: a's 400 and 20, 300; b's 10 (a NaN left out)."""
+    table = stats.content_distance_band_statistics(_distance_events())
+    assert list(table.index) == [
+        (group, band) for group in ("no SWR", "SWR") for band in stats.DISTANCE_BANDS_CM
+    ]
+    no_swr = table.loc["no SWR"]
+    np.testing.assert_allclose(no_swr["share_animal_mean"], [1 / 12, 1 / 3, 7 / 12])
+    np.testing.assert_allclose(no_swr["animal_min"], [0.0, 0.0, 1 / 6])
+    np.testing.assert_allclose(no_swr["animal_max"], [1 / 6, 2 / 3, 1.0])
+    np.testing.assert_allclose(no_swr["share"], [1 / 6, 2 / 6, 3 / 6])
+    swr = table.loc["SWR"]
+    np.testing.assert_allclose(swr["share_animal_mean"], [0.5, 1 / 8, 3 / 8])
+    assert (swr["n_events"] == 4).all() and (no_swr["n_animals"] == 2).all()
 
 
 def test_hpd_tight_share_statistics_reduce_each_epochs_share():

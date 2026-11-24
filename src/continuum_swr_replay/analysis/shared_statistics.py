@@ -246,6 +246,35 @@ def animal_session_values(
     return per_session.groupby(level=0, observed=True).agg(statistic)
 
 
+def animal_range(per_epoch: pd.DataFrame) -> pd.DataFrame:
+    """The mean over animals of each column's per-animal mean, with the
+    smallest and largest animal's.
+
+    Parameters
+    ----------
+    per_epoch : pd.DataFrame, shape (n_epochs, n_measures)
+        One row per epoch, indexed with a level ``animal``; one column per
+        measure.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_measures, 5)
+        Indexed by ``per_epoch``'s columns: ``animal_mean`` (the mean of the
+        animals' means over their epochs), ``animal_min``, ``animal_max``,
+        ``n_animals`` and ``n_epochs``.
+    """
+    per_animal = per_epoch.groupby(level="animal").mean()
+    return pd.DataFrame(
+        {
+            "animal_mean": per_animal.mean(),
+            "animal_min": per_animal.min(),
+            "animal_max": per_animal.max(),
+            "n_animals": len(per_animal),
+            "n_epochs": len(per_epoch),
+        }
+    )
+
+
 def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
     """The median of a per-session number, with the sessions' and animals' signs.
 

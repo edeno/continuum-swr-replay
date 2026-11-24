@@ -7,6 +7,7 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    CONTRASTS,
     SCORE_COLUMNS,
 )
 from tests.support._restriction_tables import bin_facts_table, restriction_bins
@@ -485,3 +486,64 @@ def test_an_unknown_choice_raises():
         rw.restriction_window_statistics(_cohort(), n_boot=10, kinds=["y"])
     with pytest.raises(ValueError, match="unknown part"):
         rw.restriction_window_statistics(_cohort(), n_boot=10, parts=["edges"])
+
+
+def _four_model_bins() -> pd.DataFrame:
+    """:func:`_bins` with the fourth model: ``swr_allowed`` = 3 x bin index,
+    its two-sided score that plus 1."""
+    bins = _bins()
+    index = np.arange(N, dtype=np.float32)
+    bins["swr_allowed"] = 3 * index
+    bins["swr_allowed_two_sided"] = 3 * index + 1
+    return bins
+
+
+def test_window_sums_and_contrasts_of_a_fourth_model():
+    """The window table carries the fourth model's sums when the bins do, and
+    its contrasts are read like the canonical ones."""
+    table = rw.window_table(_four_model_bins(), _facts(), _windows())
+    # window 1-3: 3 x (1 + 2 + 3)
+    assert table.loc[1, "swr_allowed"] == 18.0
+    # outside SWRs, window 1-3 has bin 1 only
+    assert table.loc[1, "swr_allowed_outside_swr"] == 3.0
+    # bins outside SWRs inside the visit of window 0-1: 3 x (0 + 1)
+    assert table.loc[0, "swr_allowed_outside_swr_in_visit"] == 3.0
+    canonical = rw.window_table(_bins(), _facts(), _windows())
+    pd.testing.assert_frame_equal(canonical, table[list(canonical.columns)])
+    out = rw.window_contrasts(table)
+    # swr_allowed - swr filter: 2 x the index sum: 2, 12, 22
+    np.testing.assert_allclose(
+        out["swr_allowed_minus_swr_per_s"],
+        [2 / (2 * STEP), 12 / (3 * STEP), 22 / (2 * STEP), np.nan],
+    )
+    # full - swr_allowed outside SWRs: -(index) there: -1, -1, -5
+    np.testing.assert_allclose(
+        out["full_minus_swr_allowed_outside_swr_per_s"],
+        [-1 / (2 * STEP), -1 / STEP, -5 / STEP, np.nan],
+    )
+    assert "swr_allowed_minus_none_two_sided_per_spike" in out.columns
+    assert "swr_allowed_minus_none_per_s" not in rw.window_contrasts(canonical)
+
+
+def test_statistics_of_a_fourth_model_contrast_need_its_windows():
+    cohort = _cohort()
+    with pytest.raises(ValueError, match="do not hold the models"):
+        rw.restriction_window_statistics(
+            cohort, n_boot=10, contrasts=["full_minus_swr_allowed"]
+        )
+    four = cohort.assign(swr_allowed=cohort["swr"], swr_allowed_two_sided=0.0)
+    stats = rw.restriction_window_statistics(
+        four, n_boot=10, contrasts=["full_minus_swr_allowed"], kinds=["event"]
+    )
+    same = rw.restriction_window_statistics(
+        four, n_boot=10, contrasts=["full_minus_swr"], kinds=["event"]
+    )
+    # swr_allowed is swr here, so the two contrasts' filter rows agree
+    filtered = stats[stats["family"] == "filter"]
+    np.testing.assert_allclose(
+        filtered["estimate"], same[same["family"] == "filter"]["estimate"]
+    )
+    # by default, the canonical three only
+    assert set(rw.restriction_window_statistics(four, n_boot=10)["contrast"]) == set(
+        CONTRASTS
+    )

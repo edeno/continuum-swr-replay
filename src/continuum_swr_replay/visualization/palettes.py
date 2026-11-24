@@ -57,6 +57,12 @@ COLORS: dict[str, str] = {
 }
 """Color scheme for plotting the event types and decoder states."""
 
+REFERENCE_COLOR = "#777777"
+"""A neutral gray for reference levels and their names (a zero line, a level
+between events), not the No-Spike state's."""
+ANIMAL_LINE_COLOR = "#999999"
+"""A light gray for one animal's thin line, beside the mean over animals."""
+
 LIGHT_COLOR_LIGHTNESS = 0.6
 """A color lighter than this (HLS lightness) is too pale for text on white, and
 too pale under white text."""

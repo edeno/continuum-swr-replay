@@ -140,6 +140,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     cpu_pool,
     event_table_path,
     file_input,
+    restriction_bin_columns,
     restriction_run_dir,
     run,
     run_input,
@@ -203,7 +204,9 @@ def run_epoch(
     bins_path = output_path(epoch_id, restriction_dir, NONLOCAL_RESTRICTION_BINS_NAME)
     facts_path = output_path(epoch_id, facts_dir, BIN_FACTS_NAME)
     decode_path = decode_paths(epoch_id, data_dir).data_over_time
-    bins = pd.read_parquet(bins_path, columns=BIN_COLUMNS)
+    bins = pd.read_parquet(
+        bins_path, columns=restriction_bin_columns(bins_path, BIN_COLUMNS)
+    )
     facts = pd.read_parquet(facts_path)
     raw = read_raw_frame(epoch_id, data_dir)
     time = raw.index.to_numpy(dtype=float)

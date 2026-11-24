@@ -1074,6 +1074,26 @@ def immobile_analyzed_bins(
     return (frame["head_speed"].to_numpy() < speed_threshold) & analyzed_bins(frame)
 
 
+def rest_bins(frame: pd.DataFrame, in_visit: NDArray[np.bool_]) -> NDArray[np.bool_]:
+    """The rows of a read frame that are immobile and analyzed
+    (:func:`immobile_analyzed_bins`) and inside a well visit (``in_visit``,
+    ``event_definition.well_visits.in_well_visit`` on the frame's times): the
+    time the counts by signal and by probability are over.
+
+    Raises
+    ------
+    ValueError
+        If ``in_visit`` is not one bool per row.
+    """
+    in_visit = np.asarray(in_visit)
+    if in_visit.dtype != bool or in_visit.shape != (len(frame),):
+        raise ValueError(
+            f"in_visit must be one bool per bin, shape ({len(frame)},); got "
+            f"{in_visit.dtype} of shape {in_visit.shape}"
+        )
+    return immobile_analyzed_bins(frame) & in_visit
+
+
 def swr_intervals(
     dot: pd.DataFrame,
     *,

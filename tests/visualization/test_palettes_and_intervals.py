@@ -194,3 +194,45 @@ class TestIntervalsToTimebins:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ── plot_spike_times ──
+
+
+def test_spike_raster_ticks_sit_on_the_first_and_last_rows():
+    """eventplot draws row k at y = k; the ticks are on rows 0 and n - 1,
+    labeled 1 and n."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import xarray as xr
+
+    from continuum_swr_replay.visualization.plots import plot_spike_times
+
+    times = np.arange(0.0, 1.0, 0.1)
+    states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
+    results = xr.Dataset(
+        {
+            "acausal_state_probabilities": (
+                ("time", "states"),
+                np.tile([0.7, 0.1, 0.1, 0.1], (times.size, 1)),
+            )
+        },
+        coords={"time": times, "states": states},
+    )
+
+    class NoPlaceFields:
+        encoding_model_: dict = {}
+
+    spikes = [np.array([0.2]), np.array([0.3, 0.4]), np.array([0.5])]
+    fig, ax = plt.subplots()
+    plot_spike_times(
+        {"spike_times": {"HPC": spikes}}, slice(0.0, 1.0), NoPlaceFields(), None,
+        results, ax,
+    )  # fmt: skip
+    rows = sorted({float(c.get_lineoffset()) for c in ax.collections[:3]})
+    assert rows == [0.0, 1.0, 2.0]
+    assert list(ax.get_yticks()) == [rows[0], rows[-1]]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["1", "3"]
+    plt.close(fig)

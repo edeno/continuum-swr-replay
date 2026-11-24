@@ -31,6 +31,7 @@ them importable.
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
 - `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions (the immobile ones inside the well visits) and calibration curve, which the events summary reads.
+- `measure_nonlocal_probability.py` — each analyzed epoch's immobile time bins inside the well visits counted in 50 equal bins of non-local probability (`Processed-Data/nonlocal_probability`), for Figure 2's supplement, panel c, and the events summary's `nonlocal_probability_*` shares.
 
 ## `detection/` — the event detectors (Part 1)
 - `run_artifact_detection.py` — the artifact mask of every epoch's CA1 data (`docs/design/2026-10-09-artifact-detection.md`).
@@ -62,18 +63,20 @@ them importable.
 - `score_tetrode_holdout.py` — the held-out tetrode score of every canonical non-local event and its Local-rest control: each tetrode left out of the decoder in turn and scored under the other tetrodes' position distribution against local coding, with encodings held out in folds of whole trials balanced by destination well (GPU; needs `--gpus`).
 - `measure_bin_facts.py` — each decode bin's spikes over every tetrode and whether it is inside a well visit (the visits from the session cache only, whose entries the run records), on every epoch of the restriction run (CPU; reads the lab's database, read only).
 - `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control, with each window's spike count and its sums over the bins outside SWRs (CPU; `--restriction-dir` reads another restriction run).
-- `detect_heldout_events.py` — the non-local events detected by the canonical rule from the restriction run's held-out state probabilities (Figure 2j reads them), with the restriction scores summed over each, which held-out and canonical events share a bin, and each epoch's bins, spikes and scores by category, well visit and held-out event window; each epoch checks that the rule on the canonical decode's own probabilities gives its canonical labels (CPU; `--restriction-dir` reads another restriction run).
+- `detect_heldout_events.py` — the non-local events detected by the canonical rule from the restriction run's held-out state probabilities (Figure 2k reads them), with the restriction scores summed over each, which held-out and canonical events share a bin, and each epoch's bins, spikes and scores by category, well visit and held-out event window; each epoch checks that the rule on the canonical decode's own probabilities gives its canonical labels (CPU; `--restriction-dir` reads another restriction run).
 
 ## `event_properties/` — what the events are like (Part 2)
 Each is over the events that start inside a well visit and the time inside one
 (`docs/figure-pipeline.md`, "The data subset of Figures 2 and 3"), and records
-`cohort_selection.ANALYZED_SUBSET` in its manifest; `measure_content_along_arms.py`
-and the `measure` stage of `measure_ripple_class_structure.py` measure every event,
-and their readers select.
+`cohort_selection.ANALYZED_SUBSET` in its manifest; `measure_content_along_arms.py`,
+`measure_content_place_rate.py` and the `measure` stage of
+`measure_ripple_class_structure.py` measure every event, and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
 - `sweep_event_rule.py` — each epoch's non-local events, and those with no SWR, at other settings of the event rule (the sensitivity check of Figure 2's supplement; the canonical events are not changed).
 - `measure_nonlocal_by_signal.py` — each epoch's immobile time bins by ripple power, by MUA and by non-local probability (Figure 2i and the MUA panel of Figure 2's supplement).
+- `measure_state_by_signal.py` — each epoch's immobile time bins inside the well visits by ripple power and by MUA and by decoder state class (Local, non-local or No-Spike probability above 0.8, or none; `Processed-Data/state_by_signal`), for the top strips of Figure 2i and of its supplement's MUA panel and the events summary's `*_share_at_detection_level` values.
+- `measure_content_place_rate.py` — the rank, among the track's real places, of the saved encoding model's summed ground intensity at each event's decoded place: the events decoded where the tetrodes fire little (CPU; reads the event table and the detectors, no database).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 
 ## `tables/` — the event, stop and time-bin tables
@@ -123,7 +126,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.
 - `generate_supp_figure01.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
-- `generate_supp_figure02.py` — Figure 2's supplement (S2), ten panels in four rows: the decoder's states calibrated by held-out spikes and MUA in No-Spike; the event rule's sensitivity and the timing table; non-local time against MUA, the HPD coverage, the held-out tetrode gain split by bins with and without spikes, and shared content; the events' peak ripple power and the gain outside SWRs away from the SWRs (reads every analyzed epoch's decode frame with `--workers` processes, 4 by default).
+- `generate_supp_figure02.py` — Figure 2's supplement (S2), twelve panels in five rows: the decoder's states calibrated by held-out spikes and MUA in No-Spike; the event rule's sensitivity and the timing table; non-local time against MUA, the HPD coverage, the held-out tetrode gain split by bins with and without spikes, and tetrode participation; the step test at the SWR threshold and the gain outside SWRs away from the SWRs; Figure 2g's traces per animal and the distance of the content from the animal (reads every analyzed epoch's decode frame with `--workers` processes, 4 by default).
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
 

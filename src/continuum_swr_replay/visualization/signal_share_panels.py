@@ -1,11 +1,13 @@
 """Where the non-local time sits in a signal: Figure 2i (ripple power) and its
 MUA counterpart on Figure 2's supplement draw it the same way.
 
-Top, each animal's non-local time bins spread over the signal (the percent of
-them in each signal bin), the part below the threshold shaded under the
-animals' mean and its share written; bottom, the share of immobile bins decoded
-non-local at each level. One thin line per animal, their mean in bold, a dashed
-line at the threshold.
+Top, how confident Local time and confident non-local time are spread over the
+signal (each class's percent of its time in each signal bin; the mean over
+animals of each animal's mean over its epochs, in the class's color), the part
+of the non-local curve below the threshold shaded and the share of non-local
+time below it written; bottom, the share of immobile bins decoded non-local at
+each level, one thin line per animal and their mean in bold. A dashed line at
+the threshold on both.
 """
 
 from __future__ import annotations
@@ -13,8 +15,55 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 
+from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
+
+STATE_STYLES = {
+    "local": ("Local", COLORS["Local"]),
+    "non_local": ("Non-local", COLORS["Non-Local"]),
+}
+"""Each state class of the top strip: its name and color."""
+STRIP_TITLE = (
+    ("Local", "local"),
+    ("and", None),
+    ("non-local", "non_local"),
+    ("time", None),
+)
+"""The top strip's title, word by word, with the state class whose color a
+word takes (the strip's two curves are named there, not on the curves)."""
+
+
+def draw_strip_title(ax: Axes) -> None:
+    """:data:`STRIP_TITLE` centered above ``ax``, each class's name in its color."""
+    words = [
+        TextArea(
+            word,
+            textprops={
+                "fontsize": SMALL_SIZE,
+                "color": "black"
+                if state is None
+                else readable_text_color(STATE_STYLES[state][1]),
+            },
+        )
+        for word, state in STRIP_TITLE
+    ]
+    ax.add_artist(
+        AnchoredOffsetbox(
+            loc="lower center",
+            child=HPacker(children=words, pad=0, sep=2, align="baseline"),
+            frameon=False,
+            pad=0.0,
+            borderpad=0.25,
+            bbox_to_anchor=(0.5, 1.0),
+            bbox_transform=ax.transAxes,
+        )
+    )
+
+
+SHADE_COLOR = COLORS["All Events"]
+"""The non-local curve's part below the threshold, shaded."""
 
 
 def draw_share_by_signal(
@@ -25,15 +74,17 @@ def draw_share_by_signal(
     threshold: float,
     threshold_label: str,
     threshold_color: str,
-    shade_color: str,
     xlabel: str,
     below_note: str,
+    states: pd.DataFrame,
 ) -> None:
-    """Where the non-local time sits in a signal.
+    """Where the non-local time sits in a signal, against the Local time.
 
-    Top, each animal's non-local time bins spread over the signal, the part
-    below ``threshold`` shaded under the animals' mean and ``below_note``
-    written (the figure's script makes it from
+    Top, confident Local and confident non-local time spread over the signal
+    (``states``), each the mean over animals in the class's color, the classes
+    named in their colors in the strip's title (:func:`draw_strip_title`), the
+    non-local curve's part below ``threshold`` shaded and ``below_note``
+    written in the non-local color (the figure's script makes it from
     ``event_statistics.nonlocal_below_threshold_statistics``, which counts the
     bins beyond the axis too). Bottom, the share of immobile bins decoded
     non-local at each level, with ``threshold_label`` beside the threshold's
@@ -43,38 +94,52 @@ def draw_share_by_signal(
     ----------
     ax_spread, ax_share : Axes
     counts : pd.DataFrame
-        ``event_statistics.animal_signal_counts`` of the stored per-epoch counts.
+        ``event_statistics.animal_signal_counts`` of the stored per-epoch counts
+        (the bottom axis).
     threshold : float
         z; an edge of the signal's bins.
-    threshold_label, threshold_color, shade_color, xlabel : str
+    threshold_label, threshold_color, xlabel : str
     below_note : str
         The share below the threshold, in words.
+    states : pd.DataFrame
+        ``state_by_signal.state_distribution`` of the signal: ``state``,
+        ``animal``, ``signal_low``, ``signal_high`` and ``percent``.
     """
     drawn = counts[
         np.isfinite(counts["signal_low"]) & np.isfinite(counts["signal_high"])
     ]
     width = (drawn["signal_high"] - drawn["signal_low"]).iloc[0]
-    for ax, column in ((ax_spread, "nonlocal_fraction"), (ax_share, "share")):
-        by_animal = 100 * drawn.pivot(
-            index="signal_low", columns="animal", values=column
+    by_animal = 100 * drawn.pivot(index="signal_low", columns="animal", values="share")
+    center = by_animal.index + width / 2
+    ax_share.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax_share.plot(center, by_animal.mean(axis=1), color="k", lw=1.0)
+    finite = states[
+        np.isfinite(states["signal_low"]) & np.isfinite(states["signal_high"])
+    ]
+    for state, (_, color) in STATE_STYLES.items():
+        mean = (
+            finite[finite["state"] == state]
+            .pivot(index="signal_low", columns="animal", values="percent")
+            .mean(axis=1)
         )
-        center = by_animal.index + width / 2
-        mean = by_animal.mean(axis=1)
-        ax.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-        ax.plot(center, mean, color="k", lw=1.0)
+        middle = mean.index + width / 2
+        ax_spread.plot(middle, mean.to_numpy(), color=color, lw=1.0)
+        if state == "non_local":
+            ax_spread.fill_between(
+                middle, mean.to_numpy(), where=middle < threshold, color=SHADE_COLOR,
+                lw=0,
+            )  # fmt: skip
+    for ax in (ax_spread, ax_share):
         ax.axvline(threshold, color=threshold_color, lw=0.8, ls="--")
         ax.set_xlim(drawn["signal_low"].min(), drawn["signal_high"].max())
-        if ax is ax_spread:
-            ax.fill_between(
-                center, mean, where=center < threshold, color=shade_color, lw=0
-            )
     ax_spread.text(
         0.98, 0.95, below_note, transform=ax_spread.transAxes, ha="right",
         va="top", fontsize=SMALL_SIZE,
+        color=readable_text_color(STATE_STYLES["non_local"][1]),
     )  # fmt: skip
     ax_spread.set_ylim(0, None)
     ax_spread.set_ylabel(f"% per\n{width:g} z")
-    ax_spread.set_title("Non-local time", fontsize=SMALL_SIZE, pad=3)
+    draw_strip_title(ax_spread)
     ax_spread.tick_params(labelbottom=False)
     ax_share.text(
         threshold + 0.3, 5, threshold_label, fontsize=SMALL_SIZE,
@@ -83,4 +148,5 @@ def draw_share_by_signal(
     ax_share.set_ylim(0, 102)
     ax_share.set_yticks([0, 50, 100])
     ax_share.set_xlabel(xlabel)
+    ax_share.set_xticks([0, 5, 10])
     ax_share.set_ylabel("% of bins\nnon-local")

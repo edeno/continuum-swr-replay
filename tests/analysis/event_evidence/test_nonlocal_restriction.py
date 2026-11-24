@@ -326,6 +326,11 @@ def test_allowed_states_by_model():
         allowed["swr"], [[1, 1, 0, 0], [0, 0, 1, 1], [1, 1, 0, 0]]
     )
     np.testing.assert_array_equal(allowed["full"], [[1, 1, 1, 1]] * 3)
+    # every state inside the SWR, the local states outside it
+    np.testing.assert_array_equal(
+        allowed["swr_allowed"], [[1, 1, 0, 0], [1, 1, 1, 1], [1, 1, 0, 0]]
+    )
+    assert set(allowed) == set(nr.ALL_MODELS)
 
 
 def _table() -> pd.DataFrame:
@@ -535,8 +540,8 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
             "fit_s": 1.0,
         }
 
-    def scores(detector, likelihood, in_swr, summary_bins, log):
-        out = {c: np.zeros(n, dtype=np.float32) for c in nr.SCORE_COLUMNS}
+    def scores(detector, likelihood, in_swr, models, summary_bins, log):
+        out = {c: np.zeros(n, dtype=np.float32) for c in nr.score_columns(models)}
         out |= {
             c: np.zeros(n, dtype=np.float32)
             for c in nr.STATE_PROBABILITY_COLUMNS.values()
@@ -810,10 +815,11 @@ def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatc
         np.testing.assert_array_equal(missing, is_missing)
         return detector.k
 
-    def scores(detector, k, in_swr, summary_bins, log):
+    def scores(detector, k, in_swr, models, summary_bins, log):
         assert detector.k == k
+        assert models == nr.MODELS
         np.testing.assert_array_equal(summary_bins, folds == k)
-        out = {c: np.full(n, k, dtype=np.float32) for c in nr.SCORE_COLUMNS}
+        out = {c: np.full(n, k, dtype=np.float32) for c in nr.score_columns(models)}
         out |= {
             c: np.full(n, k / 10, dtype=np.float32)
             for c in nr.STATE_PROBABILITY_COLUMNS.values()
@@ -854,3 +860,196 @@ def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatc
     assert [f["n_bins"] for f in record["folds"]] == np.bincount(folds).tolist()
     assert record["folds"][2]["discrete_transition_difference"] == pytest.approx(0.2)
     assert record["n_missing"] == 10 and record["fit_s"] == 5.0
+
+
+def test_score_columns_and_the_models_a_table_holds():
+    assert (
+        nr.score_columns()
+        == nr.SCORE_COLUMNS
+        == (
+            "none",
+            "swr",
+            "full",
+            "none_two_sided",
+            "swr_two_sided",
+            "full_two_sided",
+        )
+    )
+    assert nr.score_columns(nr.ALL_MODELS)[3:5] == ("swr_allowed", "none_two_sided")
+    canonical = _table().columns
+    assert nr.table_models(canonical) == nr.MODELS
+    assert nr.table_contrasts(canonical) == nr.CONTRASTS
+    four = [*canonical, "swr_allowed", "swr_allowed_two_sided"]
+    assert nr.table_models(four) == nr.ALL_MODELS
+    assert nr.table_score_columns(four) == nr.score_columns(nr.ALL_MODELS)
+    assert nr.table_contrasts(four) == nr.ALL_CONTRASTS
+    # one family of the fourth model is not the model
+    assert nr.table_models([*canonical, "swr_allowed"]) == nr.MODELS
+
+
+def test_restriction_sums_carry_a_fourth_model():
+    table = _table()
+    table["swr_allowed"] = [-1.0, -1.0, -2.0, -1.0, -5.0]
+    table["swr_allowed_two_sided"] = table["swr_allowed"] + 10.0
+    sums = nr.restriction_sums(table, LABELS)
+    assert list(sums.columns) == ["n_bins", *nr.score_columns(nr.ALL_MODELS)]
+    assert sums.loc["inside", "swr_allowed"] == -3.0
+    assert sums.loc["outside", "swr_allowed_two_sided"] == 18.0
+    # the canonical table's sums are unchanged
+    assert list(nr.restriction_sums(_table(), LABELS).columns) == [
+        "n_bins",
+        *nr.SCORE_COLUMNS,
+    ]
+
+
+def test_the_checks_cover_the_scored_models():
+    record = _record() | {
+        "filter_identity_deviation_swr_allowed": 1e-7,
+        "causal_mass_deviation_swr_allowed": 1e-6,
+        "predicted_mass_deviation_swr_allowed": 1e-3,
+    }
+    assert nr.check_failures(record) == []
+    failures = nr.check_failures(record, nr.ALL_MODELS)
+    assert len(failures) == 1 and failures[0].startswith("swr_allowed: predictive")
+    folds = {"folds": [{"fold": 0, "converged": True, "em_iterations": 4, **record}]}
+    assert nr.fold_check_failures(folds, nr.ALL_MODELS)[0].startswith(
+        "fold 0: swr_allowed"
+    )
+
+
+def test_fold_fit_scores_scores_the_models_it_is_given(monkeypatch):
+    """With every model, the table has eight score columns in
+    ``score_columns`` order; ``full`` must be among the models."""
+    from types import SimpleNamespace
+
+    n = 500
+    folds = np.repeat(np.arange(5), n // 5)
+    seen = []
+
+    def fit(c, t, position, spikes, marks, training, missing):
+        return SimpleNamespace(), {
+            "discrete_transition": np.eye(4),
+            "initial_discrete": np.array([1.0, 0, 0, 0]),
+            "em_iterations": 3,
+            "converged": True,
+            "fit_s": 1.0,
+        }
+
+    def scores(detector, likelihood, in_swr, models, summary_bins, log):
+        seen.append(models)
+        out = {
+            c: np.full(n, i, dtype=np.float32)
+            for i, c in enumerate(nr.score_columns(models))
+        }
+        out |= {
+            c: np.zeros(n, dtype=np.float32)
+            for c in nr.STATE_PROBABILITY_COLUMNS.values()
+        }
+        out[nr.NONLOCAL_PLACE_BIN_COLUMN] = np.zeros(n, dtype=np.int32)
+        return out, {}
+
+    monkeypatch.setattr(nr, "fold_log_likelihood", lambda *args: None)
+    monkeypatch.setattr(nr, "model_scores", scores)
+    monkeypatch.setattr(nr, "check_place_grid", lambda detector, c: None)
+    canonical = SimpleNamespace(
+        discrete_state_transitions_=np.eye(4),
+        discrete_initial_conditions=np.array([1.0, 0, 0, 0]),
+    )
+    arguments = (
+        canonical,
+        np.arange(n) * 0.002,
+        np.zeros((n, 2)),
+        [],
+        [],
+        np.ones(n, dtype=bool),
+        np.zeros(n, dtype=bool),
+        np.zeros(n, dtype=bool),
+    )
+    table, _ = nr.fold_fit_scores(
+        *arguments,
+        folds=folds,
+        margin_bins=3,
+        fit=fit,
+        models=nr.ALL_MODELS,
+        log=lambda message: None,
+    )
+    assert seen == [nr.ALL_MODELS] * 5
+    columns = nr.score_columns(nr.ALL_MODELS)
+    assert list(table.columns[1:9]) == list(columns)
+    for i, column in enumerate(columns):
+        np.testing.assert_array_equal(table[column], i)
+    with pytest.raises(ValueError, match="full among them"):
+        nr.fold_fit_scores(
+            *arguments, folds=folds, margin_bins=3, fit=fit, models=("none", "swr")
+        )
+
+
+def _stored_fold(k, n_training_bins=10):
+    return {
+        "fold": k,
+        "n_training_bins": n_training_bins,
+        "discrete_transition": np.eye(4).tolist(),
+        "initial_discrete": [1.0, 0.0, 0.0, 0.0],
+        "em_iterations": 4,
+        "converged": True,
+        "marginal_log_likelihoods": [-2.0, -1.0],
+    }
+
+
+def test_the_stored_fit_takes_the_folds_in_order(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        nr,
+        "fold_detector_from_record",
+        lambda c, t, p, s, m, training, record: calls.append(record["fold"])
+        or (None, {}),
+    )
+    fit = nr.stored_fold_fit([_stored_fold(0), _stored_fold(1)])
+    fit(None, None, None, None, None, None, None)
+    fit(None, None, None, None, None, None, None)
+    assert calls == [0, 1]
+    with pytest.raises(ValueError, match="2 folds, no more"):
+        fit(None, None, None, None, None, None, None)
+    with pytest.raises(ValueError, match="not 0, 1"):
+        nr.stored_fold_fit([_stored_fold(1), _stored_fold(0)])
+
+
+def test_a_stored_fit_of_other_training_bins_is_refused():
+    with pytest.raises(ValueError, match="9 training bins, the stored fit 10"):
+        nr.fold_detector_from_record(
+            None, None, None, [], [], np.arange(12) < 9, _stored_fold(0)
+        )
+
+
+def test_stored_score_differences_by_hand():
+    """Two folds; the new run differs from the stored one by 0.1 in fold 0's
+    ``none`` and 0.3 in fold 1's ``full_two_sided``; the fourth model is not
+    compared (the stored run has none)."""
+    n = 6
+    stored = pd.DataFrame(
+        {
+            "time": np.arange(n) * 0.002,
+            "block": [0, 0, 0, 1, 1, 1],
+            "in_swr": [False, True, False, False, True, False],
+            **{c: np.zeros(n, dtype=np.float32) for c in nr.SCORE_COLUMNS},
+        }
+    )
+    new = stored.copy()
+    new.loc[1, "none"] = 0.1
+    new.loc[4, "full_two_sided"] = -0.3
+    new["swr_allowed"] = new["swr_allowed_two_sided"] = 5.0
+    out = nr.stored_score_differences(new, stored, nr.ALL_MODELS)
+    assert [o["fold"] for o in out] == [0, 1] and [o["n_bins"] for o in out] == [3, 3]
+    assert out[0]["none"] == pytest.approx(0.1) and out[0]["full_two_sided"] == 0
+    assert out[1]["full_two_sided"] == pytest.approx(0.3) and out[1]["none"] == 0
+    assert set(out[0]) == {"fold", "n_bins", *nr.SCORE_COLUMNS}
+    # only the models scored again
+    assert set(nr.stored_score_differences(new, stored, ["full"])[0]) == {
+        "fold",
+        "n_bins",
+        "full",
+        "full_two_sided",
+    }
+    moved = new.assign(block=[0, 0, 1, 1, 1, 1])
+    with pytest.raises(ValueError, match="'block'"):
+        nr.stored_score_differences(moved, stored, nr.MODELS)

@@ -34,6 +34,12 @@ Raw-data quality statistics for hippocampal clusterless decoding.
 
 `extract_discrete_transition_matrix`, `compute_hpc_raw_stats_single`, `check_transition_matrix_flags`, `apply_raw_stats_flags`
 
+### `src/continuum_swr_replay/analysis/decode_quality/nonlocal_probability.py`
+
+How the immobile time inside the well visits is spread over non-local probability.
+
+`probability_counts`, `animal_probability_distribution`, `probability_share_statistics`
+
 ### `src/continuum_swr_replay/analysis/decode_quality/posterior_analysis.py`
 
 Analysis of decoded posterior distributions.
@@ -44,7 +50,7 @@ Analysis of decoded posterior distributions.
 
 Quality metrics for hippocampal decoding analysis.
 
-`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
+`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `animal_distance_by_local_probability`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
 
 ### `src/continuum_swr_replay/analysis/detection/artifacts/detect.py`
 
@@ -86,7 +92,7 @@ The simulated run of Figure 1, decoded by the switching state-space model.
 
 The analyzed-time read point: a decode frame held to the one analyzed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `rest_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py`
 
@@ -188,7 +194,7 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Is the non-local activity of rest the activity of sharp-wave ripples? Three decoders that differ only in when the non-local states may be occupied, scored by how well each predicts each bin's spikes.
 
-`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `model_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `share_outside_swr`, `ratio_or_nan`
+`score_columns`, `table_models`, `table_score_columns`, `table_contrasts`, `bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `model_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_detector_from_record`, `stored_fold_fit`, `stored_score_differences`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `share_outside_swr`, `ratio_or_nan`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 
@@ -200,19 +206,19 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 The non-local restriction contrasts over all immobile time, and outside SWRs.
 
-`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `epoch_inside_swr_gains`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_subset_shares`, `outside_swr_gain_statistics`, `outside_swr_statistics`, `inside_swr_gain_statistics`, `immobile_gain_statistics`, `restriction_figure_statistics`
+`swr_margin_bands`, `place_sampling_bands`, `restriction_time_sums`, `epoch_outside_swr_gains`, `epoch_immobile_gains`, `epoch_inside_swr_gains`, `epoch_contrast_gains`, `contrast_gain_statistics`, `outside_swr_not_observed_counts`, `epoch_outside_swr_subset_gains`, `outside_swr_subset_statistics`, `outside_swr_subset_shares`, `outside_swr_gain_statistics`, `outside_swr_statistics`, `inside_swr_gain_statistics`, `immobile_gain_statistics`, `RestrictionFigureStatistics`, `restriction_figure_statistics`, `SwrAllowedStatistics`, `swr_allowed_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
 
 The non-local restriction models summed over event windows.
 
-`outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+`bin_fact_columns`, `outside_swr_bins`, `not_observed_outside_swr_bins`, `restriction_window_sums`, `window_bin_fact_sums`, `window_table`, `outside_swr_window_counts`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/shared_content.py`
 
 Shared content: during an event, do the tetrodes point to the same remote place?
 
-`spread_bins`, `agreement_by_spread_statistics`
+`width_bins`, `width_matched`, `agreement_by_width_statistics`, `SharedContentStatistics`, `shared_content_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
@@ -224,7 +230,7 @@ Spike evidence of non-local events: does the prior-excluded spike likelihood fav
 
 Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode left out of the decoder better than local coding does?
 
-`fold_blocks`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
+`fold_blocks`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `hpd_lengths`, `rate_terms`, `spike_information`, `null_donors`, `null_pairs`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `require_extra_columns`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
@@ -236,7 +242,7 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `peak_power_densities`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_along_arms.py`
 
@@ -250,6 +256,12 @@ Where non-local content sits: each content time bin's track distance to the anim
 
 `well_positions`, `content_distances`
 
+### `src/continuum_swr_replay/analysis/event_properties/content_place_rate.py`
+
+How much the tetrodes fire, in the encoding model, at an event's decoded place.
+
+`real_places`, `place_ranks`, `nearest_places`, `epoch_place_rates`, `low_rate_events`, `low_rate_share_statistics`, `rank_tenth_shares`
+
 ### `src/continuum_swr_replay/analysis/event_properties/event_analysis.py`
 
 Analysis functions for manipulating and characterizing detected events.
@@ -260,7 +272,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -268,17 +280,29 @@ Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and it
 
 `band_power`, `stretch_band_power`, `recorded_mask`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `matched_level`, `epoch_gamma`
 
+### `src/continuum_swr_replay/analysis/event_properties/low_rate_places.py`
+
+The held-out tetrode evidence of events decoded at low-rate places, and the place information of the scored spikes against the events' controls.
+
+`place_groups`, `events_outside_low_rate`, `low_rate_split_statistics`, `event_minus_control`, `LowRateStatistics`, `low_rate_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_properties/nonlocal_by_signal.py`
 
 Where the non-local time sits in ripple power and in MUA, per time bin.
 
-`count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
+`signal_bin_index`, `count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
 Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
 `duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
+
+### `src/continuum_swr_replay/analysis/event_properties/resolved_content.py`
+
+The share of events with no SWR among the events whose content is resolved.
+
+`event_widths`, `resolved_share_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/rule_sweep.py`
 
@@ -292,11 +316,17 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 `start_and_rest_theta`
 
+### `src/continuum_swr_replay/analysis/event_properties/state_by_signal.py`
+
+Ripple power and MUA of confident Local time against confident non-local time.
+
+`state_classes`, `state_signal_counts`, `state_distribution`, `detection_level_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_properties/triggered_analysis.py`
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`, `triggering_events_in`, `window_quartiles`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `animal_quartiles`, `animal_balanced_quartiles`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -698,6 +728,12 @@ Measure each analyzed epoch's decoder quality: Local-state error, state fraction
 
 `measure_epoch`, `main`
 
+### `scripts/decoding/measure_nonlocal_probability.py`
+
+Count each epoch's immobile time bins inside the well visits by non-local probability.
+
+`measure`, `main`
+
 ### `scripts/decoding/run_decoding_bandit.py`
 
 Main script for running continuum neural decoding on spatial bandit task data.
@@ -1040,7 +1076,7 @@ Does each detector's content reproduce in cells it never saw?
 
 What the per-event runners share: their arguments, the canonical event table, their input records, an epoch's decode inputs, the CPU and GPU worker pools, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `file_input`, `trials_input`, `run_input`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `add_bin_facts_dir_argument`, `bin_facts_run_dir`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
+`event_table_path`, `file_input`, `trials_input`, `run_input`, `restriction_bin_columns`, `participation_input`, `decode_time`, `add_run_arguments`, `select_epochs`, `add_cpu_arguments`, `cpu_pool`, `add_restriction_dir_argument`, `restriction_run_dir`, `add_bin_facts_dir_argument`, `bin_facts_run_dir`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -1082,7 +1118,7 @@ Spike likelihood at decoded and actual positions, for every canonical non-local 
 
 Per-bin scores of the three non-local restriction models on every analyzed epoch.
 
-`fit_settings`, `run_epoch`, `main`
+`fit_settings`, `current_epoch_inputs`, `stored_record`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/score_tetrode_holdout.py`
 
@@ -1108,6 +1144,12 @@ Summarize the held-out state calibration over the immobile windows inside the we
 
 `epoch_windows`, `main`
 
+### `scripts/event_properties/_epoch_counts.py`
+
+The skeleton the per-epoch counts runners share.
+
+`run`
+
 ### `scripts/event_properties/bootstrap_event_properties.py`
 
 Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
@@ -1126,6 +1168,12 @@ Place every event time bin's content on its arm of the track.
 
 `measure_epoch`, `main`
 
+### `scripts/event_properties/measure_content_place_rate.py`
+
+The rank of the tetrodes' summed rate at each non-local event's decoded place.
+
+`run_epoch`, `main`
+
 ### `scripts/event_properties/measure_event_gamma.py`
 
 Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
@@ -1142,13 +1190,19 @@ Measure each event's start distance and the theta-like share of duration-matched
 
 Count each epoch's immobile time bins by ripple power, by MUA and by non-local probability.
 
-`main`
+`measure`, `main`
 
 ### `scripts/event_properties/measure_ripple_class_structure.py`
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
 `out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
+
+### `scripts/event_properties/measure_state_by_signal.py`
+
+Count each epoch's immobile time bins by ripple power, by MUA and by decoder state.
+
+`measure`, `main`
 
 ### `scripts/event_properties/sweep_event_rule.py`
 
