@@ -758,6 +758,12 @@ Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
 `contfrag_detector_kwargs`, `run_decode`, `main`
 
+### `scripts/decoding/store_example_session.py`
+
+Store the recording of one epoch that a figure draws beside its decode.
+
+`session_tables`, `main`
+
 ### `scripts/detection/run_artifact_detection.py`
 
 Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.

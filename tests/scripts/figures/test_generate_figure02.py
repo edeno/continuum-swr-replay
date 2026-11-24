@@ -1144,3 +1144,26 @@ def test_a_participation_run_the_summary_marks_pending_is_refused(
     assert str(refused.value).endswith(
         "Rerun scripts/event_evidence/measure_event_participation.py."
     )
+
+
+def test_a_stored_session_that_is_not_current_refuses_panel_a(figure02, monkeypatch):
+    """Panels a and b read the stored example session; one that is not current
+    is refused as panel a, naming the runner."""
+    epoch = "wilbur20210329_02_r1_HPC"
+    monkeypatch.setattr(
+        figure02,
+        "read_manifest",
+        lambda run: {"epochs": {epoch: {"decode": {"sha256": "d" * 64}}}},
+    )
+
+    def stale(folder, epoch_id, decode_sha256):
+        assert (folder.name, epoch_id, decode_sha256) == (epoch, epoch, "d" * 64)
+        raise ValueError("it was made from another decode frame")
+
+    monkeypatch.setattr(figure02, "read_example_session", stale)
+    with pytest.raises(ValueError) as refused:
+        figure02.read_session("wilbur20210329_.nwb", "02_r1")
+    assert str(refused.value) == (
+        f"Figure 2: panel {figure02.LETTERS['overview']} is not drawn: it was made "
+        "from another decode frame. Rerun scripts/decoding/store_example_session.py."
+    )

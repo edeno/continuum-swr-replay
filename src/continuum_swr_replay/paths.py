@@ -153,6 +153,9 @@ STATE_BY_SIGNAL_DIR = "state_by_signal"
 """Each epoch's immobile time bins inside the well visits by ripple power and
 by MUA and by decoder state class
 (``scripts/event_properties/measure_state_by_signal.py``)."""
+EXAMPLE_SESSION_DIR = "example_session"
+"""The recording of a session a figure draws whole, beside its decode: one
+folder per epoch, ``<epoch_id>/`` (``scripts/decoding/store_example_session.py``)."""
 EVENT_TRIGGER_WINDOWS_DIR = "event_trigger_windows"
 """Each epoch's windows of the per-time-bin signals around its non-local events'
 starts and its No-Spike periods' starts, Figure 2g's and its supplement's
