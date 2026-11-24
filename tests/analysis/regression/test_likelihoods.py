@@ -32,17 +32,11 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
 from continuum_swr_replay.analysis.regression.newton import penalized_newton
 from continuum_swr_replay.analysis.regression.padding import pad_values
 
-from .conftest import family_kernel
+from .conftest import family_kernel, numeric_gradient, numeric_hessian, relative_error
 
 TOLERANCE = 1e-6
 N_ROWS = 14
 N_COLUMNS = 3
-
-
-def _relative_error(analytic: np.ndarray, numeric: np.ndarray) -> float:
-    """``||analytic - numeric|| / ||numeric||``; zero when both are zero."""
-    gap = float(np.linalg.norm(np.asarray(analytic) - np.asarray(numeric)))
-    return gap / float(np.linalg.norm(numeric)) if gap > 0 else 0.0
 
 
 def _case(name: str):
@@ -99,12 +93,8 @@ def test_derivatives_match_finite_differences(name: str) -> None:
         return family_kernel(lik, "d2information", X, e, y, aux, d, d_)
 
     # The score: the gradient of the log-likelihood in eta.
-    h = 1e-5
-    eye = np.eye(N_ROWS)
-    numeric_score = np.array(
-        [(loglik(eta + h * e) - loglik(eta - h * e)) / (2 * h) for e in eye]
-    )
-    assert _relative_error(score(eta), numeric_score) < TOLERANCE
+    numeric_score = numeric_gradient(loglik, eta, 1e-5)
+    assert relative_error(score(eta), numeric_score) < TOLERANCE
 
     # The information: minus the beta-derivative of X' score(X beta).
     beta = np.linalg.lstsq(X, eta, rcond=None)[0]
@@ -113,27 +103,21 @@ def test_derivatives_match_finite_differences(name: str) -> None:
     def gradient(b: np.ndarray) -> np.ndarray:
         return X.T @ score(X @ b)
 
-    h = 1e-5
-    numeric_information = -np.column_stack(
-        [
-            (gradient(beta + h * e) - gradient(beta - h * e)) / (2 * h)
-            for e in np.eye(N_COLUMNS)
-        ]
-    )
+    numeric_information = -np.column_stack(numeric_gradient(gradient, beta, 1e-5))
     assert information(eta).shape == (N_COLUMNS, N_COLUMNS)
-    assert _relative_error(information(eta), numeric_information) < TOLERANCE
+    assert relative_error(information(eta), numeric_information) < TOLERANCE
 
     # dinformation: the derivative of the information along d1.
     h = 1e-5
     numeric_d = (information(eta + h * d1) - information(eta - h * d1)) / (2 * h)
-    assert _relative_error(dinformation(eta, d1), numeric_d) < TOLERANCE
+    assert relative_error(dinformation(eta, d1), numeric_d) < TOLERANCE
 
     # d2information: the derivative of dinformation(d1) along d2.
     numeric_d2 = (dinformation(eta + h * d2, d1) - dinformation(eta - h * d2, d1)) / (
         2 * h
     )
     analytic_d2 = d2information(eta, d1, d2)
-    assert _relative_error(analytic_d2, numeric_d2) < TOLERANCE
+    assert relative_error(analytic_d2, numeric_d2) < TOLERANCE
     # Symmetric in its two directions.
     assert np.allclose(analytic_d2, d2information(eta, d2, d1))
 
@@ -235,29 +219,13 @@ def test_softmax_information_is_minus_the_hessian_of_loglik() -> None:
     log-likelihood."""
     lik, X, y, groups, eta = _case("softmax_counts")
     beta = np.linalg.lstsq(X, eta, rcond=None)[0]
-    h = 1e-4
-    eye = np.eye(N_COLUMNS)
 
     def loglik(b: np.ndarray) -> float:
         return family_kernel(lik, "loglik", None, X @ b, y, groups)
 
-    hessian = np.array(
-        [
-            [
-                (
-                    loglik(beta + h * (ei + ej))
-                    - loglik(beta + h * (ei - ej))
-                    - loglik(beta - h * (ei - ej))
-                    + loglik(beta - h * (ei + ej))
-                )
-                / (4 * h * h)
-                for ej in eye
-            ]
-            for ei in eye
-        ]
-    )
+    hessian = numeric_hessian(loglik, beta, 1e-4)
     information = family_kernel(lik, "information", X, X @ beta, y, groups)
-    assert _relative_error(information, -hessian) < 1e-5
+    assert relative_error(information, -hessian) < 1e-5
 
 
 def test_softmax_rejects_unsorted_groups() -> None:

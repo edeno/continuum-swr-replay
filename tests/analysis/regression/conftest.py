@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.regression.padding import pad_values
+from continuum_swr_replay.analysis.regression.reml import PenaltyBlock
 from continuum_swr_replay.analysis.regression.runtime import float64_kernel, in_float64
 from continuum_swr_replay.analysis.regression.terms import Category
 from scripts.checks.compare_regression_to_mgcv import bins_of
@@ -28,6 +29,69 @@ N_LAGS = 10
 ROLES = ("current", "previous", "other", "trunk")
 #: The content rows' role category, the "other" leaf arm its reference.
 ROLE = Category("role", ROLES, reference="other", penalty="none")
+
+
+def relative_error(analytic: np.ndarray, numeric: np.ndarray) -> float:
+    """``||analytic - numeric|| / ||numeric||``; zero when both are zero."""
+    gap = float(np.linalg.norm(np.asarray(analytic) - np.asarray(numeric)))
+    return gap / float(np.linalg.norm(numeric)) if gap > 0 else 0.0
+
+
+def numeric_gradient(f, point: np.ndarray, h: float) -> np.ndarray:
+    """Central differences of ``f`` at ``point`` with step ``h``, one per
+    coordinate of ``point`` (each the shape of ``f``'s value)."""
+    unit = np.eye(point.size)
+    return np.array([(f(point + h * e) - f(point - h * e)) / (2 * h) for e in unit])
+
+
+def numeric_hessian(f, point: np.ndarray, h: float) -> np.ndarray:
+    """Central second differences of a scalar ``f`` at ``point`` with step
+    ``h``, shape ``(m, m)``."""
+    unit = np.eye(point.size)
+    return np.array(
+        [
+            [
+                (
+                    f(point + h * (a + c))
+                    - f(point + h * (a - c))
+                    - f(point - h * (a - c))
+                    + f(point - h * (a + c))
+                )
+                / (4 * h * h)
+                for c in unit
+            ]
+            for a in unit
+        ]
+    )
+
+
+def stack_smooths(*parts) -> tuple[np.ndarray, list[PenaltyBlock]]:
+    """A design of ``parts`` side by side, and a penalty block on each smooth.
+
+    Parameters
+    ----------
+    *parts : np.ndarray or tuple
+        A column, shape ``(n_rows,)``, or columns, shape ``(n_rows, k)``; or a
+        smooth, the pair ``(design, penalty)`` of a constrained P-spline.
+
+    Returns
+    -------
+    X : np.ndarray, shape (n_rows, p)
+    blocks : list of PenaltyBlock
+        One per smooth, on its columns.
+    """
+    columns, blocks, start = [], [], 0
+    for part in parts:
+        if isinstance(part, tuple):
+            design, penalty = part
+            blocks.append(
+                PenaltyBlock(np.arange(start, start + design.shape[1]), penalty)
+            )
+        else:
+            design = np.asarray(part, dtype=float).reshape(np.shape(part)[0], -1)
+        columns.append(design)
+        start += design.shape[1]
+    return np.column_stack(columns), blocks
 
 
 @float64_kernel(static_argnames=("lik", "name"))
