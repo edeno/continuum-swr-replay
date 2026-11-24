@@ -10,9 +10,9 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | Module | What it holds |
 | --- | --- |
 | `constants.py` | every numerical rule below; change a value only there |
-| `likelihoods.py` | the four likelihoods and their derivatives on the linear-predictor scale |
-| `newton.py` | the penalized Newton fit at fixed penalty strengths |
-| `reml.py` | the REML score with exact derivatives, pooled over sessions, and the penalty search |
+| `likelihoods.py` | the four likelihoods and their derivatives on the linear-predictor scale, as JAX kernels on padded rows |
+| `newton.py` | the penalized Newton fit at fixed penalty strengths: a host loop around a JAX iteration kernel |
+| `reml.py` | the REML score with exact derivatives, pooled over sessions, and the penalty search (the score at a fit, `A^-1` and the edf in JAX) |
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
 | `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
@@ -24,8 +24,8 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
 | `simulation.py` | the simulation engine: an outcome drawn from a planted truth on a model's own rows, fitted and reduced by the real code |
-| `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces (not used by the solver yet) |
-| `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows (not used by the solver yet) |
+| `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces |
+| `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows |
 
 The reduction of a per-session estimate to recording days and animals is in
 `analysis/shared_statistics.py`, beside the project's other statistics. The declared
@@ -781,8 +781,44 @@ set, since its interface takes rows, not a built design.
 
 ## Precision, devices, threads and padding
 
-The solver is being moved to JAX, one fitter for every model. These pieces are in place;
-the solver does not call them yet. The rules hold for the JAX code as it is added.
+The fit at fixed penalties runs in JAX, one fitter for every model: the likelihoods'
+kernels (`likelihoods.py`), the Newton iteration and the evaluation of the objective
+(`newton.py`), and REML's fixed-penalty summary and profiled Gaussian (`reml.py`). What is
+still NumPy: the design check, the columns running away, the penalty search and the
+refits, and REML's gradient and Hessian in the log penalties, which factor `A` with SciPy
+and read the information's derivatives from the likelihoods' JAX kernels through their
+public methods (they move to JAX next).
+
+**The kernels and the host loop.** Each family has JAX functions of the padded rows and
+their weights (`_jax_loglik`, `_jax_score`, `_jax_information`, `_jax_dinformation`,
+`_jax_d2information`, `_jax_weighted_design`). The public methods (`loglik`,
+`score_eta`, `information`, `dinformation`, `d2information`, `weighted_design`) take
+NumPy arrays, pad them and run one jitted kernel on those functions; a likelihood made for
+a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
+once and runs a host loop in Python and NumPy that holds every rule, status and count of
+"The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
+at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
+the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`). The
+loop is written for a batch of fits on one design (state arrays with a leading axis of
+fits, each rule a vectorized expression over it), and the kernels map over that axis
+(`jax.vmap`); a session is a batch of one. A family is a static argument of the kernels
+(two families are equal when they are of the same class). The rule constants
+(`MAX_STEP_HALVINGS`, `NEWTON_DECREMENT_TOL`, the step cap) are read on the host at each
+call and passed to the kernel as arguments, so a changed value takes effect in a kernel
+already compiled (`tests/analysis/regression/test_newton.py`). JAX's Cholesky gives NaN
+where SciPy raises, so `A` is "not positive definite" when `A` or its factor is not
+finite; on the CPU both call LAPACK's `potrf` (JAX 0.8.0 replaces the factor by NaN when
+`potrf` reports a failure, `jax/_src/lax/linalg.py`, `_cholesky_cpu_lowering`).
+`jax.scipy.linalg.cho_factor` reads one triangle, as SciPy's does.
+
+**How the log-likelihood is summed.** The last step of a fit is taken when `F` does not
+rise by more than `8 eps max(1, |F|)`, which only the rounding of `F` decides at the
+optimum. Written as two dot products (`y' log mu - 1' mu`, NumPy's form), XLA's sum of a
+Poisson session of 240 rows moved `F` by 2.0e-12 between two points 1e-15 apart in the
+decrement, above the allowance (1.3e-12), and the fit refused a last step NumPy took
+(`select.poisson_two_smooths`, a step count one lower). Each row's terms are therefore
+combined before one sum (`sum w (y log mu - mu)`; for the grouped softmax `y log p` per
+row): there the same two points differed by 0 to 1.1e-13.
 
 **Float64 for each call.** Every public entry that makes a JAX array or runs a kernel
 carries `runtime.in_float64`, which enters a fresh `jax.enable_x64(True)` for that call.
@@ -837,16 +873,32 @@ gradient and its information; with a zero design row it adds nothing to the grad
 the information even unweighted. Its terms are finite: an offset of minus infinity would
 make a zero weight give `0 * -inf = nan`. For the grouped softmax the padded rows form
 one group after the real ones, with a response total of 0, and the groups after it to the
-bucket have no rows. A kernel guards each group's `n_g log(sum exp)` term where `n_g = 0`,
-since a group with no rows gives `0 * -inf`. The padded and unpadded log-likelihood,
-gradient and information agree to 1e-12 of their largest entry for each family, against
-the NumPy likelihoods (`tests/analysis/regression/test_padding.py`).
+bucket have no rows. A group with no rows has `log(sum exp) = -inf`; the log-likelihood is
+summed by row (`y log p`), so no row reads that group and it adds 0 (a per-group sum would
+give `n_g log(sum exp) = 0 * -inf`). Every quantity that depends on the number of rows uses
+the real count: the Gaussian's normalizing constant and the profiled Gaussian's degrees of
+freedom. The padded and unpadded log-likelihood, gradient, information and its two
+directional derivatives agree to 1e-12 of their largest entry for each family, the kernels
+on the padded rows against the same kernels on the rows unpadded, with groups that have no
+rows, and so do the profiled Gaussian's scale and score
+(`tests/analysis/regression/test_padding.py`). The hand-written score, information and
+its directional derivatives equal JAX's automatic derivatives of the log-likelihood
+(`jax.grad`, `jax.hessian`, `jax.jvp`) to 1e-12 of their largest entry, at most 8.2e-16
+measured (`tests/analysis/regression/test_likelihoods.py`).
 
 **Compilations.** `runtime.COMPILE_LOG` counts each kernel's traces by input signature.
 JAX traces a jitted function once for each new signature and compiles each trace; a
 program found in the persistent compilation cache is still traced (measured). So the count
-is the number of programs a process needed, whatever the cache holds, and a test can bound
-it for a set of sessions.
+is the number of programs a process needed, whatever the cache holds: ten Poisson fits of
+ten row counts in two buckets trace each Newton kernel at most twice
+(`tests/analysis/regression/test_newton.py`).
+
+**Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
+so every module of the fitter that imports them (`sessions`, `calibration`, `record`,
+`terms`, `support`, `collinearity`, `simulation`) and the modules that import those (the
+rate model's `visit_rate`, `visit_rate_statistics` and `visit_rate_scenarios`). `folds`,
+`bands`, `contrasts`, `pspline`, `padding` and `constants` do not. Importing `sessions`
+took 1.6 s against 1.1 s before (three runs each, under load, 2026-11-23).
 
 ## Cost
 
@@ -863,3 +915,25 @@ of the design in that basis, and the covariance computed at each evaluation, add
 session's evaluation (40,000 rows, 53 columns, two smooths, one thread, warm start,
 median of 5; 2026-11-21) 18 ms to the score alone (54 to 72 ms) and 26 ms with the
 gradient and Hessian (165 to 191 ms).
+
+The fit at fixed penalties in JAX, against the NumPy solver before it, by
+`scripts/checks/time_regression_fitter.py` (one thread, pinned to one CPU, the median of
+5 calls after the first; every case under load, the 1-minute load average 37 to 70 on 96
+CPUs; 2026-11-23). NumPy at commit 7959aca7, JAX at 61e938c1:
+
+| Case | NumPy first (s) | NumPy median (s) | JAX first (s) | JAX median (s) | Peak RSS NumPy, JAX (MB) |
+|---|---|---|---|---|---|
+| fit_rate (37,000 x 76) | 0.236 | 0.239 | 2.395 | 0.472 | 332, 837 |
+| fit_content (400 events x 9) | 0.014 | 0.013 | 7.973 | 0.019 | 266, 801 |
+| fit_bernoulli (20,000 x 23) | 0.035 | 0.034 | 2.686 | 0.071 | 274, 807 |
+| fit_gaussian (20,000 x 23) | 0.027 | 0.028 | 3.264 | 0.053 | 274, 817 |
+| fit_sessions_30 | 8.86 | 8.75 | 24.5 | 14.2 | 1454, 1454 |
+| calibration_30 | 134 | 126 | 227 | 228 | 1454, 1454 |
+| pytest tests/analysis/regression, cold and warm cache | 161, 160 | | 807, 811 | | 1005, 2156 |
+
+The first call includes the compilations (a new process, an empty in-process cache). A fit
+of real size takes about twice the NumPy time, as the prototype did. Small fits take
+longer still: most of the suite's added time is `test_simulation.py::test_coverage_and_size`
+(2,000 penalty selections on about 100 summed cells, 452 s), where each call of a kernel
+costs about 0.5 ms whatever the rows (padding those cells to 128 rows instead of 4,096
+changed 20 of those selections from 3.3 s to 3.0 s, against 0.7 s in NumPy).
