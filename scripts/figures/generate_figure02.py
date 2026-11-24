@@ -1031,8 +1031,11 @@ def draw_overview(
     ax_pos, ax_lane, ax_rip, ax_st, ax_sp = (fig.add_subplot(rows[i]) for i in range(5))
     draw_posterior(ax_pos, data, results, env, sl, start, max_pos)
     strip = add_track_strip(ax_pos, data, max_pos)
-    # the top only: a 0 at the strip's foot would sit on the lanes' first name
-    strip.set_yticks([0, max_pos], ["", f"{max_pos:g}"])
+    # the range's ends anchored inward, so neither reaches past the axis onto
+    # the lanes' first name below or the panel above
+    bottom, top = strip.get_yticklabels()
+    bottom.set_va("bottom")
+    top.set_va("top")
     ax_pos.text(
         0.48, 0.45, "animal's position", transform=ax_pos.transAxes,
         color=ANIMAL_POS_COLOR, fontsize=SMALL_SIZE, ha="left", va="top",
