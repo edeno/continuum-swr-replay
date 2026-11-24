@@ -1586,6 +1586,24 @@ Model-free event-start rates on the three visit clocks, and how stops end.
 
 `visit_clock_rate_curves`, `stop_end_kind_counts`
 
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate.py`
+
+The visit rate model: event starts on the three visit clocks, models A and D.
+
+`CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `declared_contrasts`, `CohortRows`, `model_d_rows`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `calibrate_log_penalty`, `ThirdClockDecision`, `third_clock_decision`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_scenarios.py`
+
+Planted scenarios of the visit rate model, as pure functions of the rows.
+
+`interpolated_curve`, `PlantedClocks`, `Planted`, `Projection`, `poisson_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `drop_before_small_movements`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
+
+The estimands of the visit rate model, per session and over sessions.
+
+`session_estimands`, `summarize_estimands`, `lag_curves`, `lag_curve_band`, `ThirdClockQ7a`, `third_clock_q7a`
+
 ### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
 
 The well-visit time-bin design of the event-rate models.
