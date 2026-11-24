@@ -862,9 +862,9 @@ and `Processed-Data/event_nonlocal_restriction_swr_allowed_windows/`, were made 
 | `tetrode_holdout.require_extra_columns`, `EXTRA_COLUMNS` (removed) | `tetrode_holdout.require_run_columns`, `RUN_COLUMNS` |
 | `reported.events.require_trial_folds`, `require_tetrode_holdout_folds`, `read_tetrode_holdout` | `analysis.event_evidence.heldout_runs` |
 
-## The restriction run is one run, 2026-11-23
+## The restriction run is one run, 2026-11-24
 
-The restriction run in `Processed-Data/event_nonlocal_restriction/` is, since 2026-11-23,
+The restriction run in `Processed-Data/event_nonlocal_restriction/` is, since 2026-11-24,
 the run that scores all four decoders (local-only, SWR-only, full and SWR-allowed). It was
 made with `score_nonlocal_restriction.py --from-stored-fit` from the fold-fit run of the
 three decoders: each fold's decoder rebuilt from that run's records, no EM. Its header
