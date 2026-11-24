@@ -114,12 +114,11 @@ from continuum_swr_replay.reported.events import (
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
     check_placement,
-    drawn_extent,
-    letter_panel,
     set_publication_style,
 )
 
@@ -547,34 +546,6 @@ LETTER_ROWS = ("abcd", "ef")
 LETTER_COLUMNS = ("ae", "b", "cf", "d")
 
 
-def letter_positions(fig, panels: dict[str, list]) -> dict[str, tuple[float, float]]:
-    """Each panel letter's top left corner, in figure fractions.
-
-    The letters of a row sit at one height, just above the highest of the row's
-    drawn tops; the letters of a column sit at one left edge, the leftmost of
-    the column's drawn extents (the rule of Figure 2's ``place_letters``). The
-    figure must already be drawn.
-
-    Parameters
-    ----------
-    fig : matplotlib.figure.Figure
-    panels : dict
-        Each letter's axes.
-    """
-    extents = {letter: drawn_extent(fig, axes) for letter, axes in panels.items()}
-    tops = {
-        letter: min(max(extents[other].y1 for other in row) + 0.02, 0.985)
-        for row in LETTER_ROWS
-        for letter in row
-    }
-    lefts = {
-        letter: max(min(extents[other].x0 for other in column) - 0.004, 0.0)
-        for column in LETTER_COLUMNS
-        for letter in column
-    }
-    return {letter: (lefts[letter], tops[letter]) for letter in panels}
-
-
 def generate_figure(inputs: dict):
     """Build Figure 3 from :func:`read_inputs`."""
     events = inputs["events"]
@@ -627,8 +598,10 @@ def generate_figure(inputs: dict):
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
         "e": [ax_e_frame, *ax_e], "f": [ax_f],
     }  # fmt: skip
-    for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
-        letter_panel(fig, letter, left, top)
+    place_letters(
+        fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS, above=0.02,
+        left_of=0.004, ceiling=0.985,
+    )  # fmt: skip
     check_placement(fig, panels_by_letter)
     return fig
 

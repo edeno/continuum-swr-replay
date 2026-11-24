@@ -286,7 +286,7 @@ import argparse
 import logging
 import string
 import warnings
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -426,14 +426,18 @@ from continuum_swr_replay.visualization.palettes import (
     COLORS,
     readable_text_color,
 )
+from continuum_swr_replay.visualization.panel_layout import (
+    fit_panel,
+    letter_layout,
+    panel_spans,
+    place_letters,
+)
 from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     STATE_COLORS,
     check_journal_limits,
     check_placement,
-    drawn_extent,
-    letter_panel,
     set_publication_style,
 )
 
@@ -519,68 +523,56 @@ the next row's letters."""
 SERIES_START = 1.3
 """The x position of a series' first part, after the "Outside SWRs" column at 0;
 the parts are 1 apart."""
+COLUMNS = {"a": -0.0036, "b": 0.322, "c": 0.570, "d": 0.774}
+"""Where the drawings of the panels of each letter column start (figure width;
+convention 10), named for the first row's panel that starts there: the rows'
+first panels (at the figure's edge: it is saved cropped to its ink), then
+three columns set by the first row's panels b, c and d."""
 LAYOUT = (
     (
         (0.861, 0.950),
         (
-            ("state_calibration", 0.09, 0.145),
-            ("no_spike_mua", 0.375, 0.17),
-            ("nonlocal_probability", 0.625, 0.13),
-            ("decoded_distance", 0.845, 0.145),
+            ("state_calibration", "a", 0.2746),
+            ("no_spike_mua", "b", 0.545),
+            ("nonlocal_probability", "c", 0.7585),
+            ("decoded_distance", "d", 0.9935),
         ),
     ),
     (
         (0.634, 0.759),
         (
-            ("rule_sweep", 0.085, 0.445),
-            ("boundary_timing", 0.652, 0.328),
+            ("rule_sweep", "a", 0.53),
+            ("boundary_timing", "c", 0.9871),
         ),
     ),
     (
         (0.399, 0.509),
         (
-            ("nonlocal_mua", 0.075, 0.215),
-            ("left_out_split", 0.39, 0.155),
-            ("outside_distance", 0.662, 0.318),
+            ("nonlocal_mua", "a", 0.2971),
+            ("left_out_split", "b", 0.545),
+            ("outside_distance", "c", 0.98),
         ),
     ),
     (
         (0.230, 0.297),
         (
-            ("event_traces", 0.085, 0.58),
-            ("hpd", 0.823, 0.162),
+            ("event_traces", "a", 0.7226),
+            ("hpd", "d", 0.9878),
         ),
     ),
     (
         (0.054, 0.127),
-        (("four_decoders", 0.11, 0.87),),
+        (("four_decoders", "a", 0.98),),
     ),
 )
 """The figure's rows, top to bottom: each row's frames' bottom and top (figure
-height), then its panels left to right, each with its frame's left edge and
-width (figure width). Read in this order the panels are in the order the text
-cites them, so their letters follow from it. A panel of :data:`LETTER_COLUMNS`
-keeps its frame's right edge; its left edge is then set so that its drawing
-starts at its column's (:func:`align_columns`)."""
+height), then its panels left to right, each with the column where its drawing
+starts (:data:`COLUMNS`) and where it ends (figure width), as
+``panel_layout.panel_spans`` reads them. Read in this order the panels are in
+the order the text cites them, so their letters follow from it."""
 PANELS = tuple(panel for _, row in LAYOUT for panel, _, _ in row)
 """The panels in the order the text cites them."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
-ROWS = tuple((span, tuple(panel for panel, _, _ in row)) for span, row in LAYOUT)
-"""Each row's frames' bottom and top and its panels, left to right."""
-FRAMES = {panel: (left, width) for _, row in LAYOUT for panel, left, width in row}
-"""Each panel's frame's left edge and width (figure width)."""
-LETTER_COLUMNS = (
-    (None, tuple(row[0][0] for _, row in LAYOUT)),
-    (0.322, ("no_spike_mua", "left_out_split")),
-    (0.570, ("nonlocal_probability", "boundary_timing", "outside_distance")),
-    (0.774, ("decoded_distance", "hpd")),
-)
-"""The panels whose letters share a left edge (convention 10), with where their
-drawing starts (figure width; ``None``: at the leftmost of the column's
-panels): the rows' first panels, then three columns set by the first row's
-panels b, c and d."""
-ALIGN_PASSES = 3
-"""The passes of :func:`align_columns`."""
 LETTER_HEIGHT = 0.0268
 """A panel letter's height (figure height): the letters' tops sit this far
 above the highest drawn top of their row."""
@@ -1396,8 +1388,8 @@ PANEL_GRIDS = {
 """The panels drawn on several axes in their frame: rows and columns."""
 PANEL_ROW_SHARES = {"rule_sweep": (2.2, 1), "nonlocal_mua": (1.2, 1)}
 """The heights of a stacked panel's rows, as shares (equal when not named)."""
-GRID_GAP = (0.1, 0.1)
-"""The gap between a panel's axes, as a share of its frame's height and width."""
+ROW_GAP = 0.1
+"""The gap between a stacked panel's rows, as a share of its frame's height."""
 PANEL_COLUMN_SHARES = {
     "boundary_timing": (1.15, 1.0),
     "four_decoders": (0.7, 1.6, 0.35),
@@ -1405,12 +1397,13 @@ PANEL_COLUMN_SHARES = {
 """The widths of a panel's columns, as shares (equal when not named): the
 timing panel's drawing and bars, and the fourth-decoder panel's three axes."""
 PANEL_COLUMN_GAPS = {
-    "boundary_timing": 0.03,
-    "event_traces": 0.12,
-    "four_decoders": 0.16,
+    "rule_sweep": 0.375,
+    "boundary_timing": 0.0619,
+    "event_traces": 0.75,
+    "four_decoders": 0.7059,
 }
-"""A panel's gap between its axes' columns, as a share of its frame's width,
-where :data:`GRID_GAP`'s is not the one wanted."""
+"""The gap between a panel's columns of axes, as a share of their mean width
+(``panel_layout.fit_panel``)."""
 
 
 def _n_axes(panel: str) -> int:
@@ -1425,63 +1418,48 @@ def panel_axes(fig: Figure, panel: str) -> list[Axes]:
     return fig.axes[start : start + _n_axes(panel)]
 
 
-def align_columns(fig: Figure, axes: Mapping[str, Sequence[Axes]]) -> None:
-    """Start each panel of a letter column (:data:`LETTER_COLUMNS`) at the
-    column's left edge: the panel's axes are scaled sideways about its frame's
-    right edge until what it draws (the y label and tick labels included)
-    starts there, so that the panels of a column, and their letters, line up."""
-    for target, column in LETTER_COLUMNS:
-        starts = {panel: drawn_extent(fig, axes[panel]).x0 for panel in column}
-        edge = min(starts.values()) if target is None else target
-        for panel in column:
-            boxes = [ax.get_position() for ax in axes[panel]]
-            right = max(box.x1 for box in boxes)
-            left = min(box.x0 for box in boxes)
-            scale = (right - left + starts[panel] - edge) / (right - left)
-            for ax, box in zip(axes[panel], boxes, strict=True):
-                ax.set_position(
-                    (
-                        right - (right - box.x0) * scale,
-                        box.y0,
-                        box.width * scale,
-                        box.height,
-                    )
-                )
-
-
 def generate_figure(statistics: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
     order and laid out by :data:`LAYOUT`."""
-    spans = {panel: span for span, row in ROWS for panel in row}
+    heights = {panel: span for span, row in LAYOUT for panel, _, _ in row}
+    spans = panel_spans([row for _, row in LAYOUT], COLUMNS)
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     axes = {}
+    columns = {}
     for panel in PANELS:  # the axes in the panels' order (panel_axes)
-        (bottom, top), (left, width) = spans[panel], FRAMES[panel]
-        rows, columns = PANEL_GRIDS.get(panel, (1, 1))
+        (bottom, top), (left, right) = heights[panel], spans[panel]
+        rows, n_columns = PANEL_GRIDS.get(panel, (1, 1))
         shares = np.asarray(PANEL_ROW_SHARES.get(panel, (1,) * rows), dtype=float)
-        heights = (
-            (top - bottom) * (1 - GRID_GAP[0] * (rows - 1)) * shares / shares.sum()
+        frame_heights = (
+            (top - bottom) * (1 - ROW_GAP * (rows - 1)) * shares / shares.sum()
         )
         tops = (
             top
-            - np.concatenate([[0.0], np.cumsum(heights[:-1])])
-            - np.arange(rows) * GRID_GAP[0] * (top - bottom)
-        )
-        gap = PANEL_COLUMN_GAPS.get(panel, GRID_GAP[1])
-        column_shares = np.asarray(
-            PANEL_COLUMN_SHARES.get(panel, (1,) * columns), dtype=float
-        )
-        across = width * (1 - gap * (columns - 1)) * column_shares / column_shares.sum()
-        lefts = (
-            left
-            + np.concatenate([[0.0], np.cumsum(across[:-1])])
-            + np.arange(columns) * gap * width
+            - np.concatenate([[0.0], np.cumsum(frame_heights[:-1])])
+            - np.arange(rows) * ROW_GAP * (top - bottom)
         )
         axes[panel] = [
-            fig.add_axes((lefts[c], tops[r] - heights[r], across[c], heights[r]))
+            fig.add_axes(
+                (left, tops[r] - frame_heights[r], right - left, frame_heights[r])
+            )
             for r in range(rows)
-            for c in range(columns)
+            for _ in range(n_columns)
         ]
+        columns[panel] = [axes[panel][c::n_columns] for c in range(n_columns)]
+
+    def fit(panel: str) -> None:
+        fit_panel(
+            fig,
+            columns[panel],
+            *spans[panel],
+            weights=PANEL_COLUMN_SHARES.get(panel),
+            gap=PANEL_COLUMN_GAPS.get(panel, 0.0),
+        )
+
+    # placed once before they are drawn, so that a panel that places a text
+    # by its axes' positions sees their proportions, then again on what they draw
+    for panel in PANELS:
+        fit(panel)
     draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
     draw_event_traces(axes["event_traces"], statistics["event_traces"])
     draw_boundary_timing(*axes["boundary_timing"], statistics["timing"])
@@ -1500,25 +1478,20 @@ def generate_figure(statistics: dict) -> Figure:
     )
     draw_decoded_distance(axes["decoded_distance"][0], *statistics["distance"])
     draw_four_decoders(axes["four_decoders"], statistics["four_decoders"])
+    for panel in PANELS:
+        fit(panel)
     fig.draw_without_rendering()
-    # a few passes: a label set in its axes' coordinates moves as its axes widen
-    for _ in range(ALIGN_PASSES):
-        align_columns(fig, axes)
-        fig.draw_without_rendering()
-    # convention 10: a row's letters at one height, just above its highest
-    # panel; a column's letters at one left edge, its leftmost panel's
-    extent = {
-        panel: drawn_extent(fig, panel_list) for panel, panel_list in axes.items()
-    }
-    left = {panel: max(e.x0 - 0.004, 0.0) for panel, e in extent.items()}
-    for _, column in LETTER_COLUMNS:
-        edge = min(left[panel] for panel in column)
-        left.update(dict.fromkeys(column, edge))
-    for _, row in ROWS:
-        top = max(extent[panel].y1 for panel in row) + LETTER_HEIGHT
-        for panel in row:
-            letter_panel(fig, LETTERS[panel], left[panel], top)
-    check_placement(fig, {LETTERS[p]: panel_list for p, panel_list in axes.items()})
+    panels = {LETTERS[panel]: panel_list for panel, panel_list in axes.items()}
+    letter_rows, letter_columns = letter_layout([row for _, row in LAYOUT], LETTERS)
+    place_letters(
+        fig,
+        panels,
+        rows=letter_rows,
+        columns=list(letter_columns.values()),
+        above=LETTER_HEIGHT,
+        left_of=0.004,
+    )
+    check_placement(fig, panels)
     return fig
 
 
