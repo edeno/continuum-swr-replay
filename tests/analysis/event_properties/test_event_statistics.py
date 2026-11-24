@@ -1119,3 +1119,23 @@ def test_nonlocal_below_threshold_statistics_refuse_a_threshold_between_edges():
     counts = stats.animal_signal_counts(_epoch_power_counts())
     with pytest.raises(ValueError, match="not an edge"):
         stats.nonlocal_below_threshold_statistics(counts, threshold=3.0)
+
+
+def test_transport_speed_distribution_is_each_animals_percent_per_bin():
+    """Animal a's four no-SWR events at 10, 30, 30 and 2,000 cm/s and one
+    without a speed: of the four with one, 25 % in 0-25, 50 % in 25-50, and the
+    one beyond the last edge in no bin."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d",
+            "epoch": "e",
+            "is_swr": False,
+            "transport_slope_speed_cm_s": [10.0, 30.0, 30.0, 2000.0, np.nan],
+        }
+    )
+    table = stats.transport_speed_distribution(events)
+    assert set(table["group"]) == {"no SWR"}
+    percent = table.set_index("bin_low")["percent"]
+    assert percent[0.0] == 25.0 and percent[25.0] == 50.0
+    assert percent.sum() == 75.0

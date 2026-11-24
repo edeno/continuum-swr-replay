@@ -17,9 +17,13 @@ Each row asks one thing:
             alike); bars the animals' mean, dots the animals
             (``event_statistics.state_composition_statistics``).
         c — Spatial extent of the decoded content.
-        d — Replay speed (each event's median over its time bins), twice on
-            one axis: the distribution, and under it the share of events at
-            or below each speed.
+        d — Replay speed, twice on one axis: the distribution, and under it
+            the share of events at or below each speed. An event's speed is
+            the MAP line-fit speed: the slope, at least 0, of the track
+            distance from its first decoded position against time
+            (``event_speed.map_line_fit_speed``; the event-speed run,
+            ``scripts/event_properties/measure_event_speed.py``). A position
+            that stays put has a speed of 0, the first bin.
     Where on the track the content is
         e — Where each kind's content is: its content time per cm along every
             arm, drawn on the track once per kind, against what content spread
@@ -41,11 +45,14 @@ around the events are Figure 2's, and slow and fast gamma during them are a
 supplementary figure (``generate_supp_figure03.py``).
 
 b comes before c and d because the far mode of c and the fastest events of d
-(its end bin) are the events with Fragmented time. d's axis is linear: a decoded
-position that moves one place bin in one time bin has a speed of 1,000 cm/s,
-which the smoothing spreads over the bins around it, so the values an event's
-median takes below about 100 cm/s are the smoother's, and a log axis would give
-them two fifths of its length. The number of arms the decoded position touches is
+(its end bin) are the events with Fragmented time. d's speed is not the median
+of the smoothed MAP speed over the event's bins (``replay_speed_median_cm_s``
+of the event table): a position that moves one 2 cm place bin in one 2 ms time
+bin has a speed of 1,000 cm/s, which the smoothing spreads over the bins around
+it as 319, 232 and 89 cm/s, and an event's median took those values; on
+simulated replays it returned about 0 for ones drawn at 20 to 150 cm/s. The
+speed of the position distribution, the transport-slope speed, is the
+supplement's (``generate_supp_figure03.py``). The number of arms the decoded position touches is
 not drawn: it restates c in arms, and an arm counts when one time bin's position
 is on it. Its values stay in the events summary.
 
@@ -111,6 +118,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.reported.events import (
     content_along_arms_bins,
     default_inputs,
+    with_event_speed,
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -165,8 +173,8 @@ HISTOGRAMS = {
         np.linspace(0, 240, 41), {0: "0", 100: "100", 200: "200"},
     ),
     "speed": (
-        "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
-        np.arange(0, 1501, 100),
+        "map_line_fit_speed_cm_s", "Replay speed (cm/s)", 1.0,
+        np.arange(0, 1501, 50),
         {0: "0", 500: "500", 1000: "1000", 1500: "≥1500"},
     ),
 }  # fmt: skip
@@ -196,6 +204,7 @@ def read_inputs() -> dict:
             "distance_to_animal_cm",
         ],
     )
+    events, _ = with_event_speed(events, inputs.event_speed, n_epochs)
     density = content_density_along_arms(along, N_SEGMENTS)
     even = even_content(along, AT_WELL_CM)
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)

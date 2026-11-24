@@ -57,6 +57,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.runs.threads import pool_context
 
 CONTINUOUS_STATE = "Non-Local Continuous"
 
@@ -166,7 +167,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         folder = Path(args.output_dir)
     folder.mkdir(parents=True, exist_ok=True)
-    with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
+    with ProcessPoolExecutor(
+        max_workers=args.n_workers, mp_context=pool_context()
+    ) as pool:
         for measured in pool.map(measure_epoch, jobs):
             identifier = measured.epoch_id.iloc[0]
             tmp = folder / f"{identifier}.parquet.tmp"

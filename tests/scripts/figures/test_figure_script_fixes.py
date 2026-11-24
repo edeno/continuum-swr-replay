@@ -1376,7 +1376,7 @@ def _figure03_events(n: int = 400) -> pd.DataFrame:
             "is_swr": np.arange(n) % 2 == 0,
             "event_duration_s": np.r_[rng.uniform(0.02, 0.3, n - 2), 0.45, 0.6],
             "spatial_extent_cm": rng.uniform(0, 220, n),
-            "replay_speed_median_cm_s": np.r_[
+            "map_line_fit_speed_cm_s": np.r_[
                 np.zeros(4), rng.lognormal(6, 2, n - 4)
             ].clip(0, 9e4),
         }
@@ -1482,7 +1482,7 @@ def test_figure03_cumulative_is_the_share_of_events_at_or_below(offline):
     assert ax.get_xlim() == (edges[0], edges[-1])
 
     missing = events.assign(
-        replay_speed_median_cm_s=events[column].where(events.index > 0)
+        map_line_fit_speed_cm_s=events[column].where(events.index > 0)
     )
     with pytest.raises(ValueError, match="an event has no value"):
         figure03.draw_cumulative(ax, missing, "speed")
@@ -2079,8 +2079,10 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(
         figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
     )
-    # panel c's distribution is the analysis layer's, tested there
+    # panels c and d's distributions are the analysis layer's, tested there
     monkeypatch.setattr(figure, "content_distance_distribution", lambda events: None)
+    monkeypatch.setattr(figure, "with_event_speed", lambda events, *_: (events, []))
+    monkeypatch.setattr(figure, "transport_speed_distribution", lambda events: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
     with pytest.raises(ValueError, match=f"{folder}.* {note}"):
         figure.read_inputs()

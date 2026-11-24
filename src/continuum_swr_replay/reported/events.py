@@ -230,6 +230,7 @@ from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_RULE_SWEEP_DIR,
+    EVENT_SPEED_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EXPOSURE_IN_VISITS_DIR,
@@ -445,6 +446,7 @@ class EventsInputs:
     event_rule_sweep: Path
     state_calibration_in_visits: Path
     event_start_rest_theta: Path
+    event_speed: Path
     property_bootstrap: Path
     decoder_quality: Path
     event_participation: Path
@@ -480,6 +482,7 @@ def default_inputs() -> EventsInputs:
         state_calibration_in_visits=processed_data_dir()
         / STATE_CALIBRATION_IN_VISITS_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
+        event_speed=processed_data_dir() / EVENT_SPEED_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
@@ -5301,6 +5304,37 @@ def with_start_and_rest_theta(
     )
     if joined.n_bins.isna().any():
         raise ValueError("an event has no start-distance and rest-theta row")
+    return joined, paths
+
+
+EVENT_SPEED_COLUMNS = ("map_line_fit_speed_cm_s", "transport_slope_speed_cm_s")
+"""The speeds read from the event-speed output
+(``analysis/event_properties/event_speed.py``)."""
+
+
+def with_event_speed(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """``events`` with each one's :data:`EVENT_SPEED_COLUMNS`
+    (``Processed-Data/event_speed``), and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row
+        or no MAP line-fit speed (the transport-slope speed may be missing: an
+        event too short or too Fragmented has none).
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    speeds = pd.concat(
+        (pd.read_parquet(p, columns=["event_id", *EVENT_SPEED_COLUMNS]) for p in paths),
+        ignore_index=True,
+    )
+    joined = events.merge(speeds, on="event_id", how="left", validate="1:1")
+    if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
+        raise ValueError("an event has no MAP line-fit speed")
     return joined, paths
 
 

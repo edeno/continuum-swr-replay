@@ -1436,6 +1436,39 @@ def content_distance_distribution(
     return _class_distribution(events, DISTANCE_COLUMN, edges)
 
 
+TRANSPORT_SPEED_COLUMN = "transport_slope_speed_cm_s"
+"""Each event's transport-slope speed (``event_speed.transport_slope_speed``)."""
+
+TRANSPORT_SPEED_BIN_EDGES_CM_S = np.arange(0.0, 1001.0, 25.0)
+"""The speed bins of the transport-speed panel (cm/s); an event faster than the
+last edge is in no bin, so the percents of a class sum to less than 100."""
+
+
+def transport_speed_distribution(
+    events: pd.DataFrame, edges: np.ndarray = TRANSPORT_SPEED_BIN_EDGES_CM_S
+) -> pd.DataFrame:
+    """Each animal's distribution of the events' transport-slope speed
+    (:data:`TRANSPORT_SPEED_COLUMN`), by class, as :func:`hpd_distribution`
+    takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        :data:`TRANSPORT_SPEED_COLUMN` (an event without one is left out).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (cm/s).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent`` (of the animal's events of the class that
+        have a speed).
+    """
+    return _class_distribution(events, TRANSPORT_SPEED_COLUMN, edges)
+
+
 def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """The share of each class's events whose content lies in each distance
     band from the animal (:data:`DISTANCE_BANDS_CM`).

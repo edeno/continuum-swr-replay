@@ -132,10 +132,11 @@ FIGURES: dict[str, Figure] = {
         "abcdefghijkl",
     ),
     "S3": Figure(
-        "Slow and fast gamma during SWR and no-SWR events, and how far their "
-        "content lies from the animal",
+        "Slow and fast gamma during SWR and no-SWR events, how far their "
+        "content lies from the animal, and how fast their position distribution "
+        "moves",
         "scripts/figures/generate_supp_figure03.py",
-        "abc",
+        "abcd",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
