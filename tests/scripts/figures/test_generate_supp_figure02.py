@@ -907,29 +907,6 @@ def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     )
 
 
-def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):
-    """Panel l is refused on the same grounds as panel i, from its own
-    held-out event run (read by the same reader from its own folders)."""
-    stored = {
-        "table": _figure02_events().assign(event_id=range(8)),
-        "scores": pd.DataFrame({"event_id": [0]}),
-    }
-    _patch_reading(monkeypatch, stored, {})
-    current, stale = (
-        _HeldoutRestriction(),
-        _HeldoutRestriction(restriction_run="made from another restriction run"),
-    )
-    four_dir = figure.default_inputs().nonlocal_restriction_swr_allowed_heldout_events
-    monkeypatch.setattr(
-        figure,
-        "read_heldout_restriction",
-        lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
-    )
-    with pytest.raises(ValueError, match="panel l is not drawn") as refused:
-        figure.read_inputs()
-    assert "detect_heldout_events" in str(refused.value)
-
-
 def test_the_four_decoder_panel_draws_the_decoders_with_the_fourth(drawn):
     """Panel l: the SWR-only, SWR-allowed (open dots) and full decoders over
     the local-only decoder; at each time, the full minus the SWR-allowed

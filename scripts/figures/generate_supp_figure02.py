@@ -239,10 +239,9 @@ the order the text cites them, in five rows:
     l — Supports Figure 2k against a permissive comparator: a fourth decoder,
         SWR-allowed (every state inside SWRs, only the local states outside
         them; open dots, a variant of SWR-only), scored with the other three
-        in one pass under the stored fold fits
-        (``Processed-Data/event_nonlocal_restriction_swr_allowed``, from
-        ``scripts/event_evidence/score_nonlocal_restriction.py
-        --from-stored-fit``), drawn as Figure 2k's decoder comparisons are. First axis: the SWR-only,
+        in the restriction run
+        (``Processed-Data/event_nonlocal_restriction``), drawn as Figure 2k's
+        decoder comparisons are. First axis: the SWR-only,
         SWR-allowed and full decoders' gains over the local-only decoder per
         spike of all the immobile time inside a well visit. Second axis: the
         full minus the SWR-allowed decoder (filled) and the SWR-allowed minus
@@ -251,7 +250,7 @@ the order the text cites them, in five rows:
         the same states (their scores there differ by about 2e-5 nats per
         spike, through what each carries out of the SWRs), inside SWRs they
         differ only in whether the local states are allowed. Third axis: the full minus the SWR-allowed decoder outside
-        SWRs in the no-SWR events detected from that run's held-out decode.
+        SWRs in the no-SWR events detected from the run's held-out decode.
         Each a dot per animal and the animals' mean with its 95 % interval
         (``restriction_totals.swr_allowed_statistics``; the events summary's
         values tagged S2l).
@@ -267,9 +266,7 @@ was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
 or when the per-bin facts were not made from the current session cache. Its
 values are the events summary's ``restriction_outside_swr_*`` values. Panel l
-reads the held-out event run made from the run with the fourth decoder
-(``Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events``) by
-the same reader and refuses it on the same grounds. Panels f and k read the
+reads the same runs. Panels f and k read the
 canonical event table; a, c, e and g read
 their stored outputs, d the decoder-quality run's table
 (``Processed-Data/decoder_quality/calibration.parquet``) as the events summary
@@ -596,7 +593,6 @@ NO_SPIKE_WORKERS = 4
 """The processes that read the decode frames for the No-Spike panel by
 default: each holds one frame at a time."""
 REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
-REFUSED_FOUR = f"Figure 2's supplement: panel {LETTERS['four_decoders']} is not drawn"
 FOUR_DECODER_TIMES = {
     "immobile": "all",
     "inside_swr": "inside_swr",
@@ -647,8 +643,8 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         (i): ``outside_swr_subset_statistics`` of the margins over its time
         sums, indexed by subset, threshold, family and measure; ``hpd``
         (k): the selected events' ``hpd_distribution``;
-        ``four_decoders`` (l): ``swr_allowed_statistics`` over the held-out
-        event run made from the run with the fourth decoder.
+        ``four_decoders`` (l): ``swr_allowed_statistics`` over the same
+        held-out event run.
 
     Raises
     ------
@@ -670,13 +666,12 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
             rel(inputs.tetrode_holdout),
         )
     )
-    event_table_sha256 = sha256_file(inputs.event_table)
     heldout = read_heldout_restriction(
         inputs.nonlocal_restriction_heldout_events,
         inputs.nonlocal_restriction,
         inputs.bin_facts,
         epochs,
-        event_table_sha256,
+        sha256_file(inputs.event_table),
     )
     refusal = heldout_restriction_refusal(
         heldout, restriction_inputs_note(inputs.nonlocal_restriction, epochs)
@@ -684,20 +679,6 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     if refusal is not None:
         cause, rerun = refusal
         raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
-    # panel l: the run with the fourth decoder, read and refused as above
-    four = read_heldout_restriction(
-        inputs.nonlocal_restriction_swr_allowed_heldout_events,
-        inputs.nonlocal_restriction_swr_allowed,
-        inputs.bin_facts,
-        epochs,
-        event_table_sha256,
-    )
-    refusal = heldout_restriction_refusal(
-        four, restriction_inputs_note(inputs.nonlocal_restriction_swr_allowed, epochs)
-    )
-    if refusal is not None:
-        cause, rerun = refusal
-        raise ValueError(f"{REFUSED_FOUR}: {cause}. Rerun {rerun}.")
     return {
         "calibration": read_state_calibration(inputs.state_calibration_in_visits),
         "probability": read_nonlocal_probability(inputs.nonlocal_probability),
@@ -718,7 +699,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
             heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
         ).set_index(["subset", "threshold_s", "family", "measure"]),
         "four_decoders": swr_allowed_statistics(
-            four.events, four.time_sums, four.bin_s
+            heldout.events, heldout.time_sums, heldout.bin_s
         ),
         **read_frame_traces(events, workers),
     }
