@@ -22,7 +22,7 @@ decoded place. Each panel's question, and the analysis function it draws:
         ``event_statistics.reference_medians``).
     h — are the events population events? (``participation.participation_statistics``)
     i — where non-local time sits in ripple power
-        (``nonlocal_by_signal.animal_nonlocal_counts``,
+        (``nonlocal_by_signal.animal_nonlocal_shares``,
         ``state_by_signal.state_distribution``).
     j — do the spikes of a left-out tetrode point to the decoded place?
         (``tetrode_holdout.holdout_statistics``)
@@ -117,7 +117,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 )
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     DETECTION_LEVELS,
-    animal_nonlocal_counts,
+    animal_nonlocal_shares,
 )
 from continuum_swr_replay.analysis.event_properties.state_by_signal import (
     state_distribution,
@@ -436,7 +436,7 @@ def read_inputs(
         ``event_traces``, ``triggered_analysis.stored_triggered_curves`` of the
         stored windows of the selected events and ``reference_medians``;
         ``participation``, :func:`read_participation`;
-        ``nonlocal_ripple_power``, the counts by ripple power and the states by
+        ``nonlocal_ripple_power``, the shares by ripple power and the states by
         ripple power; ``left_out``, ``holdout_statistics`` of the two
         comparisons; ``decoder_comparison``, ``restriction_figure_statistics``.
 
@@ -518,7 +518,7 @@ def read_inputs(
         ),
         "participation": read_participation(inputs, epochs, events["event_id"]),
         "nonlocal_ripple_power": (
-            animal_nonlocal_counts(
+            animal_nonlocal_shares(
                 read_checked(inputs.nonlocal_by_signal, "counts by signal"),
                 "ripple_power",
             ),
@@ -1227,13 +1227,15 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     two rows of two strips (ripple and MUA above theta and speed).
 
     Every row is animal-balanced: the line is the mean over animals of each
-    animal's median over its events, the band the mean over animals of each
-    animal's quartiles (``triggered_analysis.animal_balanced_quartiles``), so
+    animal's median (the median over its epochs of each epoch's median over its
+    events), the band the same of the quartiles
+    (``triggered_analysis.animal_balanced_quartiles``), so
     the spread over events is seen, not only the center: ripple and MUA rise
     at the start, theta stays at
     its level between events, far below running, and the animal is still. The
-    dashed "between events" line is the epochs' median in immobile bins outside
-    every non-local, SWR and MUA event (``reference_medians``).
+    dashed "between events" line is each epoch's median in immobile bins
+    outside every non-local, SWR and MUA event, each animal's median over its
+    epochs, then the mean over animals (``reference_medians``).
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
     groups = [(key, *EVENT_KINDS[is_swr][::-1]) for key, is_swr in WINDOW_KINDS.items()]
@@ -1343,7 +1345,7 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
 
 
 def draw_share_by_power(
-    ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame, states: pd.DataFrame
+    ax_spread: Axes, ax_share: Axes, shares: pd.DataFrame, states: pd.DataFrame
 ) -> None:
     """Panel i: where confident Local and confident non-local time sit in
     ripple power (top) and the share of immobile bins decoded non-local at each
@@ -1354,15 +1356,15 @@ def draw_share_by_power(
     Parameters
     ----------
     ax_spread, ax_share : Axes
-    counts : pd.DataFrame
-        ``animal_signal_counts`` of the stored counts' ripple power.
+    shares : pd.DataFrame
+        ``animal_signal_shares`` of the stored counts' ripple power.
     states : pd.DataFrame
         ``state_by_signal.state_distribution`` of ripple power.
     """
     level = DETECTION_LEVELS["ripple_power"]
-    below = nonlocal_below_threshold_statistics(counts, level)
+    below = nonlocal_below_threshold_statistics(shares, level)
     draw_share_by_signal(
-        ax_spread, ax_share, counts, threshold=level,
+        ax_spread, ax_share, shares, threshold=level,
         threshold_label="SWR threshold", threshold_color=C_SWR,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "

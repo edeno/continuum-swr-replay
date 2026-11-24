@@ -1440,7 +1440,9 @@ def gamma_z_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 )
             )
@@ -1454,7 +1456,8 @@ def gamma_z_values(
                         levels.loc[(word, is_swr), regime],
                         "quantity",
                         "dec2",
-                        f"median over epochs of the epoch's z-scored {label} in "
+                        "mean over animals of each animal's median over its epochs "
+                        f"(those with such events) of the epoch's z-scored {label} in "
                         f"{words_of_regime} windows as long as its {name} events (the "
                         "median over the events of one window's mean each, averaged "
                         "over the draws)",
@@ -1504,7 +1507,8 @@ def _signal_values(
                 levels.loc[word, "running"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} while running",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} while running",
                 "z",
             ),
             make(
@@ -1512,7 +1516,8 @@ def _signal_values(
                 levels.loc[word, "rest"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} in quiet rest",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} in quiet rest",
                 "z",
             ),
         ]
@@ -1525,7 +1530,9 @@ def _signal_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 ),
                 make(
@@ -1555,7 +1562,9 @@ def _signal_values(
                         "fraction",
                         "pct",
                         f"share of immobile {name} non-local events whose theta power "
-                        "reaches their epoch's median running level",
+                        "reaches their epoch's median running level: each epoch's "
+                        "share, each animal's mean over its epochs, the mean over "
+                        "animals",
                     )
                 )
     return values
@@ -3746,13 +3755,14 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5: how much of the non-local time has ripple power below the
     Kay threshold (Figure 2i)?
 
-    Over the immobile time bins decoded non-local, each animal's bins pooled
-    over its epochs (``counts``: the stored per-epoch counts by signal and
-    non-local probability, ``nonlocal_by_signal.rest_signal_counts``).
+    Over the immobile time bins decoded non-local: each epoch's share, each
+    animal's mean over its epochs, the mean over animals (``counts``: the
+    stored per-epoch counts by signal and non-local probability,
+    ``nonlocal_by_signal.rest_signal_counts``).
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        nonlocal_by_signal.animal_nonlocal_counts(counts, "ripple_power"),
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "ripple_power"),
         KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
@@ -3764,15 +3774,17 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "pct",
             "share of the immobile time bins decoded non-local (non-local "
             f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
-            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
-            "animals of each animal's share of its bins",
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): each "
+            "epoch's share of its bins, each animal's mean over its epochs, the mean "
+            "over animals",
         ),
         make(
             f"{key}_animal_min",
             stats["fraction_animal_min"],
             "fraction",
             "pct",
-            "lowest per-animal share of non-local time bins below the Kay threshold",
+            "lowest per-animal share of non-local time bins below the Kay threshold "
+            "(the mean over its epochs)",
         ),
         make(
             f"{key}_animal_max",
@@ -3890,10 +3902,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     detection is independent of population bursts (the held-out tetrode values
     address whether the spikes point to the decoded place)."""
     make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
-    animals = nonlocal_by_signal.animal_nonlocal_counts(counts, "mua")
     level = nonlocal_by_signal.MUA_LEVEL_Z
-    above = event_statistics.nonlocal_share_above_statistics(animals, level)
-    below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
+    above = event_statistics.nonlocal_share_above_statistics(
+        nonlocal_by_signal.nonlocal_counts(counts, "mua"), level
+    )
+    below = event_statistics.nonlocal_below_threshold_statistics(
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "mua"), level
+    )
     nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
     level_words = (
         f"{level:g} z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded "
@@ -3921,12 +3936,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins with MUA at or above {level_words} "
-                f"that are decoded non-local ({nonlocal_}): mean over animals of each "
-                "animal's share of its bins. Nearly all time above the MUA level is "
+                f"that are decoded non-local ({nonlocal_}): each epoch's share of its "
+                "bins, each animal's mean over its epochs, the mean over animals. "
+                "Nearly all time above the MUA level is "
                 "decoded non-local: the decoder needs spikes, so this does not show "
                 "that non-local detection is independent of population bursts",
                 f"lowest per-animal share of the bins with MUA at or above {level:g} z "
-                "that are decoded non-local",
+                "that are decoded non-local (the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -3941,9 +3957,11 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
-                f"MUA is below {level_words}: mean over animals of each animal's share "
-                "of its bins. Most non-local time is below the MUA level",
-                f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+                f"MUA is below {level_words}: each epoch's share of its bins, each "
+                "animal's mean over its epochs, the mean over animals. Most non-local "
+                "time is below the MUA level",
+                f"lowest per-animal share of non-local time bins with MUA below {level:g} z "
+                "(the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",

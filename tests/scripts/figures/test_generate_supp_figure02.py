@@ -146,18 +146,18 @@ def _decoded_distance() -> tuple[pd.DataFrame, pd.DataFrame]:
     return animal_distance_by_local_probability(pd.DataFrame(rows))
 
 
-def _mua_counts() -> pd.DataFrame:
-    """``animal_signal_counts`` of two animals over the MUA bins: 20 bins in each,
+def _mua_shares() -> pd.DataFrame:
+    """``animal_signal_shares`` of two animals over the MUA bins: 20 bins in each,
     non-local in 2 below 2 z and 10 at or above."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        animal_signal_counts,
+        animal_signal_shares,
     )
     from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
         MUA_EDGES,
     )
 
     low, high = MUA_EDGES[:-1], MUA_EDGES[1:]
-    return animal_signal_counts(
+    return animal_signal_shares(
         pd.concat(
             pd.DataFrame(
                 {
@@ -230,7 +230,7 @@ def _statistics() -> dict:
         "decoded_distance": _decoded_distance(),
         "rule_sweep": _sweep(),
         "boundary_timing": _timing(),
-        "nonlocal_mua": (_mua_counts(), _mua_states()),
+        "nonlocal_mua": (_mua_shares(), _mua_states()),
         "left_out_split": {
             column: gain_statistics(*groups) for column, groups in GAIN_SPLIT.items()
         },
@@ -751,7 +751,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
             "event_traces": "traces",
         },
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
-        "read_mua_counts": lambda folder: "mua",
+        "read_mua_shares": lambda folder: "mua",
         "read_mua_states": lambda folder: "mua_states",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",

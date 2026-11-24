@@ -493,44 +493,60 @@ def test_triggering_events_in_keeps_the_frames_rows_of_the_selected_events():
     assert len(event_types[no_swr]) == 4  # the input is not changed
 
 
-def test_animal_quartiles_are_over_each_animals_events_at_each_lag():
-    """Animal a's five events, two lags: at the first lag 1..5 (quartiles 2,
-    3, 4); at the second one value missing, 10, 20, 30, 40 (17.5, 25, 32.5).
-    Animal b's one event is its own quartiles."""
+def _two_animal_windows() -> tuple[np.ndarray, list[str], list[str]]:
+    """Animal a: epoch e1 with five events, 1..5 at both lags, and epoch e2
+    with one event, 10 at the first lag and no value at the second. Animal b:
+    one epoch with two events, (0, 0) and (4, 8)."""
+    windows = np.array(
+        [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0],
+         [10.0, np.nan], [0.0, 0.0], [4.0, 8.0]]
+    )  # fmt: skip
+    animals = ["a"] * 6 + ["b"] * 2
+    epochs = ["e1"] * 5 + ["e2"] + ["e1"] * 2
+    return windows, animals, epochs
+
+
+def test_animal_quartiles_are_each_epochs_then_the_median_over_its_epochs():
+    """First lag: a's e1 has quartiles 2, 3, 4 and e2 10, so a's are the
+    medians of two epochs, 6, 6.5 and 7 (pooled over its six events they would
+    be 2.25, 3.5 and 4.75). Second lag: e2 has no value, so it is not one of
+    a's epochs there and a's quartiles are e1's, 2, 3, 4. b's one epoch of two
+    events: 1, 2, 3 and 2, 4, 6."""
     from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
         animal_quartiles,
     )
 
-    windows = np.array(
-        [[1.0, 10.0], [2.0, 20.0], [3.0, np.nan], [4.0, 30.0], [5.0, 40.0], [7.0, 8.0]]
-    )
-    quartiles = animal_quartiles(windows, ["a"] * 5 + ["b"])
-    np.testing.assert_allclose(quartiles["q25"]["a"], [2.0, 17.5])
-    np.testing.assert_allclose(quartiles["median"]["a"], [3.0, 25.0])
-    np.testing.assert_allclose(quartiles["q75"]["a"], [4.0, 32.5])
-    for label in ("q25", "median", "q75"):
-        np.testing.assert_allclose(quartiles[label]["b"], [7.0, 8.0])
+    quartiles = animal_quartiles(*_two_animal_windows())
+    assert list(quartiles["median"].columns) == ["a", "b"]
+    np.testing.assert_allclose(quartiles["q25"]["a"], [6.0, 2.0])
+    np.testing.assert_allclose(quartiles["median"]["a"], [6.5, 3.0])
+    np.testing.assert_allclose(quartiles["q75"]["a"], [7.0, 4.0])
+    np.testing.assert_allclose(quartiles["q25"]["b"], [1.0, 2.0])
+    np.testing.assert_allclose(quartiles["median"]["b"], [2.0, 4.0])
+    np.testing.assert_allclose(quartiles["q75"]["b"], [3.0, 6.0])
 
 
-def test_animal_balanced_quartiles_weight_every_animal_the_same():
-    """Animal a's four events of 1 and b's one event of 9: pooled, the median
-    would be 1; animal-balanced, every quartile is (1 + 9) / 2 = 5. Where only
-    b has a value, b's value alone."""
+def test_animal_balanced_quartiles_are_the_mean_over_animals():
+    """The animals' quartiles of the test above, averaged: (6 + 1) / 2, ...
+    Where only b has a value, b's value alone."""
     from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
         animal_balanced_quartiles,
     )
 
-    windows = np.array(
-        [[1.0, np.nan], [1.0, np.nan], [1.0, np.nan], [1.0, np.nan], [9.0, 3.0]]
+    quartiles = animal_balanced_quartiles(*_two_animal_windows())
+    np.testing.assert_allclose(quartiles["q25"], [3.5, 2.0])
+    np.testing.assert_allclose(quartiles["median"], [4.25, 3.5])
+    np.testing.assert_allclose(quartiles["q75"], [5.0, 5.0])
+    only_b = animal_balanced_quartiles(
+        np.array([[1.0, np.nan], [9.0, 3.0]]), ["a", "b"], ["e1", "e1"]
     )
-    quartiles = animal_balanced_quartiles(windows, ["a", "a", "a", "a", "b"])
-    for label in ("q25", "median", "q75"):
-        np.testing.assert_allclose(quartiles[label], [5.0, 3.0])
+    np.testing.assert_allclose(only_b["median"], [5.0, 3.0])
 
 
 def test_animal_window_medians_are_each_animals_median_over_its_events():
-    """Animal a's three events and b's one: a's median at each lag is the
-    middle of its three windows (a NaN left out), b's is its own window."""
+    """Animal a's events 1 and 2 of day 1 and event 1 of day 2, b's one: a's
+    median at each lag is the median of its two epochs' medians (day 1: 1.5,
+    and 5 with the NaN left out; day 2: 3 and 7), b's is its own window."""
     import xarray as xr
 
     from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
@@ -549,7 +565,7 @@ def test_animal_window_medians_are_each_animals_median_over_its_events():
     )
     medians = animal_window_medians(windows, "MUA_zscore")
     assert list(medians.columns) == ["a", "b"]
-    np.testing.assert_allclose(medians["a"], [2.0, 6.0])
+    np.testing.assert_allclose(medians["a"], [2.25, 6.0])
     np.testing.assert_allclose(medians["b"], [10.0, 20.0])
     np.testing.assert_allclose(medians.index, [-0.002, 0.0])
 
@@ -702,6 +718,45 @@ def test_the_stored_windows_give_figure_2gs_curves_and_the_supplements_traces():
     np.testing.assert_allclose(trace["median"], [3.0, 1.0, -1.0])
     # a's median over its epochs 0.5, b's 2 -> 1.25
     assert trace["level"] == pytest.approx(1.25)
+
+
+def test_the_stored_windows_are_reduced_epoch_by_epoch():
+    """a's no-SWR events at the first lag: 1 on day 1; 3, 7 and 9 on day 2.
+    Day 1's median is 1 and day 2's 7, so a's is 4 (pooled over its four
+    events it would be 5); with b's 5 the mean is 4.5. A No-Spike window of a
+    third day is one more of a's epochs."""
+    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
+
+    rows = _stored_rows()
+    a_two = (rows["animal"] == "a") & (rows["non_local_event"] == 2)
+    rows.loc[a_two, "session_date"] = 2
+    extra = rows[a_two & (rows["kind"] == "no_overlap")].copy()
+    rows = pd.concat(
+        [
+            rows,
+            extra.assign(non_local_event=4, **{"lag-001": 7.0}),
+            extra.assign(non_local_event=5, **{"lag-001": 9.0}),
+        ],
+        ignore_index=True,
+    )
+    traces = ta.stored_animal_window_medians(rows)
+    assert traces["no_overlap"]["MUA_zscore"]["a"].iloc[0] == pytest.approx(4.0)
+    curves = ta.stored_triggered_curves(rows)
+    # a 4, b 5
+    assert curves["MUA_zscore"]["no_overlap_median"][0] == pytest.approx(4.5)
+    no_spike = rows[rows["kind"] == ta.NO_SPIKE_KIND]
+    rows = pd.concat(
+        [
+            rows,
+            no_spike[no_spike["animal"] == "a"].assign(
+                session_date=3, **{"lag-001": 6.0}
+            ),
+        ],
+        ignore_index=True,
+    )
+    epochs = pd.DataFrame({"animal": ["a", "b"], "no_spike_level": [0.0, 0.0]})
+    # a: the median of its epochs' 2 and 6, 4; b: 4
+    assert ta.stored_no_spike_trace(rows, epochs)["median"][0] == pytest.approx(4.0)
 
 
 def test_the_stored_windows_of_the_selected_events_are_kept_with_every_period():
