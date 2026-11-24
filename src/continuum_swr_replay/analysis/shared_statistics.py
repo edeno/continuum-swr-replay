@@ -60,8 +60,6 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import t as student_t
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.tables.session_keys import FIT_BY_COLUMNS, FitBy
-
 MIN_SIGNED_RANK_DIFFERENCES = 6
 """The fewest non-zero differences a signed-rank p is computed for.
 
@@ -1241,8 +1239,14 @@ def estimand_summary(
     }
 
 
+#: The levels of a unit's key, by the unit of the fit (the key columns are
+#: ``tables.session_keys.FIT_BY_COLUMNS``; this module imports nothing from the
+#: package).
+_UNIT_KEY_LEVELS = {"session": 3, "day": 2, "animal": 1}
+
+
 def unit_summary(
-    values: pd.Series, fit_by: FitBy, *, n_draws: int, seed: int
+    values: pd.Series, fit_by: str, *, n_draws: int, seed: int
 ) -> dict[str, float | str]:
     """The summary of a scalar estimand over the units of a fit.
 
@@ -1268,6 +1272,7 @@ def unit_summary(
         (``tables.session_keys.FIT_BY_COLUMNS``). A value that is not finite is
         left out.
     fit_by : {"session", "day", "animal"}
+        A ``tables.session_keys.FitBy`` value.
     n_draws, seed : int
         The bootstrap's (not read at ``"animal"``, but returned).
 
@@ -1289,15 +1294,14 @@ def unit_summary(
         If ``fit_by`` is not a unit, the index does not have the unit's key
         levels, no unit has a finite value, or a unit has more than one value.
     """
-    if fit_by not in FIT_BY_COLUMNS:
+    if fit_by not in _UNIT_KEY_LEVELS:
         raise ValueError(
-            f"fit_by must be one of {list(FIT_BY_COLUMNS)}, not {fit_by!r}"
+            f"fit_by must be one of {list(_UNIT_KEY_LEVELS)}, not {fit_by!r}"
         )
-    columns = FIT_BY_COLUMNS[fit_by]
-    if values.index.nlevels != len(columns):
+    if values.index.nlevels != _UNIT_KEY_LEVELS[fit_by]:
         raise ValueError(
-            f"one value per {fit_by}: the index must have the levels {columns}, "
-            f"not {values.index.nlevels}"
+            f"one value per {fit_by}: the index must have "
+            f"{_UNIT_KEY_LEVELS[fit_by]} levels, not {values.index.nlevels}"
         )
     if values.index.duplicated().any():
         raise ValueError(f"a {fit_by} has more than one value")
