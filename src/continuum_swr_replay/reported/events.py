@@ -153,6 +153,10 @@ from continuum_swr_replay.analysis.event_evidence import (
     shared_content,
     tetrode_holdout,
 )
+from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
+    read_tetrode_holdout,
+    require_trial_folds,
+)
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     ALL_CONTRASTS,
     FAMILY_SUFFIX,
@@ -180,7 +184,6 @@ from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import TRIAL_DESIGN
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
@@ -550,27 +553,6 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     )
 
 
-def require_trial_folds(manifest: dict, what: str, rerun: str) -> None:
-    """Refuse a held-out run whose folds are not whole trials.
-
-    A held-out run records its fold design in its settings (``fold_design``).
-    A run of an older design (contiguous blocks of time, or no design recorded)
-    cannot give values that describe folds of whole trials.
-
-    Raises
-    ------
-    ValueError
-        If ``manifest``'s settings do not record ``"fold_design": "trials"``;
-        the message ends with ``rerun``, what to run instead.
-    """
-    design = manifest.get("settings", {}).get("fold_design")
-    if design != TRIAL_DESIGN:
-        raise ValueError(
-            f"{what} is not held out in folds of whole trials (its settings "
-            f"record fold_design {design!r}, not {TRIAL_DESIGN!r}). {rerun}"
-        )
-
-
 def require_fold_fit(manifest: dict, what: str) -> None:
     """Refuse a restriction run that is not the fold fit on folds of whole trials.
 
@@ -602,43 +584,6 @@ def require_fold_fit(manifest: dict, what: str) -> None:
             f"encodings. {rerun}"
         )
     require_trial_folds(manifest, what, rerun)
-
-
-def require_tetrode_holdout_folds(manifest: dict, what: str) -> None:
-    """Refuse a held-out tetrode run whose folds are not whole trials
-    (:func:`require_trial_folds`).
-
-    Raises
-    ------
-    ValueError
-        If ``manifest``'s settings do not record ``"fold_design": "trials"``.
-    """
-    require_trial_folds(
-        manifest,
-        what,
-        "Put the held-out tetrode run on folds of whole trials "
-        "(scripts/event_evidence/score_tetrode_holdout.py) in this folder, then "
-        "rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py on it.",
-    )
-
-
-def read_tetrode_holdout(
-    folder: Path,
-    epoch_ids: Iterable[str],
-    selected: object,
-) -> pd.DataFrame:
-    """The held-out tetrode run's per-event table over the selected events: the
-    run refused when its folds are not whole trials
-    (:func:`require_tetrode_holdout_folds`), read over ``epoch_ids``
-    (``read_complete_run``) and selected by ``cohort_selection.select_events_in``
-    with ``selected``; refused without every column of the run
-    (``tetrode_holdout.require_run_columns``)."""
-    require_tetrode_holdout_folds(read_output_manifest(folder), rel(folder))
-    table = select_events_in(
-        read_complete_run(folder, TETRODE_HOLDOUT_NAME, epoch_ids), selected
-    )
-    tetrode_holdout.require_run_columns(table, rel(folder))
-    return table
 
 
 def spike_evidence_staleness(
@@ -2291,43 +2236,6 @@ _TETRODE_HELD_OUT = (
 (``tetrode_holdout.holdout_scores``)."""
 
 
-#: Each held-out tetrode measure reported: its column of
-#: ``tetrode_holdout.window_scores`` and the score in words.
-_TETRODE_MEASURES = {
-    "gain": (
-        "gain_per_spike",
-        "each tetrode's log predictive score under the other tetrodes' position "
-        "distribution minus under local coding around the animal",
-    ),
-    "spiking_gain": (
-        "spiking_gain_per_spike",
-        "each tetrode's log predictive score under the other tetrodes' position "
-        "distribution minus under local coding around the animal in the bins "
-        "where the scored tetrode spiked (its spikes' waveform terms with the "
-        "expected-firing term of those bins); with the silent bins' part it adds "
-        "to the gain for each event, but each of the three is a median over "
-        "events, so over the cohort they need not add up",
-    ),
-    "silent_gain": (
-        "silent_gain_per_spike",
-        "each tetrode's log predictive score under the other tetrodes' position "
-        "distribution minus under local coding around the animal in the bins "
-        "where the scored tetrode was silent (the expected-firing term alone: "
-        "the gain from the absence of spikes); with the spiking bins' part it "
-        "adds to the gain for each event, but each of the three is a median over "
-        "events, so over the cohort they need not add up",
-    ),
-    "agreement": (
-        "agreement_per_spike",
-        "the agreement, each tetrode's log predictive score under the other "
-        "tetrodes' position distribution minus under no place preference (the "
-        "mean over place bins): above zero when the other tetrodes' "
-        "distribution predicts where the scored tetrode points better than no "
-        "preference does, that is when the tetrodes share content, local or "
-        "not (the gain over local coding is above zero for any non-local "
-        "activity the distribution covers, coherent or not)",
-    ),
-}
 _CONTROL_AGREEMENT = (
     "; in the Local-rest controls the tetrodes share content, the animal's own "
     "place, so the controls are not a zero reference for the agreement (they are "
@@ -2360,7 +2268,7 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
         ("control_agreement", "agreement", "control", "Local-rest controls"),
     )
     for name, measure, kind, label in estimates:
-        column, words = _TETRODE_MEASURES[measure]
+        column, words = _HELDOUT_MEASURES[measure]
         note = _CONTROL_AGREEMENT if (measure, kind) == ("agreement", "control") else ""
         if measure == "agreement" or kind == "control":
             make = make_text
@@ -2435,6 +2343,86 @@ _MATCHED_DONOR = (
 )
 
 
+#: Each held-out tetrode measure reported: its column of
+#: ``tetrode_holdout.window_scores`` and the score in words.
+_HELDOUT_MEASURES = {
+    "gain": (
+        "gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal",
+    ),
+    "spiking_gain": (
+        "spiking_gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal in the bins "
+        "where the scored tetrode spiked (its spikes' waveform terms with the "
+        "expected-firing term of those bins); with the silent bins' part it adds "
+        "to the gain for each event, but each of the three is a median over "
+        "events, so over the cohort they need not add up",
+    ),
+    "silent_gain": (
+        "silent_gain_per_spike",
+        "each tetrode's log predictive score under the other tetrodes' position "
+        "distribution minus under local coding around the animal in the bins "
+        "where the scored tetrode was silent (the expected-firing term alone: "
+        "the gain from the absence of spikes); with the spiking bins' part it "
+        "adds to the gain for each event, but each of the three is a median over "
+        "events, so over the cohort they need not add up",
+    ),
+    "agreement": (
+        "agreement_per_spike",
+        "the agreement, each tetrode's log predictive score under the other "
+        "tetrodes' position distribution minus under no place preference (the "
+        "mean over place bins): above zero when the other tetrodes' "
+        "distribution predicts where the scored tetrode points better than no "
+        "preference does, that is when the tetrodes share content, local or "
+        "not (the gain over local coding is above zero for any non-local "
+        "activity the distribution covers, coherent or not)",
+    ),
+    "gain_rate": (
+        "gain_rate_per_spike",
+        "the part of the gain over local coding that the firing-rate term gives "
+        "(the expected spikes and the spike count, not the waveform marks)",
+    ),
+    "gain_mark": (
+        "gain_mark_per_spike",
+        "the part of the gain over local coding that only the waveform marks "
+        "give (the gain minus its firing-rate part)",
+    ),
+    "agreement_rate": (
+        "agreement_rate_per_spike",
+        "the part of the agreement that the firing-rate term gives",
+    ),
+    "agreement_mark": (
+        "agreement_mark_per_spike",
+        "the part of the agreement that only the waveform marks give",
+    ),
+    "agreement_reference": (
+        "agreement_null_per_spike",
+        f"{_REFERENCE_WORDS}; {_UNMATCHED_DONOR}",
+    ),
+    "agreement_minus_reference": (
+        "agreement_minus_null_per_spike",
+        "the agreement minus the shuffled-event reference, event by event (an "
+        f"event without a donor has no value); {_UNMATCHED_DONOR}",
+    ),
+    "mark_information": (
+        "mark_information_per_spike",
+        "the place information of the scored spikes' marks: for each spike, log "
+        "of the places minus the entropy of the conditional density of its mark "
+        "over place (the rate map divided out), under its fold's encoding, "
+        "summed over the window's spikes and divided by the spikes counted",
+    ),
+    "spike_information": (
+        "spike_information_per_spike",
+        "the place information of the scored spikes: for each spike, log of the "
+        "places minus the entropy of its whole per-spike term over place (rate "
+        "map and mark together), under its fold's encoding, summed over the "
+        "window's spikes and divided by the spikes counted",
+    ),
+}
+
+
 def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: during an event, do the tetrodes point to
     the same remote place? Over the events of each SWR group by the width of
@@ -2457,7 +2445,7 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     statistics = shared_content.shared_content_statistics(
         windows[windows["kind"] == "event"]
     )
-    _, words = _TETRODE_MEASURES["agreement"]
+    _, words = _HELDOUT_MEASURES["agreement"]
     reduction = (
         "mean over animals of each animal's median over epochs of each epoch's median"
     )
@@ -2578,53 +2566,6 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-#: Each extra measure of the held-out tetrode run: its column
-#: of ``tetrode_holdout.window_scores`` and the score in words.
-_EXTRA_MEASURES = {
-    "gain_rate": (
-        "gain_rate_per_spike",
-        "the part of the gain over local coding that the firing-rate term gives "
-        "(the expected spikes and the spike count, not the waveform marks)",
-    ),
-    "gain_mark": (
-        "gain_mark_per_spike",
-        "the part of the gain over local coding that only the waveform marks "
-        "give (the gain minus its firing-rate part)",
-    ),
-    "agreement_rate": (
-        "agreement_rate_per_spike",
-        "the part of the agreement that the firing-rate term gives",
-    ),
-    "agreement_mark": (
-        "agreement_mark_per_spike",
-        "the part of the agreement that only the waveform marks give",
-    ),
-    "agreement_reference": (
-        "agreement_null_per_spike",
-        f"{_REFERENCE_WORDS}; {_UNMATCHED_DONOR}",
-    ),
-    "agreement_minus_reference": (
-        "agreement_minus_null_per_spike",
-        "the agreement minus the shuffled-event reference, event by event (an "
-        f"event without a donor has no value); {_UNMATCHED_DONOR}",
-    ),
-    "mark_information": (
-        "mark_information_per_spike",
-        "the place information of the scored spikes' marks: for each spike, log "
-        "of the places minus the entropy of the conditional density of its mark "
-        "over place (the rate map divided out), under its fold's encoding, "
-        "summed over the window's spikes and divided by the spikes counted",
-    ),
-    "spike_information": (
-        "spike_information_per_spike",
-        "the place information of the scored spikes: for each spike, log of the "
-        "places minus the entropy of its whole per-spike term over place (rate "
-        "map and mark together), under its fold's encoding, summed over the "
-        "window's spikes and divided by the spikes counted",
-    ),
-}
-
-
 def tetrode_holdout_extra_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: what the held-out tetrode evidence of the events is made
     of, from the held-out tetrode run's extra scores (``windows``,
@@ -2657,7 +2598,7 @@ def tetrode_holdout_extra_values(windows: pd.DataFrame, source: str) -> list[Val
         "mark_information",
         "spike_information",
     ):
-        column, words = _EXTRA_MEASURES[name]
+        column, words = _HELDOUT_MEASURES[name]
         kinds = [("event", "events", "")]
         if name.endswith("information"):
             kinds.append(("control", "Local-rest controls", "control_"))
@@ -2813,13 +2754,10 @@ def low_rate_values(
     reduction = (
         "mean over animals of each animal's median over epochs of each epoch's median"
     )
-    names = {column: name for name, (column, _) in _EXTRA_MEASURES.items()}
-    names["gain_per_spike"] = "gain"
+    names = {column: name for name, (column, _) in _HELDOUT_MEASURES.items()}
     for column in low_rate_places.LOW_RATE_MEASURES:
         name = names[column]
-        words = (
-            _TETRODE_MEASURES["gain"][1] if name == "gain" else _EXTRA_MEASURES[name][1]
-        )
+        words = _HELDOUT_MEASURES[name][1]
         make = make_text
         split = statistics.measures[column]
         for place, (place_word, place_words) in _PLACES.items():
@@ -5799,7 +5737,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
         selected,
     )
-    holdout_table = read_tetrode_holdout(inputs.tetrode_holdout, analyzed, selected)
+    # the held-out tetrode run, reduced to its windows at the read (no name
+    # keeps the per-tetrode table)
+    holdout_windows = tetrode_holdout.window_scores(
+        read_tetrode_holdout(
+            inputs.tetrode_holdout, analyzed, selected, rel(inputs.tetrode_holdout)
+        )
+    )
     # the place-rate run: every event of the table, read over the selected ones
     place_rate_table = select_events_in(
         read_complete_run(inputs.content_place_rate, CONTENT_PLACE_RATE_NAME, analyzed),
@@ -5868,7 +5812,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             EVENTS_SUBSET,
         )
     )
-    holdout_windows = tetrode_holdout.window_scores(holdout_table)
     holdout_source = (
         f"{rel(inputs.tetrode_holdout)} "
         "(scripts/event_evidence/score_tetrode_holdout.py)"
