@@ -7,8 +7,7 @@ is where the others point. Over all events it is near zero, because in many
 events the others' distribution is spread over much of the track and there is
 nothing specific to agree with. This module groups the events by that width.
 
-An event's width is its ``hpd_cm`` from ``tetrode_holdout.window_scores`` (a
-run made with ``--extra-scores``): the mean over its left-out tetrodes of the
+An event's width is its ``hpd_cm`` from ``tetrode_holdout.window_scores``: the mean over its left-out tetrodes of the
 mean over the window's scored bins of the 95 % HPD length of the other
 tetrodes' position distribution (``tetrode_holdout.hpd_lengths``). The mean
 over tetrodes is the natural summary: each left-out tetrode has its own
@@ -213,8 +212,8 @@ def shared_content_statistics(
     Parameters
     ----------
     windows : pd.DataFrame
-        ``tetrode_holdout.window_scores`` of a run with ``--extra-scores``, the
-        events only (with ``hpd_null_cm``).
+        ``tetrode_holdout.window_scores``, the events only (with
+        ``hpd_null_cm``).
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
     """

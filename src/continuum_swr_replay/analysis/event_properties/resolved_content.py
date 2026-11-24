@@ -36,8 +36,8 @@ def event_widths(events: pd.DataFrame, windows: pd.DataFrame) -> pd.Series:
     events : pd.DataFrame
         The canonical event table's selected events, with ``event_id``.
     windows : pd.DataFrame
-        ``tetrode_holdout.window_scores`` of a run with ``--extra-scores``; the
-        event windows (``kind`` ``"event"``) are read.
+        ``tetrode_holdout.window_scores``; the event windows (``kind``
+        ``"event"``) are read.
 
     Raises
     ------

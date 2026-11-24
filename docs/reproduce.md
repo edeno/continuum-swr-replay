@@ -77,8 +77,9 @@ after a change to fitting code only, start at step 6.
       (needs 1 and 2; reads the event table);
    4. `measure_event_participation.py`: the Local-rest controls (reads the event table, the decodes and the
       session cache);
-   5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score (needs 4; reads the event table,
-      the decodes, the detectors and the trials);
+   5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score, with its extra scores (the
+      95 % HPD length, the shuffled-event reference, the rate and mark parts, the place information; needs 4;
+      reads the event table, the decodes, the detectors and the trials);
    6. `sum_nonlocal_restriction_windows.py`: the restriction scores over the canonical windows (needs 1, 2,
       4 and 5);
    7. on the CPU, from stored outputs only: `scripts/event_properties/measure_nonlocal_by_signal.py`
@@ -125,12 +126,6 @@ after a change to fitting code only, start at step 6.
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_windows
    ```
 
-   Figure 2j's comparison with another event's place, Figure 2's supplement, panel i, the parts of the held-out tetrode evidence and the low-rate events read step 5 made again with its extra scores (the 95 % HPD length, the shuffled-event
-   reference, the rate and mark parts, the place information), into its own folder:
-
-   ```bash
-   uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --extra-scores --null-seed 0 --output-dir Processed-Data/event_tetrode_holdout_extra --gpus 1 2 4 5
-   ```
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
    `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.
