@@ -69,7 +69,8 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
-from continuum_swr_replay.reported.events import default_inputs, with_brain_state
+from continuum_swr_replay.reported.events import with_brain_state
+from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (

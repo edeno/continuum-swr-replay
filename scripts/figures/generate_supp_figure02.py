@@ -260,7 +260,7 @@ reads, and refuses a run not held out in folds of whole trials, as the summary
 does. Panel i reads the held-out event run
 (``Processed-Data/event_nonlocal_restriction_heldout_events``, its events and
 time sums) by the events summary's reader
-(``reported.events.read_heldout_restriction``) and refuses it, as Figure 2k
+(``reported.inputs.read_heldout_restriction``) and refuses it, as Figure 2k
 does, when the restriction run is not the fold fit on folds of whole trials or
 was not made from the current decode frames and SWR source, when the held-out
 event run was not made from the current restriction run or per-bin facts run,
@@ -314,7 +314,6 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
-    subset_staleness,
 )
 from continuum_swr_replay.analysis.event_definition.no_spike_periods import (
     level_outside_periods,
@@ -373,7 +372,6 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     triggering_events_in,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
-    time_mask_staleness,
     well_visit_times,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_medians
@@ -388,17 +386,15 @@ from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events import (
-    default_inputs,
-    event_table_staleness,
-    heldout_restriction_refusal,
-    read_checked,
-    read_heldout_restriction,
-    restriction_inputs_note,
-)
 from continuum_swr_replay.reported.formatting import format_number
+from continuum_swr_replay.reported.inputs import (
+    default_inputs,
+    output_staleness,
+    panel_refusal,
+    read_checked,
+    read_figure_restriction,
+)
 from continuum_swr_replay.reported.values import rel
-from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.evidence_drawings import draw_boundary_cases
 from continuum_swr_replay.visualization.figure_utilities import save_figure
@@ -584,7 +580,6 @@ NO_SPIKE_COLOR = COLORS["No-Spike"]
 NO_SPIKE_WORKERS = 4
 """The processes that read the decode frames for the No-Spike panel by
 default: each holds one frame at a time."""
-REFUSED = f"Figure 2's supplement: panel {LETTERS['outside_distance']} is not drawn"
 FOUR_DECODER_TIMES = {
     "immobile": "all",
     "inside_swr": "inside_swr",
@@ -617,32 +612,32 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
     Returns
     -------
     dict
-        In panel order: ``calibration`` (a): :func:`read_state_calibration`;
-        ``no_spike`` (b) and ``event_traces`` (j): :func:`read_frame_traces`;
-        ``probability`` (c): ``nonlocal_probability.animal_probability_distribution``
-        of the stored counts; ``distance`` (d):
+        By panel, in :data:`PANELS`' order: ``state_calibration``,
+        :func:`read_state_calibration`; ``no_spike_mua`` and ``event_traces``,
+        :func:`read_frame_traces`; ``nonlocal_probability``,
+        ``nonlocal_probability.animal_probability_distribution`` of the stored
+        counts; ``decoded_distance``,
         ``quality_metrics.animal_distance_by_local_probability`` of the
         decoder-quality run's table (each animal's values and the statistics);
-        ``sweep`` (e): :func:`read_rule_sweep`; ``timing`` (f): the selected
-        events' ``boundary_timing_statistics``; ``mua`` (g):
-        :func:`read_mua_counts`; ``split`` (h): by column of
-        ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics`` of the
-        events of the held-out tetrode run that start inside a well
+        ``rule_sweep``, :func:`read_rule_sweep`; ``boundary_timing``, the
+        selected events' ``boundary_timing_statistics``; ``nonlocal_mua``,
+        :func:`read_mua_counts` and :func:`read_mua_states`; ``left_out_split``,
+        by column of ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics``
+        of the events of the held-out tetrode run that start inside a well
         visit, indexed by group (a run not held out in folds of whole trials is
-        refused, ``heldout_runs.read_tetrode_holdout``);
-        ``outside`` (i): ``outside_swr_statistics``
-        over the held-out event run, indexed by family and measure; ``parts``
-        (i): ``outside_swr_subset_statistics`` of the margins over its time
-        sums, indexed by subset, threshold, family and measure; ``hpd``
-        (k): the selected events' ``hpd_distribution``;
-        ``four_decoders`` (l): ``swr_allowed_statistics`` over the same
-        held-out event run.
+        refused, ``heldout_runs.read_tetrode_holdout``); ``outside_distance``,
+        ``outside_swr_statistics`` over the held-out event run, indexed by
+        family and measure, and ``outside_swr_subset_statistics`` of the
+        margins over its time sums, indexed by subset, threshold, family and
+        measure; ``hpd``, the selected events' ``hpd_distribution``;
+        ``four_decoders``, ``swr_allowed_statistics`` over the same held-out
+        event run.
 
     Raises
     ------
     ValueError
         If a held-out event run, or what it was made from, is not current
-        (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
+        (``reported.inputs.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
     table = read_swr_table(inputs.event_table)
@@ -658,43 +653,41 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
             rel(inputs.tetrode_holdout),
         )
     )
-    heldout = read_heldout_restriction(
-        inputs.nonlocal_restriction_heldout_events,
-        inputs.nonlocal_restriction,
-        inputs.bin_facts,
-        epochs,
-        sha256_file(inputs.event_table),
-    )
-    refusal = heldout_restriction_refusal(
-        heldout, restriction_inputs_note(inputs.nonlocal_restriction, epochs)
-    )
+    heldout, refusal = read_figure_restriction(inputs, epochs)
     if refusal is not None:
-        cause, rerun = refusal
-        raise ValueError(f"{REFUSED}: {cause}. Rerun {rerun}.")
-    return {
-        "calibration": read_state_calibration(inputs.state_calibration_in_visits),
-        "probability": read_nonlocal_probability(inputs.nonlocal_probability),
-        "distance": read_decoded_distance(inputs.decoder_quality),
-        "sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
-        "mua": read_mua_counts(inputs.nonlocal_by_signal),
-        "mua_states": read_mua_states(inputs.state_by_signal),
-        "hpd": hpd_distribution(events),
-        "timing": boundary_timing_statistics(boundary_offsets(events), events),
-        "split": {
+        raise ValueError(panel_refusal(FIGURE, LETTERS["outside_distance"], *refusal))
+    read = {
+        "state_calibration": read_state_calibration(inputs.state_calibration_in_visits),
+        "nonlocal_probability": read_nonlocal_probability(inputs.nonlocal_probability),
+        "decoded_distance": read_decoded_distance(inputs.decoder_quality),
+        "rule_sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
+        "boundary_timing": boundary_timing_statistics(boundary_offsets(events), events),
+        "nonlocal_mua": (
+            read_mua_counts(inputs.nonlocal_by_signal),
+            read_mua_states(inputs.state_by_signal),
+        ),
+        "left_out_split": {
             column: holdout_statistics(holdout, "event", column)
             for column in SPLIT_LABELS
         },
-        "outside": outside_swr_statistics(
-            heldout.time_sums, heldout.bin_s, heldout.events
+        "outside_distance": (
+            outside_swr_statistics(heldout.time_sums, heldout.bin_s, heldout.events),
+            outside_swr_subset_statistics(
+                heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
+            ).set_index(["subset", "threshold_s", "family", "measure"]),
         ),
-        "parts": outside_swr_subset_statistics(
-            heldout.time_sums, heldout.bin_s, subsets=("beyond_swr_margin",)
-        ).set_index(["subset", "threshold_s", "family", "measure"]),
+        "hpd": hpd_distribution(events),
         "four_decoders": swr_allowed_statistics(
             heldout.events, heldout.time_sums, heldout.bin_s
         ),
-        **read_frame_traces(events, workers),
     }
+    # the decode frames last: the slow read, after every refusal
+    read.update(read_frame_traces(events, workers))
+    return {panel: read[panel] for panel in PANELS}
+
+
+FIGURE = "Figure 2's supplement"
+"""The figure's name in its refusals (``reported.inputs.panel_refusal``)."""
 
 
 def _refuse_stale(
@@ -705,25 +698,14 @@ def _refuse_stale(
     event_table: Path | None = None,
     epoch_ids: Iterable[str] | None = None,
 ) -> None:
-    """Refuse an output the events summary marks pending: one not made from the
-    current event table (when ``event_table`` is given), not over the analyses'
-    subset, or, for a time-masked output (``epoch_ids`` given), not from the
-    current well visits (``prepare_data.time_mask_staleness``)."""
-    manifest = read_output_manifest(folder)
-    what = rel(folder)
-    for reason in (
-        None
-        if event_table is None
-        else event_table_staleness(manifest, sha256_file(event_table), what),
-        subset_staleness(manifest, what)
-        if epoch_ids is None
-        else time_mask_staleness(manifest, epoch_ids, what),
-    ):
-        if reason is not None:
-            raise ValueError(
-                f"Figure 2's supplement: panel {LETTERS[panel]} is not drawn: "
-                f"{reason}. Rerun {rerun}."
-            )
+    """Refuse an output the events summary marks pending
+    (``reported.inputs.output_staleness``): not made from the current event
+    table (when ``event_table`` is given), not over the analyses' subset, or,
+    for a time-masked output (``epoch_ids`` given), not from the current well
+    visits."""
+    reason = output_staleness(folder, event_table=event_table, epoch_ids=epoch_ids)
+    if reason is not None:
+        raise ValueError(panel_refusal(FIGURE, LETTERS[panel], reason, rerun))
 
 
 def read_nonlocal_probability(folder: Path) -> pd.DataFrame:
@@ -758,8 +740,12 @@ def read_mua_states(folder: Path) -> pd.DataFrame:
         counts = read_checked(folder, "counts by signal and state")
     except ValueError as error:
         raise ValueError(
-            f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
-            f"{error}. Rerun scripts/event_properties/measure_state_by_signal.py."
+            panel_refusal(
+                FIGURE,
+                LETTERS["nonlocal_mua"],
+                str(error),
+                "scripts/event_properties/measure_state_by_signal.py",
+            )
         ) from error
     return state_distribution(counts, "mua")
 
@@ -818,14 +804,18 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
     ValueError
         If the counts were not made over the analyses' subset from the current
         well visits and the decodes the event features run records, for the
-        analyzed epochs (``reported.events.checked_reference``, as Figure 2i).
+        analyzed epochs (``reported.inputs.checked_reference``, as Figure 2i).
     """
     try:
         counts = read_checked(folder, "counts by signal")
     except ValueError as error:
         raise ValueError(
-            f"Figure 2's supplement: panel {LETTERS['nonlocal_mua']} is not drawn: "
-            f"{error}. Rerun scripts/event_properties/measure_nonlocal_by_signal.py."
+            panel_refusal(
+                FIGURE,
+                LETTERS["nonlocal_mua"],
+                str(error),
+                "scripts/event_properties/measure_nonlocal_by_signal.py",
+            )
         ) from error
     return animal_nonlocal_counts(counts, "mua")
 
@@ -903,7 +893,7 @@ def read_frame_traces(
     Returns
     -------
     dict
-        ``no_spike``, the No-Spike panel's trace: ``time`` (s from the
+        ``no_spike_mua``, the No-Spike panel's trace: ``time`` (s from the
         start), ``q25``, ``median`` and ``q75``, animal-balanced over the
         periods with a window (``triggered_analysis.animal_balanced_quartiles``);
         ``level``: the mean over animals of each animal's median over its
@@ -942,7 +932,7 @@ def read_frame_traces(
         ),
     }
     if events is None:
-        return {"no_spike": no_spike, "event_traces": None}
+        return {"no_spike_mua": no_spike, "event_traces": None}
     traces: dict = {}
     for kind in ("overlap", "no_overlap"):
         windows = xr.concat(
@@ -953,7 +943,7 @@ def read_frame_traces(
             for signal in TRIGGERED_SIGNALS
         }
         traces["time"] = windows["time"].values
-    return {"no_spike": no_spike, "event_traces": traces}
+    return {"no_spike_mua": no_spike, "event_traces": traces}
 
 
 def draw_boundary_timing(ax_cases: Axes, ax: Axes, timing: pd.DataFrame) -> None:
@@ -1418,7 +1408,7 @@ def panel_axes(fig: Figure, panel: str) -> list[Axes]:
     return fig.axes[start : start + _n_axes(panel)]
 
 
-def generate_figure(statistics: dict) -> Figure:
+def generate_figure(inputs: dict) -> Figure:
     """Build the figure from :func:`read_inputs`, the panels in :data:`PANELS`'
     order and laid out by :data:`LAYOUT`."""
     heights = {panel: span for span, row in LAYOUT for panel, _, _ in row}
@@ -1460,24 +1450,20 @@ def generate_figure(statistics: dict) -> Figure:
     # by its axes' positions sees their proportions, then again on what they draw
     for panel in PANELS:
         fit(panel)
-    draw_no_spike_mua(axes["no_spike_mua"][0], statistics["no_spike"])
-    draw_event_traces(axes["event_traces"], statistics["event_traces"])
-    draw_boundary_timing(*axes["boundary_timing"], statistics["timing"])
-    draw_left_out_split(axes["left_out_split"][0], statistics["split"])
-    draw_hpd(axes["hpd"][0], statistics["hpd"])
-    draw_outside_swr_series(
-        axes["outside_distance"][0], statistics["outside"], statistics["parts"]
-    )
-    draw_nonlocal_mua(
-        *axes["nonlocal_mua"], statistics["mua"], statistics["mua_states"]
-    )
-    draw_rule_sweep(axes["rule_sweep"], statistics["sweep"])
-    draw_state_calibration(axes["state_calibration"][0], statistics["calibration"])
+    draw_state_calibration(axes["state_calibration"][0], inputs["state_calibration"])
+    draw_no_spike_mua(axes["no_spike_mua"][0], inputs["no_spike_mua"])
     draw_nonlocal_probability(
-        axes["nonlocal_probability"][0], statistics["probability"]
+        axes["nonlocal_probability"][0], inputs["nonlocal_probability"]
     )
-    draw_decoded_distance(axes["decoded_distance"][0], *statistics["distance"])
-    draw_four_decoders(axes["four_decoders"], statistics["four_decoders"])
+    draw_decoded_distance(axes["decoded_distance"][0], *inputs["decoded_distance"])
+    draw_rule_sweep(axes["rule_sweep"], inputs["rule_sweep"])
+    draw_boundary_timing(*axes["boundary_timing"], inputs["boundary_timing"])
+    draw_nonlocal_mua(*axes["nonlocal_mua"], *inputs["nonlocal_mua"])
+    draw_left_out_split(axes["left_out_split"][0], inputs["left_out_split"])
+    draw_outside_swr_series(axes["outside_distance"][0], *inputs["outside_distance"])
+    draw_event_traces(axes["event_traces"], inputs["event_traces"])
+    draw_hpd(axes["hpd"][0], inputs["hpd"])
+    draw_four_decoders(axes["four_decoders"], inputs["four_decoders"])
     for panel in PANELS:
         fit(panel)
     fig.draw_without_rendering()

@@ -108,10 +108,8 @@ from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events import (
-    content_along_arms_bins,
-    default_inputs,
-)
+from continuum_swr_replay.reported.events import content_along_arms_bins
+from continuum_swr_replay.reported.inputs import default_inputs
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.panel_layout import place_letters

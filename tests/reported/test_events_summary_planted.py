@@ -63,6 +63,7 @@ from continuum_swr_replay.paths import (
     STATE_CALIBRATION_IN_VISITS_DIR,
 )
 from continuum_swr_replay.reported import events as builder
+from continuum_swr_replay.reported import inputs as stored_inputs
 from continuum_swr_replay.reported.values import Tags, pend, value_factory
 from tests.reported.test_reported_events_values import _events
 from tests.support._session_cache_fixtures import write_session_cache_entries
@@ -517,6 +518,9 @@ class _Run:
             "read_complete_run": _read_complete_run,
         }.items():
             monkeypatch.setattr(builder, name, value)
+            # the shared readers of the stored outputs, where they are defined
+            if hasattr(stored_inputs, name):
+                monkeypatch.setattr(stored_inputs, name, value)
         # the held-out tetrode run's reader, beside the scoring code
         monkeypatch.setattr(heldout_runs, "read_complete_run", _read_complete_run)
         monkeypatch.setattr(
