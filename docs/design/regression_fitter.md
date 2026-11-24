@@ -720,6 +720,15 @@ the difference of the two kinds' session estimates, reduced the same way. With f
 animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
 alone.
 
+`unit_summary(values, fit_by, n_draws=..., seed=...)` reduces one estimate per unit of a
+fit (`tables.session_keys.FitBy`; `docs/design/2026-11-24-unit-of-fit.md`, section 7), with
+the same keys at every unit. At `"session"` it is `estimand_summary`. At `"day"` it is
+`estimand_summary` with each day as its own session. At `"animal"` it is
+`animal_mean_interval`: the mean over the animals, `mean +/- t(0.975, A - 1) SD / sqrt(A)`,
+and no day-level test. A band over units is `bands.across_session_band` with one row per
+day, or one row per animal whose day label is the animal
+(`test_bands.py::test_band_over_days`, `::test_band_over_animals`).
+
 ## Simulation
 
 **The rule.** A simulation replaces only the outcome column of a model's own rows. The

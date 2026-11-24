@@ -398,7 +398,7 @@ Stable row identities: the ``event_id`` and ``stop_id`` hashes.
 
 The natural key for one recording session: (animal, session_date, epoch).
 
-`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `one_session`, `present_session_columns`, `require_session_unique_ids`
+`unit_key`, `session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `one_session`, `present_session_columns`, `require_session_unique_ids`
 
 ## Covariates
 
@@ -1615,6 +1615,12 @@ The per-event SWR-power model: an event's ripple power against the behavioral co
 The declared family of tests: one list, written before any fit.
 
 `CurveContrast`, `SDChangeContrast`, `CoefficientContrast`, `Estimand`, `estimand`
+
+### `src/continuum_swr_replay/analysis/replay_models/fit_by.py`
+
+The units every behavior model is fitted at: one declaration.
+
+_No module-level public symbols._
 
 ### `src/continuum_swr_replay/analysis/replay_models/fit_comparability.py`
 
