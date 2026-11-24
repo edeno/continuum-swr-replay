@@ -54,6 +54,7 @@ __all__ = [
     "GroupedSoftmax",
     "Likelihood",
     "Poisson",
+    "draw",
     "group_starts",
 ]
 
@@ -393,3 +394,131 @@ class GroupedSoftmax:
     ) -> np.ndarray:
         """``G d = p (d - p'd)`` per group, shape ``(n_rows,)``."""
         return p * (d - np.repeat(np.add.reduceat(p * d, starts), sizes))
+
+
+def draw(
+    lik: Likelihood,
+    eta: np.ndarray,
+    aux: object,
+    rng: np.random.Generator,
+    *,
+    n_trials: int | np.ndarray = 1,
+    concentration: float | np.ndarray | None = None,
+) -> np.ndarray:
+    """Outcomes drawn from a family at the linear predictor ``eta``.
+
+    The draws use only ``rng``, a NumPy generator, and none of the fitter's
+    code, so the same seed gives the same outcomes whatever the fitter's
+    solver is. ``aux`` is the family's, as for its other methods:
+
+    - Poisson: counts of mean ``exp(eta + aux)``, ``aux`` the offset.
+    - Bernoulli: 0/1 with probability ``expit(eta)``; ``aux`` unused.
+    - Gaussian: ``eta`` plus Normal noise of variance ``aux``, the scale.
+    - Grouped softmax: ``aux`` the sorted group id of each row; the outcome
+      is each row's share of its group, so the shares of a group sum to one,
+      as the content response does. With ``p = softmax(eta)`` within a group,
+      the mean share of every noise model is ``p``. The noise model is set
+      by ``n_trials`` and ``concentration``:
+
+      1. categorical (``n_trials = 1``, no concentration): one row of each
+         group is chosen, with probability ``p``, and has share 1. The
+         variance of a share is ``p (1 - p)``.
+      2. multinomial (``n_trials = n``, an integer or one per group, no
+         concentration): ``n`` independent choices per group, the share the
+         count over ``n``. Variance ``p (1 - p) / n``: that of (1) over
+         ``n``.
+      3. Dirichlet-multinomial (``n_trials = n`` and ``concentration = a``,
+         a number or one per group): the group's probabilities are first
+         drawn from ``Dirichlet(a p)``, then ``n`` choices from them.
+         Variance ``p (1 - p) (n + a) / (n (1 + a))``: that of (1) times
+         ``(n + a) / (n (1 + a))``, between ``1 / n`` (large ``a``, no
+         overdispersion) and 1 (small ``a``); for large ``n`` it tends to
+         ``1 / (1 + a)``.
+
+      Each choice is the Gumbel-max draw: the row of the largest
+      ``log p + Gumbel`` noise.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    eta : np.ndarray, shape (n_rows,)
+    aux : object
+    rng : np.random.Generator
+    n_trials : int or np.ndarray of int, shape (n_groups,)
+        The choices per group under the grouped softmax; not read otherwise.
+    concentration : float or np.ndarray, shape (n_groups,), or None
+        The Dirichlet concentration of model 3 under the grouped softmax;
+        None for models 1 and 2. Not read otherwise.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+        Float outcomes.
+
+    Raises
+    ------
+    ValueError
+        If the family has no draw (named by ``lik.name``); under the grouped
+        softmax, if ``n_trials`` is not a whole number of at least one or a
+        concentration is not finite and positive, or either has the wrong
+        number of groups, or a group has no finite ``eta``.
+    """
+    eta = np.asarray(eta, dtype=float)
+    if lik.name == "poisson":
+        return rng.poisson(np.exp(eta + np.asarray(aux, dtype=float))).astype(float)
+    if lik.name == "bernoulli":
+        return (rng.random(eta.size) < expit(eta)).astype(float)
+    if lik.name == "gaussian":
+        return eta + np.sqrt(aux) * rng.standard_normal(eta.size)
+    if lik.name == "grouped_softmax":
+        return _softmax_draw(eta, np.asarray(aux), rng, n_trials, concentration)
+    raise ValueError(f"no draw for the likelihood {lik.name!r}")
+
+
+def _per_group(value: object, n_groups: int, name: str) -> np.ndarray:
+    """``value`` as one number per group, shape ``(n_groups,)``."""
+    value = np.asarray(value, dtype=float)
+    if value.ndim > 1 or value.size not in (1, n_groups):
+        raise ValueError(f"{name}: one value, or one per group ({n_groups})")
+    return np.broadcast_to(value.ravel(), (n_groups,))
+
+
+def _softmax_draw(
+    eta: np.ndarray,
+    groups: np.ndarray,
+    rng: np.random.Generator,
+    n_trials: int | np.ndarray,
+    concentration: float | np.ndarray | None,
+) -> np.ndarray:
+    """The grouped softmax's shares (:func:`draw`), shape ``(n_rows,)``."""
+    starts = group_starts(groups)
+    sizes = np.diff(starts, append=eta.size)
+    n = _per_group(n_trials, starts.size, "n_trials")
+    if np.any(n < 1) or np.any(n != np.round(n)):
+        raise ValueError(f"n_trials must be whole numbers of at least one, not {n}")
+    n = n.astype(int)
+    empty = np.flatnonzero(np.maximum.reduceat(eta, starts) == -np.inf)
+    if empty.size:
+        raise ValueError(
+            f"group {empty[0]} has no finite eta (every share zero): no share to draw"
+        )
+    logits = eta
+    if concentration is not None:
+        a = _per_group(concentration, starts.size, "concentration")
+        if not np.all(np.isfinite(a) & (a > 0)):
+            raise ValueError("a concentration must be finite and positive")
+        weight = np.exp(eta - np.repeat(np.maximum.reduceat(eta, starts), sizes))
+        p = weight / np.repeat(np.add.reduceat(weight, starts), sizes)
+        gamma = rng.gamma(np.repeat(a, sizes) * p)
+        with np.errstate(divide="ignore"):
+            logits = np.log(gamma / np.repeat(np.add.reduceat(gamma, starts), sizes))
+    chosen = np.zeros(eta.size)
+    for trial in range(int(n.max())):
+        noisy = logits + rng.gumbel(size=eta.size)
+        top = noisy == np.repeat(np.maximum.reduceat(noisy, starts), sizes)
+        # One row per group: the first at the maximum (a tie has probability
+        # zero unless every weight of a group underflowed to zero).
+        before = np.cumsum(top) - top
+        first = top & (before == np.repeat(before[starts], sizes))
+        chosen += first & np.repeat(trial < n, sizes)
+    return chosen / np.repeat(n, sizes)

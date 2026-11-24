@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
 from continuum_swr_replay.analysis.regression.record import NoFit
 from continuum_swr_replay.analysis.regression.reml import SessionData, fit_at_penalties
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
+from continuum_swr_replay.analysis.regression.simulation import draw_data_set
 from continuum_swr_replay.analysis.regression.support import Removed
 from continuum_swr_replay.analysis.regression.terms import (
     SMALLEST_COLUMN_SIZE,
@@ -821,9 +822,14 @@ def test_the_declared_penalty_recovers_a_planted_curve() -> None:
     ``test_simulate_declared_penalty.py``."""
     config = sim.Config(days_per_animal=(2,) * 5, sessions_per_day=(3, 3))
     sessions = sim.cohort(config, seed=7)
-    data = sim.simulate(sessions, "rise", np.random.default_rng(8))
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    data = draw_data_set(
+        sim.model_at("rise", pooled, 0.0),
+        sessions,
+        sim.scenarios()[0],
+        np.random.default_rng(8),
+    )
     assert len(data) == 30
-    pooled = pd.concat(data.values(), ignore_index=True)
     found = log_penalty_for_edf(
         sim.design_at(pooled, 0.0),
         data,
@@ -850,10 +856,7 @@ def test_the_declared_penalty_recovers_a_planted_curve() -> None:
         ]
     )
     per_animal = animal_day_session_values(
-        estimates,
-        pd.Series([s.animal for s in sessions]),
-        pd.Series([s.day for s in sessions]),
-        pd.Series([s.key[2] for s in sessions]),
+        estimates, *(pd.Series([key[k] for key in sessions]) for k in range(3))
     )
     planted = sim.planted_contrast("rise")
     print(f"planted {planted:.4f}, estimate {per_animal.mean():.4f}")

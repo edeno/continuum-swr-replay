@@ -809,6 +809,25 @@ class Design:
                 out.setdefault(term.term, []).append(term.columns)
         return {name: np.concatenate(parts) for name, parts in out.items()}
 
+    @property
+    def columns(self) -> tuple[str, ...]:
+        """The columns of the rows that :meth:`build` reads, each once, in
+        the order of the terms: a term's column (its lag columns for a
+        :class:`LinearFunctional`), its ``by`` category's column, and the
+        offset's exposure last."""
+        out: list[str] = []
+        for b in self._built:
+            term = b.term
+            if isinstance(term, LinearFunctional):
+                out += term.lag_columns
+            else:
+                out.append(term.column)
+            if getattr(term, "by", None) is not None:
+                out.append(term.by.column)
+        if self.offset is not None:
+            out.append(self.offset.column)
+        return tuple(dict.fromkeys(out))
+
     def basis_record(self) -> dict[str, dict]:
         """Term -> its basis (C7 ``basis``), for the terms with a basis."""
         return {b.name: b.record() for b in self._built if b.basis is not None}

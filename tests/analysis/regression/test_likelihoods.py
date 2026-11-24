@@ -1,4 +1,5 @@
-"""The likelihoods' derivatives against central finite differences.
+"""The likelihoods' derivatives against central finite differences, and
+their draws.
 
 Each level is checked against a finite difference of the level below it, and
 the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
@@ -6,6 +7,7 @@ the lowest against the log-likelihood itself: ``score_eta`` is the gradient of
 coefficient gradient ``X' score_eta(X beta)`` in ``beta``; ``dinformation`` is
 the derivative of ``information`` along a direction of ``eta``; and
 ``d2information`` the derivative of ``dinformation`` along a second one.
+The draws (``draw``) have the family's mean.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Gaussian,
     GroupedSoftmax,
     Poisson,
+    draw,
 )
 
 TOLERANCE = 1e-6
@@ -158,3 +161,149 @@ def test_softmax_is_invariant_to_a_constant_within_each_group() -> None:
     lik, X, y, groups, eta = _case("softmax_fractions")
     shift = np.array([3.0, -1.0, 0.5, 20.0])[groups]
     assert np.isclose(lik.loglik(eta + shift, y, groups), lik.loglik(eta, y, groups))
+
+
+N_DRAWS = 20_000
+ETA = np.array([-1.2, 0.3, 0.9, -0.4, 1.5, 0.0, -2.0])
+GROUPS = np.array([0, 0, 0, 1, 1, 2, 2])
+#: The softmax's noise models: (n_trials, concentration).
+SOFTMAX = {
+    "categorical": (1, None),
+    "multinomial": (5, None),
+    "multinomial_per_group": (np.array([2, 4, 7]), None),
+    "dirichlet_multinomial": (np.array([2, 4, 7]), 3.0),
+    "dirichlet_multinomial_per_group": (6, np.array([0.5, 3.0, 20.0])),
+}
+
+
+def _softmax_draws(
+    name: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """20,000 draws of a softmax noise model at ``ETA``, the softmax ``p``
+    and each row's ``n`` and concentration (inf without one)."""
+    n_trials, concentration = SOFTMAX[name]
+    rng = np.random.default_rng(13)
+    draws = np.stack(
+        [
+            draw(
+                GroupedSoftmax(),
+                ETA,
+                GROUPS,
+                rng,
+                n_trials=n_trials,
+                concentration=concentration,
+            )
+            for _ in range(N_DRAWS)
+        ]
+    )
+    weight = np.exp(ETA)
+    p = weight / np.bincount(GROUPS, weights=weight)[GROUPS]
+    n = np.broadcast_to(np.asarray(n_trials), (3,))[GROUPS]
+    a = (
+        np.full(3, np.inf)
+        if concentration is None
+        else np.broadcast_to(np.asarray(concentration, dtype=float), (3,))
+    )
+    return draws, p, n, a[GROUPS]
+
+
+@pytest.mark.parametrize("name", ["poisson", "bernoulli", "gaussian"])
+def test_draws_have_the_family_mean(name: str) -> None:
+    """At a fixed ``eta``, the mean of 20,000 draws of each row is the
+    family's mean within 4 standard errors (the draws' SD over sqrt(20,000)):
+    ``exp(eta + offset)``, ``expit(eta)`` and ``eta``. The softmax's are
+    tested below, for each noise model."""
+    rng = np.random.default_rng(11)
+    if name == "poisson":
+        lik, aux = Poisson(), np.log([0.5, 1.0, 2.0, 3.0, 0.2, 1.0, 4.0])
+        mean = np.exp(ETA + aux)
+    elif name == "bernoulli":
+        lik, aux = Bernoulli(), None
+        mean = 1.0 / (1.0 + np.exp(-ETA))
+    else:
+        lik, aux = Gaussian(), 0.7
+        mean = ETA
+    draws = np.stack([draw(lik, ETA, aux, rng) for _ in range(N_DRAWS)])
+    assert draws.shape == (N_DRAWS, ETA.size)
+    se = draws.std(axis=0, ddof=1) / np.sqrt(N_DRAWS)
+    assert np.all(np.abs(draws.mean(axis=0) - mean) < 4.0 * se)
+
+
+@pytest.mark.parametrize("name", list(SOFTMAX))
+def test_softmax_draws_have_the_model_mean_and_variance(name: str) -> None:
+    """Each noise model of the grouped softmax: the mean share of each row is
+    the softmax ``p`` within 4 standard errors, and its variance is ``p (1 -
+    p) (n + a) / (n (1 + a))`` (``a`` infinite without a concentration:
+    ``p (1 - p) / n``) within 4 standard errors of the sample variance. The
+    shares of each group sum to one and are counts over ``n``."""
+    draws, p, n, a = _softmax_draws(name)
+    se = draws.std(axis=0, ddof=1) / np.sqrt(N_DRAWS)
+    assert np.all(np.abs(draws.mean(axis=0) - p) < 4.0 * se)
+    with np.errstate(invalid="ignore"):
+        ratio = np.where(np.isinf(a), 1.0 / n, (n + a) / (n * (1.0 + a)))
+    variance = p * (1 - p) * ratio
+    squared = (draws - p) ** 2
+    variance_se = squared.std(axis=0, ddof=1) / np.sqrt(N_DRAWS)
+    assert np.all(np.abs(squared.mean(axis=0) - variance) < 4.0 * variance_se)
+    totals = np.stack([np.bincount(GROUPS, weights=row) for row in draws])
+    np.testing.assert_allclose(totals, 1.0, rtol=0, atol=1e-12)
+    counts = draws * n
+    np.testing.assert_allclose(counts, np.round(counts), rtol=0, atol=1e-9)
+
+
+def test_overdispersion_widens_the_shares() -> None:
+    """At the same ``n``, a smaller concentration gives a larger variance,
+    and a very large one gives the multinomial's."""
+    rng = np.random.default_rng(3)
+
+    def variance(concentration):
+        draws = np.stack(
+            [
+                draw(
+                    GroupedSoftmax(),
+                    ETA,
+                    GROUPS,
+                    rng,
+                    n_trials=10,
+                    concentration=concentration,
+                )
+                for _ in range(5000)
+            ]
+        )
+        return draws.var(axis=0)[0]
+
+    small, large, none = variance(1.0), variance(1e6), variance(None)
+    assert small > 2 * none
+    assert large == pytest.approx(none, rel=0.15)
+
+
+def test_softmax_draw_refuses_bad_noise_parameters() -> None:
+    """A number of choices below one or not whole, a concentration not
+    positive, and a per-group value of the wrong length are refused."""
+    rng = np.random.default_rng(0)
+    for kwargs, match in (
+        ({"n_trials": 0}, "whole numbers of at least one"),
+        ({"n_trials": 2.5}, "whole numbers of at least one"),
+        ({"n_trials": np.array([1, 2])}, "one per group"),
+        ({"n_trials": 3, "concentration": 0.0}, "finite and positive"),
+    ):
+        with pytest.raises(ValueError, match=match):
+            draw(GroupedSoftmax(), ETA, GROUPS, rng, **kwargs)
+
+
+def test_softmax_draw_refuses_a_group_without_weight() -> None:
+    """A group whose every ``eta`` is minus infinity (every share zero) has
+    no share to draw: it is refused, not given to its first row."""
+    eta = np.array([0.1, 0.2, -np.inf, -np.inf])
+    with pytest.raises(ValueError, match="group 1 has no finite eta"):
+        draw(GroupedSoftmax(), eta, np.array([0, 0, 1, 1]), np.random.default_rng(0))
+
+
+def test_a_draw_refuses_an_unknown_family() -> None:
+    """A likelihood without a draw is refused by name."""
+
+    class Other:
+        name = "other"
+
+    with pytest.raises(ValueError, match="no draw for the likelihood 'other'"):
+        draw(Other(), np.zeros(2), None, np.random.default_rng(0))
