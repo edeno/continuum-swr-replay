@@ -399,6 +399,117 @@ def test_sessions_without_a_value_counted(rate_sessions_cohort) -> None:
     assert set(by_key.loc[keys[3], "without_value"]) == {""}
 
 
+def test_no_interval_is_neither_covered_nor_a_rejection(rate_sessions_cohort) -> None:
+    """Only animal0 has events: each data set's estimate is finite but its
+    interval is NaN (one animal has no t quantile). Its ``covered`` and
+    ``excludes_zero`` are NaN, not 0 and 1, and the summary's rates leave it
+    out: with no data set with an interval both are NaN, and it counts the
+    data sets with an estimate, an interval and a day-level p."""
+    keys = list(rate_sessions_cohort)
+    zero = tuple(key for key in keys if key[0] != "animal0")
+    scenario = OutsideScenario(
+        "one_animal",
+        partial(expected_rate, zero_sessions=zero),
+        planted={"reward": 0.5},
+    )
+    model = rate_model(rate_sessions_cohort)
+    result = engine.run(_simulation(model, rate_sessions_cohort, [scenario]))
+    reward = result.data_sets.query("estimand == 'reward'")
+    assert np.isfinite(reward["estimate"]).all()
+    assert reward["low"].isna().all() and reward["high"].isna().all()
+    assert reward["covered"].isna().all()
+    assert reward["excludes_zero"].isna().all()
+    row = result.summary.set_index("estimand").loc["reward"]
+    assert row["n_data_sets_with_estimate"] == 2
+    assert row["n_data_sets_with_interval"] == 0
+    assert row["n_data_sets_with_day_p"] == 0
+    assert np.isnan(row["coverage"]) and np.isnan(row["coverage_se"])
+    assert np.isnan(row["excludes_zero"]) and np.isnan(row["excludes_zero_se"])
+    # A NaN day-level p is no rejection (the documented rule).
+    assert row["reject_day"] == 0.0
+
+
+def _hand_tables() -> tuple[pd.DataFrame, pd.DataFrame, Simulation]:
+    """A ``data_sets`` and a ``sessions`` table of one (scenario, model,
+    estimand) with answers known by hand, and a run of four sessions.
+
+    Five data sets, planted 1: three with an interval (two covering it, two
+    excluding zero), one with an estimate but no interval (and no day-level
+    p), one without an estimate. Ten session rows: two ``no_events`` (not
+    fitted), one ``support``, and one fit tried that did not converge."""
+    nan = np.nan
+    data_sets = pd.DataFrame(
+        {
+            "scenario": "s",
+            "model": "m",
+            "data_set": range(5),
+            "estimand": "e",
+            "planted": 1.0,
+            "estimate": [1.0, 2.0, 0.4, 1.2, nan],
+            "low": [0.5, 1.8, -0.1, nan, nan],
+            "high": [1.5, 2.2, 0.9, nan, nan],
+            "day_p": [0.01, 0.2, nan, nan, nan],
+            "n_sessions_used": [4, 4, 3, 2, 0],
+            "covered": [1.0, 0.0, 1.0, nan, nan],
+            "excludes_zero": [1.0, 1.0, 0.0, nan, nan],
+        }
+    )
+    causes = ["", "", "", "", "", "", "no_events", "no_events", "support", ""]
+    status = ["converged"] * 6 + ["not fitted"] * 2 + ["converged", "max_iter"]
+    sessions = pd.DataFrame(
+        {
+            "scenario": "s",
+            "model": "m",
+            "estimand": "e",
+            "without_value": causes,
+            "status": status,
+        }
+    )
+    keys = [(f"animal{a}", "20260001", "02_r1") for a in range(4)]
+    simulation = Simulation([], dict.fromkeys(keys), [], 5, 100, 7)
+    return data_sets, sessions, simulation
+
+
+def test_summary_arithmetic_by_hand() -> None:
+    """The summary of :func:`_hand_tables`, every value worked by hand."""
+    row = engine.summarize(*_hand_tables()).iloc[0]
+    estimates = np.array([1.0, 2.0, 0.4, 1.2])  # the four with an estimate
+    sd = np.sqrt(((estimates - 1.15) ** 2).sum() / 3)
+    expected = {
+        "planted": 1.0,
+        "mean_estimate": 1.15,
+        "bias": 0.15,
+        "bias_share": 0.15,
+        "sd": sd,
+        "bias_se": sd / 2,
+        # Over the three data sets with an interval.
+        "coverage": 2 / 3,
+        "coverage_se": np.sqrt(2 / 9 / 3),
+        "excludes_zero": 2 / 3,
+        "excludes_zero_se": np.sqrt(2 / 9 / 3),
+        # Over the four with an estimate, a NaN p no rejection.
+        "reject_day": 0.25,
+        "reject_day_se": np.sqrt(0.25 * 0.75 / 4),
+        "share_without_value": 0.3,
+        "without_value_no_events": 0.2,
+        "without_value_support": 0.1,
+        "share_not_converged": 1 / 8,
+        "n_sessions": 4,
+        "n_sessions_used_min": 0,
+        "n_sessions_used_mean": 2.6,
+        "n_data_sets": 5,
+        "n_data_sets_with_estimate": 4,
+        "n_data_sets_with_interval": 3,
+        "n_data_sets_with_day_p": 2,
+        "n_draws": 100,
+        "seed": 7,
+    }
+    for column, value in expected.items():
+        assert row[column] == pytest.approx(value), column
+    others = [c for c in CAUSES if c not in ("no_events", "support")]
+    assert all(row[f"without_value_{c}"] == 0.0 for c in others)
+
+
 def test_bootstrap_seeds_differ() -> None:
     """Each (model, estimand) of each data set has its own bootstrap seed,
     and the data sets of a scenario their own data seed."""
@@ -487,15 +598,25 @@ def reference_tables() -> dict[str, list[dict]]:
     }
 
 
+#: The summary's columns that the fixture predates.
+ADDED_COLUMNS = {"n_data_sets_with_interval", "n_data_sets_with_day_p"}
+
+
 @pytest.mark.slow
 def test_matches_the_fixed_seed_fixture() -> None:
     """The fixture's tables, to the tolerance of the solver's port
-    (``1e-11 + 1e-9 |b|``), with the counts exactly equal."""
+    (``1e-11 + 1e-9 |b|``), with the counts exactly equal. The summary's two
+    counts added after the fixture was written (:data:`ADDED_COLUMNS`) are
+    not stored: every fixture data set with an estimate has an interval."""
     stored = json.loads(FIXTURE.read_text())["tables"]
     for name, rows in reference_tables().items():
         assert len(rows) == len(stored[name])
         for got, want in zip(rows, stored[name], strict=True):
-            assert got.keys() == want.keys()
+            assert got.keys() - want.keys() == ADDED_COLUMNS
+            assert want.keys() <= got.keys()
+            n = got["n_data_sets_with_estimate"]
+            assert got["n_data_sets_with_interval"] == n
+            assert 0 <= got["n_data_sets_with_day_p"] <= n
             for column, value in want.items():
                 if isinstance(value, float):
                     assert got[column] == pytest.approx(

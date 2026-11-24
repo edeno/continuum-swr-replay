@@ -55,7 +55,8 @@ The tables of a run (:class:`SimulationResult`):
 - ``data_sets``: one row per (scenario, model, data set, estimand): the
   planted value, ``estimand_summary``'s estimate, interval, day-level p and
   sessions used, whether the interval holds the planted value
-  (``covered``) and whether it excludes zero (``excludes_zero``);
+  (``covered``) and whether it excludes zero (``excludes_zero``), both NaN
+  without a finite interval;
 - ``summary``: one row per (scenario, model, estimand), :data:`SUMMARY_COLUMNS`
   (described in :func:`summarize`).
 """
@@ -527,7 +528,9 @@ def _data_set_row(
     seed: int,
 ) -> dict:
     """One estimand's reduction over a data set's sessions (module docstring);
-    NaN when no session has a value."""
+    NaN when no session has a value. ``covered`` and ``excludes_zero`` are
+    NaN without a finite interval (``estimand_summary`` gives none with
+    fewer than two animals), so such a data set counts in neither rate."""
     index = pd.MultiIndex.from_tuples(keys)
     if not np.isfinite(values).any():
         return {
@@ -548,6 +551,7 @@ def _data_set_row(
         pd.Series(values, index=index), *labels, n_draws=n_draws, seed=seed
     )
     low, high = summary["low"], summary["high"]
+    interval = bool(np.isfinite(low) and np.isfinite(high))
     return {
         "planted": planted,
         "estimate": summary["estimate"],
@@ -557,8 +561,12 @@ def _data_set_row(
         "day_p": float(summary["day_p"]),
         "n_sessions_used": int(summary["n_sessions"]),
         "n_animals_same_sign": int(summary["n_animals_same_sign"]),
-        "covered": float(low <= planted <= high) if np.isfinite(planted) else np.nan,
-        "excludes_zero": float(not low <= 0.0 <= high),
+        "covered": (
+            float(low <= planted <= high)
+            if interval and np.isfinite(planted)
+            else np.nan
+        ),
+        "excludes_zero": float(not low <= 0.0 <= high) if interval else np.nan,
         "bootstrap_seed": seed,
     }
 
@@ -722,14 +730,18 @@ SUMMARY_COLUMNS = (
     "n_sessions_used_mean",
     "n_data_sets",
     "n_data_sets_with_estimate",
+    "n_data_sets_with_interval",
+    "n_data_sets_with_day_p",
     "n_draws",
     "seed",
 )
 
 
 def _share(hits: np.ndarray, name: str) -> dict[str, float]:
-    """The share of ``hits`` (0/1) and its binomial standard error; NaN
-    without any."""
+    """The share of ``hits`` (0/1, NaN for a data set that has none) and its
+    binomial standard error, over the data sets that have one; NaN without
+    any."""
+    hits = hits[np.isfinite(hits)]
     if hits.size == 0:
         return {name: np.nan, f"{name}_se": np.nan}
     p = float(hits.mean())
@@ -747,19 +759,25 @@ def summarize(
     for a planted value of zero or NaN), ``bias_se = sd / sqrt(n)``;
     ``coverage``, the share whose 95 % interval holds the planted value (NaN
     when it is NaN); ``excludes_zero``, the share whose interval excludes
-    zero; ``reject_day``, the share whose day-level p is below
-    :data:`REJECTION_LEVEL`, a NaN p (fewer than six non-zero day values)
-    counting as no rejection. Each share has its binomial standard error
-    (``*_se``). Under a planted value of zero ``excludes_zero`` and
-    ``reject_day`` are false-positive rates, otherwise power.
+    zero. Both are over the data sets with a finite interval only
+    (``n_data_sets_with_interval``; none with fewer than two animals with a
+    value), and NaN without any. ``reject_day`` is the share whose day-level
+    p is below :data:`REJECTION_LEVEL`, over every data set with an
+    estimate, a NaN p (fewer than six non-zero day values) counting as no
+    rejection; ``n_data_sets_with_day_p`` says how many had a p, so that a
+    rate of zero without any is not read as a test that never rejects.
+    Each share has its binomial standard error (``*_se``). Under a planted
+    value of zero ``excludes_zero`` and ``reject_day`` are false-positive
+    rates, otherwise power.
 
     Over every session of every data set: ``share_without_value`` and, for
     each code of :data:`CAUSES`, ``without_value_<code>``, the share of
     sessions without a value for that cause; ``share_not_converged``, the
     share of the session fits tried (status not ``not fitted``) that did not
     converge. ``n_sessions`` is the cohort's, ``n_sessions_used_min`` and
-    ``n_sessions_used_mean`` the sessions in the estimates; ``n_data_sets``
-    and ``n_data_sets_with_estimate``; ``n_draws`` and ``seed`` the run's.
+    ``n_sessions_used_mean`` the sessions in the estimates; ``n_data_sets``,
+    ``n_data_sets_with_estimate``, ``n_data_sets_with_interval`` and
+    ``n_data_sets_with_day_p``; ``n_draws`` and ``seed`` the run's.
     """
     out = []
     keys = ["scenario", "model", "estimand"]
@@ -811,6 +829,10 @@ def summarize(
                 "n_sessions_used_mean": float(group["n_sessions_used"].mean()),
                 "n_data_sets": len(group),
                 "n_data_sets_with_estimate": n,
+                "n_data_sets_with_interval": int(
+                    (np.isfinite(found["low"]) & np.isfinite(found["high"])).sum()
+                ),
+                "n_data_sets_with_day_p": int(np.isfinite(found["day_p"]).sum()),
                 "n_draws": simulation.n_draws,
                 "seed": simulation.seed,
             }
