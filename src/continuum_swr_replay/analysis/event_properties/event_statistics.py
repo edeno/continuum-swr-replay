@@ -35,6 +35,7 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
+    animal_medians,
     animal_session_values,
     session_median_statistics,
 )
@@ -551,26 +552,40 @@ def boundary_both_ends_differ_statistics(
 def reference_medians(reference: pd.DataFrame, signals: list[str]) -> pd.DataFrame:
     """The typical running and quiet-rest level of each signal.
 
+    Epoch -> animal -> mean over animals: each animal's median over its epochs
+    of the epoch's level, then the mean over animals.
+
     Parameters
     ----------
     reference : pd.DataFrame, shape (n_epochs, n_columns)
-        The brain-state reference: for each signal, each epoch's median while
-        running (``<signal>_running_median``) and in quiet rest
-        (``<signal>_rest_median``), z-scored within the epoch.
+        The brain-state reference: ``animal`` and, for each signal, each
+        epoch's median while running (``<signal>_running_median``) and in
+        quiet rest (``<signal>_rest_median``), z-scored within the epoch.
     signals : list of str
         The signals (``"theta"``, ``"ripple"``, ...).
 
     Returns
     -------
     medians : pd.DataFrame, shape (n_signals, 2)
-        ``running`` and ``rest``: the median over epochs of each, by signal.
+        ``running`` and ``rest``: the mean over animals of each animal's
+        median over its epochs, by signal. An epoch with no level is not one
+        of its animal's epochs.
     """
     return pd.DataFrame(
         {
-            "running": {s: reference[f"{s}_running_median"].median() for s in signals},
-            "rest": {s: reference[f"{s}_rest_median"].median() for s in signals},
+            regime: {
+                s: _animal_median_mean(reference, f"{s}_{regime}_median")
+                for s in signals
+            }
+            for regime in ("running", "rest")
         }
     )
+
+
+def _animal_median_mean(reference: pd.DataFrame, column: str) -> float:
+    """The mean over animals of each animal's median over its epochs of
+    ``column`` (an epoch with no value left out)."""
+    return float(animal_medians(reference[column], reference["animal"]).mean())
 
 
 _CLASS_WORDS = {False: "non_swr", True: "swr"}
@@ -586,21 +601,25 @@ def matched_reference_medians(
     Parameters
     ----------
     reference : pd.DataFrame, shape (n_epochs, n_columns)
-        For each signal, class (``swr``, ``non_swr``) and regime, each epoch's
-        ``<signal>_<regime>_matched_<class>`` (``gamma_power.matched_level``).
+        ``animal`` and, for each signal, class (``swr``, ``non_swr``) and
+        regime, each epoch's ``<signal>_<regime>_matched_<class>``
+        (``gamma_power.matched_level``).
     signals : list of str
 
     Returns
     -------
     medians : pd.DataFrame, shape (2 * n_signals, 2)
-        ``running`` and ``rest``, indexed by signal and ``is_swr``: the median
-        over the epochs that have the level (an epoch with no event of the class
-        has none).
+        ``running`` and ``rest``, indexed by signal and ``is_swr``: the mean
+        over animals of each animal's median over its epochs that have the
+        level (an epoch with no event of the class has none, and is not one of
+        its animal's epochs for that class).
     """
     return pd.DataFrame.from_dict(
         {
             (signal, is_swr): {
-                regime: reference[f"{signal}_{regime}_matched_{word}"].median()
+                regime: _animal_median_mean(
+                    reference, f"{signal}_{regime}_matched_{word}"
+                )
                 for regime in ("running", "rest")
             }
             for signal in signals

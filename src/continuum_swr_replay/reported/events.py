@@ -1454,7 +1454,8 @@ def gamma_z_values(
                         levels.loc[(word, is_swr), regime],
                         "quantity",
                         "dec2",
-                        f"median over epochs of the epoch's z-scored {label} in "
+                        "mean over animals of each animal's median over its epochs "
+                        f"(those with such events) of the epoch's z-scored {label} in "
                         f"{words_of_regime} windows as long as its {name} events (the "
                         "median over the events of one window's mean each, averaged "
                         "over the draws)",
@@ -1504,7 +1505,8 @@ def _signal_values(
                 levels.loc[word, "running"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} while running",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} while running",
                 "z",
             ),
             make(
@@ -1512,7 +1514,8 @@ def _signal_values(
                 levels.loc[word, "rest"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} in quiet rest",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} in quiet rest",
                 "z",
             ),
         ]

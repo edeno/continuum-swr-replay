@@ -1202,8 +1202,9 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     the spread over events is seen, not only the center: ripple and MUA rise
     at the start, theta stays at
     its level between events, far below running, and the animal is still. The
-    dashed "between events" line is the epochs' median in immobile bins outside
-    every non-local, SWR and MUA event (``reference_medians``).
+    dashed "between events" line is each epoch's median in immobile bins
+    outside every non-local, SWR and MUA event, each animal's median over its
+    epochs, then the mean over animals (``reference_medians``).
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
     groups = [(key, *EVENT_KINDS[is_swr][::-1]) for key, is_swr in WINDOW_KINDS.items()]

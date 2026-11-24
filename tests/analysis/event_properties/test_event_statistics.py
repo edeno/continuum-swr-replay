@@ -317,11 +317,30 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     return events.assign(session_date="d1"), reference
 
 
-def test_reference_medians_are_medians_over_epochs():
+def test_reference_medians_are_each_animals_median_then_the_mean():
     _, reference = _signal_tables()
     levels = stats.reference_medians(reference, ["theta"])
-    assert levels.loc["theta", "running"] == 1.0
-    assert levels.loc["theta", "rest"] == -0.5
+    # running: a's median of 1 and 2, 1.5, and b's 1 (pooled: 1)
+    assert levels.loc["theta", "running"] == pytest.approx(1.25)
+    # rest: a's median of -1 and 0, -0.5, and b's -0.5
+    assert levels.loc["theta", "rest"] == pytest.approx(-0.5)
+
+
+def test_reference_medians_leave_out_an_epoch_without_a_level():
+    """a has three epochs (1, 2, 6: median 2), b two, one of them without a
+    level (0): the mean is 1, where the median over the four levels would be
+    1.5. The mean of a's epochs would be 3, which a median does not take."""
+    reference = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "b"],
+            "theta_running_median": [1.0, 2.0, 6.0, 0.0, np.nan],
+            "theta_rest_median": [-1.0, -1.0, 5.0, np.nan, -3.0],
+        }
+    )
+    levels = stats.reference_medians(reference, ["theta"])
+    assert levels.loc["theta", "running"] == pytest.approx(1.0)
+    # rest: a -1, b -3
+    assert levels.loc["theta", "rest"] == pytest.approx(-2.0)
 
 
 def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels():
@@ -413,12 +432,23 @@ def test_matched_statistics_count_animals_against_their_class_s_windows():
     assert result.loc[("theta", False), "n_animals_above_rest"] == 2
     # no SWR, a: 1.15 below 1.7; b: 1.0 below 1.2 (it equals the running median)
     assert result.loc[("theta", False), "n_animals_below_running"] == 2
+    # each animal's median over its epochs, then the mean: no SWR, running a
+    # 1.7 (1.2, 2.2), b 1.2; rest a -0.4 (-0.9, 0.1), b -0.4
     levels = stats.matched_reference_medians(_matched_reference(), ["theta"])
     assert levels.loc[("theta", False)].to_dict() == pytest.approx(
-        {"running": 1.2, "rest": -0.4}
+        {"running": 1.45, "rest": -0.4}
     )
+    # SWR, running a 1.9 (1.4, 2.4), b 1.4; rest a -0.8 (-0.7, -0.9), b 0.2
     assert levels.loc[("theta", True)].to_dict() == pytest.approx(
-        {"running": 1.4, "rest": -0.7}
+        {"running": 1.65, "rest": -0.3}
+    )
+    # an epoch with no event of a class has no level and is left out: a's
+    # first epoch without SWR windows leaves a 2.4 and -0.9
+    without = _matched_reference()
+    without.loc[0, ["theta_running_matched_swr", "theta_rest_matched_swr"]] = np.nan
+    levels = stats.matched_reference_medians(without, ["theta"])
+    assert levels.loc[("theta", True)].to_dict() == pytest.approx(
+        {"running": (2.4 + 1.4) / 2, "rest": (-0.9 + 0.2) / 2}
     )
 
 
