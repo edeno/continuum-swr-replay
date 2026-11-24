@@ -95,7 +95,7 @@ from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.panel_layout import place_letters
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
     check_journal_limits,
     check_placement,

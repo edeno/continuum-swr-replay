@@ -16,9 +16,7 @@ import pytest  # noqa: E402
 
 from continuum_swr_replay.analysis.event_evidence import heldout_runs  # noqa: E402
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
-from continuum_swr_replay.visualization.simulated_run_panels import (  # noqa: E402
-    drawn_extent,
-)
+from continuum_swr_replay.visualization.publication_style import drawn_extent
 from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     GAIN_SPLIT,

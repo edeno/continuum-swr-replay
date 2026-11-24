@@ -1610,9 +1610,7 @@ def test_figure03_track_map_names_the_center_a_junction_and_a_well(offline):
     from matplotlib.collections import PolyCollection
     from matplotlib.path import Path
 
-    from continuum_swr_replay.visualization.simulated_run_panels import (
-        overlapping_texts,
-    )
+    from continuum_swr_replay.visualization.publication_style import overlapping_texts
 
     figure03 = offline("scripts.figures.generate_figure03")
     graph, edge_order = _spider_track()

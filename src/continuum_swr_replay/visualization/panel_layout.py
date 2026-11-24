@@ -22,7 +22,7 @@ from matplotlib.figure import Figure
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     PANEL_LETTER_SIZE,
     drawn_extent,
 )

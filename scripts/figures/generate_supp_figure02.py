@@ -432,14 +432,14 @@ from continuum_swr_replay.visualization.panel_layout import (
     panel_spans,
     place_letters,
 )
-from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
-    STATE_COLORS,
     check_journal_limits,
     check_placement,
     set_publication_style,
 )
+from continuum_swr_replay.visualization.signal_share_panels import draw_share_by_signal
+from continuum_swr_replay.visualization.simulated_run_panels import STATE_COLORS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"

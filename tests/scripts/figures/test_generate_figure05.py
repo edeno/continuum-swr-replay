@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 )
 from continuum_swr_replay.visualization import figure_utilities
 from continuum_swr_replay.visualization.palettes import COLORS
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     check_journal_limits,
     set_publication_style,
 )

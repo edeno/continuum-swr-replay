@@ -894,3 +894,14 @@ removed. `event_bin_facts`' records keep the deleted run's record digest
 | `paths.EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR`, `..._SWR_ALLOWED_HELDOUT_EVENTS_DIR`, `..._SWR_ALLOWED_WINDOWS_DIR` (removed) | `paths.EVENT_NONLOCAL_RESTRICTION_DIR`, `..._HELDOUT_EVENTS_DIR`, `..._WINDOWS_DIR` |
 | `EventsInputs.nonlocal_restriction_swr_allowed`, `nonlocal_restriction_swr_allowed_heldout_events` (removed) | `EventsInputs.nonlocal_restriction`, `nonlocal_restriction_heldout_events` |
 | `REFUSED_FOUR` in `scripts/figures/generate_supp_figure02.py` (removed) | panel l reads panel i's runs |
+
+## Figure 2's code, 2026-11-24
+
+The figure scripts of Figure 2 and its supplement were given one shape (inputs read
+first, then drawn), and what they share moved into shared modules. Paths are under
+`src/continuum_swr_replay/` unless they start with `scripts/` or `tests/`.
+
+| Old place | New place |
+|---|---|
+| `visualization/simulated_run_panels.py`: `LABEL_SIZE`, `SMALL_SIZE`, `PANEL_LETTER_SIZE`, `set_publication_style`, `MAX_FIGURE_SIZE_CM`, `TEXT_SIZE_LIMITS_PT`, `LINE_WIDTH_LIMITS_PT`, `check_journal_limits`, `drawn_extent`, `drawn_texts`, `TEXT_OVERLAP_PT`, `overlapping_texts`, `overlapping_panels`, `check_placement` (removed: moved) | `visualization/publication_style.py` |
+| `tests/visualization/test_simulated_run_panels.py`: the journal-limit and placement tests (removed: moved) | `tests/visualization/test_publication_style.py` |

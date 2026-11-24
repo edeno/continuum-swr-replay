@@ -332,18 +332,19 @@ from continuum_swr_replay.visualization.plots import (
     plot_spike_times,
     plot_track_graph_2d,
 )
-from continuum_swr_replay.visualization.signal_share_panels import (
-    draw_share_by_signal,
-)
-from continuum_swr_replay.visualization.simulated_run_panels import (
-    ANIMAL_POS_COLOR,
+from continuum_swr_replay.visualization.publication_style import (
     LABEL_SIZE,
     LINE_WIDTH_LIMITS_PT,
     SMALL_SIZE,
     check_journal_limits,
     check_placement,
     drawn_extent,
+    set_publication_style,
 )
+from continuum_swr_replay.visualization.signal_share_panels import (
+    draw_share_by_signal,
+)
+from continuum_swr_replay.visualization.simulated_run_panels import ANIMAL_POS_COLOR
 
 # The render cache's version, part of its file name. The name also carries the
 # SWR source's name and fingerprints of the epoch register's analyzed epochs, of
@@ -363,27 +364,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
 )
 figure_utilities.set_figure_defaults(context="paper")
-plt.rcParams.update(
-    {
-        "font.size": SMALL_SIZE,
-        "axes.labelsize": LABEL_SIZE,
-        "axes.titlesize": LABEL_SIZE,
-        "xtick.labelsize": SMALL_SIZE,
-        "ytick.labelsize": SMALL_SIZE,
-        "legend.fontsize": SMALL_SIZE,
-        "axes.linewidth": 0.6,
-        "xtick.major.width": 0.6,
-        "ytick.major.width": 0.6,
-        "xtick.minor.width": 0.5,
-        "ytick.minor.width": 0.5,
-        "xtick.major.size": 2.5,
-        "ytick.major.size": 2.5,
-        "lines.linewidth": 0.9,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "figure.constrained_layout.use": False,
-    }
-)
+set_publication_style()
 warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).

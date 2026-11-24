@@ -107,12 +107,14 @@ from continuum_swr_replay.visualization.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.visualization.panel_layout import place_letters
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.publication_style import (
     LABEL_SIZE,
-    NON_LOCAL_COLOR,
     SMALL_SIZE,
-    axes_added,
     check_journal_limits,
+)
+from continuum_swr_replay.visualization.simulated_run_panels import (
+    NON_LOCAL_COLOR,
+    axes_added,
     plot_posterior,
     plot_raster,
     posterior_color_limit,

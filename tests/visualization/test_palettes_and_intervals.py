@@ -236,3 +236,32 @@ def test_spike_raster_ticks_sit_on_the_first_and_last_rows():
     assert list(ax.get_yticks()) == [rows[0], rows[-1]]
     assert [t.get_text() for t in ax.get_yticklabels()] == ["1", "3"]
     plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    ("color", "expected"),
+    [
+        ("#add8e6", "black"),
+        ("#b0b0b0", "black"),
+        ("#1b9e77", "white"),
+        ("#D55E00", "white"),
+    ],
+)
+def test_text_on_a_light_fill_is_black_and_on_a_dark_fill_white(color, expected):
+    from continuum_swr_replay.visualization.palettes import text_color_on
+
+    assert text_color_on(color) == expected
+
+
+def test_a_light_color_is_darkened_for_text_and_a_dark_one_kept():
+    from colorsys import rgb_to_hls
+
+    from matplotlib.colors import to_rgb
+
+    from continuum_swr_replay.visualization.palettes import readable_text_color
+
+    assert readable_text_color("#1b9e77") == "#1b9e77"
+    darkened = readable_text_color("#add8e6")
+    hue, lightness, _ = rgb_to_hls(*to_rgb(darkened))
+    assert lightness == pytest.approx(0.4, abs=0.01)
+    assert hue == pytest.approx(rgb_to_hls(*to_rgb("#add8e6"))[0], abs=0.01)

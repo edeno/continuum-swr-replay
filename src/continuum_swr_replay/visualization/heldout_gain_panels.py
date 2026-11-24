@@ -29,7 +29,7 @@ from continuum_swr_replay.visualization.palettes import (
     REFERENCE_COLOR,
     readable_text_color,
 )
-from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
+from continuum_swr_replay.visualization.publication_style import SMALL_SIZE
 
 GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["SWR"]}
 """Each group's color, in the figures' order: no-SWR events, then SWR events."""

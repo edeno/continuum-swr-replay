@@ -16,9 +16,7 @@ from continuum_swr_replay.visualization.panel_layout import (  # noqa: E402
     panel_spans,
     place_letters,
 )
-from continuum_swr_replay.visualization.simulated_run_panels import (  # noqa: E402
-    drawn_extent,
-)
+from continuum_swr_replay.visualization.publication_style import drawn_extent
 
 
 @pytest.fixture
