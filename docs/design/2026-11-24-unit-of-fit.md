@@ -1,6 +1,8 @@
 # The unit of the fit: session, day or animal, one setting for the behavior models
 
-2026-11-24. Status: **proposal**. Nothing here is built. The implementation plan is
+2026-11-24. Status: **direction given by the lead; the task-free mechanism is being built** (section 11
+has what the simulations and the lead settled after sections 1 to 10 were written, and where it and an
+earlier section disagree, section 11 holds). The implementation plan is
 `.claude/docs/plans/regression-convention/phase-4b-unit-of-fit.md`. The convention this changes is
 [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-convention-and-figure04.md)
 (the "design" below), sections 4.3 and 4.5 and the fourteenth and seventeenth rounds of its section 9.
@@ -300,3 +302,78 @@ to it and does not replace it:
 6. Whether design D follows, and for which models (section 9).
 
 The plan lists these as questions for the lead, each with the evidence that is still awaited.
+
+## 11. After the simulations (2026-11-24, 10:00)
+
+Every number here is a simulation number. The reports are under
+`.claude/research/2026-11-20-regression-prototypes/`: `design_d_trial/rate/REPORT.md` (one `mgcv::bam` fit
+per animal, 242 sessions, 1,800 fits), `design_d_trial/content/REPORT.md` (one fit per animal with random
+session arm effects and REML, a hand-built sparse fitter, 2,110 fits), `content_validation/unit_of_fit/`
+(`tables.md`: the same data sets fitted per session, per day and per animal, fixed penalties; interim at
+54 of 56 tasks).
+
+### 11.1 What the lead said
+
+- 09:47: "I suspect with will end up doing design C for all. And then running both the day and animal
+  model and compare"
+- 09:48: "I think there will be a decent amount of variation from day to day (or even session to session)
+  from learning, motivation, etc."
+- 09:49: "So maybe design C with day and animal model and then design D later to check."
+
+**Call (the author's reading):** the behavior models are built as design C; the setting `fit_by` carries
+both `"day"` and `"animal"`, both are simulated and, after the lead has seen the validation, both are
+fitted and compared; design D is a later check on the same mechanism (section 9), not part of this phase.
+Design C shares the tested terms, the curves included, inside a unit. That is the point the fourteenth
+round declined on 2026-11-21 for the per-session design; the lead has now seen design C described in those
+terms twice (the rate trial's "C-like" form, the content run's form B) and named it. The rate model's
+clock curves stay question 1 until its scenario with session-specific curves reports (11.4).
+
+### 11.2 What the simulations settled
+
+| question (section 10) | answer | evidence |
+|---|---|---|
+| 2. Content: arm effects shared or per session | **per session** (a baseline for each session) | animal unit, nothing planted, 60 tests: largest bias 0.035 with per-session arm effects against 0.062 with shared ones, whose interval excludes zero in up to 35 % of data sets in a test |
+| 3. Penalties: fixed or REML | **fixed, declared** (the author's decision, on the lead's "Ok decide then") | REML over-smooths the curves the tests read at their ends: rate Q7a +0.20 for SWR (coverage 0.3); content Q7b -20 % / -60 % and Q5a -15 to -24 % with REML, against +6 % / -5 % and -7 % / +7 % at the declared penalties |
+| 3. The values of the fixed penalties | **content: today's per-session values**; recalibrating on the unit was not better (the leaving curve for SWR 20 % too small). Rate: awaited (11.4) | `unit_of_fit/tables.md`, columns `*_pS` against `*_pU` |
+| 6. Design D | **no gain over C in either model**, at ten times the time per fit (rate) and with a fitter the project does not have (content); a later check | both trial reports |
+
+What a larger unit does to the bias of the per-session design (content, nothing planted, No SWR / SWR):
+Q3a -0.22 / -0.15 per session, -0.03 / -0.03 per day, -0.005 / -0.005 per animal; Q7b -0.34 / -0.47,
+-0.08 / -0.18, -0.02 / -0.03; Q5b-var +0.26 / +0.25, +0.04 / +0.06, +0.004 / +0.002. Rate, reward
+coefficient, nothing planted: +0.11 / +0.09 per session, +0.011 / +0.006 per animal (form C).
+
+**A day is not enough for every content test** at the sizes simulated: the leaving curve, the
+belief-variance slope and a small current-arm effect still fail the 10 % and 0.05 rule at the day unit,
+and its interval is wide (it excludes zero in 0.2 % of the tests with nothing planted; a planted Q5a of
+0.20 is detected in 5 to 10 % of data sets, against 70 % at the animal unit). The day unit is kept
+because it shows what the animal unit hides: the variation between days and a trend over days (11.3).
+
+### 11.3 Variation between days and sessions (the lead's 09:48 point)
+
+- **Variation in the level** (the rate, the arm preferences) is the per-session baseline's job.
+- **Variation in a tested effect**: an animal's fit returns the pooled value (near an event-weighted mean
+  of its sessions); a day's fit returns the day's own value. Tested so far: independent session-to-session
+  variation only (content: role levels and slopes with session SD 0.2 and arm effects with SD 0.3, the
+  animal fit within 2 to 14 % of the plain mean; rate: session SD 0.3 on the log ratio, the animal fit
+  about 5 % below the mean of the sessions).
+- **Not tested, and added to the validation**: a day-level component (the sessions of a day move
+  together), a trend over an animal's recording days (learning), and a day-level shift of the level
+  (motivation). For each, at both units: both targets of section 6; how well the day fits recover the
+  planted day values; a moment estimate of the between-day SD from the day estimates and their standard
+  errors, also where none is planted; the slope of the day estimates on the day's rank; and the
+  difference between an animal's value and the mean of its day values, which is what the comparison on
+  the real data will show.
+- The interval over the five animals does not rest on the errors inside one animal's fit, so
+  between-day variation inside an animal does not invalidate it; it changes what the animal's value means.
+
+### 11.4 Still open
+
+1. Rate: clock curves shared in the unit or per session (the scenario with session-specific curves is
+   running, `design_d_trial/rate/followup/`); the rate model at the day unit; the declared penalties of
+   the rate clocks at a larger unit; whether an outcome-specific arrival curve with a window contrast
+   answers the later-onset problem (the same follow-up).
+2. Which target the paper states when sessions differ (section 6): the two differ by about 5 to 10 % at
+   the variation simulated.
+3. Which unit the paper's headline values come from, after both are fitted and compared.
+4. A session without support for its baseline (question 8 of the plan): the default stays "its rows are
+   dropped and counted".

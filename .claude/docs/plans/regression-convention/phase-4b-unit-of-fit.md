@@ -6,7 +6,8 @@ Branch: `unit-of-fit` from master, after the rate branch (`visit-rate-validation
 (`role-content-models`) have each taken master and been merged (see "Order of work"). CPU only. No real
 fit is run in this phase.
 
-**Status:** not started. The what and the why are in the design note,
+**Status:** tasks 1, 2, 3, 5 and 7 started 2026-11-24 on branch `unit-of-fit` (see "Amendments,
+2026-11-24" at the end, which holds where it and a task above disagree). The what and the why are in the design note,
 `docs/design/2026-11-24-unit-of-fit.md` (read all of it first). This file is the work.
 
 **Decided by the lead (2026-11-24):** "I'd like to be consistent with what we do with the behavior
@@ -398,3 +399,44 @@ master.
 - `docs/README.md`: an index line for `docs/design/2026-11-24-unit-of-fit.md`.
 - `docs/design/regression_fitter.md` (edited by the rate branch): task 13's sections.
 - `docs/regression_pipeline_map.md` (edited by both branches): regenerated after task 13.
+
+## Amendments, 2026-11-24 (after the simulations and the lead's 09:47 to 09:49 words)
+
+The design note's section 11 has the evidence. What changes in this file:
+
+- **Order of work.** The lead: "I suspect with will end up doing design C for all. And then running both
+  the day and animal model and compare" and "So maybe design C with day and animal model and then design D
+  later to check." The task-free tasks (1, 2, 3, 5, 7, then 11) start now from master 5ad82a02, which has
+  the JAX fitter and the cleanup of 2026-11-24; the rate and content branches take master and this branch
+  afterward (tasks 8 to 10, 12).
+- **Question 2 is answered: per-session arm effects** (the baseline). `RoleContentSettings.arm_effects`
+  is not built as a choice (task 9).
+- **Question 3 is answered: fixed, declared penalties.** Task 6's `penalty_rule = "reml"` path is not
+  built. The content model keeps today's per-session values at every unit (recalibrating on the unit was
+  not better); a penalty is a declared value of the model, not tied to a unit, so the refusal of "a
+  penalty calibrated at another unit" is not built either. `log_penalty_for_edf` still gains `fit_by`
+  (the median over units), for the rate clocks, whose values are open.
+- **Question 6: design D is a later check**, on this mechanism (design note, section 9). Nothing of D is
+  built here.
+- **Task 2.** The record's parquet storage was removed on 2026-11-24 (`record.write_records`,
+  `read_records`; `tests/analysis/regression/test_record.py` went with it), so the two `test_record.py`
+  tests are not written. `FitRecord` gains `fit_by` and `sessions` as written.
+- **Task 4.** `support.terms_failing_share` was removed on 2026-11-24 (no fit applied it); only the rate
+  model's `third_clock_decision` counts a share over units (task 8), and `log_penalty_for_edf` takes the
+  median over units.
+- **Task 5.** `shared_statistics.animal_mean_interval` is on the rate branch only; this branch adds it to
+  master with its tests (copied from `origin/visit-rate-validation`), and the rate branch drops its copy
+  when it takes master. Master's `animal_mean` (a table's mean per animal, 2026-11-24) is another
+  function; `unit_summary` does not replace it.
+- **Task 7.** The engine's own-fit path and its animal-unit branch are on the rate branch only; on master
+  the engine gains `fit_by`, `unit_summary` and the two targets, and the rate branch's copies go when it
+  takes master.
+- **Task 10 gains the lead's 09:48 point** ("a decent amount of variation from day to day (or even session
+  to session) from learning, motivation, etc."): each model's scenarios plant a day-level component of the
+  tested effects, a trend over an animal's recording days, and a day-level shift of the level, and the
+  statistics modules report, at the day unit, the between-day SD (the variance of the day estimates within
+  an animal less their mean squared standard error, floored at 0) and the slope of the day estimates on
+  the day's rank, and the difference between an animal's value and the mean of its day values.
+- **The program bound** (`runtime.LIVE_PROGRAM_LIMIT`): a unit's fit is one outermost call per unit, as a
+  session's is today; `fit_sessions` stays without `in_float64` (`docs/design/regression_fitter.md`, "How
+  many programs a process keeps").
