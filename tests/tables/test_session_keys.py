@@ -10,6 +10,7 @@ import pytest
 
 from continuum_swr_replay.tables.covariate_registry import row_keys
 from continuum_swr_replay.tables.session_keys import (
+    FIT_BY_COLUMNS,
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
     n_sessions,
@@ -17,6 +18,7 @@ from continuum_swr_replay.tables.session_keys import (
     session_key_frame,
     session_key_set,
     subset_max_per_animal,
+    unit_key,
 )
 
 
@@ -171,3 +173,30 @@ def test_subset_max_per_animal_keeps_each_animal_s_first_sessions():
 
     by_key = subset_max_per_animal(frame, 1, sort_sessions=True)
     assert by_key["row"].tolist() == [2, 3, 6]
+
+
+def test_unit_key_of_each_fit_by():
+    """A session's unit: itself, its recording day, or its animal; the key's
+    columns are those of ``FIT_BY_COLUMNS``."""
+    key = ("chimi", "20200212", "02_r1")
+    assert unit_key(key, "session") == ("chimi", "20200212", "02_r1")
+    assert unit_key(key, "day") == ("chimi", "20200212")
+    assert unit_key(key, "animal") == ("chimi",)
+    assert FIT_BY_COLUMNS == {
+        "session": SESSION_COLUMNS,
+        "day": ("animal", "session_date"),
+        "animal": ("animal",),
+    }
+    for fit_by, columns in FIT_BY_COLUMNS.items():
+        assert len(unit_key(key, fit_by)) == len(columns)
+
+
+@pytest.mark.parametrize("fit_by", ["epoch", "Day", "", None])
+def test_unknown_fit_by_refused(fit_by):
+    with pytest.raises(ValueError, match="fit_by"):
+        unit_key(("chimi", "20200212", "02_r1"), fit_by)
+
+
+def test_a_session_key_of_three_parts():
+    with pytest.raises(ValueError, match="three"):
+        unit_key(("chimi", "20200212"), "day")

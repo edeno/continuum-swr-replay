@@ -14,9 +14,18 @@ The table builders and the analyses that group by an id share three helpers
 here: :func:`present_session_columns` (the session columns a frame carries),
 :func:`require_session_unique_ids` (an id names one session) and
 :func:`one_session` (the one epoch a per-epoch frame holds).
+
+The unit of a fit is declared here too, beside the session key, because it is
+a grouping of sessions and knows nothing of the task: :data:`FitBy` names the
+unit (one fit for each session, each recording day of an animal, or each
+animal), :data:`FIT_BY_COLUMNS` gives the key columns of each unit, and
+:func:`unit_key` maps a session key to the key of its unit
+(``docs/design/2026-11-24-unit-of-fit.md``, section 4).
 """
 
 from __future__ import annotations
+
+from typing import Literal
 
 import pandas as pd
 
@@ -30,7 +39,20 @@ SESSION_COLUMNS: tuple[str, ...] = row_keys(table="event")[:3]
 # The hippocampus event table's date column is ``day``, not ``session_date``.
 SESSION_COLUMNS_DAY: tuple[str, ...] = ("animal", "day", "epoch")
 
+#: The unit of a fit: one fit for each session, for each recording day of an
+#: animal, or for each animal.
+FitBy = Literal["session", "day", "animal"]
+
+#: Each unit's key columns: a prefix of :data:`SESSION_COLUMNS`.
+FIT_BY_COLUMNS: dict[str, tuple[str, ...]] = {
+    "session": SESSION_COLUMNS,
+    "day": SESSION_COLUMNS[:2],
+    "animal": SESSION_COLUMNS[:1],
+}
+
 __all__ = [
+    "FIT_BY_COLUMNS",
+    "FitBy",
     "SESSION_COLUMNS",
     "SESSION_COLUMNS_DAY",
     "session_key_set",
@@ -40,7 +62,40 @@ __all__ = [
     "one_session",
     "present_session_columns",
     "require_session_unique_ids",
+    "unit_key",
 ]
+
+
+def unit_key(session_key: tuple, fit_by: FitBy) -> tuple:
+    """The key of the unit that holds a session.
+
+    Parameters
+    ----------
+    session_key : tuple
+        ``(animal, session_date, epoch)``.
+    fit_by : {"session", "day", "animal"}
+
+    Returns
+    -------
+    tuple
+        The first ``len(FIT_BY_COLUMNS[fit_by])`` parts of ``session_key``:
+        the session itself, ``(animal, session_date)`` or ``(animal,)``.
+
+    Raises
+    ------
+    ValueError
+        If ``fit_by`` is not a :data:`FitBy` value, or the session key does not
+        have three parts.
+    """
+    if fit_by not in FIT_BY_COLUMNS:
+        raise ValueError(
+            f"fit_by must be one of {list(FIT_BY_COLUMNS)}, not {fit_by!r}"
+        )
+    if len(session_key) != len(SESSION_COLUMNS):
+        raise ValueError(
+            f"a session key has three parts {SESSION_COLUMNS}, not {session_key!r}"
+        )
+    return tuple(session_key[: len(FIT_BY_COLUMNS[fit_by])])
 
 
 def session_key_set(
