@@ -91,7 +91,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.tables.session_keys import FitBy, unit_key
+from continuum_swr_replay.tables.session_keys import FitBy, unit_fields, unit_key
 
 from .collinearity import term_collinearity
 from .likelihoods import Bernoulli, GroupedSoftmax, Likelihood, Poisson
@@ -597,7 +597,7 @@ def _record(
                 session_copies=_session_copies(session, beta),
             )
             edf = _edf(design, last, block_terms, np.isfinite(beta))
-    animal, session_date, epoch = (*identity.key, "", "")[:3]
+    animal, session_date, epoch = unit_fields(identity.key)
     return FitRecord(
         model=identity.model,
         kind=identity.kind,

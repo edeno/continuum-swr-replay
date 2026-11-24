@@ -25,6 +25,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
 | `simulation.py` | the simulation engine: an outcome drawn from a planted truth on a model's own rows, fitted and reduced by the real code |
+| `units.py` | one estimate per unit of a fit, indexed by the unit's key, and its reduction (`unit_summary`) |
 | `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces |
 | `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows |
 
@@ -758,7 +759,9 @@ the difference of the two kinds' session estimates, reduced the same way. With f
 animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
 alone.
 
-`unit_summary(values, fit_by, n_draws=..., seed=...)` reduces one estimate per unit of a
+`units.unit_summary(values, fit_by, n_draws=..., seed=...)` (in the fitter's package, as it
+knows the units; `units.unit_values` indexes a fit's values by `FitRecord.unit_key`, and
+`units.unit_estimate` is its estimate alone) reduces one estimate per unit of a
 fit (`tables.session_keys.FitBy`; `docs/design/2026-11-24-unit-of-fit.md`, section 7), with
 the same keys at every unit. At `"session"` it is `estimand_summary`. At `"day"` it is
 `estimand_summary` with each day as its own session. At `"animal"` it is
@@ -772,7 +775,7 @@ day, or one row per animal whose day label is the animal
 **The rule.** A simulation replaces only the outcome column of a model's own rows. The
 rows, the design, the fit of each unit (`fit_sessions` at the model's `fit_by`), the
 estimands (`contrasts`) and the reduction over the units with the project's interval
-(`shared_statistics.unit_summary`) are the real functions. Models that differ only in
+(`units.unit_summary`) are the real functions. Models that differ only in
 their `fit_by` are fitted to the same drawn data sets in one run.
 
 **Two targets.** Each data set has the present target, `planted` (the planted value, the

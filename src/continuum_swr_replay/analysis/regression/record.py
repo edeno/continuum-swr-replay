@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from continuum_swr_replay.tables.session_keys import unit_key
+
 from .reml import RefitEnd
 
 __all__ = ["FitRecord", "NoFit"]
@@ -156,3 +158,9 @@ class FitRecord:
     no_fit: str
     fit_by: str
     sessions: list
+
+    @property
+    def unit_key(self) -> tuple:
+        """The key of the fit's unit: ``(animal, session_date, epoch)``,
+        ``(animal, session_date)`` or ``(animal,)`` by ``fit_by``."""
+        return unit_key((self.animal, self.session_date, self.epoch), self.fit_by)

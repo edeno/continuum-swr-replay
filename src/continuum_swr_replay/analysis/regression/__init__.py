@@ -33,6 +33,8 @@ package may import it.
   destination well, long stays cut into pieces.
 - ``bands``: simultaneous 95 % bands for a curve, one fit's and the
   animal-balanced curve's across sessions.
+- ``units``: one estimate per unit of a fit, indexed by the unit's key, and
+  its reduction by the rule of the unit (session, day or animal).
 - ``runtime``: how the fitter's JAX runs: float64 for each call, the device
   guard, the float64 kernel guard and the log of traces. It imports JAX; the
   other modules do not.

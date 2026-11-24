@@ -6,7 +6,7 @@ design, the fit of each unit (:func:`.sessions.fit_sessions` at the model's
 ``fit_by``: a session, a recording day or an animal), the estimands
 (:func:`.contrasts.evaluate_contrast`) and the reduction over the units with
 the project's interval
-(:func:`continuum_swr_replay.analysis.shared_statistics.unit_summary`) are the
+(:func:`.units.unit_summary`) are the
 real functions. Nothing here builds a model: the caller gives the
 :class:`Model` as the model's own code builds it, and the engine only draws
 outcomes (:func:`.likelihoods.draw`) and calls those functions.
@@ -92,9 +92,8 @@ import numpy as np
 import pandas as pd
 from scipy.special import expit
 
-from continuum_swr_replay.analysis.shared_statistics import unit_summary
 from continuum_swr_replay.runs.threads import pool_context
-from continuum_swr_replay.tables.session_keys import FIT_BY_COLUMNS, FitBy
+from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns
 
 from .contrasts import evaluate_contrast
 from .likelihoods import (
@@ -110,6 +109,7 @@ from .record import FitRecord, NoFit
 from .sessions import NOT_FITTED, SessionKey, fit_sessions
 from .support import Removed, require_tested_penalized
 from .terms import Design
+from .units import unit_estimate, unit_summary, unit_values
 
 __all__ = [
     "CAUSES",
@@ -191,8 +191,7 @@ class Model:
                 )
             estimands[name] = c
         object.__setattr__(self, "estimands", estimands)
-        if self.fit_by not in FIT_BY_COLUMNS:
-            raise ValueError(f"model {self.name!r}: fit_by {self.fit_by!r}")
+        fit_by_columns(self.fit_by)
         baseline = [
             n
             for c in estimands.values()
@@ -664,12 +663,6 @@ def _unit_c(c: np.ndarray, model: Model, record: FitRecord) -> np.ndarray:
     return out
 
 
-def _unit_key(record: FitRecord) -> tuple:
-    """The key of the unit a record is of."""
-    full = (record.animal, record.session_date, record.epoch)
-    return full[: len(FIT_BY_COLUMNS[record.fit_by])]
-
-
 def _session_rows(
     model: Model, records: Sequence[FitRecord], base: dict
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
@@ -707,28 +700,6 @@ def _session_rows(
     return rows, {name: np.array(v) for name, v in estimates.items()}
 
 
-def _unit_values(values: np.ndarray, records: Sequence[FitRecord]) -> pd.Series:
-    """One estimate per unit, indexed by the unit's key."""
-    keys = [_unit_key(r) for r in records]
-    index = pd.Index([k[0] for k in keys]) if len(keys[0]) == 1 else None
-    if index is None:
-        index = pd.MultiIndex.from_tuples(keys)
-    return pd.Series(values, index=index)
-
-
-def _reduced_estimate(values: np.ndarray, records: Sequence[FitRecord]) -> float:
-    """The estimate of :func:`unit_summary` over the units (it does not read
-    the bootstrap's draws); NaN when no unit has a value."""
-    if not np.isfinite(values).any():
-        return np.nan
-    fit_by = records[0].fit_by
-    return float(
-        unit_summary(_unit_values(values, records), fit_by, n_draws=2, seed=0)[
-            "estimate"
-        ]
-    )
-
-
 def _data_set_row(
     values: np.ndarray,
     records: Sequence[FitRecord],
@@ -761,7 +732,7 @@ def _data_set_row(
             "bootstrap_seed": seed,
         }
     summary = unit_summary(
-        _unit_values(values, records), fit_by, n_draws=n_draws, seed=seed
+        unit_values(values, records), fit_by, n_draws=n_draws, seed=seed
     )
     low, high = summary["low"], summary["high"]
     interval = bool(np.isfinite(low) and np.isfinite(high))
@@ -841,7 +812,8 @@ def _unit_targets(
     )
     _, estimates = _session_rows(model, records, {})
     return {
-        name: _reduced_estimate(values, records) for name, values in estimates.items()
+        name: unit_estimate(unit_values(values, records), records[0].fit_by)
+        for name, values in estimates.items()
     }
 
 

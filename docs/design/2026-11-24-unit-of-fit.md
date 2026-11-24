@@ -246,7 +246,9 @@ unit's model (the fit on unlimited data).
 
 - For the animal unit the function exists on the rate branch: `shared_statistics.animal_mean_interval`
   (branch `visit-rate-validation`). It is the interval `bootstrap_interval` gives a mean of animal values,
-  without resampling. **Call**: it becomes the one animal-level reduction.
+  without resampling. **Call**: it becomes the one animal-level reduction. As built: the rule of this
+  table is one function, `analysis/regression/units.py:unit_summary` (in the fitter's package, as it knows
+  the units), which calls `shared_statistics.estimand_summary` or `shared_statistics.animal_mean_interval`.
 - With five animals the day-level test is not defined at the animal unit (`signed_rank_p` needs six
   non-zero differences). The design's rule that no claim rests on a p over five animals stays.
 - The kind difference (SWR minus No SWR) is taken unit by unit, over the units with both kinds, then

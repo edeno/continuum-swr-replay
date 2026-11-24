@@ -253,11 +253,12 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    units. Tests: `test_support.py::test_failing_share_over_units`, `test_calibration.py::test_median_over_units`
    (at `"animal"` with five animals, the median of five edfs; the bracket rule still raises when the
    median jumps).
-5. **The reduction per unit.** One function, `shared_statistics.unit_summary(values, fit_by, *, n_draws,
-   seed)`: `"session"` is `estimand_summary`; `"day"` is `estimand_summary` with each day as its own
+5. **The reduction per unit.** One function, `regression.units.unit_summary(values, fit_by, *, n_draws,
+   seed)` (first built in `shared_statistics`, moved into the fitter's package on 2026-11-24 because it
+   knows the units): `"session"` is `estimand_summary`; `"day"` is `estimand_summary` with each day as its own
    session; `"animal"` is `animal_mean_interval`, with `day_p` NaN. Its output has the same keys at every
    unit. The kind difference is taken unit by unit. The bands follow the same rule (`across_session_band`
-   with a day or an animal per row). Tests (`tests/analysis/test_shared_statistics.py`):
+   with a day or an animal per row). Tests (`tests/analysis/regression/test_units.py`):
    `test_unit_summary_session_is_estimand_summary`, `test_unit_summary_day_one_session_per_day`,
    `test_unit_summary_animal_is_t_interval` (hand-checked on five values),
    `test_unit_summary_same_keys_at_every_unit`; `tests/analysis/regression/test_bands.py::test_band_over_animals`.

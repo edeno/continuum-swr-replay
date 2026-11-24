@@ -66,6 +66,8 @@ __all__ = [
     "one_session",
     "present_session_columns",
     "require_session_unique_ids",
+    "fit_by_columns",
+    "unit_fields",
     "unit_key",
 ]
 
@@ -91,15 +93,34 @@ def unit_key(session_key: tuple, fit_by: FitBy) -> tuple:
         If ``fit_by`` is not a :data:`FitBy` value, or the session key does not
         have three parts.
     """
-    if fit_by not in FIT_BY_COLUMNS:
-        raise ValueError(
-            f"fit_by must be one of {list(FIT_BY_COLUMNS)}, not {fit_by!r}"
-        )
+    columns = fit_by_columns(fit_by)
     if len(session_key) != len(SESSION_COLUMNS):
         raise ValueError(
             f"a session key has three parts {SESSION_COLUMNS}, not {session_key!r}"
         )
-    return tuple(session_key[: len(FIT_BY_COLUMNS[fit_by])])
+    return tuple(session_key[: len(columns)])
+
+
+def fit_by_columns(fit_by: FitBy) -> tuple[str, ...]:
+    """The key columns of a unit of the fit (:data:`FIT_BY_COLUMNS`).
+
+    Raises
+    ------
+    ValueError
+        If ``fit_by`` is not a :data:`FitBy` value.
+    """
+    if fit_by not in FIT_BY_COLUMNS:
+        raise ValueError(
+            f"fit_by must be one of {list(FIT_BY_COLUMNS)}, not {fit_by!r}"
+        )
+    return FIT_BY_COLUMNS[fit_by]
+
+
+def unit_fields(key: tuple) -> tuple[str, str, str]:
+    """A unit key as the three session fields of a record: ``(animal,
+    session_date, epoch)``, a part the unit does not have ``""`` (the inverse
+    of :func:`unit_key`)."""
+    return tuple((*key, "", "")[: len(SESSION_COLUMNS)])
 
 
 def session_key_set(

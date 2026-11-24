@@ -27,7 +27,7 @@ forms:
   interval.
 
   A fit of a larger unit gives one curve per unit, and the same function takes
-  one row per unit (``shared_statistics.unit_summary`` has the scalar rule): a
+  one row per unit (``units.unit_summary`` has the scalar rule): a
   recording day is passed as a row with its own day label (day -> animal), and
   an animal as a row whose day label is the animal (the plain mean of the
   animals' curves, whose half width at one point is about the t interval of

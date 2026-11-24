@@ -18,6 +18,7 @@ from continuum_swr_replay.tables.session_keys import (
     session_key_frame,
     session_key_set,
     subset_max_per_animal,
+    unit_fields,
     unit_key,
 )
 
@@ -200,3 +201,16 @@ def test_unknown_fit_by_refused(fit_by):
 def test_a_session_key_of_three_parts():
     with pytest.raises(ValueError, match="three"):
         unit_key(("chimi", "20200212"), "day")
+
+
+def test_unit_fields_are_the_inverse_of_unit_key():
+    """A unit key as a record's three session fields, a part the unit does
+    not have empty; unit_key of those fields gives the key back."""
+    key = ("chimi", "20200212", "02_r1")
+    for fit_by, fields in (
+        ("session", key),
+        ("day", ("chimi", "20200212", "")),
+        ("animal", ("chimi", "", "")),
+    ):
+        assert unit_fields(unit_key(key, fit_by)) == fields
+        assert unit_key(fields, fit_by) == unit_key(key, fit_by)
