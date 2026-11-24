@@ -162,7 +162,6 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 import joblib
 import matplotlib.pyplot as plt
@@ -321,7 +320,12 @@ from continuum_swr_replay.visualization.palettes import (
     COLORS,
     readable_text_color,
 )
-from continuum_swr_replay.visualization.panel_layout import place_letters
+from continuum_swr_replay.visualization.panel_layout import (
+    fit_panel,
+    letter_layout,
+    panel_spans,
+    place_letters,
+)
 from continuum_swr_replay.visualization.plots import (
     plot_linear_track_graph_strip,
     plot_ripple_consensus_trace_zscore,
@@ -386,7 +390,7 @@ WIDTH = 6.5
 HEIGHT = 7.86
 OUTER_HEIGHTS = (1.85, 1.88, 1.02, 1.12, 1.23)
 """The rows' heights, in proportion: a, b, c to f, then the bottom rows
-(:data:`BOTTOM_ROWS`)."""
+(:data:`BOTTOM_LAYOUT`)."""
 OUTER_HSPACE = 0.72
 
 C_LOCAL = COLORS["Local"]
@@ -976,103 +980,6 @@ def label_reward_well(ax: Axes, track_graph) -> None:
     )  # fmt: skip
 
 
-def fit_axes_in_row(
-    fig: Figure,
-    renderer: Any,
-    axes: Sequence[Axes],
-    left: float,
-    right: float,
-    weights: Sequence[float],
-) -> None:
-    """Place a panel's axes side by side so that what they draw runs from
-    ``left`` to ``right`` (figure coordinates), with :data:`DECODER_AXES_GAP`
-    between one axes' drawing and the next, and their frames' widths in
-    proportion to ``weights``.
-
-    Each axes' y axis (its label and tick labels) and the texts it writes
-    beside its frame, past the right edge (a reference's name, direct labels),
-    take what they need,
-    measured on the drawn figure, and the frames share the rest, so no label
-    runs into the next axes. The x tick labels, rotated to hang down and left
-    below the frames, do not count: parallel labels do not cross, and the
-    first axes' hang into the figure's margin as panel c's labels do. Nor do
-    the titles and texts above the frames, which may reach over the gaps;
-    whether they meet is checked on the image. Measured again after each move,
-    as the extents change with the frames, until the frames stop moving (at
-    most :data:`FIT_PASSES` times).
-    """
-    for _ in range(FIT_PASSES):
-        fig.draw_without_rendering()
-        to_figure = fig.transFigure.inverted()
-        pads = []
-        for ax in axes:
-            y_axis = ax.yaxis.get_tightbbox(renderer).transformed(to_figure)
-            box = ax.get_position()
-            beside = [
-                text.get_window_extent(renderer).transformed(to_figure)
-                for text in ax.texts
-            ]
-            ink_right = max([box.x1] + [b.x1 for b in beside if b.y0 < box.y1])
-            # a drawing (its axis turned off) has no y axis to make room for
-            before = box.x0 - y_axis.x0 if ax.axison else 0.0
-            pads.append((before, ink_right - box.x1))
-        free = (
-            right
-            - left
-            - DECODER_AXES_GAP * (len(axes) - 1)
-            - sum(before + after for before, after in pads)
-        )
-        x = left
-        moved = False
-        for ax, (before, after), weight in zip(axes, pads, weights, strict=True):
-            width = free * weight / sum(weights)
-            box = ax.get_position()
-            # set_position stores the extents x0 and x0 + width
-            if (box.x0, box.x1) != (x + before, x + before + width):
-                ax.set_position((x + before, box.y0, width, box.height))
-                moved = True
-            x += before + width + after + DECODER_AXES_GAP
-        if not moved:
-            break
-
-
-def fit_grid_in_column(
-    fig: Figure,
-    renderer: Any,
-    rows: Sequence[Sequence[Axes]],
-    left: float,
-    right: float,
-    wspace: float,
-) -> None:
-    """Place rows of axes (each row the same number of axes, side by side) so
-    that what they draw runs from ``left`` to ``right`` (figure coordinates):
-    the first column's y axes (tick labels and labels) take what the widest
-    needs, every frame gets one width, and the gap between two frames of a
-    row is ``wspace`` times that width. The axes keep their heights."""
-    to_figure = fig.transFigure.inverted()
-    before = max(
-        row[0].get_position().x0
-        - row[0].yaxis.get_tightbbox(renderer).transformed(to_figure).x0
-        for row in rows
-    )
-    after = max(
-        0.0,
-        *(
-            row[-1].get_tightbbox(renderer).transformed(to_figure).x1
-            - row[-1].get_position().x1
-            for row in rows
-        ),
-    )
-    n = len(rows[0])
-    width = (right - after - left - before) / (n + wspace * (n - 1))
-    for row in rows:
-        for k, ax in enumerate(row):
-            box = ax.get_position()
-            ax.set_position(
-                (left + before + k * width * (1 + wspace), box.y0, width, box.height)
-            )
-
-
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
     """Size the track's equal-aspect axes to fill its row's height, at ``left``."""
     box = ax_track.get_position(original=True)
@@ -1222,8 +1129,7 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 
 
 LEFT_OUT_WIDTHS = (1.25, 1.0)
-"""Panel j's drawing and axis, in proportion within its cell."""
-LEFT_OUT_WSPACE = 0.75
+"""Panel j's drawing and axis frames' widths, in proportion (``fit_panel``)."""
 
 
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
@@ -1305,64 +1211,44 @@ def restriction_refusal(cause: str, rerun: str) -> str:
     )
 
 
-BOTTOM_ROWS = (
-    ("traces", "participation", "ripple_power"),
-    ("left_out", "decoder_comparison"),
+BOTTOM_RIGHT = 0.995
+"""Where the last panel of each bottom row ends (figure width): the figure is
+saved cropped to its ink, so the edge is the page's."""
+BOTTOM_LAYOUT = (
+    (
+        ("traces", "c", "e"),
+        ("participation", "e", "f"),
+        ("ripple_power", "f", BOTTOM_RIGHT),
+    ),
+    (("left_out", "c", "e"), ("decoder_comparison", "e", BOTTOM_RIGHT)),
 )
-"""The panels below row 3 by what they draw, row by row, left to right: the
+"""The panels below row 3 by what they draw, row by row, left to right, each
+with the left and right edges it spans (``panel_layout.panel_spans``): the
 traces around event starts, tetrode participation and where the non-local time
 sits in ripple power; then the left-out tetrode test and the decoder
-comparison, each a drawing of its test beside its axes. The one place their
-order is set: the grids, the letters (:data:`BOTTOM_LETTERS`), the columns
-(:data:`BOTTOM_COLUMNS`) and the letter columns follow from it (the docstrings
-that name a panel by letter are found by grepping for ``BOTTOM_LETTERS`` and
-"panel g" to "panel k")."""
-BOTTOM_PANELS = tuple(panel for row in BOTTOM_ROWS for panel in row)
+comparison, each a drawing of its test beside its axes. A panel starts at a
+column, the left edge of a row-3 panel's drawing (c, the figure's left column;
+e; f), and ends :data:`COLUMN_GAP` before the next panel's column, the last of
+a row at :data:`BOTTOM_RIGHT`. The one place their order is set: the grids, the letters (:data:`BOTTOM_LETTERS`)
+and the letter columns follow from it (the docstrings that name a panel by
+letter are found by grepping for ``BOTTOM_LETTERS`` and "panel g" to "panel
+k")."""
+BOTTOM_PANELS = tuple(panel for row in BOTTOM_LAYOUT for panel, _, _ in row)
 BOTTOM_LETTERS = dict(zip(BOTTOM_PANELS, "ghijk", strict=True))
 """Each bottom panel's letter, by its position."""
-BOTTOM_WIDTHS = {
-    "traces": 1.0,
-    "participation": 0.5,
-    "ripple_power": 0.6,
-    "left_out": 1.45,
-    "decoder_comparison": 1.2,
-}
-"""Each bottom panel's cell width, in proportion within its row; the decoder
-comparison's drawing and two axes are then placed in its space by
-:func:`fit_axes_in_row`."""
-BOTTOM_WSPACE = 0.55
-"""The grids' first guess; the panels are then placed in two columns."""
 DECODER_AXES_WIDTHS = (1.1, 0.8, 0.85)
 """The decoder comparison's frame widths, in proportion: its drawing, the full
 minus the SWR-only decoder by time (inside and outside SWRs), and that
-difference outside SWRs in and outside the held-out events
-(:func:`fit_axes_in_row`)."""
-DECODER_AXES_WSPACE = 1.0
-"""The grid's first guess; :func:`fit_axes_in_row` then places the axes."""
-FIT_PASSES = 10
-"""The passes of :func:`fit_axes_in_row`: what overhangs a frame shrinks as the
-frame grows, so the widths settle over a few passes."""
+difference outside SWRs in and outside the held-out events (``fit_panel``)."""
 DECODER_AXES_GAP = 0.012
-"""The decoder comparison: the space between one axes' drawing and the next
-(figure width)."""
-BOTTOM_RIGHT = 0.995
-"""Where the last panel of each bottom row may end (figure width): the figure
-is saved cropped to its ink, so the edge is the page's."""
-BOTTOM_COLUMNS = {
-    "traces": "c",
-    "participation": "e",
-    "ripple_power": "f",
-    "left_out": "c",
-    "decoder_comparison": "e",
-}
-"""Each bottom panel's column: the row-3 panel whose left edge it starts at (c,
-the figure's left column; e; f). A panel ends a gap before the next panel's
-left edge, the last of its row at the figure's right."""
+"""Panels j and k: the space between one axes' drawing and the next (figure
+width)."""
+BOTTOM_ROWS, BOTTOM_COLUMNS = letter_layout(BOTTOM_LAYOUT, BOTTOM_LETTERS)
 LETTER_COLUMNS = (
-    "abc" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "c"),
+    "abc" + BOTTOM_COLUMNS["c"],
     "d",
-    "e" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "e"),
-    "f" + "".join(BOTTOM_LETTERS[p] for p, c in BOTTOM_COLUMNS.items() if c == "f"),
+    "e" + BOTTOM_COLUMNS["e"],
+    "f" + BOTTOM_COLUMNS["f"],
 )
 """The panel letters that share a left edge (convention 10): a, b, c and the
 bottom panels that start at the figure's left; e and those that start at its
@@ -1371,8 +1257,8 @@ OVERVIEW_GAP = 0.02
 """Panel a: the space between the track drawing and the labels of the example
 beside it (figure width)."""
 COLUMN_GAP = 0.03
-"""The bottom rows: the space between a panel's drawing and the left edge of
-the next panel of its row (figure width)."""
+"""The bottom rows: the space between a panel's drawing and the column where
+the next panel of its row starts (figure width)."""
 
 
 LEFT_OUT_HEADING = "Do the spikes of a left-out tetrode point to the decoded place?"
@@ -1860,7 +1746,7 @@ def generate_figure(
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
-        3 + len(BOTTOM_ROWS),
+        3 + len(BOTTOM_LAYOUT),
         1,
         figure=fig,
         height_ratios=OUTER_HEIGHTS,
@@ -1888,15 +1774,11 @@ def generate_figure(
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
     draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
     cells = {}
-    for k, row in enumerate(BOTTOM_ROWS):
-        grid = outer[3 + k].subgridspec(
-            1,
-            len(row),
-            width_ratios=[BOTTOM_WIDTHS[p] for p in row],
-            wspace=BOTTOM_WSPACE,
-        )
-        cells.update(zip(row, grid, strict=True))
-    triggered = cells["traces"].subgridspec(2, 2, hspace=0.3, wspace=TRACES_WSPACE)
+    # the grids set the bottom panels' heights; fit_panel then places them across
+    for k, row in enumerate(BOTTOM_LAYOUT):
+        grid = outer[3 + k].subgridspec(1, len(row))
+        cells.update(zip((panel for panel, _, _ in row), grid, strict=True))
+    triggered = cells["traces"].subgridspec(2, 2, hspace=0.3)
     ax_ripple = fig.add_subplot(triggered[0, 0])
     triggered_axes = [
         ax_ripple,
@@ -1906,9 +1788,7 @@ def generate_figure(
         ),
     ]
     draw_triggered(triggered_axes, inputs["triggered_curves"], reference)
-    left_out_grid = cells["left_out"].subgridspec(
-        1, 2, width_ratios=LEFT_OUT_WIDTHS, wspace=LEFT_OUT_WSPACE
-    )
+    left_out_grid = cells["left_out"].subgridspec(1, 2)
     ax_left_out_drawing = fig.add_subplot(left_out_grid[0])
     ax_left_out = fig.add_subplot(left_out_grid[1])
     headings = {
@@ -1922,9 +1802,7 @@ def generate_figure(
     ax_spread = fig.add_subplot(power_grid[0])
     ax_share = fig.add_subplot(power_grid[1], sharex=ax_spread)
     draw_share_by_power(ax_spread, ax_share, power_counts, power_states)
-    decoder_grid = cells["decoder_comparison"].subgridspec(
-        1, 3, width_ratios=DECODER_AXES_WIDTHS, wspace=DECODER_AXES_WSPACE
-    )
+    decoder_grid = cells["decoder_comparison"].subgridspec(1, 3)
     ax_decoder_drawing, ax_time, ax_outside = (
         fig.add_subplot(decoder_grid[k]) for k in range(3)
     )
@@ -1949,40 +1827,34 @@ def generate_figure(
         )
         - 0.004
     )
-    # the bottom panels in the columns of row 3 (BOTTOM_COLUMNS): each from its
-    # column's left edge to a gap before the next panel's, the last of a row to
-    # the figure's right
+    # the columns of the bottom rows (BOTTOM_LAYOUT): where the drawings of the
+    # row-3 panels c, e and f start
     starts = {
         "c": x_left + 0.004,
         "e": drawn_extent(fig, [ax_e, ax_e2]).x0,
         "f": drawn_extent(fig, [ax_f1, ax_f2]).x0,
     }
-    fitters = {
-        "traces": lambda left, right: fit_grid_in_column(
-            fig, renderer, [triggered_axes[:2], triggered_axes[2:]], left, right,
-            TRACES_WSPACE,
-        ),
-        "participation": lambda left, right: fit_grid_in_column(
-            fig, renderer, [[ax_participation]], left, right, 0.0
-        ),
-        "ripple_power": lambda left, right: fit_grid_in_column(
-            fig, renderer, [[ax_spread], [ax_share]], left, right, 0.0
-        ),
-        "left_out": lambda left, right: fit_axes_in_row(
-            fig, renderer, bottom_axes["left_out"], left, right, LEFT_OUT_WIDTHS
-        ),
-        "decoder_comparison": lambda left, right: fit_axes_in_row(
-            fig, renderer, bottom_axes["decoder_comparison"], left, right,
-            DECODER_AXES_WIDTHS,
-        ),
+    columns = {
+        "traces": [triggered_axes[::2], triggered_axes[1::2]],
+        "participation": [[ax_participation]],
+        "ripple_power": [[ax_spread, ax_share]],
+        "left_out": [[ax] for ax in bottom_axes["left_out"]],
+        "decoder_comparison": [[ax] for ax in bottom_axes["decoder_comparison"]],
+    }
+    fits = {
+        "traces": {"gap": TRACES_WSPACE},
+        "left_out": {
+            "weights": LEFT_OUT_WIDTHS, "gap": DECODER_AXES_GAP, "between": "drawings",
+        },
+        "decoder_comparison": {
+            "weights": DECODER_AXES_WIDTHS, "gap": DECODER_AXES_GAP,
+            "between": "drawings",
+        },
     }  # fmt: skip
-    for row in BOTTOM_ROWS:
-        lefts = [starts[BOTTOM_COLUMNS[panel]] for panel in row]
-        rights = [left - COLUMN_GAP for left in lefts[1:]] + [BOTTOM_RIGHT]
-        for panel, left, right in zip(row, lefts, rights, strict=True):
-            fitters[panel](left, right)
-            if panel in headings:
-                center_heading(headings[panel], left, right)
+    for panel, (left, right) in panel_spans(BOTTOM_LAYOUT, starts, COLUMN_GAP).items():
+        fit_panel(fig, columns[panel], left, right, **fits.get(panel, {}))
+        if panel in headings:
+            center_heading(headings[panel], left, right)
     fit_track_to_height(fig, ax_a, x_left)
     # panel a's example fills the space the track drawing leaves: its labels
     # start a gap after the drawing, and its right edge stays
@@ -2012,7 +1884,7 @@ def generate_figure(
             "a",
             "b",
             "cdef",
-            *("".join(BOTTOM_LETTERS[p] for p in row) for row in BOTTOM_ROWS),
+            *BOTTOM_ROWS,
         ],
         columns=LETTER_COLUMNS,
         above=0.002,
