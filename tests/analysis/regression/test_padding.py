@@ -366,13 +366,13 @@ def test_the_profiled_gaussian_counts_the_real_rows(step):
                     padded.X,
                     padded.y[None],
                     padded.weight,
-                    S_j,
                     S_j.sum(axis=0),
                     beta,
                     masks,
                     np.float64(0.0),
                     np.int64(y.size),
                     np.int64(y.size - 1),
+                    S_j,
                     np.array([2.0, 2.0]),
                 )
             )
@@ -481,13 +481,13 @@ def test_junk_in_the_padded_rows_changes_no_reml_derivative(family):
                         X,
                         y[None],
                         weight,
-                        S_j,
                         S_j.sum(axis=0),
                         beta,
                         masks,
                         np.float64(0.0),
                         np.int64(padded.n_real),
                         np.int64(padded.n_real - 1),
+                        S_j,
                         np.array([2.0, 2.0]),
                     )
                 )

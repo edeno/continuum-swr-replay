@@ -174,10 +174,16 @@ def _score_in_jax(lik, data: SessionData, blocks, beta):
     point of differentiation. A Newton step's derivative in its start is zero
     at the optimum, so the steps' derivatives in ``rho`` there are the
     implicit derivatives of the optimum, to second order after two steps. The
-    Gaussian's profiled score is written in closed form. Called with JAX's
-    64-bit types on."""
-    X, y = jnp.asarray(data.X), jnp.asarray(data.y)
-    p = X.shape[1]
+    Gaussian's profiled score is written in closed form. It is written in the
+    penalties' eigenbasis, as the fitter computes: with ``S`` as given, the
+    rounding of its null space times ``exp(rho)`` moved the score's
+    derivatives by up to 8e-7 of themselves at log penalties 8 to 12. Called
+    with JAX's 64-bit types on."""
+    p = data.X.shape[1]
+    vectors, blocks = reml._eigenbasis(blocks, p)
+    Q = reml._rotate(blocks, vectors, np.eye(p))
+    X, y = jnp.asarray(data.X @ Q), jnp.asarray(data.y)
+    beta = Q.T @ beta
     units = jnp.asarray(np.stack([reml._embedded(b, 1.0, p) for b in blocks]))
     ranks = jnp.asarray([b.rank for b in blocks], dtype=float)
     constant = sum(b.log_pdet for b in blocks)
@@ -227,17 +233,41 @@ def _score_in_jax(lik, data: SessionData, blocks, beta):
     return V
 
 
+def _with_a_ridge(family: str, seed: int):
+    """Two smooths (penalties with a null space) and a third block, a ridge on
+    three more columns (no null space), on 120 rows."""
+    lik, data, blocks = _session(family, 2, seed=seed, n_rows=120)
+    rng = np.random.default_rng(seed + 100)
+    p = data.X.shape[1]
+    X = np.column_stack([data.X, rng.normal(scale=0.5, size=(data.y.size, 3))])
+    ridge = PenaltyBlock(np.arange(p, p + 3), np.eye(3))
+    return lik, replace(data, X=X), [*blocks, ridge]
+
+
+@pytest.mark.parametrize(
+    "rho", [[0.5, 2.0, 1.0], [8.0, 12.0, 10.0]], ids=["moderate", "strong"]
+)
+@pytest.mark.parametrize("n_blocks", [1, 2, 3])
 @pytest.mark.parametrize("family", FAMILIES)
-def test_gradient_and_hessian_equal_autodiff_of_the_score(family: str) -> None:
+def test_gradient_and_hessian_equal_autodiff_of_the_score(
+    family: str, n_blocks: int, rho: list[float]
+) -> None:
     """The hand-written gradient and Hessian in ``rho`` (the information's
     directional derivatives, the traces against ``A^-1``, the profiled
     Gaussian's own) equal ``jax.grad`` and ``jax.hessian`` of the score written
-    in JAX (:func:`_score_in_jax`), two smooths on 120 rows, unpadded. The
+    in JAX (:func:`_score_in_jax`), on 120 rows, unpadded: one, two and three
+    penalties (the third a ridge, with no null space), at moderate and strong
+    log penalties. The
     finite differences of the score check the same derivatives on the padded
     rows (:func:`test_gradient_and_hessian_finite_differences`)."""
-    lik, data, blocks = _session(family, 2, seed=5, n_rows=120)
-    rho = np.array([0.5, 2.0])
-    at = _score(lik, data, blocks, rho)
+    if n_blocks == 3:
+        lik, data, blocks = _with_a_ridge(family, seed=5)
+    else:
+        lik, data, blocks = _session(family, n_blocks, seed=5, n_rows=120)
+    rho = np.array(rho[:n_blocks])
+    # Warm-started at its own fit, so that it lands on the optimum to rounding
+    # (from a cold start one softmax fit stopped 2e-13 of the score short).
+    at = _score(lik, data, blocks, rho, _score(lik, data, blocks, rho).fit.beta)
     assert at.fit.converged
     with jax.enable_x64(True):
         V = _score_in_jax(lik, data, blocks, at.fit.beta)
@@ -246,9 +276,115 @@ def test_gradient_and_hessian_equal_autodiff_of_the_score(family: str) -> None:
         gradient = np.asarray(jax.grad(V)(rho_jax))
         hessian = np.asarray(jax.hessian(V)(rho_jax))
     assert score == pytest.approx(at.score, rel=1e-12)
-    # 1e-12 of the largest entry: 7e-15 to 3e-14 measured.
+    # 5e-11 of the largest entry, at least 1e-14: up to 7e-12 of it measured
+    # (the Bernoulli's Hessian at the strong penalties), most below 1e-13; the
+    # softmax's one smooth at the strong penalties, whose gradient is 9e-6
+    # (a score near its limit in the null space), differed by 9e-16.
     for got, want in [(at.gradient, gradient), (at.hessian, hessian)]:
-        np.testing.assert_allclose(got, want, rtol=0, atol=1e-12 * np.abs(want).max())
+        floor = max(5e-11 * np.abs(want).max(), 1e-14)
+        np.testing.assert_allclose(got, want, rtol=0, atol=floor)
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+def test_no_penalty_blocks_give_empty_derivatives(family: str) -> None:
+    """With no penalty blocks the score is the fit's, the gradient has shape
+    ``(0,)`` and the Hessian ``(0, 0)``, through ``reml_and_derivatives`` and
+    ``pooled_reml``, with or without the derivatives."""
+    lik, data, _ = _session(family, 1, seed=1)
+    alone = reml_and_derivatives(
+        lik, data.X, data.y, data.aux, [], np.array([]), derivatives=False
+    )
+    at = reml_and_derivatives(lik, data.X, data.y, data.aux, [], np.array([]))
+    assert at.fit.converged and np.isfinite(at.score)
+    assert at.score == alone.score and alone.gradient is None
+    assert at.gradient.shape == (0,) and at.gradient.dtype == np.float64
+    assert at.hessian.shape == (0, 0) and at.hessian.dtype == np.float64
+    np.testing.assert_array_equal(at.covariance, alone.covariance)
+    pooled = pooled_reml(lik, [data], [], [])
+    assert pooled.score == at.score
+    assert pooled.gradient.shape == (0,) and pooled.hessian.shape == (0, 0)
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+def test_a_design_not_finite_is_counted_before_it_is_rotated(family: str) -> None:
+    """One infinite and one NaN entry are counted as two: the rotation into
+    the eigenbasis would spread each over the columns of its block."""
+    lik, data, blocks = _session(family, 2, seed=3)
+    X = data.X.copy()
+    X[0, blocks[0].columns[0]] = np.inf
+    X[5, blocks[1].columns[2]] = np.nan
+    with pytest.raises(ValueError, match="design not finite in 2 entries"):
+        reml_and_derivatives(lik, X, data.y, data.aux, blocks, [0.0, 0.0])
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "grouped_softmax"])
+def test_a_converged_fit_whose_a_is_not_positive_definite_raises(
+    family: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A converged fit whose ``A`` cannot be factored (forced here) stops the
+    derivatives with ``LinAlgError`` rather than passing NaN on. The
+    Gaussian makes its ``A`` from the rows (the test below)."""
+    lik, data, blocks = _session(family, 1, seed=2)
+    newton_fit = reml._fit_one
+
+    def cracked(*args, **kwargs):
+        fit, problem = newton_fit(*args, **kwargs)
+        return replace(fit, A=-np.eye(fit.A.shape[0])), problem
+
+    monkeypatch.setattr(reml, "_fit_one", cracked)
+    with pytest.raises(np.linalg.LinAlgError, match="not positive definite"):
+        _score(lik, data, blocks, [0.5])
+
+
+def test_the_profiled_gaussian_flags_a_gram_it_cannot_factor() -> None:
+    """The profiled Gaussian's kernel returns whether ``X'X + S`` was
+    factored; the host raises on False (as for the Laplace families)."""
+    _, data, blocks = _session("gaussian", 1, seed=2)
+    p = data.X.shape[1]
+    S_j = reml._embedded(blocks[0], 1.0, p)[None]
+    rows = Gaussian().pad(data.X, data.y, None)
+    with jax.enable_x64(True):
+
+        def factored(S):
+            outputs = reml._profiled_gaussian(
+                rows.X,
+                rows.y[None],
+                rows.weight,
+                S,
+                np.zeros(p),
+                np.ones((1, p)),
+                np.float64(0.0),
+                np.int64(data.y.size),
+                np.int64(data.y.size - 2),
+                S_j,
+                np.array([float(blocks[0].rank)]),
+            )
+            return bool(outputs[-1])
+
+        assert factored(S_j[0])
+        assert not factored(-1e6 * np.eye(p))
+    with pytest.raises(np.linalg.LinAlgError, match="not positive definite"):
+        reml._require_factored(False)
+
+
+@pytest.mark.parametrize("family", ["bernoulli", "grouped_softmax"])
+def test_an_inner_fit_without_a_finite_maximum_has_no_derivatives(
+    family: str,
+) -> None:
+    """An unpenalized column that separates the outcome: the inner fit has no
+    finite maximum, the score is infinite and there is no gradient or
+    Hessian."""
+    lik, data, blocks = _session(family, 1, seed=6)
+    if family == "bernoulli":
+        separating = data.y.copy()
+    else:  # the largest share of each group of four
+        shares = data.y.reshape(-1, 4)
+        separating = (shares == shares.max(axis=1, keepdims=True)).ravel() * 1.0
+        data = replace(data, y=separating)
+    X = np.column_stack([data.X, separating])
+    at = reml_and_derivatives(lik, X, data.y, data.aux, blocks, [1.0])
+    assert at.fit.status == NO_FINITE_MAXIMUM
+    assert at.score == np.inf and at.gradient is None and at.hessian is None
 
 
 def test_block_rank_is_the_penalty_rank() -> None:

@@ -748,13 +748,13 @@ def test_no_kernel_copies_the_transposed_design(family: str) -> None:
                 r.X,
                 problem.Y,
                 r.weight,
-                S_j,
                 np.eye(p),
                 b,
                 masks,
                 f,
                 np.int64(n),
                 np.int64(n - 1),
+                S_j,
                 ranks,
             )
         else:

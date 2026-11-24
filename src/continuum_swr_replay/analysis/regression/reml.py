@@ -83,6 +83,7 @@ from .newton import (
     NOT_IDENTIFIED,
     FitStatus,
     NewtonFit,
+    _check_design_finite,
     _fit_one,
     running_away_columns,
 )
@@ -697,6 +698,23 @@ def _fixed_penalty_summary(A, S, b, masks, loglik, log_pdet, n_null):
     return _laplace_summary(A, S, b, masks, loglik, log_pdet, n_null)[1]
 
 
+def _factored(A, factor):
+    """Whether ``A`` and its Cholesky ``factor`` are finite: JAX's factor is
+    NaN where SciPy's raises."""
+    return jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(factor[0]))
+
+
+def _require_factored(factored: bool) -> None:
+    """Raise ``numpy.linalg.LinAlgError`` unless the derivative kernel could
+    factor ``A`` (a converged fit's ``A`` is positive definite, so this is a
+    guard: a derivative of NaN would pass on silently)."""
+    if not factored:
+        raise np.linalg.LinAlgError(
+            "A = H + S is not positive definite at the converged fit: its "
+            "Cholesky factor is not finite, so the score has no derivatives"
+        )
+
+
 def _upper_pairs(m: int):
     """The pairs ``j <= k`` of ``m`` penalties, as two index arrays, and
     whether each is a diagonal pair."""
@@ -729,12 +747,16 @@ def _laplace_derivatives(
     ``A_jk = d2H(X b_j, X b_k) + dH(X b_jk) + delta_jk S_j``, its trace read by
     ``lik._jax_information_traces`` against ``A^-1``. The ``m`` matrices
     ``dH(X b_j)`` are made one at a time (``jax.lax.map``); the Hessian is
-    computed for ``j <= k`` and mirrored.
+    computed for ``j <= k`` and mirrored. The last output is whether ``A`` and
+    its factor are finite (:func:`_require_factored`).
     """
     factor, summary = _laplace_summary(A, S, b, masks, loglik, log_pdet, n_null)
+    factored = _factored(A, factor)
     covariance = summary[1]
     y = Y[0]
     m = S_j.shape[0]
+    if m == 0:
+        return (*summary, jnp.zeros(0), jnp.zeros((0, 0)), factored)
     eta = X @ b
     S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
     E = X @ b_j.T  # (n_bucket, m): eta's derivative in each rho_j
@@ -767,20 +789,23 @@ def _laplace_derivatives(
         + trace_first
         + jnp.where(diagonal, trace_S[j], 0.0)
     )
-    return (*summary, gradient, _mirrored(upper, j, k, m))
+    return (*summary, gradient, _mirrored(upper, j, k, m), factored)
 
 
 @float64_kernel
-def _profiled_gaussian(X, Y, weight, S_j, S, b, masks, log_pdet, n_real, dof, ranks):
+def _profiled_gaussian(
+    X, Y, weight, S, b, masks, log_pdet, n_real, dof, S_j=None, ranks=None
+):
     """The Gaussian score with the scale profiled out, at the penalized least
     squares fit ``b`` (:func:`_gaussian_profiled`), on padded rows, with its
     gradient and Hessian in ``rho``.
 
-    ``Y`` has shape ``(1, n_bucket)``; ``S_j`` shape ``(m, p, p)``, each
-    ``exp(rho_j) S_j`` embedded; ``ranks`` shape ``(m,)``. Returns ``X'X +
-    S``, ``D_p``, the scale ``D_p / dof``, the score, the covariance ``scale
-    (X'X + S)^-1``, the edf per block and in all, the log-likelihood at that
-    scale (``n_real`` real rows), and the gradient and Hessian, all on one
+    ``Y`` has shape ``(1, n_bucket)``. Returns ``X'X + S``, ``D_p``, the
+    scale ``D_p / dof``, the score, the covariance ``scale (X'X + S)^-1``, the
+    edf per block and in all, and the log-likelihood at that scale (``n_real``
+    real rows). Given ``S_j``, shape ``(m, p, p)``, each ``exp(rho_j) S_j``
+    embedded, and ``ranks``, shape ``(m,)``, it also returns the gradient,
+    the Hessian and whether ``X'X + S`` and its factor are finite, all on one
     Cholesky factor of ``X'X + S``.
     """
     gram = _gram(X, weight) + S
@@ -796,9 +821,15 @@ def _profiled_gaussian(X, Y, weight, S_j, S, b, masks, log_pdet, n_real, dof, ra
     loglik = -weighted_rss / (2.0 * scale) - 0.5 * n_real * jnp.log(
         2.0 * jnp.pi * scale
     )
+    summary = (gram, D_p, scale, score, scale * inverse, edf, edf_total, loglik)
+    if S_j is None:
+        return summary
+    factored = _factored(gram, factor)
+    m = S_j.shape[0]
+    if m == 0:
+        return (*summary, jnp.zeros(0), jnp.zeros((0, 0)), factored)
     # D_p has derivatives b' S_j b and delta_jk b' S_j b + 2 b_k' S_j b, as in
     # the Laplace case with the information fixed.
-    m = S_j.shape[0]
     S_j_b, b_j = _coefficient_derivatives(S_j, b, factor)
     Ainv_S_j = jax.vmap(lambda M: jax.scipy.linalg.cho_solve(factor, M))(S_j)
     D_j = S_j_b @ b
@@ -816,18 +847,7 @@ def _profiled_gaussian(X, Y, weight, S_j, S, b, masks, log_pdet, n_real, dof, ra
         + jnp.where(diagonal, trace_j[j], 0.0)
         - trace_jk
     )
-    return (
-        gram,
-        D_p,
-        scale,
-        score,
-        scale * inverse,
-        edf,
-        edf_total,
-        loglik,
-        gradient,
-        _mirrored(upper, j, k, m),
-    )
+    return (*summary, gradient, _mirrored(upper, j, k, m), factored)
 
 
 @in_float64
@@ -893,6 +913,9 @@ def reml_and_derivatives(
     vectors, rotated = _eigenbasis(blocks, n_columns)
     if rho.shape != (len(blocks),):
         raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
+    # Counted before the rotation, which spreads a value that is not finite
+    # over its row's columns of the block.
+    _check_design_finite(np.asarray(X))
     # X Q as one product: assigning each block's columns by index took 3 to 6
     # times as long (fancy indexing copies) at the rate model's size.
     X_rotated = X @ _rotate(blocks, vectors, np.eye(n_columns))
@@ -972,7 +995,7 @@ def _reml_in_basis(
     )
     if derivatives:
         r = problem.rows
-        score, covariance, edf, edf_total, gradient, hessian = jax.device_get(
+        score, covariance, edf, edf_total, gradient, hessian, factored = jax.device_get(
             _laplace_derivatives(
                 lik,
                 r.X,
@@ -984,6 +1007,7 @@ def _reml_in_basis(
                 _ranks(blocks),
             )
         )
+        _require_factored(bool(factored))
         gradient, hessian = np.array(gradient), np.array(hessian)
     else:
         score, covariance, edf, edf_total = jax.device_get(
@@ -1033,8 +1057,8 @@ def _gaussian_profiled(
     the penalty ``S / var(y)`` (the same minimizer), so that its decrement, and
     the tolerance it is held to, do not depend on the outcome's units. The
     score, its derivatives (:func:`_profiled_gaussian`) and the rest are
-    computed on the fit's padded rows; the derivatives cost no more products
-    with the design, so they are always computed.
+    computed on the fit's padded rows; the derivatives need no product with
+    the design beyond the Gram.
     """
     n_rows, n_columns = X.shape
     working = float(np.var(y))
@@ -1055,32 +1079,28 @@ def _gaussian_profiled(
     if not pls.converged:
         return RemlScore(np.inf, None, None, pls, np.nan)
     rows = problem.rows
-    (
-        gram,
-        D_p,
-        scale,
-        score,
-        covariance,
-        edf,
-        edf_total,
-        loglik,
-        gradient,
-        hessian,
-    ) = jax.device_get(
+    # The penalties' stack goes to the device only when the derivatives read it.
+    extra = (_stacked(S_j, n_columns), _ranks(blocks)) if derivatives else ()
+    outputs = jax.device_get(
         _profiled_gaussian(
             rows.X,
             problem.Y,
             rows.weight,
-            _stacked(S_j, n_columns),
             S,
             pls.beta,
             _block_masks(blocks, n_columns),
             np.float64(_log_pdet(blocks, rho)),
             np.int64(n_rows),
             np.int64(n_rows - _null_dimension(blocks, n_columns)),
-            _ranks(blocks),
+            *extra,
         )
     )
+    gram, D_p, scale, score, covariance, edf, edf_total, loglik = outputs[:8]
+    gradient = hessian = None
+    if derivatives:
+        gradient, hessian, factored = outputs[8:]
+        _require_factored(bool(factored))
+        gradient, hessian = np.array(gradient), np.array(hessian)
     scale = float(scale)
     fit = replace(
         pls,
@@ -1090,8 +1110,8 @@ def _gaussian_profiled(
     )
     return RemlScore(
         float(score),
-        np.array(gradient) if derivatives else None,
-        np.array(hessian) if derivatives else None,
+        gradient,
+        hessian,
         fit,
         scale,
         covariance=np.array(covariance),

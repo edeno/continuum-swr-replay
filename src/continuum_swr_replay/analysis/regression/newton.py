@@ -203,6 +203,13 @@ def _unidentified(X: np.ndarray, free_basis: np.ndarray) -> np.ndarray:
     return free_basis @ vectors[:, eigenvalues <= IDENTIFIABILITY_TOL]
 
 
+def _check_design_finite(X: np.ndarray) -> None:
+    """Raise ``ValueError``, with their count, when entries of ``X`` are not
+    finite."""
+    if not np.all(np.isfinite(X)):
+        raise ValueError(f"design not finite in {np.sum(~np.isfinite(X))} entries")
+
+
 def _check_inputs(
     lik: Likelihood,
     X: np.ndarray,
@@ -220,8 +227,7 @@ def _check_inputs(
             f"penalty of shape {S.shape} and start of shape {np.shape(beta0)} for "
             f"{p} columns"
         )
-    if not np.all(np.isfinite(X)):
-        raise ValueError(f"design not finite in {np.sum(~np.isfinite(X))} entries")
+    _check_design_finite(X)
     if not np.all(np.isfinite(y)):
         raise ValueError(f"response not finite on {np.sum(~np.isfinite(y))} rows")
     if not (np.all(np.isfinite(S)) and np.all(np.isfinite(beta0))):
