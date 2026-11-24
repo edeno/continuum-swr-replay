@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 import scipy.stats
 
-from continuum_swr_replay.analysis.regression.newton import CONVERGED
+from continuum_swr_replay.analysis.regression.newton import CONVERGED, NO_FINITE_MAXIMUM
 from continuum_swr_replay.analysis.regression.reml import assemble_penalty
 from continuum_swr_replay.analysis.replay_models.rate import visit_rate as vr
 from continuum_swr_replay.analysis.replay_models.rate import (
@@ -266,3 +266,41 @@ def test_the_cohort_value_is_the_mean_over_animals_with_its_t_interval() -> None
         difference.mean() - t3 * difference.std(ddof=1) / np.sqrt(3)
     )
     assert table.loc["No SWR", "n_animals_same_sign"] == 2
+
+
+def test_an_animal_without_an_event_on_one_side_has_no_finite_coefficient(
+    make_visit_rows, cohort_of
+) -> None:
+    """No session of rat1 holds an event after an omission: the joint
+    likelihood rises without bound, so rat1 has no coefficient (not fitted,
+    ``no finite maximum``), and rat0 is fitted as before."""
+    first = _animal_cohort(
+        make_visit_rows,
+        cohort_of,
+        log_ratio=0.5,
+        n_sessions=2,
+        n_visits=40,
+        total=200.0,
+        seed=51,
+    )
+    second = _animal_cohort(
+        make_visit_rows,
+        cohort_of,
+        log_ratio=0.5,
+        n_sessions=2,
+        n_visits=40,
+        total=200.0,
+        seed=61,
+        animal="rat1",
+    )
+    for key, c in second.items():
+        rows = c.rows["A"].copy()
+        rows.loc[rows[vr.REWARD] == 0.0, vr.RESPONSE] = 0.0
+        second[key] = cohort_of(rows, "SWR")
+    fit = vr.fit_animal_rewards(
+        {**first, **second}, kind="SWR", settings=ANIMAL, allow_provisional="test"
+    )
+    rat0, rat1 = fit.animals
+    assert rat0.status == CONVERGED and np.isfinite(rat0.coefficient)
+    assert rat1.status == NO_FINITE_MAXIMUM and np.isnan(rat1.coefficient)
+    assert rat1.records == [] and rat1.n_sessions == 0

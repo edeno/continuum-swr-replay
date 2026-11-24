@@ -89,7 +89,10 @@ from continuum_swr_replay.analysis.regression.calibration import (
 from continuum_swr_replay.analysis.regression.collinearity import separable
 from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
-from continuum_swr_replay.analysis.regression.newton import CONVERGED
+from continuum_swr_replay.analysis.regression.newton import (
+    CONVERGED,
+    NO_FINITE_MAXIMUM,
+)
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.record import FitRecord
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
@@ -1085,8 +1088,10 @@ class AnimalReward(NamedTuple):
         Its standard error, from the profile information (the inverse of the
         pooled profile information at ``coefficient``).
     status : str
-        ``newton.CONVERGED``, or :data:`ANIMAL_REWARD_NOT_CONVERGED`, or the
-        cause of a coefficient with no session in it (``"no_kept_fit"``).
+        ``newton.CONVERGED``; :data:`ANIMAL_REWARD_NOT_CONVERGED`;
+        ``newton.NO_FINITE_MAXIMUM`` for an animal with no event on one side
+        in all its sessions (not fitted); or ``"no_kept_fit"`` when no
+        session has a kept fit.
     n_iter : int
         The fits of the animal's sessions it took.
     n_sessions, n_events : int
@@ -1181,6 +1186,16 @@ def _require_both_sides(animal: str, rows: Sequence[pd.DataFrame]) -> None:
             )
 
 
+def _events_on_both_sides(rows: Sequence[pd.DataFrame]) -> bool:
+    """Whether the animal's sessions hold an event after an omission and one
+    after a reward. Without one on a side, the joint likelihood rises without
+    bound as the coefficient runs to that side (each session's baseline
+    follows it), so the coefficient has no finite maximum."""
+    reward = np.concatenate([r[REWARD].to_numpy(dtype=float) for r in rows])
+    count = np.concatenate([r[RESPONSE].to_numpy(dtype=float) for r in rows])
+    return bool(count[reward == 0.0].sum() > 0 and count[reward == 1.0].sum() > 0)
+
+
 def _fit_animal(
     animal: str,
     keys: list[SessionKey],
@@ -1192,6 +1207,10 @@ def _fit_animal(
 ) -> AnimalReward:
     """One animal's coefficient (:func:`fit_animal_rewards`)."""
     _require_both_sides(animal, [sessions[key] for key in keys])
+    if not _events_on_both_sides([sessions[key] for key in keys]):
+        return AnimalReward(
+            animal, kind, np.nan, np.nan, NO_FINITE_MAXIMUM, 0, 0, 0, []
+        )
     coefficient = 0.0
     for n_iter in range(1, ANIMAL_REWARD_MAX_ITER + 1):
         rows = {key: _with_reward_offset(sessions[key], coefficient) for key in keys}
@@ -1259,7 +1278,9 @@ def fit_animal_rewards(
     A session with no event on one side takes part like any other: no rule
     reads its events (one with no event at all is not fitted, as in
     ``fit_sessions``, and so has no part). A session whose fit is not kept is
-    left out of that step's score.
+    left out of that step's score. An animal with no event on one side in
+    all its sessions has no finite coefficient (``_events_on_both_sides``):
+    it is not fitted, and its status is ``newton.NO_FINITE_MAXIMUM``.
 
     Parameters
     ----------
