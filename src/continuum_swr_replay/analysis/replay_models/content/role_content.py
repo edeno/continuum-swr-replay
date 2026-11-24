@@ -1221,6 +1221,17 @@ def tested_coefficient_collinearity(
     direction the penalty does not touch (a slope that is a straight line
     in a smooth's covariate, in the penalty's null space) still fails.
 
+    Status: the author's call, under review. It departs from section 4.7 of
+    the design (``docs/design/2026-11-20-regression-convention-and-figure04.md``:
+    a penalty steadies a fit but adds no information, so a direction that is
+    inseparable stays so under any penalty); the lead has not approved it. A
+    review showed that it certifies a level whose value depends on the
+    declared penalty. Nothing reads its result yet: :attr:`RoleContentFit
+    .separable` is computed and not used (the estimands' ``kept`` reads
+    convergence and the left-out columns only). The measure uses weights at
+    the fitted values, so dropping sessions by it would select on the
+    response.
+
     Each tested coefficient is a term of its own and each model term's other
     columns are one term. Empty for a session without a kept fit.
 
