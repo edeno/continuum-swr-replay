@@ -65,6 +65,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.event_definition import (
     analyzed_time,
@@ -1154,14 +1155,14 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
     assert record["encoding_removed_s"] == pytest.approx(removed * 0.002)
 
 
-@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID"])
+@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN", "ARTIFACT_INTERVALS_RUN"])
 @pytest.mark.parametrize("key", list(DECODERS))
 def test_an_hpc_decode_refuses_to_run_without_both_runs(
     decoders, monkeypatch, tmp_path, key, unset
 ):
     """Fail closed: nothing is loaded, the epoch fails, and its log says why."""
     decoder, module = DECODERS[key], decoders.modules[key]
-    monkeypatch.setattr(swr_source, unset, None)
+    monkeypatch.setattr(paths, unset, None)
 
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data without both runs")
@@ -1171,7 +1172,7 @@ def test_an_hpc_decode_refuses_to_run_without_both_runs(
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
     assert failed == decoder.epoch_identifier
-    assert f"swr_source.{unset}" in _log(tmp_path, decoder)
+    assert f"paths.{unset}" in _log(tmp_path, decoder)
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -1205,12 +1206,12 @@ def test_main_refuses_an_hpc_batch_without_both_runs(
     module = decoders.modules[key]
     batches = []
     monkeypatch.setattr(module, "run_batch", lambda *args, **kw: batches.append(args))
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", None)
 
     with pytest.raises(SystemExit) as stopped:
         module.main([])
     assert stopped.value.code == 2
-    assert "swr_source.ARTIFACT_INTERVALS_RUN_ID" in capsys.readouterr().err
+    assert "paths.ARTIFACT_INTERVALS_RUN" in capsys.readouterr().err
     assert batches == []
 
     module.main(["--brain_area", "mPFC"])

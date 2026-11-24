@@ -19,6 +19,7 @@ import pytest
 from dask.distributed import LocalCluster
 
 import scripts.detection.run_artifact_detection as runner
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     CORE_COLUMNS,
@@ -231,7 +232,7 @@ def test_lfp_columns_that_are_not_band_and_references_in_id_order_fail(tmp_path)
 
 
 def test_the_runner_writes_where_the_source_reads(processed_data_root, monkeypatch):
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", "run0001")
 
     output_root = runner.build_parser().parse_args([]).output_root
     assert output_root / "run0001" == swr_source.artifact_intervals_dir()
@@ -250,7 +251,7 @@ def test_the_source_reads_a_run_the_runner_wrote(processed_data_root, monkeypatc
         {"run_id": "run0001", "epochs": {EPOCH_ID: record}},
         indent=2,
     )
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", "run0001")
 
     stored = read_epoch_cores(output_dir, EPOCH_ID)
     pd.testing.assert_frame_equal(

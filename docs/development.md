@@ -95,7 +95,7 @@ src/continuum_swr_replay/
 ├── columns.py             # require_columns, the one check that a table carries the columns a step reads
 ├── reported/              # reported numbers: the summary builders (survey, detection, events, and behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
-├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
+├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), the pinned runs (*_RUN), canonical table names, table_path()
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
@@ -576,4 +576,4 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types or brain areas: the loaders count rows and skip the step when there are none, and an absent area raises `spikes.AreaNotRecordedError`, which `get_spike_data` skips
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
-- Artifacts: one detector (`analysis/detection/artifacts/`, run `analysis/event_definition/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
+- Artifacts: one detector (`analysis/detection/artifacts/`, run `paths.py:ARTIFACT_INTERVALS_RUN`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
