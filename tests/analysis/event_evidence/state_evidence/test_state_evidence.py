@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
     TetrodeTerms,
+    animal_step,
     animal_t_test,
     bout_animal_summaries,
     bout_statistics,
@@ -44,7 +45,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     keyed_rng,
     matched_windows,
     nearest_interior_bins,
-    nested_mean_intervals,
+    nested_intervals,
     null_partners,
     ols_slope_ci,
     per_tetrode_terms,
@@ -62,8 +63,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     window_folds,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
-    NestedDraw,
-    nested_bootstrap_draws,
+    nested_bootstrap_copies,
     nested_codes,
 )
 from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_KEYS
@@ -843,38 +843,43 @@ def test_sign_flip_p_is_exact_for_few_values():
 
 
 def test_the_nested_intervals_are_the_corrected_t_rule_on_nested_replicates():
-    # Animal a has epochs 1 and 3 (mean 2), b one epoch 0.5, c epochs 2, 2.5
-    # and 3.5 (mean 8/3); a NaN epoch is dropped.
+    # Animal a has epochs 1 and 3 (median 2), b one epoch 0.5, c epochs 2, 2.5
+    # and 3.5 (median 2.5, mean 8/3); a NaN epoch is dropped.
     summaries = np.array([1.0, 3.0, 0.5, 2.0, 2.5, 3.5, np.nan])
     animals = np.array(["a", "a", "b", "c", "c", "c", "b"])
-    result = nested_mean_intervals(summaries, animals, n_boot=300, seed=(4,))
-
-    assert result["animal_estimate"] == pytest.approx((2.0 + 0.5 + 8 / 3) / 3)
-    assert result["epoch_estimate"] == pytest.approx(12.5 / 6)
-    # The replicates by hand, one loop per replicate: the animals drawn, each
-    # drawn animal's epochs drawn as often as it was (pooled).
-    values, owner = summaries[:6], animals[:6]
-    animal_codes, epoch_codes = nested_codes(owner, np.arange(6))
-    replicates = nested_bootstrap_draws(
-        animal_codes, epoch_codes, keyed_rng((4,), "hierarchical"), 300
-    )
-    animal_draws, epoch_draws = [], []
-    for draw in zip(*replicates, strict=True):
-        draw = NestedDraw(*draw)
-        own = [
-            np.average(values[animal_codes == a], weights=draw.rows[animal_codes == a])
-            for a in np.flatnonzero(draw.animals)
-        ]
-        animal_draws.append(np.average(own, weights=draw.animals[draw.animals > 0]))
-        epoch_draws.append(np.average(values, weights=draw.rows))
-    for name, estimate, draws in (
-        ("animal", result["animal_estimate"], animal_draws),
-        ("epoch", result["epoch_estimate"], epoch_draws),
+    for statistic, by_animal in (
+        ("median", [2.0, 0.5, 2.5]),
+        ("mean", [2.0, 0.5, 8 / 3]),
     ):
-        # three animals: t(0.975, 2) = 4.3026527, the correction sqrt(3/2)
-        half = 4.30265273 * np.sqrt(3 / 2) * np.std(draws, ddof=1)
-        assert result[f"{name}_ci_lo"] == pytest.approx(estimate - half), name
-        assert result[f"{name}_ci_hi"] == pytest.approx(estimate + half), name
+        result = nested_intervals(
+            summaries, animals, statistic=statistic, n_boot=300, seed=(4,)
+        )
+        assert result["animal_estimate"] == pytest.approx(np.mean(by_animal))
+        assert result["epoch_estimate"] == pytest.approx(12.5 / 6)
+        # The replicates by hand, one loop per replicate and slot: the animals
+        # drawn, every drawn copy of an animal with its own draw of its epochs,
+        # and each copy's statistic over them, as on the data.
+        values, owner = summaries[:6], animals[:6]
+        animal_codes, _ = nested_codes(owner, np.arange(6))
+        copies = nested_bootstrap_copies(
+            animal_codes, keyed_rng((4,), "hierarchical"), 300
+        )
+        reduce = np.median if statistic == "median" else np.mean
+        animal_draws, epoch_draws = [], []
+        for draw in range(300):
+            slots = [
+                np.repeat(values, copies.sessions[draw, slot]) for slot in range(3)
+            ]
+            animal_draws.append(np.mean([reduce(drawn) for drawn in slots]))
+            epoch_draws.append(np.concatenate(slots).mean())
+        for name, estimate, draws in (
+            ("animal", result["animal_estimate"], animal_draws),
+            ("epoch", result["epoch_estimate"], epoch_draws),
+        ):
+            # three animals: t(0.975, 2) = 4.3026527, the correction sqrt(3/2)
+            half = 4.30265273 * np.sqrt(3 / 2) * np.std(draws, ddof=1)
+            assert result[f"{name}_ci_lo"] == pytest.approx(estimate - half), name
+            assert result[f"{name}_ci_hi"] == pytest.approx(estimate + half), name
 
 
 def test_the_nested_intervals_resample_animals_then_epochs():
@@ -882,17 +887,17 @@ def test_the_nested_intervals_resample_animals_then_epochs():
     animal = np.repeat(["a", "b", "c", "d"], 20)
     summaries = np.repeat([-1.0, 0.0, 1.0, 2.0], 20) + rng.normal(0, 0.1, 80)
 
-    result = nested_mean_intervals(summaries, animal, seed=(5,))
+    result = nested_intervals(summaries, animal, statistic="median", seed=(5,))
     lo, hi = result["epoch_ci_lo"], result["epoch_ci_hi"]
     flat_lo, flat_hi = stratified_bootstrap_ci(summaries, np.zeros(80), seed=(5,))
 
     assert lo < summaries.mean() < hi
     # four animals, not eighty epochs, set the uncertainty
     assert hi - lo > 3 * (flat_hi - flat_lo)
-    assert result == nested_mean_intervals(summaries, animal, seed=(5,))
+    assert result == nested_intervals(summaries, animal, statistic="median", seed=(5,))
     # one epoch per animal: the t-interval over the animals, up to the draws
     one_each = summaries[::20]
-    single = nested_mean_intervals(one_each, np.arange(4), seed=(6,))
+    single = nested_intervals(one_each, np.arange(4), statistic="median", seed=(6,))
     t_lo, t_hi = student_t.interval(
         0.95, 3, loc=one_each.mean(), scale=one_each.std(ddof=1) / 2
     )
@@ -900,16 +905,20 @@ def test_the_nested_intervals_resample_animals_then_epochs():
         t_hi - t_lo, rel=0.03
     )
     # nothing varies: nothing is uncertain
-    same = nested_mean_intervals(np.ones(6), np.repeat([0, 1, 2], 2), seed=(7,))
+    same = nested_intervals(
+        np.ones(6), np.repeat([0, 1, 2], 2), statistic="median", seed=(7,)
+    )
     assert (same["animal_ci_lo"], same["animal_ci_hi"]) == (1.0, 1.0)
     # one animal: no t quantile, no interval; no epoch: no estimate
-    alone = nested_mean_intervals(np.array([1.0, 2.0]), np.zeros(2), seed=(7,))
+    alone = nested_intervals(
+        np.array([1.0, 2.0]), np.zeros(2), statistic="median", seed=(7,)
+    )
     assert alone["animal_estimate"] == 1.5
     assert np.isnan([alone["animal_ci_lo"], alone["epoch_ci_hi"]]).all()
     assert np.isnan(
-        nested_mean_intervals(np.array([np.nan]), np.zeros(1), seed=(7,))[
-            "animal_estimate"
-        ]
+        nested_intervals(
+            np.array([np.nan]), np.zeros(1), statistic="median", seed=(7,)
+        )["animal_estimate"]
     )
 
 
@@ -940,11 +949,21 @@ def test_the_epoch_summary_follows_the_kind_of_metric():
             epoch_summary_kind(metric)
 
 
+def test_the_animal_step_is_the_median_for_a_log_ratio_and_the_mean_for_a_share():
+    """The animal step follows the kind of metric: a log-likelihood ratio (and
+    its calibration slope) takes the median of an animal's epochs, a count, a
+    share or a distance their mean."""
+    for metric in ("runcv_nl_anim_mark_ps", "runcv_loc_mark_ps", "can_ns_logratio"):
+        assert animal_step(metric) == "median", metric
+    for metric in ("run_ns_silent_frac", "run_ns_count", "run_mapS_dist_cm"):
+        assert animal_step(metric) == "mean", metric
+
+
 def test_the_animal_t_test_takes_each_animal_once():
     summaries = np.array([1.0, 3.0, 0.5, 2.0, 2.5, 3.5, np.nan])
     animals = np.array(["a", "a", "b", "c", "c", "c", "b"])  # b: one finite epoch
 
-    result = animal_t_test(summaries, animals)
+    result = animal_t_test(summaries, animals, statistic="mean")
 
     by_animal = np.array([2.0, 0.5, 8.0 / 3.0])  # each animal's mean epoch summary
     sem = by_animal.std(ddof=1) / np.sqrt(3)
@@ -953,13 +972,18 @@ def test_the_animal_t_test_takes_each_animal_once():
     t = by_animal.mean() / sem
     assert result.p == pytest.approx(2 * student_t.sf(t, df=2))  # A - 1 df
     # 40 more epochs of animal a at its own mean change nothing: a counts once
-    more = animal_t_test(np.r_[summaries, [2.0] * 40], np.r_[animals, ["a"] * 40])
+    more = animal_t_test(
+        np.r_[summaries, [2.0] * 40], np.r_[animals, ["a"] * 40], statistic="mean"
+    )
     assert tuple(more) == pytest.approx(tuple(result))
     # one animal: an estimate, but no test
-    single = animal_t_test(np.array([1.0, 2.0]), np.array(["a", "a"]))
+    single = animal_t_test(np.array([1.0, 2.0]), np.array(["a", "a"]), statistic="mean")
     assert single.estimate == 1.5
     assert np.isnan(single.p)
     assert not result.zero_variance and not single.zero_variance
+    # with the median at the animal step: c's median 2.5, not its mean 8/3
+    median = animal_t_test(summaries, animals, statistic="median")
+    assert median.estimate == pytest.approx((2.0 + 0.5 + 2.5) / 3)
 
 
 def test_identical_animal_summaries_are_flagged_and_untested():
@@ -969,7 +993,9 @@ def test_identical_animal_summaries_are_flagged_and_untested():
     1e-17 rather than 0; they are still identical.
     """
     for value in (2.0, 0.0, 0.1, 0.7):
-        result = animal_t_test(np.full(3, value), np.array(["a", "b", "c"]))
+        result = animal_t_test(
+            np.full(3, value), np.array(["a", "b", "c"]), statistic="median"
+        )
 
         assert result.zero_variance, value
         assert np.isnan(result.p), value
@@ -1030,16 +1056,20 @@ def test_bout_statistics_infer_at_the_epoch_level():
         assert row[f"{role}epoch_estimate"] == pytest.approx(means.mean())
         assert row[f"{role}epoch_ci_lo"] < means.mean() < row[f"{role}epoch_ci_hi"]
         assert row[f"{role}p_epoch_signflip"] == pytest.approx(exact)
-    # each animal once, as the mean of its epochs: 1.5, 1.25 and 2.25
+    # each animal once, as the median of its two epochs (their mean): 1.5,
+    # 1.25 and 2.25
     by_animal = np.array([1.5, 1.25, 2.25])
     for role in ("", "other_"):
         assert row[f"{role}animal_estimate"] == pytest.approx(by_animal.mean())
-    # The intervals are nested_mean_intervals of the epoch values; the mean
-    # summary keeps the bout's own seed, the median one adds its kind.
+    # The intervals are nested_intervals of the epoch values with the median at
+    # the animal step (a log-likelihood ratio, animal_step); the mean summary
+    # keeps the bout's own seed, the median one adds its kind.
     epoch_animals = np.repeat(["aa", "bb", "cc"], 2)
     seed = (1, "Local", "immobile", "run_loc_mark", "epoch")
     for role, role_seed in (("other_", seed), ("", (*seed, "median"))):
-        expected = nested_mean_intervals(means, epoch_animals, seed=role_seed)
+        expected = nested_intervals(
+            means, epoch_animals, statistic="median", seed=role_seed
+        )
         for name in ("animal_ci_lo", "animal_ci_hi", "epoch_ci_lo", "epoch_ci_hi"):
             assert row[f"{role}{name}"] == pytest.approx(expected[name]), role + name
     assert row["p_animal_t"] == pytest.approx(ttest_1samp(by_animal, 0.0).pvalue)

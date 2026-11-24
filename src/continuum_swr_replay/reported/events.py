@@ -1851,7 +1851,9 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"held-out evidence per held-out spike for immobile Non-Local Continuous "
-                f"bouts {label}, against the animal's position: mean over animals",
+                f"bouts {label}, against the animal's position: each epoch's median "
+                "over its bouts, each animal's median over its epochs, the mean over "
+                "animals",
                 "nats per spike",
             ),
             make(
@@ -4168,8 +4170,9 @@ def state_calibration_values(
     make = value_factory(state_calibration_values, source, TAGS["state_calibration"])
     reduction = (
         "per epoch the median over its windows, then the mean over animals of "
-        "each animal's mean epoch value; 95 % interval from the nested bootstrap "
-        "of the animals and their epochs, small-sample t correction"
+        "each animal's median epoch value; 95 % interval from the nested bootstrap "
+        "of the animals and their epochs (each replicate with the same estimator), "
+        "small-sample t correction"
     )
     values = []
     for state, (word, what) in _CALIBRATED_STATES.items():
@@ -4213,7 +4216,7 @@ def state_calibration_values(
                 f"rise of that held-out evidence for {state} with the state's "
                 "probability: each epoch's least-squares slope over its windows "
                 "(nats per spike per unit of probability), then the mean over "
-                "animals of each animal's mean epoch slope",
+                "animals of each animal's median epoch slope",
                 "nats per spike per unit probability",
             ),
             make(f"{key}_slope_per_spike_ci_low", trend["slope_animal_ci_lo"], "quantity",
