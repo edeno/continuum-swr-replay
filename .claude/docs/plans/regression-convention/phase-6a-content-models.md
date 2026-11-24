@@ -2,7 +2,9 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md) · [designs](designs.md#content-design)
 
-Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can run beside Phase 5a.
+Branch: `role-content-models` from master after Phases 2b and 3 (the simulation engine on master). It
+runs on the present fitter, beside Phase 5a and beside Phase 2c, the JAX port (Figure 4 does not wait
+for the port; lead, twenty-third round). CPU only.
 
 **Inputs to read first:**
 
@@ -58,7 +60,9 @@ real fit and state the answers in `docs/regression_models.md`):
   curve.
 - The trial number in the epoch is the number of visits the animal has arrived at by the event start
   (Phase 3's `n_visits_arrived`), not the trials completed (`completed_trial_id`).
-- WAITS FOR THE LEAD (smooth-term rule): the freedom of the per-session smooth terms (gate item 2 below).
+- The declared penalty of each per-session smooth term (gate item 2 below): the rule is decided (design,
+  seventeenth round); the values found on this model's rows, with the targets, go to the lead with the
+  gate's results.
 
 **Gate before any real fit: the uncertainty simulations.** Two semi-synthetic studies on the real data
 structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`):
@@ -77,11 +81,14 @@ structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/202
    basis with no penalty, keeps that test correct (false positives 0 to 7 %) with low power (23 to 50 %
    at an effect of the size of the recency effect's linear part). The lead kept one fit for each session
    (fourteenth round).
-   WAITS FOR THE LEAD (smooth-term rule): how the uncertainty model's recency curve, and every other
-   per-session smooth of this phase, is fitted: option A, a natural cubic spline of 4 columns, knots from
-   the pooled data, no penalty (the author's recommendation, with the conclusions checked at 3, 4 and 5
-   columns), or option B, a P-spline with one fixed weak penalty per term. Write the rule into the phase's
-   PR and `docs/regression_models.md` before the first real fit.
+   The rule that follows (design, seventeenth round): the uncertainty model's recency curve, and every
+   other per-session smooth of this phase, is a P-spline at one declared fixed log penalty, the same in
+   every session. Each value is found on this model's own real rows by `calibration.log_penalty_for_edf`
+   at a target median edf, and checked by this phase's scenario list: the recency penalty must be weak
+   enough that the belief-variance test keeps its size (3 to 7 %). (Simulation, recency: log penalty -4,
+   about 4.3 effective parameters, was cleaner than -2, about 3.0, which biased the slope by +0.05 to
+   +0.10.) Do not reuse a target from the rate model. Write the values, their targets and the stiffer
+   and looser values into the phase's PR and `docs/regression_models.md` before the first real fit.
 
 Both results go to the lead before any real fit of this phase. The statements that must be written before the
 fits (C5's rule for a term that fails the collinearity rule by design): the belief variance is reported
@@ -109,16 +116,20 @@ identifiability test" below), since scratch is not kept.
   missing covariate in the cohort step (counted per kind) -> terms:
   `Category(arm)` (arm fixed effects) + `Category(role)` + `Smooth(reward_fraction, 0, 1, 6, by=role)` +
   `Slope(value, by=role)` + `Smooth(log_recency, log 1, log 200)` on leaf rows + never-visited indicator +
-  `Smooth(u, 0, 3)` for the current role (Q7b). WAITS FOR THE LEAD (smooth-term rule): the three `Smooth`
-  terms' basis and penalty (a natural spline of 4 columns with no penalty, or a P-spline at a fixed weak
-  penalty); their ranges stay. Two variants per model: length-unadjusted, and
+  `Smooth(u, 0, 3)` for the current role (Q7b). The three `Smooth` terms are P-splines at declared
+  fixed log penalties (gate item 2); their ranges stay. Two variants per model: length-unadjusted, and
   length-adjusted (every role term and role slope interacting with `log(duration) - L0`, `L0` the pooled
   median, stored). One uncertainty model: the main design plus, on the leaf roles, the belief variance,
   the sample count (Phase 3's column) and the trial number in the epoch (Phase 3's `n_visits_arrived`), each
   a pooled-SD slope per role, with the recency curve fitted as the gate decides.
+  Each simple tested coefficient (a role level that a declared test reads, a role slope, the uncertainty
+  slopes) has the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`). The arm fixed effects and other nuisance
+  categories are baselines and are not penalized (**call**). The nine-arm scenario list below checks the
+  penalty before the fit is used.
 - **Nine-arm simulation first** (design 4.2: "the nine-arm design goes through the same simulations
-  before it is used"): stored analysis `scripts/replay_models/content/simulate_role_content.py` (new, from
-  `S/proto_content/sim_lib.py` and `content/simulation.py`) on the real nine-arm design of every session:
+  before it is used"): a scenario list for the simulation package (Phase 2b),
+  `replay_models/content/role_content_scenarios.py` (new; scenarios from `S/proto_content/sim_lib.py`),
+  run by Phase 2b's runner on the real nine-arm design of every session:
   (a) opposite true slopes by role, where a pooled slope returns about zero and the role slopes recover
   both; (b) recency-only truth, where the uncertainty slope's false-positive rate is near nominal with the
   uncentered smooth and above it with the shipped centered spline; (c) a curved recency truth, which a
@@ -128,10 +139,10 @@ identifiability test" below), since scratch is not kept.
   output `models_convention/simulations/role_content.parquet`. Do not fit the real data until (a) to (e)
   pass.
 - **Uncertainty identifiability test** (committed form of the gate studies): a slow test
-  `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` and a stored analysis
-  `scripts/replay_models/content/simulate_uncertainty_measures.py` (new, from the scratch study's scripts:
-  `sim.py`, `fit_lib.py`, `build_measures.py`, `check_measures.py`, `collinearity.py` and what `REPORT.md`
-  names), fit with the shared fitter and the uncertainty model as it will be fit to the real data (the
+  `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` and a scenario list for
+  the simulation package (Phase 2b), `replay_models/content/uncertainty_scenarios.py` (new; scenarios
+  from the scratch study's scripts: `sim.py`, `build_measures.py`, `check_measures.py` and what
+  `REPORT.md` names; its own fitting code is not copied), run by Phase 2b's runner with the shared fitter and the uncertainty model as it will be fit to the real data (the
   recency curve as the gate decides). Truths: recency only; the belief variance; the sample count; a drift
   with the trial number; a curved reward-fraction effect. Asserts: under each truth without a measure's
   effect, that measure's slope is significant in 3 to 7 % of data sets (100 in the stored analysis, fewer in
@@ -144,12 +155,13 @@ identifiability test" below), since scratch is not kept.
   record; each source is one stream, without an SWR and No SWR split, call). Their values are a
   supplementary comparison (Phase 7 builds the comparison values), not members of the declared family.
 - **Fit** through `analysis/regression/sessions.py` with the grouped softmax: support rule per role slope
-  and role category (a role column made inactive drops that role's rows from the session's fit, Phase 2);
+  and role category, read from the design (units with a row on each side; under the softmax the same
+  counts as the events with a candidate row; a role column made inactive drops that role's rows from the
+  session's fit, Phase 2);
   sessions without a finite maximum handled by Phase 2's rule (the simulated content model had 4 of 242
   such sessions; simulation); collinearity per term (recency against uncertainty is the known concern,
-  design 2.3); records. WAITS FOR THE LEAD (smooth-term rule): the plan had one pooled REML selection per
-  smooth, model and kind; under either option no penalty is chosen from the data for these per-session
-  smooth terms.
+  design 2.3); records. The plain penalized fit at the declared penalties (no bias-reduced fit; lead,
+  2026-11-23); no penalty is chosen from the data, and no selection runs.
 - **Storage order of the design** (in the design builder, `role_content.py`): store each session's design
   in column (Fortran) order if a timing confirms it. A reviewer measured one weighted Gram product at
   7.0 ms in column order against 9.8 ms in row order on a synthetic session of 40,000 rows and 56 columns
@@ -233,9 +245,9 @@ seeds; the synthetic visit helpers of Phase 3 for `u`.
 - Simulated first (tests, then the stored nine-arm simulation over the real designs), then five sessions,
   then 242.
 - The design measured about 0.03 s per content fit and session; a pooled selection with two smooths (25 grid
-  points plus Newton steps) over 242 sessions is minutes; one uncertainty model, two length variants and
-  two kinds make about twelve selections. WAITS FOR THE LEAD (smooth-term rule): without selections the
-  cost is one fit per session, model, variant and kind. Time the smoke test; run the full fits in `tmux`
+  points plus Newton steps) over 242 sessions is minutes; no selection runs under the declared-penalty
+  rule, so the cost is one fit per session, model, variant and kind, plus one calibration per smooth and
+  kind (about 18 passes each) and the scenario lists. Time the smoke test; run the full fits in `tmux`
   (`csr-6a-content`).
 - Compare with the model-free references: Q3a's direction and Q4a's sign (negative for SWR on the current arm
   in the design's check) against the within-arm slopes; Q7b against the model-free current-arm share by time

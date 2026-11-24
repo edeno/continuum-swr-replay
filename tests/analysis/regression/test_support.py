@@ -6,77 +6,78 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
+from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
+from continuum_swr_replay.analysis.regression.sessions import fit_sessions
 from continuum_swr_replay.analysis.regression.support import (
     MIN_UNITS,
     Removed,
     Support,
     binary_support,
     design_support,
+    require_tested_penalized,
     slope_support,
     terms_failing_share,
 )
 from continuum_swr_replay.analysis.regression.terms import (
+    Category,
+    Offset,
     Slope,
     Smooth,
     build_design,
 )
 
-from .conftest import ROLE
+from .conftest import ROLE, by_session
 
 FEW = Removed.SUPPORT
 
 
-def test_binary_term_counts() -> None:
-    """Hand-built visits: the units with an event on a row where the 0/1 term
-    is 1 and those where it is 0, and the pass flag (both at least 5)."""
-    # Visits 0-6 rewarded (term 1), 7-12 not; events in visits 0-5 and 7-9.
+def test_binary_term_counts_rows_not_events() -> None:
+    """Hand-built visits: the units with a row where the 0/1 term is 1 and
+    those with a row where it is 0, and the pass flag (both at least 5). The
+    rule reads the design only: where the events are does not enter."""
+    # Visits 0-6 rewarded (term 1), 7-10 not.
+    visit = np.repeat(np.arange(11), 3)
+    term = (visit <= 6).astype(float)
+    support = binary_support(term, visit)
+    assert support == Support(n_low=4, n_high=7, reason=FEW)
     visit = np.repeat(np.arange(13), 3)
     term = (visit <= 6).astype(float)
-    count = np.zeros(visit.size)
-    count[
-        np.isin(visit, [0, 1, 2, 3, 4, 5, 7, 8, 9]) & (np.arange(visit.size) % 3 == 1)
-    ] = 1
-    count[0] = 2  # a second event in visit 0 counts it once
-    support = binary_support(term, visit, count > 0)
-    assert support == Support(n_low=3, n_high=6, reason=FEW)
-    count[np.isin(visit, [10, 11]) & (np.arange(visit.size) % 3 == 0)] = 1
-    assert binary_support(term, visit, count > 0) == Support(5, 6)
-    assert Support(5, 6).passes and not support.passes
+    assert binary_support(term, visit) == Support(6, 7)
+    assert Support(6, 7).passes and not support.passes
     assert MIN_UNITS == 5
 
 
 def test_term_changing_within_a_unit_counts_each_side() -> None:
     """A unit whose term changes within it (an outcome known mid-visit) counts
-    on the side of each row that holds an event."""
-    visit = np.array([0, 0, 1, 1])
-    term = np.array([0.0, 1.0, 0.0, 1.0])
-    events = np.array([True, True, False, True])
-    assert binary_support(term, visit, events) == Support(1, 2, FEW)
+    on each side it has a row on."""
+    visit = np.array([0, 0, 1, 1, 2])
+    term = np.array([0.0, 1.0, 0.0, 1.0, 1.0])
+    assert binary_support(term, visit) == Support(2, 3, FEW)
 
 
 def test_role_slope_counts_and_constant() -> None:
-    """A role slope: events above and below the median of the role's rows
-    (ties to neither); a slope constant within the role fails."""
+    """A slope: units with a row above and below the median of its rows (ties
+    to neither); a constant column fails, and so do no rows."""
     event = np.arange(12)
     x = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1])
-    every = np.ones(12, dtype=bool)
     # median 0.6: five below, five above, two ties
-    assert slope_support(x, event, every) == Support(5, 5)
-    assert slope_support(np.full(12, 0.4), event, every) == Support(0, 0, FEW)
-    assert slope_support(x, event, np.zeros(12, dtype=bool)) == Support(0, 0, FEW)
+    assert slope_support(x, event) == Support(5, 5)
+    assert slope_support(np.full(12, 0.4), event) == Support(0, 0, FEW)
+    assert slope_support(x[:0], event[:0]) == Support(0, 0, FEW)
 
 
 def test_design_support_reads_each_columns_rows(content_sessions) -> None:
     """In a content design, a role level counts the events with a candidate in
     the role (and those with a candidate in another); a slope by a role is
-    split at the median of that role's rows only; smooths have no entry."""
+    split at the median of that role's rows only; a smooth has no entry."""
     pooled = pd.concat(content_sessions.values(), ignore_index=True)
     design = build_design(
         [
             ROLE,
-            Slope("reward_fraction", by=ROLE, levels=("current", "previous")),
+            Slope("reward_fraction", "none", by=ROLE, levels=("current", "previous")),
             Smooth("clock_s", 0.0, 20.0, 8, 2.0),
         ],
         pooled,
@@ -87,8 +88,7 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
     rows = rows.reset_index(drop=True)
     built = design.build(rows)
     unit = rows["event_id"].to_numpy()
-    every = np.ones(len(rows), dtype=bool)
-    support = design_support(design, built.X, built.level_rows, unit, every)
+    support = design_support(design, built.X, built.level_rows, unit)
     assert list(support) == [
         "role[current]",
         "role[previous]",
@@ -103,9 +103,77 @@ def test_design_support_reads_each_columns_rows(content_sessions) -> None:
     assert support["reward_fraction:role=previous"] == slope_support(
         rows.loc[previous, "reward_fraction"].to_numpy(),
         unit[previous.to_numpy()],
-        np.ones(int(previous.sum()), dtype=bool),
     )
     assert not support["reward_fraction:role=previous"].passes
+
+
+def test_softmax_counts_are_those_of_the_event_rule(content_sessions) -> None:
+    """Under the grouped softmax every candidate row belongs to an event, so
+    the counts on rows are those of the event-based rule they replace (lead,
+    2026-11-23): the support records of two content sessions equal the counts
+    that rule gave at commit ec1ae69c, for every simple term."""
+    frames = list(content_sessions.values())
+    first = frames[0]
+    first = first[~((first["role"] == "previous") & (first["event_id"] >= 7))]
+    frames[0] = first.assign(
+        flag=((first["role"] == "current") & (first["event_id"] < 9)) * 1.0
+    ).reset_index(drop=True)
+    for k, rows in enumerate(frames[1:], start=1):
+        on = (rows["role"] == "current") & (rows["event_id"] % 2 == 0)
+        frames[k] = rows.assign(flag=on * 1.0)
+    sessions = by_session(frames)
+    design = build_design(
+        [
+            ROLE,
+            Slope(
+                "reward_fraction",
+                "none",
+                by=ROLE,
+                levels=("current", "previous", "other"),
+            ),
+            Slope("clock_s", "none"),
+            Slope("flag", "none"),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    records = fit_sessions(
+        design,
+        sessions,
+        GroupedSoftmax(),
+        model="m",
+        kind="k",
+        response="share",
+        unit="event_id",
+        table_sha256={},
+    )
+    before = [
+        {
+            "role[current]": (150, 150, ""),
+            "role[previous]": (150, 7, ""),
+            "role[trunk]": (150, 150, ""),
+            "reward_fraction:role=current": (75, 75, ""),
+            "reward_fraction:role=previous": (3, 3, FEW),
+            "reward_fraction:role=other": (75, 75, ""),
+            "clock_s": (131, 126, ""),
+            "flag": (150, 9, ""),
+        },
+        {
+            "role[current]": (150, 150, ""),
+            "role[previous]": (150, 150, ""),
+            "role[trunk]": (150, 150, ""),
+            "reward_fraction:role=current": (75, 75, ""),
+            "reward_fraction:role=previous": (75, 75, ""),
+            "reward_fraction:role=other": (75, 75, ""),
+            "clock_s": (135, 140, ""),
+            "flag": (150, 75, ""),
+        },
+    ]
+    for record, expected in zip(records[:2], before, strict=True):
+        assert {
+            name: (entry["n_low"], entry["n_high"], entry["reason"])
+            for name, entry in record.support.items()
+        } == expected
 
 
 def test_failing_share_rule() -> None:
@@ -122,3 +190,37 @@ def test_failing_share_rule() -> None:
     records.append(record("no finite maximum", False, False))
     assert MAX_FAILING_SHARE == 0.20
     assert terms_failing_share(records) == {"a": 0.21}
+
+
+def test_a_tested_coefficient_without_a_penalty_is_refused(rate_sessions) -> None:
+    """The guard of the convention "a tested coefficient carries the
+    penalty": given coefficient or term names, it passes when each has a
+    fixed penalty and raises one error that names every one without."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    pooled["g"] = np.where(pooled["well_visit_id"] % 2 == 0, "a", "b")
+    baseline = Category("g", ("a", "b"), reference="a", penalty="none")
+    design = build_design(
+        [
+            baseline,
+            Slope("last_rewarded", 0.5),
+            Slope("x", "none"),
+            Slope("time_until_s", 0.5, by=baseline, levels=("a", "b")),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+    )
+    require_tested_penalized(
+        design, ["last_rewarded", "time_until_s:g=a", "time_until_s:g=b"]
+    )
+    require_tested_penalized(design, [])
+    with pytest.raises(ValueError, match=r"'x', 'g\[b\]'") as error:
+        require_tested_penalized(design, ["last_rewarded", "x", "g[b]"])
+    assert "last_rewarded" not in str(error.value)
+    # A model term is checked on each of its coefficients.
+    with pytest.raises(ValueError, match=r"'g'"):
+        require_tested_penalized(design, ["g"])
+    with pytest.raises(ValueError, match=r"\(Intercept\)"):
+        require_tested_penalized(design, ["(Intercept)"])
+    with pytest.raises(ValueError, match="not a coefficient or term"):
+        require_tested_penalized(design, ["reward"])

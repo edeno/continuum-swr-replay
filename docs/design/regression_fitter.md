@@ -16,12 +16,15 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
 | `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
-| `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) |
+| `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
+| `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
 | `record.py` | the fit-row record and its parquet storage |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
+| `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces (not used by the solver yet) |
+| `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows (not used by the solver yet) |
 
 The reduction of a per-session estimate to recording days and animals is in
 `analysis/shared_statistics.py`, beside the project's other statistics. The declared
@@ -179,7 +182,7 @@ The fit at the upper bound, 20, is obtainable, and the score there is within its
 few `1e-8` of the limit. The measurements behind this, and the rules it replaced, are in
 [the fitter's history](../../.claude/docs/reviews/2026-11-21-regression-fitter-history.md).
 
-A session may lack support for an unpenalized term (a 0/1 term none of its rows has):
+A session may lack support for a term (a 0/1 term none of its rows has):
 `SessionData.active`, a boolean mask over the columns, marks the columns the session
 estimates. Its fit, score and derivatives are those of its design built without the
 inactive columns, and their coefficients and covariance rows and columns are NaN. A
@@ -403,9 +406,52 @@ A built design describes each term once, as a `DesignTerm`: its kind (intercept,
 covariate, its penalty block and, for a level, the terms that leave a session with it.
 The support rule, the design check and the per-session loop read these descriptions.
 
-A smooth's penalty is required: `"none"` or a fixed log penalty. No penalty is chosen
-from the data in a per-session fit: the rule for a smooth term there is open with the
-lead.
+Every term but the offset takes a required penalty: `"none"` or a fixed log penalty. No
+penalty is chosen from the data in a per-session fit. A smooth's penalty is its
+second-order difference penalty. A slope's and a category's is the identity on each of
+its columns, each column its own penalty block: one block for a slope, one for each
+level of a slope by a category, one for each coded level of a category. It enters
+`Design.blocks`, `Design.log_penalties` and `Design.log_penalty_record()` as a smooth's
+does; the record names every term's penalty, `"none"` included. A category used only as
+the `by` of another term is not a term, and its penalty is not read.
+
+A fixed log penalty `rho` on a simple coefficient is a Normal prior of mean 0 and SD
+`exp(-rho / 2)`: the fit minimizes `-l + exp(rho) b**2 / 2`
+(`terms.log_penalty_from_prior_sd` and `terms.prior_sd_from_log_penalty`). The
+coefficient is in the unit the convention reports: a 0/1 column enters as it is (a step
+from 0 to 1), and a continuous column enters divided by its pooled SD (centered first
+when it is by a category), so its coefficient is per pooled SD and the prior SD is too.
+A covariate given in units 1000 times larger builds the same column
+(`test_terms.py::test_the_penalty_acts_in_the_reported_unit`). Under the Gaussian the
+penalty is on the scale of the residual sum of squares, so the prior SD is in units of
+the residual SD. There a penalized category, a penalized slope of a covariate of mean near 100 and SD
+near 50, a penalized slope by the category and a penalized 0/1 slope equal the ridge
+solution `(X'X + diag(exp(rho))) b = X'y`, with `X` built by hand with the pooled SD and
+the by-category centering, to 1e-10
+(`test_sessions.py::test_a_gaussian_penalized_fit_is_the_ridge_solution`).
+
+Each record holds the edf of each penalized simple coefficient (`edf`; a level of a
+penalized category by its coefficient name as well as in its category's sum). Near 1 the
+data decide the value; near 0 the penalty does. The category's entry is the sum of its
+levels' entries, so a total over all the entries counts those levels twice; a total sums
+the model terms only. For one coefficient with a 1x1 penalty the edf is the diagonal
+element `[(H + S)^-1 H]_jj` of the influence of the penalized information: in a Gaussian
+case and a grouped-softmax case the records equal it computed from the fit alone
+(`test_sessions.py::test_a_penalized_category_edf_is_the_sum_of_its_levels`,
+`test_penalized_terms_record_their_edf`).
+
+Measured results, two cells (an intercept, one penalized 0/1 column, an offset; 20
+visits; `test_sessions.py`):
+
+- The fit equals a one-dimensional root of the penalized score equations to 1e-8, with
+  counts on both sides and with no event on one side.
+- At the weakest log penalty, -10, the estimate equals the plain maximum likelihood value
+  to 1e-4 and its edf is 1 to 1e-4; from -10 to 10 the estimate falls toward zero and its
+  edf falls, monotonically.
+- The intercept, the coefficient and its edf equal mgcv 1.9-4's
+  `gam(..., paraPen = list(flag = list(diag(1), sp = exp(rho))))` at the same fixed
+  strength to 1e-8, in four cases (`test_a_penalized_binary_slope_matches_mgcv`; mgcv's
+  `sp b**2` on the deviance is the fitter's `exp(rho) b**2 / 2` on the log-likelihood).
 
 ## Standardization
 
@@ -456,12 +502,37 @@ mgcv's "para" term keeps the intercept, so it is not compared.
 
 ## The support rule
 
-`support.py` decides from the rows, before the fit, whether a session can estimate an
-unpenalized term: a level of a category passes on the units with an event on its rows, a
-0/1 slope and a continuous slope when both of their sides reach `MIN_UNITS = 5` units with
-an event. The rule, the units and what a row holding an event is are in its docstring. A
-term that fails in more than `MAX_FAILING_SHARE` (20 %) of the sessions with a fit leaves
-the per-session model (`terms_failing_share`).
+`support.py` decides from the design, before the fit, whether a session can estimate a
+simple term (a level, a 0/1 slope, a continuous slope), penalized or not. No rule reads
+the event counts before a fit. A level of a category passes when `MIN_UNITS = 5` units
+have a row of the level. A 0/1 slope passes when 5 units have a row where it is 1 and 5
+have a row where it is 0. A continuous slope passes when 5 units have a row above the
+median of its rows and 5 have a row below it; a constant column fails. The units and the
+rule are in the module docstring. A term that fails in more than `MAX_FAILING_SHARE`
+(20 %) of the sessions with a fit leaves the per-session model (`terms_failing_share`).
+A smooth and a lag functional have no counts; every term is judged by the design check.
+
+The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
+side. The lead chose a weak penalty on the reward coefficient and on every simple tested
+coefficient; a guard that reads the design only is the author's call that goes with it
+(design, section 9, twenty-second round).
+Under the grouped softmax every candidate row belongs to an event, so the counts are the
+same as before (`test_support.py::test_softmax_counts_are_those_of_the_event_rule`, the
+records of two content sessions against the old rule's counts at commit `ec1ae69c`).
+Under the Poisson and the Bernoulli a side can have rows and few events or none. A
+penalized term always has a finite maximum and stays in the fit. An unpenalized term has
+no finite maximum only when it is a 0/1 slope or a level with no event on a side (under
+the Bernoulli, also with an event on every row of a side); the refit then leaves it out
+(below). In every other case it has a finite maximum and is fitted: a continuous slope, or
+a level whose events are in one to four units. The event-based rule left these out; this
+rule fits them, with a large standard error. A Poisson session with a level on 10 of 60
+visits and one event there, the category unpenalized, fits the level at -3.67 with a
+standard error of 1.0, the two-cell maximum likelihood
+(`test_sessions.py::test_an_unpenalized_level_with_one_event_is_fitted`). So an
+unpenalized simple term is a baseline or a nuisance term, whose value is not reported or
+tested. A tested coefficient must carry the penalty. `support.require_tested_penalized(design,
+tested)` raises an error that names every coefficient or term in `tested` without a fixed
+penalty; each model module calls it with the coefficients of its declared tests.
 
 A level that fails is removed with its rows, which are dropped and counted, not merged
 into the reference level: in simulation, merging inflated the belief variance's false
@@ -638,6 +709,75 @@ animal, day or session label is refused. A kind difference is
 the difference of the two kinds' session estimates, reduced the same way. With five
 animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
 alone.
+
+## Precision, devices, threads and padding
+
+The solver is being moved to JAX, one fitter for every model. These pieces are in place;
+the solver does not call them yet. The rules hold for the JAX code as it is added.
+
+**Float64 for each call.** Every public entry that makes a JAX array or runs a kernel
+carries `runtime.in_float64`, which enters a fresh `jax.enable_x64(True)` for that call.
+The flag is never set for the whole process, because the decoders in the same process
+compute in float32. In JAX 0.8.0 the flag is thread-local: a thread started inside the
+scope sees it off, and the calling thread has its old value back after the call, also
+when the call raises (measured, and `tests/analysis/regression/test_runtime.py`). The jit
+caches are keyed on the flag (`jax/_src/config.py`, `include_in_jit_key=True`), so a
+function called inside and outside the scope has two compiled programs. With the flag
+off, `jnp.asarray` of a float64 NumPy array silently gives float32. So every kernel is
+jitted through `runtime.float64_kernel`, which refuses when it is traced with the flag off
+or with a floating input that is not float64. A float64 array made inside the scope stays
+float64 after it, but arithmetic on it outside the scope is in float32.
+
+**One device.** `in_float64` first calls `runtime.require_device`, which is
+`runs.device.require_one_jax_device`: the fitter refuses to start unless this process
+configured a card (`configure_jax_gpu`), `JAX_PLATFORMS` excludes CUDA, or
+`CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
+starts no backend. The message says what to set. A runner that fits calls
+`runs.device.default_jax_platforms("cpu")` in `main` unless it asks for a GPU
+(`simulate_declared_penalty.py`, `compare_regression_to_mgcv.py`,
+`compare_regression_to_current_fitters.py`). The GPU's own check is a later step.
+
+**Threads.** JAX 0.8.0 has no setting for the number of CPU threads. Its CPU client takes
+no thread count (`jax/_src/xla_bridge.py`, `make_cpu_client`), and its pool follows the
+process's CPU set: 7 threads on 1 CPU, 18 on 4 and 30 on 8, and a float64 `X'X` took 1.0
+second of CPU time per second of wall time on 1 CPU and 6.5 on 8.
+`--xla_cpu_multi_thread_eigen=false` changed neither (6.7 on 8; measured 2026-11-23, under
+load). `os.sched_setaffinity(0, ...)` moves only the calling thread: called after the
+backend started, it left the pool on 8 CPUs (7.3). The pool's threads are made when JAX
+starts its backend and keep the CPU set they were made with, so a process is pinned
+before its first JAX computation. `runs.threads.pin_to_cpus(cpus)` moves every thread of
+the process to `cpus` and sets the BLAS thread variables to their number; it refuses when
+numpy was already imported with another count, which its BLAS keeps. A pool whose
+processes compute with JAX starts them by spawn, `runs.threads.pool_context()`: a fork of
+a process with JAX's threads running can deadlock. `tests/repository/test_no_fork_pools.py`
+fails when `src/` or `scripts/` asks for fork explicitly (`get_context("fork")`,
+`set_start_method("fork")`). A pool made with no start method also forks on Linux, so the
+same file fails when a module that imports `jax`, the regression fitter or
+`non_local_detector` (directly or through this repository's modules) makes a `Pool` or a
+`ProcessPoolExecutor` with no `mp_context=` or `context=`, other than by `pool_context()` or
+`get_context(...)`. The present offenders are listed there with their reasons; the test
+also fails when a listed one is gone.
+
+**Padding.** `jit` compiles once for each new shape, so a session's rows are padded to a
+bucket: a multiple of 4,096 rows for the Poisson, Bernoulli and Gaussian families
+(`padding.pad_rows`), and of 1,024 rows and 64 groups for the grouped softmax
+(`padding.pad_groups`). Columns are not padded. A padded row has a design row of zeros, a
+response of 0, an offset of 0 and a weight of 0, after the real rows. A kernel multiplies
+each row's terms by the weight, so a padded row adds exactly 0 to the log-likelihood, its
+gradient and its information; with a zero design row it adds nothing to the gradient or
+the information even unweighted. Its terms are finite: an offset of minus infinity would
+make a zero weight give `0 * -inf = nan`. For the grouped softmax the padded rows form
+one group after the real ones, with a response total of 0, and the groups after it to the
+bucket have no rows. A kernel guards each group's `n_g log(sum exp)` term where `n_g = 0`,
+since a group with no rows gives `0 * -inf`. The padded and unpadded log-likelihood,
+gradient and information agree to 1e-12 of their largest entry for each family, against
+the NumPy likelihoods (`tests/analysis/regression/test_padding.py`).
+
+**Compilations.** `runtime.COMPILE_LOG` counts each kernel's traces by input signature.
+JAX traces a jitted function once for each new signature and compiles each trace; a
+program found in the persistent compilation cache is still traced (measured). So the count
+is the number of programs a process needed, whatever the cache holds, and a test can bound
+it for a set of sessions.
 
 ## Cost
 

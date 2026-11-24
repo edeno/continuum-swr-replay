@@ -31,7 +31,11 @@ def test_round_trip(rate_sessions, tmp_path) -> None:
     at a column left out survives)."""
     pooled = pd.concat(rate_sessions.values(), ignore_index=True)
     design = build_design(
-        [Smooth("time_since_s", 0.0, 8.0, 10, 2.0), Slope("x"), Offset("exposure")],
+        [
+            Smooth("time_since_s", 0.0, 8.0, 10, 2.0),
+            Slope("x", "none"),
+            Offset("exposure"),
+        ],
         pooled,
         intercept=True,
     )
@@ -82,7 +86,10 @@ def test_each_cause_has_its_words() -> None:
     person are made from the code (with the round for a fit without a finite
     maximum)."""
     words = {
-        Removed.SUPPORT: "fewer than MIN_UNITS = 5 units with an event",
+        Removed.SUPPORT: (
+            "fewer than MIN_UNITS = 5 units with a row on a side of the column "
+            "(a level: of the level)"
+        ),
         Removed.TOO_SMALL: (
             "largest absolute value below SMALLEST_COLUMN_SIZE = 0.01 in the session"
         ),

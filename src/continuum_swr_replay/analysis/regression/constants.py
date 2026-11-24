@@ -61,6 +61,21 @@ PENALTY_ROUNDING_TOL = 1e-10
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 
+# The declared log penalty of a per-session smooth (``calibration``) is found by
+# bisection inside LOG_PENALTY_BOUNDS until the bracket is narrower than
+# CALIBRATION_LOG_PENALTY_TOL: 15 halvings of the bounds' 30 units.
+CALIBRATION_LOG_PENALTY_TOL = 1e-3
+
+# The median edf at the returned log penalty must be the target to within
+# CALIBRATION_EDF_TOL, or the calibration raises. With a fixed Hessian a
+# term's edf is sum_i 1 / (1 + lambda d_i), whose slope in the log penalty is
+# at most 1/4 per penalized column; the returned point is within half the
+# bracket, 5e-4, of the crossing, so a median over a fixed set of sessions
+# is within 1.25e-4 per penalized column of the target: under 0.01 for up to
+# 80 columns. A larger gap means the median jumped, a session entering or
+# leaving it as the penalty moved.
+CALIBRATION_EDF_TOL = 0.01
+
 # REML penalty selection. The search starts from the best point of a grid over
 # the log penalties (the score can have two optima): every integer in the
 # bounds for one term; the product of REML_GRID_POINTS for two or three; for

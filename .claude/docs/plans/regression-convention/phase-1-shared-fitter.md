@@ -123,7 +123,7 @@ basis of [smooth terms](designs.md#smooth-terms-and-bases) (Phase 2 adds the res
 ## Deliberately not in this phase
 
 - Collinearity, support rule, fit-row record, folds, bands, day-level reduction (Phase 2).
-- The JAX batch twin and the GPU check (Phase 8).
+- The JAX batch twin and the GPU check (Phase 8; since 2026-11-23 replaced by one JAX fitter for every family, Phase 2c).
 - Any change to a production model or stored fit. The current fitters stay as they are; they are the
   baselines of check 1 and 3.
 

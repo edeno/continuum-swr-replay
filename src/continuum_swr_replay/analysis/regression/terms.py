@@ -17,6 +17,15 @@ A model is a list of terms and, for the diagonal families, an intercept:
   other levels) and the levels' columns are collinear, and the session's
   first fit is an error naming them.
 - :class:`Slope`: one column, or one for each level of a category.
+
+A :class:`Category` and a :class:`Slope` take the same required ``penalty``
+as a smooth. A fixed log penalty puts the identity on each of the term's
+columns (each coded level; each level's slope), as its own penalty block: a
+Normal prior of mean 0 on each coefficient, of SD
+:func:`prior_sd_from_log_penalty`. The coefficient is in the unit the
+convention reports (a 0/1 step; one pooled SD of a continuous covariate, see
+Standardization), so the prior SD is in that unit too. A category used only
+as the ``by`` of another term is not a term: its ``penalty`` is not read.
 - :class:`Offset`: ``log`` of a column (an exposure), the Poisson offset.
 
 :func:`build_design` computes, once, from the pooled rows of the model (every
@@ -98,6 +107,8 @@ __all__ = [
     "Smooth",
     "Standardization",
     "build_design",
+    "log_penalty_from_prior_sd",
+    "prior_sd_from_log_penalty",
     "standardization",
 ]
 
@@ -128,6 +139,35 @@ def _check_penalty(penalty: Penalty) -> None:
         raise ValueError(f"log penalty {penalty} outside the bounds [{lo}, {hi}]")
 
 
+def log_penalty_from_prior_sd(sd: float) -> float:
+    """The log penalty of a Normal prior of SD ``sd`` on one coefficient.
+
+    The fit minimizes ``-l + exp(rho) b**2 / 2``, so a prior ``N(0, sd**2)``
+    is ``rho = log(1 / sd**2)``. Under the Gaussian the penalty is on the
+    scale of the residual sum of squares (:mod:`.reml`), so there ``sd`` is in
+    units of the residual SD.
+
+    Parameters
+    ----------
+    sd : float
+        The prior SD, positive and finite, in the coefficient's unit.
+
+    Returns
+    -------
+    float
+    """
+    if not (np.isfinite(sd) and sd > 0):
+        raise ValueError(f"a prior SD must be positive and finite, not {sd}")
+    return float(-2.0 * np.log(sd))
+
+
+def prior_sd_from_log_penalty(log_penalty: float) -> float:
+    """The prior SD of one coefficient at ``log_penalty``:
+    ``exp(-log_penalty / 2)``, the inverse of
+    :func:`log_penalty_from_prior_sd`."""
+    return float(np.exp(-0.5 * log_penalty))
+
+
 @dataclass(frozen=True)
 class Category:
     """A category: one 0/1 column for each level but ``reference``.
@@ -143,13 +183,19 @@ class Category:
     reference : object
         The level without a column (absorbed by the intercept or, under the
         grouped softmax, by the other levels).
+    penalty : "none" or float
+        ``"none"`` for no penalty, else the fixed log penalty of the identity
+        on each coded level's column (module docstring); not read when the
+        category is only a ``by``.
     """
 
     column: str
     levels: tuple
     reference: object
+    penalty: Penalty
 
     def __post_init__(self) -> None:
+        _check_penalty(self.penalty)
         object.__setattr__(self, "levels", tuple(self.levels))
         if len(set(self.levels)) != len(self.levels):
             raise ValueError(f"{self.column}: levels repeat: {self.levels}")
@@ -261,6 +307,9 @@ class Slope:
     Attributes
     ----------
     column : str
+    penalty : "none" or float
+        ``"none"`` for no penalty, else the fixed log penalty of the identity
+        on the slope's column (on each level's, with ``by``).
     by : Category or None
     levels : tuple or None
         The levels of ``by`` that get a slope (the rows of the others are zero
@@ -268,10 +317,12 @@ class Slope:
     """
 
     column: str
+    penalty: Penalty
     by: Category | None = None
     levels: tuple | None = None
 
     def __post_init__(self) -> None:
+        _check_penalty(self.penalty)
         object.__setattr__(
             self, "levels", _by_levels(self.by, self.levels, self.column)
         )
@@ -365,7 +416,7 @@ class DesignTerm:
         The column a slope or a smooth reads; None otherwise.
     block : int or None
         Its penalty block's place in :attr:`Design.blocks`; None without a
-        penalty.
+        penalty. Each level of a penalized category has its own block.
     dependents : tuple of str
         For a level, the names of the terms fitted for it: when the level is
         removed from a session, its rows are dropped (not merged into the
@@ -399,7 +450,7 @@ class _Built:
     level: tuple | None = None  # (by column, level) for a term by a category
     basis: PSplineBasis | None = None
     constraint: np.ndarray | None = None
-    penalty: np.ndarray | None = None
+    penalty: np.ndarray | None = None  # a simple term's: on each column
     scale: Standardization | None = None
 
     @property
@@ -562,7 +613,7 @@ def _build_term(
             )
             for j, level in enumerate(_coded(term))
         )
-        return [_Built(term.column, term, kinds)]
+        return [_Built(term.column, term, kinds, penalty=_identity(term))]
     if isinstance(term, LinearFunctional):
         name = f"lf({term.lag_columns[0]}..{term.lag_columns[-1]})"
         basis = PSplineBasis(term.lo, term.hi, term.n_basis)
@@ -615,8 +666,18 @@ def _build_term(
                 level=level_key,
                 covariate=term.column,
             )
-            out.append(_Built(name, term, (kind,), level_key, scale=scale))
+            out.append(
+                _Built(
+                    name, term, (kind,), level_key, scale=scale, penalty=_identity(term)
+                )
+            )
     return out
+
+
+def _identity(term: Category | Slope) -> np.ndarray | None:
+    """A simple term's penalty on each of its columns: the identity; None
+    without a penalty."""
+    return None if term.penalty == "none" else np.eye(1)
 
 
 def _covariate_scales(
@@ -709,7 +770,8 @@ class Design:
     coef_names : tuple of str
         One per design column, in order.
     blocks : tuple of PenaltyBlock
-        One per term with a fixed penalty, in the order of the terms.
+        One per term with a fixed penalty, in the order of the terms; a
+        penalized category has one per coded level.
     log_penalties : np.ndarray, shape (n_blocks,)
         Each block's fixed log penalty.
     offset : Offset or None
@@ -752,16 +814,16 @@ class Design:
         return {b.name: b.record() for b in self._built if b.basis is not None}
 
     def log_penalty_record(self) -> dict[str, dict]:
-        """Term -> how its penalty is set (C7 ``log_penalty``), for the terms
-        with a basis: ``{"set": "fixed", "log_penalty": value}`` or
-        ``{"set": "none", "log_penalty": None}``."""
+        """Term -> how its penalty is set (C7 ``log_penalty``), for every
+        term (a category by its column, a slope by a category for each
+        level): ``{"set": "fixed", "log_penalty": value}`` or ``{"set":
+        "none", "log_penalty": None}``."""
         return {
             b.name: {
                 "set": "none" if b.log_penalty is None else "fixed",
                 "log_penalty": b.log_penalty,
             }
             for b in self._built
-            if b.basis is not None
         }
 
     def standardization_record(self) -> dict[str, dict]:
@@ -951,15 +1013,17 @@ def build_design(
     start = int(intercept)
     pieces = []
     for b in built:
-        block = None
-        if b.penalty is not None:
-            block = len(blocks)
-            width = sum(t.columns.size for t in b.design_terms)
-            blocks.append(PenaltyBlock(np.arange(start, start + width), b.penalty))
-            log_penalties.append(b.log_penalty)
-        placed = tuple(
-            replace(t, columns=t.columns + start, block=block) for t in b.design_terms
-        )
+        # One block per design term: a smooth or a lag functional is one
+        # design term on all its columns, a category one per coded level.
+        placed = []
+        for t in b.design_terms:
+            block = None
+            if b.penalty is not None:
+                block = len(blocks)
+                blocks.append(PenaltyBlock(t.columns + start, b.penalty))
+                log_penalties.append(b.log_penalty)
+            placed.append(replace(t, columns=t.columns + start, block=block))
+        placed = tuple(placed)
         start += sum(t.columns.size for t in placed)
         pieces.append(replace(b, design_terms=placed))
         design_terms.extend(placed)

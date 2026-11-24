@@ -17,10 +17,13 @@ package may import it.
   names of terms and coefficients, the standardization and the design check.
 - ``collinearity``: how well the other terms explain each term, on the
   information-weighted design (VIF, mgcv's concurvity).
-- ``support``: the support rule of an unpenalized column and the row rule for
-  an inactive level of a category.
+- ``support``: the support rule of a simple term, the row rule for an
+  inactive level of a category, and the guard that a tested coefficient
+  carries a penalty.
 - ``sessions``: the per-session fitting loop, with the handling of a session
   without a finite maximum.
+- ``calibration``: the declared log penalty of a per-session smooth, the one
+  at which its median edf over the sessions is a target.
 - ``record``: the fit-row record and its parquet storage.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
@@ -28,6 +31,11 @@ package may import it.
   destination well, long stays cut into pieces.
 - ``bands``: simultaneous 95 % bands for a curve, one fit's and the
   animal-balanced curve's across sessions.
+- ``runtime``: how the fitter's JAX runs: float64 for each call, the device
+  guard, the float64 kernel guard and the log of traces. It imports JAX; the
+  other modules do not.
+- ``padding``: rows and groups padded to bucket sizes, with the weight that
+  marks the real rows.
 
 Submodules are imported by name; nothing is re-exported here.
 """

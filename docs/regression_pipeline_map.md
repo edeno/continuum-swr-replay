@@ -544,6 +544,12 @@ Simultaneous bands for a curve on a fixed grid.
 
 `Band`, `simultaneous_band`, `across_session_band`
 
+### `src/continuum_swr_replay/analysis/regression/calibration.py`
+
+The declared log penalty of a smooth term: the one that gives a target edf.
+
+`EdfCalibration`, `log_penalty_for_edf`
+
 ### `src/continuum_swr_replay/analysis/regression/collinearity.py`
 
 How well the other terms of a fit explain each term, on what the likelihood sees.
@@ -580,6 +586,12 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 `NewtonFit`, `running_away_columns`, `penalized_newton`
 
+### `src/continuum_swr_replay/analysis/regression/padding.py`
+
+Rows padded to a few bucket sizes, so that a jitted kernel compiles once per bucket rather than once per session.
+
+`bucket_size`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
+
 ### `src/continuum_swr_replay/analysis/regression/pspline.py`
 
 Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
@@ -598,6 +610,12 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 
 `FreeDirection`, `PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `in_null_space`, `SetAsideSession`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `free_basis`, `reml_and_derivatives`, `pooled_reml`, `RefitEnd`, `SessionRefit`, `refit_session`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
 
+### `src/continuum_swr_replay/analysis/regression/runtime.py`
+
+How the fitter's JAX code runs: float64 for each call, one device, float64 kernels, and a log of the programs traced.
+
+`require_device`, `in_float64`, `CompileLog`, `float64_kernel`
+
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
 The per-session fitting loop: one design, every session fitted alone.
@@ -606,15 +624,15 @@ The per-session fitting loop: one design, every session fitted alone.
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
-The support rule: whether a session's data can estimate an unpenalized term.
+The support rule: whether a session's design can estimate a simple term.
 
-`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `terms_failing_share`
+`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`, `terms_failing_share`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 
 Model terms and the design they build, the same for every session.
 
-`Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+`log_penalty_from_prior_sd`, `prior_sd_from_log_penalty`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -957,6 +975,12 @@ Objective AST mutation check for value-critical builder logic.
 Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
+
+### `scripts/checks/simulate_declared_penalty.py`
+
+The declared-penalty rule for a per-session smooth, in simulation.
+
+`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `data_seed`, `bootstrap_seeds`, `run_data_set`, `calibrate`, `summarize`, `run`, `report`, `main`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 
@@ -1591,6 +1615,24 @@ The per-bin replay rate vs behavioral uncertainty and value, by population.
 Model-free event-start rates on the three visit clocks, and how stops end.
 
 `visit_clock_rate_curves`, `stop_end_kind_counts`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate.py`
+
+The visit rate model: event starts on the three visit clocks, models A and D.
+
+`CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `declared_contrasts`, `CohortRows`, `model_d_rows`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `calibrate_log_penalty`, `ThirdClockDecision`, `third_clock_decision`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_scenarios.py`
+
+Planted scenarios of the visit rate model, as pure functions of the rows.
+
+`interpolated_curve`, `PlantedClocks`, `Planted`, `Projection`, `poisson_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `drop_before_small_movements`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
+
+### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
+
+The estimands of the visit rate model, per session and over sessions.
+
+`session_estimands`, `summarize_estimands`, `lag_curves`, `lag_curve_band`, `ThirdClockQ7a`, `third_clock_q7a`
 
 ### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
 

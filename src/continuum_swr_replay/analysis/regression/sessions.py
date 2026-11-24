@@ -23,8 +23,17 @@ slice. For each session, in order:
    made it fail.
 4. The session is fitted at the design's fixed log penalties by
    :func:`.reml.refit_session`, which makes the columns running away inactive
-   while the fit has no finite maximum along unpenalized columns only. At the
-   session's first fit a design not identified, or a numerical failure, is an
+   while the fit has no finite maximum along unpenalized columns only. A
+   penalized simple term (a slope or a category with a fixed log penalty)
+   always has a finite maximum, so it stays in the fit where the support rule
+   passes it, even with no event on one side. An unpenalized simple term is
+   left out only where it has no finite maximum: a 0/1 slope or a level with
+   no event on a side. With few events on a side (a level whose events are
+   in one to four units), or for a continuous slope, it is fitted, with a
+   large standard error. So an unpenalized simple term is a baseline or a
+   nuisance term, whose value is not reported or tested; a tested
+   coefficient carries the penalty (:func:`.support.require_tested_penalized`).
+   At the session's first fit a design not identified, or a numerical failure, is an
    error that names the session. When a level is left out there, it is
    removed as in step 2 and the steps run again from step 2 on the rows then
    kept. A term leaves whole: when the refit leaves out part of the columns
@@ -47,9 +56,12 @@ A session with columns left out keeps its other terms: those columns'
 coefficients and covariance are NaN and ``left_out`` says why (with the
 refit's round in ``left_out_round`` for no finite maximum). The units are
 the ``unit`` column (a visit for a rate model; for the grouped softmax, each
-unit is one event, a group of rows). A row holds an event when its response is
-above zero (Poisson, Bernoulli), and every row does under the softmax and the
-Gaussian. The collinearity of each term is measured at the fit
+unit is one event, a group of rows). The support rule counts units with rows,
+not events. Only the check that a session has events reads the response: a
+row holds an event when its response is above zero (Poisson, Bernoulli), and
+every row does under the softmax and the Gaussian. The edf of a penalized
+simple coefficient is recorded (:func:`_edf`): near 1 the data decide its
+value, near 0 the penalty does. The collinearity of each term is measured at the fit
 (:func:`.collinearity.term_collinearity`).
 """
 
@@ -199,7 +211,6 @@ class _Session:
                 self.X[kept],
                 {level: rows[kept] for level, rows in self.level_rows.items()},
                 self.unit[kept],
-                _holds_event(self.lik, self.y[kept]),
             )
             for name, counted in self.support.items():
                 term = self.design.by_name[name]
@@ -393,13 +404,25 @@ def _n_events(lik: Likelihood, y: np.ndarray, unit: np.ndarray) -> float:
 def _edf(
     design: Design, fit: RemlScore, block_terms: list[str], active: np.ndarray
 ) -> dict[str, float]:
-    """Term -> edf: a penalized term's from the fit, an unpenalized term's
-    number of active columns."""
+    """Model term -> edf: the sum over its design terms of a penalized one's
+    edf from the fit and an unpenalized one's active columns. A level of a
+    penalized category has its own entry too, by its coefficient name, and
+    the category's entry is the sum of those: a total over all entries
+    counts the levels twice."""
     penalized = dict(zip(block_terms, fit.edf.tolist(), strict=True))
-    return {
-        name: penalized.get(name, float(active[cols].sum()))
-        for name, cols in design.term_columns.items()
+    part = {
+        t.name: penalized.get(t.name, float(active[t.columns].sum()))
+        for t in design.terms
+        if t.kind != "intercept"
     }
+    out: dict[str, float] = {}
+    for t in design.terms:
+        if t.kind != "intercept":
+            out[t.term] = out.get(t.term, 0.0) + part[t.name]
+    for t in design.terms:
+        if t.kind == "level" and t.block is not None:
+            out[t.name] = part[t.name]
+    return out
 
 
 def _named(design: Design, block_terms: list[str], score: RemlScore) -> str:

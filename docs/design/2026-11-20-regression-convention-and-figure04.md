@@ -787,6 +787,199 @@ The lead: "A session with no finite best value: do terms missing."
   record of the session names the columns left out and the reason.
 - Still open: the rule for a smooth term in a per-session fit (fifteenth round).
 
+### Seventeenth round (lead, 2026-11-22): the rule for a smooth term in a per-session fit
+
+The lead, 10:59: "For decision 2, I think I would prefer the penalized splines". Then, 12:19: "I want to
+stick with one fit per session for now". (Decision 2 was the question of the fifteenth round: the rule
+for a smooth term in a per-session fit.)
+
+The author's reading of these two answers (**call**). The author told the lead this reading on
+2026-11-22 and on 2026-11-23, and the lead did not object:
+
+- The fit stays one fit for each session, for every model.
+- A per-session smooth term is the cubic P-spline that the package has (`pspline.PSplineBasis`). It has
+  **one fixed log penalty per term**, declared in the model and the same in every session.
+- No natural-spline basis is added. Option A of the fifteenth round is dropped.
+- No penalty is chosen from the data for a per-session smooth term. The REML selection stays in the
+  package (`reml.select_penalties`), for a family that may still need it.
+- The value of each declared penalty is set per model, on that model's own real rows, by a target median
+  number of effective parameters over the sessions (`regression/calibration.py:log_penalty_for_edf`,
+  built on branch `regression-declared-penalty`, b47faec9 and 39a51d3a). A simulation on those rows
+  checks the value. The fit is reported at that value and also at a stiffer and a looser value.
+- A target does not carry from one model to another. Simulation: the same target (6 effective
+  parameters) gave different log penalties in two designs (about 3.4 for one arrival curve alone, about
+  1.8 with two clocks and the reward term), and biases of the Q1 contrast of opposite sign.
+
+### Eighteenth round (lead, 2026-11-23, 09:52): no bias-reduced fit
+
+The lead: "I don't want to use firth".
+
+- The fit is plain penalized maximum likelihood. No bias-reduced fit is used in any family. This covers
+  the full form and the partial form that the author had proposed.
+
+### Nineteenth round (lead, 2026-11-23, 11:31): the rate questions are answered by the regression model
+
+The author proposed a stratified estimate for each animal (a Mantel-Haenszel rate ratio), and then
+plain window counts for each animal. The lead: "this all seems very complicated", then "I want the
+regression model".
+
+- The rate questions (Q1, Q2, Q7a) are answered by the regression model of section 4: one fit for each
+  session, the plain penalized fit, the declared penalties.
+- The model-free curves by outcome stay a diagnostic. They are not an estimator.
+
+### Twentieth round (lead, 2026-11-23, 12:08 to 12:11): a simulation package and one JAX fitter
+
+The lead: "yeah, maybe we should have a simulation package so that we have these for the rate, content,
+etc models, all with the same principle, we should always be using the real regression code". The
+author proposed this shape, and the lead said "yes":
+
+- Each likelihood gets a function that draws outcomes.
+- A task-free engine, `analysis/regression/simulation.py`, takes a model, its real rows and a scenario.
+  It draws the outcome, runs the real fit, the real declared tests and the real reduction, and returns
+  one results table (bias, spread, coverage, rejections, sessions without a value).
+- A named scenario list sits beside each model in `analysis/replay_models/<family>/`.
+- One runner script runs the scenario lists.
+- Tests run on tiny cohorts.
+- A scenario is either inside the model (planted coefficients) or outside it (any expected outcome as a
+  function of the rows).
+- The rule: a simulation replaces only the outcome column. Nothing rebuilds a model by hand.
+
+The lead: "I would prefer a jax fitter for all models".
+
+- There is one fitter, in JAX, for the rate, content, stay or leave, ripple power and mPFC models.
+- The separate JAX twin for the mPFC models only is dropped.
+- By the lead's rule on legacy code (ninth round), the NumPy solver is removed when the JAX one replaces
+  it. Its outputs are kept as test fixtures.
+- The port design is
+  `.claude/research/2026-11-20-regression-prototypes/jax_fitter/DESIGN.md` (main checkout; a copy is in
+  the plan folder as `jax-fitter-design.md`).
+
+### Twenty-first round (lead, 2026-11-23, 12:32): precision and the port's acceptance
+
+- **Precision.** Asked "Double precision on the GPU too? I recommend yes. The single-precision path and
+  its extra check are then dropped", the lead answered "sure". So the fitter runs in float64 on the CPU
+  and on the GPU. Float64 is turned on for each public call of the fitter, not for the whole process
+  (the decoder in the same process stays in float32). The single-precision GPU path of section 5 and
+  check 6 of section 6 (single against double precision) are dropped. The GPU check is GPU float64
+  against CPU float64.
+- **The acceptance rule of the port.** Asked whether the JAX fitter must match the stored NumPy outputs
+  within 1e-9 relative, with the statuses and counts exactly equal (bit-for-bit equality is not
+  possible), the lead answered "ok".
+- **A slower fit on the CPU.** The lead: "depends on how much time things take". This is not decided.
+  Before the port starts, the time of whole workloads is measured with the present fitter and with a
+  JAX prototype, and the table goes to the lead.
+- (**call**) The simulation engine lands before the port, so that the same seeds give the same data
+  before and after it and the engine checks the port. The author told the lead this order and its
+  reason, and the lead did not object.
+
+### Twenty-second round (lead, 2026-11-23, 13:00 and 13:02): a weak penalty on simple coefficients
+
+At 13:00 the author listed five options for the reward coefficient of the rate model (item a of the open
+list below): the event-based support rule of the plan; a lower minimum; counting visits with at-risk time;
+a weak penalty on the coefficient; one coefficient for several sessions. The lead: "I think weak penalty".
+
+At 13:02 the author asked: "For consistency, should the same weak penalty apply to every simple tested
+coefficient in every model? I recommend yes, with a simulation check for each family before use." The
+lead: "yes".
+
+- The reward coefficient of the rate model has a weak penalty. Item a of the open list is decided.
+- Every simple tested coefficient (a 0/1 step, a slope, a level of a tested category) in every model has
+  the same weak penalty. Each family's simulation (Phase 2b's engine, the family's scenario list) checks
+  the penalty before the family's fit is used.
+- This replaces two sentences of section 4.3: "Terms with no smooth ... carry no penalty and must pass the
+  support rule below", and the support rule "decided from the data before the fit (the term varies in too
+  few units with events on each side)".
+
+The author's calls that go with these decisions (**call**, each):
+
+- Baselines are not penalized: the intercept, the arm effects and the other nuisance categories.
+  Greenland and Mansournia (2015, Statistics in Medicine 34:3133, doi 10.1002/sim.6537) advise a weak
+  penalty on coefficients as a default for sparse data, caution against penalizing intercepts, and advise
+  a sensitivity analysis over the strength.
+- A guard stays, and it reads the design only, never the outcome. A term is absent in a session when its
+  column does not vary enough there: fewer than 5 units with a row on each side (a level: with a row of the
+  level; a continuous slope: above and below the median of its rows; a constant column fails). No rule
+  reads the event counts before a fit. What happens to a failing term is unchanged (inactive; a level's
+  rows dropped), and the 20 % rule stays, on these counts. Under the grouped softmax every candidate row
+  belongs to an event, so the counts there do not change.
+- A penalized coefficient always has a finite maximum, so a session with no event on one side of a
+  penalized term is fitted with the term in. An unpenalized term in that case still has no finite maximum
+  and is left out by the sixteenth round's rule.
+- Each fit records how much the penalty mattered: the effective parameters of each penalized simple
+  coefficient (near 1: the data decide; near 0: the penalty decides).
+- The width is one declared number for all models: a Normal prior SD on the coefficient in the
+  convention's reported unit (a 0/1 step; one pooled SD of a continuous covariate). The log penalty is
+  `log(1 / SD^2)`. Its value is not chosen yet (open item g below).
+
+Built: the penalty on `Slope` and `Category` and the support rule on the design, branch `weak-penalty`,
+commit aa8f8425 (`docs/design/regression_fitter.md`, "Terms and their names" and "The support rule").
+
+### Twenty-third round (lead, 2026-11-23, 12:34 and 13:21): the JAX port goes ahead without blocking Figure 4
+
+At 12:34 the lead said, on one JAX fitter: "I think I would in general prefer one fitter, but if there's a
+good reason not to, then that's fine". The author then measured whole workloads with the present fitter
+and a JAX prototype, under load (absolute times rough;
+`.claude/docs/plans/regression-convention/jax-fitter-timing.md`):
+
+| Workload | NumPy, 32 processes | JAX CPU, 32 processes | JAX, one A100 |
+|---|---|---|---|
+| One whole fit of a rate session | 0.349 s (one core) | 0.727 s (one core) | 0.102 s |
+| The real rate fit | 32 s | 1.4 min | 5.2 min |
+| One penalty calibration | 6.3 min | 13.5 min | 60 min |
+| One simulation sweep | 42 min | 1.5 h | 6.6 h |
+| The content fit | under 1 min | under 1 min | under 1 min |
+| The mPFC fit at its present size (extrapolated) | 3.1 h | 2.0 h | 15 min |
+
+Fits that share one design, batched, took 0.8 ms each on the GPU against 311 ms in a NumPy loop.
+
+The lead asked "what do you recommend?". The author recommended that the port go ahead without blocking
+Figure 4, in this order:
+
+1. the weak-penalty change in the present fitter (twenty-second round);
+2. the simulation engine;
+3. in parallel, on separate branches, the rate model and the JAX port;
+4. the port replaces the solver, and every fit is rerun once to confirm equality.
+
+The lead: "ok".
+
+- Item d of the open list (the port's speed) is decided. The entry condition of the JAX fitter phase is
+  met.
+- (**call**) The acceptance rule of the port (twenty-first round) gets an absolute floor: a value `b`
+  matches when the difference is at most `1e-11 + 1e-9 |b|`, with the statuses and counts exactly equal.
+  The prototype had one coefficient near zero (about 4e-4) at a relative difference of 5.4e-9. The author
+  told the lead, and the lead did not object.
+
+### Open after the twenty-third round
+
+Each of these is open unless it says it is decided.
+
+a. *(Decided in the twenty-second round: a weak penalty on the reward coefficient, and on every simple
+   tested coefficient; the support rule reads the design.)* The evidence that led to it: the planned
+   event-based rule (5 visits with an event on each side) failed in 86 % of the real SWR sessions and 42 %
+   of the No SWR sessions (counts of the input tables, not results), over the plan's 20 % limit
+   (`MAX_FAILING_SHARE`).
+b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled; not results): omission
+   visits have a median length of 0.9 s against 5.4 s after reward. SWR events almost never start in the
+   first second after arrival after either outcome (none in 93 % of sessions), so the first window of Q1
+   is empty for SWR events. The reward ratio at the same time since arrival is about 2 to 3 from 1 to
+   6 s and about 1 beyond 10 s, so it is not constant. Visits longer than 10 s are 705 of 44,435; ten
+   sessions hold 72 % of that time, and that time holds 56 % of the SWR events after an omission. The two
+   clocks add from 2 s on, but not between 1 and 2 s. A simulation with planted curves shaped like the
+   real ones is running (scratch `proto_rate_realistic/`). Open: whether the model covers a declared
+   time range; whether the reward effect may change with time since arrival; the reference window of
+   Q1; the value of each clock's penalty.
+c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
+d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
+   has an absolute floor.)*
+e. **The penalties of the mPFC models and of the history kernels.** Whether a penalty chosen over the
+   many units of one session, or the declared-penalty rule, applies there. Decided at those phases.
+f. **A support rule per grid point** for curves averaged over sessions (an idea of the author; not built,
+   not decided). Simulation: few sessions have bins near the 20 s end of the arrival clock, and the
+   average curve is far off there.
+g. **The width of the weak penalty.** One declared prior SD for all models, in the reported unit. Not
+   chosen. A simulation with SD 1, 2 and 4 is running. Each family reports a sensitivity analysis over the
+   strength (Greenland and Mansournia 2015).
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions

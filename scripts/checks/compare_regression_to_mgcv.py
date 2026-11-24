@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     in_null_space,
     select_penalties,
 )
+from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.io import write_json
 
 REPO = Path(__file__).resolve().parents[2]
@@ -318,6 +319,7 @@ def run_mgcv(name: str, frame: pd.DataFrame, rscript: Path, work: Path) -> dict:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--out-dir",

@@ -32,13 +32,11 @@ JAX; run it with `JAX_PLATFORMS=cpu` unless a measured run says otherwise).
 ## Tasks
 
 - **Count response**: the same role design with the per-arm decoded bin counts (`arm_count_hard`) as the
-  grouped softmax response (`n_g` the event's bin count), its own pooled REML; estimands as in 6a.
-- WAITS FOR THE LEAD (smooth-term rule): "its own pooled REML" above and "the smooths at the main model's
-  selected penalties" below assume penalties chosen from the data. Under either option both estimators
-  take Phase 6a's smooth terms at the same declared freedom (no penalty, or the same fixed weak penalty),
-  so the three estimators differ only in the response.
+  grouped softmax response (`n_g` the event's bin count), with Phase 6a's smooth terms at the same
+  declared fixed log penalties (design, seventeenth round; no penalty chosen from the data); estimands as
+  in 6a. The three estimators then differ only in the response.
 - **Dirichlet-multinomial**: the same design matrix (Phase 6a's terms, the smooths at the main model's
-  selected penalties, fixed; call, since the shared fitter has no Dirichlet-multinomial REML) fit with
+  declared penalties, fixed) fit with
   `dirichlet_multinomial.py`'s likelihood and `log phi = g0 + g1 * is_swr` as now. Adapt
   `fit_dirichlet_multinomial` to take a prebuilt design and a fixed quadratic penalty, or add a thin
   wrapper; do not fork it.

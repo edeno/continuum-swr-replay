@@ -1,12 +1,18 @@
 # Regression convention and Figures 2 to 5 on one data subset: Implementation Plan
 
-**Status (2026-11-21):** Phases 1, 3 and 4 are done and on master: Phase 1, the shared fitter (merged in
-6e54eda8, cleaned up in 98fe5c06); Phase 3, the well visit in the tables (d14ff888; the 13 tables
-published); Phase 4, Figures 2 and 3 on the common subset (5dc74fc6), except 20 held-out tetrode values in
-`paper/reported/events.json`, pending until another session's rerun ends. Next is Phase 2, the convention's
-tools. It is started; its smooth-term vocabulary waits for one question open with the lead
-([overview.md](overview.md#status)); a session without a finite maximum is reported with those terms
-missing (lead, 2026-11-21). Phases 5a, 6a and 8 wait for Phase 2.
+**Status (2026-11-23):** Phases 1 to 4 are done and on master: Phase 1, the shared fitter (merged in
+6e54eda8, cleaned up in 98fe5c06); Phase 2, the convention's tools (492dffb4); Phase 3, the well visit in
+the tables (d14ff888; the 13 tables published); Phase 4, Figures 2 and 3 on the common subset (5dc74fc6).
+The declared-penalty parts of Phase 2 are on branch `regression-declared-penalty` (b47faec9, 39a51d3a,
+86ad3fc5; pushed, not merged); the weak penalty on simple terms and the support rule on the design are on
+branch `weak-penalty` (aa8f8425; pushed, not merged). The lead decided the smooth-term rule (a P-spline at
+one declared fixed penalty per term), a plain penalized fit with no bias reduction, the regression model
+for the rate questions, a simulation package, one JAX fitter for every family, float64 on CPU and GPU, the
+port's acceptance rule, a weak penalty on every simple tested coefficient, and the order of the port
+(design, seventeenth to twenty-third rounds; [overview.md](overview.md#status)). Next: Phase 2b, the
+simulation engine; then, in parallel on separate branches, Phase 5a and Phase 2c, the JAX port; the port
+then replaces the solver and every fit is rerun once to confirm equality. Open questions b, e, f and g
+(the width of the weak penalty) are listed in the overview.
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the
@@ -42,8 +48,14 @@ For agent invocation, **load only the slice you need**:
   - [phase-1-shared-fitter.md](phase-1-shared-fitter.md) — **done** (6e54eda8, 98fe5c06):
     `analysis/regression/`: likelihoods, penalized Newton, REML with a grid start and exact derivatives,
     checks 1 to 5, the mgcv script; the older all-bins history model deleted first.
-  - [phase-2-convention-tools.md](phase-2-convention-tools.md) — **next**: bases, collinearity, support rule,
-    fit-row record, trial folds, simultaneous bands, the session to day to animal reduction.
+  - [phase-2-convention-tools.md](phase-2-convention-tools.md) — **done** (492dffb4; the declared-penalty
+    parts on `regression-declared-penalty`): bases, collinearity, support rule, fit-row record, trial
+    folds, simultaneous bands, the session to day to animal reduction, the declared penalty by a target edf.
+  - [phase-2b-simulation-engine.md](phase-2b-simulation-engine.md) — **next**: the simulation package
+    (draws on each likelihood, a task-free engine on the real fit, tests and reduction, scenario lists per
+    model, one runner).
+  - [phase-2c-jax-fitter.md](phase-2c-jax-fitter.md) — one JAX fitter for every family, float64 on CPU and
+    GPU; the NumPy solver removed. Its design: [jax-fitter-design.md](jax-fitter-design.md).
   - [phase-3-visit-tables.md](phase-3-visit-tables.md) — **done** (d14ff888): the well visit as the unit:
     visit clocks and stop-end kinds in the tables, the visit at-risk bin design, the sample count and the
     trial number; one table rebuild.
@@ -61,8 +73,8 @@ For agent invocation, **load only the slice you need**:
     estimators on the new design; the within-arm comparison deleted.
   - [phase-7-choice-stay-power.md](phase-7-choice-stay-power.md) — Q6 (content and the next choice),
     stay or leave per visit, ripple power, on the convention.
-  - [phase-8-mpfc.md](phase-8-mpfc.md) — the mPFC unit models on the convention (JAX batch fitter,
-    REML shared over a session's units, trial folds); Figure 5 redrawn.
+  - [phase-8-mpfc.md](phase-8-mpfc.md) — the mPFC unit models on the convention (the mPFC entry point of
+    the JAX fitter, batched over a session's units; the penalty rule open; trial folds); Figure 5 redrawn.
   - [phase-9-inference-family.md](phase-9-inference-family.md) — the declared family of tests with FDR,
     the simultaneous bands, the inference values in the behavior summary.
   - [phase-10-figure04.md](phase-10-figure04.md) — Figure 4 drawn to the standards of Figures 1 to 3
@@ -74,5 +86,6 @@ For agent invocation, **load only the slice you need**:
     replaced).
 - [legacy-inventory.md](legacy-inventory.md) — every piece of legacy in the touched areas, by the phase that
   removes it, classed REMOVE, ASK or KEEP, with the ASK list for the lead.
+- [jax-fitter-design.md](jax-fitter-design.md) — the JAX port design (a copy, not shortened).
 - [appendix.md](appendix.md) — map of the scratch prototypes to the phase, test or stored analysis that
   replaces each; outside references with commits.
