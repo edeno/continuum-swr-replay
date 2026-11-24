@@ -39,6 +39,8 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.intervals import sample_step
 
+from .padding import group_sizes
+
 __all__ = [
     "AFTER_LAST_TRIAL",
     "BEFORE_FIRST_TRIAL",
@@ -254,7 +256,7 @@ def capped_groups(
     if (np.diff(segment) < 0).any():
         raise ValueError("segments must be runs of consecutive bins")
     first = np.r_[0, np.flatnonzero(np.diff(segment)) + 1]
-    lengths = np.diff(np.r_[first, segment.size])
+    lengths = group_sizes(first, segment.size)
     if max_segment_s is None:
         pieces = np.ones(lengths.size, dtype=np.int64)
     else:

@@ -74,7 +74,7 @@ import jax.numpy as jnp
 import numpy as np
 from scipy.special import expit
 
-from .padding import group_starts, pad_groups, pad_rows, pad_values
+from .padding import group_sizes, group_starts, pad_groups, pad_rows, pad_values
 from .runtime import float64_kernel, in_float64
 
 __all__ = [
@@ -536,7 +536,7 @@ class GroupedSoftmax(_Family):
         likelihood sees only variation within a group, so a combination of
         columns constant within every group is not identified."""
         starts = group_starts(aux)
-        sizes = np.diff(starts, append=X.shape[0])
+        sizes = group_sizes(starts, X.shape[0])
         means = np.add.reduceat(X, starts, axis=0) / sizes[:, None]
         return X - np.repeat(means, sizes, axis=0)
 
@@ -715,7 +715,7 @@ def _softmax_draw(
 ) -> np.ndarray:
     """The grouped softmax's shares (:func:`draw`), shape ``(n_rows,)``."""
     starts = group_starts(groups)
-    sizes = np.diff(starts, append=eta.size)
+    sizes = group_sizes(starts, eta.size)
     n = _per_group(n_trials, starts.size, "n_trials")
     if np.any(n < 1) or np.any(n != np.round(n)):
         raise ValueError(f"n_trials must be whole numbers of at least one, not {n}")

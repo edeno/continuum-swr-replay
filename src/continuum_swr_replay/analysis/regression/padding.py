@@ -42,6 +42,7 @@ __all__ = [
     "SMALLEST_ROW_BUCKET",
     "SOFTMAX_ROW_BUCKET",
     "bucket_size",
+    "group_sizes",
     "group_starts",
     "pad_groups",
     "pad_rows",
@@ -101,6 +102,12 @@ def group_starts(groups: np.ndarray) -> np.ndarray:
     if np.any(groups[1:] < groups[:-1]):
         raise ValueError("group ids must be sorted so each group's rows are contiguous")
     return np.flatnonzero(np.r_[True, groups[1:] != groups[:-1]])
+
+
+def group_sizes(starts: np.ndarray, n_rows: int) -> np.ndarray:
+    """Each group's number of rows, shape ``(n_groups,)``, from the index of
+    its first row (:func:`group_starts`) and the number of rows."""
+    return np.diff(starts, append=n_rows)
 
 
 def pad_values(
@@ -277,7 +284,7 @@ def pad_groups(
     n_real_groups = starts.size
     group = np.full(padded.y.size, n_real_groups)
     group[: padded.n_real] = np.repeat(
-        np.arange(n_real_groups), np.diff(starts, append=padded.n_real)
+        np.arange(n_real_groups), group_sizes(starts, padded.n_real)
     )
     return PaddedGroups(
         X=padded.X,
