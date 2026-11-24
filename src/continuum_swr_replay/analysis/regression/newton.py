@@ -396,15 +396,13 @@ class _Problem:
         """One fit's problem (a batch of one)."""
         hash(lik)  # a family that cannot key a kernel fails here, as itself
         padded = lik.pad(X, y, aux)
-        rows = Rows(
-            jnp.asarray(padded.X),
-            None,
-            jax.tree_util.tree_map(jnp.asarray, padded.aux),
-            jnp.asarray(padded.weight),
-            padded.n_real,
-        )
         S = np.asarray(S, dtype=float)
-        return cls(lik, X, aux, S, rows, jnp.asarray(padded.y)[None], jnp.asarray(S))
+        # One transfer of every array, the batch axis added in NumPy.
+        X_device, aux_device, weight, Y, S_device = jax.device_put(
+            (padded.X, padded.aux, padded.weight, padded.y[None], S)
+        )
+        rows = Rows(X_device, None, aux_device, weight, padded.n_real)
+        return cls(lik, X, aux, S, rows, Y, S_device)
 
     def evaluate(self, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """``(F, l)`` at ``beta`` of shape ``(B, p)``, each shape ``(B,)``."""
