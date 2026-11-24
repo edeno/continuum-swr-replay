@@ -13,6 +13,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_properties import event_statistics
+from continuum_swr_replay.analysis.event_properties.event_speed import with_event_speed
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
@@ -24,6 +25,7 @@ from continuum_swr_replay.reported.events.common import (
     TIME_SUBSET,
     SummaryReads,
     _animal_range_values,
+    _epoch_files,
     _share_interval,
 )
 from continuum_swr_replay.reported.formatting import MS_PER_S, format_number
@@ -192,8 +194,9 @@ _PROPERTY_NAMES = {
 def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2d.1–2d.6: per-event properties, non-SWR against SWR.
 
-    Plain medians of all events, and the number of animals whose own medians
-    differ in the claim's direction. Not duration-controlled. The properties
+    Each class's median, the mean over animals of each animal's median (the
+    median over its epochs of the epoch's median), and the number of animals
+    whose own medians differ in the claim's direction. Not duration-controlled. The properties
     are the event table's own columns; the start distance and the two speeds,
     read from other outputs, are made by :func:`start_distance_values` and
     :func:`speed_values`.
@@ -353,8 +356,8 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
     100 cm, and 100 cm or more from the animal (the mean over the event's bins
     of the absolute distance along the track of the decoded place from the
     animal's; ``event_statistics.content_distance_band_statistics``): the mean
-    over animals of each animal's share with the lowest and highest animal,
-    tagged to the panel; the headline share is the same number."""
+    over animals of each animal's share (the mean over its epochs of the
+    epoch's share), with the lowest and highest animal."""
     make = value_factory(content_distance_values, source, TAGS["content_distance"])
     table = event_statistics.content_distance_band_statistics(events)
     values = []
@@ -375,18 +378,11 @@ def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
                 (row["share"], row["animal_min"], row["animal_max"]),
                 (
                     f"{what}: the mean over animals of each animal's share (the "
-                    "mean over its epochs of the epoch's share), the same number "
-                    f"as content_distance_{band_word}_{word}_fraction_animal_mean",
+                    "mean over its epochs of the epoch's share)",
                     f"lowest animal's {what} (an animal's share is the mean over "
                     "its epochs of the epoch's share)",
                     f"highest animal's {what} (the mean over its epochs)",
                 ),
-                animal_mean=(
-                    row["share_animal_mean"],
-                    f"{what}, the mean over animals of each animal's share (the "
-                    "mean over its epochs of the epoch's share)",
-                ),
-                pooled_tags=TAGS["content_distance_pooled"],
             )
     values += [
         make(
@@ -560,9 +556,7 @@ def with_start_and_rest_theta(
     ValueError
         If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row.
     """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs)
     extras = pd.concat(map(pd.read_parquet, paths), ignore_index=True)
     joined = events.merge(
         extras.drop(columns=["epoch_id", "decode_sha256"]),
@@ -572,37 +566,6 @@ def with_start_and_rest_theta(
     )
     if joined.n_bins.isna().any():
         raise ValueError("an event has no start-distance and rest-theta row")
-    return joined, paths
-
-
-EVENT_SPEED_COLUMNS = ("map_line_fit_speed_cm_s", "transport_slope_speed_cm_s")
-"""The speeds read from the event-speed output
-(``analysis/event_properties/event_speed.py``)."""
-
-
-def with_event_speed(
-    events: pd.DataFrame, folder: Path, n_epochs: int
-) -> tuple[pd.DataFrame, list[Path]]:
-    """``events`` with each one's :data:`EVENT_SPEED_COLUMNS`
-    (``Processed-Data/event_speed``), and the files read.
-
-    Raises
-    ------
-    ValueError
-        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row
-        or no MAP line-fit speed (the transport-slope speed may be missing: an
-        event too short or too Fragmented has none).
-    """
-    paths = sorted(folder.glob("*.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
-    speeds = pd.concat(
-        (pd.read_parquet(p, columns=["event_id", *EVENT_SPEED_COLUMNS]) for p in paths),
-        ignore_index=True,
-    )
-    joined = events.merge(speeds, on="event_id", how="left", validate="1:1")
-    if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
-        raise ValueError("an event has no MAP line-fit speed")
     return joined, paths
 
 

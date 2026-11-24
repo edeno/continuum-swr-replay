@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "4e793986f2da",
+ "commit": "1cbc8deb9ac3",
  "code": {
-  "head": "4e793986f2da965c877cd60b83385c882d7981a4",
+  "head": "1cbc8deb9ac3f55f120535d680ee38b93e8a0ff0",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -195,8 +195,8 @@
     "code_sha256": "7ef51ebf420d76aa0e66421990ab89f51f0b93b666c843926a652b8c7ec2de16"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "f97a57f2c73a51897af6441993610ffaaf8e895cbab48b3dfd51d0fd6b98ba59",
-    "code_sha256": "9bdbacc71af27c6de45824119b9b07eb10a34a216807dc28a2771543a1d50e6f"
+    "sha256": "fb064f3627980e018819e7d93ec8d55c25adadd8e83eaf1ff50fc4998161dc30",
+    "code_sha256": "b3115f4a906ee12fe392657fd51238ebf2f43fd79a914758ea2bc7c1aac141ac"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
@@ -274,19 +274,19 @@
  },
  "inputs": [
   {
-   "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
    "sha256": "b18303308fde58130474bef6afc95941cc51368207c78ab11b146f327debb59e"
   },
   {
-   "path": "Processed-Data/_refresh_20261016/state_evidence/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/manifest.json",
    "sha256": "85044d43dee28ec366285a8d283b558d89bd56d3a6568543ee2afa0df9347490"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet",
    "sha256": "b0d748077ef24200932e10af9288fa78e54c1f79a976feab8249afa3c809d6b0"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/manifest.json",
    "sha256": "5755ce0e0c40dc189380ec9435c7813769c0388e34ed7ae222531f2e4cf0263f"
   },
   {
@@ -793,7 +793,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -807,7 +807,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -821,7 +821,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -835,7 +835,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -849,7 +849,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -863,7 +863,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -877,7 +877,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -891,7 +891,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -905,7 +905,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -919,7 +919,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -933,7 +933,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -947,7 +947,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -975,7 +975,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -989,7 +989,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1003,7 +1003,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1017,7 +1017,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1031,7 +1031,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1045,7 +1045,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1087,7 +1087,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1101,7 +1101,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1115,7 +1115,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1129,7 +1129,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1143,7 +1143,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1157,7 +1157,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1171,7 +1171,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1185,7 +1185,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1199,7 +1199,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1213,7 +1213,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1227,7 +1227,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1241,7 +1241,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1467,7 +1467,7 @@
    "figures": [
     "S1"
    ],
-   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
    "pending": null
   },
@@ -1483,7 +1483,7 @@
    "figures": [
     "S1"
    ],
-   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
    "pending": null
   },
@@ -1499,7 +1499,7 @@
    "figures": [
     "S1"
    ],
-   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
    "pending": null
   },
@@ -1705,7 +1705,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1719,7 +1719,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },
@@ -1733,7 +1733,7 @@
     "2a.7"
    ],
    "figures": [],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
    "function": "state_evidence_values",
    "pending": null
   },

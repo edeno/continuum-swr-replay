@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -32,6 +33,9 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
     count_visit_context,
     select_visit_context,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    NON_LOCAL_STATES,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id_of_session,
@@ -56,8 +60,9 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.runs.threads import pool_context
+from continuum_swr_replay.tables.io import write_atomically
 
-CONTINUOUS_STATE = "Non-Local Continuous"
+CONTINUOUS_STATE = NON_LOCAL_STATES[0]
 
 
 def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
@@ -161,8 +166,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         jobs.append((identifier, record["decode"]["sha256"], by_epoch[identifier]))
     folder = processed_data_dir() / EVENT_SPEED_DIR
     if args.output_dir:
-        from pathlib import Path
-
         folder = Path(args.output_dir)
     folder.mkdir(parents=True, exist_ok=True)
     with ProcessPoolExecutor(
@@ -170,9 +173,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     ) as pool:
         for measured in pool.map(measure_epoch, jobs):
             identifier = measured.epoch_id.iloc[0]
-            tmp = folder / f"{identifier}.parquet.tmp"
-            measured.to_parquet(tmp, index=False)
-            tmp.replace(folder / f"{identifier}.parquet")
+            write_atomically(
+                folder / f"{identifier}.parquet",
+                lambda path, table=measured: table.to_parquet(path, index=False),
+            )
             print(f"{identifier}: {len(measured)} events", flush=True)
     if not args.epochs:
         write_json(

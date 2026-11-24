@@ -3898,3 +3898,9 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_recovery_in_event_fraction` | 96 | 97 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_fewer_in_event_trials` | 4 | 2 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_more_in_event_trials` | 24 | 25 |
+
+## 2026-11-24
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/content_estimator_comparison.md` | `events.duration_median_swr` | 94 | 95 |

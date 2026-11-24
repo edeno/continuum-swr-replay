@@ -213,7 +213,7 @@ The likelihood uses an event's length `L_e` **only as the multinomial index**:
 `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` carries no length
 term, so the fitter assumes one concentration for a short event and a long one.
 Event length is **post-treatment** with respect to `is_swr` — SWR events last
-longer (median <!--v:events.duration_median_swr-->94<!--/v--> ms against
+longer (median <!--v:events.duration_median_swr-->95<!--/v--> ms against
 <!--v:events.duration_median_non_swr-->48<!--/v--> ms) and a longer trajectory
 covers more arms. The shipped `log_phi_is_swr` is therefore the **TOTAL**
 concentration contrast, length included: the total/direct distinction §8 draws

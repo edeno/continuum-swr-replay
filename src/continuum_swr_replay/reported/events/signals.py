@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_properties import (
     event_statistics,
     gamma_power,
@@ -22,6 +23,7 @@ from continuum_swr_replay.reported.events.common import (
     TAGS,
     TIME_SUBSET,
     SummaryReads,
+    _epoch_files,
 )
 from continuum_swr_replay.reported.inputs import EventsInputs
 from continuum_swr_replay.reported.values import (
@@ -303,20 +305,11 @@ def gamma_triggered_curves(
         If ``folder`` does not hold ``n_epochs`` epochs' traces, or an event's
         epoch has none.
     """
-    paths = sorted(folder.glob("*_gamma_z.parquet"))
-    if len(paths) != n_epochs:
-        raise ValueError(f"{folder} holds {len(paths)} epochs' gamma, not {n_epochs}")
+    paths = _epoch_files(folder, n_epochs, "*_gamma_z.parquet")
     n_each_side = int(
         round(triggered_analysis.TRIGGERED_WINDOW_S / 2 * SAMPLING_FREQUENCY)
     )
-    # the gamma pass's own table names each epoch's file
-    keys = ["animal", "session_date", "epoch"]
-    named = pd.read_parquet(folder / "reference.parquet", columns=["epoch_id", *keys])
-    epoch_id = events[keys].merge(named, on=keys, how="left", validate="m:1")[
-        "epoch_id"
-    ]
-    if epoch_id.isna().any():
-        raise ValueError(f"{folder} has no gamma for an event's epoch")
+    epoch_id = swr_source.event_epoch_ids(events)
     by_path = {path.name.removesuffix("_gamma_z.parquet"): path for path in paths}
     if not set(epoch_id).issubset(by_path):
         raise ValueError(f"{folder} has no gamma for an event's epoch")

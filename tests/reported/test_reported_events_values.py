@@ -1021,12 +1021,11 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     )
 
     values = _by_key(content_distance_values(_distance_events(), "s"))
-    assert len(values) == 2 * 3 * 4 + 2
+    assert len(values) == 2 * 3 * 3 + 2
     key = "content_distance_under_non_swr_fraction"
     assert values[key].value == pytest.approx(1 / 12)  # the animals' mean
-    assert values[f"{key}_animal_mean"].value == pytest.approx(1 / 12)
     assert values[f"{key}_animal_max"].value == pytest.approx(1 / 6)
-    assert values["content_distance_beyond_swr_fraction_animal_mean"].value == (
+    assert values["content_distance_beyond_swr_fraction"].value == (
         pytest.approx(3 / 8)
     )
     assert values["content_distance_between_swr_fraction_animal_min"].value == 0.0
@@ -1034,8 +1033,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     assert values["content_distance_remote_cm"].value == 100.0
     for name, value in values.items():
         assert value.questions == ("2d.1",)
-        pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("3g",)), name
+        assert value.figures == ("3g",), name
     assert "under 20 cm from the animal" in values[key].description
 
 

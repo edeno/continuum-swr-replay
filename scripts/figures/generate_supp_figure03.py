@@ -28,7 +28,7 @@ b — How fast the position distribution moves, no-SWR against SWR events: each
     class's events at or below each speed (the bins of
     ``event_statistics.TRANSPORT_SPEED_BIN_EDGES_CM_S`` summed), a thin line
     per animal and their mean in bold
-    (``event_statistics.transport_speed_distribution``), over the events that
+    (``event_statistics.property_distribution`` of the transport-slope speed), over the events that
     have a speed: one too short for three lags, or with too few time bins that
     are mostly Continuous, has none.
 
@@ -113,10 +113,6 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     EXTENT_BIN_EDGES_CM,
-    PATCH_CONTENT_CLASSES,
-    PATCH_COUNT_CLASSES,
-    START_END_CLASSES,
-    WELL_COUNT_CLASSES,
     content_place_shares,
     patch_content_shares,
     patch_count_shares,
@@ -125,10 +121,14 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     start_end_shares,
     well_count_shares,
 )
+from continuum_swr_replay.analysis.event_properties.event_speed import (
+    with_event_speed,
+)
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TRANSPORT_SPEED_BIN_EDGES_CM_S,
+    TRANSPORT_SPEED_COLUMN,
+    property_distribution,
     reference_medians,
-    transport_speed_distribution,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
@@ -140,22 +140,20 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
 from continuum_swr_replay.reported.events.content import (
-    content_mass_along_arms,
-    content_mass_by_patch,
-    with_event_place_shares,
+    content_mass_tables,
     with_event_start_end,
 )
-from continuum_swr_replay.reported.events.properties import with_event_speed
-from continuum_swr_replay.reported.events.signals import (
-    gamma_triggered_curves,
-    with_brain_state,
+from continuum_swr_replay.reported.events.signals import gamma_triggered_curves
+from continuum_swr_replay.reported.inputs import (
+    EventsInputs,
+    default_inputs,
+    read_example_decode,
 )
-from continuum_swr_replay.reported.inputs import default_inputs, read_example_decode
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.example_event_panels import draw_examples
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
-    GROUP_COLORS,
+    draw_cumulative_by_animal,
     name_groups,
 )
 from continuum_swr_replay.visualization.palettes import (
@@ -183,73 +181,69 @@ WIDTH = 6.5
 # The journal's page is 20 cm tall with the saving margin.
 HEIGHT = 7.6
 
-# Each panel: (band, event column, title).
+# Each gamma panel: (band, title).
 SIGNALS = tuple(
-    (band, f"{band}_z", f"{name} gamma ({low:.0f}–{high:.0f} Hz)")
+    (band, f"{name} gamma ({low:.0f}–{high:.0f} Hz)")
     for name, (band, (low, high)) in zip(
         ("Slow", "Fast"), GAMMA_BANDS.items(), strict=True
     )
 )
 
 
-def read_inputs() -> dict:
-    """The events with their gamma, each epoch's rest and running levels, the
-    selected events' ``transport_speed_distribution`` (``speed``), each animal's
-    shares of content time by place (``places``:
-    ``content_along_arms.content_place_shares``) and its
-    ``remote_well_share_by_extent`` (``by_extent``).
+def read_gamma_levels(inputs: EventsInputs) -> pd.DataFrame:
+    """Each gamma band's quiet-rest and running level
+    (``event_statistics.reference_medians`` of the gamma run's reference).
 
     Raises
     ------
     ValueError
-        If the brain-state or the gamma reference was not made over the
-        analyses' subset or from the current session cache's well visits
+        If the gamma reference was not made over the analyses' subset or from
+        the current session cache's well visits
         (``prepare_data.time_mask_staleness``).
     """
+    reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
+    note = time_mask_staleness(
+        read_output_manifest(inputs.event_gamma),
+        reference["epoch_id"],
+        str(inputs.event_gamma),
+    )
+    if note is not None:
+        raise ValueError(note)
+    return reference_medians(reference, list(GAMMA_BANDS))
+
+
+def read_inputs() -> dict:
+    """What each panel draws, over the events that start inside a well visit:
+    the example session and events (a), the transport-speed distribution (b),
+    the shares of content time by place with their intervals (c), the shares
+    of events by wells, patches and where content starts and ends and of
+    content time by patch (d to g), the remote-well share by extent (h), and
+    gamma around event starts with each band's levels (i, j)."""
     inputs = default_inputs()
     events = select_visit_context(read_swr_table(inputs.event_table))
-    selected = events
-    events, reference, gamma_reference = with_brain_state(
-        events, inputs, len(analyzed_epoch_ids())
-    )
-    for folder, levels in (
-        (inputs.brain_state_reference.parent, reference),
-        (inputs.event_gamma, gamma_reference),
-    ):
-        note = time_mask_staleness(
-            read_output_manifest(folder), levels["epoch_id"], str(folder)
-        )
-        if note is not None:
-            raise ValueError(note)
-    # panel c: the selected events, as the events summary reads them
     n_epochs = len(analyzed_epoch_ids())
-    with_speed, _ = with_event_speed(selected, inputs.event_speed, n_epochs)
-    # panels d and e: the content-mass run, as Figure 3 e and f read it
-    along, _ = content_mass_along_arms(
-        selected, inputs.content_mass_along_arms, n_epochs
-    )
-    with_places, _ = with_event_place_shares(
-        selected, inputs.content_mass_along_arms, n_epochs
-    )
-    by_patch, _ = content_mass_by_patch(
-        selected, inputs.content_mass_along_arms, n_epochs
-    )
-    # where content starts and ends: the decode's place at the first and last bin
+    with_speed, _ = with_event_speed(events, inputs.event_speed, n_epochs)
+    # c to f and h: the content-mass run, read once
+    mass, _ = content_mass_tables(events, inputs.content_mass_along_arms, n_epochs)
+    along, with_places = mass["along"], mass["events"]
+    # g: the decode's most probable place at each event's first and last bin
     with_ends, _ = with_event_start_end(
         with_places, inputs.content_along_arms, n_epochs
     )
     return {
-        "gamma": gamma_triggered_curves(selected, inputs.event_gamma, n_epochs)[0],
-        "gamma_levels": reference_medians(gamma_reference, list(GAMMA_BANDS)),
-        "speed": transport_speed_distribution(with_speed),
+        "gamma": gamma_triggered_curves(events, inputs.event_gamma, n_epochs)[0],
+        "gamma_levels": read_gamma_levels(inputs),
+        "speed": property_distribution(
+            with_speed, TRANSPORT_SPEED_COLUMN, TRANSPORT_SPEED_BIN_EDGES_CM_S
+        ),
         "places": content_place_shares(along),
         "place_intervals": place_share_intervals(along),
         "well_counts": well_count_shares(with_places, column="content_n_wells"),
         "patch_counts": patch_count_shares(with_places, column="content_n_patches"),
-        "patch_content": patch_content_shares(by_patch),
+        "patch_content": patch_content_shares(mass["by_patch"]),
         "start_end": start_end_shares(with_ends),
         "session": read_example_decode(EXAMPLE_NWB_FILE, EXAMPLE_EPOCH),
-        "examples": example_windows(selected),
+        "examples": example_windows(events),
         "by_extent": remote_well_share_by_extent(
             with_places, column="content_remote_well"
         ),
@@ -261,11 +255,11 @@ def draw_gamma(axes, curves: dict, levels: pd.DataFrame) -> None:
     band), as Figure 2g draws ripple power and theta: the line is the mean over
     animals of each animal's median (the median over its epochs of each
     epoch's median over its events), the band the same of the quartiles
-    (``curves``: ``reported.events.gamma_triggered_curves``). The dashed lines
+    (``curves``: ``reported.events.signals.gamma_triggered_curves``). The dashed lines
     are the band's level in quiet rest (gray) and while running (black),
     each animal's median over its epochs, then the mean over animals
     (``levels``: ``event_statistics.reference_medians``)."""
-    for ax, (band, _, title) in zip(axes, SIGNALS, strict=True):
+    for ax, (band, title) in zip(axes, SIGNALS, strict=True):
         curve = curves[band]
         t_ms = 1000 * np.asarray(curve["time"])
         for kind, is_swr in WINDOW_KINDS.items():
@@ -293,13 +287,7 @@ def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
     class's events (with a speed) whose transport-slope speed is at most each
     speed, a thin line per animal and their mean in bold in the class's color
     (``distribution``: :func:`read_inputs`' ``speed``)."""
-    for group, color in GROUP_COLORS.items():
-        mine = distribution[distribution["group"] == group]
-        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
-        within = by_animal.cumsum()
-        edges = within.index.to_numpy()
-        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
-        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    draw_cumulative_by_animal(ax, distribution)
     name_groups(ax, 0.98, 0.3, 0.1, "right")
     ax.set_xlim(TRANSPORT_SPEED_BIN_EDGES_CM_S[0], TRANSPORT_SPEED_BIN_EDGES_CM_S[-1])
     ax.set_xticks(SPEED_TICKS_CM_S)
@@ -311,7 +299,7 @@ def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
 
 
 WELL_PLACES = (("remote_well", "remote well"), ("own_well", "own well"))
-"""Panel d's two places and their names under the axis."""
+"""Panel c's two places and their names under the axis."""
 
 
 def draw_well_shares(
@@ -380,13 +368,16 @@ def draw_remote_well_by_extent(ax: Axes, by_extent: pd.DataFrame) -> None:
 def draw_class_bars(
     ax: Axes,
     shares: pd.DataFrame,
-    classes: Sequence[str],
     labels: Sequence[str],
     title: str,
     ylabel: str,
+    groups: Sequence[str] = (),
 ) -> None:
     """A share per class and kind: bars the animals' mean, dots the animals
-    (``shares``: one column per class, indexed by ``is_swr`` and ``animal``)."""
+    (``shares``: one column per class, in the order drawn, indexed by
+    ``is_swr`` and ``animal``). ``groups`` names the first and the second half
+    of the classes under their labels, with a line between the halves."""
+    classes = list(shares.columns)
     for g, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
         mine = 100 * shares.loc[is_swr]
         for x, name in enumerate(classes):
@@ -396,6 +387,14 @@ def draw_class_bars(
                 position + np.linspace(-0.08, 0.08, len(mine)), mine[name], s=3,
                 color="k", lw=0, zorder=3,
             )  # fmt: skip
+    half = len(classes) / 2
+    for k, name in enumerate(groups):
+        ax.text(
+            (k + 0.5) * half - 0.5, -0.2, name, transform=ax.get_xaxis_transform(),
+            ha="center", va="top", fontsize=SMALL_SIZE, color="0.35",
+        )  # fmt: skip
+    if groups:
+        ax.axvline(half - 0.5, color="0.8", lw=0.5, zorder=0)
     ax.set_xticks(range(len(classes)), labels)
     ax.set_xlim(-0.55, len(classes) - 0.45)
     ax.set_ylim(0, 100)
@@ -404,55 +403,20 @@ def draw_class_bars(
     ax.set_title(title, fontsize=SMALL_SIZE)
 
 
-def draw_well_counts(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel d: the share of each kind's events that represent no well, one
-    well, and two or more (``shares``: :func:`read_inputs`' ``well_counts``)."""
-    draw_class_bars(
-        ax, shares, WELL_COUNT_CLASSES, ["none", "one", "two\nor more"],
-        "Wells an event represents", "Events (%)",
-    )  # fmt: skip
-
-
-def draw_patch_content(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel e: the share of each kind's content time in the animal's own patch
-    and in the other two, at the wells and elsewhere (``shares``:
-    :func:`read_inputs`' ``patch_content``)."""
-    draw_class_bars(
-        ax, shares, PATCH_CONTENT_CLASSES,
-        ["wells", "other", "wells", "other"],
-        "Content by patch", "Content time (%)",
-    )  # fmt: skip
-    for x, name in ((0.5, "own patch"), (2.5, "other patches")):
-        ax.text(
-            x, -0.2, name, transform=ax.get_xaxis_transform(), ha="center",
-            va="top", fontsize=SMALL_SIZE, color="0.35",
-        )  # fmt: skip
-    ax.axvline(1.5, color="0.8", lw=0.5, zorder=0)
-
-
-def draw_patch_counts(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel f: the share of each kind's events whose content spans one patch,
-    two and three (``shares``: :func:`read_inputs`' ``patch_counts``)."""
-    draw_class_bars(
-        ax, shares, PATCH_COUNT_CLASSES, ["one", "two", "three"],
-        "Patches an event spans", "Events (%)",
-    )  # fmt: skip
-
-
-def draw_start_end(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel g: the share of each kind's events whose content starts, and
-    ends, near the animal and at a remote well (``shares``:
-    :func:`read_inputs`' ``start_end``)."""
-    draw_class_bars(
-        ax, shares, START_END_CLASSES, ["starts", "ends", "starts", "ends"],
-        "Where content starts and ends", "Events (%)",
-    )  # fmt: skip
-    for x, name in ((0.5, "near the animal"), (2.5, "at a remote well")):
-        ax.text(
-            x, -0.2, name, transform=ax.get_xaxis_transform(), ha="center",
-            va="top", fontsize=SMALL_SIZE, color="0.35",
-        )  # fmt: skip
-    ax.axvline(1.5, color="0.8", lw=0.5, zorder=0)
+# Panels d to g, each a share per class and kind: the input of
+# :func:`read_inputs`, then :func:`draw_class_bars`' labels, title, y label and
+# group names.
+CLASS_PANELS = {
+    "d": ("well_counts", ["none", "one", "two\nor more"],
+          "Wells an event represents", "Events (%)", ()),
+    "e": ("patch_content", ["wells", "other", "wells", "other"],
+          "Content by patch", "Content time (%)", ("own patch", "other patches")),
+    "f": ("patch_counts", ["one", "two", "three"],
+          "Patches an event spans", "Events (%)", ()),
+    "g": ("start_end", ["starts", "ends", "starts", "ends"],
+          "Where content starts and ends", "Events (%)",
+          ("near the animal", "at a remote well")),
+}  # fmt: skip
 
 
 EXAMPLES = {
@@ -509,10 +473,10 @@ def generate_figure(inputs: dict):
     )
     draw_transport_speed(ax_b, inputs["speed"])
     draw_well_shares(ax_c, inputs["places"], inputs["place_intervals"])
-    draw_well_counts(ax_d, inputs["well_counts"])
-    draw_patch_content(ax_e, inputs["patch_content"])
-    draw_patch_counts(ax_f, inputs["patch_counts"])
-    draw_start_end(ax_g, inputs["start_end"])
+    for ax, (key, *how) in zip(
+        (ax_d, ax_e, ax_f, ax_g), CLASS_PANELS.values(), strict=True
+    ):
+        draw_class_bars(ax, inputs[key], *how)
     draw_remote_well_by_extent(ax_h, inputs["by_extent"])
     draw_gamma((ax_i, ax_j), inputs["gamma"], inputs["gamma_levels"])
     # the dashed lines' names, in the fast-gamma panel, where the two levels

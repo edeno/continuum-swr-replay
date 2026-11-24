@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.constants import VISIT_CONTEXTS
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
     count_visit_context,
@@ -173,72 +174,63 @@ def test_the_content_mass_is_summed_over_the_selected_events(tmp_path):
         )
 
 
-def test_each_selected_event_gets_its_shares_of_content_time_at_wells(tmp_path):
-    """Every event of the run has 1 time bin at a remote well, 1 at its own
-    well and 2 off the wells; the selected events get shares 0.5, 0.25 and
-    0.25 (named apart from the table's own at_well) and one well, the other is
-    not read."""
-    events = select_visit_context(_labeled())
-    rows = [
-        {
-            "event_id": event_id,
-            "epoch_id": "e",
-            "arm": 2,
-            "far": far,
-            "weight": weight,
-            "distance_to_well_cm": d_well,
-        }
-        for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
-        for far, weight, d_well in (
-            (True, 1.0, 5.0),
-            (False, 1.0, 5.0),
-            (True, 2.0, 60.0),
-        )
-    ]
-    pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
-
-    joined, _ = content.with_event_place_shares(events, tmp_path, 1)
-
-    assert joined["event_id"].tolist() == events["event_id"].tolist()
-    assert (joined["content_at_well"] == 0.5).all()
-    assert (joined["content_remote_well"] == 0.25).all()
-    assert (joined["content_own_well"] == 0.25).all()
-    # half of each event's content time is at arm 2's well: one well
-    assert (joined["content_n_wells"] == 1).all()
-    assert (joined["epoch_id"] == "e").all()
-    with pytest.raises(ValueError, match="no row"):
-        content.with_event_place_shares(
-            pd.concat([events, events.iloc[[0]].assign(event_id=999)]), tmp_path, 1
-        )
-
-
-def test_the_content_by_patch_is_summed_over_the_selected_events(tmp_path):
-    """Each event of the run has 2 time bins at a well on arm 0 and 1 off the
-    wells on arm 7; the rows of an epoch, animal, kind and patch of the animal
-    are one per arm and place, and the unselected event's are not read."""
+def test_the_content_mass_run_is_read_once_for_the_selected_events(tmp_path):
+    """Every event of the run has, on arm 2 (patch 2), 1 time bin at a remote
+    well, 1 at its own well and 2 far off the wells. The selected events get
+    shares 0.5, 0.25 and 0.25 (named apart from the table's own at_well), one
+    well and one patch; the content by patch is one row per kind, animal and
+    distance to the well; the unselected event is not read."""
     events = select_visit_context(_labeled()).assign(current_patch=1)
     rows = [
         {
             "event_id": event_id,
             "epoch_id": "e",
-            "arm": arm,
+            "arm": 2,
+            "arm_length_cm": 100.0,
+            "place_bin": place_bin,
+            "n_place_bins": 50,
             "distance_to_well_cm": d_well,
+            "far": far,
             "weight": weight,
+            "distance_to_animal_cm": 150.0 if far else 5.0,
         }
         for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
-        for arm, d_well, weight in ((0, 5.0, 2.0), (7, 80.0, 1.0))
+        for far, weight, d_well, place_bin in (
+            (True, 1.0, 5.0, 0),
+            (False, 1.0, 5.0, 0),
+            (True, 2.0, 60.0, 30),
+        )
     ]
     pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
 
-    by_patch, _ = content.content_mass_by_patch(events, tmp_path, 1)
+    tables, paths = content.content_mass_tables(events, tmp_path, 1)
 
+    assert [path.name for path in paths] == ["e.parquet"]
+    joined = tables["events"]
+    assert joined["event_id"].tolist() == events["event_id"].tolist()
+    assert (joined["content_at_well"] == 0.5).all()
+    assert (joined["content_remote_well"] == 0.25).all()
+    assert (joined["content_own_well"] == 0.25).all()
+    # half of each event's content time is at arm 2's well: one well, one patch
+    assert (joined["content_n_wells"] == 1).all()
+    assert (joined["content_n_patches"] == 1).all()
+    assert (joined["epoch_id"] == "e").all()
+    along, _ = content.content_mass_along_arms(events, tmp_path, 1)
+    pd.testing.assert_frame_equal(tables["along"], along)
+    by_patch = tables["by_patch"]
     assert set(by_patch["current_patch"]) == {1}
     n = events.groupby(["animal", "is_swr"]).size()
-    assert len(by_patch) == 2 * len(n)
-    at_well = by_patch[by_patch["arm"] == 0].set_index(["animal", "is_swr"])["weight"]
+    at_well = by_patch[by_patch["distance_to_well_cm"] == 5.0].set_index(
+        ["animal", "is_swr"]
+    )["weight"]
     assert (at_well == 2.0 * n).all()
+    assert by_patch["weight"].sum() == 4.0 * len(events)
     with pytest.raises(ValueError, match="no current patch"):
-        content.content_mass_by_patch(events.assign(current_patch=np.nan), tmp_path, 1)
+        content.content_mass_tables(events.assign(current_patch=np.nan), tmp_path, 1)
+    with pytest.raises(ValueError, match="no row"):
+        content.content_mass_tables(
+            pd.concat([events, events.iloc[[0]].assign(event_id=999)]), tmp_path, 1
+        )
 
 
 def test_each_selected_event_gets_where_its_content_starts_and_ends(tmp_path):
@@ -271,19 +263,17 @@ def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
     trace is the samples 125 to 275 (0.3 s at 500 Hz)."""
     events = select_visit_context(_labeled())
     events = events.assign(
-        animal="a", session_date=1, epoch="e1", event_start_s=200 * 0.002
+        animal="a", session_date=20200101, epoch="02_r1", event_start_s=200 * 0.002
     )
-    pd.DataFrame(
-        {"epoch_id": ["x"], "animal": ["a"], "session_date": [1], "epoch": ["e1"]}
-    ).to_parquet(tmp_path / "reference.parquet")
+    (epoch_id,) = set(swr_source.event_epoch_ids(events))
     sample = np.arange(400.0)
     pd.DataFrame(
         {"time": sample * 0.002, "slow_gamma_z": sample, "fast_gamma_z": -sample}
-    ).to_parquet(tmp_path / "x_gamma_z.parquet")
+    ).to_parquet(tmp_path / f"{epoch_id}_gamma_z.parquet")
 
     curves, paths = signals.gamma_triggered_curves(events, tmp_path, 1)
 
-    assert [path.name for path in paths] == ["x_gamma_z.parquet"]
+    assert [path.name for path in paths] == [f"{epoch_id}_gamma_z.parquet"]
     np.testing.assert_allclose(
         curves["slow_gamma"]["time"][[0, 75, -1]], [-0.15, 0, 0.15]
     )
@@ -297,7 +287,7 @@ def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
     with pytest.raises(ValueError, match="not 2"):
         signals.gamma_triggered_curves(events, tmp_path, 2)
     with pytest.raises(ValueError, match="no gamma for an event's epoch"):
-        signals.gamma_triggered_curves(events.assign(epoch="e9"), tmp_path, 1)
+        signals.gamma_triggered_curves(events.assign(epoch="04_r2"), tmp_path, 1)
 
 
 def test_an_output_not_made_over_the_subset_is_pending():

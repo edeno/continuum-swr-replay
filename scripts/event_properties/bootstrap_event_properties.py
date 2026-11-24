@@ -39,6 +39,9 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     count_visit_context,
     select_visit_context,
 )
+from continuum_swr_replay.analysis.event_properties.event_speed import (
+    with_event_speed,
+)
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
@@ -54,7 +57,6 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.events.properties import with_event_speed
 from continuum_swr_replay.runs.io import files_sha256, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
@@ -81,7 +83,7 @@ PROPERTIES = {
 
 def load_events() -> tuple[pd.DataFrame, pd.DataFrame, list[Path], list[Path]]:
     """The events that start inside a well visit, with their start distance and
-    their two speeds (``reported.events.properties.with_event_speed``); the counts per
+    their two speeds (``event_speed.with_event_speed``); the counts per
     well-visit label (``count_visit_context``); the start-distance and the
     event-speed files read."""
     table = read_swr_table(table_path("event_table", replay_content_dir()))

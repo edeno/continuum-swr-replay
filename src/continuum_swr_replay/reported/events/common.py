@@ -96,7 +96,6 @@ TAGS = {
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2k",)),
     "content_distance": Tags(("2d.1",), ("3g",)),
-    "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
 }
@@ -303,6 +302,15 @@ def _share_interval(
             "upper bound of that interval",
         ),
     ]
+
+
+def _epoch_files(folder: Path, n_epochs: int, pattern: str = "*.parquet") -> list[Path]:
+    """The per-epoch files of a run, sorted; refused when they are not
+    ``n_epochs``."""
+    paths = sorted(folder.glob(pattern))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    return paths
 
 
 @dataclass(frozen=True)

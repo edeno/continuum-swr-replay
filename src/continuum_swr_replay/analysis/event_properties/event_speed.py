@@ -38,6 +38,7 @@ calls :func:`event_speeds` and writes one table per epoch.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -360,3 +361,33 @@ def event_speeds(
             }
         )
     return pd.DataFrame.from_records(records)
+
+
+EVENT_SPEED_COLUMNS = ("map_line_fit_speed_cm_s", "transport_slope_speed_cm_s")
+"""The speeds read from the event-speed output (:func:`event_speeds`' columns)."""
+
+
+def with_event_speed(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """``events`` with each one's :data:`EVENT_SPEED_COLUMNS`
+    (``Processed-Data/event_speed``), and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row
+        or no MAP line-fit speed (the transport-slope speed may be missing: an
+        event too short or too Fragmented has none).
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    speeds = pd.concat(
+        (pd.read_parquet(p, columns=["event_id", *EVENT_SPEED_COLUMNS]) for p in paths),
+        ignore_index=True,
+    )
+    joined = events.merge(speeds, on="event_id", how="left", validate="1:1")
+    if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
+        raise ValueError("an event has no MAP line-fit speed")
+    return joined, paths

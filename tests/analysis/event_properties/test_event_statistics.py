@@ -941,12 +941,11 @@ def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
         (group, band) for group in ("no SWR", "SWR") for band in stats.DISTANCE_BANDS_CM
     ]
     no_swr = table.loc["no SWR"]
-    np.testing.assert_allclose(no_swr["share_animal_mean"], [1 / 12, 1 / 3, 7 / 12])
+    np.testing.assert_allclose(no_swr["share"], [1 / 12, 1 / 3, 7 / 12])
     np.testing.assert_allclose(no_swr["animal_min"], [0.0, 0.0, 1 / 6])
     np.testing.assert_allclose(no_swr["animal_max"], [1 / 6, 2 / 3, 1.0])
-    np.testing.assert_allclose(no_swr["share"], no_swr["share_animal_mean"])
     swr = table.loc["SWR"]
-    np.testing.assert_allclose(swr["share_animal_mean"], [0.5, 1 / 8, 3 / 8])
+    np.testing.assert_allclose(swr["share"], [0.5, 1 / 8, 3 / 8])
     assert (swr["n_events"] == 4).all() and (no_swr["n_animals"] == 2).all()
 
 
@@ -1339,7 +1338,9 @@ def test_transport_speed_distribution_is_each_animals_percent_per_bin():
             "transport_slope_speed_cm_s": [10.0, 30.0, 30.0, 2000.0, np.nan],
         }
     )
-    table = stats.transport_speed_distribution(events)
+    table = stats.property_distribution(
+        events, stats.TRANSPORT_SPEED_COLUMN, stats.TRANSPORT_SPEED_BIN_EDGES_CM_S
+    )
     assert set(table["group"]) == {"no SWR"}
     percent = table.set_index("bin_low")["percent"]
     assert percent[0.0] == 25.0 and percent[25.0] == 50.0
