@@ -8,16 +8,19 @@ groups, one stored file each (:data:`GROUPS`):
 - ``newton``: :func:`.newton.penalized_newton` for each likelihood (Poisson with
   an offset, Bernoulli, Gaussian, grouped softmax), with and without a penalty,
   with penalized simple terms (a slope and the levels of a category, each with
-  a weak identity penalty), a P-spline of 40 columns at a weak penalty, and the
-  statuses other than converged.
+  a weak identity penalty), a P-spline of 40 columns at a weak penalty for each
+  likelihood, and the statuses other than converged.
 - ``reml``: :func:`.reml.reml_and_derivatives` (the score, its gradient and
   Hessian in the log penalties, the coefficients, covariance and edf) for each
-  likelihood with one and two smooths at several log penalties, and with a
-  smooth beside penalized simple terms.
+  likelihood with one and two smooths at several log penalties, with a smooth
+  beside penalized simple terms and as a P-spline of 40 columns (each
+  likelihood), and a design not identified beside a penalty block.
 - ``refit``: :func:`.reml.refit_session` on sessions with no finite maximum:
   columns left out over rounds, along a penalty, along the intercept.
 - ``select``: :func:`.reml.select_penalties` on small sets of sessions, with a
-  session set aside and refitted, and one left without a fit.
+  session set aside and refitted, one left without a fit, one whose fit fails
+  at a grid point, a search of six outer steps, and four smooths (the grid of
+  one term at a time).
 - ``sessions``: :func:`.sessions.fit_sessions`, every field of every record,
   on simulated rate, content, Bernoulli and Gaussian sessions.
 - ``calibration``: :func:`.calibration.log_penalty_for_edf` on rate sessions.
@@ -373,16 +376,24 @@ def _diagonal_inputs(family: str, seed: int, n_basis: int, rho: float):
     return lik, X, y, aux, S, free_basis(design.blocks, p)
 
 
-def _content_frame(seed: int, n_events: int = 120) -> pd.DataFrame:
+def _content_frame(
+    seed: int, n_events: int = 120, early_clock: bool = False
+) -> pd.DataFrame:
     """Content rows: four candidate rows per event (roles), a clock and a
-    reward fraction (missing on the trunk row), shares from a Dirichlet."""
+    reward fraction (missing on the trunk row), shares from a Dirichlet. The
+    clock is uniform on [0, 20]; ``early_clock``: exponential of mean 3, cut
+    at 20, so that the late basis functions of a wide spline see few rows."""
     rng = np.random.default_rng(1000 + seed)
     roles = ("current", "previous", "other", "trunk")
     event = np.repeat(np.arange(n_events), len(roles))
     role = np.tile(np.array(roles, dtype=object), n_events)
     fraction = rng.uniform(0.0, 1.0, event.size)
     fraction[role == "trunk"] = np.nan
-    clock = rng.uniform(0.0, 20.0, event.size)
+    clock = (
+        np.minimum(rng.exponential(3.0, event.size), 20.0)
+        if early_clock
+        else rng.uniform(0.0, 20.0, event.size)
+    )
     eta = (
         np.select([role == "current", role == "previous"], [1.0, 0.3], default=0.0)
         + 0.8 * np.nan_to_num(fraction)
@@ -409,9 +420,12 @@ ROLE = Category(
 )
 
 
-def _content_design(pooled: pd.DataFrame, rho: float = 2.0) -> Design:
+def _content_design(
+    pooled: pd.DataFrame, rho: float = 2.0, n_basis: int = 10
+) -> Design:
     """The role category (weakly penalized), a slope of the reward fraction by
-    leaf role (weakly penalized), a smooth of the clock."""
+    leaf role (weakly penalized), a smooth of the clock (``n_basis`` basis
+    functions at log penalty ``rho``)."""
     return build_design(
         [
             ROLE,
@@ -421,17 +435,22 @@ def _content_design(pooled: pd.DataFrame, rho: float = 2.0) -> Design:
                 by=ROLE,
                 levels=("current", "previous", "other"),
             ),
-            Smooth("clock_s", 0.0, 20.0, 10, rho),
+            Smooth("clock_s", 0.0, 20.0, n_basis, rho),
         ],
         pooled,
         intercept=False,
     )
 
 
-def _softmax_inputs(seed: int):
-    frame = _content_frame(seed)
+def _softmax_frame(seed: int, early_clock: bool = False) -> pd.DataFrame:
+    frame = _content_frame(seed, early_clock=early_clock)
     frame["reward_fraction"] = frame["reward_fraction"].fillna(0.0)
-    design = _content_design(frame)
+    return frame
+
+
+def _softmax_inputs(seed: int, n_basis: int = 10, rho: float = 2.0):
+    frame = _softmax_frame(seed, early_clock=n_basis > 10)
+    design = _content_design(frame, rho, n_basis)
     X = design.build(frame).X
     p = X.shape[1]
     S = assemble_penalty(design.blocks, design.log_penalties, p)
@@ -471,10 +490,15 @@ def _unpenalized(lik, X, y, aux):
     return lik, X, y, aux, np.zeros((p, p)), None
 
 
-def _separated(name: str):
+def _separated(name: str, seed: int = 1):
     """A logistic 0/1 cell whose rows are all y = 1, a Poisson cell with no
-    events, a logistic column that quasi-separates the outcome."""
-    rng = np.random.default_rng(1)
+    events, a logistic column that quasi-separates the outcome.
+
+    Along the direction of unbounded increase the decrement falls by ``e``
+    per step, so the stop lies between a decrement within a factor ``e`` above
+    the tolerance and one below it. The logistic cell uses seed 6, where these
+    are 1.60 and 0.59 times it; from seed 1 they were 1.18 and 0.43."""
+    rng = np.random.default_rng(seed)
     x = rng.normal(size=300)
     high = (x > 1.5).astype(float)
     y = (rng.uniform(size=300) < 0.3).astype(float)
@@ -495,8 +519,11 @@ def _separated(name: str):
 
 
 def _far_maximum():
-    """A Poisson slope of 2e3 on a column of units 1e-3."""
-    rng = np.random.default_rng(3)
+    """A Poisson slope of 2e3 on a column of units 1e-3. Seed 4: with seed 3
+    the converged fit's last decrement was 1.08 times the tolerance; here the
+    closest is 871 times it, on the same path (step limit at 40 steps,
+    converged in about 190)."""
+    rng = np.random.default_rng(4)
     x = rng.uniform(0.0, 1e-3, 400)
     X = np.column_stack([np.ones(400), x])
     y = rng.poisson(np.exp(0.2 + 2e3 * x)).astype(float)
@@ -556,11 +583,17 @@ NEWTON_CASES: dict[str, Callable[[], dict]] = {
     ),
     "not_identified": lambda: _fit(_collinear()),
     "softmax_not_identified": lambda: _fit(_softmax_constant_within_groups()),
-    "no_finite_maximum_logistic_cell": lambda: _fit(_separated("logistic_cell")),
+    "no_finite_maximum_logistic_cell": lambda: _fit(_separated("logistic_cell", 6)),
     "no_finite_maximum_poisson_cell": lambda: _fit(_separated("poisson_cell")),
     "no_finite_maximum_quasi": lambda: _fit(_separated("quasi")),
     "far_maximum_step_limit": lambda: _fit(_far_maximum(), max_iter=40),
     "far_maximum_converged": lambda: _fit(_far_maximum(), max_iter=400),
+    # Seed 6: from seed 1 the last decrement was 1.06 times the tolerance.
+    "bernoulli_spline_40_weak": lambda: _fit(
+        _diagonal_inputs("bernoulli", 6, 41, -6.0)
+    ),
+    "gaussian_spline_40_weak": lambda: _fit(_diagonal_inputs("gaussian", 1, 41, -8.0)),
+    "softmax_spline_40_weak": lambda: _fit(_softmax_inputs(4, 41, -6.0)),
 }
 
 
@@ -568,12 +601,21 @@ NEWTON_CASES: dict[str, Callable[[], dict]] = {
 # Group reml
 
 
-def _smooth_session(family: str, n_smooths: int, seed: int, n_rows: int = 240):
+def _smooth_session(
+    family: str,
+    n_smooths: int,
+    seed: int,
+    n_rows: int = 240,
+    amplitudes: tuple[float, ...] | None = None,
+):
     """A likelihood, a session with ``n_smooths`` smooths of 6 columns each
-    (an intercept first but under the grouped softmax) and its blocks."""
+    (an intercept first but under the grouped softmax) and its blocks. The
+    effect of smooth ``j`` is ``a_j sin(pi (j + 1) x_j)``, ``a_j`` of
+    ``amplitudes`` (0.7 each by default)."""
     rng = np.random.default_rng(seed)
     x = rng.uniform(size=(n_smooths, n_rows))
-    truth = sum(0.7 * np.sin(np.pi * (j + 1) * x[j]) for j in range(n_smooths))
+    a = (0.7,) * n_smooths if amplitudes is None else amplitudes
+    truth = sum(a[j] * np.sin(np.pi * (j + 1) * x[j]) for j in range(n_smooths))
     parts = [] if family == "grouped_softmax" else [np.ones((n_rows, 1))]
     blocks, start = [], len(parts)
     for j in range(n_smooths):
@@ -646,10 +688,52 @@ REML_CASES.update(
 )
 REML_CASES.update(
     {
-        f"poisson_spline_40_rho_{rho:g}": _reml_design_case("poisson", 41, rho)
-        for rho in (-4.0,)
+        f"{family}_spline_40_rho_{rho:g}": _reml_design_case(family, 41, rho)
+        for family, rho in (("poisson", -4.0), ("bernoulli", -4.0), ("gaussian", -6.0))
     }
 )
+
+
+def _reml_softmax_design_case(n_basis: int, rho: float) -> Callable[[], dict]:
+    """The content design's blocks (the role category and the slope by role,
+    each weakly penalized, and a smooth of the clock at ``rho``) at their log
+    penalties, under the grouped softmax."""
+
+    def case() -> dict:
+        frame = _softmax_frame(7, early_clock=n_basis > 10)
+        design = _content_design(frame, rho, n_basis)
+        data = SessionData(
+            design.build(frame).X,
+            frame["share"].to_numpy(),
+            frame["event_id"].to_numpy(),
+        )
+        return _reml(GroupedSoftmax(), data, design.blocks, design.log_penalties)
+
+    return case
+
+
+REML_CASES.update(
+    {
+        "grouped_softmax_design_simple_terms_rho_2": _reml_softmax_design_case(10, 2.0),
+        "grouped_softmax_spline_40_rho_-4": _reml_softmax_design_case(41, -4.0),
+    }
+)
+
+
+def _line_beside_its_smooth() -> dict:
+    """A Poisson session whose design is not identified beside a penalty
+    block: an intercept, a smooth of ``x`` and the slope of ``x``, which lies
+    in the smooth's null space (its straight line)."""
+    rng = np.random.default_rng(12)
+    x = rng.uniform(size=240)
+    design, penalty = _smooth(x, 0.0, 1.0, 7)
+    X = np.column_stack([np.ones(240), design, x - x.mean()])
+    y = rng.poisson(np.exp(0.5 + 0.7 * np.sin(np.pi * x))).astype(float)
+    blocks = [PenaltyBlock(np.arange(1, 1 + design.shape[1]), penalty)]
+    return _reml(Poisson(), SessionData(X, y, np.zeros(240)), blocks, [2.0])
+
+
+REML_CASES["poisson_not_identified_line_beside_its_smooth"] = _line_beside_its_smooth
 
 
 # --------------------------------------------------------------------------
@@ -707,14 +791,15 @@ def _with_arm_columns(data: SessionData, seed: int, separated: bool) -> SessionD
     return SessionData(X, y.ravel(), data.aux, name=data.name)
 
 
-def _near_copies(seed: int, separated: bool):
-    """A Bernoulli session: an intercept, a P-spline (9 columns) and ten
-    near-copies of a 0/1 column; separated: every row of the column has y = 1."""
+def _near_copies(seed: int, separated: bool, n_copies: int = 10):
+    """A Bernoulli session: an intercept, a P-spline (9 columns) and
+    ``n_copies`` near-copies of a 0/1 column; separated: every row of the
+    column has y = 1."""
     rng = np.random.default_rng(seed)
     x = rng.uniform(0.0, 4.0, 600)
     design, penalty = _smooth(x, 0.0, 4.0, 10)
     indicator = (rng.uniform(size=600) < 0.2).astype(float)
-    copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
+    copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(n_copies)]
     X = np.column_stack([np.ones(600), design, *copies])
     y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
     if separated:
@@ -751,8 +836,10 @@ def _refit_case(lik, built, rho) -> Callable[[], dict]:
 
 
 REFIT_CASES: dict[str, Callable[[], dict]] = {
+    # Six near-copies: with ten, the copies shared a step of about 1, so each
+    # column's part of it was about NO_MAXIMUM_ETA_STEP (1.06 times it).
     "columns_left_out_in_rounds": _refit_case(
-        Bernoulli(), lambda: _near_copies(0, separated=True), [6.0]
+        Bernoulli(), lambda: _near_copies(0, separated=True, n_copies=6), [6.0]
     ),
     "arm_and_role_left_out": _refit_case(
         GroupedSoftmax(),
@@ -787,9 +874,40 @@ def _select_case(lik, sessions: Callable[[], tuple[list, list]]) -> Callable[[],
     return case
 
 
-def _smooth_sessions(family: str, n_smooths: int, n: int):
-    built = [_smooth_session(family, n_smooths, seed=40 + s) for s in range(n)]
+def _smooth_sessions(family: str, n_smooths: int, n: int, first_seed: int = 40, **kw):
+    built = [
+        _smooth_session(family, n_smooths, seed=first_seed + s, **kw) for s in range(n)
+    ]
     return [b[1] for b in built], built[0][2]
+
+
+def _wiggly_bernoulli(seed: int, flip: float):
+    """A Bernoulli session of 300 rows: an intercept and a P-spline of ``x``
+    (9 columns); ``y`` is 1 where ``sin(3 pi x) > 0``, each row flipped with
+    probability ``flip``. Unflipped, the spline's wiggly part separates the
+    outcome: at the weakest penalty its maximum is far, and Newton from zero
+    runs out of steps (117 needed at log penalty -10). The session and its
+    block."""
+    rng = np.random.default_rng(seed)
+    x = rng.uniform(size=300)
+    y = (np.sin(3.0 * np.pi * x) > 0).astype(float)
+    flips = rng.uniform(size=300) < flip
+    y[flips] = 1.0 - y[flips]
+    design, penalty = _smooth(x, 0.0, 1.0, 10)
+    X = np.column_stack([np.ones(300), design])
+    return SessionData(X, y, name=f"w{seed}"), [
+        PenaltyBlock(np.arange(1, 1 + design.shape[1]), penalty)
+    ]
+
+
+def _one_fails_at_the_weakest_point():
+    """Two noisy wiggly sessions and one separated by its spline: the grid
+    point at log penalty -10 fails (step limit) in the separated session,
+    the others are finite."""
+    built = [_wiggly_bernoulli(3, 0.0)] + [
+        _wiggly_bernoulli(100 + s, 0.05) for s in range(2)
+    ]
+    return [b[0] for b in built], built[0][1]
 
 
 def _content_sessions_set_aside():
@@ -809,11 +927,15 @@ SELECT_CASES: dict[str, Callable[[], dict]] = {
     "poisson_one_smooth": _select_case(
         Poisson(), lambda: _smooth_sessions("poisson", 1, 4)
     ),
+    # Seeds 43 to 45: from seeds 40 to 42 a Newton decrement of the search
+    # was 1.0009 times the tolerance; here the closest is 1.37 times it.
     "poisson_two_smooths": _select_case(
-        Poisson(), lambda: _smooth_sessions("poisson", 2, 3)
+        Poisson(), lambda: _smooth_sessions("poisson", 2, 3, first_seed=43)
     ),
+    # Seeds 44 to 47 (the closest decrement 1.30 times the tolerance; 0.95
+    # from seeds 40 to 43).
     "bernoulli_one_smooth": _select_case(
-        Bernoulli(), lambda: _smooth_sessions("bernoulli", 1, 4)
+        Bernoulli(), lambda: _smooth_sessions("bernoulli", 1, 4, first_seed=44)
     ),
     "gaussian_one_smooth": _select_case(
         Gaussian(), lambda: _smooth_sessions("gaussian", 1, 4)
@@ -822,6 +944,22 @@ SELECT_CASES: dict[str, Callable[[], dict]] = {
         GroupedSoftmax(), _content_sessions_set_aside
     ),
     "poisson_one_without_a_fit": _select_case(Poisson(), _rate_sessions_intercept),
+    "bernoulli_one_fails_at_the_weakest_grid_point": _select_case(
+        Bernoulli(), _one_fails_at_the_weakest_point
+    ),
+    # Six outer steps from the best grid point. With the second smooth
+    # without an effect its term stops on the score's plateau (log penalty
+    # 16, 11 steps), but there the stop is set by the tolerance: the last
+    # decrement was 0.93 times it, and the log penalty moved with it.
+    "gaussian_two_smooths_six_steps": _select_case(
+        Gaussian(),
+        lambda: _smooth_sessions(
+            "gaussian", 2, 3, first_seed=5000, amplitudes=(0.7, 0.4)
+        ),
+    ),
+    "poisson_four_smooths": _select_case(
+        Poisson(), lambda: _smooth_sessions("poisson", 4, 3, first_seed=60, n_rows=400)
+    ),
 }
 
 
