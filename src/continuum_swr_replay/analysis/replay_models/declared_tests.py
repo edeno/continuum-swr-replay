@@ -29,9 +29,12 @@ own coefficient (``role[current]``); a smooth or a slope fitted for one role
 carries ``:role=<level>``. The rate models' clocks are
 ``time_since_visit_start_s`` (since the first poke-in) and
 ``time_until_visit_end_s`` (until the final poke-out); recency is
-``log_trials_since_last_visit``, a smooth on the other-leaf rows only (the
+``log_trials_since_last_visit``, a smooth whose rows are an open setting of
+the role content models (``role_content.RECENCY_ROWS``): Q5a names the
+other-leaf smooth, the default, and under ``all_leaf`` the model reads the
+same two points from its all-leaf smooth (``role_content.recency_term``); the
 current arm is always 1 trial since its last visit and the previous arm 2, so
-on their rows a recency curve is their role level); the last outcome is
+on their rows a recency curve is their role level. The last outcome is
 ``last_outcome_rewarded`` (0/1).
 
 Models: ``visit_rate_A`` (the visit rate with the smooths of both clocks and
@@ -162,6 +165,8 @@ class Estimand:
 _ARRIVAL = "s(time_since_visit_start_s)"
 _LEAVING = "s(time_until_visit_end_s)"
 _RECENCY = "s(log_trials_since_last_visit):role=other_leaf"
+"""Q5a's term under the default recency rows; under ``all_leaf`` the role
+content model reads ``role_content.recency_term`` at the same points."""
 
 ESTIMANDS: tuple[Estimand, ...] = (
     Estimand(

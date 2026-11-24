@@ -39,15 +39,21 @@ over one pooled SD of its covariate at ``L0``; a curve is read from the term's
 own columns. In the unadjusted model these are the declared coefficient
 contrasts themselves.
 
-Two calls of this module, made where the plan does not fix them:
+The rows of the recency smooth and the never-visited indicator are an open
+setting (:data:`RECENCY_ROWS`). The current arm is always 1 trial since its last
+visit and the previous arm always 2; a visited other-leaf arm is at least 3
+trials since its last visit, and one never visited carries the censored count,
+which can be 2, and the never-visited indicator. Under ``other_leaf`` (the
+default) the smooth is on the other-leaf rows only, and the role levels carry
+everything for the current and previous arms. Under ``all_leaf`` one smooth
+covers every leaf row: on the current and previous rows the curve's values at
+1 and 2 trials are then the same columns as their role levels, so the
+likelihood fixes only each level plus the curve at its recency, and the split
+is set by the smooth's penalty (its extrapolation below 3 trials) and the weak
+penalty on the levels. Q5a reads the curve at its two points under both.
 
-- The recency smooth and the never-visited indicator are on the other-leaf rows
-  only. The current arm is always 1 trial since its last visit and the previous
-  arm always 2, so a recency curve on those rows is the same column as their
-  role level: the split between the two would be set by the penalty's
-  extrapolation of the curve to 1 and 2 trials. A visited other-leaf arm is at
-  least 3 trials since its last visit; one never visited carries the censored
-  count, which can be 2, and the never-visited indicator.
+A call of this module, made where the plan does not fix it:
+
 - The trunk level of the role category is a function of the arm, so it is not
   identified beside the arm effects. It is kept as a level (so that the trunk
   rows are a role of their own for every term by role and for the support
@@ -128,8 +134,10 @@ __all__ = [
     "LEAF_ROLES",
     "MODELS",
     "MODEL_COLUMNS",
+    "LEAF_ROW",
     "PRIOR_SD_CANDIDATES",
     "Q4A_READINGS",
+    "RECENCY_ROWS",
     "REFERENCE_ROLE",
     "ROLES",
     "SCALE_POOLINGS",
@@ -146,6 +154,7 @@ __all__ = [
     "fit_role_content",
     "fit_role_content_session",
     "model_estimands",
+    "recency_term",
     "role_content_cohort",
     "role_design",
     "role_terms",
@@ -229,6 +238,23 @@ smooth. ``sd_change`` (the plan's): ``f(m + sd/2) - f(m - sd/2)``, ``m`` and
 ``full_range``: ``f(1) - f(0)``. Both are linear functionals with an exact
 variance."""
 
+RECENCY_ROWS: tuple[str, ...] = ("other_leaf", "all_leaf")
+"""OPEN (lead): the rows the recency smooth and the never-visited indicator
+cover (module docstring). ``other_leaf`` (the default, what the branch fitted
+first): the other-leaf rows only, the smooth ``s(...):role=other_leaf``.
+``all_leaf`` (the plan's first wording): every leaf row, current and previous
+included, one smooth ``s(...):leaf_row=leaf``; the current and previous levels
+are then identified only with the curve at 1 and 2 trials. The lead has not
+decided."""
+
+LEAF_ROW = "leaf_row"
+"""The design column of the ``all_leaf`` recency smooth: ``leaf`` on a leaf
+row, ``trunk`` on a trunk row (:func:`design_rows`)."""
+
+_LEAF_ROW_CATEGORY = Category(LEAF_ROW, ("leaf", "trunk"), "trunk", "none")
+"""Only the ``by`` of the ``all_leaf`` recency smooth; not a term."""
+
+
 DEFAULT_Q5A_TRIALS: tuple[float, float] = (20.0, 3.0)
 """OPEN (lead): the two recency points of Q5a, trials since the last visit.
 The default is the declared 20 against 3, a placeholder; 3 trials is the
@@ -255,6 +281,8 @@ class RoleContentSettings:
         One of :data:`SCALE_POOLINGS`.
     event_weight : str
         One of :data:`EVENT_WEIGHTS`.
+    recency_rows : str
+        One of :data:`RECENCY_ROWS`.
     """
 
     prior_sd: float = DEFAULT_PRIOR_SD
@@ -266,6 +294,7 @@ class RoleContentSettings:
     q5a_trials: tuple[float, float] = DEFAULT_Q5A_TRIALS
     scale_pooling: str = SCALE_POOLINGS[0]
     event_weight: str = EVENT_WEIGHTS[0]
+    recency_rows: str = RECENCY_ROWS[0]
 
     def __post_init__(self) -> None:
         if self.scale_pooling not in SCALE_POOLINGS:
@@ -275,6 +304,10 @@ class RoleContentSettings:
         if self.event_weight not in EVENT_WEIGHTS:
             raise ValueError(
                 f"event_weight {self.event_weight!r} not in {EVENT_WEIGHTS}"
+            )
+        if self.recency_rows not in RECENCY_ROWS:
+            raise ValueError(
+                f"recency_rows {self.recency_rows!r} not in {RECENCY_ROWS}"
             )
         if self.prior_sd not in PRIOR_SD_CANDIDATES:
             raise ValueError(
@@ -343,7 +376,9 @@ _RECENCY_TRIALS = (1.0, 200.0)
 """Recency is clamped to this range of trials since the last visit."""
 
 #: (covariate, lo, hi, n_basis, roles) of each smooth. The ranges are decided;
-#: time until leaving has knots 0.1 s apart over [0, 3] s.
+#: time until leaving has knots 0.1 s apart over [0, 3] s. The recency
+#: smooth's roles are those of ``other_leaf``; ``all_leaf`` replaces them
+#: (:data:`RECENCY_ROWS`).
 _SMOOTHS: tuple[tuple[str, float, float, int, tuple[str, ...]], ...] = (
     (REWARD_FRACTION, 0.0, 1.0, 6, LEAF_ROLES),
     (RECENCY, 0.0, float(np.log(_RECENCY_TRIALS[1])), 10, (REFERENCE_ROLE,)),
@@ -358,7 +393,8 @@ _ROLE_SLOPES: dict[str, tuple[str, ...]] = {
 
 #: The event-arm table's column behind each model column, and the roles whose
 #: rows read it (a missing value there drops the event). The trial number's
-#: source is a setting.
+#: source is a setting, and so are the roles that read the recency and the
+#: never-visited flag (:data:`RECENCY_ROWS`).
 _SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
     RESPONSE: (RESPONSE, ROLES),
     REWARD_FRACTION: ("reward_fraction_candidate_arm_last10_visits", LEAF_ROLES),
@@ -398,6 +434,23 @@ MODEL_COLUMNS["role_content_uncertainty"] = (
 def _in_model(model: str) -> str:
     """The cohort column that marks the events kept for ``model``."""
     return f"in_{model}"
+
+
+def _recency_roles(settings: RoleContentSettings) -> tuple[str, ...]:
+    """The roles whose rows read the recency and the never-visited flag."""
+    return LEAF_ROLES if settings.recency_rows == "all_leaf" else (REFERENCE_ROLE,)
+
+
+def recency_term(settings: RoleContentSettings | None = None) -> str:
+    """The name of the recency smooth under the settings' :data:`RECENCY_ROWS`.
+
+    ``declared_tests`` names Q5a's term as the ``other_leaf`` smooth;
+    :func:`estimand_contrasts` reads it from this term.
+    """
+    settings = settings or RoleContentSettings()
+    if settings.recency_rows == "all_leaf":
+        return f"s({RECENCY}):{LEAF_ROW}=leaf"
+    return f"s({RECENCY}):{ROLE}={REFERENCE_ROLE}"
 
 
 COHORT_COLUMNS: tuple[str, ...] = (
@@ -524,7 +577,8 @@ def role_content_cohort(
         Nine rows per event (the canonical event-arm table, or the rows of
         some sessions of it).
     settings : RoleContentSettings, optional
-        Read for the trial-number column and the event weight.
+        Read for the trial-number column, the event weight and the rows that
+        read the recency (:data:`RECENCY_ROWS`).
     contexts : str or sequence of str
         The ``visit_context`` labels kept (``select_visit_context``).
 
@@ -544,6 +598,8 @@ def role_content_cohort(
     sources = dict(_SOURCES)
     sources[TRIAL_NUMBER] = (settings.trial_number, LEAF_ROLES)
     sources[EVENT_WEIGHT] = (_event_weight_column(settings.event_weight), ROLES)
+    for column in (RECENCY, NEVER_VISITED):
+        sources[column] = (sources[column][0], _recency_roles(settings))
     require_columns(
         event_arm_table,
         [
@@ -704,17 +760,20 @@ class ContrastReference(NamedTuple):
 def design_rows(
     rows: pd.DataFrame, model: Model, variant: Variant, reference: ContrastReference
 ) -> pd.DataFrame:
-    """The cohort rows with the columns of the length-adjusted variant.
+    """The cohort rows with the design's derived columns.
 
-    ``log_duration_rel`` is ``log(duration) - L0``; each role slope's product
-    column is its covariate less its pooled mean, times ``log_duration_rel``
-    (centered, so that it is not the role's length slope again). The
-    unadjusted variant adds nothing.
+    :data:`LEAF_ROW` (``leaf`` or ``trunk``, read only by the ``all_leaf``
+    recency smooth) is added in both variants. For the length-adjusted
+    variant, ``log_duration_rel`` is ``log(duration) - L0``, and each role
+    slope's product column is its covariate less its pooled mean, times
+    ``log_duration_rel`` (centered, so that it is not the role's length slope
+    again).
     """
     _check_model(model, variant)
-    if variant == "unadjusted":
-        return rows
     out = rows.copy()
+    out[LEAF_ROW] = np.where(out[ROLE].isin(LEAF_ROLES), "leaf", "trunk")
+    if variant == "unadjusted":
+        return out
     out[LOG_DURATION_REL] = out[LOG_DURATION] - reference.reference_log_duration
     for covariate in _ROLE_SLOPES[model]:
         centered = out[covariate] - reference.covariate_means[covariate]
@@ -748,6 +807,9 @@ def role_terms(
         role,
     ]
     for covariate, lo, hi, n_basis, roles in _SMOOTHS:
+        by = role
+        if covariate == RECENCY and settings.recency_rows == "all_leaf":
+            by, roles = _LEAF_ROW_CATEGORY, ("leaf",)
         terms.append(
             Smooth(
                 covariate,
@@ -755,7 +817,7 @@ def role_terms(
                 hi,
                 n_basis,
                 settings.smooth_log_penalties[covariate],
-                by=role,
+                by=by,
                 levels=roles,
             )
         )
@@ -885,7 +947,10 @@ def _curve_contrast(
 ) -> np.ndarray:
     """A curve contrast on a smooth term's own columns."""
     term = design.by_name[contrast.term]
-    covariate, role = term.covariate, term.level[1]
+    covariate = term.covariate
+    # A smooth by role is read on its role's rows; the all-leaf recency smooth
+    # on other-leaf rows.
+    role = term.level[1] if term.level[0] == ROLE else REFERENCE_ROLE
     lo, hi = next((s[1], s[2]) for s in _SMOOTHS if s[0] == covariate)
 
     def curve_rows(x: np.ndarray) -> np.ndarray:
@@ -917,7 +982,8 @@ def estimand_contrasts(
     model, variant : str
     reference : ContrastReference
     settings : RoleContentSettings, optional
-        Read for the reading of Q4a and the points of Q5a.
+        Read for the reading of Q4a, the points of Q5a and its term
+        (:func:`recency_term`).
 
     Returns
     -------
@@ -931,7 +997,9 @@ def estimand_contrasts(
         contrast = estimand.contrast
         if estimand.estimand_id == "Q5a":
             first, second = (float(np.log(t)) for t in settings.q5a_trials)
-            contrast = dt.CurveContrast(contrast.term, (first, first), (second, second))
+            contrast = dt.CurveContrast(
+                recency_term(settings), (first, first), (second, second)
+            )
         if isinstance(contrast, dt.SDChangeContrast):
             if settings.q4a_reading == "sd_change":
                 contrast = contrast.at(
