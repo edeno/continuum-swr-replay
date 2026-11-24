@@ -1113,6 +1113,10 @@ class AnimalReward(NamedTuple):
     records : list of FitRecord
         Each session's fit at ``coefficient``, with the reward column in its
         offset (``exposure * exp(coefficient * rewarded)``).
+    used_sessions : tuple of (animal, session_date, epoch)
+        The sessions whose kept fit enters the coefficient at the last fit
+        (``n_sessions`` of them); a session whose fit is not kept there is
+        not part of the coefficient. Empty when the animal was not fitted.
     """
 
     animal: str
@@ -1124,6 +1128,7 @@ class AnimalReward(NamedTuple):
     n_sessions: int
     n_events: int
     records: list[FitRecord]
+    used_sessions: tuple[SessionKey, ...] = ()
 
 
 class AnimalRewardFit(NamedTuple):
@@ -1256,6 +1261,7 @@ def _fit_animal(
         len(kept),
         int(sum(r.n_events for _, r in kept)),
         records,
+        tuple(key for key, _ in kept),
     )
 
 
@@ -1296,9 +1302,15 @@ def fit_animal_rewards(
     A session with no event on one side takes part like any other: no rule
     reads its events (one with no event at all is not fitted, as in
     ``fit_sessions``, and so has no part). A session whose fit is not kept is
-    left out of that step's score. An animal with no event on one side in
+    left out of that step's score, so the objective may change between steps;
+    the sessions that take part at the last fit are recorded
+    (``AnimalReward.used_sessions``). An animal with no event on one side in
     all its sessions has no finite coefficient (``_events_on_both_sides``):
-    it is not fitted, and its status is ``newton.NO_FINITE_MAXIMUM``.
+    it is not fitted, and its status is ``newton.NO_FINITE_MAXIMUM``. That
+    existence rule reads the outcome: with a large true effect, the animals
+    left out are the most extreme ones (no event after an omission), so the
+    mean over the animals can be biased toward zero. It did not occur in any
+    cell of the validation runs.
 
     Parameters
     ----------

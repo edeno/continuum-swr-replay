@@ -304,3 +304,32 @@ def test_an_animal_without_an_event_on_one_side_has_no_finite_coefficient(
     assert rat0.status == CONVERGED and np.isfinite(rat0.coefficient)
     assert rat1.status == NO_FINITE_MAXIMUM and np.isnan(rat1.coefficient)
     assert rat1.records == [] and rat1.n_sessions == 0
+    assert rat0.used_sessions == tuple(first) and rat1.used_sessions == ()
+
+
+def test_the_sessions_that_take_part_at_the_final_value_are_recorded(
+    make_visit_rows, cohort_of
+) -> None:
+    """The result names the sessions whose kept fit enters the coefficient at
+    its final value: a session with no event is not fitted and is not among
+    them; the others are."""
+    cohort = _animal_cohort(
+        make_visit_rows,
+        cohort_of,
+        log_ratio=0.5,
+        n_sessions=3,
+        n_visits=60,
+        total=300.0,
+        seed=21,
+    )
+    empty = list(cohort)[1]
+    rows = cohort[empty].rows["A"].copy()
+    rows[vr.RESPONSE] = 0.0
+    cohort[empty] = cohort_of(rows, "SWR")
+    fit = vr.fit_animal_rewards(
+        cohort, kind="SWR", settings=ANIMAL, allow_provisional="test"
+    )
+    (animal,) = fit.animals
+    assert animal.status == CONVERGED
+    assert animal.used_sessions == tuple(k for k in cohort if k != empty)
+    assert animal.n_sessions == len(animal.used_sessions) == 2

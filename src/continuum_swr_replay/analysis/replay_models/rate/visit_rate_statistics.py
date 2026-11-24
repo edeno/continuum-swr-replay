@@ -221,6 +221,12 @@ def summarize_animal_rewards(values: pd.DataFrame) -> pd.DataFrame:
     (``shared_statistics.animal_mean_interval``). The difference SWR minus No
     SWR is taken animal by animal, over the animals with both.
 
+    Which animals have a value reads the outcome: an animal with no event on
+    one side in all its sessions has no finite coefficient
+    (``visit_rate.fit_animal_rewards``), so with a large true effect the most
+    extreme animals are the ones left out and the mean can be biased toward
+    zero. It did not occur in any cell of the validation runs.
+
     Parameters
     ----------
     values : pd.DataFrame

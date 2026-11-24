@@ -52,6 +52,21 @@ The planted values (each scenario's truth for each model):
 
 A scenario with no planted ratio (the later onset) has Q2 NaN in every truth.
 
+Which truths depend on the real outcome. On the real cohort, every scenario's
+planted clock curves are shaped by the stored model-free curves of the real
+event starts, and each session's expected total is its real number of events;
+those set the curves and the baseline, not a reward effect. The reward effect
+of "no effect" (zero) and of "constant" (:data:`LOG_RATIO`) does not depend
+on the real outcome, nor do the fading, differing, later-onset and drop
+effects. The rate table's does (:data:`TRUTH_FROM_REAL_COUNTS`): its planted
+rate is a tabulation of the rows' REAL counts by outcome and both clocks
+(:func:`_rate_table`), and its "planted" Q1, Q2 and Q7a are an unpenalized
+Poisson projection of the model's coefficient form onto that tabulation
+(``visit_rate_scenarios.rate_table_truth``): in substance the real data's
+pooled model-free values, not a chosen truth. They are not a result and are
+not to be quoted; the table carries ``truth_from_real_counts`` on its rows
+and the run's ``attrs`` the same note.
+
 The joint run (:func:`joint_simulation`, ``config`` with ``kind="both"``)
 holds both kinds in each session's rows, each kind drawn from its own planted
 rate and fitted as its own run fits it, and adds each session's SWR minus No
@@ -108,6 +123,7 @@ __all__ = [
     "PRIOR_SDS",
     "SCENARIOS",
     "TARGETS",
+    "TRUTH_FROM_REAL_COUNTS",
     "Config",
     "JointConfig",
     "calibrate_clocks",
@@ -120,7 +136,6 @@ __all__ = [
     "simulation",
     "smoothed_log_rate",
     "spread_sessions",
-    "synthetic_visit_rows",
     "table",
 ]
 
@@ -155,6 +170,11 @@ RATE_TABLE_FLOOR = 5e-4
 SMOOTHING = {vr.ARRIVAL: (0.5, 4.0), vr.LEAVING: (0.1, 4.0)}
 #: The stored model-free curves, under the replay-content root.
 DESCRIPTIVE = Path("models_convention") / "descriptive" / "visit_clock_curves.parquet"
+
+#: The scenarios whose planted values are read from the real counts (the
+#: module docstring): their rows of :func:`table` carry
+#: ``truth_from_real_counts``.
+TRUTH_FROM_REAL_COUNTS: tuple[str, ...] = ("rate_table",)
 
 #: The scenarios of each kind, in the list's order (the order fixes the seeds).
 SCENARIOS: dict[str, tuple[str, ...]] = {
@@ -707,9 +727,10 @@ def animal_level_fit(
     session from its records, Q2 per animal.
 
     An animal with no finite coefficient (no event on one side in all its
-    sessions) has no Q2 (``without_value`` ``no_finite_maximum``); one whose
-    coefficient did not converge, or with no session with a kept fit, has
-    none either (``other_status``).
+    sessions) has no Q2 (``without_value`` ``no_finite_maximum``), and its
+    sessions have a row of Q1, Q1b and Q7a without a value for that cause
+    (it was not fitted); one whose coefficient did not converge, or with no
+    session with a kept fit, has no Q2 either (``other_status``).
     """
     cohort = {
         key: vr.CohortRows(kind, {"A": rows, "D": rows.iloc[:0]}, {})
@@ -721,6 +742,30 @@ def animal_level_fit(
     contrasts = _estimands(fit.design, settings)
     rows = []
     for animal in fit.animals:
+        if not animal.records:
+            cause = (
+                Removed.NO_FINITE_MAXIMUM.value
+                if animal.status == NO_FINITE_MAXIMUM
+                else NoFit.OTHER_STATUS.value
+            )
+            rows += [
+                {
+                    "estimand": name,
+                    "animal": key[0],
+                    "session_date": key[1],
+                    "epoch": key[2],
+                    "status": animal.status,
+                    "no_fit": cause,
+                    "without_value": cause,
+                    "estimate": np.nan,
+                    "se": np.nan,
+                    "edf": {},
+                    "n_sessions": 1,
+                }
+                for key in data
+                if key[0] == animal.animal
+                for name in contrasts
+            ]
         for record in animal.records:
             kept = record.status == CONVERGED and not record.no_fit
             coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
@@ -945,7 +990,10 @@ def _calibrated(
 def _rate_table(sessions: Mapping[SessionKey, pd.DataFrame]) -> sc.RateTable:
     """The rate table of the scenario taken from a table of rates: the rows'
     counts by outcome and both clocks, pooled over every session (a
-    model-free tabulation; ``rate_table_from_bins``)."""
+    model-free tabulation; ``rate_table_from_bins``). On the real cohort
+    these are the REAL counts, so the scenario's planted rate and its truths
+    are the real data's pooled model-free values
+    (:data:`TRUTH_FROM_REAL_COUNTS`)."""
     pooled = pd.concat(
         [
             rows[[vr.ARRIVAL, vr.LEAVING, vr.REWARD, vr.EXPOSURE, vr.RESPONSE]]
@@ -1090,6 +1138,15 @@ def simulation(
         },
         "allow_provisional": None if calibrated else "simulation",
         "truths": truths,
+        "truth_from_real_counts": {
+            "scenarios": [n for n in names if n in TRUTH_FROM_REAL_COUNTS],
+            "note": (
+                "the planted rate is a tabulation of the rows' counts (the real "
+                "counts on the real cohort) and its planted values a Poisson "
+                "projection onto it: the real data's pooled model-free values, "
+                "not a result"
+            ),
+        },
         "planted_constants": {
             "log_ratio": LOG_RATIO[kind],
             "fade_s": list(FADE_S),
@@ -1115,7 +1172,8 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     """The engine's summary with the run's kind, target and each model's
     level and prior SD, and Q2's truths beside the planted value:
     ``truth_session`` and ``truth_animal`` (each level's pooled truth) and
-    ``truth_omission_side`` (the time-varying form's). A joint run's is
+    ``truth_omission_side`` (the time-varying form's), and
+    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`). A joint run's is
     :func:`joint_table`."""
     config = simulation.attrs["config"]
     if config["kind"] == "both":
@@ -1129,6 +1187,7 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
         float(m.removeprefix("session_sd")) if m.startswith("session_sd") else np.nan
         for m in out["model"]
     ]
+    out["truth_from_real_counts"] = out["scenario"].isin(TRUTH_FROM_REAL_COUNTS)
     for name in ("session", "animal", "omission_side"):
         out[f"truth_{name}"] = [
             truths[s][name][e]
@@ -1188,6 +1247,11 @@ class JointConfig:
         exists, as :class:`Config`'s ``calibration_path``).
     quick : bool
         Both kinds on the synthetic cohort, as :data:`QUICK`.
+    scenarios : tuple of str or None
+        The scenarios of :data:`JOINT_SCENARIOS` the run holds (their truths
+        are computed only for them), in the list's order; None holds all. A
+        scenario keeps its seeds only when the subset holds every scenario
+        before it in the list.
     """
 
     target_edf: float | None = None
@@ -1197,6 +1261,21 @@ class JointConfig:
     prior_sds: tuple[float, ...] = JOINT_PRIOR_SDS
     calibration_paths: Mapping[str, str] | None = None
     quick: bool = False
+    scenarios: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.scenarios is not None:
+            unknown = sorted(set(self.scenarios) - set(JOINT_SCENARIOS))
+            if unknown:
+                raise ValueError(f"{unknown} are not joint scenarios")
+            ordered = tuple(n for n in JOINT_SCENARIOS if n in self.scenarios)
+            object.__setattr__(self, "scenarios", ordered)
+
+    @property
+    def joint_scenarios(self) -> dict[str, tuple[str, str]]:
+        """The scenarios the run holds, in the list's order."""
+        names = self.scenarios or tuple(JOINT_SCENARIOS)
+        return {n: JOINT_SCENARIOS[n] for n in names}
 
 
 JOINT_QUICK = JointConfig(n_data_sets=2, n_draws=200, prior_sds=(2.0,), quick=True)
@@ -1329,13 +1408,15 @@ def joint_fit(
 
 
 def _joint_truths(
-    keys: Sequence[SessionKey], planted: Mapping[str, Mapping[SessionKey, dict]]
+    keys: Sequence[SessionKey],
+    planted: Mapping[str, Mapping[SessionKey, dict]],
+    scenarios: Mapping[str, tuple[str, str]],
 ) -> tuple[dict, dict]:
     """Each joint scenario's planted values, reduced session -> day -> animal
     (:func:`_balanced`), and each session's own (the difference the
     difference of the kinds' session truths)."""
     reduced, per_session = {}, {}
-    for name, (swr, no_swr) in JOINT_SCENARIOS.items():
+    for name, (swr, no_swr) in scenarios.items():
         own = {}
         for estimand in JOINT_ESTIMANDS:
             values = {
@@ -1382,6 +1463,7 @@ def joint_simulation(
         (``session_truths``, keyed ``animal/session_date/epoch``).
     """
     config = JOINT_QUICK if quick else JointConfig(**dict(config or {}))
+    joint = config.joint_scenarios
     kinds = tuple(vr.EVENT_KINDS)
     cohorts, records, clocks = {}, {}, {}
     if not config.quick:
@@ -1410,7 +1492,7 @@ def joint_simulation(
     keys_frame = pd.DataFrame(keys, columns=["animal", "session_date", "epoch"])
     planted, calibrated = {}, {}
     for place, kind in enumerate(kinds):
-        names = tuple(dict.fromkeys(s[place] for s in JOINT_SCENARIOS.values()))
+        names = tuple(dict.fromkeys(s[place] for s in joint.values()))
         log_ratios = sc.session_log_ratios(
             keys_frame,
             mean=LOG_RATIO[kind],
@@ -1497,13 +1579,13 @@ def joint_simulation(
                         KIND_COLUMN: kind,
                         **{
                             f"expected_{name}": planted[kind][key][s[place]]["expected"]
-                            for name, s in JOINT_SCENARIOS.items()
+                            for name, s in joint.items()
                         },
                     }
                 )
             )
         rows_out[key] = pd.concat(parts, ignore_index=True)
-    truths, session_truths = _joint_truths(keys, planted)
+    truths, session_truths = _joint_truths(keys, planted, joint)
     scenarios = [
         OutsideScenario(
             name,
@@ -1511,7 +1593,7 @@ def joint_simulation(
             planted=truths[name],
             columns=(f"expected_{name}",),
         )
-        for name in JOINT_SCENARIOS
+        for name in joint
     ]
     attrs = {
         "config": {
@@ -1519,6 +1601,7 @@ def joint_simulation(
             "kind": "both",
             "prior_sds": list(config.prior_sds),
             "calibration_paths": dict(config.calibration_paths or {}),
+            "scenarios": list(joint),
         },
         "rows": records,
         "calibration": {
@@ -1526,7 +1609,7 @@ def joint_simulation(
             for (kind, c), p in calibrated.items()
         },
         "allow_provisional": None if calibrated else "simulation",
-        "joint_scenarios": {n: list(s) for n, s in JOINT_SCENARIOS.items()},
+        "joint_scenarios": {n: list(s) for n, s in joint.items()},
         "truths": truths,
         "session_truths": session_truths,
         "planted_constants": {

@@ -53,7 +53,9 @@ constant cancels. Q1's reference window is an argument (the declared ``(0,
 1)`` by default). Where the outcomes differ only in their arrival curve (a
 later onset after an omission), there is no planted reward ratio: Q2 is NaN in
 both truths. The rate table (:func:`rate_table_truth`) plants no curve: both
-of its truths are projections (see there).
+of its truths are projections (see there). Given a table tabulated from real
+counts (as ``visit_rate_simulation`` does), its planted rate and its truths
+are the real data's pooled model-free values, not a chosen truth.
 """
 
 from __future__ import annotations
@@ -120,9 +122,13 @@ TRUTH_OF_FORM: dict[str, str] = {
 }
 
 #: The projection's convergence: the largest log ratio of a margin's planted
-#: to fitted expected events, and the sweeps allowed.
+#: to fitted expected events, and the sweeps allowed. One real session of
+#: the 242 (chimi 20200225 08_r4, SWR rows: its omission visits all end
+#: before 1.9 s after arrival) needs more than 20,000 sweeps; at 200,000 it
+#: converges to the planted log ratio. A session that converges sooner stops
+#: at the same sweep, so the limit changes no other value.
 _PROJECTION_TOL = 1e-11
-_PROJECTION_MAX_SWEEPS = 20_000
+_PROJECTION_MAX_SWEEPS = 200_000
 
 
 def interpolated_curve(x: np.ndarray, log_rate: np.ndarray) -> LogCurve:
@@ -834,6 +840,13 @@ def rate_table_truth(
       cell (the time-varying form's coefficient).
 
     A value whose window or rows fall in a cell without exposure is NaN.
+
+    The truth is only as chosen as the table. ``visit_rate_simulation``
+    tabulates the REAL counts (``rate_table_from_bins`` on the real rows), so
+    there the planted rate is the real data's, and Q1, Q2 and Q7a are an
+    unpenalized Poisson projection of the model's coefficient form onto it: in
+    substance the real data's pooled model-free values. They are not a result
+    of the simulation and are not to be quoted as one.
     """
     outcome, arrival_cell, leaving_cell = table.cells(rows)
     expected = _scaled(

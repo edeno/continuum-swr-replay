@@ -339,3 +339,86 @@ def test_the_joint_run_recovers_the_swr_ratio(joint_result) -> None:
     assert (summary["share_not_converged"] == 0.0).all()
     assert (summary["share_without_value"] == 0.0).all()
     assert list(dict.fromkeys(summary["scenario"])) == list(vs.JOINT_SCENARIOS)
+
+
+def test_the_rate_table_truth_is_flagged_as_read_from_the_real_counts(
+    quick, quick_result
+) -> None:
+    """The rate table's planted values are a projection of a tabulation of the
+    rows' counts (the real counts on the real cohort): its rows of the table
+    carry ``truth_from_real_counts`` and the run's ``attrs`` say so; no other
+    scenario's do."""
+    table = vs.table(quick_result, quick)
+    flagged = table.groupby("scenario")["truth_from_real_counts"].agg(["all", "any"])
+    assert flagged.loc["rate_table"].all()
+    assert not flagged.drop(index="rate_table")["any"].any()
+    assert list(quick.attrs["truth_from_real_counts"]["scenarios"]) == ["rate_table"]
+
+
+def _no_event_after_omission(sessions, rng):
+    """About 150 events a session, none after an omission."""
+    out = {}
+    for key, rows in sessions.items():
+        mean = rows[vr.EXPOSURE].to_numpy() * rows[vr.REWARD].to_numpy()
+        out[key] = mean * 150.0 / mean.sum()
+    return out
+
+
+def test_the_animal_check_counts_the_sessions_of_an_animal_without_a_coefficient(
+    quick,
+) -> None:
+    """With no event after an omission anywhere, no animal has a finite
+    coefficient: every session still has a row of Q1, Q1b and Q7a, without a
+    value (``no_finite_maximum``), every animal a Q2 without one, and the run
+    records no value instead of raising."""
+    animal = next(m for m in quick.models if m.name == "animal")
+    data = engine.draw_data_set(
+        animal,
+        quick.sessions,
+        OutsideScenario("none_after_omission", _no_event_after_omission),
+        np.random.default_rng(3),
+    )
+    units = animal.fit(data)
+    for estimand in ("Q1", "Q1b", "Q7a"):
+        part = units[units["estimand"] == estimand]
+        assert sorted(map(tuple, part[["animal", "session_date", "epoch"]].values)) == (
+            sorted(quick.sessions)
+        )
+        assert (part["without_value"] == "no_finite_maximum").all()
+        assert part["estimate"].isna().all()
+    q2 = units[units["estimand"] == "Q2"]
+    assert len(q2) == 5 and q2["estimate"].isna().all()
+    result = engine.run(
+        Simulation(
+            [animal],
+            quick.sessions,
+            [OutsideScenario("none_after_omission", _no_event_after_omission)],
+            2,
+            200,
+            5,
+        )
+    )
+    assert (result.summary["share_without_value"] == 1.0).all()
+    assert result.summary["mean_estimate"].isna().all()
+
+
+def test_a_joint_run_may_hold_a_subset_of_the_scenarios(joint) -> None:
+    """A subset of the joint scenarios is held in the list's order, with the
+    truths of the full run; a name not in the list is refused."""
+    subset = vs.simulation(
+        False,
+        1,
+        {
+            "kind": "both",
+            "quick": True,
+            "n_data_sets": 2,
+            "n_draws": 200,
+            "prior_sds": [2.0],
+            "scenarios": ["swr_ratio", "no_effect"],
+        },
+    )
+    assert [s.name for s in subset.scenarios] == ["no_effect", "swr_ratio"]
+    for name in ("no_effect", "swr_ratio"):
+        assert subset.attrs["truths"][name] == joint.attrs["truths"][name]
+    with pytest.raises(ValueError, match="not joint scenarios"):
+        vs.JointConfig(scenarios=("nothing",))
