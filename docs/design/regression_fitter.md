@@ -600,7 +600,9 @@ once on the final rows; the fit; a level the refit leaves out is removed and the
 again. In a fit of several sessions each session's rows are sorted by unit (under the
 softmax) and then joined, the support unit is coded within each session and then offset
 (a well visit id starts at 0 in every session), and the baselines are copied for each
-session (above). An intercept copy that fails the support rule, or that the refit leaves
+session (above). A fit by day or animal of a design without a baseline is refused at entry:
+it would fit one intercept, or one set of arm effects, for all the unit's sessions. An
+intercept copy that fails the support rule, or that the refit leaves
 out (a session with no event), drops that session's rows, counted under `rows_dropped`.
 A unit of one session is the per-session fit, bit for bit: the stored per-session
 references pass unedited (`scripts/checks/_regression_reference.py::_records` checks that
