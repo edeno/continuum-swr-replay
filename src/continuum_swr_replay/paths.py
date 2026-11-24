@@ -14,6 +14,10 @@ basenames (:data:`CANONICAL_TABLE_BASENAMES`), ``tables.io.SWR_SOURCE_TABLES``
 and the covariate registry's row keys follow from it. :func:`table_path` turns
 a name and a root into the file, and refuses a name outside the registry.
 
+The pinned runs, which stored run of each analysis is the canonical one, are
+here too, in one block beside the roots they select (:data:`SWR_INVENTORY_RUN`
+and the others ending in ``_RUN``).
+
 The upper-case names this module once bound at import (``REPLAY_CONTENT_DIR``
 and the rest of :data:`_LEGACY_ROOTS`) still resolve, through the module's
 ``__getattr__``, for notebooks and exploratory scripts; library code and
@@ -28,15 +32,21 @@ from pathlib import Path
 
 __all__ = [
     "ROOT_DIR",
+    "ARTIFACT_INTERVALS_RUN",
     "BASENAME_TO_TABLE",
     "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
+    "EVENT_FEATURES_RUN",
     "MANUSCRIPT",
+    "MEMORYLESS_PILOT_RUN",
     "MODEL_SUBDIRS",
     "PROCESSED_DATA_DIR_ENV",
     "QVALS_STANDARDIZATION_REFERENCE",
     "STANDARDIZATION_REFERENCE",
+    "STATE_EVIDENCE_RUN",
+    "STATE_SPACE_FEATURES_RUN",
     "SUMMARY_DIR",
+    "SWR_INVENTORY_RUN",
     "TEX_PATH",
     "artifact_intervals_root",
     "carey_root",
@@ -136,6 +146,93 @@ def content_occupancy_dir() -> Path:
     return processed_data_dir() / "content_occupancy"
 
 
+# The pinned runs: which stored run of each analysis is the canonical one. A run
+# folder is named by the commit its runner ran at (the first 12 characters, with
+# a seed when the runner takes one) or by a dated name. Each pin is a folder name
+# under the root its docstring names, and changing a pin is the whole switch to
+# another run. Code that a test patches reads a pin when called, as
+# ``paths.<PIN>``, not by importing the name.
+SWR_INVENTORY_RUN = "056eee0dcb5a"
+"""The SWR runner's run folder every analysis reads its SWRs from, under
+:func:`swr_inventory_root`.
+
+The run of ``scripts/detection/run_swr_detection.py`` made on 2026-10-10 at
+commit ``056eee0dcb5a`` (the runner names a run by its commit's first 12
+characters): all 255 epochs ``ok`` (the register's 242 analyzed and its 13
+``SUSTAINED_NOISE``), masked by the artifact run :data:`ARTIFACT_INTERVALS_RUN`,
+with each detector's pinned ``swr_detectors.DETECTOR_SETTINGS`` and, for all
+four detectors, the CA1 tetrodes kept by rule R-T
+(``ripple_tetrodes.select_ripple_tetrodes``). The run's ``manifest.json``
+records its settings and each epoch's provenance.
+``analysis/event_definition/swr_source.py`` reads it; the decoders, the other
+detectors and the detector comparison record it. To replace it, rerun the
+runner (``python scripts/detection/run_swr_detection.py --n-workers 8``) and
+set this constant to the new run's id. With :data:`ARTIFACT_INTERVALS_RUN`, it
+names the SWR source ``kay@056eee0dcb5a+artifacts@fbbff144a123``
+(``swr_source.swr_source_name``).
+"""
+
+ARTIFACT_INTERVALS_RUN: str | None = "fbbff144a123"
+"""The artifact detector's run whose intervals drop overlapping SWRs and leave
+the coverage, under :func:`artifact_intervals_root`.
+
+The run of ``scripts/detection/run_artifact_detection.py`` made on 2026-10-10
+at commit ``fbbff144a123`` over all 255 epochs (the run id is the commit's first
+12 characters), with the detector's constants in
+``analysis/detection/artifacts/detect.py`` at that commit; the run's
+``manifest.json`` records them. ``analysis/event_definition/swr_source.py``
+reads it, and through it the SWR runner, MUA detection, the decoders and every
+analysis. To replace it, rerun that script, set this constant to the new run's
+id, then rerun the SWR runner (which reads this constant when it starts) and set
+:data:`SWR_INVENTORY_RUN` to its run, so the SWRs are masked by the same
+artifact run. None would mean no artifact is masked (``artifacts@none``). The
+folder, ``artifact_intervals_root() / <run id>``, holds ``manifest.json`` and
+one ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
+cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing
+file is an error, not an epoch without artifacts.
+"""
+
+EVENT_FEATURES_RUN = "e2331f976fd1"
+"""The event features run the events summary reads, under
+:func:`event_features_root` (242 epochs, all ``ok``).
+
+Made by ``scripts/detector_comparison/run_event_features.py`` on the inventory
+comparison run ``e2331f976fd1`` and the memoryless run
+``e2331f976fd1-seed20260922`` (the 5 ms step, its own running-only encoding
+model). The events summary's inputs (``reported/inputs.py``) and
+``scripts/figures/generate_figure02.py`` read it."""
+
+STATE_SPACE_FEATURES_RUN = "30cf1cc432e9"
+"""The event features run, under :func:`event_features_root`, that the scripts
+measuring the events summary's derived inputs read
+(``scripts/event_properties/measure_event_start_and_rest_theta.py``,
+``scripts/event_properties/measure_ripple_class_structure.py``,
+``scripts/event_properties/measure_content_along_arms.py``): each epoch's
+decode sha256 and the ``state_space`` rows' ripple power and spike counts, none
+of which depend on the memoryless run. Made by
+``scripts/detector_comparison/run_event_features.py``, it is the run before
+:data:`EVENT_FEATURES_RUN`; in all 242 epochs the two record the same decode
+sha256 and the same ``state_space`` rows of those columns (checked 2026-11-14),
+so the derived measures were not remeasured after the memoryless rerun."""
+
+STATE_EVIDENCE_RUN = "_refresh_20261016"
+"""The held-out tetrode run, under the processed-data root, that the detection
+and events summaries read (242 epochs, all ``ok``). Its folder
+:data:`STATE_EVIDENCE_DIR` holds what
+``scripts/event_evidence/run_state_evidence.py`` wrote;
+``scripts/event_evidence/summarize_state_calibration_in_visits.py`` reads it
+too."""
+
+MEMORYLESS_PILOT_RUN = "e2331f976fd1-seed20260922"
+"""The memoryless run, under :func:`memoryless_root`, whose pilot epoch
+(chimi20200225_02_r1, the epoch of the detector's first real-data pilot) the
+caption's stray-window note reads: the main cohort run of
+``scripts/detection/run_memoryless_detection.py``, at the 5 ms step on its own
+running-only encoding model. The detection summary (``reported/detection.py``)
+reads it. The note first read the October pilot,
+``0c2548cacf2d-seed20260922``."""
+
+
 # The events measurements' folders, under the processed-data root: each is
 # written by its script and read by the events summary.
 BRAIN_STATE_REFERENCE_DIR = "brain_state_reference"
@@ -188,9 +285,6 @@ DECODER_QUALITY_DIR = "decoder_quality"
 STATE_EVIDENCE_DIR = "state_evidence"
 """A held-out tetrode run's folder inside its run directory
 (``scripts/event_evidence/run_state_evidence.py``); the detection summary reads it."""
-STATE_EVIDENCE_RUN = "_refresh_20261016"
-"""The held-out tetrode run, under the processed-data root, that the detection
-and events summaries read (242 epochs, all ``ok``)."""
 STATE_CALIBRATION_IN_VISITS_DIR = "state_calibration_in_visits"
 """The held-out state calibration over the immobile windows inside the well
 visits, summarized from the held-out tetrode run's stored windows

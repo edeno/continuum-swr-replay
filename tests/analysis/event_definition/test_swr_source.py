@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
@@ -108,22 +109,20 @@ def _artifacts(tmp_path, monkeypatch, cores, span=(0.0, 1e6)) -> None:
     use_artifact_run(monkeypatch, directory)
 
 
-CONFIGURED_ARTIFACT_RUN_ID = swr_source.ARTIFACT_INTERVALS_RUN_ID
+CONFIGURED_ARTIFACT_RUN_ID = paths.ARTIFACT_INTERVALS_RUN
 """The committed value, read at import: the suite's autouse fixture sets the
 module's to None for every test (tests/conftest.py)."""
 
 
 class TestTheConfiguredInventory:
     def test_the_run_id_and_detector_are_the_r3_kay_inventory(self, monkeypatch):
-        assert swr_source.SWR_INVENTORY_RUN_ID == "056eee0dcb5a"
+        assert paths.SWR_INVENTORY_RUN == "056eee0dcb5a"
         assert swr_source.SWR_DETECTOR == "kay"
         assert swr_source.swr_inventory_dir() == (
-            swr_inventory_root() / swr_source.SWR_INVENTORY_RUN_ID
+            swr_inventory_root() / paths.SWR_INVENTORY_RUN
         )
         assert CONFIGURED_ARTIFACT_RUN_ID == "fbbff144a123"
-        monkeypatch.setattr(
-            swr_source, "ARTIFACT_INTERVALS_RUN_ID", CONFIGURED_ARTIFACT_RUN_ID
-        )
+        monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", CONFIGURED_ARTIFACT_RUN_ID)
         assert swr_source.artifact_intervals_dir() == (
             artifact_intervals_root() / "fbbff144a123"
         )
@@ -134,8 +133,8 @@ class TestTheConfiguredInventory:
     def test_the_folders_and_name_follow_the_constants_when_they_change(
         self, monkeypatch
     ):
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "rerun_masked")
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        monkeypatch.setattr(paths, "SWR_INVENTORY_RUN", "rerun_masked")
+        monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", "task16")
 
         assert swr_source.swr_inventory_dir().name == "rerun_masked"
         assert swr_source.artifact_intervals_dir() == (
@@ -146,9 +145,9 @@ class TestTheConfiguredInventory:
     def test_a_source_name_says_which_artifact_run_it_was_built_under(
         self, monkeypatch
     ):
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", "task16")
         assert swr_source.artifact_run_of(swr_source.swr_source_name()) == "task16"
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+        monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", None)
         assert swr_source.artifact_run_of(swr_source.swr_source_name()) is None
         # a name from before the artifact run was recorded in it: no run
         assert swr_source.artifact_run_of("Kay") is None
@@ -159,13 +158,11 @@ class TestTheConfiguredInventory:
             str(path.relative_to(REPO))
             for folder in ("src", "scripts")
             for path in (REPO / folder).rglob("*.py")
-            if swr_source.SWR_INVENTORY_RUN_ID in path.read_text()
+            if paths.SWR_INVENTORY_RUN in path.read_text()
             or CONFIGURED_ARTIFACT_RUN_ID in path.read_text()
         )
 
-        assert holders == [
-            "src/continuum_swr_replay/analysis/event_definition/swr_source.py"
-        ]
+        assert holders == ["src/continuum_swr_replay/paths.py"]
 
     def test_the_swr_runner_writes_where_the_source_reads(self, processed_data_root):
         import scripts.detection.run_swr_detection as runner
@@ -674,7 +671,7 @@ class TestTheStamp:
 
     def test_a_new_artifact_run_retires_every_stamp(self, inventory, monkeypatch):
         frame = stamp_swr_source(pd.DataFrame())
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", "task16")
 
         with pytest.raises(SwrSourceError):
             require_swr_source(frame, what="the event table")

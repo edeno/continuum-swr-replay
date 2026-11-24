@@ -130,9 +130,6 @@ from continuum_swr_replay.analysis.decode_quality import (
     quality_metrics,
 )
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -221,6 +218,7 @@ from continuum_swr_replay.paths import (
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
+    STATE_SPACE_FEATURES_RUN,
     TETRODE_HOLDOUT_NAME,
 )
 from continuum_swr_replay.reported.formatting import (

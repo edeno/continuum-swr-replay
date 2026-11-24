@@ -147,6 +147,23 @@ def test_state_evidence_values_read_each_states_primary_row():
     assert values["heldout_fragmented_immobile_mismatched_animals_positive"] == 2
 
 
+def test_state_evidence_values_say_each_animal_takes_the_median_of_its_epochs():
+    """The stored table takes each animal's median over its epochs of a
+    log-likelihood ratio (``state_evidence.summary.animal_step``): the
+    descriptions say so, not the mean."""
+    values = {
+        value.key: value
+        for value in detection.state_evidence_values(
+            pd.DataFrame(BOUTS), MANIFEST, "source"
+        )
+    }
+    estimate = values["heldout_local_immobile_estimate"].description
+    assert "each animal's median over its epochs" in estimate
+    assert "mean epoch" not in estimate
+    positive = values["heldout_local_immobile_animals_positive"].description
+    assert "median over their epochs" in positive
+
+
 def test_state_evidence_values_refuse_a_state_without_one_primary_row():
     not_primary = [row | {"primary": row["state"] != "No-Spike"} for row in BOUTS]
     with pytest.raises(ValueError, match="no single primary row for No-Spike"):

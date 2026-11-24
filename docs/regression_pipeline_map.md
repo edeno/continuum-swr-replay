@@ -1160,7 +1160,7 @@ Tetrode participation and spike rate of each non-local event, against Local rest
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `stored_log_likelihood`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `stored_log_likelihood`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `resummarize`, `main`
 
 ### `scripts/event_evidence/score_event_likelihood_advantage.py`
 

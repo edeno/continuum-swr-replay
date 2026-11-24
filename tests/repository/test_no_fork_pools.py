@@ -85,7 +85,6 @@ ALLOWED_FORKING_POOLS: dict[str, str] = {
         "whose workers count decode bins and cut windows with NumPy."
     ),
     "scripts/event_properties/measure_brain_state_reference.py": _PARENT_ONLY,
-    "scripts/event_properties/measure_content_along_arms.py": _PARENT_ONLY,
     "scripts/event_properties/measure_event_gamma.py": _PARENT_ONLY,
     "scripts/event_properties/measure_event_start_and_rest_theta.py": _PARENT_ONLY,
     "scripts/event_properties/measure_ripple_class_structure.py": _PARENT_ONLY,

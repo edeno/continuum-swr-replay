@@ -37,8 +37,8 @@ hand-joined string. Nothing under the root is committed.
 | Part 4 fits (mPFC) | `{epoch_id}_mPFC_modulation.pkl` and its `.npy` arrays | `scripts/pfc/run_pfc_analysis_bandit.py` |
 
 Two settings tie the decodes to the detector runs:
-`ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
-`src/continuum_swr_replay/analysis/event_definition/swr_source.py` name the artifact and
+`ARTIFACT_INTERVALS_RUN` and `SWR_INVENTORY_RUN` in
+`src/continuum_swr_replay/paths.py` name the artifact and
 SWR runs every decode and every analysis reads. A decode refuses to start
 without them. The rule for which time and which events are analyzed is
 described in [development.md](development.md#canonical-per-event-classification-table).

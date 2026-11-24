@@ -36,7 +36,7 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 > are the per-grain rules below. Any re-derived Δ must be measured on the new source.
 
 > **One analyzed-time rule (2026-10-10, Task 18).** With an artifact run configured
-> (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains follow one rule
+> (`paths.ARTIFACT_INTERVALS_RUN`), both grains follow one rule
 > (`analysis/event_definition/eligibility.py`). *Excluded time* is the artifact mask
 > widened by 0.3 s on each side (`analysed_time.excluded_intervals`). The rule below
 > (do not cross-substitute) still holds:

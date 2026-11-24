@@ -26,9 +26,6 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -50,6 +47,7 @@ from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import (
     EVENT_SPEED_DIR,
+    STATE_SPACE_FEATURES_RUN,
     event_features_root,
     processed_data_dir,
     replay_content_dir,

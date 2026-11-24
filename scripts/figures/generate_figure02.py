@@ -62,9 +62,6 @@ from continuum_swr_replay.analysis.detector_comparison import (
     inventory_run,
     nonlocal_comparison,
 )
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
     SWR_DEFINITIONS,
 )
@@ -144,6 +141,7 @@ from continuum_swr_replay.parameters import (
     EXAMPLE_NWB_FILE,
 )
 from continuum_swr_replay.paths import (
+    EVENT_FEATURES_RUN,
     EXAMPLE_SESSION_DIR,
     PARTICIPATION_NAME,
     event_features_root,

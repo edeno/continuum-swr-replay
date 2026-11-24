@@ -18,9 +18,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
     decode_path,
 )
@@ -50,6 +47,7 @@ from continuum_swr_replay.paths import (
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
     EVENT_CONTENT_PLACE_RATE_DIR,
+    EVENT_FEATURES_RUN,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,

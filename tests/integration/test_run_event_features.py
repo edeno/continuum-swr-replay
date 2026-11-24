@@ -44,6 +44,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
 
 import scripts.detector_comparison.run_event_features as runner
 import scripts.detector_comparison.run_inventory_comparison as comparison
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detection.detection_inputs import (
     input_paths,
     marks_cache_dir,
@@ -717,10 +718,10 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
 
     assert settings["input_runs"] == {
         "inventory": INVENTORY_RUN,
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "swr": paths.SWR_INVENTORY_RUN,
         "carey": CAREY_RUN,
         "memoryless": MEMORYLESS_RUN,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "artifacts": paths.ARTIFACT_INTERVALS_RUN,
     }
     assert settings["evidence"]["remote_cm"] == runner.REMOTE_CM == 100.0
     assert settings["evidence"]["block_rows"] == runner.BLOCK_ROWS

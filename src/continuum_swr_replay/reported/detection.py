@@ -24,7 +24,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_supp_figure01.py``);
-- the pilot epoch of the main memoryless run (:data:`MEMORYLESS_PILOT_RUN`, a
+- the pilot epoch of the main memoryless run (``paths.MEMORYLESS_PILOT_RUN``, a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
   stray-window note.
@@ -61,6 +61,7 @@ from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     TILING_FOLDS,
 )
 from continuum_swr_replay.paths import (
+    MEMORYLESS_PILOT_RUN,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
@@ -77,12 +78,6 @@ from continuum_swr_replay.reported.values import (
     value_factory,
 )
 from continuum_swr_replay.runs.io import read_manifest
-
-MEMORYLESS_PILOT_RUN = "e2331f976fd1-seed20260922"
-"""The memoryless run whose pilot epoch (chimi20200225_02_r1, the epoch of the
-detector's first real-data pilot) the caption's stray-window note reads: the main
-cohort run, at the 5 ms step on its own running-only encoding model. The note
-first read the October pilot, ``0c2548cacf2d-seed20260922``."""
 
 MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 
@@ -182,8 +177,10 @@ def state_evidence_values(
     """Held-out tetrodes support each decoder state.
 
     Half the tetrodes choose the location, the other half score it; each
-    animal's value is the mean of its epochs' medians, and "animals positive"
-    counts the animals whose mean is above zero. Bouts are the primary
+    epoch's value is its median over its bouts, each animal's value the median
+    over its epochs (``state_evidence.summary.animal_step``: a log-likelihood
+    ratio), and "animals positive" counts the animals whose median is above
+    zero. Bouts are the primary
     (``runcv_``, time-held-out running-only encoding) rows of ``bout_stats``.
     """
     make = value_factory(state_evidence_values, source, TAGS["state_evidence"])
@@ -233,7 +230,8 @@ def state_evidence_values(
                 "quantity",
                 "sig2",
                 f"held-out evidence of {label}, {compares}: mean over animals of "
-                "each animal's mean epoch median",
+                "each animal's median over its epochs of each epoch's median over "
+                "its bouts",
                 "nats per window",
             ),
             make(
@@ -242,8 +240,8 @@ def state_evidence_values(
                 "quantity",
                 "sig2",
                 f"lower bound of its 95 % interval (nested bootstrap of the animals "
-                f"and their epochs, small-sample t correction over the {total} "
-                "animals)",
+                "and their epochs, each replicate with the same estimator, "
+                f"small-sample t correction over the {total} animals)",
                 "nats per window",
             ),
             make(
@@ -259,7 +257,8 @@ def state_evidence_values(
                 positive,
                 "count",
                 "count",
-                f"animals whose mean held-out evidence of {label} is above zero",
+                f"animals whose median over their epochs of the held-out evidence of "
+                f"{label} is above zero",
             ),
             make(
                 f"heldout_{word}_epochs_positive",
