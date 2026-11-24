@@ -68,8 +68,10 @@ after a change to fitting code only, start at step 6.
    the supplements). The runs behind Figure 2j and 2k and the restriction
    and held-out tetrode values of the events summary go in this order (in `scripts/event_evidence/` unless
    named otherwise; the two GPU runners need `--gpus`):
-   1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on
-      the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR source);
+   1. `score_nonlocal_restriction.py --gpus <cards>`: the four restriction decoders (local-only, SWR-only,
+      full and SWR-allowed: every state inside SWRs, only the local states outside them), each fold fit by EM
+      on the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR
+      source);
    2. `measure_bin_facts.py`: each bin's spikes, well-visit flag and SWR-observed flag (reads run 1's
       records, the decodes, the SWR source and the session cache);
    3. `detect_heldout_events.py`: the events detected from the held-out decode and the time sums, by
@@ -115,15 +117,13 @@ after a change to fitting code only, start at step 6.
    Steps 3 and 6 read another per-bin facts run with `--bin-facts-dir` (and another restriction run with
    `--restriction-dir`); with `--output-dir`, a trial of the CPU steps writes nothing under the data root.
 
-   The fourth restriction decoder (SWR-allowed: every state inside SWRs, only the local states outside
-   them), compared with the other three in the events summary and in panel n of Figure 2's supplement,
-   is scored after step 6 in three runs of its own: all four decoders scored again under step 1's stored
-   fold fits (no EM), then steps 3 and 6 on that run, each into its own folder:
+   The restriction run in `Processed-Data/event_nonlocal_restriction` was made in two passes: the three
+   decoders fit by EM, then all four scored again under those stored fold fits (no EM), the pass that is
+   the run (its records hold each fold's fit). The same pass scores a new decoder under the run's fits
+   into a folder of its own:
 
    ```bash
-   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit Processed-Data/event_nonlocal_restriction --gpus 1 2 4 5
-   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/detect_heldout_events.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events
-   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_windows
+   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit Processed-Data/event_nonlocal_restriction --output-dir <new folder> --gpus 1 2 4 5
    ```
 
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).

@@ -22,8 +22,8 @@ The epoch's bins summed by category, well visit and event window, and Figure
 2j's events, come from ``detect_heldout_events.py``, from events detected on
 held-out data.
 
-``--restriction-dir`` reads another restriction run (a second scoring of the
-same bins), ``--bin-facts-dir`` another per-bin facts run, and ``--output-dir``
+``--restriction-dir`` reads another restriction run (a trial, such as a pass
+from a stored fit into its own folder), ``--bin-facts-dir`` another per-bin facts run, and ``--output-dir``
 writes elsewhere; by default the canonical restriction and per-bin facts runs
 and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
 

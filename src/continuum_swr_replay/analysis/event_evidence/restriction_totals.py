@@ -645,8 +645,8 @@ def epoch_contrast_gains(
     visit, in nats, per spike and per second, both score families.
 
     It reads any contrast of :data:`.nonlocal_restriction.ALL_CONTRASTS` whose
-    models the time sums hold, the fourth model's (``swr_allowed``) among them
-    when the restriction run scored it, on the same bins as
+    models the time sums hold, the fourth model's (``swr_allowed``) among them,
+    on the same bins as
     :func:`epoch_inside_swr_gains`, :func:`epoch_outside_swr_gains` and
     :func:`epoch_immobile_gains` (their ``full - swr`` is this function's
     ``full_minus_swr``).
@@ -1153,11 +1153,11 @@ SWR_ALLOWED_TIME_CONTRASTS = {
     )
     for time in CONTRAST_TIMES
 }
-"""The contrasts read of a restriction run that scored the fourth model
+"""The contrasts of the fourth model's panel
 (:data:`.nonlocal_restriction.SWR_ALLOWED`), by the time they are read over
 (:data:`CONTRAST_TIMES`): the fourth model's three contrasts over each, and
 over all immobile time also the SWR-only and full decoders' gains over the
-local-only decoder of the same scoring pass."""
+local-only decoder."""
 SWR_ALLOWED_FIGURE_DECODERS = (
     "swr_minus_none_per_spike",
     "swr_allowed_minus_none_per_spike",
@@ -1200,8 +1200,8 @@ def swr_allowed_statistics(
     Parameters
     ----------
     windows : pd.DataFrame
-        The held-out events of a run made from a restriction run that scored
-        the fourth model, as :func:`restriction_figure_statistics` takes them.
+        The held-out events, as :func:`restriction_figure_statistics` takes
+        them.
     time_sums : pd.DataFrame
         That run's time sums of every epoch.
     bin_s : pd.Series
