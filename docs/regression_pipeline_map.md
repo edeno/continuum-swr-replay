@@ -1158,7 +1158,7 @@ Spike likelihood at decoded and actual positions, for every canonical non-local 
 
 ### `scripts/event_evidence/score_nonlocal_restriction.py`
 
-Per-bin scores of the three non-local restriction models on every analyzed epoch.
+Per-bin scores of the four non-local restriction models on every analyzed epoch.
 
 `fit_settings`, `current_epoch_inputs`, `stored_record`, `run_epoch`, `main`
 
