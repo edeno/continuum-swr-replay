@@ -566,13 +566,10 @@ def _level_index(rows: pd.DataFrame, category: Category) -> np.ndarray:
     """Each row's place in ``category.levels``, shape ``(n_rows,)``: -1 for a
     missing value (None or NaN); a value outside the levels is an error."""
     values = rows[category.column]
-    codes, uniques = pd.factorize(values)
-    place = pd.Index(uniques).get_indexer(list(category.levels))
-    lookup = np.full(len(uniques), -2)
-    lookup[place[place >= 0]] = np.flatnonzero(place >= 0)
-    index = np.full(len(codes), -1)
-    index[codes >= 0] = lookup[codes[codes >= 0]]
-    unknown = index == -2
+    missing = values.isna().to_numpy()
+    index = pd.Index(list(category.levels)).get_indexer(values)
+    index[missing] = -1
+    unknown = (index == -1) & ~missing
     if unknown.any():
         raise ValueError(
             f"{category.column}: values outside the levels {category.levels}: "
