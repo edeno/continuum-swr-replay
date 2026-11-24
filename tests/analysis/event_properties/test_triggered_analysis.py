@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
     get_signal_windows,
@@ -800,3 +801,30 @@ def test_the_frames_events_are_counted_by_swr_overlap():
         }
     )
     assert counts == {"swr": 1, "non_swr": 2, "total": 3}
+
+
+def test_windows_at_take_the_samples_around_each_time_and_nan_past_the_ends():
+    time = np.arange(10) * 0.002
+    signal = np.arange(10.0)
+    windows = ta.windows_at(time, signal, np.array([0.008, 0.0, 0.0171]), 2)
+    np.testing.assert_array_equal(windows[0], [2, 3, 4, 5, 6])
+    np.testing.assert_array_equal(windows[1], [np.nan, np.nan, 0, 1, 2])
+    # 17.1 ms: the first sample at or after it is the last
+    np.testing.assert_array_equal(windows[2], [7, 8, 9, np.nan, np.nan])
+
+
+def test_kind_triggered_curves_are_animal_balanced_by_kind():
+    """Animal a's no-SWR windows are flat at 0 and 2 in one epoch (median 1),
+    animal b's at 5: the no-SWR median is 3 at every lag. One SWR window at 7."""
+    windows = np.array([[0.0] * 3, [2.0] * 3, [5.0] * 3, [7.0] * 3])
+    curves = ta.kind_triggered_curves(
+        windows,
+        np.array([False, False, False, True]),
+        np.array(["a", "a", "b", "b"]),
+        np.array(["d/e"] * 4),
+        sampling_frequency=500.0,
+    )
+    np.testing.assert_allclose(curves["time"], [-0.002, 0.0, 0.002])
+    np.testing.assert_allclose(curves["no_overlap_median"], 3.0)
+    np.testing.assert_allclose(curves["overlap_median"], 7.0)
+    np.testing.assert_allclose(curves["no_overlap_q25"], (0.5 + 5.0) / 2)

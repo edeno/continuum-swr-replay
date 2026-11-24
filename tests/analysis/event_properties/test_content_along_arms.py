@@ -15,10 +15,21 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     distance_from_animal_shares,
     distance_to_nearest_well,
     even_content,
+    event_patch_counts,
+    event_place_mass,
+    event_place_shares,
+    event_start_end,
+    event_well_counts,
     leaf_and_trunk_profiles,
     log2_density_against_even,
     log2_density_ratio,
+    patch_content_shares,
+    patch_count_shares,
+    place_share_intervals,
     place_share_statistics,
+    remote_well_share_by_extent,
+    start_end_shares,
+    well_count_shares,
 )
 
 
@@ -137,6 +148,9 @@ def test_even_content_is_one_over_the_track_and_the_tracks_share_at_wells():
     even = even_content(bins, at_well_cm=20.0)
     assert even["density_per_cm"] == pytest.approx(1 / 160)
     assert even["at_well_fraction"] == pytest.approx(40 / 160)
+    # 20 cm is two fifths of a 50 cm leaf arm and a third of the 60 cm trunk arm
+    assert even["leaf_arm_fraction"] == pytest.approx(0.4)
+    assert even["trunk_arm_fraction"] == pytest.approx(1 / 3)
     # one time bin on every place bin is even content: that density everywhere
     density = content_density_along_arms(bins, n_segments=5)["density_per_cm"]
     np.testing.assert_allclose(density.to_numpy(), even["density_per_cm"])
@@ -317,3 +331,273 @@ def test_place_shares_go_epoch_then_animal_and_count_animals_at_wells():
     assert statistics["means"].loc[False, "at_well"] == pytest.approx(0.875)
     assert statistics["means"].loc[True, "at_well"] == 0.0
     assert statistics["n_animals_non_swr_more_at_well"] == 2
+
+
+# --- content as posterior mass: one row per place, with its content time -----
+
+
+def test_event_place_mass_sums_each_events_mass_per_place_and_side():
+    """Two events on three places. Event 1 (two time bins): place 0 is near
+    the animal (5 cm) at the first bin and far (30 cm) at the second; place 1
+    is far at both. Event 2 (one bin) is all on place 2, near."""
+    mass = np.array([[0.75, 0.25, 0.0], [0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])
+    distance = np.array([[5.0, 40.0, 60.0], [30.0, 50.0, 60.0], [60.0, 60.0, 10.0]])
+    table = event_place_mass(np.array([1, 1, 2]), mass, distance)
+    by = table.set_index(["event_id", "place", "far"])
+    assert len(by) == 4  # no row where a side holds no mass
+    assert by.loc[(1, 0, False), "weight"] == 0.75
+    assert by.loc[(1, 0, True), "weight"] == 0.5
+    assert by.loc[(1, 1, True), "weight"] == 0.75
+    assert by.loc[(1, 1, True), "distance_to_animal_cm"] == pytest.approx(
+        (0.25 * 40 + 0.5 * 50) / 0.75
+    )
+    assert by.loc[(2, 2, False), "distance_to_animal_cm"] == 10.0
+    # an event's weights sum to its number of time bins
+    assert table.groupby("event_id")["weight"].sum().tolist() == [2.0, 1.0]
+
+
+def test_density_of_weighted_rows_is_the_density_of_as_many_time_bins():
+    """Three time bins on place bin 8 and one on bin 1 are one row of weight 3
+    and one of weight 1; half weights give the same shares."""
+    counted = _bins("a", False, [0, 0, 0, 0], [8, 8, 8, 1])
+    weighted = _bins("a", False, [0, 0], [8, 1]).assign(weight=[3.0, 1.0])
+    expected = content_density_along_arms(counted, n_segments=2)
+    pd.testing.assert_frame_equal(
+        content_density_along_arms(weighted, n_segments=2), expected
+    )
+    halved = weighted.assign(weight=[1.5, 0.5])
+    pd.testing.assert_frame_equal(
+        content_density_along_arms(halved, n_segments=2), expected
+    )
+
+
+def test_density_by_animal_is_each_animals_mean_over_its_epochs():
+    bins = pd.concat(
+        [
+            _bins("a", False, [0, 0, 0], [8, 8, 8], epoch="e1"),
+            _bins("a", False, [0], [1], epoch="e2"),
+            _bins("b", False, [0], [8]),
+        ],
+        ignore_index=True,
+    )
+    each = content_density_along_arms(bins, n_segments=2, by_animal=True)
+    density = each["density_per_cm"]
+    assert density[(False, "a", 0, 0)] == pytest.approx(0.5 / 5)
+    assert density[(False, "b", 0, 1)] == pytest.approx(1 / 5)
+    # the animals' mean is the mean of these
+    mean = content_density_along_arms(bins, n_segments=2)["density_per_cm"]
+    np.testing.assert_allclose(
+        density.groupby(["is_swr", "arm", "segment"]).mean(), mean
+    )
+    profiles = leaf_and_trunk_profiles(each)
+    assert profiles.index.names == ["is_swr", "animal", "arm_type", "segment"]
+    assert profiles.loc[(False, "b", "leaf", 1), "density_per_cm"] == pytest.approx(0.2)
+
+
+def test_place_and_distance_shares_weigh_rows_by_their_content_time():
+    """One row of weight 3 at a remote well and one of weight 1 near the animal
+    off the wells: three quarters and one quarter, as four time bins give."""
+    bins = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": "e1",
+            "is_swr": False,
+            "distance_to_animal_cm": [100.0, 5.0],
+            "distance_to_well_cm": [5.0, 50.0],
+            "weight": [3.0, 1.0],
+        }
+    )
+    shares = content_place_shares(bins).loc[(False, "a")]
+    assert shares["remote_well"] == 0.75 and shares["near_off"] == 0.25
+    assert shares["at_well"] == 0.75
+    by_distance = distance_from_animal_shares(bins, np.array([0.0, 20.0, 200.0]), 20.0)
+    np.testing.assert_allclose(by_distance.loc[False, "at_well"], [0.0, 0.75])
+    np.testing.assert_allclose(by_distance.loc[False, "elsewhere"], [0.25, 0.0])
+
+
+def test_event_place_shares_split_each_events_time_at_a_well_by_the_animals_side():
+    """Event 1: 2 of its 4 time bins of content at a well far from the animal,
+    1 at a well near it, 1 off the wells. Event 2: all off the wells."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2],
+            "far": [True, False, True, True],
+            "weight": [2.0, 1.0, 1.0, 3.0],
+            "distance_to_well_cm": [5.0, 5.0, 60.0, 60.0],
+        }
+    )
+    shares = event_place_shares(rows)
+    assert shares.loc[1].to_dict() == {
+        "at_well": 0.75,
+        "remote_well": 0.5,
+        "own_well": 0.25,
+    }
+    assert shares.loc[2].tolist() == [0.0, 0.0, 0.0]
+
+
+def test_remote_well_share_by_extent_goes_event_then_epoch_then_animal():
+    """Animal a, no SWR, extents under 10 cm: epoch e1 has events with shares
+    1 and 0 (mean 0.5), e2 one event with share 1; a's value is 0.75, not the
+    pooled 2/3. Its one wide event (150 cm) is the last class."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": ["e1", "e1", "e2", "e2"],
+            "is_swr": False,
+            "spatial_extent_cm": [2.0, 9.9, 0.0, 150.0],
+            "remote_well": [1.0, 0.0, 1.0, 0.2],
+        }
+    )
+    shares = remote_well_share_by_extent(events)
+    assert shares.loc[(False, "a", 0), "remote_well"] == 0.75
+    assert shares.loc[(False, "a", 0), "n_events"] == 3
+    assert shares.loc[(False, "a", 4), "remote_well"] == 0.2
+    assert len(shares) == 2  # no row for a class with no event
+    with pytest.raises(ValueError, match="outside"):
+        remote_well_share_by_extent(events.assign(spatial_extent_cm=np.nan))
+
+
+def test_place_share_intervals_estimate_the_animals_mean_and_bound_it():
+    """Three animals of two epochs each. No SWR: every epoch all at a remote
+    well except animal c's (half). SWR: every epoch a quarter at a remote well.
+    The estimates are content_place_shares' means over animals; the difference
+    is of each epoch's pair; a share's interval stays inside 0 to 1, and the
+    difference's is the t-interval over three animals, wide enough to hold 0
+    here (two animals differ by 0.75, the third by 0.25)."""
+
+    def rows(animal, epoch, is_swr, d_well):
+        return pd.DataFrame(
+            {
+                "animal": animal,
+                "epoch_id": f"{animal}{epoch}",
+                "is_swr": is_swr,
+                "distance_to_animal_cm": 100.0,
+                "distance_to_well_cm": d_well,
+            }
+        )
+
+    frames = []
+    for animal in "abc":
+        for epoch in (1, 2):
+            no_swr = [5.0, 5.0] if animal != "c" else [5.0, 50.0]
+            frames.append(rows(animal, epoch, False, no_swr))
+            frames.append(rows(animal, epoch, True, [5.0, 50.0, 50.0, 50.0]))
+    bins = pd.concat(frames, ignore_index=True)
+    intervals = place_share_intervals(bins, n_draws=200, seed=1)
+    means = place_share_statistics(content_place_shares(bins))["means"]
+    for group, is_swr in (("non_swr", False), ("swr", True)):
+        for place in ("at_well", "remote_well", "own_well"):
+            row = intervals.loc[(group, place)]
+            assert row["estimate"] == pytest.approx(means.loc[is_swr, place])
+            assert 0.0 <= row["ci_low"] <= row["estimate"] <= row["ci_high"] <= 1.0
+    assert intervals.loc[("non_swr", "remote_well"), "estimate"] == pytest.approx(5 / 6)
+    difference = intervals.loc[("difference", "remote_well")]
+    assert difference["estimate"] == pytest.approx(5 / 6 - 0.25)
+    assert difference["n_epochs"] == 6
+    assert difference["ci_low"] < 0 < difference["estimate"] < difference["ci_high"]
+    # the SWR share is the same in every epoch: no spread, a point interval
+    swr = intervals.loc[("swr", "remote_well")]
+    assert swr["ci_low"] == pytest.approx(0.25) and swr["ci_high"] == pytest.approx(
+        0.25
+    )
+    assert intervals.loc[("non_swr", "own_well"), "estimate"] == 0.0
+
+
+def test_event_well_counts_count_the_wells_that_hold_a_tenth_of_the_event():
+    """Event 1: 6 of 10 time bins at the well of arm 0, 0.5 at the well of arm
+    3 (under a tenth), the rest off the wells: one well. Event 2: 5 at arm 1's
+    well and 5 at arm 4's: two. Event 3: all on a trunk arm: none."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2, 3],
+            "arm": [0, 3, 0, 1, 4, 6],
+            "weight": [6.0, 0.5, 3.5, 5.0, 5.0, 4.0],
+            "distance_to_well_cm": [5.0, 5.0, 40.0, 5.0, 5.0, 80.0],
+        }
+    )
+    assert event_well_counts(rows).to_dict() == {1: 1, 2: 2, 3: 0}
+    # with a lower bar, event 1's second well counts
+    assert event_well_counts(rows, share=0.05)[1] == 2
+
+
+def test_well_count_shares_go_event_then_epoch_then_animal():
+    """Animal a, no SWR: epoch e1 has events with 1, 1, 0 and 2 wells, e2 one
+    event with 1 well: one well is (0.5 + 1) / 2 of its events, not the pooled
+    3/5."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": ["e1", "e1", "e1", "e1", "e2"],
+            "is_swr": False,
+            "n_wells": [1, 1, 0, 2, 1],
+        }
+    )
+    shares = well_count_shares(events).loc[(False, "a")]
+    assert shares.to_dict() == {"none": 0.125, "one": 0.75, "two or more": 0.125}
+
+
+def test_event_patch_counts_count_the_patches_that_hold_a_tenth_of_the_event():
+    """Arms 0, 1 and 6 are patch 1; arms 2, 3 and 7 patch 2; arm 4 patch 3.
+    Event 1: 9 time bins in patch 1 (a leaf arm and its trunk) and 1 in patch 2:
+    two patches. Event 2: 9.6 in patch 1 and 0.4 in patch 3: one."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2],
+            "arm": [0, 6, 7, 1, 4],
+            "weight": [5.0, 4.0, 1.0, 9.6, 0.4],
+        }
+    )
+    assert event_patch_counts(rows).to_dict() == {1: 2, 2: 1}
+    events = pd.DataFrame(
+        {"animal": "a", "epoch_id": "e", "is_swr": False, "n_patches": [2, 1, 1, 3]}
+    )
+    shares = patch_count_shares(events).loc[(False, "a")]
+    assert shares.to_dict() == {"one": 0.5, "two": 0.25, "three": 0.25}
+
+
+def test_patch_content_shares_split_content_by_the_animals_patch_and_the_wells():
+    """The animal is in patch 1. Of 10 time bins of content: 2 at a well of
+    patch 1 (arm 0), 3 on patch 1's trunk (arm 6), 4 at a well of patch 2 (arm
+    3) and 1 on patch 3's leaf arm off its well."""
+    rows = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": "e",
+            "is_swr": False,
+            "arm": [0, 6, 3, 4],
+            "distance_to_well_cm": [5.0, 80.0, 5.0, 40.0],
+            "weight": [2.0, 3.0, 4.0, 1.0],
+            "current_patch": 1,
+        }
+    )
+    shares = patch_content_shares(rows).loc[(False, "a")]
+    assert shares.to_dict() == {
+        "own_patch_wells": 0.2,
+        "own_patch_elsewhere": 0.3,
+        "other_patch_wells": 0.4,
+        "other_patch_elsewhere": 0.1,
+    }
+
+
+def test_event_start_end_read_the_first_and_the_last_time_bin():
+    """Event 1 starts 5 cm from the animal and ends at a well 150 cm away;
+    event 2 (its bins given out of order) starts and ends far, off the wells."""
+    bins = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2],
+            "time": [0.0, 0.002, 0.004, 1.002, 1.0],
+            "distance_to_animal_cm": [5.0, 60.0, 150.0, 90.0, 80.0],
+            "distance_to_well_cm": [5.0, 60.0, 4.0, 50.0, 60.0],
+        }
+    )
+    places = event_start_end(bins)
+    assert places.loc[1].to_dict() == {
+        "starts_near_animal": True,
+        "ends_near_animal": False,
+        "starts_at_remote_well": False,
+        "ends_at_remote_well": True,
+    }
+    assert not places.loc[2].any()
+    events = places.reset_index().assign(animal="a", epoch_id="e", is_swr=True)
+    shares = start_end_shares(events).loc[(True, "a")]
+    assert shares["starts_near_animal"] == 0.5 and shares["ends_at_remote_well"] == 0.5

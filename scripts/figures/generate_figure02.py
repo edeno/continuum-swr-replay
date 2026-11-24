@@ -56,7 +56,6 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
 from matplotlib.text import Annotation
 from matplotlib.ticker import NullLocator
-from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.detector_comparison import (
@@ -75,9 +74,6 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     check_visit_context_starts,
     select_events_in,
     select_visit_context,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    nonlocal_state_probability,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
@@ -176,6 +172,12 @@ from continuum_swr_replay.visualization.evidence_drawings import (
     draw_left_out_test,
     draw_restriction_test,
 )
+from continuum_swr_replay.visualization.example_event_panels import (
+    add_track_strip,
+    draw_examples,
+    draw_posterior,
+    draw_state_stack,
+)
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     DIFFERENCE_LABELS,
@@ -206,13 +208,9 @@ from continuum_swr_replay.visualization.panel_layout import (
     place_letters,
 )
 from continuum_swr_replay.visualization.plots import (
-    plot_linear_track_graph_strip,
-    plot_ripple_consensus_trace_zscore,
-    plot_spike_times,
     plot_track_graph_2d,
 )
 from continuum_swr_replay.visualization.publication_style import (
-    LABEL_SIZE,
     LINE_WIDTH_LIMITS_PT,
     SMALL_SIZE,
     check_journal_limits,
@@ -239,9 +237,6 @@ FIGURE = "Figure 2"
 # Data choices
 # ---------------------------------------------------------------------------
 
-SESSION_INPUTS = ("data", "results", "detector", "env")
-"""The example session's inputs (panels a and b): its data, and the decode's
-results, detector and environment (:func:`read_session`)."""
 OVERVIEW_START_S = 1617036555.9
 OVERVIEW_DURATION_S = 12.6
 """Panel a: a run and the rest after it in the example session (start and
@@ -264,8 +259,6 @@ SWR."""
 LOCAL_SWR_START_S = 1617036373.982971
 """Panel b's SWR with Local content: its start in the SWR source (s). No
 non-local event overlaps it and the decode is Local through it."""
-EXAMPLE_HALF_WINDOW_S = 0.2
-"""Panel b: half the window around each example's center (s)."""
 
 # ---------------------------------------------------------------------------
 # Layout
@@ -357,7 +350,6 @@ HEADING_OFFSET_PT = 10
 """How far above its axes' top a panel's heading sits (points), clear of the
 axes' titles."""
 TRACK_LINEWIDTH = LINE_WIDTH_LIMITS_PT[0]
-TRACK_EDGE_LINEWIDTH = LINE_WIDTH_LIMITS_PT[1]
 """The track plotters' line widths, inside the journal's limits."""
 
 # ---------------------------------------------------------------------------
@@ -764,88 +756,6 @@ def detector_comparison(events: pd.DataFrame) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def summed_posterior(window: xr.Dataset, env: Environment) -> np.ndarray:
-    """Posterior over position summed over the states with one, (n_time, n_bins)."""
-    post = window.acausal_posterior
-    states = post.state.values
-    total = sum(
-        post.isel(state_bins=np.flatnonzero(states == s)).to_numpy()
-        for s in ("Local", "Non-Local Continuous", "Non-Local Fragmented")
-    )
-    total[:, ~env.is_track_interior_] = np.nan
-    return total
-
-
-def draw_posterior(
-    ax: Axes,
-    data: dict,
-    results: xr.Dataset,
-    env: Environment,
-    sl: slice,
-    t_offset: float,
-    max_pos: float,
-) -> None:
-    """The decoded position (bone_r) with the animal's position (magenta dots)."""
-    window = results.sel(time=sl)
-    cmap = plt.get_cmap("bone_r").copy()
-    cmap.set_bad("#e6e6e6")
-    centers = env.place_bin_centers_
-    t = window.time.values - t_offset
-    ax.imshow(
-        summed_posterior(window, env).T,
-        aspect="auto",
-        origin="lower",
-        extent=[t[0], t[-1], centers[0], centers[-1]],
-        cmap=cmap,
-        vmin=0,
-        vmax=0.1,
-        interpolation="none",
-        rasterized=True,
-    )
-    position = data["position_info"].loc[sl]
-    ax.scatter(
-        position.index - t_offset,
-        position.linear_position,
-        color=ANIMAL_POS_COLOR,
-        s=0.4,
-        lw=0,
-        rasterized=True,
-    )
-    ax.set_ylim(0, max_pos)
-
-
-def draw_state_stack(ax: Axes, results: xr.Dataset, sl: slice, t_offset: float) -> None:
-    """Stacked state probabilities: Non-local (both states), Local, No-Spike."""
-    sp = results.acausal_state_probabilities.sel(time=sl)
-    ax.stackplot(
-        sp.time.values - t_offset,
-        nonlocal_state_probability(sp).to_numpy(),
-        sp.sel(states="Local").to_numpy(),
-        sp.sel(states="No-Spike").to_numpy(),
-        colors=[C_NL, C_LOCAL, C_NOSPIKE],
-        lw=0,
-        rasterized=True,
-    )
-    ax.set_ylim(0, 1)
-    ax.set_yticks([0, 1])
-
-
-def add_track_strip(ax: Axes, data: dict, max_pos: float) -> Axes:
-    """The linearized track as the posterior's y key, flush to its left."""
-    strip = ax.inset_axes([-0.075, 0.0, 0.07, 1.0])
-    plot_linear_track_graph_strip(
-        data["track_graph"],
-        data["linear_edge_order"],
-        data["linear_edge_spacing"],
-        ax=strip,
-        max_position=max_pos,
-        edge_linewidth=TRACK_EDGE_LINEWIDTH,
-    )
-    strip.set_ylabel("")
-    ax.tick_params(labelleft=False, left=False)
-    return strip
-
-
 def spans(mask: np.ndarray, t: np.ndarray) -> list[tuple[float, float]]:
     """(first, last) time of each run of True in ``mask``."""
     return [(t[a], t[b - 1]) for a, b in contiguous_true_runs(mask)]
@@ -1002,58 +912,6 @@ def draw_overview(
     for ax in (ax_pos, ax_lane, ax_rip, ax_st):
         ax.tick_params(labelbottom=False)
     return ax_track, [ax_pos, ax_lane, ax_rip, ax_st, ax_sp]
-
-
-def draw_examples(
-    fig: Figure, spec: SubplotSpec, session: dict, windows: dict, max_pos: float
-) -> Axes:
-    """Panel b: one column per example (ripple, raster, decode, states)."""
-    data, results, detector, env = (session[name] for name in SESSION_INPUTS)
-    n = len(windows)
-    gs = spec.subgridspec(
-        4, n, hspace=0.08, wspace=0.14, height_ratios=[0.5, 0.85, 1.1, 0.5]
-    )
-    first = None
-    for j, (title, (start, end)) in enumerate(windows.items()):
-        ax_rip, ax_raster, ax_post, ax_states = (
-            fig.add_subplot(gs[r, j]) for r in range(4)
-        )
-        center = (start + end) / 2
-        sl = slice(center - EXAMPLE_HALF_WINDOW_S, center + EXAMPLE_HALF_WINDOW_S)
-        plot_ripple_consensus_trace_zscore(data, sl, ax_rip)
-        # the SWR threshold as panel a draws it, under the trace
-        ax_rip.axhline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.5, ls="--", zorder=-1)
-        plot_spike_times(data, sl, detector, env, results, ax_raster)
-        draw_posterior(ax_post, data, results, env, sl, center, max_pos)
-        draw_state_stack(ax_states, results, sl, center)
-        for ax in (ax_rip, ax_raster):
-            ax.set_xlim(sl.start, sl.stop)
-            ax.tick_params(labelbottom=False)
-        for ax in (ax_post, ax_states):
-            ax.set_xlim(-EXAMPLE_HALF_WINDOW_S, EXAMPLE_HALF_WINDOW_S)
-        ax_rip.set_title(title, fontsize=LABEL_SIZE, pad=3)
-        ax_rip.set_ylim(-2, 8)
-        ax_rip.set_yticks([0, 5])
-        ax_post.tick_params(labelbottom=False, labelleft=False)
-        ax_post.set_yticks([0, max_pos])
-        ax_states.set_xticks([-0.1, 0, 0.1], ["-0.1", "0", "0.1"])
-        ax_states.set_xlabel("Time from event center (s)" if j == n // 2 else "")
-        if j == 0:
-            first = (ax_rip, ax_raster, ax_post, ax_states)
-            for ax, label in zip(
-                first,
-                ("Ripple\n(z)", "Tetrode", "Decoded\npos. (cm)", "State\nprob."),
-                strict=True,
-            ):
-                ax.set_ylabel(label)
-        else:
-            for ax in (ax_rip, ax_raster, ax_states):
-                ax.set_ylabel("")
-                ax.tick_params(labelleft=False)
-    add_track_strip(first[2], data, max_pos)
-    for ax in first:
-        ax.yaxis.set_label_coords(-0.42, 0.5)
-    return first[0]
 
 
 def draw_class_bars(

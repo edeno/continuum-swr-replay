@@ -849,10 +849,10 @@ def _property_events() -> pd.DataFrame:
     )
 
 
-def test_class_medians_pool_the_events_with_a_value():
+def test_class_medians_are_the_mean_of_the_animals_medians():
     medians = stats.class_medians(_property_events(), "extent")
-    # non-SWR: 1, 1, 3, 7, 8; SWR: 4, 5, 7, 9
-    assert medians == {"median_non_swr": 3.0, "median_swr": 6.0}
+    # the animals' medians: non-SWR 2, 8, 1, 7; SWR 5, 4, 9, 7
+    assert medians == {"median_non_swr": 4.5, "median_swr": 6.25}
 
 
 def test_animal_class_medians_give_each_animal_s_median_of_each_class():
@@ -941,12 +941,11 @@ def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
         (group, band) for group in ("no SWR", "SWR") for band in stats.DISTANCE_BANDS_CM
     ]
     no_swr = table.loc["no SWR"]
-    np.testing.assert_allclose(no_swr["share_animal_mean"], [1 / 12, 1 / 3, 7 / 12])
+    np.testing.assert_allclose(no_swr["share"], [1 / 12, 1 / 3, 7 / 12])
     np.testing.assert_allclose(no_swr["animal_min"], [0.0, 0.0, 1 / 6])
     np.testing.assert_allclose(no_swr["animal_max"], [1 / 6, 2 / 3, 1.0])
-    np.testing.assert_allclose(no_swr["share"], [1 / 6, 2 / 6, 3 / 6])
     swr = table.loc["SWR"]
-    np.testing.assert_allclose(swr["share_animal_mean"], [0.5, 1 / 8, 3 / 8])
+    np.testing.assert_allclose(swr["share"], [0.5, 1 / 8, 3 / 8])
     assert (swr["n_events"] == 4).all() and (no_swr["n_animals"] == 2).all()
 
 
@@ -1017,8 +1016,9 @@ def test_n_animals_in_direction_takes_each_class_median_over_the_epochs():
             "extent": [1.0, 1.0, 1.0, 2.0, 10.0, 3.0],
         }
     )
+    # one animal: the median over its two epochs of the epoch's median
     assert stats.class_medians(events, "extent") == {
-        "median_non_swr": 1.0,
+        "median_non_swr": 5.5,
         "median_swr": 2.5,
     }
     assert stats.n_animals_in_direction(events, "extent", "lower") == 0
@@ -1323,3 +1323,25 @@ def test_nonlocal_below_threshold_statistics_refuse_a_threshold_between_edges():
     shares = stats.animal_signal_shares(_epoch_power_counts())
     with pytest.raises(ValueError, match="not an edge"):
         stats.nonlocal_below_threshold_statistics(shares, threshold=3.0)
+
+
+def test_transport_speed_distribution_is_each_animals_percent_per_bin():
+    """Animal a's four no-SWR events at 10, 30, 30 and 2,000 cm/s and one
+    without a speed: of the four with one, 25 % in 0-25, 50 % in 25-50, and the
+    one beyond the last edge in no bin."""
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d",
+            "epoch": "e",
+            "is_swr": False,
+            "transport_slope_speed_cm_s": [10.0, 30.0, 30.0, 2000.0, np.nan],
+        }
+    )
+    table = stats.property_distribution(
+        events, stats.TRANSPORT_SPEED_COLUMN, stats.TRANSPORT_SPEED_BIN_EDGES_CM_S
+    )
+    assert set(table["group"]) == {"no SWR"}
+    percent = table.set_index("bin_low")["percent"]
+    assert percent[0.0] == 25.0 and percent[25.0] == 50.0
+    assert percent.sum() == 75.0

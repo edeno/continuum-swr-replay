@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_SPEED_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TRIGGER_WINDOWS_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
@@ -232,6 +233,15 @@ def test_the_bootstrap_resamples_the_selected_events(processed_data_root, monkey
     pd.DataFrame(
         {"event_id": pd.Series([1, 2, 3], dtype="uint64"), "start_distance_cm": 5.0}
     ).to_parquet(starts / f"{EPOCH}.parquet")
+    speeds = bootstrap.processed_data_dir() / EVENT_SPEED_DIR
+    speeds.mkdir()
+    pd.DataFrame(
+        {
+            "event_id": pd.Series([1, 2, 3], dtype="uint64"),
+            "map_line_fit_speed_cm_s": 100.0,
+            "transport_slope_speed_cm_s": [150.0, np.nan, 150.0],
+        }
+    ).to_parquet(speeds / f"{EPOCH}.parquet")
     seen = {}
 
     def contrasts(values, is_swr, animals, sessions, durations, **kwargs):
@@ -251,6 +261,7 @@ def test_the_bootstrap_resamples_the_selected_events(processed_data_root, monkey
     assert manifest["subset"] == ANALYZED_SUBSET
     assert manifest["event_table"]["sha256"] == event_table_sha256
     assert manifest["n_events"] == 2
+    assert manifest["event_speed"]["n_files"] == 1
     assert manifest["visit_context_counts"]["track_center"] == 1
 
 

@@ -950,6 +950,7 @@ def test_property_values_name_each_property_class_and_direction():
     values = _by_key(
         builder.property_values(_property_events(), "s")
         + builder.start_distance_values(_property_events(), "s")
+        + builder.speed_values(_property_events(), "s")
     )
     assert len(values) == 3 * len(builder._PROPERTIES)
     for i, (word, _, scale, unit, _, direction, _) in enumerate(builder._PROPERTIES):
@@ -970,18 +971,17 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     """Per class and band (under 20 cm, 20 to 100 cm, 100 cm or more): the
     share pooled over events with no figure, and the mean over animals of each
     animal's share with the lowest and highest animal, tagged to the
-    supplement's distance panel; and the two cuts."""
+    figure's distance panel (3g); and the two cuts."""
     from tests.analysis.event_properties.test_event_statistics import (
         _distance_events,
     )
 
     values = _by_key(builder.content_distance_values(_distance_events(), "s"))
-    assert len(values) == 2 * 3 * 4 + 2
+    assert len(values) == 2 * 3 * 3 + 2
     key = "content_distance_under_non_swr_fraction"
-    assert values[key].value == pytest.approx(1 / 6)
-    assert values[f"{key}_animal_mean"].value == pytest.approx(1 / 12)
+    assert values[key].value == pytest.approx(1 / 12)  # the animals' mean
     assert values[f"{key}_animal_max"].value == pytest.approx(1 / 6)
-    assert values["content_distance_beyond_swr_fraction_animal_mean"].value == (
+    assert values["content_distance_beyond_swr_fraction"].value == (
         pytest.approx(3 / 8)
     )
     assert values["content_distance_between_swr_fraction_animal_min"].value == 0.0
@@ -989,8 +989,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     assert values["content_distance_remote_cm"].value == 100.0
     for name, value in values.items():
         assert value.questions == ("2d.1",)
-        pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S3c",)), name
+        assert value.figures == ("3g",), name
     assert "under 20 cm from the animal" in values[key].description
 
 
@@ -1096,6 +1095,7 @@ def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
     assert builder.TAGS["content_occupancy"].figures == ("3f",)
     assert builder.TAGS["content_by_animal"].figures == ()
+    assert builder.TAGS["content_well_side"].figures == ("S3c",)
     assert (
         builder.TAGS["content_by_animal"].questions
         == builder.TAGS["content_occupancy"].questions
@@ -1135,14 +1135,41 @@ def test_content_occupancy_values_name_each_group_and_place():
         ignore_index=True,
     )
     values = builder.content_occupancy_values(bins, "s")
-    shown = {value.key for value in values if value.figures}
-    assert shown == {
-        "occupancy_epochs",
-        "non_swr_content_at_well_fraction",
-        "swr_content_at_well_fraction",
-        "animals_non_swr_more_at_well",
-        "even_content_at_well_fraction",
+    shown = {
+        value.key: value.figures
+        for value in values
+        if value.figures and "_ci_" not in value.key and "difference" not in value.key
     }
+    assert shown == {
+        "occupancy_epochs": ("3f",),
+        "non_swr_content_at_well_fraction": ("3f",),
+        "swr_content_at_well_fraction": ("3f",),
+        "animals_non_swr_more_at_well": ("3f",),
+        "even_content_at_well_fraction": ("3f",),
+        # the wells by the animal's side: the supplement's panel c
+        "non_swr_content_remote_well_fraction": ("S3c",),
+        "non_swr_content_own_well_fraction": ("S3c",),
+        "swr_content_remote_well_fraction": ("S3c",),
+        "swr_content_own_well_fraction": ("S3c",),
+    }
+    # each of the three shares at a well has its interval and its difference
+    extra = {
+        key: value
+        for key, value in _by_key(values).items()
+        if "_ci_" in key or key.endswith("_difference")
+    }
+    assert len(extra) == 3 * (2 * 2 + 3)
+    # the difference is of an epoch's two shares: only a's e1 has both kinds
+    # (no SWR all at a remote well, SWR none)
+    assert extra["content_remote_well_fraction_difference"].value == pytest.approx(1.0)
+    assert extra["content_at_well_fraction_difference"].figures == ("3f",)
+    assert extra["non_swr_content_remote_well_fraction_ci_low"].figures == ("S3c",)
+    low, high = (
+        extra[f"non_swr_content_remote_well_fraction_ci_{b}"].value
+        for b in ("low", "high")
+    )
+    assert 0.0 <= low <= 0.75 <= high <= 1.0
+    values = [value for value in values if value.key not in extra]
     assert _numbers(values) == {
         "occupancy_epochs": 3,
         # no SWR: a (0.5, 0.25, 0.25, 0), b (1, 0, 0, 0); the animals' mean

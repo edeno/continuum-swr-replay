@@ -41,6 +41,7 @@ from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
+    CONTENT_MASS_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_BIN_FACTS_DIR,
     EVENT_CONTENT_PLACE_RATE_DIR,
@@ -52,6 +53,7 @@ from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_RULE_SWEEP_DIR,
+    EVENT_SPEED_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     EVENT_TRIGGER_WINDOWS_DIR,
@@ -87,6 +89,7 @@ EVENT_BUILDERS = (
     "state_composition_values",
     "property_values",
     "start_distance_values",
+    "speed_values",
     "rest_theta_values",
     "brain_state_values",
     "gamma_z_values",
@@ -296,6 +299,7 @@ class _Run:
         self.manifests = {}
         for folder in (
             EVENT_START_REST_THETA_DIR,
+            EVENT_SPEED_DIR,
             EVENT_PROPERTY_BOOTSTRAP_DIR,
             BRAIN_STATE_REFERENCE_DIR,
             EVENT_GAMMA_DIR,
@@ -308,6 +312,7 @@ class _Run:
             DECODER_QUALITY_DIR,
             EXPOSURE_IN_VISITS_DIR,
             CONTENT_ALONG_ARMS_DIR,
+            CONTENT_MASS_ALONG_ARMS_DIR,
             EVENT_PARTICIPATION_DIR,
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             EVENT_TETRODE_HOLDOUT_DIR,
@@ -388,6 +393,7 @@ class _Run:
             / "state_evidence"
             / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
             content_along_arms=root / CONTENT_ALONG_ARMS_DIR,
+            content_mass_along_arms=root / CONTENT_MASS_ALONG_ARMS_DIR,
             brain_state_reference=root
             / BRAIN_STATE_REFERENCE_DIR
             / "reference.parquet",
@@ -399,6 +405,7 @@ class _Run:
             event_rule_sweep=root / EVENT_RULE_SWEEP_DIR,
             state_calibration_in_visits=root / STATE_CALIBRATION_IN_VISITS_DIR,
             event_start_rest_theta=root / EVENT_START_REST_THETA_DIR,
+            event_speed=root / EVENT_SPEED_DIR,
             property_bootstrap=root / EVENT_PROPERTY_BOOTSTRAP_DIR,
             decoder_quality=root / DECODER_QUALITY_DIR,
             event_participation=root / EVENT_PARTICIPATION_DIR,
@@ -464,13 +471,17 @@ class _Run:
             seen["with_start_and_rest_theta"] = (events,)
             return events, [Path(f"{epoch}.parquet") for epoch in EPOCHS]
 
+        def speeds(events, folder, n_epochs):
+            seen["with_event_speed"] = (events,)
+            return events, [Path(f"{epoch}.parquet") for epoch in EPOCHS]
+
         def brain_state(events, inputs, n_epochs):
             seen["with_brain_state"] = (events,)
             levels = pd.DataFrame({"epoch_id": EPOCHS})
             return events, levels, levels
 
-        def along(events, folder, n_epochs, columns):
-            seen["content_along_arms_bins"] = (events,)
+        def along(events, folder, n_epochs):
+            seen["content_mass_along_arms"] = (events,)
             return events, []
 
         def comparison(run, visits):
@@ -498,8 +509,9 @@ class _Run:
             "class_step_values_with_staleness": class_steps,
             "left_out_values": left_out,
             "with_start_and_rest_theta": extras,
+            "with_event_speed": speeds,
             "with_brain_state": brain_state,
-            "content_along_arms_bins": along,
+            "content_mass_along_arms": along,
             "check_visit_context_starts": check,
             "read_swr_table": lambda path: _table(),
             # the event features run, with the decode frames it read
@@ -558,9 +570,14 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     # the label counts and the check against the visits see every event
     assert len(seen["visit_context_values"][0]) == 14
     assert len(seen["check_visit_context_starts"][0]) == 14
-    for name in (*EVENT_BUILDERS, "with_start_and_rest_theta", "with_brain_state"):
+    for name in (
+        *EVENT_BUILDERS,
+        "with_start_and_rest_theta",
+        "with_event_speed",
+        "with_brain_state",
+    ):
         assert PLANTED not in set(seen[name][0]["event_id"]), name
-    assert PLANTED not in set(seen["content_along_arms_bins"][0]["event_id"])
+    assert PLANTED not in set(seen["content_mass_along_arms"][0]["event_id"])
     # the per-event runs' tables are read over the selected events, controls too
     for name in (
         "participation_values",
@@ -706,6 +723,8 @@ PENDING_CASES = [
         ("event_table", {"sha256": "old"}),
         {"rest_theta", "start_distance"},
     ),
+    (EVENT_SPEED_DIR, ("subset", None), {"speed"}),
+    (EVENT_SPEED_DIR, ("event_table", {"sha256": "old"}), {"speed"}),
     (
         EVENT_PROPERTY_BOOTSTRAP_DIR,
         ("subset", None),
@@ -766,7 +785,7 @@ PENDING_CASES = [
     (EXPOSURE_IN_VISITS_DIR, ("subset", None), {"left_out"}),
     (EXPOSURE_IN_VISITS_DIR, ("session_cache", _other_cache()), {"left_out"}),
     (
-        CONTENT_ALONG_ARMS_DIR,
+        CONTENT_MASS_ALONG_ARMS_DIR,
         ("event_table", {"sha256": "old"}),
         {"content_occupancy"},
     ),

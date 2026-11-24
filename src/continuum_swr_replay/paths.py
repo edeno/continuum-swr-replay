@@ -267,9 +267,15 @@ rule (``scripts/event_properties/sweep_event_rule.py``)."""
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
 (``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""
+EVENT_SPEED_DIR = "event_speed"
+"""Each event's MAP line-fit speed and transport-slope speed
+(``scripts/event_properties/measure_event_speed.py``)."""
 CONTENT_ALONG_ARMS_DIR = "content_along_arms"
 """Each event time bin's arm and place along it
 (``scripts/event_properties/measure_content_along_arms.py``)."""
+CONTENT_MASS_ALONG_ARMS_DIR = "content_mass_along_arms"
+"""Each event's posterior mass at each place along the arms
+(``scripts/event_properties/measure_content_mass_along_arms.py``)."""
 EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
 """The event properties' bootstrap intervals
 (``scripts/event_properties/bootstrap_event_properties.py``)."""
