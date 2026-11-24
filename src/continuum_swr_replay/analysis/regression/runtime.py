@@ -15,7 +15,7 @@ kernels, and a log of the programs traced.
   persistent compilation cache is still traced. So the count is the number of
   programs this process needed, whatever the cache holds.
 - :data:`LIVE_PROGRAM_LIMIT` bounds the programs kept compiled. Each compiled
-  XLA CPU program holds about 25 to 110 memory mappings, and Linux stops a
+  XLA CPU program holds 6 to 111 memory mappings, and Linux stops a
   process at ``vm.max_map_count`` (65,530 by default): a stream of fits over
   many shapes died at about 735 programs. :func:`in_float64` counts the
   programs traced since JAX's caches were last cleared and, at the entry of a

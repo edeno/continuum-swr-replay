@@ -129,6 +129,14 @@ a block's penalized direction. Error texts give both
 (`session 4 (s4): no finite maximum (columns running away: [11, 12]; along column 11,
 column 12)`; a separation by a smooth's own line reads `... along block 0's null space
 (direction 0), column 0`). Nothing is regularized to hide a separation.
+The coefficients of a fit with no finite maximum are a point on a diverging path, set by
+where the rule stopped it and by the rounding along the way: only its status and its
+`running_away` set are stable. Between two versions of the fitter that differ only in
+rounding (c169e039 and d42ad2a0, 51 such fits of random samples) the status, the step
+count and the columns running away were the same in every one, while a coefficient moved
+by up to 7e-5 of itself, the log-likelihood by up to 1e-4 relative and `step` by up to
+5e-4; the stored references keep such a fit's status, steps, log-likelihood and columns,
+not its coefficients.
 
 A separation can also end at the step limit: a 0/1 outcome that is a step in `x`,
 beside a P-spline of `x`, is separated by the smooth's unpenalized line; every Newton
@@ -800,9 +808,10 @@ once and runs a host loop in Python and NumPy that holds every rule, status and 
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
 the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`). A trial
 of the search takes its linear predictor as `eta + scale * (X @ step)`, and the accepted
-trial's starts the next iteration, kept on the device, so an iteration multiplies a vector
-by `X` once (`X @ step`) whatever its halvings, where it did once for `eta`, once for the
-step and once for each trial. The iteration returns the seven numbers per fit the loop
+trial's starts the next iteration, kept on the device, so the line search multiplies a
+vector by `X` once (`X @ step`) whatever its halvings, where it did once for `eta`, once
+for the step and once for each trial; the gradient `score @ X` is the iteration's second
+product with `X`, beside the Gram. The iteration returns the seven numbers per fit the loop
 reads at every step (`ok`, the decrement, `max |X step|`, whether the step was capped, the
 new `F` and `l`, whether a halving was found) stacked in one array, brought to the host in
 one transfer; `A`, the step and the candidate stay on the device until the loop reads them
@@ -832,10 +841,15 @@ model's size) on every iteration. One Newton iteration of the rate model took 90
 least of four processes, each the least of 40 calls; one thread, under load, 2026-11-23),
 51 ms with the gradient as `score @ X`, and 46 ms with the Gram as well. The jaxpr cannot
 tell the forms apart (`X.T @ (w * X)` has a `transpose` there that XLA removes, and
-`dot_general(w * X, X)` has none but is compiled with the copy), so
-`tests/analysis/regression/test_newton.py` reads the optimized program of the iteration
-kernel and of the three information kernels of each family, on the CPU, and fails on a
-`transpose` whose shape has the padded row count.
+`dot_general(w * X, X)` has none, yet inside the iteration's program it compiled to a
+`transpose` of the weighted design; compiled alone it had none).
+`tests/analysis/regression/test_newton.py` keeps a canary on the CPU only: it reads the
+optimized program of the iteration kernel and of the three information kernels of each
+family and fails on an instruction named `transpose` whose printed shape has the padded
+row count. It is not a proof: XLA can write the same copy as a `copy` to another layout
+(the old `X.T @ score` compiled to a `transpose` and then a `copy`), which it would not
+see if the `transpose` went away, and a form whose copy appears only in some programs is
+caught only in those it compiles.
 
 **How the log-likelihood is summed.** The last step of a fit is taken when `F` does not
 rise by more than `8 eps max(1, |F|)`, which only the rounding of `F` decides at the
@@ -847,22 +861,36 @@ combined before one sum (`sum w (y log mu - mu)`; for the grouped softmax `y log
 row): there the same two points differed by 0 to 1.1e-13.
 
 The JAX fitter therefore takes some last steps the NumPy fitter refused, and the two can
-differ by one Newton step outside the stored references. In 216 fits drawn at random by
-an independent review (200 Newton fits, 16 REML scores; 2026-11-23), 2 took one more step
-(a Bernoulli fit of 2,500 rows, 9 steps to 10; the inner fit of a Poisson REML score of
-4,096 rows, 4 to 5); no status differed. Where it happens, the outputs differ by about
+differ by one Newton step outside the stored references. In 216 fits drawn at random by a
+first independent review (200 Newton fits, 16 REML scores; 2026-11-23), 2 took one more
+step (a Bernoulli fit of 2,500 rows, 9 steps to 10; the inner fit of a Poisson REML score
+of 4,096 rows, 4 to 5). In 970 random fits of a second review (four families, 40 to 20,000
+rows, 2 to 13 columns), 4 of 650 in one sample and 0 of 320 in another took one more step,
+all of them Poisson (about 2.5 % of the Poisson fits of the first sample, none of the 480
+of the other families). No status differed. Where it happens, the outputs differ by about
 the stop's tolerance, 1e-8 (1.6e-8 in the REML score, log-likelihood, gradient and Hessian
-of the Poisson case), not by the references' rule of `1e-11 + 1e-9 |b|`. The rate, about 1
-fit in 100 to 200 on that sample, depends on the data and on the platform. The NumPy sum
-had moved `F` by 16.8 eps |F| along the Bernoulli step; under an exact sum (`math.fsum`)
-the step changes `F` by -0.99 eps |F| there and lowers it by 4.1 eps |F| in the Poisson
-case, so the JAX fit is the better converged one. The per-row sum is within 1.5 eps |F| of
-the exact sum on fits of 500 to 20,000 rows. The `F` of the iteration kernel's halving
-search, on the carried `eta + scale * (X @ step)`, differs from the evaluation kernel's on
-`X @ beta` at the same coefficients by at most 1.5 eps |F| (at the last step of 299 random
-fits of 40 to 20,000 rows; 44 of them differ at all, and none changed its status or step
-count against the search on `X @ beta`; 2026-11-23), so the allowance of 8 eps |F| covers
-the rounding of the two with room to spare. Every stored case matches
+of the Poisson case), not by the references' rule of `1e-11 + 1e-9 |b|`; the rate depends
+on the data, the family and the platform. The NumPy sum had moved `F` by 16.8 eps |F|
+along the Bernoulli step; under an exact sum (`math.fsum`) the step changes `F` by -0.99
+eps |F| there and lowers it by 4.1 eps |F| in the Poisson case, so the JAX fit is the
+better converged one. The per-row sum is within 1.5 eps |F| of the exact sum on fits of
+500 to 20,000 rows. The rule compares two evaluations of the evaluation kernel, both on `X
+@ beta`: `F` at the point where the fit stands and at the moved point, and the
+log-likelihood the fit reports is that evaluation's. The iteration's own `F`, from the
+line search on the carried `eta + scale * (X @ step)`, differs from it at the same
+coefficients by up to 1.5 eps |F| on one sample (the last step of 299 random fits) and 5.4
+eps |F| on another (298 fits; 7 above 1.5, the largest a Poisson fit of 100 rows and 3
+columns from a far start), too close to the allowance to compare one with the other, as
+the rule did for a while. Evaluating `F` again costs one more call of the evaluation
+kernel per fit (rate size: 252 to 260 ms for `penalized_newton`, 3 %; 300 rows: 2.3 to 2.4
+ms) and changed no status, step count or coefficient on 400 random fits. The carried
+linear predictor drifts from `X @ beta` by the rounding of each step: 1 to 3 eps of the
+largest `|X @ beta|` along the path after 15 to 49 capped steps from a far start (which is
+up to 51 eps of the final `max |eta|`, the early predictors being larger); the second
+review measured 1.3 to 2.6 eps max|eta| after 20 iterations, 3.0 to 3.3 after 50 and 9.4
+after 100, growing about as the square root of the iterations. Nothing bounds it but
+`max_iter`; `tests/analysis/regression/test_newton.py` pins it to 8 eps of the path's
+largest `|X @ beta|` on a fit of 45 steps. Every stored case matches
 (`tests/analysis/regression/data/numpy_reference/README.md`, "Differences from the NumPy
 fitter outside the stored cases").
 
@@ -932,10 +960,17 @@ bucket have no rows. A group with no rows has `log(sum exp) = -inf`; the log-lik
 summed by row (`y log p`), so no row reads that group and it adds 0 (a per-group sum would
 give `n_g log(sum exp) = 0 * -inf`). Every quantity that depends on the number of rows uses
 the real count: the Gaussian's normalizing constant and the profiled Gaussian's degrees of
-freedom. No rows pad to one bucket of padded rows, every sum 0: a fit without rows is
-"design not identified" with a log-likelihood of 0, as before. A per-row argument
-(`eta`, `d`, `d1`, `d2`) needs one value per row, and a single Poisson offset is every
-row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
+freedom. No rows pad to one bucket of padded rows, every sum 0. A fit without rows is then
+what the penalty alone makes it: where the penalty leaves a coefficient free (no penalty,
+or a null space) it is "design not identified" at the start, log-likelihood 0, no step;
+where the penalty has full rank it is "converged" at its minimum, `beta = 0` whatever the
+start, with `A = S`, a decrement of 0 and a log-likelihood of 0 (the NumPy fitter raised
+there, by accident); a grouped softmax without rows is refused (`ValueError`, no groups).
+A per-row argument (`eta`, `d`, `d1`, `d2`, `y`, a per-row offset) needs one value per row
+on one axis: a column of shape (n, 1) is refused with its name and shape, since it would
+broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out -1536.6 for
+-5.82). So is a scalar or a one-element array given for a per-row vector, which the NumPy
+code broadcast: that narrowing is intended. A single Poisson offset is still every row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
 every quantity unchanged, exactly, and the kernels equal the formulas written in NumPy in
 the test. The padded and unpadded log-likelihood, gradient, information and its two
 directional derivatives agree to 1e-12 of their largest entry for each family, the kernels
@@ -953,6 +988,32 @@ is the number of programs a process needed, whatever the cache holds: ten Poisso
 ten row counts in four buckets trace each Newton kernel once per bucket
 (`tests/analysis/regression/test_newton.py`). Each new bucket of a family costs its first
 fit about 2 to 3 s of compilation on one CPU thread.
+
+**How many programs a process keeps.** Each compiled XLA CPU program holds memory mappings
+of its own: 111 for an iteration kernel, 24 for an evaluation kernel and 6 for an
+information kernel (CPU, 30 shapes each, 2026-11-23), and 1.5 to 4.3 MB of resident
+memory. Linux stops a process at `vm.max_map_count` (65,530 by default; the allocation
+fails inside LLVM and the process dies): a stream of 800 random fits of 2 to 13 columns
+and 40 to 20,000 rows reached 735 programs and 64,823 mappings at about fit 775 and
+aborted, and the finer row buckets had made it come about 1.7 times sooner.
+`jax.clear_caches()` releases them (5,048 mappings to 672 after 93 programs;
+`gc.collect()` adds nothing), though not the resident memory the allocator keeps (786 to
+774 MB). So `runtime.in_float64` counts the programs traced since the last clear and, at
+the entry of a call when no call of the fitter is running in any thread (never inside a
+fit, never while a kernel runs), clears JAX's caches once the count has reached
+`runtime.LIVE_PROGRAM_LIMIT`, 256: 256 iteration kernels are 28,400 mappings, under half
+the default limit with the process's own and one call's new programs added; the 800-fit
+stream peaked at 21,021 mappings and 1.3 GB (2.4 GB without the bound at fit 675) and ran
+to the end. `jax.clear_caches()` clears every jitted function of the process, another
+library's too. A process that fits many designs of different column counts and row buckets
+recompiles each after a clear: the first 700 fits of that stream took 849 s with the bound
+against 595 s without it (two processes at once on two CPUs under load). JAX's persistent
+compilation cache, which this project does not configure, makes the recompilation cheap:
+with `JAX_COMPILATION_CACHE_DIR` set (and `JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS=0`,
+so that every program is stored) the same 700 fits took 554 s, a long driver's choice.
+`tests/analysis/regression` without its slow tests traces about 435 programs in one
+process, so it clears once or twice; the tests that count traces fix the limit high for
+their own run.
 
 **Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
 so every module of the fitter that imports them (`sessions`, `calibration`, `record`,
@@ -986,7 +1047,7 @@ thread, each process pinned to one CPU, the code versions run in turn in the sam
 least time over all calls of all rounds, then the median of the rounds' medians, in ms.
 NumPy at commit 7959aca7; JAX before the changes at 2592ef01 and after them at efc2bb3a:
 
-| Case | Rounds | NumPy | JAX before | JAX after | After / NumPy |
+| Case | Rounds | NumPy: least, median | JAX before: least, median | JAX after: least, median | After / NumPy: least, median |
 |---|---|---|---|---|---|
 | fit_rate (37,000 x 76) | 9 | 242, 298 | 534, 690 | 245, 381 | 1.0, 1.3 |
 | fit_content (400 events x 9) | 8 | 12.4, 14.6 | 16.6, 20.0 | 11.3, 16.0 | 0.9, 1.1 |
