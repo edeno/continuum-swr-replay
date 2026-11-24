@@ -461,7 +461,7 @@ def draw(
         If the family has no draw (named by ``lik.name``); under the grouped
         softmax, if ``n_trials`` is not a whole number of at least one or a
         concentration is not finite and positive, or either has the wrong
-        number of groups.
+        number of groups, or a group has no finite ``eta``.
     """
     eta = np.asarray(eta, dtype=float)
     if lik.name == "poisson":
@@ -497,6 +497,11 @@ def _softmax_draw(
     if np.any(n < 1) or np.any(n != np.round(n)):
         raise ValueError(f"n_trials must be whole numbers of at least one, not {n}")
     n = n.astype(int)
+    empty = np.flatnonzero(np.maximum.reduceat(eta, starts) == -np.inf)
+    if empty.size:
+        raise ValueError(
+            f"group {empty[0]} has no finite eta (every share zero): no share to draw"
+        )
     logits = eta
     if concentration is not None:
         a = _per_group(concentration, starts.size, "concentration")

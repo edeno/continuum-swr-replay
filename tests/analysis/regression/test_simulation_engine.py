@@ -510,6 +510,39 @@ def test_summary_arithmetic_by_hand() -> None:
     assert all(row[f"without_value_{c}"] == 0.0 for c in others)
 
 
+def _shares(sessions, rng, *, scale_first=1.0):
+    """Equal shares within each event; the first event of the first session
+    has its shares times ``scale_first``."""
+    out = {}
+    for k, (key, rows) in enumerate(sessions.items()):
+        size = rows.groupby("event_id")["event_id"].transform("size").to_numpy()
+        share = 1.0 / size
+        if k == 0:
+            share = np.where(
+                rows["event_id"] == rows["event_id"].iloc[0], share * scale_first, share
+            )
+        out[key] = share
+    return out
+
+
+def test_expected_shares_must_sum_to_one(content_sessions_cohort) -> None:
+    """Under the grouped softmax an event whose expected shares are all zero
+    is refused (the draw would give its first row a share of one), as is one
+    whose shares do not sum to one within :data:`SHARE_TOLERANCE`; shares
+    off by less are drawn."""
+    sessions = content_sessions_cohort
+    model = content_model(sessions)
+    rng = np.random.default_rng(0)
+    for scale, match in ((0.0, "sum to zero"), (0.8, "sum to 0.8, not one")):
+        scenario = OutsideScenario("bad", partial(_shares, scale_first=scale))
+        with pytest.raises(ValueError, match=match):
+            draw_data_set(model, sessions, scenario, rng)
+    near = 1.0 + engine.SHARE_TOLERANCE / 10
+    scenario = OutsideScenario("near", partial(_shares, scale_first=near))
+    drawn = draw_data_set(model, sessions, scenario, rng)
+    assert all(np.isfinite(rows["share"]).all() for rows in drawn.values())
+
+
 def test_bootstrap_seeds_differ() -> None:
     """Each (model, estimand) of each data set has its own bootstrap seed,
     and the data sets of a scenario their own data seed."""

@@ -83,6 +83,7 @@ from .terms import Design
 
 __all__ = [
     "CAUSES",
+    "SHARE_TOLERANCE",
     "SUMMARY_COLUMNS",
     "InsideScenario",
     "Model",
@@ -101,6 +102,10 @@ __all__ = [
 #: Every cause of a session without a value of an estimand: a record's
 #: ``no_fit`` code, then a ``left_out`` code.
 CAUSES = (*(code.value for code in NoFit), *(code.value for code in Removed))
+
+#: Under the grouped softmax, the most an event's expected shares may differ
+#: from summing to one.
+SHARE_TOLERANCE = 1e-9
 
 #: A data set rejects by the day-level test when its p is below this.
 REJECTION_LEVEL = 0.05
@@ -194,9 +199,9 @@ class InsideScenario:
 #: Each session's rows -> its expected outcome per row, shape ``(n_rows,)``:
 #: the mean count (Poisson, the exposure included), the probability
 #: (Bernoulli), the mean (Gaussian) or the share (grouped softmax, summing to
-#: one within each group). It may read the generator, for effects drawn anew
-#: in each data set; it must be a module-level function so that a process
-#: pool can send it.
+#: one within each group, to :data:`SHARE_TOLERANCE`). It may read the
+#: generator, for effects drawn anew in each data set; it must be a
+#: module-level function so that a process pool can send it.
 ExpectedOutcome = Callable[
     [Mapping[SessionKey, pd.DataFrame], np.random.Generator],
     Mapping[SessionKey, np.ndarray],
@@ -365,14 +370,35 @@ def _linear_predictor(
     return mean
 
 
-def _check_expected(lik: Likelihood, mean: np.ndarray, where: str) -> None:
-    """Refuse an expected outcome outside what the family takes."""
+def _check_expected(
+    lik: Likelihood, mean: np.ndarray, units: np.ndarray, where: str
+) -> None:
+    """Refuse an expected outcome outside what the family takes: under the
+    grouped softmax also an event (a unit of ``units``, shape ``(n_rows,)``)
+    whose shares sum to zero or differ from one by more than
+    :data:`SHARE_TOLERANCE`."""
     if not np.all(np.isfinite(mean)):
         raise ValueError(f"{where}: an expected outcome is not finite")
     if lik.name in ("poisson", "grouped_softmax") and np.any(mean < 0):
         raise ValueError(f"{where}: an expected outcome is below zero")
     if lik.name == "bernoulli" and np.any((mean < 0) | (mean > 1)):
         raise ValueError(f"{where}: an expected probability is outside [0, 1]")
+    if lik.name == "grouped_softmax" and mean.size:
+        codes, events = pd.factorize(units, use_na_sentinel=False)
+        sums = np.bincount(codes, weights=mean)
+        zero = np.flatnonzero(sums == 0)
+        if zero.size:
+            raise ValueError(
+                f"{where}: the expected shares of {zero.size} events sum to zero "
+                f"(the first, {events[zero[0]]!r}): an event needs a share"
+            )
+        off = np.flatnonzero(np.abs(sums - 1.0) > SHARE_TOLERANCE)
+        if off.size:
+            raise ValueError(
+                f"{where}: the expected shares of {off.size} events do not sum to "
+                f"one within {SHARE_TOLERANCE:g}; those of the first, "
+                f"{events[off[0]]!r}, sum to {sums[off[0]]:.6g}, not one"
+            )
 
 
 def _per_event(value: object, frame: pd.DataFrame, first: np.ndarray) -> object:
@@ -445,7 +471,8 @@ def _draw(
             where = f"scenario {scenario.name!r}, session {'/'.join(key)}"
             if mean.shape != p.missing.shape:
                 raise ValueError(f"{where}: {mean.shape} expected outcomes")
-            _check_expected(model.likelihood, mean[~p.missing], where)
+            units = sessions[key][model.unit].to_numpy()[~p.missing]
+            _check_expected(model.likelihood, mean[~p.missing], units, where)
             etas[key] = _linear_predictor(model.likelihood, mean, p.offset)
     return {
         key: rows.assign(

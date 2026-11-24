@@ -291,6 +291,14 @@ def test_softmax_draw_refuses_bad_noise_parameters() -> None:
             draw(GroupedSoftmax(), ETA, GROUPS, rng, **kwargs)
 
 
+def test_softmax_draw_refuses_a_group_without_weight() -> None:
+    """A group whose every ``eta`` is minus infinity (every share zero) has
+    no share to draw: it is refused, not given to its first row."""
+    eta = np.array([0.1, 0.2, -np.inf, -np.inf])
+    with pytest.raises(ValueError, match="group 1 has no finite eta"):
+        draw(GroupedSoftmax(), eta, np.array([0, 0, 1, 1]), np.random.default_rng(0))
+
+
 def test_a_draw_refuses_an_unknown_family() -> None:
     """A likelihood without a draw is refused by name."""
 
