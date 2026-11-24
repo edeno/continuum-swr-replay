@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     STATE_PROBABILITY_COLUMNS,
@@ -15,15 +16,22 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
 )
 
 
-def test_decoding_error_median_is_over_sessions_with_a_finite_error():
-    # Four finite sessions: an even count, so the median is the mean of the
-    # middle two (2 and 4), not the mean of all four (5.25). The NaN session
-    # is not counted.
-    error_df = pd.DataFrame({"median_error_cm": [1.0, 4.0, np.nan, 2.0, 14.0]})
+def test_decoding_error_is_each_animals_median_session_then_the_mean():
+    # a: sessions 1, 4 and 2 (median 2) and one with no finite error, which is
+    # not one of its sessions; b: one session, 14. The mean over animals is 8
+    # (the median over the four pooled sessions would be 3).
+    error_df = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b"],
+            "day": [1, 1, 2, 2, 1],
+            "epoch": ["02_r1", "04_r2", "02_r1", "04_r2", "02_r1"],
+            "median_error_cm": [1.0, 4.0, np.nan, 2.0, 14.0],
+        }
+    )
 
     statistics = local_decoding_error_statistics(error_df)
 
-    assert statistics == {"n_sessions": 4, "median_error_cm": 3.0}
+    assert statistics == {"n_sessions": 4, "median_error_cm": 8.0}
 
 
 def test_calibration_curve_is_median_and_quartiles_over_sessions_per_bin():
@@ -124,13 +132,13 @@ def test_a_session_with_no_moving_bin_has_no_moving_fraction():
         ]
     )
 
-    fractions = session_state_fractions(frame).set_index("animal")
+    fractions = session_state_fractions(frame)
     statistics = state_fraction_statistics(fractions)
 
-    assert np.isnan(fractions.loc["b", "moving_Local_prob"])
-    # moving: a 1 and c 0 -> 0.5; immobile: a 0, b 1, c 1 -> 1
+    assert np.isnan(fractions.set_index("animal").loc["b", "moving_Local_prob"])
+    # moving: a 1 and c 0 -> 0.5 (b is left out); immobile: a 0, b 1, c 1 -> 2/3
     np.testing.assert_allclose(
-        statistics["Local_prob"].to_numpy(), [0.5, 1.0], err_msg="moving, immobile"
+        statistics["Local_prob"].to_numpy(), [0.5, 2 / 3], err_msg="moving, immobile"
     )
 
 
@@ -147,22 +155,44 @@ def test_session_decoder_quality_joins_the_error_and_the_fractions_per_session()
     np.testing.assert_allclose(quality["moving_Local_prob"], [1.0, 0.0, 0.5])
 
 
-def test_state_fractions_are_session_means_then_the_median_over_sessions():
+def test_state_fractions_are_session_means_then_the_mean_over_animals():
     fractions = state_fraction_statistics(session_state_fractions(_three_sessions()))
 
     assert fractions.index.tolist() == ["moving", "immobile"]
     assert fractions.columns.tolist() == list(STATE_PROBABILITY_COLUMNS)
-    # Moving: sessions 1, 0, 0.5 -> median 0.5.
+    # One session per animal. Moving: 1, 0, 0.5 -> 0.5.
     np.testing.assert_allclose(
         fractions.loc["moving", ["Local_prob", "Non-Local_Continuous_prob"]],
         [0.5, 0.5],
     )
-    # Immobile: sessions a 2/3, b 1/2 and c 0 -> median 1/2 (the mean is
-    # 7/18; with b's threshold bin counted the median would be 1/3).
+    # Immobile: a 2/3, b 1/2 and c 0 -> 7/18 (the median over the sessions
+    # would be 1/2).
     np.testing.assert_allclose(
         fractions.loc["immobile", ["Local_prob", "Non-Local_Continuous_prob"]],
-        [0.5, 0.5],
+        [7 / 18, 11 / 18],
     )
     np.testing.assert_allclose(
         fractions.loc[:, ["No-Spike_prob", "Non-Local_Fragmented_prob"]], 0.0
     )
+
+
+def test_state_fractions_weigh_an_animals_sessions_then_the_animals():
+    """a: three sessions with moving Local 1, 1 and 0.4 (mean 0.8) and one
+    with no moving bin, which is not one of its sessions; b: one session, 0.2.
+    The mean over animals is 0.5; the median over the four pooled sessions
+    would be 0.7."""
+    rows = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b"],
+            "day": [1, 1, 2, 2, 1],
+            "epoch": ["02_r1", "04_r2", "02_r1", "04_r2", "02_r1"],
+        }
+    )
+    for movement in ("moving", "immobile"):
+        for column in STATE_PROBABILITY_COLUMNS:
+            rows[f"{movement}_{column}"] = 0.0
+    rows["moving_Local_prob"] = [1.0, 1.0, 0.4, np.nan, 0.2]
+
+    statistics = state_fraction_statistics(rows)
+
+    assert statistics.loc["moving", "Local_prob"] == pytest.approx(0.5)

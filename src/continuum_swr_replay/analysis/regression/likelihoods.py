@@ -10,34 +10,32 @@ keeps no parameter on the object; anything that changes its result travels in
 ``aux``. A family object with an attribute of its own is refused
 (``TypeError``) when a kernel would key on it.
 
-The public methods take and return NumPy arrays, and run in float64
-(``runtime.in_float64``):
+The methods that take NumPy arrays:
 
 - ``check(y, aux)``: raise ``ValueError``, naming the problem, when the
   response or ``aux`` is outside what the family takes (the fit calls it once,
   at its entry, after checking that ``y`` is finite).
 - ``identifying_design(X, aux)``: the design whose column space the likelihood
   identifies (the design check reads it).
-- ``loglik(eta, y, aux)``: the log-likelihood, a float.
-- ``score_eta(eta, y, aux)``: ``dl/deta``, shape ``(n_rows,)``; the coefficient
-  gradient is ``X.T @ score_eta``.
-- ``information(X, eta, y, aux)``: ``-d2l/dbeta2``, shape ``(p, p)``.
-- ``dinformation(X, eta, y, aux, d)``: the derivative of ``information`` when
-  ``eta`` moves along ``d`` (shape ``(n_rows,)``), shape ``(p, p)``.
-- ``d2information(X, eta, y, aux, d1, d2)``: the second derivative of
-  ``information`` along ``d1`` and ``d2``, shape ``(p, p)``.
+- ``pad(X, y, aux)``: the rows padded to their bucket (``padding``), as the
+  kernels take them (:class:`Rows`).
 - ``weighted_design(X, y, aux, eta)``: the design weighted by the information,
   ``X~`` with ``X~' X~`` the information, shape ``(n_rows, p)`` (what
-  ``collinearity`` measures on).
+  ``collinearity`` measures on). It runs in float64
+  (``runtime.in_float64``): it pads the rows and runs one jitted kernel.
 
-Each of the last six pads the rows (``pad``, with ``padding``) and runs one
-jitted kernel. The kernels compute from the family's JAX functions, which the
-Newton and REML kernels call too: ``_jax_loglik``, ``_jax_score``,
-``_jax_information``, ``_jax_dinformation``, ``_jax_d2information`` and
-``_jax_weighted_design``. Each takes the padded rows and their ``weight`` (1
-on a real row, 0 on a padded one) and multiplies every row's term by it, so a
-padded row adds exactly 0. A likelihood made for a test follows the protocol
-by overriding these.
+The Newton and REML kernels compute from the family's JAX functions:
+``_jax_loglik`` (the log-likelihood), ``_jax_score`` (``dl/deta``, shape
+``(n_rows,)``; the coefficient gradient is ``X.T @ score``),
+``_jax_information`` (``-d2l/dbeta2``, shape ``(p, p)``),
+``_jax_dinformation`` (its derivative when ``eta`` moves along a direction
+``d``, shape ``(n_rows,)``), ``_jax_d2information`` (the second derivative
+along ``d1`` and ``d2``), ``_jax_weighted_design`` and
+``_jax_information_traces`` (the traces of the information's derivatives
+against a matrix, which REML's derivatives read). Each takes the padded rows
+and their ``weight`` (1 on a real row, 0 on a padded one) and multiplies every
+row's term by it, so a padded row adds exactly 0. A likelihood made for a test
+follows the protocol by overriding these.
 
 The information is the observed information. For the three diagonal families it
 is ``X' diag(w) X`` with weights ``w(eta)`` that do not depend on ``y``; their
@@ -68,69 +66,33 @@ cap on its length.
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Protocol
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy.special import expit
 
-from .padding import group_starts, pad_groups, pad_rows, pad_values
+from .padding import (
+    Groups,
+    Rows,
+    group_sizes,
+    group_starts,
+    pad_groups,
+    pad_rows,
+    pad_values,
+)
 from .runtime import float64_kernel, in_float64
 
 __all__ = [
     "Bernoulli",
     "Gaussian",
     "GroupedSoftmax",
-    "Groups",
     "Likelihood",
     "Poisson",
-    "Rows",
     "draw",
     "group_starts",
 ]
-
-
-class Rows(NamedTuple):
-    """A session's rows padded for a kernel (``Likelihood.pad``).
-
-    Attributes
-    ----------
-    X : np.ndarray, shape (n_bucket, p)
-    y : np.ndarray, shape (n_bucket,)
-    aux : object
-        The family's extra data as its kernels take it: the padded offset, the
-        scale, :class:`Groups`, or None.
-    weight : np.ndarray, shape (n_bucket,)
-        1 on a real row, 0 on a padded one.
-    n_real : int
-        The real rows, which are the first `n_real`.
-    """
-
-    X: np.ndarray
-    y: np.ndarray
-    aux: Any
-    weight: np.ndarray
-    n_real: int
-
-
-@dataclass(frozen=True)
-class Groups:
-    """The grouped softmax's ``aux`` in a kernel.
-
-    Attributes
-    ----------
-    index : array of int, shape (n_bucket,)
-        Each row's group, 0 to ``n_groups - 1``, sorted; the padded rows are in
-        one group after the real ones.
-    n_groups : int
-        The groups summed over, padded (``padding.pad_groups``); static, since
-        ``segment_sum`` needs it when traced.
-    """
-
-    index: Any
-    n_groups: int
 
 
 jax.tree_util.register_dataclass(
@@ -150,28 +112,6 @@ class Likelihood(Protocol):
     def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray: ...
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows: ...
-
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float: ...
-
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray: ...
-
-    def information(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object
-    ) -> np.ndarray: ...
-
-    def dinformation(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object, d: np.ndarray
-    ) -> np.ndarray: ...
-
-    def d2information(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: object,
-        d1: np.ndarray,
-        d2: np.ndarray,
-    ) -> np.ndarray: ...
 
     def weighted_design(
         self, X: np.ndarray, y: np.ndarray, aux: object, eta: np.ndarray
@@ -197,33 +137,12 @@ class Likelihood(Protocol):
         self, X: Any, eta: Any, y: Any, aux: Any, weight: Any
     ) -> Any: ...
 
-
-# The kernels of the public methods: one program per family and padded shape.
-
-
-@float64_kernel(static_argnames=("lik",))
-def _loglik_kernel(lik, eta, y, aux, weight):
-    return lik._jax_loglik(eta, y, aux, weight)
+    def _jax_information_traces(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, M: Any, D: Any, E: Any
+    ) -> tuple[Any, Any]: ...
 
 
-@float64_kernel(static_argnames=("lik",))
-def _score_kernel(lik, eta, y, aux, weight):
-    return lik._jax_score(eta, y, aux, weight)
-
-
-@float64_kernel(static_argnames=("lik",))
-def _information_kernel(lik, X, eta, y, aux, weight):
-    return lik._jax_information(X, eta, y, aux, weight)
-
-
-@float64_kernel(static_argnames=("lik",))
-def _dinformation_kernel(lik, X, eta, y, aux, weight, d):
-    return lik._jax_dinformation(X, eta, y, aux, weight, d)
-
-
-@float64_kernel(static_argnames=("lik",))
-def _d2information_kernel(lik, X, eta, y, aux, weight, d1, d2):
-    return lik._jax_d2information(X, eta, y, aux, weight, d1, d2)
+# The kernel of the public method: one program per family and padded shape.
 
 
 @float64_kernel(static_argnames=("lik",))
@@ -252,6 +171,18 @@ def _gram(X: Any, weights: Any) -> Any:
     return X.T @ (weights[:, None] * X)
 
 
+def _upper_pairs(m: int) -> tuple[Any, Any, Any]:
+    """The pairs ``j <= k`` of ``m`` items, as two index arrays, and whether
+    each is a diagonal pair."""
+    j, k = jnp.triu_indices(m)
+    return j, k, j == k
+
+
+def _mirrored(upper: Any, j: Any, k: Any, m: int) -> Any:
+    """The symmetric ``(m, m)`` matrix whose entries ``j <= k`` are ``upper``."""
+    return jnp.zeros((m, m), upper.dtype).at[j, k].set(upper).at[k, j].set(upper)
+
+
 @functools.cache
 def _can_keep_state(cls: type) -> bool:
     """Whether a family class defines ``__init__`` or a
@@ -265,7 +196,7 @@ def _can_keep_state(cls: type) -> bool:
 
 
 class _Family:
-    """The public methods of every family, on its JAX functions."""
+    """The public method of every family, on its JAX functions."""
 
     def __eq__(self, other: object) -> bool:
         return type(other) is type(self) and self._stateless()
@@ -294,61 +225,6 @@ class _Family:
             )
         return True
 
-    def _padded(
-        self, X: np.ndarray | None, y: np.ndarray, aux: object, **rows: np.ndarray
-    ) -> tuple[Rows, list[np.ndarray]]:
-        """``pad`` of ``X`` (no columns when None), and each of ``rows``
-        (``eta``, ``d``...) padded to the same rows; each must have one value
-        per row of ``y``, on one axis, as ``y`` must."""
-        self._stateless()
-        y = _one_axis(y, "y")
-        X = np.empty((y.size, 0)) if X is None else X
-        padded = self.pad(X, y, aux)
-        n = padded.y.size
-        return padded, [
-            pad_values(_one_axis(r, name), padded.n_real, n, name)
-            for name, r in rows.items()
-        ]
-
-    @in_float64
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float:
-        r, (eta,) = self._padded(None, y, aux, eta=eta)
-        return float(_loglik_kernel(self, eta, r.y, r.aux, r.weight))
-
-    @in_float64
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray:
-        r, (eta,) = self._padded(None, y, aux, eta=eta)
-        return np.array(_score_kernel(self, eta, r.y, r.aux, r.weight))[: r.n_real]
-
-    @in_float64
-    def information(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object
-    ) -> np.ndarray:
-        r, (eta,) = self._padded(X, y, aux, eta=eta)
-        return np.array(_information_kernel(self, r.X, eta, r.y, r.aux, r.weight))
-
-    @in_float64
-    def dinformation(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object, d: np.ndarray
-    ) -> np.ndarray:
-        r, (eta, d) = self._padded(X, y, aux, eta=eta, d=d)
-        return np.array(_dinformation_kernel(self, r.X, eta, r.y, r.aux, r.weight, d))
-
-    @in_float64
-    def d2information(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: object,
-        d1: np.ndarray,
-        d2: np.ndarray,
-    ) -> np.ndarray:
-        r, (eta, d1, d2) = self._padded(X, y, aux, eta=eta, d1=d1, d2=d2)
-        return np.array(
-            _d2information_kernel(self, r.X, eta, r.y, r.aux, r.weight, d1, d2)
-        )
-
     @in_float64
     def weighted_design(
         self, X: np.ndarray, y: np.ndarray, aux: object, eta: np.ndarray
@@ -371,9 +247,46 @@ class _Family:
             ``X~``, with ``X~' X~`` the information (the Gaussian's at unit
             scale, so ``X~ = X``).
         """
-        r, (eta,) = self._padded(X, y, aux, eta=eta)
+        self._stateless()
+        r = self.pad(X, _one_axis(y, "y"), aux)
+        eta = pad_values(_one_axis(eta, "eta"), r.n_real, r.y.size, "eta")
         weighted = _weighted_design_kernel(self, r.X, eta, r.y, r.aux, r.weight)
         return np.array(weighted)[: r.n_real]
+
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of the information's derivatives against ``M``.
+
+        ``M`` is a symmetric ``(p, p)`` matrix, ``D`` has shape ``(n_rows, k)``
+        and ``E`` shape ``(n_rows, m)``, each column a direction of ``eta``.
+        Returns ``tr(M _jax_dinformation(D[:, a]))`` for each column ``a``,
+        shape ``(k,)``, and ``tr(M _jax_d2information(E[:, j], E[:, l]))`` for
+        each pair,
+        shape ``(m, m)``, symmetric. Here each derivative is made and
+        multiplied by ``M``, one at a time (``jax.lax.map``): one
+        ``(p, p)`` product with the design per column and per pair ``j <= l``.
+        """
+
+        def against_M(information):
+            return jnp.sum(M * information)
+
+        def first(a):
+            d = jax.lax.dynamic_index_in_dim(D, a, axis=1, keepdims=False)
+            return against_M(self._jax_dinformation(X, eta, y, aux, weight, d))
+
+        m = E.shape[1]
+        rows, columns, _ = _upper_pairs(m)
+
+        def second(pair):
+            j, k = pair
+            e_j = jax.lax.dynamic_index_in_dim(E, j, axis=1, keepdims=False)
+            e_k = jax.lax.dynamic_index_in_dim(E, k, axis=1, keepdims=False)
+            return against_M(self._jax_d2information(X, eta, y, aux, weight, e_j, e_k))
+
+        upper = jax.lax.map(second, (rows, columns))
+        return (
+            jax.lax.map(first, jnp.arange(D.shape[1])),
+            _mirrored(upper, rows, columns, m),
+        )
 
 
 class _DiagonalFamily(_Family):
@@ -382,11 +295,6 @@ class _DiagonalFamily(_Family):
     def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray:
         """The design whose column space the likelihood identifies: ``X``."""
         return X
-
-    def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
-        """The rows padded to their bucket (``padding.pad_rows``)."""
-        padded = pad_rows(X, y)
-        return Rows(padded.X, padded.y, aux, padded.weight, padded.n_real)
 
     def _jax_weights(self, eta: Any, aux: Any) -> tuple[Any, Any, Any]:
         """``(w, dw/deta, d2w/deta2)``, each shape ``(n_rows,)``."""
@@ -403,6 +311,19 @@ class _DiagonalFamily(_Family):
 
     def _jax_weighted_design(self, X, eta, y, aux, weight):
         return X * jnp.sqrt(weight * self._jax_weights(eta, aux)[0])[:, None]
+
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of :meth:`_Family._jax_information_traces`, without
+        making the derivatives: with ``h_i = x_i' M x_i``,
+        ``tr(M X' diag(c) X) = sum_i c_i h_i``, so the traces are
+        ``(weight w' h) @ D`` and ``E' diag(weight w'' h) E``. One product of
+        the design with ``M`` in all; read from ``_jax_weights``, as the
+        directional derivatives are. The second is mirrored from its upper
+        triangle, so that it is exactly symmetric."""
+        _, w1, w2 = self._jax_weights(eta, aux)
+        h = jnp.sum((X @ M) * X, axis=1)
+        second = _gram(E, weight * w2 * h)
+        return (weight * w1 * h) @ D, jnp.triu(second) + jnp.triu(second, 1).T
 
 
 class Poisson(_DiagonalFamily):
@@ -440,8 +361,7 @@ class Poisson(_DiagonalFamily):
         offset = np.asarray(aux, dtype=float)
         if offset.ndim == 0:  # one offset for every row
             offset = np.full(np.shape(y), float(offset))
-        padded = pad_rows(X, y, _one_axis(offset, "offset"))
-        return Rows(padded.X, padded.y, padded.offset, padded.weight, padded.n_real)
+        return pad_rows(X, y, _one_axis(offset, "offset"))
 
     def _jax_loglik(self, eta, y, aux, weight):
         log_mu = eta + aux
@@ -475,8 +395,7 @@ class Bernoulli(_DiagonalFamily):
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
         """The rows padded to their bucket (``padding.pad_rows``); no aux."""
-        padded = pad_rows(X, y)
-        return Rows(padded.X, padded.y, None, padded.weight, padded.n_real)
+        return pad_rows(X, y)
 
     def _jax_loglik(self, eta, y, aux, weight):
         return jnp.sum(weight * (y * eta - jnp.logaddexp(0.0, eta)))
@@ -509,9 +428,7 @@ class Gaussian(_DiagonalFamily):
     def pad(self, X: np.ndarray, y: np.ndarray, aux: float | None) -> Rows:
         """The rows padded to their bucket (``padding.pad_rows``); the scale
         as a float64 (None stays None: the weighted design does not read it)."""
-        padded = pad_rows(X, y)
-        scale = None if aux is None else np.float64(aux)
-        return Rows(padded.X, padded.y, scale, padded.weight, padded.n_real)
+        return pad_rows(X, y)._replace(aux=None if aux is None else np.float64(aux))
 
     def _jax_loglik(self, eta, y, aux, weight):
         residual = y - eta
@@ -579,15 +496,13 @@ class GroupedSoftmax(_Family):
         likelihood sees only variation within a group, so a combination of
         columns constant within every group is not identified."""
         starts = group_starts(aux)
-        sizes = np.diff(starts, append=X.shape[0])
+        sizes = group_sizes(starts, X.shape[0])
         means = np.add.reduceat(X, starts, axis=0) / sizes[:, None]
         return X - np.repeat(means, sizes, axis=0)
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
         """The rows and groups padded (``padding.pad_groups``)."""
-        padded = pad_groups(X, y, aux)
-        groups = Groups(padded.group, padded.n_groups)
-        return Rows(padded.X, padded.y, groups, padded.weight, padded.n_real)
+        return pad_groups(X, y, aux)
 
     @staticmethod
     def _per_group(values: Any, groups: Groups) -> Any:
@@ -758,7 +673,7 @@ def _softmax_draw(
 ) -> np.ndarray:
     """The grouped softmax's shares (:func:`draw`), shape ``(n_rows,)``."""
     starts = group_starts(groups)
-    sizes = np.diff(starts, append=eta.size)
+    sizes = group_sizes(starts, eta.size)
     n = _per_group(n_trials, starts.size, "n_trials")
     if np.any(n < 1) or np.any(n != np.round(n)):
         raise ValueError(f"n_trials must be whole numbers of at least one, not {n}")

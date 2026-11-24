@@ -141,8 +141,8 @@ def test_the_entry_refuses_before_running_when_no_device_was_chosen(monkeypatch)
 
 
 def test_the_fitters_public_calls_leave_the_flag_as_it_was():
-    """A fit, a REML score, a likelihood method and the weighted design, in
-    this thread and in another: the process's flag is off before and after."""
+    """A fit, a REML score and the weighted design, in this thread and in
+    another: the process's flag is off before and after."""
     from continuum_swr_replay.analysis.regression.collinearity import weighted_design
     from continuum_swr_replay.analysis.regression.likelihoods import Gaussian, Poisson
     from continuum_swr_replay.analysis.regression.newton import penalized_newton
@@ -161,7 +161,6 @@ def test_the_fitters_public_calls_leave_the_flag_as_it_was():
         fit = penalized_newton(Poisson(), X, y, offset, np.zeros((3, 3)), np.zeros(3))
         reml_and_derivatives(Poisson(), X, y, offset, blocks, [0.0])
         reml_and_derivatives(Gaussian(), X, y, None, blocks, [0.0])
-        Poisson().information(X, X @ fit.beta, y, offset)
         weighted_design(Poisson(), X, y, offset, X @ fit.beta)
         return jax.config.x64_enabled
 

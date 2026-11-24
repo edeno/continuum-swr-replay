@@ -223,9 +223,10 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         One row per setting and value, in :data:`SETTINGS`' order: ``setting``,
         ``value``, ``is_rule``, ``n_events`` (summed over epochs),
-        ``events_vs_rule`` (over the rule's events), ``no_swr_fraction``
-        (pooled over events, as the events summary's ``non_swr_fraction``),
-        ``animals`` and ``animal_names`` (each animal's share, the mean over
+        ``events_vs_rule`` (over the rule's events), ``no_swr_fraction`` (the
+        same number as ``no_swr_fraction_animal_mean``, as the events summary's
+        ``non_swr_fraction``), ``animals`` and ``animal_names`` (each animal's
+        share, the mean over
         its epochs with an event of each epoch's share, as
         ``event_statistics.overlap_class_animal_shares`` takes it),
         ``no_swr_fraction_animal_mean`` (the mean over animals of those
@@ -272,7 +273,7 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
                     "is_rule": bool(np.isclose(value, RULE[setting])),
                     "n_events": n_events,
                     "events_vs_rule": n_events / rule_events,
-                    "no_swr_fraction": mine["n_no_swr"].sum() / n_events,
+                    "no_swr_fraction": float(animals.mean()),
                     "animals": animals.to_numpy(),
                     "animal_names": animals.index.to_numpy(),
                     "no_swr_fraction_animal_mean": float(animals.mean()),
@@ -285,6 +286,15 @@ def sweep_statistics(counts: pd.DataFrame) -> pd.DataFrame:
 
 def criterion_agreement(counts: pd.DataFrame) -> float:
     """The share of the rule's events whose Kay criterion label at 2 z is their
-    canonical SWR label (:func:`epoch_sweep_counts`' ``n_criterion_agrees``)."""
+    canonical SWR label (:func:`epoch_sweep_counts`' ``n_criterion_agrees``):
+    each epoch's share, each animal's mean over its epochs, the mean over
+    animals. An epoch with no event is not one of its animal's epochs."""
     rule = rule_rows(counts, "swr_threshold_z")
-    return float(rule["n_criterion_agrees"].sum() / rule["n_events"].sum())
+    rule = rule[rule["n_events"] > 0]
+    animals = animal_session_values(
+        rule["n_criterion_agrees"] / rule["n_events"],
+        rule["animal"],
+        rule[["session_date", "epoch"]],
+        "mean",
+    )
+    return float(animals.mean())

@@ -662,9 +662,13 @@ FIGURE_SCRIPTS = (
 def test_the_figures_draw_the_sources_intervals(script):
     text = (REPO / script).read_text()
 
-    # The plotted ``data["ripple_times"]`` is replaced by the session's source
-    # intervals from the source-read frame, before anything draws or gates it ...
-    assert re.search(r'data\["ripple_times"\] = swr_intervals\(', text)
+    # The plotted ``data["ripple_times"]`` is the session's source intervals from
+    # the source-read frame, before anything draws or gates it: the gallery
+    # replaces ``load_data``'s entry, and Figure 2, which reads stored outputs
+    # alone, builds its ``data`` with it ...
+    assert re.search(
+        r'(data\["ripple_times"\] = |"ripple_times": )swr_intervals\(', text
+    )
     # ... and load_data's stored ripples are never re-gated or unpickled around it.
     assert not re.search(
         r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', text

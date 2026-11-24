@@ -127,11 +127,10 @@ def agreement_by_width_statistics(
           epoch without one has no row);
         - ``share_positive``, ``share_positive_animal_min``,
           ``share_positive_animal_max``: the share of events with a score
-          above zero, per epoch, then each animal's median, then the mean over
-          animals, and the lowest and highest animal;
-        - ``share_of_events``: the share of the group's scored events that fall
-          in the bin, pooled over every event;
-        - ``share_of_events_animal_mean``, ``share_of_events_animal_min``,
+          above zero, per epoch, then each animal's mean over its epochs, then
+          the mean over animals, and the lowest and highest animal;
+        - ``share_of_events`` and ``share_of_events_animal_mean`` (the same
+          number), ``share_of_events_animal_min``,
           ``share_of_events_animal_max`` and ``share_of_events_animals``: that
           share per epoch (of the epoch's scored events of the group), each
           animal's mean over its epochs
@@ -143,7 +142,6 @@ def agreement_by_width_statistics(
     scored = windows.dropna(subset=[column]).assign(
         width_bin=lambda t: width_bins(t[WIDTH_COLUMN])
     )
-    totals = scored.groupby("group").size()
     rows = []
     for label in WIDTH_BIN_LABELS:
         mine = scored[scored["width_bin"] == label]
@@ -154,12 +152,7 @@ def agreement_by_width_statistics(
             events = mine[mine["group"] == group]
             positive = (events[column] > 0).astype(float)
             per_animal = animal_session_values(
-                positive.groupby([events["animal"], events["epoch_id"]]).transform(
-                    "mean"
-                ),
-                events["animal"],
-                events["epoch_id"],
-                "median",
+                positive, events["animal"], events["epoch_id"], "mean"
             )
             everyone = scored[scored["group"] == group]
             # every animal of the group: one with no event in the bin has 0
@@ -178,7 +171,7 @@ def agreement_by_width_statistics(
                     "share_positive": float(per_animal.mean()),
                     "share_positive_animal_min": float(per_animal.min()),
                     "share_positive_animal_max": float(per_animal.max()),
-                    "share_of_events": len(events) / totals[group],
+                    "share_of_events": float(shares.mean()),
                     "share_of_events_animal_mean": float(shares.mean()),
                     "share_of_events_animal_min": float(shares.min()),
                     "share_of_events_animal_max": float(shares.max()),

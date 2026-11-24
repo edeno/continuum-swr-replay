@@ -334,10 +334,10 @@ Widloski detector."""
 def _matched_shares(
     events: pd.DataFrame, by: str, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
-    """Each detector's share of its events matched: pooled over events, per
-    animal as the mean over the animal's epochs of each epoch's share (event ->
-    epoch -> animal), as :func:`content_class_animal_shares` takes it, and the
-    mean over animals of the animals' shares."""
+    """Each detector's share of its events matched: per animal the mean over
+    the animal's epochs of each epoch's share (event -> epoch -> animal), as
+    :func:`content_class_animal_shares` takes it, and the mean over animals of
+    the animals' shares."""
     shares = {}
     for detector in detectors:
         mine = events[events[by] == detector]
@@ -348,7 +348,6 @@ def _matched_shares(
             "mean",
         )
         shares[detector] = {
-            "pooled": mine["matched"].mean(),
             "animal_mean": animals.mean(),
             "animals": animals.to_numpy(),
         }
@@ -370,12 +369,11 @@ def nonlocal_events_overlapped(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 3)
-        Indexed by detector: ``pooled``, the matched non-local events over the
-        eligible ones; ``animals``, each animal's mean over its epochs of the
-        epoch's share (an array, in the animals' sorted order); and
-        ``animal_mean``, the mean over animals of those shares (Figure 2e's
-        bars).
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``animals``, each animal's mean over its epochs
+        of the epoch's share of the eligible non-local events it matches (an
+        array, in the animals' sorted order); and ``animal_mean``, the mean
+        over animals of those shares (Figure 2e's bars).
     """
     return _matched_shares(memberships, "other_detector", detectors)
 
@@ -398,9 +396,9 @@ def events_overlapping_nonlocal(
 
     Returns
     -------
-    overlap : pd.DataFrame, shape (n_detectors, 3)
-        Indexed by detector: ``pooled``, ``animals`` and ``animal_mean``, as
-        for :func:`nonlocal_events_overlapped`.
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``animals`` and ``animal_mean``, as for
+        :func:`nonlocal_events_overlapped`.
     """
     return _matched_shares(events, "detector", detectors)
 
@@ -455,8 +453,45 @@ def content_class_animal_shares(events: pd.DataFrame, detector: str) -> pd.DataF
     )
 
 
+def content_class_means(statistics: pd.Series) -> pd.Series:
+    """The mean over animals of the animals' shares of a detector's events in
+    each content class, from its row of :func:`other_detector_statistics`:
+    with non-local activity, one minus ``no_nonlocal_fraction_animal_mean``;
+    mostly Local, ``mostly_local_fraction_animal_mean``; and the other events,
+    the rest of those with no non-local activity.
+
+    Parameters
+    ----------
+    statistics : pd.Series
+        One detector's row of :func:`other_detector_statistics`.
+
+    Returns
+    -------
+    pd.Series, shape (3,)
+        Indexed by :data:`CONTENT_CLASSES`.
+    """
+    no_nonlocal = statistics["no_nonlocal_fraction_animal_mean"]
+    mostly_local = statistics["mostly_local_fraction_animal_mean"]
+    return pd.Series(
+        {
+            "with_nonlocal": 1 - no_nonlocal,
+            "mostly_local": mostly_local,
+            "other": no_nonlocal - mostly_local,
+        }
+    )
+
+
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """For each other detector, how its events sit against the non-local events.
+
+    Every statistic is event -> epoch -> animal -> mean over animals: each
+    epoch's share (or median) over its events of the subset the statistic is
+    about, each animal's mean (a share) or median (a per-event quantity) over
+    its epochs with an event of that subset, then the mean over the animals
+    with such an epoch. An epoch with no event of the subset is not one of its
+    animal's epochs for that statistic, and an animal with none is left out of
+    its mean over animals; a subset can hold few events, and a share is then
+    a mean over few epochs' shares, each of few events.
 
     Parameters
     ----------
@@ -468,61 +503,91 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    statistics : pd.DataFrame, shape (n_detectors, 17)
+    statistics : pd.DataFrame, shape (n_detectors, 19)
         Indexed by detector. "Mostly" a state is more than half the event's
         rows.
 
         - ``n_events``: its compared events.
-        - ``no_nonlocal_fraction``: the share overlapping no non-local event,
-          pooled, and ``no_nonlocal_fraction_animal_min`` and
-          ``..._animal_max``, the lowest and highest of the animals' own
-          shares, each event -> epoch -> animal: the mean over the animal's
-          epochs of each epoch's share; ``no_nonlocal_fraction_animal_mean``,
-          the mean over animals of the animals' own shares.
+        - ``no_nonlocal_fraction``: the share overlapping no non-local event;
+          ``no_nonlocal_fraction_animal_mean``, the same number;
+          ``no_nonlocal_fraction_animal_min`` and ``..._animal_max``, the
+          lowest and highest of the animals' own shares (the mean over the
+          animal's epochs of each epoch's share).
         - ``mostly_local_fraction``: the events overlapping no non-local event
           that are mostly Local, as a share of all its compared events (an
           event without state shares is not mostly Local), and
-          ``mostly_local_fraction_animal_mean``, the mean over animals of the
-          animals' own shares (:func:`content_class_animal_shares`).
-        - Of the events overlapping no non-local event:
+          ``mostly_local_fraction_animal_mean``, the same number
+          (:func:`content_class_animal_shares`).
+        - Of the events overlapping no non-local event (with state shares):
           ``no_nonlocal_mostly_local_fraction``,
           ``no_nonlocal_mostly_no_spike_fraction`` and
-          ``no_nonlocal_mixed_fraction`` (neither).
-        - Of the events overlapping a non-local event, the median share of
-          their rows in each state (``overlap_local_share_median``,
+          ``no_nonlocal_mixed_fraction`` (neither); ``no_nonlocal_n_animals``,
+          the animals with such an event.
+        - Of the events overlapping a non-local event (with state shares), the
+          median share of their rows in each state (``overlap_local_share_median``,
           ``overlap_no_spike_share_median``, ``overlap_nonlocal_share_median``,
-          ``overlap_uncertain_share_median``), and the shares of events with
-          any Local row (``overlap_any_local_fraction``), any No-Spike row
-          (``overlap_any_no_spike_fraction``) and every row non-local
-          (``overlap_all_nonlocal_fraction``).
+          ``overlap_uncertain_share_median``: each epoch's median, each
+          animal's median over its epochs, the mean over animals), and the
+          shares of events with any Local row (``overlap_any_local_fraction``),
+          any No-Spike row (``overlap_any_no_spike_fraction``) and every row
+          non-local (``overlap_all_nonlocal_fraction``);
+          ``overlap_n_animals``, the animals with such an event.
     """
     local, no_spike, non_local, uncertain = STATE_SHARE_COLUMNS
+    session = ["day", "epoch"]
+
+    def by_animal(values: pd.Series, rows: pd.DataFrame, statistic: str) -> float:
+        return float(
+            animal_session_values(
+                values.astype(float), rows["animal"], rows[session], statistic
+            ).mean()
+        )
+
     rows = {}
     for detector, mine in events.groupby("detector"):
         alone = mine[~mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         overlapping = mine[mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         mostly_local = alone[local] > 0.5
         mostly_no_spike = alone[no_spike] > 0.5
-        by_animal = content_class_animal_shares(mine, detector)
-        matched_by_animal = by_animal["with_nonlocal"]
+        shares = content_class_animal_shares(mine, detector)
+        matched_by_animal = shares["with_nonlocal"]
         rows[detector] = {
             "n_events": len(mine),
-            "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),
+            "no_nonlocal_fraction": 1 - matched_by_animal.mean(),
             "no_nonlocal_fraction_animal_min": 1 - matched_by_animal.max(),
             "no_nonlocal_fraction_animal_max": 1 - matched_by_animal.min(),
             "no_nonlocal_fraction_animal_mean": 1 - matched_by_animal.mean(),
-            "mostly_local_fraction": mostly_local.sum() / len(mine),
-            "mostly_local_fraction_animal_mean": by_animal["mostly_local"].mean(),
-            "no_nonlocal_mostly_local_fraction": mostly_local.mean(),
-            "no_nonlocal_mostly_no_spike_fraction": mostly_no_spike.mean(),
-            "no_nonlocal_mixed_fraction": (~mostly_local & ~mostly_no_spike).mean(),
-            "overlap_local_share_median": overlapping[local].median(),
-            "overlap_no_spike_share_median": overlapping[no_spike].median(),
-            "overlap_nonlocal_share_median": overlapping[non_local].median(),
-            "overlap_uncertain_share_median": overlapping[uncertain].median(),
-            "overlap_any_local_fraction": (overlapping[local] > 0).mean(),
-            "overlap_any_no_spike_fraction": (overlapping[no_spike] > 0).mean(),
-            "overlap_all_nonlocal_fraction": (overlapping[non_local] == 1).mean(),
+            "mostly_local_fraction": shares["mostly_local"].mean(),
+            "mostly_local_fraction_animal_mean": shares["mostly_local"].mean(),
+            "no_nonlocal_mostly_local_fraction": by_animal(mostly_local, alone, "mean"),
+            "no_nonlocal_mostly_no_spike_fraction": by_animal(
+                mostly_no_spike, alone, "mean"
+            ),
+            "no_nonlocal_mixed_fraction": by_animal(
+                ~mostly_local & ~mostly_no_spike, alone, "mean"
+            ),
+            "no_nonlocal_n_animals": alone["animal"].nunique(),
+            **{
+                f"overlap_{name}_share_median": by_animal(
+                    overlapping[column], overlapping, "median"
+                )
+                for name, column in (
+                    ("local", local),
+                    ("no_spike", no_spike),
+                    ("nonlocal", non_local),
+                    ("uncertain", uncertain),
+                )
+            },
+            "overlap_any_local_fraction": by_animal(
+                overlapping[local] > 0, overlapping, "mean"
+            ),
+            "overlap_any_no_spike_fraction": by_animal(
+                overlapping[no_spike] > 0, overlapping, "mean"
+            ),
+            "overlap_all_nonlocal_fraction": by_animal(
+                overlapping[non_local] == 1, overlapping, "mean"
+            ),
+            "overlap_n_animals": overlapping["animal"].nunique(),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("detector")
 
@@ -596,18 +661,23 @@ def _selected(table: pd.DataFrame, event_ids: Iterable[object]) -> np.ndarray:
     )
 
 
-def left_out_seconds(
+_LEFT_OUT_SESSION = ["animal", "day", "epoch"]
+"""The columns that name an epoch in the run's and the inventory run's tables."""
+
+
+def left_out_epoch_seconds(
     run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
-) -> dict[str, float]:
+) -> pd.DataFrame:
     """Seconds of the selected non-local events' time outside each other
-    inventory, summed over the run's ``ok`` epochs.
+    inventory, in each of the run's ``ok`` epochs.
 
     Each epoch's compared events (``*_features.parquet``: every inventory's
-    whole-event-immobile events): the time of the non-local events in
-    ``event_ids`` (``nonlocal``), the time the Kay SWRs whose first sample is
-    inside a well visit span (``kay``), and, for each of :data:`COVERINGS`,
-    the part of that non-local time that no event of those inventories covers,
-    wherever the covering event starts (``outside_<covering>``).
+    whole-event-immobile events, with ``animal``, ``day`` and ``epoch``): the
+    time of the non-local events in ``event_ids`` (``nonlocal``), the time the
+    Kay SWRs whose first sample is inside a well visit span (``kay``), and,
+    for each of :data:`COVERINGS`, the part of that non-local time that no
+    event of those inventories covers, wherever the covering event starts
+    (``outside_<covering>``).
 
     Parameters
     ----------
@@ -618,6 +688,11 @@ def left_out_seconds(
     visits : Mapping
         Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
 
+    Returns
+    -------
+    pd.DataFrame
+        One row per ok epoch: ``animal``, ``day``, ``epoch`` and the seconds.
+
     Raises
     ------
     ValueError
@@ -625,19 +700,24 @@ def left_out_seconds(
         ok epoch has no visits in ``visits``.
     """
     event_ids = list(event_ids)
-    totals = dict.fromkeys(
-        ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS)), 0.0
-    )
     identifiers = ok_epochs(read_manifest(run_dir))
     if missing := sorted(set(identifiers) - set(visits)):
         raise ValueError(
             f"no well visits for {len(missing)} epochs, e.g. {missing[:3]}"
         )
+    rows = []
     for identifier, path in zip(
         identifiers, _epoch_paths(run_dir, "features"), strict=True
     ):
         table = pd.read_parquet(
-            path, columns=["detector", "event_key", "event_start_s", "event_end_s"]
+            path,
+            columns=[
+                *_LEFT_OUT_SESSION,
+                "detector",
+                "event_key",
+                "event_start_s",
+                "event_end_s",
+            ],
         )
         is_nonlocal = (table["detector"] == STATE_SPACE).to_numpy()
         selected = np.zeros(len(table), dtype=bool)
@@ -649,12 +729,86 @@ def left_out_seconds(
                 kay["event_start_s"].to_numpy(dtype=np.float64), *visits[identifier]
             )
         ]
-        totals["nonlocal"] += intervals.total_duration(nonlocal_)
-        totals["kay"] += intervals.total_duration(_intervals(kay, ("kay",)))
+        row = dict(table[_LEFT_OUT_SESSION].iloc[0])
+        row["nonlocal"] = intervals.total_duration(nonlocal_)
+        row["kay"] = intervals.total_duration(_intervals(kay, ("kay",)))
         for name, detectors in COVERINGS.items():
             outside = intervals.subtract(nonlocal_, _intervals(table, detectors))
-            totals[f"outside_{name}"] += intervals.total_duration(outside)
-    return totals
+            row[f"outside_{name}"] = intervals.total_duration(outside)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def left_out_seconds(
+    run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
+) -> dict[str, float]:
+    """:func:`left_out_epoch_seconds`, summed over the run's ``ok`` epochs:
+    ``nonlocal``, ``kay`` and ``outside_<covering>`` for each of
+    :data:`COVERINGS`, in seconds.
+
+    Raises
+    ------
+    ValueError
+        As :func:`left_out_epoch_seconds`.
+    """
+    seconds = left_out_epoch_seconds(run_dir, event_ids, visits)
+    names = ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS))
+    return {name: float(seconds[name].sum()) for name in names}
+
+
+def left_out_animal_shares(epochs: pd.DataFrame) -> dict[str, float]:
+    """The shares and rates of :func:`left_out_statistics`, epoch -> animal ->
+    mean over animals, from one row per epoch.
+
+    A time share is each epoch's left-out seconds over its selected non-local
+    seconds (epochs with such time); an event share each epoch's left-out
+    events over its events with a known membership (epochs with such an
+    event); a rate each epoch's left-out events per hour of its exposure
+    inside the well visits (epochs the non-local detector observed, with an
+    exposure; an observed epoch with no left-out event has a rate of 0). Each
+    animal's mean over its epochs with a value, then the mean over the
+    animals with one: an animal with no such epoch is left out.
+
+    Parameters
+    ----------
+    epochs : pd.DataFrame, shape (n_epochs, n_columns)
+        ``animal``, ``day``, ``epoch``; ``nonlocal`` and ``outside_<covering>``
+        (s) for each of :data:`COVERINGS` (NaN for an epoch the run does not
+        hold); ``hours`` (NaN for an epoch not observed); and for each of
+        ``kay``, ``widloski`` and ``trigger``, ``<name>_outside`` (left-out
+        events) and ``<name>_known`` (events with a known membership).
+
+    Returns
+    -------
+    dict
+        ``nonlocal_time_outside_<covering>_fraction``,
+        ``nonlocal_events_outside_<name>_fraction`` and
+        ``nonlocal_events_outside_<name>_per_hour``.
+    """
+
+    def mean_over_animals(values: pd.Series, rows: pd.DataFrame) -> float:
+        return float(
+            animal_session_values(
+                values, rows["animal"], rows[["day", "epoch"]], "mean"
+            ).mean()
+        )
+
+    shares = {}
+    timed = epochs[epochs["nonlocal"] > 0]
+    for name in COVERINGS:
+        shares[f"nonlocal_time_outside_{name}_fraction"] = mean_over_animals(
+            timed[f"outside_{name}"] / timed["nonlocal"], timed
+        )
+    for name in ("kay", "widloski", "trigger"):
+        known = epochs[epochs[f"{name}_known"] > 0]
+        shares[f"nonlocal_events_outside_{name}_fraction"] = mean_over_animals(
+            known[f"{name}_outside"] / known[f"{name}_known"], known
+        )
+        observed = epochs[epochs["hours"] > 0]
+        shares[f"nonlocal_events_outside_{name}_per_hour"] = mean_over_animals(
+            observed[f"{name}_outside"].fillna(0) / observed["hours"], observed
+        )
+    return shares
 
 
 def left_out_statistics(
@@ -693,18 +847,21 @@ def left_out_statistics(
         - ``rest_hours``: hours of the non-local detector's exposure inside a
           well visit, summed over the sessions it observed.
         - ``nonlocal_time_s``, ``kay_time_s``: seconds the selected non-local
-          events, and the Kay SWRs that start inside a visit, span
-          (:func:`left_out_seconds`).
-        - For each of :data:`COVERINGS`, ``nonlocal_time_outside_<covering>_s``
-          and ``..._fraction``: the selected non-local event time it does not
-          cover, in seconds and as a share.
+          events, and the Kay SWRs that start inside a visit, span, summed
+          over the epochs (:func:`left_out_seconds`).
+        - For each of :data:`COVERINGS`, ``nonlocal_time_outside_<covering>_s``,
+          the selected non-local event time it does not cover (summed), and
+          ``..._fraction``, that time as a share of the selected non-local
+          time (:func:`left_out_animal_shares`: each epoch's, each animal's
+          mean over its epochs, the mean over animals).
         - For ``kay`` and ``widloski``, and for ``trigger`` (no SWR definition
           and no MUA event; the comparison's cell
           ``sequence_matched_by_no_trigger``): ``nonlocal_events_outside_<name>``,
           the selected non-local events none of its events overlaps (wherever
-          that event starts); ``..._fraction``, their share of the selected
-          events with a known membership; and ``..._per_hour``, per hour of
-          ``rest_hours``.
+          that event starts; summed); ``..._fraction``, their share of the
+          selected events with a known membership; and ``..._per_hour``, per
+          hour of exposure inside the visits (both
+          :func:`left_out_animal_shares`).
 
     Raises
     ------
@@ -714,7 +871,7 @@ def left_out_statistics(
         detector observed.
     """
     event_ids = list(event_ids)
-    session = ["animal", "day", "epoch"]
+    session = _LEFT_OUT_SESSION
     availability = detector_availability(
         typed_table(
             map(read_table, _epoch_paths(inventory_dir, "observations")),
@@ -732,18 +889,16 @@ def left_out_statistics(
     )
     if exposed["exposure_in_visit_s"].isna().any():
         raise ValueError("the exposure lacks a session the non-local detector observed")
-    hours = float(exposed["exposure_in_visit_s"].sum()) / 3600.0
-    seconds = left_out_seconds(run_dir, event_ids, visits)
+    exposed = exposed.assign(hours=exposed["exposure_in_visit_s"] / 3600.0)
+    seconds = left_out_epoch_seconds(run_dir, event_ids, visits)
     statistics = {
-        "rest_hours": hours,
-        "nonlocal_time_s": seconds["nonlocal"],
-        "kay_time_s": seconds["kay"],
+        "rest_hours": float(exposed["hours"].sum()),
+        "nonlocal_time_s": float(seconds["nonlocal"].sum()),
+        "kay_time_s": float(seconds["kay"].sum()),
     }
     for name in COVERINGS:
-        outside = seconds[f"outside_{name}"]
-        statistics[f"nonlocal_time_outside_{name}_s"] = outside
-        statistics[f"nonlocal_time_outside_{name}_fraction"] = (
-            outside / seconds["nonlocal"]
+        statistics[f"nonlocal_time_outside_{name}_s"] = float(
+            seconds[f"outside_{name}"].sum()
         )
 
     membership = _read_epochs(
@@ -751,12 +906,7 @@ def left_out_statistics(
     )
     known = membership[
         membership["membership"].isin(_KNOWN) & _selected(membership, event_ids)
-    ]
-    alone = (
-        known.assign(alone=known["membership"] == "unmatched")
-        .groupby("other_detector")["alone"]
-        .agg(["sum", "size"])
-    )
+    ].assign(alone=lambda t: t["membership"] == "unmatched")
     cells = typed_table(
         map(read_table, _epoch_paths(inventory_dir, "cells")), TABLE_DTYPES["cells"]
     )
@@ -764,20 +914,39 @@ def left_out_statistics(
         (cells["cell"] == "sequence_matched_by_no_trigger")
         & (cells["detector"] == STATE_SPACE)
     ].merge(observed, on=session, how="inner")
-    no_trigger = cells.loc[_selected(cells, event_ids), "membership"]
-    outside_events = {
-        "kay": (int(alone.loc["kay", "sum"]), int(alone.loc["kay", "size"])),
-        "widloski": (
-            int(alone.loc[MEMORYLESS, "sum"]),
-            int(alone.loc[MEMORYLESS, "size"]),
-        ),
-        "trigger": (
-            int((no_trigger == "unmatched").sum()),
-            int(no_trigger.isin(_KNOWN).sum()),
-        ),
+    cells = cells[_selected(cells, event_ids) & cells["membership"].isin(_KNOWN)]
+    cells = cells.assign(alone=cells["membership"] == "unmatched")
+    epochs = seconds.merge(exposed[[*session, "hours"]], on=session, how="outer")
+    for name, table in (
+        ("kay", known[known["other_detector"] == "kay"]),
+        ("widloski", known[known["other_detector"] == MEMORYLESS]),
+        ("trigger", cells),
+    ):
+        counts = (
+            table.groupby(session)["alone"]
+            .agg(["sum", "size"])
+            .set_axis([f"{name}_outside", f"{name}_known"], axis=1)
+            .reset_index()
+        )
+        epochs = epochs.merge(counts, on=session, how="outer")
+        statistics[f"nonlocal_events_outside_{name}"] = int(table["alone"].sum())
+    for key, value in left_out_animal_shares(epochs).items():
+        statistics[key] = value
+    return {
+        key: statistics[key]
+        for key in (
+            "rest_hours",
+            "nonlocal_time_s",
+            "kay_time_s",
+            *(
+                f"nonlocal_time_outside_{name}_{unit}"
+                for name in COVERINGS
+                for unit in ("s", "fraction")
+            ),
+            *(
+                f"nonlocal_events_outside_{name}{suffix}"
+                for name in ("kay", "widloski", "trigger")
+                for suffix in ("", "_fraction", "_per_hour")
+            ),
+        )
     }
-    for name, (n, n_known) in outside_events.items():
-        statistics[f"nonlocal_events_outside_{name}"] = n
-        statistics[f"nonlocal_events_outside_{name}_fraction"] = n / n_known
-        statistics[f"nonlocal_events_outside_{name}_per_hour"] = n / hours
-    return statistics

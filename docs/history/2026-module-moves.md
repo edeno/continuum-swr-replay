@@ -894,3 +894,57 @@ removed. `event_bin_facts`' records keep the deleted run's record digest
 | `paths.EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR`, `..._SWR_ALLOWED_HELDOUT_EVENTS_DIR`, `..._SWR_ALLOWED_WINDOWS_DIR` (removed) | `paths.EVENT_NONLOCAL_RESTRICTION_DIR`, `..._HELDOUT_EVENTS_DIR`, `..._WINDOWS_DIR` |
 | `EventsInputs.nonlocal_restriction_swr_allowed`, `nonlocal_restriction_swr_allowed_heldout_events` (removed) | `EventsInputs.nonlocal_restriction`, `nonlocal_restriction_heldout_events` |
 | `REFUSED_FOUR` in `scripts/figures/generate_supp_figure02.py` (removed) | panel l reads panel i's runs |
+
+## Figure 2's code, 2026-11-24
+
+The figure scripts of Figure 2 and its supplement were given one shape (inputs read
+first, then drawn), and what they share moved into shared modules. Paths are under
+`src/continuum_swr_replay/` unless they start with `scripts/` or `tests/`.
+
+| Old place | New place |
+|---|---|
+| `visualization/simulated_run_panels.py`: `LABEL_SIZE`, `SMALL_SIZE`, `PANEL_LETTER_SIZE`, `set_publication_style`, `MAX_FIGURE_SIZE_CM`, `TEXT_SIZE_LIMITS_PT`, `LINE_WIDTH_LIMITS_PT`, `check_journal_limits`, `drawn_extent`, `drawn_texts`, `TEXT_OVERLAP_PT`, `overlapping_texts`, `overlapping_panels`, `check_placement` (removed: moved) | `visualization/publication_style.py` |
+| `tests/visualization/test_simulated_run_panels.py`: the journal-limit and placement tests (removed: moved) | `tests/visualization/test_publication_style.py` |
+| `reported/events.py`: `EventsInputs`, `default_inputs`, `_input_staleness` (now `input_staleness`), `event_table_staleness`, `require_fold_fit`, `run_staleness`, `HeldoutRestriction`, `restriction_inputs_note`, `restriction_input_staleness`, `checked_reference`, `read_checked`, `HELDOUT_EVENTS_RERUN`, `HELDOUT_RESTRICTION_RERUN`, `heldout_restriction_refusal`, `read_heldout_restriction` (removed: moved; `reported.events.default_inputs` is the same function, for `summarize.py`) | `reported/inputs.py`, with `output_staleness`, `participation_staleness`, `read_figure_restriction` and `panel_refusal`, which the figures and the summary share |
+| `scripts/figures/generate_figure02.py`: `generate_figure(nwb_file_name, epoch_name, data_dir, use_cache)` and `--data-dir` (removed) | `read_inputs(nwb_file_name, epoch_name, use_cache)`, then `generate_figure(inputs)`; the data root is `$CSR_PROCESSED_DATA_DIR` |
+| `scripts/figures/generate_figure02.py`: `BOTTOM_LETTERS`, `BOTTOM_PANELS`, `BOTTOM_ROWS`, `BOTTOM_COLUMNS`, `read_participation(folder, ...)`, `restriction_refusal`; the panel names `traces`, `ripple_power` (removed) | `LAYOUT`, `PANELS`, `LETTERS`, `LETTER_ROWS`, `LETTER_COLUMNS`, `read_participation(inputs, ...)`, `reported.inputs.panel_refusal`; `event_traces`, `nonlocal_ripple_power` |
+| `scripts/figures/generate_supp_figure02.py`: `read_inputs()`'s keys `calibration`, `no_spike`, `probability`, `distance`, `sweep`, `timing`, `mua`, `mua_states`, `split`, `outside`, `parts`; `REFUSED` (removed) | one key per panel, its name in `LAYOUT` (`nonlocal_mua` and `outside_distance` hold two tables each); `reported.inputs.panel_refusal` |
+| `tests/scripts/figures/test_figure_script_fixes.py`: Figure 2's tests, its shared helpers and the `offline` fixture (removed: moved) | `tests/scripts/figures/test_generate_figure02.py`, `tests/support/_figure02_tables.py`, `tests/scripts/figures/conftest.py` |
+| `test_the_figure02_panel_e_label_lies_inside_the_figure` (removed) | none: it drew a proxy of a layout the figure no longer has |
+| `scripts/figures/generate_figure02.py`: `CLASS_ORDER`, `CLASS_COLORS`, `CLASS_LABELS`, `C_NO_SWR`, `DECODER_TIMES`, `DECODER_OUTSIDE`; `generate_supp_figure02.py`: `TRACE_CLASSES`, `TRACE_LABELS`, `OUTSIDE_LABEL`, `TRIGGER_WINDOW_S`; `generate_figure03.py` and `generate_supp_figure03.py`: `KINDS`; `visualization/figure_panels.py`: `_EVENT_CLASSES` (removed) | `visualization/palettes.py`: `EVENT_KINDS`, `OVERLAP_CLASSES`, `SIGNAL_LABELS`; `visualization/heldout_gain_panels.py`: `DIFFERENCE_LABELS`, `EVENTS_LABELS`; `analysis/event_properties/triggered_analysis.py`: `WINDOW_KINDS`, `TRIGGERED_WINDOW_S` |
+| `scripts/figures/generate_figure02.py`: its render cache (`_compute_figure_inputs`, `_figure02_cache_path`, the four fingerprint functions, `FIGURE02_CACHE_VERSION`, `Processed-Data/intermediates/*_figure02_*_cache.joblib`), `--force-recompute` and `frame_event_counts` (removed) | `Processed-Data/event_trigger_windows/` (`scripts/event_properties/measure_trigger_windows.py`), read by `reported.inputs.read_trigger_windows`; `triggered_analysis.frame_event_counts`; the example session is loaded at each render (`read_session`) |
+| `scripts/figures/generate_supp_figure02.py`: `read_frame_traces`, `_epoch_keys`, `_frame_epoch`, `--workers`, `NO_SPIKE_WORKERS`, `NO_SPIKE_SIGNAL` (removed) | `read_traces`, from `event_trigger_windows/` (`triggered_analysis.stored_no_spike_trace`, `stored_animal_window_medians`, `NO_SPIKE_SIGNAL`) |
+| `scripts/figures/generate_figure02.py`: `EXAMPLE_NWB_FILE`, `EXAMPLE_EPOCH`; the example session read with `load_data` at each render (removed) | `parameters.EXAMPLE_NWB_FILE`, `EXAMPLE_EPOCH`; `Processed-Data/example_session/<epoch_id>/` (`scripts/decoding/store_example_session.py`), read by `reported.inputs.read_example_session`; the position, SWRs and track graph from the decode frame and the decode's environment |
+
+## The per-animal shares by signal, 2026-11-24
+
+The per-animal table by ripple power and MUA holds shares since the averaging rule
+(each epoch's share, then the animal's mean over its epochs), so its functions were
+renamed. `nonlocal_by_signal.nonlocal_counts` still returns per-epoch counts and keeps
+its name.
+
+| Old place | New place |
+|---|---|
+| `analysis.event_properties.event_statistics.animal_signal_counts` | `event_statistics.animal_signal_shares` |
+| `analysis.event_properties.nonlocal_by_signal.animal_nonlocal_counts` | `nonlocal_by_signal.animal_nonlocal_shares` |
+| `scripts/figures/generate_supp_figure02.py`: `read_mua_counts` | `read_mua_shares` |
+
+## The regression fitter's test-only code, 2026-11-24
+
+Public code of `analysis/regression/` that only the package's own tests used was removed
+(the lead, 2026-11-24: "yes remove"), and the padded rows got one container. No result
+changed: the stored reference outputs (`tests/analysis/regression/data/numpy_reference/`)
+pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
+
+| Old place | Why it went, and what replaces it | Commit |
+|---|---|---|
+| `Likelihood.loglik`, `score_eta`, `information`, `dinformation`, `d2information` (removed) | only tests called them; the kernels call the families' `_jax_*` functions, which the tests now call through `tests/analysis/regression/conftest.py:family_kernel`; `weighted_design` stays | e6a115fd |
+| `record.write_records`, `read_records`, `records_frame`, `JSON_FIELDS`, `describe` (removed) | only `test_record.py` used the parquet storage and the words of the causes; `FitRecord` and `NoFit` stay | 1bfcb448 |
+| `support.terms_failing_share` (removed) | its 20 % rule was never applied by a fit; `constants.MAX_FAILING_SHARE` stays (the penalty search and `visit_rate.third_clock_decision` read it) | dcd7dbd4 |
+| `terms.prior_sd_from_log_penalty` (removed) | only a test called it; the prior SD of a log penalty `rho` is `exp(-rho / 2)` | c82dd554 |
+| `reml.PenaltySearch.n_grid_not_finite`, `share_without_fit` (removed) | only tests read them; `sum(search.grid_failures.values())`, and the share of `search.set_aside` not `fitted` | c82dd554 |
+| `reml.SetAsideSession.running_away` (removed) | only tests read it; `reference.fit.running_away` | c82dd554 |
+| `runtime.require_device` (removed) | a one-line wrapper; `in_float64` calls `runs.device.require_one_jax_device` | c82dd554 |
+| `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
+| `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
+| `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |

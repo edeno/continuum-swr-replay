@@ -19,7 +19,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
 | `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
-| `record.py` | the fit-row record and its parquet storage |
+| `record.py` | the fit-row record and the closed set of causes of a session without a kept fit |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
@@ -282,7 +282,7 @@ in choosing the penalties); one without a fit has NaN coefficients, covariance, 
 score. `PooledFit.score` is the
 pooled score over `search.in_choice` only, so two models' scores are compared only on
 the same set. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for reporting
-a model) of the sessions end without a fit (`PenaltySearch.share_without_fit`), the
+a model) of the sessions end without a fit (set aside and not fitted by their refits), the
 search raises, naming each with its statuses and the reason.
 
 In exact arithmetic the first refit, before any column is left out, cannot succeed:
@@ -297,7 +297,7 @@ fitted. A search that does not converge (50 steps, or a step no halving accepts)
 too, with the last log strengths, the gradient and the steps taken; there is no argument
 that returns an unconverged result. When sessions fail at only part of the grid, the
 search goes on from the finite points and records how many failed and why
-(`PenaltySearch.n_grid_not_finite`, `grid_failures`: the count per status).
+(`PenaltySearch.grid_failures`: the count per status).
 `fit_at_penalties` fits at given strengths without a search (and without the score's
 derivatives).
 Each session's fit carries its covariance `A^-1` (mgcv's `Vp`) and the edf per term and in
@@ -426,7 +426,7 @@ the `by` of another term is not a term, and its penalty is not read.
 
 A fixed log penalty `rho` on a simple coefficient is a Normal prior of mean 0 and SD
 `exp(-rho / 2)`: the fit minimizes `-l + exp(rho) b**2 / 2`
-(`terms.log_penalty_from_prior_sd` and `terms.prior_sd_from_log_penalty`). The
+(`terms.log_penalty_from_prior_sd`). The
 coefficient is in the unit the convention reports: a 0/1 column enters as it is (a step
 from 0 to 1), and a continuous column enters divided by its pooled SD (centered first
 when it is by a category), so its coefficient is per pooled SD and the prior SD is too.
@@ -517,8 +517,11 @@ the event counts before a fit. A level of a category passes when `MIN_UNITS = 5`
 have a row of the level. A 0/1 slope passes when 5 units have a row where it is 1 and 5
 have a row where it is 0. A continuous slope passes when 5 units have a row above the
 median of its rows and 5 have a row below it; a constant column fails. The units and the
-rule are in the module docstring. A term that fails in more than `MAX_FAILING_SHARE`
-(20 %) of the sessions with a fit leaves the per-session model (`terms_failing_share`).
+rule are in the module docstring. No share of sessions failing the rule drops a term
+from the model (the function that computed it, `terms_failing_share`, was never called and
+was removed on 2026-11-24); the constant `MAX_FAILING_SHARE` remains, because the penalty
+search and the rate model's third-clock decision (`visit_rate.third_clock_decision`) read
+it.
 A smooth and a lag functional have no counts; every term is judged by the design check.
 
 The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
@@ -601,9 +604,7 @@ in `sessions.py`'s docstring). A record
 whose status is not "converged" is kept; its readers flag it. Every cause is a code of a
 closed set, so that sessions can be counted by cause: `support.Removed` for a term left
 out (`left_out`, with the refit's round in `left_out_round`), `record.NoFit` for a
-session without a kept fit (`no_fit`); `record.describe` gives their words. `write_records` and
-`read_records` store the records through `tables.io` (`write_table`, `read_table`), the
-structured fields as JSON strings.
+session without a kept fit (`no_fit`).
 
 ## Contrasts
 
@@ -789,20 +790,20 @@ set, since its interface takes rows, not a built design.
 
 ## Precision, devices, threads and padding
 
-The fit at fixed penalties runs in JAX, one fitter for every model: the likelihoods'
-kernels (`likelihoods.py`), the Newton iteration and the evaluation of the objective
-(`newton.py`), and REML's fixed-penalty summary and profiled Gaussian (`reml.py`). What is
-still NumPy: the design check, the columns running away, the penalty search and the
-refits, and REML's gradient and Hessian in the log penalties, which factor `A` with SciPy
-and read the information's derivatives from the likelihoods' JAX kernels through their
-public methods (they move to JAX next).
+The fit at fixed penalties and REML's score with its gradient and Hessian in the log
+penalties run in JAX, one fitter for every model: the likelihoods' kernels
+(`likelihoods.py`), the Newton iteration and the evaluation of the objective (`newton.py`),
+and REML's fixed-penalty summary, its derivatives and the profiled Gaussian (`reml.py`).
+What is still NumPy: the design check, the columns running away, the penalty search and
+the refits, and REML's rotation of the design into the penalties' eigenbasis (below,
+"REML's derivatives").
 
 **The kernels and the host loop.** Each family has JAX functions of the padded rows and
 their weights (`_jax_loglik`, `_jax_score`, `_jax_information`, `_jax_dinformation`,
-`_jax_d2information`, `_jax_weighted_design`). The public methods (`loglik`,
-`score_eta`, `information`, `dinformation`, `d2information`, `weighted_design`) take
-NumPy arrays, pad them and run one jitted kernel on those functions; a likelihood made for
-a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
+`_jax_d2information`, `_jax_weighted_design`). The one public method on them,
+`weighted_design`, takes NumPy arrays, pads them and runs one jitted kernel; the tests call
+the other functions on NumPy rows the same way (`conftest.family_kernel`). A likelihood
+made for a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
 once and runs a host loop in Python and NumPy that holds every rule, status and count of
 "The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
@@ -850,6 +851,64 @@ row count. It is not a proof: XLA can write the same copy as a `copy` to another
 (the old `X.T @ score` compiled to a `transpose` and then a `copy`), which it would not
 see if the `transpose` went away, and a form whose copy appears only in some programs is
 caught only in those it compiles.
+
+**REML's derivatives.** `reml_and_derivatives` fits by `newton._fit_one`, which returns
+the fit with its problem, whose padded rows are on the device. The score, `A^-1`, the edf
+and the gradient and Hessian in `rho` are then one call of one kernel on those rows and on
+one Cholesky factor of `A` (`reml._laplace_derivatives`, the family a static argument;
+the profiled Gaussian's are in `reml._profiled_gaussian`, which needs no product with the
+design beyond its Gram; it is given the stack of penalties only when the derivatives are
+asked for, so it has two programs per shape, the score alone and the score with its
+derivatives). The rows are padded and moved once
+for a fit and its derivatives; the NumPy loops called the public `dinformation` and
+`d2information` (since removed) once for each penalty and pair, each padding and moving `X` again. The
+penalties are the leading axis of the kernel's arrays (`S_j` of shape `(m, p, p)`): a new
+number of penalties is a new shape and so a new program, and a model has one. With
+`b_j = -A^-1 S_j b` and `E = X [b_1 ... b_m]`, the `m` matrices `A_j = S_j + dH(E_j)` are
+made one at a time (`jax.lax.map`), and the Hessian is computed for `j <= k` and mirrored,
+so it is exactly symmetric. With `A_jk = d2H(E_j, E_k) + dH(X b_jk) + delta_jk S_j`, the
+Hessian's trace `tr(A^-1 A_jk)` is the sum of three terms: `tr(A^-1 S_j)` is its own term,
+and the traces of the two derivatives of the information, `tr(A^-1 d2H(E_j, E_k))` and
+`tr(A^-1 dH(X b_jk))`, are read by the family's `_jax_information_traces`; the cross term
+`tr(A^-1 A_k A^-1 A_j)` is computed from the `m` matrices `A^-1 A_j` in full. For the
+Poisson and the Bernoulli (the diagonal families) those two traces come from `h_i = x_i' A^-1 x_i` without making the derivatives:
+`tr(A^-1 X' diag(c) X) = sum_i c_i h_i`, so the traces of all pairs are
+`(weight w' h) @ (X b_jk)` and `E' diag(weight w'' h) E`. An evaluation with derivatives
+then makes `m + 1` products of the size of a Gram (the `A_j` and `X A^-1`) where the
+NumPy loops made `m + m (m + 1)` (8 for two penalties, now 3), beside smaller products of
+the design with vectors, `X b_j` and `X b_jk` (`n p m` and `n p m (m + 1) / 2` multiplies).
+For the grouped softmax
+they come from the derivatives made in full, one at a time, as before. The hand-written
+gradient and Hessian equal `jax.grad` and `jax.hessian` of the score written in JAX
+(the information from `jax.hessian` of the log-likelihood, the fit as four Newton steps
+from the optimum, written in the penalties' eigenbasis) to 7e-12 of their largest entry or
+less (most below 1e-13),
+one, two and three penalties (the third a ridge, without a null space) on 120 rows at
+moderate and strong log penalties, every family (`tests/analysis/regression/test_reml.py`);
+the central differences of the score
+check them as before. The kernels hold few copies of the design: XLA's memory analysis of
+the compiled programs (20,000 x 40 rows, CPU) gives temporaries of 1.1 to 1.2 times the
+padded design for the Poisson and the Bernoulli at two or three penalties (2.1 at one,
+where XLA keeps the one weighted copy and `X A^-1` at once), 1.0 for the Gaussian, and 3.4
+to 4.0 for the grouped softmax, whose sandwich forms keep several weighted copies `u X`
+for their segment sums at once (as its information kernels do).
+
+The rotation of the design into the penalties' eigenbasis is a NumPy product, `X Q` with
+`Q` the block-diagonal rotation (identity off the blocks). Assigning each block's columns
+by index, as it was, cost 140 to 160 ms at 39,792 x 56 (two blocks); the product 24 ms.
+The two are equal to the bit when each block's columns are contiguous and ascending, as the
+designs of `terms` make them; with a block's columns permuted or interleaved with another's
+they differed by up to 8.9e-16 in 6 of 28 layouts tried (an independent review,
+2026-11-24), far inside the references' rule. A value of the design that is not finite
+would be spread by the product over its row's columns of the block, so the design is
+checked before it is rotated, and the count of entries not finite in the error is the
+design's own. Moving it to the device would mean padding and moving the
+design before the rotation and reading the rotated design back for the design check
+(`newton._unidentified`) and for the columns running away; on the CPU XLA's product is
+slower than BLAS's, so it would gain nothing there. What costs more at the rate model's
+size is that each REML evaluation of a session rotates, checks, pads and moves its design
+again; keeping a session's rotated design on the device from one evaluation to the next
+is the step that would remove it.
 
 **How the log-likelihood is summed.** The last step of a fit is taken when `F` does not
 rise by more than `8 eps max(1, |F|)`, which only the rounding of `F` decides at the
@@ -907,10 +966,9 @@ jitted through `runtime.float64_kernel`, which refuses when it is traced with th
 or with a floating input that is not float64. A float64 array made inside the scope stays
 float64 after it, but arithmetic on it outside the scope is in float32.
 
-**One device.** `in_float64` first calls `runtime.require_device`, which is
-`runs.device.require_one_jax_device`: the fitter refuses to start unless this process
-configured a card (`configure_jax_gpu`), `JAX_PLATFORMS` excludes CUDA, or
-`CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
+**One device.** `in_float64` first calls `runs.device.require_one_jax_device`: the
+fitter refuses to start unless this process configured a card (`configure_jax_gpu`),
+`JAX_PLATFORMS` excludes CUDA, or `CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
 starts no backend. The message says what to set. A runner that fits calls
 `runs.device.default_jax_platforms("cpu")` in `main` unless it asks for a GPU
 (`simulate_declared_penalty.py`, `compare_regression_to_mgcv.py`,
@@ -966,11 +1024,13 @@ or a null space) it is "design not identified" at the start, log-likelihood 0, n
 where the penalty has full rank it is "converged" at its minimum, `beta = 0` whatever the
 start, with `A = S`, a decrement of 0 and a log-likelihood of 0 (the NumPy fitter raised
 there, by accident); a grouped softmax without rows is refused (`ValueError`, no groups).
-A per-row argument (`eta`, `d`, `d1`, `d2`, `y`, a per-row offset) needs one value per row
-on one axis: a column of shape (n, 1) is refused with its name and shape, since it would
-broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out -1536.6 for
--5.82). So is a scalar or a one-element array given for a per-row vector, which the NumPy
-code broadcast: that narrowing is intended. A single Poisson offset is still every row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
+A per-row argument of the weighted design (`eta`, `y`, a per-row offset) needs one value per
+row on one axis: a column of shape (n, 1) is refused with its name and shape, since it
+would broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out
+-1536.6 for -5.82). So is a scalar or a one-element array given for a per-row vector, which
+the NumPy code broadcast: that narrowing is intended. When the rows are padded
+(`Poisson.pad`) a single Poisson offset is every row's, but a fit refuses it:
+`Poisson.check`, which `penalized_newton` calls at its entry, needs one offset per row. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
 every quantity unchanged, exactly, and the kernels equal the formulas written in NumPy in
 the test. The padded and unpadded log-likelihood, gradient, information and its two
 directional derivatives agree to 1e-12 of their largest entry for each family, the kernels
@@ -1014,6 +1074,23 @@ so that every program is stored) the same 700 fits took 554 s, a long driver's c
 `tests/analysis/regression` without its slow tests traces about 435 programs in one
 process, so it clears once or twice; the tests that count traces fix the limit high for
 their own run.
+
+The clear can fire only at the entry of an outermost call, so which functions carry
+`in_float64` decides where the bound holds. The per-session loop (`sessions.fit_sessions`)
+and the calibration (`calibration.log_penalty_for_edf`, which runs that loop at each trial
+penalty) do not carry it: each session's fit is an outermost call, the caches can be cleared
+between two sessions, and the live programs stay bounded through a whole cohort
+(`test_the_program_bound_holds_between_the_sessions_of_one_loop`,
+`test_the_program_bound_holds_during_a_calibration`). The penalty searches
+(`select_penalties`, `refine_penalties`, `fit_at_penalties`, `pooled_reml`), `refit_session`
+and `term_collinearity` do carry it, so that no clear falls between two evaluations of one
+search, which would compile every session's programs again at each evaluation
+(`test_a_search_clears_the_caches_at_most_once_at_its_entry`). **Inside one search the
+bound therefore does not hold**: a search keeps one set of programs for each row bucket and
+each number of active columns among its sessions. How many that is for a full cohort has
+not been measured; measure it (`runtime.live_programs()`) before a search over a whole
+cohort is run, and see the planned fixed-width kernels (inactive columns as a mask), which
+make the count the number of row buckets.
 
 **Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
 so every module of the fitter that imports them (`sessions`, `calibration`, `record`,
@@ -1085,7 +1162,48 @@ in its compilations, not its fits. Its slow test of penalty selections on small 
 (`test_simulation.py::test_coverage_and_size`, 2,000 selections of about 100 summed cells)
 took 415 s before and 183 s after, in the same minutes. What remains of a small fit is the
 host: the cost of each kernel call (about 0.3 ms for an iteration of 300 rows), the design
-check (`_unidentified`) and REML's rotations. At the rate size REML's copy of the design
-into the penalties' eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a
-refit, and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
+check (`_unidentified`) and REML's rotations. REML's copy of the design into the
+penalties' eigenbasis (`reml_and_derivatives`, in NumPy) is now one product, 24 ms at
+39,792 x 56 where assigning each block's columns took 140 to 160 ms (the 55 to 60 ms of a
+rate refit measured before it were of that older form, at 37,000 x 76), and XLA's product for the Gram is slower than BLAS's `syrk` for an unweighted
 `X' X`, which XLA does not call.
+
+REML's gradient and Hessian in JAX, and the rotation by one product ("REML's
+derivatives", above), against the code before them (2e0ea0d0), by the `--child` cases of
+`scripts/checks/time_regression_fitter.py` run in one process per version and round. One
+thread, each process pinned to one CPU, the versions in turn on the same CPU in the same
+minutes, under heavy load (1-minute load average 70 to 82 on 96 CPUs; 2026-11-24). Each
+cell is the least time over all calls of all rounds, then the median of the rounds'
+medians. "Derivatives" is the derivatives in JAX alone (0bc534a0), "after" with the
+rotation as well (44d9ec2e). Under that load the table resolves differences of about
+25 %, and smaller ones are not to be read: `fit_rate` computes no derivatives, so its
+"derivatives" column, slower than "before", is noise.
+
+| Case | Rounds | Before: least, median | Derivatives: least, median | After: least, median | Traces before, after |
+|---|---|---|---|---|---|
+| select_cost, 2 sessions of 39,792 x 56 | 3 | 23.0 s, 25.0 s | 21.9 s, 24.8 s | 15.7 s, 18.9 s | 5, 4 |
+| fit_sessions_30 | 3 | 15.6 s, 18.3 s | 16.9 s, 17.5 s | 11.4 s, 11.9 s | 16, 16 |
+| fit_rate (37,000 x 76) | 8, 4, 8 | 430, 544 ms | 468, 693 ms | 342, 491 ms | 3, 3 |
+| calibration_30 | 1 | 247 to 254 s | | 238 s | 16, 16 |
+
+One REML evaluation of one `select_cost` session with its derivatives (warm start, seven
+calls) took 688 ms before and 418 ms with the derivatives in JAX; the score alone 245 and
+238 ms. The search spends most of its evaluations on the score alone (the grid), so the
+selection gains less than an evaluation; the rotation, which every evaluation pays, gave
+the rest (it took 140 to 160 ms of each, now 24 ms). Evaluations of 120 rows and two
+smooths with derivatives (200 calls each, only two rounds, so these few milliseconds are
+less certain than the table): Poisson 3.7 to 2.3 ms, Bernoulli
+3.6 to 2.3 ms, Gaussian 2.6 to 2.5 ms, grouped softmax 5.3 to 3.1 ms; what is left is
+the host (two Newton iterations, three evaluations of `F`, the design check, the
+transfers). The slow test of 2,000 small selections
+(`test_simulation.py::test_coverage_and_size`) took 406 s before and 343 s after, run at
+the same time on two CPUs (290 s before, alone, earlier the same day: the load moves it
+more than the change does). `tests/analysis/regression` without its slow tests, over the
+464 tests both versions have, took 605 s before and 591 s after (at the same time) and
+traced 610 and 519 programs: a Laplace family's REML derivatives are one program where the
+public `dinformation` and `d2information` were two, and a selection's traces fell from 5
+to 4. The 19 tests added with the change (the derivatives against automatic
+differentiation, the padding of the new kernels, the traces, the canary) bring the whole
+to 583 programs and about 820 s. The calibration and the per-session fits compute no
+derivatives; they gain from the rotation alone, and calibration_30's single calls are
+within the noise.

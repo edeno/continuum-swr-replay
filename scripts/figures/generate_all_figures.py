@@ -31,11 +31,14 @@ Usage:
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
+
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,7 +82,8 @@ def run_figure_script(
     script_config : dict
         Script configuration with 'script' and 'output_dir' keys
     data_dir : Path | None
-        Data directory override (if applicable)
+        The data root the script reads (``$CSR_PROCESSED_DATA_DIR``), when not
+        the caller's.
 
     Returns
     -------
@@ -91,8 +95,10 @@ def run_figure_script(
     cmd = [sys.executable, script_config["script"]]
     cmd.extend(["--output-dir", script_config["output_dir"]])
 
-    if data_dir and script_name != "figure01":
-        cmd.extend(["--data-dir", str(data_dir)])
+    # the data root of every script ($CSR_PROCESSED_DATA_DIR, read through paths)
+    env = dict(os.environ)
+    if data_dir:
+        env[PROCESSED_DATA_DIR_ENV] = str(data_dir)
 
     start_time = time.time()
     try:
@@ -101,6 +107,7 @@ def run_figure_script(
             check=True,
             capture_output=True,
             text=True,
+            env=env,
         )
         elapsed = time.time() - start_time
         logging.info(f"  {script_name} completed in {elapsed:.1f}s")

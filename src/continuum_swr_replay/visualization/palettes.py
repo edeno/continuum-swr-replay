@@ -3,6 +3,10 @@
 - :data:`COLORS` — one color per event type and decoder state (SWR, MUA,
   Non-Local, Local, No-Spike, ...), used by every figure.
 - :data:`CONTFRAG_COLORS` — the Continuous/Fragmented classifier's two states.
+- :data:`EVENT_KINDS` and :data:`OVERLAP_CLASSES` — the names and colors of the
+  non-local events' kinds (no-SWR and SWR) and of their three classes by SWR
+  overlap, as every figure names and colors them; :data:`SIGNAL_LABELS`, the
+  per-time-bin signals' names.
 
 Two arm palettes live here too:
 
@@ -56,6 +60,28 @@ COLORS: dict[str, str] = {
     "Combined": "#e6ab02",
 }
 """Color scheme for plotting the event types and decoder states."""
+
+EVENT_KINDS: dict[bool, tuple[str, str]] = {
+    False: ("No SWR", COLORS["No SWR"]),
+    True: ("SWR", COLORS["SWR"]),
+}
+"""The two kinds of non-local event, by ``is_swr``, no-SWR first (the figures'
+order): each kind's name and color."""
+OVERLAP_CLASSES: dict[str, tuple[str, str]] = {
+    "swr_contained": ("Inside SWR", COLORS["SWR"]),
+    "swr_partial": ("Partly in SWR", COLORS["SWR partial"]),
+    "non_swr": EVENT_KINDS[False],
+}
+"""The non-local events' three classes by SWR overlap (``overlap_class``), in
+the figures' order: each class's name and color."""
+SIGNAL_LABELS: dict[str, str] = {
+    "SWR_zscore": "Ripple (z)",
+    "MUA_zscore": "MUA (z)",
+    "theta_power_zscore": "Theta (z)",
+    "head_speed": "Speed (cm/s)",
+}
+"""Each per-time-bin signal's name on a figure's axis, by its decode frame
+column."""
 
 REFERENCE_COLOR = "#777777"
 """A neutral gray for reference levels and their names (a zero line, a level

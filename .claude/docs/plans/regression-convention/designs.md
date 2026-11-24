@@ -82,7 +82,7 @@ direction). `in_null_space(session, blocks)` flags, per block, a term shrunk to 
 straight line). `search` is a `PenaltySearch` (None from `fit_at_penalties`): `reference_rho`, `in_choice`
 (the sessions whose scores chose the penalties; `PooledFit.score` is over these only), `set_aside`
 (`SetAsideSession`s with `reference`, `refits`, `left_out`, `reason` and `fitted`), `grid_failures` per
-status, `n_outer_steps`, `at_boundary` per term and `share_without_fit`. A set-aside session has its refit
+status, `n_outer_steps`, `at_boundary` per term and `share_without_fit` (removed 2026-11-24: the share of `set_aside` not `fitted`). A set-aside session has its refit
 in `sessions`, NaN at the columns left out, or NaN values when it has no fit.
 
 **Statuses** (`newton.FitStatus`; `NewtonFit.converged` is true only for the first): "converged", "design
@@ -184,7 +184,9 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   raises an error that names every tested coefficient or term without a fixed penalty.
 - A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
   `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
-  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.
+  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead. (Not
+  applied: no fit read the share, and `support.terms_failing_share` was removed on 2026-11-24, the lead's
+  choice.)
 - A term that fails in a session is made inactive there (`SessionData.active`). When the term is a 0/1 role
   column (a role category, such as the previous arm), the rows with that role are dropped from that
   session's fit and counted, not merged into the reference role. Found by simulation (scratch

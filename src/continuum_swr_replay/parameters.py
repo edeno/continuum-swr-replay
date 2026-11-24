@@ -79,6 +79,11 @@ SAMPLING_FREQUENCY = 500
 DECODE_SAMPLE_S: Final[float] = 1 / SAMPLING_FREQUENCY
 """The decode's time step (s): 2 ms at ``SAMPLING_FREQUENCY`` = 500 Hz."""
 
+EXAMPLE_NWB_FILE: Final[str] = "wilbur20210329_.nwb"
+EXAMPLE_EPOCH: Final[str] = "02_r1"
+"""The example session drawn in Figure 2's panels a and b, whose recording
+``scripts/decoding/store_example_session.py`` stores by default."""
+
 # Canonical whole-event immobility threshold for Non-Local, SWR, and MUA
 # analysis events (cm/s). Every event-bin speed must be strictly below it.
 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0

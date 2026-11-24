@@ -54,6 +54,7 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EVENT_TRIGGER_WINDOWS_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
@@ -63,6 +64,7 @@ from continuum_swr_replay.paths import (
     STATE_CALIBRATION_IN_VISITS_DIR,
 )
 from continuum_swr_replay.reported import events as builder
+from continuum_swr_replay.reported import inputs as stored_inputs
 from continuum_swr_replay.reported.values import Tags, pend, value_factory
 from tests.reported.test_reported_events_values import _events
 from tests.support._session_cache_fixtures import write_session_cache_entries
@@ -409,6 +411,7 @@ class _Run:
             / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
             bin_facts=root / EVENT_BIN_FACTS_DIR,
             exposure_in_visits=root / EXPOSURE_IN_VISITS_DIR,
+            trigger_windows=root / EVENT_TRIGGER_WINDOWS_DIR,
         )
 
     def _spy(self, name: str, group=None, group_key: str | None = None):
@@ -517,6 +520,9 @@ class _Run:
             "read_complete_run": _read_complete_run,
         }.items():
             monkeypatch.setattr(builder, name, value)
+            # the shared readers of the stored outputs, where they are defined
+            if hasattr(stored_inputs, name):
+                monkeypatch.setattr(stored_inputs, name, value)
         # the held-out tetrode run's reader, beside the scoring code
         monkeypatch.setattr(heldout_runs, "read_complete_run", _read_complete_run)
         monkeypatch.setattr(

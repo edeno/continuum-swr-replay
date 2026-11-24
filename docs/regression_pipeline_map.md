@@ -278,7 +278,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_distribution`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_shares`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -296,7 +296,7 @@ The held-out tetrode evidence of events decoded at low-rate places, and the plac
 
 Where the non-local time sits in ripple power and in MUA, per time bin.
 
-`signal_bin_index`, `count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_counts`
+`signal_bin_index`, `count_by_signal_and_probability`, `rest_signal_counts`, `nonlocal_counts`, `animal_nonlocal_shares`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
@@ -332,7 +332,7 @@ Ripple power and MUA of confident Local time against confident non-local time.
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `animal_quartiles`, `animal_balanced_quartiles`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `epoch_labels`, `animal_quartiles`, `animal_balanced_quartiles`, `lag_column`, `frame_event_counts`, `epoch_trigger_windows`, `stored_windows_of`, `stored_triggered_curves`, `stored_animal_window_medians`, `stored_no_spike_trace`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -572,7 +572,7 @@ _No module-level public symbols._
 
 Linear functionals of a fit: a scalar ``c' beta`` and its exact variance.
 
-`Contrast`, `range_grid`, `range_mean_contrast`, `coefficient_contrast`, `evaluate_contrast`
+`Contrast`, `range_grid`, `range_mean_contrast`, `coefficient_contrast`, `used_coefficients`, `evaluate_contrast`
 
 ### `src/continuum_swr_replay/analysis/regression/folds.py`
 
@@ -584,7 +584,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Rows`, `Groups`, `Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
@@ -596,7 +596,7 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 Rows padded to a few bucket sizes, so that a jitted kernel compiles once per bucket rather than once per session.
 
-`bucket_size`, `group_starts`, `pad_values`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
+`bucket_size`, `group_starts`, `group_sizes`, `pad_values`, `Rows`, `Groups`, `pad_rows`, `pad_groups`
 
 ### `src/continuum_swr_replay/analysis/regression/pspline.py`
 
@@ -608,7 +608,7 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 The fit-row record: one row per (model, kind, session) of every stored fit.
 
-`NoFit`, `describe`, `FitRecord`, `records_frame`, `write_records`, `read_records`
+`NoFit`, `FitRecord`
 
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
@@ -620,7 +620,7 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 
 How the fitter's JAX code runs: float64 for each call, one device, float64 kernels, and a log of the programs traced.
 
-`require_device`, `in_float64`, `live_programs`, `CompileLog`, `float64_kernel`
+`in_float64`, `live_programs`, `CompileLog`, `float64_kernel`
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
@@ -638,13 +638,13 @@ The simulation engine: a planted truth drawn on a model's own rows, fitted by th
 
 The support rule: whether a session's design can estimate a simple term.
 
-`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`, `terms_failing_share`
+`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 
 Model terms and the design they build, the same for every session.
 
-`log_penalty_from_prior_sd`, `prior_sd_from_log_penalty`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+`log_penalty_from_prior_sd`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -757,6 +757,12 @@ Main script for running continuum neural decoding on spatial bandit task data.
 Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
 `contfrag_detector_kwargs`, `run_decode`, `main`
+
+### `scripts/decoding/store_example_session.py`
+
+Store the recording of one epoch that a figure draws beside its decode.
+
+`session_tables`, `main`
 
 ### `scripts/detection/run_artifact_detection.py`
 
@@ -1246,6 +1252,12 @@ Count each epoch's immobile time bins by ripple power, by MUA and by decoder sta
 
 `measure`, `main`
 
+### `scripts/event_properties/measure_trigger_windows.py`
+
+Store each epoch's signal windows around event starts and No-Spike starts.
+
+`measure`, `main`
+
 ### `scripts/event_properties/sweep_event_rule.py`
 
 Count the non-local events, and those with no SWR, at other settings of the event rule.
@@ -1358,7 +1370,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
+`probability_bin_center`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_intervals`, `animal_step`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 

@@ -36,13 +36,13 @@ Main Functions
 compute_local_decoding_error
     Decoding error (graph distance) during local state.
 local_decoding_error_statistics
-    The median over sessions of that error.
+    That error, each animal's median over its sessions, the mean over animals.
 compute_state_fraction_during_movement
     Fraction of movement time in each decoder state.
 session_state_fractions
     Each session's state fractions, moving and immobile.
 state_fraction_statistics
-    The median over sessions of those fractions.
+    Those fractions, each animal's mean over its sessions, the mean over animals.
 session_decoder_quality
     Each session's Local-state error and state fractions, the stored inputs of
     the two statistics over sessions.
@@ -247,24 +247,28 @@ def compute_local_decoding_error(
 
 
 def local_decoding_error_statistics(error_df: pd.DataFrame) -> dict[str, float]:
-    """The typical session's Local-state decoding error.
+    """The typical Local-state decoding error, session -> animal -> mean over
+    animals.
 
     Parameters
     ----------
     error_df : pd.DataFrame, shape (n_sessions, n_columns)
-        :func:`compute_local_decoding_error`'s table, one row per session with
-        ``median_error_cm``.
+        :func:`compute_local_decoding_error`'s table, one row per session
+        (epoch) with ``animal``, ``day``, ``epoch`` and ``median_error_cm``.
 
     Returns
     -------
     statistics : dict
         - ``n_sessions``: the sessions with a finite median error.
-        - ``median_error_cm``: the median over those sessions of each
-          session's median error, in cm (sessions pooled, not balanced by
-          animal).
+        - ``median_error_cm``: each session's median error, each animal's
+          median over its sessions, then the mean over animals, in cm. A
+          session without a finite error is not one of its animal's sessions.
     """
-    errors = error_df["median_error_cm"].dropna()
-    return {"n_sessions": len(errors), "median_error_cm": errors.median()}
+    rows = error_df.dropna(subset=["median_error_cm"])
+    per_animal = animal_session_values(
+        rows["median_error_cm"], rows["animal"], rows[["day", "epoch"]], "median"
+    )
+    return {"n_sessions": len(rows), "median_error_cm": float(per_animal.mean())}
 
 
 def compute_state_fraction_during_movement(
@@ -1500,25 +1504,33 @@ def session_state_fractions(
 
 
 def state_fraction_statistics(session_fractions: pd.DataFrame) -> pd.DataFrame:
-    """The typical session's decoder state fractions, moving and immobile.
+    """The decoder state fractions, moving and immobile, session -> animal ->
+    mean over animals.
 
     Parameters
     ----------
     session_fractions : pd.DataFrame, shape (n_sessions, n_columns)
-        :func:`session_state_fractions`'s table.
+        :func:`session_state_fractions`'s table, with ``animal``, ``day`` and
+        ``epoch``.
 
     Returns
     -------
     fractions : pd.DataFrame, shape (2, 4)
         Index :data:`MOVEMENT_STATES`; one column per state, named as
-        :data:`STATE_PROBABILITY_COLUMNS`. Each value is the median over the
-        sessions with a fraction of the session fractions, sessions pooled
-        (not balanced by animal).
+        :data:`STATE_PROBABILITY_COLUMNS`. Each value is each session's
+        fraction, each animal's mean over its sessions, then the mean over
+        animals. A session without a fraction (no bin of the movement state)
+        is not one of its animal's sessions.
     """
     return pd.DataFrame(
         [
             [
-                session_fractions[f"{movement}_{col}"].median()
+                animal_session_values(
+                    session_fractions[f"{movement}_{col}"],
+                    session_fractions["animal"],
+                    session_fractions[["day", "epoch"]],
+                    "mean",
+                ).mean()
                 for col in STATE_PROBABILITY_COLUMNS
             ]
             for movement in MOVEMENT_STATES

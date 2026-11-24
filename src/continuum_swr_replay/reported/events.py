@@ -118,7 +118,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -132,7 +131,6 @@ from continuum_swr_replay.analysis.decode_quality import (
 )
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
     STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
@@ -155,12 +153,10 @@ from continuum_swr_replay.analysis.event_evidence import (
 )
 from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
     read_tetrode_holdout,
-    require_trial_folds,
 )
 from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
     ALL_CONTRASTS,
     FAMILY_SUFFIX,
-    FIT,
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     OUTSIDE_SWR_EVENT_WINDOW_GROUPS,
@@ -215,48 +211,32 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 )
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
-    BRAIN_STATE_REFERENCE_DIR,
     CANONICAL_EVENTS_FOUND_NAME,
-    CONTENT_ALONG_ARMS_DIR,
     CONTENT_PLACE_RATE_NAME,
-    DECODER_QUALITY_DIR,
-    EVENT_BIN_FACTS_DIR,
-    EVENT_CONTENT_PLACE_RATE_DIR,
-    EVENT_GAMMA_DIR,
-    EVENT_LIKELIHOOD_ADVANTAGE_DIR,
-    EVENT_NONLOCAL_RESTRICTION_DIR,
-    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-    EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
-    EVENT_PARTICIPATION_DIR,
-    EVENT_PROPERTY_BOOTSTRAP_DIR,
-    EVENT_RULE_SWEEP_DIR,
-    EVENT_START_REST_THETA_DIR,
-    EVENT_TETRODE_HOLDOUT_DIR,
-    EXPOSURE_IN_VISITS_DIR,
     HELDOUT_EVENTS_NAME,
     HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
-    NONLOCAL_BY_SIGNAL_DIR,
-    NONLOCAL_PROBABILITY_DIR,
     NONLOCAL_RESTRICTION_WINDOWS_NAME,
     PARTICIPATION_NAME,
-    RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
-    STATE_BY_SIGNAL_DIR,
-    STATE_CALIBRATION_IN_VISITS_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
     TETRODE_HOLDOUT_NAME,
-    event_features_root,
-    event_spike_evidence_dir,
-    processed_data_dir,
-    replay_content_dir,
-    table_path,
 )
 from continuum_swr_replay.reported.formatting import (
     MS_PER_S,
     format_number,
     milliseconds,
+)
+from continuum_swr_replay.reported.inputs import (
+    EventsInputs,
+    default_inputs,  # noqa: F401  (the builder's inputs, read by summarize.py)
+    event_table_staleness,
+    input_staleness,
+    participation_staleness,
+    read_heldout_restriction,
+    restriction_inputs_note,
+    run_staleness,
 )
 from continuum_swr_replay.reported.values import (
     Summary,
@@ -277,7 +257,7 @@ from continuum_swr_replay.runs.io import (
     read_complete_run,
     read_manifest,
 )
-from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
+from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
@@ -427,103 +407,6 @@ BOUT_SUBSET = (
 """What the values of the held-out test split by SWR are over."""
 
 
-@dataclass(frozen=True)
-class EventsInputs:
-    """The files the events summary reads."""
-
-    event_table: Path
-    event_features_run: Path
-    spike_evidence_dir: Path
-    heldout_by_swr: Path
-    content_along_arms: Path
-    brain_state_reference: Path
-    event_gamma: Path
-    class_structure: Path
-    nonlocal_by_signal: Path
-    nonlocal_probability: Path
-    state_by_signal: Path
-    event_rule_sweep: Path
-    state_calibration_in_visits: Path
-    event_start_rest_theta: Path
-    property_bootstrap: Path
-    decoder_quality: Path
-    event_participation: Path
-    likelihood_advantage: Path
-    tetrode_holdout: Path
-    content_place_rate: Path
-    nonlocal_restriction: Path
-    nonlocal_restriction_windows: Path
-    nonlocal_restriction_heldout_events: Path
-    bin_facts: Path
-    exposure_in_visits: Path
-
-
-def default_inputs() -> EventsInputs:
-    return EventsInputs(
-        event_table=table_path("event_table", replay_content_dir()),
-        event_features_run=event_features_root() / EVENT_FEATURES_RUN,
-        spike_evidence_dir=event_spike_evidence_dir(),
-        heldout_by_swr=processed_data_dir()
-        / STATE_EVIDENCE_RUN
-        / STATE_EVIDENCE_DIR
-        / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
-        content_along_arms=processed_data_dir() / CONTENT_ALONG_ARMS_DIR,
-        brain_state_reference=processed_data_dir()
-        / BRAIN_STATE_REFERENCE_DIR
-        / "reference.parquet",
-        event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
-        class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
-        nonlocal_by_signal=processed_data_dir() / NONLOCAL_BY_SIGNAL_DIR,
-        nonlocal_probability=processed_data_dir() / NONLOCAL_PROBABILITY_DIR,
-        state_by_signal=processed_data_dir() / STATE_BY_SIGNAL_DIR,
-        event_rule_sweep=processed_data_dir() / EVENT_RULE_SWEEP_DIR,
-        state_calibration_in_visits=processed_data_dir()
-        / STATE_CALIBRATION_IN_VISITS_DIR,
-        event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
-        property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
-        decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
-        event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
-        likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
-        tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
-        content_place_rate=processed_data_dir() / EVENT_CONTENT_PLACE_RATE_DIR,
-        nonlocal_restriction=processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR,
-        nonlocal_restriction_windows=processed_data_dir()
-        / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
-        nonlocal_restriction_heldout_events=processed_data_dir()
-        / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
-        bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
-        exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
-    )
-
-
-def _input_staleness(
-    manifest: dict, name: str, current_sha256: str, what: str, adjective: str, noun: str
-) -> str | None:
-    """Why an output is stale for one of its inputs, or None.
-
-    ``manifest`` records the input's SHA-256 under ``name`` or ``inputs.<name>``
-    (``runs.staleness.recorded_sha256``); an output recording none cannot be
-    tied to the current input and is treated as stale.
-    """
-    recorded = recorded_sha256(manifest, name)
-    if recorded is None:
-        return f"{what} records no {adjective} SHA-256; rerun it before citing"
-    if recorded != current_sha256:
-        return (
-            f"{what} was made from another {noun} than the current one "
-            f"(sha256 {recorded[:12]}, current {current_sha256[:12]}); rerun it "
-            "before citing"
-        )
-    return None
-
-
-def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
-    """Why an output made from the canonical event table is stale, or None."""
-    return _input_staleness(
-        manifest, "event_table", current_sha256, what, "event-table", "event table"
-    )
-
-
 def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     """Why the restriction window run's values are pending for its note, or None.
 
@@ -544,39 +427,6 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
     )
 
 
-def require_fold_fit(manifest: dict, what: str) -> None:
-    """Refuse a restriction run that is not the fold fit on folds of whole trials.
-
-    The values describe scores under a decoder fit on the other folds, five
-    folds of whole trials balanced by destination well; the fold-fit run's
-    settings record ``"fit": "folds"`` and ``"fold_design": "trials"``. A run of
-    the earlier design, which held out only the encodings and ran the models
-    with the transitions fit on the whole epoch, records no ``fit``; a run of
-    another fold design is refused by :func:`require_trial_folds`. Neither can
-    give these values.
-
-    Raises
-    ------
-    ValueError
-        If ``manifest``'s settings do not record ``"fit": "folds"`` and
-        ``"fold_design": "trials"``.
-    """
-    fit = manifest.get("settings", {}).get("fit")
-    rerun = (
-        "Put the fold-fit run (scripts/event_evidence/score_nonlocal_restriction.py) "
-        "in this folder, then rerun scripts/event_evidence/measure_bin_facts.py, "
-        "scripts/event_evidence/detect_heldout_events.py and "
-        "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
-    )
-    if fit != FIT:
-        raise ValueError(
-            f"{what} is not the fold fit (its settings record fit {fit!r}, not "
-            f"{FIT!r}): it is the earlier design, which held out only the "
-            f"encodings. {rerun}"
-        )
-    require_trial_folds(manifest, what, rerun)
-
-
 def spike_evidence_staleness(
     manifest: dict, current_sha256: str, what: str
 ) -> str | None:
@@ -586,7 +436,7 @@ def spike_evidence_staleness(
     (``runs.io.files_sha256``), which the output's manifest records under
     ``inputs.spike_evidence`` and this summary records for the same files.
     """
-    return _input_staleness(
+    return input_staleness(
         manifest,
         "spike_evidence",
         current_sha256,
@@ -631,10 +481,10 @@ def decoding_error_values(sessions: pd.DataFrame, source: str) -> list[Value]:
             stats["median_error_cm"],
             "quantity",
             "sig2",
-            "median over sessions of each session's median Local-state decoding "
-            "error (the track-graph distance from the decoded to the actual "
-            "position, over time bins with Local probability above 0.5 outside "
-            "excluded time), sessions pooled",
+            "each session's median Local-state decoding error (the track-graph "
+            "distance from the decoded to the actual position, over time bins with "
+            "Local probability above 0.5 outside excluded time), each animal's "
+            "median over its sessions, then the mean over animals",
             "cm",
         ),
         make(
@@ -706,8 +556,8 @@ def _state_fraction_values(
             fractions.loc[movement, state],
             "fraction",
             "pct1",
-            f"median over sessions of each session's mean {state} over its "
-            f"{where} outside excluded time, sessions pooled",
+            f"each session's mean {state} over its {where} outside excluded time, "
+            "each animal's mean over its sessions, then the mean over animals",
         )
         for state in quality_metrics.STATE_PROBABILITY_COLUMNS
     ]
@@ -776,8 +626,9 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["non_swr_fraction"],
             "fraction",
             "pct",
-            "share of immobile non-local events overlapping no SWR, pooled over "
-            "every event (no figure draws it)",
+            "share of immobile non-local events overlapping no SWR: the mean over "
+            "animals of each animal's share (the mean over its epochs of the "
+            "epoch's share), the same number as non_swr_fraction_animal_mean",
             tags=TAGS["cohort_pooled"],
         ),
         make(
@@ -794,8 +645,9 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["swr_contained_fraction"],
             "fraction",
             "pct",
-            "share of immobile non-local events lying inside an SWR, pooled over "
-            "every event (no figure draws it)",
+            "share of immobile non-local events lying inside an SWR: the mean over "
+            "animals of each animal's share (the mean over its epochs of the "
+            "epoch's share), the same number as swr_contained_fraction_animal_mean",
             tags=TAGS["cohort_pooled"],
         ),
         make(
@@ -812,8 +664,9 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["swr_partial_fraction"],
             "fraction",
             "pct",
-            "share of immobile non-local events partly overlapping an SWR, pooled "
-            "over every event (no figure draws it)",
+            "share of immobile non-local events partly overlapping an SWR: the mean "
+            "over animals of each animal's share (the mean over its epochs of the "
+            "epoch's share), the same number as swr_partial_fraction_animal_mean",
             tags=TAGS["cohort_pooled"],
         ),
         make(
@@ -937,7 +790,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2f)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
     stats = event_statistics.boundary_offset_statistics(
-        event_statistics.boundary_offsets(events)
+        event_statistics.boundary_offsets(events), events
     )
     return [
         make(
@@ -952,7 +805,8 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             milliseconds(stats["start_offset_median_s"]),
             "quantity",
             "int",
-            "median of event start minus matched SWR start",
+            "median of event start minus matched SWR start: each epoch's median, "
+            "each animal's median over its epochs, the mean over animals",
             "ms",
         ),
         make(
@@ -960,7 +814,8 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             milliseconds(stats["end_offset_median_s"]),
             "quantity",
             "int",
-            "median of event end minus matched SWR end",
+            "median of event end minus matched SWR end: each epoch's median, each "
+            "animal's median over its epochs, the mean over animals",
             "ms",
         ),
         *(
@@ -970,7 +825,9 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of SWR-overlapping events whose {bound} differs from the "
-                f"matched SWR's {bound} by more than {1000 * tail_s:g} ms",
+                f"matched SWR's {bound} by more than {1000 * tail_s:g} ms: each "
+                "epoch's share, each animal's mean over its epochs, the mean over "
+                "animals",
             )
             for bound in ("start", "end")
             for name, tail_s in event_statistics.OFFSET_TAILS_S.items()
@@ -983,8 +840,8 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
     SWR-overlapping events in each of the nine combinations of their start and
     end against their matched SWR's (earlier, together within 10 ms, later;
     ``event_statistics.boundary_timing_statistics``): the mean over animals of
-    each animal's share, with the lowest and highest animal, and the share
-    pooled over events (no figure draws it); and the share whose start and end
+    each animal's share, with the lowest and highest animal, and the same mean
+    under the headline key (no figure draws it); and the share whose start and end
     both differ (the four corner combinations together,
     ``event_statistics.boundary_both_ends_differ_statistics``). The panel draws
     the nine combinations, a row each, which carry its tag; the share with both
@@ -1015,7 +872,9 @@ def boundary_timing_values(events: pd.DataFrame, source: str) -> list[Value]:
             f"{key}_share",
             (row["share"], row["animal_min"], row["animal_max"]),
             (
-                f"share of the {what}, pooled over every SWR-overlapping event",
+                f"share of the {what}: the mean over animals of each animal's share "
+                f"(the mean over its epochs of the epoch's share), the same number as "
+                f"{key}_share_animal_mean",
                 f"lowest animal's share of the {what} (an animal's share is the "
                 "mean over its epochs of the epoch's share)",
                 f"highest animal's share of the {what} (the mean over its epochs)",
@@ -1068,7 +927,22 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     how those divide by content, and, for the events that do overlap, the
     shares of their time in each state. A row is in a state when that state's
     probability is above 0.8; "mostly" is more than half the event's rows.
+    Every value is event -> epoch -> animal -> mean over animals
+    (``nonlocal_comparison.other_detector_statistics``): a share over a
+    subset of a detector's events is each epoch's share over its events of
+    the subset, each animal's mean over its epochs with such an event, then
+    the mean over the animals with one, so a subset with few events gives a
+    mean of few epochs' shares, each of few events.
     """
+    shared = (
+        "; each epoch's share, each animal's mean over its epochs with such an "
+        "event, then the mean over the animals with one (an animal with none is "
+        "left out; an epoch's share can rest on few events)"
+    )
+    median = (
+        "; each epoch's median, each animal's median over its epochs with such an "
+        "event, then the mean over the animals with one"
+    )
     values: list[Value] = []
     statistics = nonlocal_comparison.other_detector_statistics(events)
     for word, detector in DETECTORS.items():
@@ -1092,8 +966,9 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 stats["no_nonlocal_fraction"],
                 "fraction",
                 "pct",
-                f"share of {detector} events that overlap no non-local event, pooled "
-                "over events",
+                f"share of {detector} events that overlap no non-local event: each "
+                "epoch's share, each animal's mean over its epochs, the mean over "
+                f"animals (the same number as {word}_no_nonlocal_fraction_animal_mean)",
                 tags=TAGS["other_detectors"] if main else None,
             ),
             make(
@@ -1102,7 +977,9 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event and have "
-                "Local above 0.8 in more than half their rows, pooled over events",
+                "Local above 0.8 in more than half their rows: each epoch's share, "
+                "each animal's mean over its epochs, the mean over animals (the same "
+                f"number as {word}_mostly_local_fraction_animal_mean)",
                 tags=TAGS["other_detectors"] if main else None,
             ),
             make(
@@ -1111,7 +988,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with Local "
-                "above 0.8 in more than half their rows",
+                f"above 0.8 in more than half their rows{shared}",
             ),
             make(
                 f"{word}_no_nonlocal_mostly_no_spike_fraction",
@@ -1119,7 +996,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with No-Spike "
-                "above 0.8 in more than half their rows",
+                f"above 0.8 in more than half their rows{shared}",
             ),
             make(
                 f"{word}_no_nonlocal_mixed_fraction",
@@ -1127,39 +1004,39 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with "
-                "neither state in more than half their rows",
+                f"neither state in more than half their rows{shared}",
             ),
             make(
                 f"{word}_overlap_local_share_median",
                 stats["overlap_local_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with Local above 0.8",
+                f"median share of the rows with Local above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_no_spike_share_median",
                 stats["overlap_no_spike_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with No-Spike above 0.8",
+                f"median share of the rows with No-Spike above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_nonlocal_share_median",
                 stats["overlap_nonlocal_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with non-local above 0.8",
+                f"median share of the rows with non-local above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_uncertain_share_median",
                 stats["overlap_uncertain_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with no state above 0.8",
+                f"median share of the rows with no state above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_any_local_fraction",
@@ -1167,7 +1044,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
-                "least one row with Local above 0.8",
+                f"least one row with Local above 0.8{shared}",
             ),
             make(
                 f"{word}_overlap_any_no_spike_fraction",
@@ -1175,7 +1052,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
-                "least one row with No-Spike above 0.8",
+                f"least one row with No-Spike above 0.8{shared}",
             ),
             make(
                 f"{word}_overlap_all_nonlocal_fraction",
@@ -1183,7 +1060,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event whose every row "
-                "is non-local above 0.8",
+                f"is non-local above 0.8{shared}",
             ),
         ]
         if main:
@@ -1242,8 +1119,8 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
     draws (``nonlocal_comparison.FIGURE_DETECTORS``), the share of the
     selected non-local events that overlap one of its events: the mean over
     animals of each animal's share (the panel's bar), the lowest and highest
-    animal's share, and the share pooled over events (no figure draws it)
-    (``nonlocal_comparison.nonlocal_events_overlapped``, which the figure
+    animal's share, and the same mean under the headline key (no figure draws
+    it) (``nonlocal_comparison.nonlocal_events_overlapped``, which the figure
     draws); and the same, for the text and with no figure, for
     :data:`TEXT_FOUND_DETECTORS`.
 
@@ -1268,14 +1145,16 @@ def nonlocal_found_values(memberships: pd.DataFrame, source: str) -> list[Value]
             make,
             key,
             (
-                row["pooled"],
+                row["animal_mean"],
                 float(np.min(row["animals"])),
                 float(np.max(row["animals"])),
             ),
             (
                 f"share of the non-local events that a {detector} event overlaps "
                 "(of those whose overlap is known, inside the two detectors' "
-                "shared exposure), pooled over events",
+                "shared exposure): the mean over animals of each animal's share "
+                "(the mean over its epochs of the epoch's share), the same number "
+                f"as {key}_animal_mean",
                 f"lowest per-animal share of the non-local events that a {detector} "
                 "event overlaps (an animal's share is the mean over its epochs of "
                 "the epoch's share)",
@@ -1300,8 +1179,8 @@ def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[V
     tagged to the panel: the mean over animals of each animal's share (the
     bar), and the lowest and highest animal's (the pooled share is 1 minus
     ``{word}_no_nonlocal_fraction``). For each of :data:`TEXT_FOUND_DETECTORS`,
-    for the text: the share pooled over events, the mean over animals and the
-    lowest and highest animal's.
+    for the text: the mean over animals (under two keys, the headline and
+    ``_animal_mean``) and the lowest and highest animal's.
 
     Parameters
     ----------
@@ -1357,13 +1236,15 @@ def detections_with_nonlocal_values(events: pd.DataFrame, source: str) -> list[V
             make,
             f"{words[detector]}_with_nonlocal_fraction",
             (
-                row["pooled"],
+                row["animal_mean"],
                 float(np.min(row["animals"])),
                 float(np.max(row["animals"])),
             ),
             (
-                f"share of the {detector} events that overlap a non-local event, "
-                "pooled over events",
+                f"share of the {detector} events that overlap a non-local event: the "
+                "mean over animals of each animal's share (the mean over its epochs "
+                "of the epoch's share), the same number as "
+                f"{words[detector]}_with_nonlocal_fraction_animal_mean",
                 f"lowest per-animal share of the {detector} events that overlap a "
                 "non-local event (an animal's share is the mean over its epochs of "
                 "the epoch's share)",
@@ -1448,7 +1329,8 @@ def left_out_values(
                 stats[f"nonlocal_time_outside_{word}_fraction"],
                 "fraction",
                 "pct",
-                f"share of non-local event time that {label} do not cover",
+                f"share of non-local event time that {label} do not cover: "
+                "each epoch's share, each animal's mean over its epochs, the mean over animals",
             ),
         ]
     for word, label in (
@@ -1468,7 +1350,8 @@ def left_out_values(
                 stats[f"nonlocal_events_outside_{word}_fraction"],
                 "fraction",
                 "pct",
-                f"share of the non-local events with a known membership that {label}",
+                f"share of the non-local events with a known membership that {label}: "
+                "each epoch's share, each animal's mean over its epochs, the mean over animals",
             ),
             make(
                 f"nonlocal_events_outside_{word}_per_hour",
@@ -1476,7 +1359,7 @@ def left_out_values(
                 "quantity",
                 "sig2",
                 f"non-local events {label}, per hour of analyzed immobility inside a "
-                "well visit",
+                "well visit: each epoch's events per hour of its exposure, each animal's mean over its epochs, the mean over animals",
                 "per h",
             ),
         ]
@@ -1495,7 +1378,7 @@ def left_out_values(
             "fraction",
             "pct",
             "share of the non-local events with a known membership that no SWR "
-            "definition and no MUA event overlaps",
+            "definition and no MUA event overlaps: each epoch's share, each animal's mean over its epochs, the mean over animals",
         ),
         make(
             "nonlocal_events_outside_trigger_per_hour",
@@ -1503,7 +1386,7 @@ def left_out_values(
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
-            "analyzed immobility inside a well visit",
+            "analyzed immobility inside a well visit: each epoch's events per hour of its exposure, each animal's mean over its epochs, the mean over animals",
             "per h",
         ),
     ]
@@ -1590,7 +1473,9 @@ def gamma_z_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 )
             )
@@ -1604,7 +1489,8 @@ def gamma_z_values(
                         levels.loc[(word, is_swr), regime],
                         "quantity",
                         "dec2",
-                        f"median over epochs of the epoch's z-scored {label} in "
+                        "mean over animals of each animal's median over its epochs "
+                        f"(those with such events) of the epoch's z-scored {label} in "
                         f"{words_of_regime} windows as long as its {name} events (the "
                         "median over the events of one window's mean each, averaged "
                         "over the draws)",
@@ -1654,7 +1540,8 @@ def _signal_values(
                 levels.loc[word, "running"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} while running",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} while running",
                 "z",
             ),
             make(
@@ -1662,7 +1549,8 @@ def _signal_values(
                 levels.loc[word, "rest"],
                 "quantity",
                 "dec2",
-                f"median over epochs of the epoch's median z-scored {label} in quiet rest",
+                f"mean over animals of each animal's median over its epochs of the "
+                f"epoch's median z-scored {label} in quiet rest",
                 "z",
             ),
         ]
@@ -1675,7 +1563,9 @@ def _signal_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 ),
                 make(
@@ -1705,7 +1595,9 @@ def _signal_values(
                         "fraction",
                         "pct",
                         f"share of immobile {name} non-local events whose theta power "
-                        "reaches their epoch's median running level",
+                        "reaches their epoch's median running level: each epoch's "
+                        "share, each animal's mean over its epochs, the mean over "
+                        "animals",
                     )
                 )
     return values
@@ -1718,9 +1610,9 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     For each epoch and class: ``10 log10(mean band power over the class's event
     samples / mean band power over quiet rest)`` (below 4 cm/s, in no non-local,
     SWR or MUA event, outside excluded time), on the same band power the z
-    values are made from (``scripts/event_properties/measure_event_gamma.py``). The
-    median over epochs, and the animals whose median over their epochs is above
-    0 dB. The z values (``gamma_z_values``) stay as they are.
+    values are made from (``scripts/event_properties/measure_event_gamma.py``). Each
+    animal's median over its epochs, the mean over animals, and the animals
+    whose median over their epochs is above 0 dB. The z values (``gamma_z_values``) stay as they are.
     """
     make = value_factory(gamma_db_values, source, TAGS["brain_state"])
     bands = ["slow_gamma", "fast_gamma"]
@@ -1737,9 +1629,9 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
                     stats["median"],
                     "quantity",
                     "sig2s",
-                    f"median over epochs of the change in {label} during {name} events "
-                    "against the epoch's quiet rest: 10 log10 of the ratio of mean band "
-                    "powers",
+                    f"change in {label} during {name} events against the epoch's quiet "
+                    "rest (10 log10 of the ratio of mean band powers): each animal's "
+                    "median over its epochs, then the mean over animals",
                     "dB",
                 ),
                 make(
@@ -1795,8 +1687,9 @@ def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
 
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2c.3, 2c.4 and 2d.9: each event group's spike evidence against matched
-    quiet windows (``baseline``), the negative control. Event-level medians, pooled
-    over epochs; the run scores every event and every quiet window with at least one
+    quiet windows (``baseline``), the negative control. Each median is event ->
+    epoch -> animal (each epoch's median, each animal's median over its epochs,
+    the mean over animals); the run scores every event and every quiet window with at least one
     spike (no cap; the evidence is per spike, so a quiet window without spikes has
     none)."""
     make = value_factory(spike_evidence_values, source, TAGS["spike"])
@@ -1828,7 +1721,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 stats["spikes_median"],
                 "quantity",
                 "int",
-                f"median spike count of {label}",
+                f"median spike count of {label}: each epoch's median, each animal's "
+                "median over its epochs, the mean over animals",
                 "spikes",
                 tags=TAGS["spike_count"],
             ),
@@ -1837,7 +1731,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 stats["tetrodes_median"],
                 "quantity",
                 "int",
-                f"median number of tetrodes with a spike in {label}",
+                f"median number of tetrodes with a spike in {label}: each epoch's "
+                "median, each animal's median over its epochs, the mean over animals",
                 "tetrodes",
                 tags=TAGS["spike_count"],
             ),
@@ -1847,7 +1742,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"median log-likelihood ratio per spike, decoded location against the "
-                f"animal's, of {label}",
+                f"animal's, of {label}: each epoch's median, each animal's median over "
+                "its epochs, the mean over animals",
                 "nats per spike",
                 tags=TAGS["spike_evidence"],
             ),
@@ -1857,7 +1753,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "int",
                 f"median track distance from the MAP of {label} to the ground-process "
-                "intensity peak",
+                "intensity peak: each epoch's median, each animal's median over its "
+                "epochs, the mean over animals",
                 "cm",
                 tags=TAGS["spike_gpi"],
             ),
@@ -1954,7 +1851,9 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"held-out evidence per held-out spike for immobile Non-Local Continuous "
-                f"bouts {label}, against the animal's position: mean over animals",
+                f"bouts {label}, against the animal's position: each epoch's median "
+                "over its bouts, each animal's median over its epochs, the mean over "
+                "animals",
                 "nats per spike",
             ),
             make(
@@ -2425,7 +2324,7 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
     ``shared_content.width_matched``), each with its interval, and the
     matched windows; the share of events whose agreement is above zero; and
     the share of the group's events in the bin, each animal's then their mean
-    with the lowest and highest animal, and pooled. No figure draws these by
+    with the lowest and highest animal. No figure draws these by
     width (Figure 2j draws the difference over all widths, from
     :func:`tetrode_holdout_extra_values`); they are for the text."""
     make = value_factory(shared_content_values, source, TAGS["shared_content"])
@@ -2481,7 +2380,7 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                     "fraction",
                     "pct",
                     f"share of the {where} whose agreement per spike is above zero: "
-                    "per epoch, then each animal's median over its epochs, then the "
+                    "per epoch, then each animal's mean over its epochs, then the "
                     "mean over animals",
                 ),
                 make(
@@ -2504,7 +2403,9 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                     "fraction",
                     "pct",
                     f"share of the {group} events with a held-out score per spike "
-                    f"whose width is {width}, pooled over every event",
+                    f"whose width is {width}: each epoch's share, each animal's mean "
+                    "over its epochs, then the mean over animals (the same number as "
+                    f"{key}_share_of_events_animal_mean)",
                 ),
                 make(
                     f"{key}_share_of_events_animal_mean",
@@ -3028,7 +2929,7 @@ def _animal_range_values(
 
     With ``animal_mean`` (the mean over animals of the animals' shares and its
     description), ``{key}_animal_mean`` follows the share; ``pooled_tags``
-    then replaces the share's tags (a pooled share that no panel draws)."""
+    then replaces the share's tags (a headline share that no panel draws)."""
     values = [
         make(key_, share, kind, style_, description, unit)
         for key_, share, style_, description in zip(
@@ -3074,287 +2975,6 @@ def _share_interval(
             "upper bound of that interval",
         ),
     ]
-
-
-def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str | None:
-    """Why the output in ``folder`` (its ``manifest``) is stale for the run
-    ``name`` in ``run_dir`` that it read, or None: it records no digest of that
-    run's manifest, or another than the current one."""
-    return _input_staleness(
-        manifest,
-        name,
-        file_record(run_dir / MANIFEST, ROOT_DIR)["sha256"],
-        rel(folder),
-        f"{name} run",
-        f"{name} run",
-    )
-
-
-@dataclass(frozen=True)
-class HeldoutRestriction:
-    """The held-out event run's inputs to the restriction values and Figure 2k
-    (:func:`read_heldout_restriction`), and why a value read from them is
-    pending (each None when it is not)."""
-
-    events: pd.DataFrame
-    """The events detected from the held-out decode that start inside a well
-    visit (``starts_in_well_visit``)."""
-    time_sums: pd.DataFrame
-    """The time sums of every epoch (``restriction_totals.restriction_time_sums``)."""
-    bin_s: pd.Series
-    """Each epoch's decode time step (s), indexed by ``epoch_id``, as the run read
-    it from the decode frame's time (checked there against the per-bin table's)."""
-    restriction_run: str | None
-    """The run was not made from the current restriction run."""
-    bin_facts_run: str | None
-    """The run was not made from the current per-bin facts run."""
-    session_cache: str | None
-    """The per-bin facts, which give the time sums, the events' start and the
-    windows' bins their well-visit flag, were not made from the current
-    session cache."""
-    event_table: str | None
-    """The run was not made from the current event table."""
-
-
-def restriction_inputs_note(
-    restriction_dir: Path,
-    epochs: Iterable[str],
-    label: str | None = None,
-    features_manifest: dict | None = None,
-) -> str | None:
-    """Why the restriction run in ``restriction_dir`` was not made from the
-    current decode frames and SWR source, or None: :func:`restriction_input_staleness`
-    with the decode frames the event features run records for each epoch
-    (``features_manifest``, read from the canonical run when None). ``label``
-    names the run in the note (by default ``the restriction run (<folder>)``).
-    The figures that draw the restriction run refuse it then
-    (:func:`heldout_restriction_refusal`)."""
-    if features_manifest is None:
-        features_manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    return restriction_input_staleness(
-        read_output_manifest(restriction_dir),
-        {
-            epoch_id: record.get("decode", {}).get("sha256")
-            for epoch_id, record in features_manifest["epochs"].items()
-        },
-        epochs,
-        f"the restriction run ({restriction_dir})" if label is None else label,
-    )
-
-
-def checked_reference(reference: pd.DataFrame, folder: Path, name: str) -> pd.DataFrame:
-    """A per-epoch measurement (the brain-state reference, the counts by signal
-    of Figure 2i and its supplement), if it was made over the time inside the well visits, from the
-    current session cache's visits and from the decodes the event features run
-    records for every analyzed epoch.
-
-    Parameters
-    ----------
-    reference : pd.DataFrame
-        The measurement, with each row's ``epoch_id`` and ``decode_sha256``.
-    folder : Path
-        Its folder, whose ``manifest.json`` records the subset it is over and
-        the session-cache entries it read the visits from.
-    name : str
-        What it is, for the error.
-
-    Raises
-    ------
-    ValueError
-        If it was not made over the analyses' subset or from the current
-        session cache (``prepare_data.time_mask_staleness``), an analyzed epoch
-        is missing or extra, or its decode hash differs.
-    """
-    note = time_mask_staleness(
-        read_output_manifest(folder), reference["epoch_id"], f"the {name} ({folder})"
-    )
-    if note is not None:
-        raise ValueError(note)
-    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    expected = {
-        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
-        for epoch_id in analyzed_epoch_ids()
-    }
-    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
-    if recorded != expected:
-        differ = sorted(
-            epoch_id
-            for epoch_id in expected.keys() | recorded.keys()
-            if expected.get(epoch_id) != recorded.get(epoch_id)
-        )
-        raise ValueError(
-            f"the {name} was not made from the decodes of event "
-            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
-            f"e.g. {differ[:3]}"
-        )
-    return reference
-
-
-def read_checked(folder: Path, name: str, file: str = "counts.parquet") -> pd.DataFrame:
-    """A per-epoch measurement's table (``file`` in ``folder``), refused as
-    :func:`checked_reference` refuses it (``name`` says what it is)."""
-    return checked_reference(pd.read_parquet(folder / file), folder, name)
-
-
-def restriction_input_staleness(
-    manifest: dict,
-    decode_sha256: Mapping[str, str],
-    epoch_ids: Iterable[str],
-    what: str,
-) -> str | None:
-    """Why the restriction run was not made from the current decode frames and
-    SWR source, or None.
-
-    The run's settings record the SWR source by name (``swr_source``, which
-    names the SWR inventory run and the artifact run) and each epoch's record
-    the SHA-256 of the decode frame it read (``epoch_inputs.data_over_time``).
-    The current source is ``swr_source.swr_source_name()``. The current decode
-    frames are the ones the event features run records (``decode_sha256``),
-    which the figures also take as the decodes (:func:`checked_reference`); no decode frame is hashed here, so a decode remade
-    without a new event features run is not seen.
-
-    Parameters
-    ----------
-    manifest : dict
-        The restriction run's manifest.
-    decode_sha256 : Mapping of str to str
-        Each epoch's decode frame's SHA-256, as the event features run records it.
-    epoch_ids : iterable of str
-        The epochs read; one the run has no record of, or the features run no
-        digest of, counts as another decode.
-    what : str
-        The restriction run, for the note.
-    """
-    notes = []
-    recorded = manifest.get("settings", {}).get("swr_source")
-    current = swr_source.swr_source_name()
-    if recorded != current:
-        notes.append(
-            f"its settings record the SWR source {recorded!r}, not the current "
-            f"{current!r}"
-        )
-    records = manifest.get("epochs", {})
-
-    def recorded_decode(epoch_id: str) -> str | None:
-        inputs = records.get(epoch_id, {}).get("epoch_inputs", {})
-        return inputs.get("data_over_time", {}).get("sha256")
-
-    differ = sorted(
-        epoch_id
-        for epoch_id in epoch_ids
-        if recorded_decode(epoch_id) is None
-        or recorded_decode(epoch_id) != decode_sha256.get(epoch_id)
-    )
-    if differ:
-        notes.append(
-            f"{len(differ)} of its epochs record another decode frame than the "
-            f"one event features run {EVENT_FEATURES_RUN} records (e.g. "
-            f"{differ[:3]})"
-        )
-    if not notes:
-        return None
-    return (
-        f"{what} was not made from the current decodes and SWR source "
-        f"({'; '.join(notes)}); rerun scripts/event_evidence/"
-        "score_nonlocal_restriction.py and the runs made from it before citing"
-    )
-
-
-HELDOUT_EVENTS_RERUN = "scripts/event_evidence/detect_heldout_events.py"
-HELDOUT_RESTRICTION_RERUN = {
-    "restriction_inputs": "scripts/event_evidence/score_nonlocal_restriction.py "
-    "and the runs made from it",
-    "restriction_run": HELDOUT_EVENTS_RERUN,
-    "bin_facts_run": HELDOUT_EVENTS_RERUN,
-    "session_cache": "scripts/event_evidence/measure_bin_facts.py, then "
-    + HELDOUT_EVENTS_RERUN,
-}
-"""The runners to make again when a figure refuses the held-out event run, by
-what is not current (:func:`heldout_restriction_refusal`)."""
-
-
-def heldout_restriction_refusal(
-    heldout: HeldoutRestriction, restriction_inputs: str | None
-) -> tuple[str, str] | None:
-    """Why a figure drawing the held-out event run refuses it, or None.
-
-    Parameters
-    ----------
-    heldout : HeldoutRestriction
-        The run's inputs and reasons (:func:`read_heldout_restriction`); its
-        event-table reason is the summary's alone.
-    restriction_inputs : str or None
-        Why the restriction run was not made from the current decodes and SWR
-        source (:func:`restriction_inputs_note`).
-
-    Returns
-    -------
-    tuple of (str, str) or None
-        The first reason that is not None, without its closing advice to rerun
-        before citing, and the runners to make again
-        (:data:`HELDOUT_RESTRICTION_RERUN`).
-    """
-    for name, reason in (
-        ("restriction_inputs", restriction_inputs),
-        ("restriction_run", heldout.restriction_run),
-        ("bin_facts_run", heldout.bin_facts_run),
-        ("session_cache", heldout.session_cache),
-    ):
-        if reason is not None:
-            return reason.split("; rerun ")[0], HELDOUT_RESTRICTION_RERUN[name]
-    return None
-
-
-def read_heldout_restriction(
-    heldout_dir: Path,
-    restriction_dir: Path,
-    bin_facts_dir: Path,
-    epoch_ids: Iterable[str],
-    event_table_sha256: str,
-) -> HeldoutRestriction:
-    """The held-out event run's events, time sums and time steps, with the
-    reasons a value read from them is pending.
-
-    Parameters
-    ----------
-    heldout_dir, restriction_dir, bin_facts_dir : Path
-        The held-out event run, the restriction run and the per-bin facts run.
-    epoch_ids : iterable of str
-        The epochs read (every analyzed epoch with an event).
-    event_table_sha256 : str
-        The current event table's SHA-256.
-
-    Raises
-    ------
-    ValueError
-        If the restriction run is not the fold fit on folds of whole trials
-        (:func:`require_fold_fit`).
-    """
-    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
-    epoch_ids = list(epoch_ids)
-    manifest = read_output_manifest(heldout_dir)
-    events = read_complete_run(heldout_dir, HELDOUT_EVENTS_NAME, epoch_ids)
-    facts_manifest = read_output_manifest(bin_facts_dir)
-    return HeldoutRestriction(
-        events=events[events["starts_in_well_visit"].astype(bool)],
-        time_sums=read_complete_run(heldout_dir, HELDOUT_TIME_SUMS_NAME, epoch_ids),
-        bin_s=pd.Series(
-            {
-                epoch_id: record["bin_s"]
-                for epoch_id, record in manifest["epochs"].items()
-            }
-        ),
-        restriction_run=run_staleness(
-            manifest, heldout_dir, "nonlocal_restriction", restriction_dir
-        ),
-        bin_facts_run=run_staleness(manifest, heldout_dir, "bin_facts", bin_facts_dir),
-        session_cache=session_cache_staleness(
-            facts_manifest, ok_epochs(facts_manifest), rel(bin_facts_dir)
-        ),
-        event_table=event_table_staleness(
-            manifest, event_table_sha256, rel(heldout_dir)
-        ),
-    )
 
 
 class WindowValues(NamedTuple):
@@ -3573,7 +3193,7 @@ def restriction_agreement_values(
     canonical events agree. Of the canonical events of ``canonical``, the share
     a held-out event shares a bin with; of the held-out events of ``heldout``,
     the share a canonical event shares a bin with; each over every event and
-    by SWR group, pooled and the lowest and highest animal
+    by SWR group, the mean over animals and the lowest and highest animal
     (``heldout_events.found_again_statistics``); and the held-out events."""
     make = value_factory(
         restriction_agreement_values, source, TAGS["nonlocal_restriction"]
@@ -3608,8 +3228,8 @@ def restriction_agreement_values(
                     "fraction",
                     "pct",
                     f"share of the {which} that share at least one bin with "
-                    f"{partner} (of any well-visit start), pooled over the events "
-                    "of every epoch and animal",
+                    f"{partner} (of any well-visit start): each epoch's share, each "
+                    "animal's mean over its epochs, the mean over animals",
                 ),
                 make(
                     f"{key}_animal_min",
@@ -3617,8 +3237,7 @@ def restriction_agreement_values(
                     "fraction",
                     "pctnum",
                     "lowest of the animals' shares, each animal's share the mean "
-                    "over its epochs of the epoch's share (the pooled share, over "
-                    "events, can lie outside the animals' range)",
+                    "over its epochs of the epoch's share",
                 ),
                 make(
                     f"{key}_animal_max",
@@ -3626,8 +3245,7 @@ def restriction_agreement_values(
                     "fraction",
                     "pct",
                     "highest of the animals' shares, each animal's share the mean "
-                    "over its epochs of the epoch's share (the pooled share, over "
-                    "events, can lie outside the animals' range)",
+                    "over its epochs of the epoch's share",
                 ),
             ]
     row = heldout_events.found_again_statistics(
@@ -3711,17 +3329,21 @@ def restriction_outside_swr_values(
                 f"{_EPOCH_REDUCTION}",
                 unit=words,
             )
-        for measure, name, part in (
+        for measure, name, part, what in (
             (
                 "share_in_swr_events_outside_swr",
                 "share_in_heldout_swr_events_outside_swr",
                 "the time outside the SWR of the events detected from the held-out "
                 "decode that overlap an SWR",
+                "a share: in the data every epoch's lies between 0 and 1",
             ),
             (
                 "share_in_no_swr_events",
                 "share_in_heldout_non_swr_events",
                 "the events detected from the held-out decode with no SWR",
+                "a ratio, not a share: it can lie outside 0 to 1 (above 1 when "
+                "the full decoder does worse than the SWR-only decoder in the "
+                "rest of the time)",
             ),
         ):
             values += _share_interval(
@@ -3733,11 +3355,11 @@ def restriction_outside_swr_values(
                 "inside a well visit; an event that runs past the final poke-out "
                 "adds its bins before it only), divided by the gain summed over "
                 f"every one of the epoch's {_OUTSIDE_SWR_BINS} inside a well "
-                "visit (no value when that sum is not positive). Both are signed sums, so a share can "
-                "be above 1 or below 0 and the two shares need not add to 1. "
+                "visit (no value when that sum is not positive). Both are signed "
+                f"sums, so the two need not add to 1; this one is {what}. "
                 f"Over the cohort: {_EPOCH_REDUCTION}",
             )
-        # a share that is below 0 where the full decoder does worse: a
+        # a ratio that is below 0 where the full decoder does worse: a
         # unitless quantity, as a fraction must lie in [0, 1]
         row = statistics.loc[(family, "share_outside_events")]
         values += [
@@ -3747,14 +3369,15 @@ def restriction_outside_swr_values(
                 "quantity",
                 "dec2",
                 f"{scored}; the gain is the score {_FULL_MINUS_SWR}. Per epoch, 1 "
-                "minus the share of the gain in the events detected from the "
+                "minus the ratio of the gain in the events detected from the "
                 "held-out decode with no SWR and minus its share in the time "
-                "outside the SWR of those that overlap an SWR, so the three shares "
-                f"add to 1: the share of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
-                "inside a well visit that lies outside those events (no value when "
-                "the gain summed over those bins is not positive), as a fraction of "
-                "1, below 0 when the full decoder does worse than the SWR-only "
-                f"decoder there. Over the cohort: {_EPOCH_REDUCTION}",
+                "outside the SWR of those that overlap an SWR, so the three add to "
+                f"1: the ratio of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
+                "inside a well visit that lies outside those events to the whole "
+                "gain (no value when the gain summed over those bins is not "
+                "positive). A ratio, not a share: it can lie outside 0 to 1, below "
+                "0 when the full decoder does worse than the SWR-only decoder "
+                f"there. Over the cohort: {_EPOCH_REDUCTION}",
             ),
             make_text(
                 f"{key}_share_outside_heldout_events_ci_low",
@@ -3884,7 +3507,7 @@ def restriction_outside_swr_part_values(
                     row["estimate"],
                     "fraction",
                     "pct",
-                    f"{share}: mean over animals of each animal's median over its "
+                    f"{share}: mean over animals of each animal's mean over its "
                     "epochs; no interval is given (a t interval of a share near 1 "
                     "can pass 1), the lowest animal's value is given beside it",
                 ),
@@ -3894,7 +3517,7 @@ def restriction_outside_swr_part_values(
                     "fraction",
                     "pct",
                     f"lowest of the animals' values of the {share}, each animal's "
-                    "the median over its epochs",
+                    "the mean over its epochs",
                 ),
             ]
     return values
@@ -4177,13 +3800,14 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5: how much of the non-local time has ripple power below the
     Kay threshold (Figure 2i)?
 
-    Over the immobile time bins decoded non-local, each animal's bins pooled
-    over its epochs (``counts``: the stored per-epoch counts by signal and
-    non-local probability, ``nonlocal_by_signal.rest_signal_counts``).
+    Over the immobile time bins decoded non-local: each epoch's share, each
+    animal's mean over its epochs, the mean over animals (``counts``: the
+    stored per-epoch counts by signal and non-local probability,
+    ``nonlocal_by_signal.rest_signal_counts``).
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        nonlocal_by_signal.animal_nonlocal_counts(counts, "ripple_power"),
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "ripple_power"),
         KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
@@ -4195,15 +3819,17 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "pct",
             "share of the immobile time bins decoded non-local (non-local "
             f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
-            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
-            "animals of each animal's share of its bins",
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): each "
+            "epoch's share of its bins, each animal's mean over its epochs, the mean "
+            "over animals",
         ),
         make(
             f"{key}_animal_min",
             stats["fraction_animal_min"],
             "fraction",
             "pct",
-            "lowest per-animal share of non-local time bins below the Kay threshold",
+            "lowest per-animal share of non-local time bins below the Kay threshold "
+            "(the mean over its epochs)",
         ),
         make(
             f"{key}_animal_max",
@@ -4321,10 +3947,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
     detection is independent of population bursts (the held-out tetrode values
     address whether the spikes point to the decoded place)."""
     make = value_factory(nonlocal_mua_values, source, TAGS["nonlocal_mua"])
-    animals = nonlocal_by_signal.animal_nonlocal_counts(counts, "mua")
     level = nonlocal_by_signal.MUA_LEVEL_Z
-    above = event_statistics.nonlocal_share_above_statistics(animals, level)
-    below = event_statistics.nonlocal_below_threshold_statistics(animals, level)
+    above = event_statistics.nonlocal_share_above_statistics(
+        nonlocal_by_signal.nonlocal_counts(counts, "mua"), level
+    )
+    below = event_statistics.nonlocal_below_threshold_statistics(
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "mua"), level
+    )
     nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
     level_words = (
         f"{level:g} z of MUA (MUA_zscore, the z-scored multiunit rate of the decoded "
@@ -4352,12 +3981,13 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins with MUA at or above {level_words} "
-                f"that are decoded non-local ({nonlocal_}): mean over animals of each "
-                "animal's share of its bins. Nearly all time above the MUA level is "
+                f"that are decoded non-local ({nonlocal_}): each epoch's share of its "
+                "bins, each animal's mean over its epochs, the mean over animals. "
+                "Nearly all time above the MUA level is "
                 "decoded non-local: the decoder needs spikes, so this does not show "
                 "that non-local detection is independent of population bursts",
                 f"lowest per-animal share of the bins with MUA at or above {level:g} z "
-                "that are decoded non-local",
+                "that are decoded non-local (the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -4372,9 +4002,11 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
             ),
             (
                 f"share of the immobile time bins decoded non-local ({nonlocal_}) whose "
-                f"MUA is below {level_words}: mean over animals of each animal's share "
-                "of its bins. Most non-local time is below the MUA level",
-                f"lowest per-animal share of non-local time bins with MUA below {level:g} z",
+                f"MUA is below {level_words}: each epoch's share of its bins, each "
+                "animal's mean over its epochs, the mean over animals. Most non-local "
+                "time is below the MUA level",
+                f"lowest per-animal share of non-local time bins with MUA below {level:g} z "
+                "(the mean over its epochs)",
                 "highest per-animal share",
             ),
             lowest_style="pct",
@@ -4457,8 +4089,10 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
                 f"{key}_no_swr_fraction",
                 (row.no_swr_fraction, row.animal_min, row.animal_max),
                 (
-                    f"share of the events detected again {at} that overlap no SWR, "
-                    "pooled over events",
+                    f"share of the events detected again {at} that overlap no SWR: "
+                    "the mean over animals of each animal's share (the mean over its "
+                    "epochs of the epoch's share), the same number as "
+                    f"{key}_no_swr_fraction_animal_mean",
                     f"lowest per-animal share with no SWR {at} (an animal's share is the "
                     "mean over its epochs of the epoch's share)",
                     "highest per-animal share",
@@ -4494,7 +4128,8 @@ def rule_sweep_values(counts: pd.DataFrame, source: str) -> list[Value]:
             "pct",
             "share of the events whose Kay criterion on the decode grid gives their "
             "canonical SWR label at the detector's 2 z (the stand-in by which the "
-            "SWR threshold is swept, since the SWRs are not detected again)",
+            "SWR threshold is swept, since the SWRs are not detected again): each "
+            "epoch's share, each animal's mean over its epochs, the mean over animals",
         )
     )
     return values
@@ -4540,8 +4175,9 @@ def state_calibration_values(
     make = value_factory(state_calibration_values, source, TAGS["state_calibration"])
     reduction = (
         "per epoch the median over its windows, then the mean over animals of "
-        "each animal's mean epoch value; 95 % interval from the nested bootstrap "
-        "of the animals and their epochs, small-sample t correction"
+        "each animal's median epoch value; 95 % interval from the nested bootstrap "
+        "of the animals and their epochs (each replicate with the same estimator), "
+        "small-sample t correction"
     )
     values = []
     for state, (word, what) in _CALIBRATED_STATES.items():
@@ -4585,7 +4221,7 @@ def state_calibration_values(
                 f"rise of that held-out evidence for {state} with the state's "
                 "probability: each epoch's least-squares slope over its windows "
                 "(nats per spike per unit of probability), then the mean over "
-                "animals of each animal's mean epoch slope",
+                "animals of each animal's median epoch slope",
                 "nats per spike per unit probability",
             ),
             make(f"{key}_slope_per_spike_ci_low", trend["slope_animal_ci_lo"], "quantity",
@@ -4920,9 +4556,10 @@ def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
         f"{cut:g} cm"
     )
     reduction = (
-        "each epoch's share, each animal's median over its epochs, the mean over "
+        "each epoch's share, each animal's mean over its epochs, the mean over "
         "animals; 95 % interval from the nested bootstrap of the animals and "
-        "their epochs, small-sample t correction"
+        "their epochs (each replicate takes the same estimator), small-sample t "
+        "correction"
     )
     values = [
         make(
@@ -4951,7 +4588,7 @@ def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "count",
             "animals whose share of non-SWR events with a tight posterior (the "
-            "median over its epochs) is above their share of SWR events",
+            "mean over its epochs) is above their share of SWR events",
         )
     )
     return values
@@ -5154,7 +4791,9 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of quiet-rest windows, matched in duration to the {name} events, "
-                "whose theta reaches the epoch's median running theta",
+                "whose theta reaches the epoch's median running theta: each epoch's "
+                "mean over its events, each animal's mean over its epochs, the mean "
+                "over animals",
             ),
             make(
                 f"theta_like_animals_above_rest_matched_{group}",
@@ -5727,29 +5366,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     participation_sha256 = files_sha256(participation_paths)
 
     # why the participation run's controls are not Local rest inside the
-    # current well visits, or None: its settings record no subset or another,
-    # or it read other visits than the current session cache's (read once)
-    participation_manifest = read_output_manifest(inputs.event_participation)
-    participation_off = (
-        "; ".join(
-            note
-            for note in (
-                subset_staleness(
-                    participation_manifest.get("settings", {}),
-                    rel(inputs.event_participation),
-                ),
-                session_cache_staleness(
-                    participation_manifest, analyzed, rel(inputs.event_participation)
-                ),
-            )
-            if note
-        )
-        or None
+    # current well visits, or None (read once)
+    participation_off = participation_staleness(
+        read_output_manifest(inputs.event_participation),
+        analyzed,
+        rel(inputs.event_participation),
     )
 
-    def participation_staleness(folder: Path) -> str | None:
+    def made_from_participation(folder: Path) -> str | None:
         """Why a run made from the participation tables is stale, or None."""
-        return _input_staleness(
+        return input_staleness(
             read_output_manifest(folder),
             "event_participation",
             participation_sha256,
@@ -5781,7 +5407,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                     "(scripts/event_evidence/score_event_likelihood_advantage.py)",
                 ),
                 stale(inputs.likelihood_advantage),
-                participation_staleness(inputs.likelihood_advantage),
+                made_from_participation(inputs.likelihood_advantage),
             ),
             EVENTS_SUBSET,
         )
@@ -5792,7 +5418,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     holdout_stale = (
         stale(inputs.tetrode_holdout),
-        participation_staleness(inputs.tetrode_holdout),
+        made_from_participation(inputs.tetrode_holdout),
     )
     summary.add(
         *over(
@@ -5909,7 +5535,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     windows_manifest = read_output_manifest(restriction_windows_dir)
     restriction_stale = (
         stale(restriction_windows_dir),
-        participation_staleness(restriction_windows_dir),
+        made_from_participation(restriction_windows_dir),
         run_staleness(
             windows_manifest,
             restriction_windows_dir,
