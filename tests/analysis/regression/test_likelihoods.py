@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     GroupedSoftmax,
     Poisson,
     draw,
+    mean,
 )
 from continuum_swr_replay.analysis.regression.newton import penalized_newton
 from continuum_swr_replay.analysis.regression.padding import pad_values
@@ -502,3 +503,21 @@ def test_a_family_with_an_attribute_of_its_own_is_refused() -> None:
         scaled.weighted_design(X, y, aux, eta)
     with pytest.raises(TypeError, match=r"keeps \['scale'\] on the object"):
         penalized_newton(scaled, X, y, aux, np.zeros((3, 3)), np.zeros(3))
+
+
+def test_the_mean_of_each_family() -> None:
+    """The expected outcome at a linear predictor, the mean each draw has:
+    ``exp(eta + offset)``, ``expit(eta)``, ``eta``, and under the grouped
+    softmax each group's shares."""
+    eta = np.array([0.2, -1.0, 0.5, 1.5, 0.0])
+    offset = np.log(np.array([1.0, 2.0, 0.5, 1.0, 3.0]))
+    np.testing.assert_allclose(
+        mean(Poisson(), eta, offset), np.exp(eta) * np.exp(offset)
+    )
+    np.testing.assert_allclose(mean(Bernoulli(), eta, None), 1 / (1 + np.exp(-eta)))
+    np.testing.assert_array_equal(mean(Gaussian(), eta, None), eta)
+    groups = np.array([0, 0, 1, 1, 1])
+    shares = mean(GroupedSoftmax(), eta, groups)
+    first = np.exp(eta[:2]) / np.exp(eta[:2]).sum()
+    second = np.exp(eta[2:]) / np.exp(eta[2:]).sum()
+    np.testing.assert_allclose(shares, np.r_[first, second], rtol=1e-15)

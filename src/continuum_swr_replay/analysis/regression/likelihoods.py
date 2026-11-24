@@ -92,6 +92,7 @@ __all__ = [
     "Poisson",
     "draw",
     "group_starts",
+    "mean",
 ]
 
 
@@ -575,6 +576,39 @@ class GroupedSoftmax(_Family):
         means = self._per_group((weight * p)[:, None] * X, aux)
         centered = X - means[aux.index]
         return centered * jnp.sqrt(weight * total[aux.index] * p)[:, None]
+
+
+def mean(lik: Likelihood, eta: np.ndarray, aux: object) -> np.ndarray:
+    """The expected outcome at a linear predictor, the mean that each draw of
+    :func:`draw` has.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    eta : np.ndarray, shape (n_rows,)
+    aux : object
+        As :func:`draw`: the Poisson offset; under the grouped softmax the
+        sorted group id of each row; not read otherwise.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+        ``exp(eta + aux)`` (Poisson), ``expit(eta)`` (Bernoulli), ``eta``
+        (Gaussian), each group's ``softmax(eta)`` (grouped softmax).
+    """
+    eta = np.asarray(eta, dtype=float)
+    if lik.name == "poisson":
+        return np.exp(eta + np.asarray(aux, dtype=float))
+    if lik.name == "bernoulli":
+        return expit(eta)
+    if lik.name == "grouped_softmax":
+        starts = group_starts(np.asarray(aux))
+        sizes = group_sizes(starts, eta.size)
+        weight = np.exp(eta - np.repeat(np.maximum.reduceat(eta, starts), sizes))
+        return weight / np.repeat(np.add.reduceat(weight, starts), sizes)
+    if lik.name == "gaussian":
+        return eta
+    raise ValueError(f"no mean for the likelihood {lik.name!r}")
 
 
 def draw(

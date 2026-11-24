@@ -90,7 +90,6 @@ from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
-from scipy.special import expit
 
 from continuum_swr_replay.runs.threads import pool_context
 from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns
@@ -103,6 +102,7 @@ from .likelihoods import (
     Poisson,
     draw,
     group_starts,
+    mean,
 )
 from .newton import CONVERGED
 from .record import FitRecord, NoFit
@@ -503,26 +503,18 @@ def _draw_session(
 
 
 def _inside_mean(lik: Likelihood, eta: np.ndarray, prepared: _Prepared) -> np.ndarray:
-    """The expected outcome at ``eta`` (what :func:`.likelihoods.draw` has as
-    its mean), NaN on the rows with a missing value, shape ``(n_rows,)``:
-    under the grouped softmax each event's shares over its rows that are not
-    missing."""
-    mean = np.full(eta.size, np.nan)
-    rows = ~prepared.missing
-    if lik.name == "poisson":
-        offset = 0.0 if prepared.offset is None else prepared.offset[rows]
-        mean[rows] = np.exp(eta[rows] + offset)
-    elif lik.name == "bernoulli":
-        mean[rows] = expit(eta[rows])
-    elif lik.name == "grouped_softmax":
-        codes = pd.factorize(prepared.unit[rows])[0]
-        top = np.full(codes.max() + 1 if codes.size else 0, -np.inf)
-        np.maximum.at(top, codes, eta[rows])
-        weight = np.exp(eta[rows] - top[codes])
-        mean[rows] = weight / np.bincount(codes, weights=weight)[codes]
+    """The expected outcome at ``eta`` (:func:`.likelihoods.mean`), NaN on the
+    rows with a missing value, shape ``(n_rows,)``: under the grouped softmax
+    each event's shares over its rows that are not missing."""
+    out = np.full(eta.size, np.nan)
+    rows = np.flatnonzero(~prepared.missing)
+    if isinstance(lik, GroupedSoftmax):
+        rows = rows[np.argsort(prepared.unit[rows], kind="stable")]
+        aux = prepared.unit[rows]
     else:
-        mean[rows] = eta[rows]
-    return mean
+        aux = 0.0 if prepared.offset is None else prepared.offset[rows]
+    out[rows] = mean(lik, eta[rows], aux)
+    return out
 
 
 def _draw(
