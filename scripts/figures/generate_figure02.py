@@ -1,152 +1,36 @@
 #!/usr/bin/env python
 """Generate Figure 2: non-local events and SWRs are partly overlapping inventories.
 
-The decoder of Figure 1 applied to the recordings, and how its non-local events
-relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
+The decoder of Figure 1 on the recordings: how its non-local events relate to
+sharp-wave ripples (SWRs, Kay's detector, the SWR source), and whether the
+events outside SWRs are events of the population whose spikes point to the
+decoded place. Each panel's question, and the analysis function it draws:
 
-    a — The decode over a run and the rest after it, with the 2D track. Lanes
-        mark the immobile (analyzed) time, the Local / non-local / No-Spike
-        stretches and the SWRs; the counted non-local events are shaded.
-    b — Six examples: a non-local event inside an SWR, one that starts before
-        its SWR, one that ends after it, two with no SWR (a trajectory and a
-        stationary event), and an SWR whose content is Local; the ripple
-        traces carry panel a's dashed SWR threshold.
-    c — The SWRs by content: with a non-local event, mostly Local, or other.
-        A dot per animal (its share, the mean over its epochs of each epoch's
-        share), the bar and its percent the mean of the dots; the count is
-        every SWR. The decoder finds the replay SWRs are known for.
-    d — The non-local events by SWR overlap (bars and animal dots as in c): most
-        events have no SWR.
-    e — For each SWR definition, MUA and the Widloski detector, c's and d's
-        questions: the share of its own events that overlap a non-local event,
-        and the share of non-local events its events overlap (bars and animal
-        dots as in c).
-    f — Each SWR-overlapping event's start and end minus its SWR's: the percent
-        of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
-        outlines the animals.
-    g — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
-        power and head speed, each animal-balanced: the line the mean over
-        animals of each animal's median over its events (the lines of Figure
-        2's supplement, panel j), the band the mean over animals of each
-        animal's quartiles (a spread over events, every animal weighted the
-        same), with the epochs' level between events, theta's running level and
-        the immobility threshold. Both kinds of event come with a rise in MUA
-        that is not due to movement or theta: the animal is still and theta
-        stays at its level between events, far below running.
-    h — Tetrode participation: the events are population events. The share of
-        tetrodes with a spike in each event against a Local-rest window of its
-        length lying wholly inside one well visit, one line per animal from its
-        controls to its events, for no-SWR and SWR events (Local rest in the
-        Local state's color, the events in their class's). Each group's
-        controls have its events' lengths, so the two groups' levels are not
-        compared: a longer window holds a spike on more tetrodes
-        (``participation.participation_statistics``;
-        ``Processed-Data/event_participation``, refused when it was not made
-        over the analyses' subset from the current well visits; the events
-        summary's participation values).
-    i — Where the non-local time sits in ripple power. Top, confident Local
-        time (Local probability above 0.8) and confident non-local time
-        (non-local probability above 0.8) spread over ripple power, each the
-        mean over animals of each animal's mean over its epochs of its percent
-        per 0.25 z, in its state's color and named
-        (``state_by_signal.state_distribution``;
-        ``Processed-Data/state_by_signal``), with the share of non-local time
-        below the SWR threshold written: no threshold separates the two.
-        Bottom, the share of immobile time bins decoded non-local at each
-        power, one line per animal and their mean, which has no step at the
-        threshold (``nonlocal_by_signal.rest_signal_counts``;
-        ``Processed-Data/nonlocal_by_signal``). Drawn by
-        ``visualization.signal_share_panels.draw_share_by_signal``, which
-        Figure 2's supplement draws MUA with).
-    j — Do the spikes of a left-out tetrode point to the decoded place? At
-        the left, a drawing of the test
-        (``visualization.evidence_drawings.draw_left_out_test``): each tetrode
-        is left out of the decoder's smoother in turn and its spikes scored at
-        every bin of each event under the other tetrodes' position distribution
-        (the decoded place), summed over tetrodes and bins and divided by the
-        event's spikes, against two places it must fit better than. At the
-        right, one axis with the two comparisons, no-SWR and SWR events (the
-        immobile non-local events that start inside a well visit) each: a dot
-        per animal in the event's color, the animals' mean with its 95 %
-        interval (``heldout_gain_panels.draw_animal_gain``), and a dashed line
-        at zero, equal fit. 1, the animal's place: the gain over local coding
-        around the animal, encodings held out in folds of whole trials
-        (``tetrode_holdout.holdout_statistics`` of
-        ``Processed-Data/event_tetrode_holdout``, column ``gain_per_spike``;
-        the events summary's ``*_heldout_gain_per_spike`` values; Figure 2's
-        supplement splits it into the bins with and without a spike). 2,
-        another event's place: the fit to the decoded place minus the fit to
-        another event's decoded place of the same group, fold and width bin
-        (the same run, column ``agreement_minus_null_per_spike``; the events summary's
-        ``*_heldout_agreement_minus_reference_per_spike`` values; by width it
-        is for the text, the ``*_shared_content_*`` values). The run is refused when it was not
-        held out in folds of whole trials or has not every column of the run.
-    k — Does the decoder need non-local states outside SWRs? At the left, a
-        drawing of the two decoders compared
-        (``visualization.evidence_drawings.draw_restriction_test``): the SWR-only
-        decoder (the non-local states allowed only inside SWRs, where only they
-        are allowed) and the full decoder (every state at any time), each
-        scored by every tetrode's one-step-ahead predictive score of each bin,
-        the whole decoder (place fields, state transitions, initial conditions)
-        fit on folds of whole trials and each fold scored under the fit that
-        did not see it. Every value is the full minus the SWR-only decoder over
-        immobile bins inside a well visit (the first nose-poke at a reward well
-        to the last poke-out there), per epoch, summed over its bins and
-        divided by the spikes in them, a dot per animal the median over its
-        epochs, the animals' mean with its 95 % interval, a dashed line at
-        zero, equal fit. First axis, by time: inside SWRs
-        (``restriction_totals.inside_swr_gain_statistics``: below zero, forcing
-        the non-local states there predicts the spikes better) and outside SWRs
-        (the test; ``restriction_totals.outside_swr_gain_statistics``); the bins
-        outside SWRs are chosen by speed, ripple detection and the well visits
-        alone, not by the decoder. Second axis, on its own scale: where the
-        gain outside SWRs sits, over the bins of the no-SWR events detected
-        from the held-out decode (each event's value per spike, the epoch's
-        median over its events, then the animal's median over its epochs;
-        ``RestrictionFigureStatistics.events``) and over the other bins outside
-        SWRs (summed per epoch as on the first axis). The two reduce
-        differently, so they show where the gain is, not one quantity twice.
-        The gains over the local-only decoder are in the events summary, not
-        drawn; Figure 2's supplement draws the gain outside SWRs away from the
-        SWRs. All from
-        ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its time
-        sums and events) by ``restriction_totals.restriction_figure_statistics``,
-        which the events summary's values share.
+    a — the decode over a run and the rest after it, with the 2D track
+        (the example session's decode).
+    b — six examples: an event inside, starting before and ending after its
+        SWR, two with no SWR, and an SWR with Local content (:func:`example_windows`).
+    c — what the SWRs contain (``nonlocal_comparison.other_detector_statistics``).
+    d — how the non-local events overlap SWRs
+        (``event_statistics.overlap_class_statistics``).
+    e — for every SWR definition, MUA and the Widloski detector, c's and d's
+        questions (``nonlocal_comparison.nonlocal_events_overlapped``).
+    f — event bounds against their SWR's (``event_statistics.boundary_offsets``).
+    g — ripple power, MUA, theta power and speed around event starts
+        (``triggered_analysis.compute_triggered_average_curves``,
+        ``event_statistics.reference_medians``).
+    h — are the events population events? (``participation.participation_statistics``)
+    i — where non-local time sits in ripple power
+        (``nonlocal_by_signal.animal_nonlocal_counts``,
+        ``state_by_signal.state_distribution``).
+    j — do the spikes of a left-out tetrode point to the decoded place?
+        (``tetrode_holdout.holdout_statistics``)
+    k — does the decoder need non-local states outside SWRs?
+        (``restriction_totals.restriction_figure_statistics``)
 
-Panels d and f are drawn from the canonical event table by the functions the
-events summary uses (``event_statistics.overlap_class_statistics``,
-``boundary_offsets``); c and e from ``nonlocal_comparison`` on the event
-features run the summary reads; g's between-events and running lines from
-``event_statistics.reference_medians`` of the brain-state reference; h from
-the participation run over the selected events, as the events summary reads
-it; i from the stored counts by the functions the events summary uses
-(``nonlocal_by_signal.animal_nonlocal_counts``,
-``event_statistics.nonlocal_below_threshold_statistics``); j from the
-held-out tetrode runs over the selected events; k from the held-out event run's
-events and time sums as the events summary reads them
-(``reported.inputs.read_heldout_restriction``: the events detected from the
-held-out decode that start inside a well visit, and the time inside a well
-visit) and by ``restriction_totals.restriction_figure_statistics``, refused when
-the restriction run is not the fold fit on folds of whole trials or was not
-made from the current decode frames and SWR source, when the held-out event
-run was not made from the current restriction run or per-bin
-facts run, or when the per-bin facts, which give the time and the events' start
-their well-visit flag, were not made from the current session cache. Panel g is a
-per-time-bin signal no stored output holds, computed from the aggregated decode
-frames (cached), whose event counts by SWR overlap must equal the canonical
-table's.
-
-Every event panel is over the events that start inside a well visit (the first
-poke-in at a well to the final poke-out), the canonical events. The canonical table is checked
-against the frames whole and then selected once
-(``cohort_selection.select_visit_context``), the stored per-event tables are read
-over the selected events (``cohort_selection.select_events_in``), and g's
-averages are over the frames' rows of those events
-(``triggered_analysis.triggering_events_in``). The SWRs and the other detectors'
-events of c and e are those whose first sample is inside a visit, against the
-selected non-local events (``nonlocal_comparison.read_comparison``); g's
-quiet-rest line and i count only the time inside a visit (their producers' in-visit
-mask).
+Every event panel is over the events that start inside a well visit. What the
+figure reads, and its tests, are in ``docs/figure-pipeline.md``; each panel's
+values and questions in ``reported/questions.py``.
 
 Usage
 -----
@@ -1122,8 +1006,12 @@ def draw_overview(
     session_events: pd.DataFrame,
     max_pos: float,
 ) -> tuple[Axes, list[Axes]]:
-    """Panel a: the 2D track, then the decode over a run and the rest after it
-    (returned: the track's axes and the example's five axes, top to bottom)."""
+    """Panel a: the 2D track, then the decode over a run and the rest after it:
+    the decoded position with the animal's, lanes of the immobile (analyzed)
+    time, the Local, non-local and No-Spike stretches and the SWRs (the counted
+    non-local events shaded), the ripple trace with the SWR threshold, the
+    state probabilities and the speed (returned: the track's axes and the
+    example's five axes, top to bottom)."""
     data, results, env = session["data"], session["results"], session["env"]
     start, dur = OVERVIEW_START_S, OVERVIEW_DURATION_S
     sl = slice(start, start + dur)
