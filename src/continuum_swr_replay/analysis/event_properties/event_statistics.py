@@ -669,7 +669,9 @@ def event_signal_statistics(
     statistics : pd.DataFrame, shape (2 * n_signals, 4)
         Indexed by signal and ``is_swr``:
 
-        - ``median``: the median event value, z, over the class's events.
+        - ``median``: the class's event value, z, event -> epoch -> animal:
+          the mean over animals of each animal's median over its epochs with an
+          event of the class of each epoch's median event value.
         - ``n_animals_below_running``: animals, of those with an event of the
           class, whose value is below the median running level of the same
           epochs.
@@ -677,7 +679,9 @@ def event_signal_statistics(
           class, whose value is above the median quiet-rest level of the same
           epochs.
         - ``reaches_running_fraction``: the share of the class's events whose
-          value reaches their own epoch's median running level.
+          value reaches their own epoch's running level (median, or matched),
+          event -> epoch -> animal: each epoch's share, the mean over the
+          animal's epochs with an event of the class, the mean over animals.
 
     Raises
     ------
@@ -692,17 +696,21 @@ def event_signal_statistics(
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
             per_animal = levels.loc[is_swr]
+            reaches = animal_session_values(
+                (group[column] >= group["running_level"]).astype(float),
+                group["animal"],
+                group[_WITHIN_ANIMAL],
+                "mean",
+            )
             rows[(signal, is_swr)] = {
-                "median": group[column].median(),
+                "median": per_animal["event"].mean(),
                 "n_animals_below_running": (
                     per_animal["event"] < per_animal["running"]
                 ).sum(),
                 "n_animals_above_rest": (
                     per_animal["event"] > per_animal["rest"]
                 ).sum(),
-                "reaches_running_fraction": (
-                    group[column] >= group["running_level"]
-                ).mean(),
+                "reaches_running_fraction": reaches.mean(),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
         ["signal", "is_swr"]

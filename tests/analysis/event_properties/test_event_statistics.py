@@ -347,8 +347,9 @@ def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels(
     events, reference = _signal_tables()
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # -1, 0.8, 1, 1.1, 1.2, 1.3, 5: the median is 1.1 (the mean is 1.34)
-    assert non_swr["median"] == pytest.approx(1.1)
+    # a's median of its epochs' medians 1.1 (e1) and 1.2 (e2), 1.15, and b's
+    # 1.0: 1.075 (pooled over the seven events the median would be 1.1)
+    assert non_swr["median"] == pytest.approx(1.075)
     # a: the median of its epochs' medians 1.1 and 1.2 is 1.15, against 1.5,
     # the median of its two epochs' running levels: below (against the levels
     # 1, 1, 1, 2 of its events' epochs, median 1.0, it would not be). b: 1.0
@@ -356,12 +357,14 @@ def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels(
     assert non_swr["n_animals_below_running"] == 1
     # a: 1.15 against rest -0.5; b: 1.0 against -0.5
     assert non_swr["n_animals_above_rest"] == 2
-    # 1.1, 1.3 and 5.0 reach their epoch's 1.0, and b's 1.0 equals it, which
-    # reaches it; 0.8 and -1.0 do not, and 1.2 does not reach e2's 2.0
-    assert non_swr["reaches_running_fraction"] == pytest.approx(4 / 7)
+    # a: e1's 1.1 and 1.3 reach its 1.0, 0.8 does not (2 / 3); e2's 1.2 does
+    # not reach 2.0 (0): a 1 / 3. b: 5.0 and 1.0 (equal) reach 1.0, -1.0 does
+    # not: 2 / 3. Their mean is 0.5 (pooled over the events, 4 / 7)
+    assert non_swr["reaches_running_fraction"] == pytest.approx(0.5)
     swr = result.loc[("theta", True)]
-    # -0.9, -0.85, -0.8, -0.7, 0.0
-    assert swr["median"] == pytest.approx(-0.8)
+    # a: the median of -0.8 (e1) and -0.85 (e2), -0.825; b: 0.0 (pooled over
+    # -0.9, -0.85, -0.8, -0.7, 0.0 the median would be -0.8)
+    assert swr["median"] == pytest.approx(-0.4125)
     assert swr["n_animals_below_running"] == 2
     # a: the median of -0.8 (e1) and -0.85 (e2) is -0.825, against -0.5, the
     # median of its epochs' rest levels -1 and 0: not above (against its
@@ -485,11 +488,18 @@ def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
     )
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # pooled, the median event is 0.5; a's value is the mean of its two epochs'
-    # medians, -0.75: below running (0), above rest (-1)
-    assert non_swr["median"] == pytest.approx(0.5)
+    # a's value is the median of its two epochs' medians, -0.75 (pooled, the
+    # median event would be 0.5): below running (0), above rest (-1)
+    assert non_swr["median"] == pytest.approx(-0.75)
     assert non_swr["n_animals_below_running"] == 1
     assert non_swr["n_animals_above_rest"] == 1
+    # e1 reaches 0 in none of one event, e2 in three of three: (0 + 1) / 2
+    assert non_swr["reaches_running_fraction"] == pytest.approx(0.5)
+    # e2 has no SWR event, so it is not one of a's epochs for that class: a's
+    # value is e1's 0.0, which reaches the running level
+    swr = result.loc[("theta", True)]
+    assert swr["median"] == pytest.approx(0.0)
+    assert swr["reaches_running_fraction"] == pytest.approx(1.0)
 
 
 def test_event_signal_statistics_refuse_an_epoch_without_a_reference():

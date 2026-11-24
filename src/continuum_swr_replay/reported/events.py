@@ -1440,7 +1440,9 @@ def gamma_z_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 )
             )
@@ -1528,7 +1530,9 @@ def _signal_values(
                     stats["median"],
                     "quantity",
                     "dec2",
-                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    f"median z-scored {label} of immobile {name} non-local events (each "
+                    "event's mean over its bins; each epoch's median, each animal's "
+                    "median over its epochs, the mean over animals)",
                     "z",
                 ),
                 make(
@@ -1558,7 +1562,9 @@ def _signal_values(
                         "fraction",
                         "pct",
                         f"share of immobile {name} non-local events whose theta power "
-                        "reaches their epoch's median running level",
+                        "reaches their epoch's median running level: each epoch's "
+                        "share, each animal's mean over its epochs, the mean over "
+                        "animals",
                     )
                 )
     return values
