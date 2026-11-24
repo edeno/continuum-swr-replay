@@ -31,6 +31,10 @@
   animal; the signed-rank p over recording days; and a scalar estimand's
   summary over sessions (the animal-balanced estimate, its interval, the
   animals with its sign and the day-level p).
+- :func:`animal_mean_interval` and :func:`unit_summary`: the mean of one value
+  per animal with the t interval over the animals; and the summary of one
+  value per unit of a fit (a session, a recording day or an animal), with the
+  same keys at every unit.
 - :func:`animal_mean`: at each level of a per-animal table (a bin, a lag), the
   mean over animals of the animals' values: the bold line beside one thin line
   per animal.
@@ -55,6 +59,8 @@ import pandas as pd
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import t as student_t
 from scipy.stats import wilcoxon
+
+from continuum_swr_replay.tables.session_keys import FIT_BY_COLUMNS, FitBy
 
 MIN_SIGNED_RANK_DIFFERENCES = 6
 """The fewest non-zero differences a signed-rank p is computed for.
@@ -687,6 +693,54 @@ def bootstrap_interval(
     return BootstrapInterval(low, high, sd)
 
 
+def animal_mean_interval(values: pd.Series) -> dict[str, float]:
+    """The mean of one value per animal, with the t interval over the animals.
+
+    For a quantity estimated once per animal (one coefficient shared by an
+    animal's sessions): ``mean +/- t(0.975, A - 1) * SD / sqrt(A)`` over the
+    ``A`` animals with a finite value, ``SD`` with ``ddof=1``. It is the
+    interval :func:`bootstrap_interval` gives a mean of animal values, with no
+    resampling below the animals.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_animals,)
+        One value per animal, indexed by animal. A value that is not finite is
+        left out.
+
+    Returns
+    -------
+    summary : dict
+        ``estimate`` (the mean), ``se`` (``SD / sqrt(A)``), ``low``, ``high``,
+        ``n_animals`` and ``n_animals_same_sign`` (the animals whose value
+        has the sign of the estimate). ``estimate`` is NaN without an animal;
+        ``se``, ``low`` and ``high`` are NaN with fewer than two.
+
+    Raises
+    ------
+    ValueError
+        If an animal has more than one value.
+    """
+    if values.index.duplicated().any():
+        raise ValueError("one value per animal: an animal is repeated")
+    finite = values.to_numpy(dtype=float)
+    finite = finite[np.isfinite(finite)]
+    n = finite.size
+    estimate = float(finite.mean()) if n else float("nan")
+    se = float(finite.std(ddof=1) / np.sqrt(n)) if n >= 2 else float("nan")
+    half = float(student_t.ppf(0.975, n - 1)) * se if n >= 2 else float("nan")
+    return {
+        "estimate": estimate,
+        "se": se,
+        "low": estimate - half,
+        "high": estimate + half,
+        "n_animals": int(n),
+        "n_animals_same_sign": int(np.sum(np.sign(finite) == np.sign(estimate)))
+        if n
+        else 0,
+    }
+
+
 class AnimalBalancedDraws(NamedTuple):
     """A per-session number taken session -> day -> animal, and its bootstrap
     draws (:func:`animal_balanced_bootstrap`).
@@ -1185,6 +1239,100 @@ def estimand_summary(
         "n_draws": n_draws,
         "seed": seed,
     }
+
+
+def unit_summary(
+    values: pd.Series, fit_by: FitBy, *, n_draws: int, seed: int
+) -> dict[str, float | str]:
+    """The summary of a scalar estimand over the units of a fit.
+
+    One rule for each unit (``docs/design/2026-11-24-unit-of-fit.md``,
+    section 7):
+
+    - ``"session"``: :func:`estimand_summary` (session -> day -> animal, the
+      nested bootstrap, the t correction over the animals, the day-level test);
+    - ``"day"``: :func:`estimand_summary` with each recording day as its own
+      session (day -> animal);
+    - ``"animal"``: :func:`animal_mean_interval`, the mean over the animals with
+      the t interval on ``A - 1`` degrees of freedom; no day-level test.
+
+    A kind difference (SWR less No SWR) is taken unit by unit, over the units
+    with both kinds, before it is given here.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_units,)
+        One estimate per unit, indexed by the unit's key: a MultiIndex of
+        ``(animal, session_date, epoch)`` for a session, of ``(animal,
+        session_date)`` for a day, an Index of the animal for an animal
+        (``tables.session_keys.FIT_BY_COLUMNS``). A value that is not finite is
+        left out.
+    fit_by : {"session", "day", "animal"}
+    n_draws, seed : int
+        The bootstrap's (not read at ``"animal"``, but returned).
+
+    Returns
+    -------
+    summary : dict
+        The keys of :func:`estimand_summary`, and ``fit_by`` and ``n_units``
+        (the units with a finite value). At ``"day"`` ``n_sessions`` is NaN
+        (a day stands for its sessions). At ``"animal"``: ``n_days``,
+        ``n_sessions`` and ``day_p`` are NaN; ``sd`` is
+        ``SD / sqrt(A) / sqrt(A / (A - 1))``, so that the interval is
+        ``estimate +/- t(0.975, A - 1) * sqrt(A / (A - 1)) * sd`` as at the
+        other units (:func:`bootstrap_interval`); ``n_animals_same_sign`` is
+        :func:`animal_mean_interval`'s.
+
+    Raises
+    ------
+    ValueError
+        If ``fit_by`` is not a unit, the index does not have the unit's key
+        levels, no unit has a finite value, or a unit has more than one value.
+    """
+    if fit_by not in FIT_BY_COLUMNS:
+        raise ValueError(
+            f"fit_by must be one of {list(FIT_BY_COLUMNS)}, not {fit_by!r}"
+        )
+    columns = FIT_BY_COLUMNS[fit_by]
+    if values.index.nlevels != len(columns):
+        raise ValueError(
+            f"one value per {fit_by}: the index must have the levels {columns}, "
+            f"not {values.index.nlevels}"
+        )
+    if values.index.duplicated().any():
+        raise ValueError(f"a {fit_by} has more than one value")
+    n_units = int(np.isfinite(values.to_numpy(dtype=float)).sum())
+    if fit_by == "animal":
+        found = animal_mean_interval(values)
+        if found["n_animals"] == 0:
+            raise ValueError("no animal has a finite value")
+        n = found["n_animals"]
+        return {
+            "estimate": found["estimate"],
+            "low": found["low"],
+            "high": found["high"],
+            "sd": found["se"] / draws_sd_scale(n) if n >= 2 else float("nan"),
+            "n_animals": n,
+            "n_days": float("nan"),
+            "n_sessions": float("nan"),
+            "n_animals_same_sign": found["n_animals_same_sign"],
+            "day_p": float("nan"),
+            "n_draws": n_draws,
+            "seed": seed,
+            "fit_by": fit_by,
+            "n_units": n_units,
+        }
+    index = values.index
+    animal, day = (pd.Series(index.get_level_values(k), index=index) for k in (0, 1))
+    session = (
+        pd.Series(index.get_level_values(2), index=index)
+        if fit_by == "session"
+        else day
+    )
+    summary = estimand_summary(values, animal, day, session, n_draws=n_draws, seed=seed)
+    if fit_by == "day":
+        summary["n_sessions"] = float("nan")
+    return {**summary, "fit_by": fit_by, "n_units": n_units}
 
 
 def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:

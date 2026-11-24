@@ -26,6 +26,13 @@ forms:
   is ``|t|`` with ``A - 1`` degrees of freedom, so the band is the scalar
   interval.
 
+  A fit of a larger unit gives one curve per unit, and the same function takes
+  one row per unit (``shared_statistics.unit_summary`` has the scalar rule): a
+  recording day is passed as a row with its own day label (day -> animal), and
+  an animal as a row whose day label is the animal (the plain mean of the
+  animals' curves, whose half width at one point is about the t interval of
+  ``shared_statistics.animal_mean_interval``).
+
 What the across-session band reaches in simulation, and where it falls below
 95 %, is measured in ``docs/design/regression_fitter.md``, "Bands".
 
