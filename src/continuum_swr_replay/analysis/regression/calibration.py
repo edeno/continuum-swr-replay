@@ -38,6 +38,7 @@ from .constants import (
 )
 from .likelihoods import Likelihood
 from .newton import CONVERGED
+from .runtime import in_float64
 from .sessions import SessionKey, fit_sessions
 from .terms import Design
 
@@ -100,6 +101,7 @@ def _term_edf(
     return pd.Series(edf, index=pd.Index(list(sessions)), dtype=float, name=term)
 
 
+@in_float64
 def log_penalty_for_edf(
     design: Design,
     sessions: Mapping[SessionKey, pd.DataFrame],

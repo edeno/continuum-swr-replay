@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import reml
+from continuum_swr_replay.analysis.regression import reml, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     LOG_PENALTY_BOUNDS,
     NULL_SPACE_EDF_TOL,
@@ -1740,3 +1740,17 @@ def test_a_softmax_design_collinear_within_events_is_named() -> None:
     )
     with pytest.raises(ValueError, match=message):
         select_penalties(GroupedSoftmax(), sessions, blocks)
+
+
+def test_a_search_clears_the_caches_at_most_once_at_its_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the program limit patched to 0, every outermost call of the fitter
+    clears JAX's caches at its entry: a penalty search, an outer entry, clears
+    once, never between two of its evaluations."""
+    lik, data, blocks = _session("poisson", 2, 3)
+    clears = []
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 0)
+    monkeypatch.setattr(jax, "clear_caches", lambda: clears.append(True))
+    select_penalties(lik, [data], blocks)
+    assert len(clears) == 1

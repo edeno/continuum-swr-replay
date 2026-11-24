@@ -43,6 +43,7 @@ import numpy as np
 
 from .likelihoods import Likelihood
 from .reml import _positions
+from .runtime import in_float64
 
 __all__ = [
     "MAX_EXPLAINED",
@@ -194,6 +195,7 @@ def _largest_ratio(cross: np.ndarray, whole: np.ndarray) -> float:
     return float(np.linalg.eigvalsh(W.T @ cross @ W)[-1])
 
 
+@in_float64
 def term_collinearity(
     lik: Likelihood,
     X: np.ndarray,

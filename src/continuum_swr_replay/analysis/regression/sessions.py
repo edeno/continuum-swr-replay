@@ -83,6 +83,7 @@ from .reml import (
     SessionRefit,
     refit_session,
 )
+from .runtime import in_float64
 from .support import Removed, Support, design_support
 from .terms import Design, DesignTerm
 
@@ -522,6 +523,7 @@ def _record(
     )
 
 
+@in_float64
 def fit_sessions(
     design: Design,
     sessions: Mapping[SessionKey, pd.DataFrame],

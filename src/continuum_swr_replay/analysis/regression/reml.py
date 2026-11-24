@@ -1227,6 +1227,7 @@ def _failure(data: SessionData, index: int, session: RemlScore) -> str:
     return text
 
 
+@in_float64
 def pooled_reml(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -1743,6 +1744,7 @@ def _intercepts(X: np.ndarray) -> np.ndarray:
     return np.flatnonzero(same)
 
 
+@in_float64
 def refit_session(
     lik: Likelihood,
     data: SessionData,
@@ -1957,6 +1959,7 @@ def _screened_search(
     return _pooled_fit(rho, pooled, blocks, search)
 
 
+@in_float64
 def refine_penalties(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -1979,6 +1982,7 @@ def refine_penalties(
     return _screened_search(lik, sessions, blocks, rho0, rho0)
 
 
+@in_float64
 def select_penalties(
     lik: Likelihood,
     sessions: Sequence[SessionData],
@@ -2037,6 +2041,7 @@ def select_penalties(
     return _screened_search(lik, sessions, blocks, reference, None)
 
 
+@in_float64
 def fit_at_penalties(
     lik: Likelihood,
     sessions: Sequence[SessionData],
