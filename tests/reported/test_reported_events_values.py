@@ -433,12 +433,15 @@ def test_other_detector_values_name_each_detector_and_each_state():
     }
     assert kay == {
         "events": 4,
-        "no_nonlocal_fraction": 0.75,
+        # the headline shares are the animals' means (a 1 and 2/3, b 0; pooled
+        # over the four events: 0.75 and 0.5)
+        "no_nonlocal_fraction": 0.5,
         "no_nonlocal_fraction_animal_min": 0.0,
         "no_nonlocal_fraction_animal_max": 1.0,
         "no_nonlocal_fraction_animal_mean": 0.5,
-        "mostly_local_fraction": 0.5,
+        "mostly_local_fraction": pytest.approx(1 / 3),
         "mostly_local_fraction_animal_mean": pytest.approx(1 / 3),
+        # b has no event overlapping no non-local event: it is left out
         "no_nonlocal_mostly_local_fraction": pytest.approx(2 / 3),
         "no_nonlocal_mostly_no_spike_fraction": pytest.approx(1 / 3),
         "no_nonlocal_mixed_fraction": 0.0,
@@ -460,8 +463,8 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert "yu_no_nonlocal_fraction_animal_min" not in numbers
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
-    # Figure 2c draws the main detector's animal means; its pooled shares no
-    # figure
+    # Figure 2c draws the main detector's animal means; its headline shares
+    # (the same numbers) no figure
     assert values["kay_mostly_local_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_no_nonlocal_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_mostly_local_fraction"].figures == ()

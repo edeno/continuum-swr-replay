@@ -56,7 +56,10 @@ def _events() -> pd.DataFrame:
 def test_other_detector_statistics_split_events_by_overlap_and_state():
     result = comparison.other_detector_statistics(_events()).loc["kay"]
     assert result["n_events"] == 13
-    assert result["no_nonlocal_fraction"] == pytest.approx(7 / 13)
+    # every statistic is event -> epoch -> animal -> mean over animals: the
+    # share overlapping no non-local event is the animals' mean below (pooled
+    # over the 13 events it would be 7/13)
+    assert result["no_nonlocal_fraction"] == pytest.approx(0.45)
     # each animal's share is the mean of its epochs': a, 1 and 0; b, 0.8 and 0
     # (pooled, a's 3 of 5 and b's 4 of 8 would give 0.6 and 0.5)
     assert result["no_nonlocal_fraction_animal_min"] == pytest.approx(0.4)
@@ -67,23 +70,61 @@ def test_other_detector_statistics_split_events_by_overlap_and_state():
     assert result["mostly_local_fraction_animal_mean"] == pytest.approx(
         (1 / 3 + 0.1) / 2
     )
-    # of the six events with state shares that overlap no non-local event (the
-    # seventh has none and is left out)
-    assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(3 / 6)
+    # of the events with state shares that overlap no non-local event (b's
+    # event without shares is left out): a's e1 holds three (Local 0.8, 0.9,
+    # 0.2 with No-Spike 0.6), b's e1 three (Local 0.6; 0.4 and 0.4; 0.5 and
+    # 0.5); a's e2 and b's e2 hold none and are not their animals' epochs for
+    # these. Mostly Local a 2/3, b 1/3; mostly No-Spike a 1/3, b 0; neither
+    # a 0, b 2/3 (pooled over the six events: 3/6, 1/6, 2/6)
+    assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(0.5)
     assert result["no_nonlocal_mostly_no_spike_fraction"] == pytest.approx(1 / 6)
-    assert result["no_nonlocal_mixed_fraction"] == pytest.approx(2 / 6)
-    # the same three mostly Local events as a share of all 13 compared events
-    assert result["mostly_local_fraction"] == pytest.approx(3 / 13)
-    # of the five events with state shares that overlap a non-local event:
-    # Local 0, 0, 0.05, 0.1, 0.2; No-Spike 0, 0.1, 0.1, 0.3, 0.4;
-    # non-local 0.3, 0.35, 0.5, 0.9, 1; uncertain 0, 0, 0.2, 0.2, 0.3
+    assert result["no_nonlocal_mixed_fraction"] == pytest.approx(1 / 3)
+    assert result["no_nonlocal_n_animals"] == 2
+    # the animals' mean of the mostly Local share of all compared events
+    # (pooled: 3/13)
+    assert result["mostly_local_fraction"] == pytest.approx((1 / 3 + 0.1) / 2)
+    # of the events with state shares that overlap a non-local event: a's e2
+    # (0, 0.1, 0.9, 0) and (0.2, 0.1, 0.5, 0.2); b's e1 (0.05, 0.4, 0.35, 0.2);
+    # b's e2 (0, 0, 1, 0) and (0.1, 0.3, 0.3, 0.3). Each epoch's median, each
+    # animal's median over its epochs: Local a 0.1, b (0.05, 0.05) 0.05;
+    # No-Spike a 0.1, b (0.4, 0.15) 0.275; non-local a 0.7, b (0.35, 0.65)
+    # 0.5; uncertain a 0.1, b (0.2, 0.15) 0.175
+    assert result["overlap_local_share_median"] == pytest.approx(0.075)
+    assert result["overlap_no_spike_share_median"] == pytest.approx(0.1875)
+    assert result["overlap_nonlocal_share_median"] == pytest.approx(0.6)
+    assert result["overlap_uncertain_share_median"] == pytest.approx(0.1375)
+    # any Local: a 1/2, b (1, 1/2) 3/4; any No-Spike: a 1, b (1, 1/2) 3/4; all
+    # non-local: a 0, b (0, 1/2) 1/4 (pooled over the five: 3/5, 4/5, 1/5)
+    assert result["overlap_any_local_fraction"] == pytest.approx(0.625)
+    assert result["overlap_any_no_spike_fraction"] == pytest.approx(0.875)
+    assert result["overlap_all_nonlocal_fraction"] == pytest.approx(0.125)
+    assert result["overlap_n_animals"] == 2
+
+
+def test_other_detector_statistics_leave_out_an_animal_with_no_event_of_a_subset():
+    """Animal c's one event overlaps a non-local event: c has no epoch for the
+    shares of the events that overlap none, so it is left out of their mean
+    over animals, and counts in the medians of the overlapping events."""
+    events = pd.concat(
+        [
+            _events(),
+            pd.DataFrame(
+                [("c", "e1", True, 0.0, 0.0, 1.0, 0.0)],
+                columns=["animal", "epoch", "matched", LOCAL, NO_SPIKE, NON_LOCAL,
+                         UNCERTAIN],
+            ).assign(detector="kay", day="d1"),
+        ],
+        ignore_index=True,
+    )  # fmt: skip
+    result = comparison.other_detector_statistics(events).loc["kay"]
+    assert result["no_nonlocal_n_animals"] == 2
+    assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(0.5)
+    assert result["overlap_n_animals"] == 3
+    # Local: a 0.1, b 0.05, c 0
     assert result["overlap_local_share_median"] == pytest.approx(0.05)
-    assert result["overlap_no_spike_share_median"] == pytest.approx(0.1)
-    assert result["overlap_nonlocal_share_median"] == pytest.approx(0.5)
-    assert result["overlap_uncertain_share_median"] == pytest.approx(0.2)
-    assert result["overlap_any_local_fraction"] == pytest.approx(3 / 5)
-    assert result["overlap_any_no_spike_fraction"] == pytest.approx(4 / 5)
-    assert result["overlap_all_nonlocal_fraction"] == pytest.approx(1 / 5)
+    # c's share overlapping no non-local event is 0, and it counts: (1/2 + 2/5
+    # + 0) / 3
+    assert result["no_nonlocal_fraction"] == pytest.approx(0.3)
 
 
 def _write_manifest(run_dir) -> None:

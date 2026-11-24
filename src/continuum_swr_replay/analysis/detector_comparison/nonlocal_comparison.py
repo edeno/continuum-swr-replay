@@ -484,6 +484,15 @@ def content_class_means(statistics: pd.Series) -> pd.Series:
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """For each other detector, how its events sit against the non-local events.
 
+    Every statistic is event -> epoch -> animal -> mean over animals: each
+    epoch's share (or median) over its events of the subset the statistic is
+    about, each animal's mean (a share) or median (a per-event quantity) over
+    its epochs with an event of that subset, then the mean over the animals
+    with such an epoch. An epoch with no event of the subset is not one of its
+    animal's epochs for that statistic, and an animal with none is left out of
+    its mean over animals; a subset can hold few events, and a share is then
+    a mean over few epochs' shares, each of few events.
+
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
@@ -494,61 +503,91 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    statistics : pd.DataFrame, shape (n_detectors, 17)
+    statistics : pd.DataFrame, shape (n_detectors, 19)
         Indexed by detector. "Mostly" a state is more than half the event's
         rows.
 
         - ``n_events``: its compared events.
-        - ``no_nonlocal_fraction``: the share overlapping no non-local event,
-          pooled, and ``no_nonlocal_fraction_animal_min`` and
-          ``..._animal_max``, the lowest and highest of the animals' own
-          shares, each event -> epoch -> animal: the mean over the animal's
-          epochs of each epoch's share; ``no_nonlocal_fraction_animal_mean``,
-          the mean over animals of the animals' own shares.
+        - ``no_nonlocal_fraction``: the share overlapping no non-local event;
+          ``no_nonlocal_fraction_animal_mean``, the same number;
+          ``no_nonlocal_fraction_animal_min`` and ``..._animal_max``, the
+          lowest and highest of the animals' own shares (the mean over the
+          animal's epochs of each epoch's share).
         - ``mostly_local_fraction``: the events overlapping no non-local event
           that are mostly Local, as a share of all its compared events (an
           event without state shares is not mostly Local), and
-          ``mostly_local_fraction_animal_mean``, the mean over animals of the
-          animals' own shares (:func:`content_class_animal_shares`).
-        - Of the events overlapping no non-local event:
+          ``mostly_local_fraction_animal_mean``, the same number
+          (:func:`content_class_animal_shares`).
+        - Of the events overlapping no non-local event (with state shares):
           ``no_nonlocal_mostly_local_fraction``,
           ``no_nonlocal_mostly_no_spike_fraction`` and
-          ``no_nonlocal_mixed_fraction`` (neither).
-        - Of the events overlapping a non-local event, the median share of
-          their rows in each state (``overlap_local_share_median``,
+          ``no_nonlocal_mixed_fraction`` (neither); ``no_nonlocal_n_animals``,
+          the animals with such an event.
+        - Of the events overlapping a non-local event (with state shares), the
+          median share of their rows in each state (``overlap_local_share_median``,
           ``overlap_no_spike_share_median``, ``overlap_nonlocal_share_median``,
-          ``overlap_uncertain_share_median``), and the shares of events with
-          any Local row (``overlap_any_local_fraction``), any No-Spike row
-          (``overlap_any_no_spike_fraction``) and every row non-local
-          (``overlap_all_nonlocal_fraction``).
+          ``overlap_uncertain_share_median``: each epoch's median, each
+          animal's median over its epochs, the mean over animals), and the
+          shares of events with any Local row (``overlap_any_local_fraction``),
+          any No-Spike row (``overlap_any_no_spike_fraction``) and every row
+          non-local (``overlap_all_nonlocal_fraction``);
+          ``overlap_n_animals``, the animals with such an event.
     """
     local, no_spike, non_local, uncertain = STATE_SHARE_COLUMNS
+    session = ["day", "epoch"]
+
+    def by_animal(values: pd.Series, rows: pd.DataFrame, statistic: str) -> float:
+        return float(
+            animal_session_values(
+                values.astype(float), rows["animal"], rows[session], statistic
+            ).mean()
+        )
+
     rows = {}
     for detector, mine in events.groupby("detector"):
         alone = mine[~mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         overlapping = mine[mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         mostly_local = alone[local] > 0.5
         mostly_no_spike = alone[no_spike] > 0.5
-        by_animal = content_class_animal_shares(mine, detector)
-        matched_by_animal = by_animal["with_nonlocal"]
+        shares = content_class_animal_shares(mine, detector)
+        matched_by_animal = shares["with_nonlocal"]
         rows[detector] = {
             "n_events": len(mine),
-            "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),
+            "no_nonlocal_fraction": 1 - matched_by_animal.mean(),
             "no_nonlocal_fraction_animal_min": 1 - matched_by_animal.max(),
             "no_nonlocal_fraction_animal_max": 1 - matched_by_animal.min(),
             "no_nonlocal_fraction_animal_mean": 1 - matched_by_animal.mean(),
-            "mostly_local_fraction": mostly_local.sum() / len(mine),
-            "mostly_local_fraction_animal_mean": by_animal["mostly_local"].mean(),
-            "no_nonlocal_mostly_local_fraction": mostly_local.mean(),
-            "no_nonlocal_mostly_no_spike_fraction": mostly_no_spike.mean(),
-            "no_nonlocal_mixed_fraction": (~mostly_local & ~mostly_no_spike).mean(),
-            "overlap_local_share_median": overlapping[local].median(),
-            "overlap_no_spike_share_median": overlapping[no_spike].median(),
-            "overlap_nonlocal_share_median": overlapping[non_local].median(),
-            "overlap_uncertain_share_median": overlapping[uncertain].median(),
-            "overlap_any_local_fraction": (overlapping[local] > 0).mean(),
-            "overlap_any_no_spike_fraction": (overlapping[no_spike] > 0).mean(),
-            "overlap_all_nonlocal_fraction": (overlapping[non_local] == 1).mean(),
+            "mostly_local_fraction": shares["mostly_local"].mean(),
+            "mostly_local_fraction_animal_mean": shares["mostly_local"].mean(),
+            "no_nonlocal_mostly_local_fraction": by_animal(mostly_local, alone, "mean"),
+            "no_nonlocal_mostly_no_spike_fraction": by_animal(
+                mostly_no_spike, alone, "mean"
+            ),
+            "no_nonlocal_mixed_fraction": by_animal(
+                ~mostly_local & ~mostly_no_spike, alone, "mean"
+            ),
+            "no_nonlocal_n_animals": alone["animal"].nunique(),
+            **{
+                f"overlap_{name}_share_median": by_animal(
+                    overlapping[column], overlapping, "median"
+                )
+                for name, column in (
+                    ("local", local),
+                    ("no_spike", no_spike),
+                    ("nonlocal", non_local),
+                    ("uncertain", uncertain),
+                )
+            },
+            "overlap_any_local_fraction": by_animal(
+                overlapping[local] > 0, overlapping, "mean"
+            ),
+            "overlap_any_no_spike_fraction": by_animal(
+                overlapping[no_spike] > 0, overlapping, "mean"
+            ),
+            "overlap_all_nonlocal_fraction": by_animal(
+                overlapping[non_local] == 1, overlapping, "mean"
+            ),
+            "overlap_n_animals": overlapping["animal"].nunique(),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("detector")
 

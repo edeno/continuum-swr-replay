@@ -927,7 +927,22 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     how those divide by content, and, for the events that do overlap, the
     shares of their time in each state. A row is in a state when that state's
     probability is above 0.8; "mostly" is more than half the event's rows.
+    Every value is event -> epoch -> animal -> mean over animals
+    (``nonlocal_comparison.other_detector_statistics``): a share over a
+    subset of a detector's events is each epoch's share over its events of
+    the subset, each animal's mean over its epochs with such an event, then
+    the mean over the animals with one, so a subset with few events gives a
+    mean of few epochs' shares, each of few events.
     """
+    shared = (
+        "; each epoch's share, each animal's mean over its epochs with such an "
+        "event, then the mean over the animals with one (an animal with none is "
+        "left out; an epoch's share can rest on few events)"
+    )
+    median = (
+        "; each epoch's median, each animal's median over its epochs with such an "
+        "event, then the mean over the animals with one"
+    )
     values: list[Value] = []
     statistics = nonlocal_comparison.other_detector_statistics(events)
     for word, detector in DETECTORS.items():
@@ -951,8 +966,9 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 stats["no_nonlocal_fraction"],
                 "fraction",
                 "pct",
-                f"share of {detector} events that overlap no non-local event, pooled "
-                "over events",
+                f"share of {detector} events that overlap no non-local event: each "
+                "epoch's share, each animal's mean over its epochs, the mean over "
+                f"animals (the same number as {word}_no_nonlocal_fraction_animal_mean)",
                 tags=TAGS["other_detectors"] if main else None,
             ),
             make(
@@ -961,7 +977,9 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event and have "
-                "Local above 0.8 in more than half their rows, pooled over events",
+                "Local above 0.8 in more than half their rows: each epoch's share, "
+                "each animal's mean over its epochs, the mean over animals (the same "
+                f"number as {word}_mostly_local_fraction_animal_mean)",
                 tags=TAGS["other_detectors"] if main else None,
             ),
             make(
@@ -970,7 +988,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with Local "
-                "above 0.8 in more than half their rows",
+                f"above 0.8 in more than half their rows{shared}",
             ),
             make(
                 f"{word}_no_nonlocal_mostly_no_spike_fraction",
@@ -978,7 +996,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with No-Spike "
-                "above 0.8 in more than half their rows",
+                f"above 0.8 in more than half their rows{shared}",
             ),
             make(
                 f"{word}_no_nonlocal_mixed_fraction",
@@ -986,39 +1004,39 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with "
-                "neither state in more than half their rows",
+                f"neither state in more than half their rows{shared}",
             ),
             make(
                 f"{word}_overlap_local_share_median",
                 stats["overlap_local_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with Local above 0.8",
+                f"median share of the rows with Local above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_no_spike_share_median",
                 stats["overlap_no_spike_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with No-Spike above 0.8",
+                f"median share of the rows with No-Spike above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_nonlocal_share_median",
                 stats["overlap_nonlocal_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with non-local above 0.8",
+                f"median share of the rows with non-local above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_uncertain_share_median",
                 stats["overlap_uncertain_share_median"],
                 "fraction",
                 "pct",
-                f"median over {detector} events overlapping a non-local event of the share "
-                "of their rows with no state above 0.8",
+                f"median share of the rows with no state above 0.8 of {detector} events "
+                f"overlapping a non-local event{median}",
             ),
             make(
                 f"{word}_overlap_any_local_fraction",
@@ -1026,7 +1044,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
-                "least one row with Local above 0.8",
+                f"least one row with Local above 0.8{shared}",
             ),
             make(
                 f"{word}_overlap_any_no_spike_fraction",
@@ -1034,7 +1052,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
-                "least one row with No-Spike above 0.8",
+                f"least one row with No-Spike above 0.8{shared}",
             ),
             make(
                 f"{word}_overlap_all_nonlocal_fraction",
@@ -1042,7 +1060,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event whose every row "
-                "is non-local above 0.8",
+                f"is non-local above 0.8{shared}",
             ),
         ]
         if main:
