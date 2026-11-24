@@ -146,15 +146,14 @@ class _Session:
         self,
         design: Design,
         lik: Likelihood,
-        frames: list[pd.DataFrame],
-        keys: list[SessionKey],
+        sessions: Mapping[SessionKey, pd.DataFrame],
         response: str,
         unit: str,
         name: str,
     ) -> None:
         parts, units, offset = [], [], 0
         read = list(dict.fromkeys([*design.columns, response, unit]))
-        for frame in frames:
+        for frame in sessions.values():
             frame = frame[read].reset_index(drop=True)
             if isinstance(lik, GroupedSoftmax):
                 frame = frame.sort_values(unit, kind="stable").reset_index(drop=True)
@@ -162,15 +161,15 @@ class _Session:
             parts.append(frame)
             units.append(codes + offset)
             offset += int(codes.max()) + 1 if codes.size else 0
-        rows = parts[0] if len(parts) == 1 else pd.concat(parts, ignore_index=True)
-        self.keys = [tuple(key) for key in keys]
+        rows = pd.concat(parts, ignore_index=True)
+        self.keys = [tuple(key) for key in sessions]
         self.session = np.repeat(np.arange(len(parts)), [len(p) for p in parts])
         design = design.for_sessions(self.keys)
         built = design.build(rows, self.session)
         self.design, self.lik, self.name = design, lik, name
         self.X, self.offset, self.level_rows = built.X, built.offset, built.level_rows
         self.y = rows[response].to_numpy(dtype=float)
-        self.unit = units[0] if len(units) == 1 else np.concatenate(units)
+        self.unit = np.concatenate(units)
         self.reason = np.where(built.missing, _MISSING, _KEPT).astype(np.int8)
         self.dropped_by = np.full(len(rows), -1)  # the place in levels_dropped
         self.levels_dropped: list[str] = []
@@ -309,20 +308,26 @@ class _Session:
             for name, counted in self.support.items()
         }
 
-    def cohort_counts(self, rows: np.ndarray | None = None) -> dict:
-        """The rows and events removed before the fit, by reason, on ``rows``
-        (a mask, shape ``(n_rows,)``; all rows when None)."""
-        inside = np.ones(self.reason.size, dtype=bool) if rows is None else rows
-        reason = np.where(inside, self.reason, _KEPT)
-        dropped = {
-            name: int(np.sum((reason == _LEVEL) & (self.dropped_by == k)))
-            for k, name in enumerate(self.levels_dropped)
+    def counts(self, rows: np.ndarray) -> dict:
+        """The rows, units and events the fit saw of ``rows`` (a mask, shape
+        ``(n_rows,)``)."""
+        mine = rows & self.kept
+        return {
+            "n_rows": int(mine.sum()),
+            "n_units": int(np.unique(self.unit[mine]).size),
+            "n_events": _n_events(self.lik, self.y[mine], self.unit[mine]),
         }
+
+    def cohort_counts(self, rows: np.ndarray) -> dict:
+        """The rows and events removed before the fit, by reason, on ``rows``
+        (a mask, shape ``(n_rows,)``); every dropped level, with its count."""
+        reason = np.where(rows, self.reason, _KEPT)
         counts = {
             "rows_missing_values": int(np.sum(reason == _MISSING)),
-            "rows_dropped": (
-                dropped if rows is None else {n: c for n, c in dropped.items() if c}
-            ),
+            "rows_dropped": {
+                name: int(np.sum((reason == _LEVEL) & (self.dropped_by == k)))
+                for k, name in enumerate(self.levels_dropped)
+            },
         }
         if isinstance(self.lik, GroupedSoftmax):
             counts["events_emptied_by_dropped_rows"] = self._units(_EMPTIED, reason)
@@ -336,22 +341,22 @@ class _Session:
         (:meth:`cohort_counts` on its rows, a dropped level only where it
         dropped rows of the session) and the names of its baseline copies
         (the record's ``sessions``)."""
-        kept = self.kept
         baselines = self.design.session_baselines()
         out = []
         for s, key in enumerate(self.keys):
             own = self.session == s
-            mine = own & kept
+            removed = self.cohort_counts(own)
+            removed["rows_dropped"] = {
+                name: n for name, n in removed["rows_dropped"].items() if n
+            }
             animal, session_date, epoch = key
             out.append(
                 {
                     "animal": animal,
                     "session_date": session_date,
                     "epoch": epoch,
-                    "n_rows": int(mine.sum()),
-                    "n_units": int(np.unique(self.unit[mine]).size),
-                    "n_events": _n_events(self.lik, self.y[mine], self.unit[mine]),
-                    **self.cohort_counts(own),
+                    **self.counts(own),
+                    **removed,
                     "baseline": baselines.get(key, []),
                 }
             )
@@ -407,9 +412,8 @@ class _Session:
             what = (
                 "its design is not identified, in the coefficients "
                 + _named(self.design, names, refit.refits[0])
-                + " (a category's reference level must have rows in every "
-                + ("session" if len(self.keys) == 1 else "session of the fit")
-                + ")"
+                + " (a category's reference level must have rows in every session of"
+                + " the fit)"
                 if start == NOT_IDENTIFIED
                 else f"its fit ended as {start}, a numerical failure"
             )
@@ -512,8 +516,7 @@ def _named(design: Design, block_terms: list[str], score: RemlScore) -> str:
 
 def _fit_unit(
     design: Design,
-    frames: list[pd.DataFrame],
-    keys: list[SessionKey],
+    sessions: Mapping[SessionKey, pd.DataFrame],
     lik: Likelihood,
     identity: _Identity,
     response: str,
@@ -521,7 +524,7 @@ def _fit_unit(
 ) -> FitRecord:
     """One unit's fit and record (the steps of the module docstring)."""
     name = f"{identity.fit_by} {'/'.join(identity.key)}"
-    session = _Session(design, lik, frames, keys, response, unit, name)
+    session = _Session(design, lik, sessions, response, unit, name)
     first = True
     while True:
         why = session.judge()
@@ -570,7 +573,7 @@ def _record(
     beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)  # no fit tried
     collinearity, edf = {}, {}
     status, decrement, n_iter = NOT_FITTED, float("nan"), 0
-    n_events = _n_events(session.lik, session.y[kept], session.unit[kept])
+    everywhere = np.ones(kept.size, dtype=bool)
     if refit is not None:
         data, block_terms = session.fitted_with
         last = refit.refits[-1]
@@ -605,10 +608,8 @@ def _record(
         session_date=session_date,
         epoch=epoch,
         likelihood=session.lik.name,
-        n_rows=int(kept.sum()),
-        n_units=int(np.unique(session.unit[kept]).size),
-        n_events=n_events,
-        cohort_counts=session.cohort_counts(),
+        **session.counts(everywhere),
+        cohort_counts=session.cohort_counts(everywhere),
         coef_names=list(design.coef_names),
         coef=beta.tolist(),
         vcov=vcov.tolist(),
@@ -703,8 +704,7 @@ def fit_sessions(
     return [
         _fit_unit(
             design,
-            [sessions[key] for key in keys],
-            keys,
+            {key: sessions[key] for key in keys},
             lik,
             _Identity(key, fit_by, model, kind, table_sha256),
             response,

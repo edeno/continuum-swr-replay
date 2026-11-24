@@ -637,6 +637,12 @@ def draw_data_set(
     return dict(_DataSet(sessions, model.response, outcomes))
 
 
+def _n_sessions(record: FitRecord) -> int:
+    """The sessions of a fit with rows in it (a session dropped from a unit
+    has none)."""
+    return sum(entry["n_rows"] > 0 for entry in record.sessions)
+
+
 def _session_rows(
     model: Model, records: Sequence[FitRecord], base: dict
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
@@ -663,7 +669,7 @@ def _session_rows(
                     "session_date": record.session_date,
                     "epoch": record.epoch,
                     "fit_by": record.fit_by,
-                    "n_sessions": sum(e["n_rows"] > 0 for e in record.sessions),
+                    "n_sessions": _n_sessions(record),
                     "n_events": record.n_events,
                     "status": record.status,
                     "no_fit": record.no_fit,
@@ -689,26 +695,11 @@ def _data_set_row(
     ``excludes_zero`` are NaN without a finite interval (none with fewer than
     two animals), so such a data set counts in none of those rates."""
     fit_by = records[0].fit_by
-    if not np.isfinite(values).any():
-        return {
-            "fit_by": fit_by,
-            "planted": planted,
-            "planted_unit": planted_unit,
-            "estimate": np.nan,
-            "low": np.nan,
-            "high": np.nan,
-            "interval_sd": np.nan,
-            "day_p": np.nan,
-            "n_sessions_used": 0,
-            "n_units_used": 0,
-            "n_animals_same_sign": 0,
-            "covered": np.nan,
-            "covered_unit": np.nan,
-            "excludes_zero": np.nan,
-            "bootstrap_seed": seed,
-        }
-    summary = unit_summary(
-        unit_values(values, records), fit_by, n_draws=n_draws, seed=seed
+    summary = (
+        unit_summary(unit_values(values, records), fit_by, n_draws=n_draws, seed=seed)
+        if np.isfinite(values).any()
+        else dict.fromkeys(("estimate", "low", "high", "sd", "day_p"), np.nan)
+        | {"n_units": 0, "n_animals_same_sign": 0}
     )
     low, high = summary["low"], summary["high"]
     interval = bool(np.isfinite(low) and np.isfinite(high))
@@ -729,10 +720,9 @@ def _data_set_row(
         "day_p": float(summary["day_p"]),
         "n_sessions_used": int(
             sum(
-                e["n_rows"] > 0
+                _n_sessions(r)
                 for r, v in zip(records, values, strict=True)
                 if np.isfinite(v)
-                for e in r.sessions
             )
         ),
         "n_units_used": int(summary["n_units"]),
