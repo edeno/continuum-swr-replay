@@ -6,8 +6,9 @@ Runs every case of ``scripts/checks/_regression_reference.py`` (each builds its
 inputs from a fixed seed and runs one public entry of
 ``continuum_swr_replay.analysis.regression``) and writes one file per group,
 ``tests/analysis/regression/data/numpy_reference/<group>.json``: the commit the
-outputs were made at, the command, the versions of Python, NumPy and SciPy, and
-the outputs of each case, one case per line. Floats are written exactly
+outputs were made at, the command, the versions of Python, NumPy and SciPy, the
+BLAS library each was built with and its version, the machine and the BLAS
+settings of the environment, and the outputs of each case, one case per line. Floats are written exactly
 (``repr``); a float that is not finite as a string (strict JSON).
 
 ``tests/analysis/regression/test_reference_fixtures.py`` runs the same cases and
@@ -32,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import sys
 from collections.abc import Sequence
@@ -51,6 +53,22 @@ FIXTURE_DIR = REPO / "tests" / "analysis" / "regression" / "data" / "numpy_refer
 COMMAND = "python scripts/checks/write_regression_reference.py"
 
 
+#: The environment variables that choose the BLAS threads and kernels.
+BLAS_SETTINGS = (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_CORETYPE",
+    "NPY_DISABLE_CPU_FEATURES",
+)
+
+
+def _blas(config: dict) -> str:
+    """The BLAS library a NumPy or SciPy build links, with its version."""
+    blas = config["Build Dependencies"]["blas"]
+    return f"{blas['name']} {blas['version']}"
+
+
 def group_text(group: str, commit: str, command: str) -> str:
     """The file of one group: its header and one case per line, strict JSON."""
     header = {
@@ -60,7 +78,11 @@ def group_text(group: str, commit: str, command: str) -> str:
             "python": platform.python_version(),
             "numpy": np.__version__,
             "scipy": scipy.__version__,
+            "numpy_blas": _blas(np.show_config(mode="dicts")),
+            "scipy_blas": _blas(scipy.show_config(mode="dicts")),
         },
+        "machine": f"{platform.system()} {platform.machine()}",
+        "blas_settings": {k: os.environ[k] for k in BLAS_SETTINGS if k in os.environ},
     }
     lines = [f"{json.dumps(k)}: {json.dumps(v)}," for k, v in header.items()]
     cases = [
