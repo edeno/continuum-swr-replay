@@ -1288,9 +1288,13 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
         transform=ax.get_xaxis_transform(), ha="right", va="top",
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
-    name_groups(ax, 0.84, 0.98, 0.17, "right")
+    # the cut's label ends left of its line and the names start right of it,
+    # so that they cannot run into each other in a wider font
+    low, high = HPD_BIN_EDGES_CM[0], HPD_BIN_EDGES_CM[-1]
+    right_of_cut = np.log(1.08 * HPD_TIGHT_CM / low) / np.log(high / low)
+    name_groups(ax, right_of_cut, 0.98, 0.17, "left")
     ax.set_xscale("log")
-    ax.set_xlim(HPD_BIN_EDGES_CM[0], HPD_BIN_EDGES_CM[-1])
+    ax.set_xlim(low, high)
     ax.set_xticks(HPD_TICKS_CM, [f"{t:g}" for t in HPD_TICKS_CM])
     ax.xaxis.set_minor_locator(NullLocator())
     top = distribution.groupby(["group", "bin_low"])["percent"].max().max()

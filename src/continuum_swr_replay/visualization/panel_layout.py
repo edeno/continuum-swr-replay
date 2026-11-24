@@ -36,9 +36,13 @@ __all__ = [
     "place_letters",
 ]
 
-FIT_PASSES = 10
+FIT_PASSES = 30
 """The most passes :func:`fit_panel` makes: what a panel draws beside its
-frames can change as the frames move, so the frames settle over a few passes."""
+frames can change as the frames move, so the frames settle over a few passes.
+A label placed in its axes' coordinates can halve the remaining movement in
+each pass, and how far the first pass is off depends on the font (the
+supplement of Figure 2 needs 7 passes in Arial and 11 in DejaVu Sans, the
+font of a machine without Arial), so the limit leaves room."""
 FIT_TOLERANCE_PT = 0.01
 """The frames have settled when no frame edge moves by more than this in a
 pass, in points."""
