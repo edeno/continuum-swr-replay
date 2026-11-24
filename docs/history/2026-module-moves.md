@@ -948,3 +948,32 @@ pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
 | `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
 | `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
 | `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |
+
+## The events summary's builder is a package, 2026-11-24
+
+`reported/events.py` (about 5,800 lines) was split into the package `reported/events/`,
+organized as `reported/behavior/` and `reported/mpfc/` are: one module for each part of
+the summary, a `common.py`, and an `__init__.py` with `summarize`, `TAGS` and
+`default_inputs`. Every function, class and constant moved with its text unchanged; only
+the imports changed. `summarize` now reads the event table and the visits and calls one
+function per module, in the order the summary holds its values: the summary's keys,
+values, tags and descriptions, and their order, are unchanged. Each part runs the lines
+of the old `summarize` that made its values, unchanged; the names they read come from
+`common.SummaryReads`. Paths are under `src/continuum_swr_replay/reported/`.
+
+| Old place (`events.py`, removed: split) | New place |
+|---|---|
+| `summarize` | `events/__init__.py`: `summarize`, which calls `add_cohort`, `add_properties`, `add_signals`, `add_detectors`, `add_spike_evidence`, `add_content`, `add_tetrode_holdout`, `add_restriction`, `add_decoder`, `add_class_structure` and `add_validation`, one in each module below |
+| `summarize`'s inner `stale`, `off_subset`, `off_visits`, `off_time_mask`, `add_counts` and the names it read once | `events/common.py`: `SummaryReads` (those five are its methods) |
+| `TAGS`, `EVENTS_SUBSET`, `HELDOUT_EVENTS_SUBSET`, `CONTROL_SUBSET`, `CANONICAL_WINDOWS_SUBSET`, `TIME_SUBSET`, `DETECTOR_SUBSET`, `LEFT_OUT_SUBSET`, `SPIKE_EVIDENCE_SUBSET`, `BOUT_SUBSET`, `_RUN_GROUPS`, `_per_spike_interval`, `_interval_and_animals_positive`, `_animal_range_values`, `_share_interval` | `events/common.py` (`TAGS` is also imported by `events/__init__.py`) |
+| `event_cohort_values`, `visit_context_values`, `boundary_offset_values`, `boundary_timing_values` | `events/cohort.py` |
+| `state_composition_values`, `_PROPERTIES`, `_PROPERTY_NAMES`, `property_values`, `start_distance_values`, `_class_median_values`, `hpd_tight_values`, `_DISTANCE_BANDS`, `content_distance_values`, `property_interval_values`, `rest_theta_values`, `with_start_and_rest_theta` | `events/properties.py` |
+| `_SIGNAL_EVENT_COLUMNS`, `_SIGNAL_LABELS`, `brain_state_values`, `gamma_z_values`, `_signal_values`, `gamma_db_values`, `with_brain_state` | `events/signals.py` |
+| `DETECTORS`, `MAIN_DETECTOR`, `detector_visit_values`, `other_detector_values`, `TEXT_FOUND_DETECTORS`, `nonlocal_found_values`, `detections_with_nonlocal_values`, `left_out_values` | `events/detectors.py` |
+| `_SPIKE_EVIDENCE_GROUPS`, `spike_evidence_metrics`, `spike_evidence_values`, `spike_evidence_visit_values`, `heldout_by_swr_values`, `heldout_bout_values` | `events/spike_evidence.py` |
+| `content_occupancy_values`, `content_along_arms_bins` | `events/content.py` |
+| `participation_values`, `likelihood_advantage_values`, `tetrode_holdout_values`, `shared_content_values`, `tetrode_holdout_extra_values`, `low_rate_values`, `resolved_content_values` and their constants (`_TETRODE_HELD_OUT`, `_CONTROL_AGREEMENT`, `_WIDTH_BINS`, `_WIDTH_WORDS`, `_REFERENCE_WORDS`, `_UNMATCHED_DONOR`, `_MATCHED_DONOR`, `_HELDOUT_MEASURES`, `_TENTHS`, `_PLACES`, `_PLACE_RATE_WORDS`) | `events/tetrode_holdout.py`, with `ParticipationReads`, what the restriction values read of the participation run |
+| `window_run_note_staleness`, `WindowValues`, `OutsideSwrValues`, the eight `restriction_*_values` and their constants (`_RESTRICTION_*`, `_OUTSIDE_SWR_*`, `_INSIDE_SWR_BINS`, `_EPOCH_REDUCTION`, `_GROUP_WORDS`, `_FULL_MINUS_SWR`, `_full_minus_swr_values`, `_CONTRAST_TIME_BINS`, `_SWR_ALLOWED_RUN`) | `events/restriction.py` |
+| `CALIBRATION_BINS`, `_STATE_WORDS`, `decoding_error_values`, `calibration_values`, `_state_fraction_values`, `state_fraction_values`, `immobile_state_fraction_values` | `events/decoder.py` |
+| `spike_evidence_staleness`, `OTHER_STEP_PROPERTIES`, `STEP_KNOTS`, `STEP_WINDOW_Z`, `class_distribution_values`, `nonlocal_power_values`, `_STATE_SIGNALS`, `_STATE_MEASURES`, `state_by_signal_values`, `nonlocal_mua_values`, `_step_statistics`, `class_step_values`, `class_step_evidence_values`, `class_step_values_with_staleness` | `events/class_structure.py` |
+| `nonlocal_probability_values`, `_SWEEP_SETTINGS`, `rule_sweep_values`, `_CALIBRATED_STATES`, `_CALIBRATION_CAVEATS`, `state_calibration_values` | `events/validation.py` |

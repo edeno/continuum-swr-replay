@@ -93,7 +93,7 @@ src/continuum_swr_replay/
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers, simulated_run_panels.py what Figure 1 and its companion share, publication_style.py the paper figures' style, sizes and checks, panel_layout.py where panels and their letters sit
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── columns.py             # require_columns, the one check that a table carries the columns a step reads
-├── reported/              # reported numbers: the summary builders (survey, detection, events, and behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
+├── reported/              # reported numbers: the summary builders (survey and detection, and events/, behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
 ├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
 └── data_types.py          # shared type definitions
@@ -484,7 +484,7 @@ question in the paper's outline, with the values that answer it, their macros, a
 
 Each value records the builder function that made it (`function`; "Builder function" in `questions.md`),
 so a macro leads to its code in two steps: `\EventsRippleMedianNonSwr` is made in `brain_state_values` of
-`reported/events.py`, which reads it from the `analysis/` function that computes it
+`reported/events/signals.py`, which reads it from the `analysis/` function that computes it
 (`event_statistics.event_signal_statistics`). The last section of `questions.md` takes the second step for
 every builder function: the `analysis/` functions it calls, read from the builders' source
 (`reported/builder_calls.py`). A builder makes its values through
