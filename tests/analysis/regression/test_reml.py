@@ -191,7 +191,7 @@ def _score_in_jax(lik, data: SessionData, blocks, beta):
     blocks = reml._eigenbasis(blocks, p)
     X, y = jnp.asarray(data.X @ Q), jnp.asarray(data.y)
     beta = Q.T @ beta
-    units = jnp.asarray(np.stack([reml._embedded(b, 1.0, p) for b in blocks]))
+    units = jnp.asarray(reml._penalty_stack(blocks, np.zeros(len(blocks)), p))
     ranks = jnp.asarray([b.rank for b in blocks], dtype=float)
     constant = sum(b.log_pdet for b in blocks)
     n_null = p - sum(b.rank for b in blocks)
@@ -348,7 +348,7 @@ def test_the_profiled_gaussian_flags_a_gram_it_cannot_factor() -> None:
     factored; the host raises on False (as for the Laplace families)."""
     _, data, blocks = _session("gaussian", 1, seed=2)
     p = data.X.shape[1]
-    S_j = reml._embedded(blocks[0], 1.0, p)[None]
+    S_j = reml._penalty_stack(blocks[:1], np.zeros(1), p)
     rows = Gaussian().pad(data.X, data.y, None)
     with jax.enable_x64(True):
 

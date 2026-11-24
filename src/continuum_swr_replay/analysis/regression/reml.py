@@ -552,13 +552,6 @@ def _check_blocks(blocks: Sequence[PenaltyBlock], n_columns: int) -> None:
         seen.update(columns)
 
 
-def _embedded(block: PenaltyBlock, strength: float, n_columns: int) -> np.ndarray:
-    """``strength * S_j`` embedded in a ``(p, p)`` matrix."""
-    out = np.zeros((n_columns, n_columns))
-    out[np.ix_(block.columns, block.columns)] = strength * block.S
-    return out
-
-
 def assemble_penalty(
     blocks: Sequence[PenaltyBlock], rho: Sequence[float], n_columns: int
 ) -> np.ndarray:
@@ -567,22 +560,23 @@ def assemble_penalty(
     rho = np.asarray(rho, dtype=float)
     if rho.shape != (len(blocks),):
         raise ValueError(f"{rho.size} log penalties for {len(blocks)} blocks")
-    return _summed(_strength_blocks(blocks, rho, n_columns), n_columns)
+    return _summed(_penalty_stack(blocks, rho, n_columns))
 
 
-def _strength_blocks(
+def _penalty_stack(
     blocks: Sequence[PenaltyBlock], rho: np.ndarray, n_columns: int
-) -> list[np.ndarray]:
-    """Each ``exp(rho_j) S_j``, embedded, shape ``(n_columns, n_columns)``."""
-    return [
-        _embedded(block, np.exp(r), n_columns)
-        for block, r in zip(blocks, rho, strict=True)
-    ]
+) -> np.ndarray:
+    """Each ``exp(rho_j) S_j``, embedded, stacked, shape ``(m, p, p)``."""
+    stack = np.zeros((len(blocks), n_columns, n_columns))
+    for j, (block, r) in enumerate(zip(blocks, rho, strict=True)):
+        stack[j][np.ix_(block.columns, block.columns)] = np.exp(r) * block.S
+    return stack
 
 
-def _summed(S_j: Sequence[np.ndarray], n_columns: int) -> np.ndarray:
-    """The sum of the embedded blocks ``S_j`` (zeros for none)."""
-    return sum(S_j, np.zeros((n_columns, n_columns)))
+def _summed(stack: np.ndarray) -> np.ndarray:
+    """The sum of the stacked blocks, shape ``(p, p)`` (zeros for none): added
+    in order from zeros, so that a -0 of a block's penalty is summed to 0."""
+    return np.add.reduce(stack, axis=0, initial=0.0)
 
 
 def free_basis(blocks: Sequence[PenaltyBlock], n_columns: int) -> np.ndarray:
@@ -951,8 +945,8 @@ def _reml_in_basis(
 ) -> RemlScore:
     """:func:`reml_and_derivatives` in the basis of ``X`` and ``blocks`` as given."""
     n_columns = X.shape[1]
-    S_j = _strength_blocks(blocks, rho, n_columns)
-    S = _summed(S_j, n_columns)
+    S_j = _penalty_stack(blocks, rho, n_columns)
+    S = _summed(S_j)
     if isinstance(lik, Gaussian):
         return _gaussian_profiled(X, y, blocks, rho, S_j, S, start, derivatives)
 
@@ -977,7 +971,7 @@ def _reml_in_basis(
                 problem.Y,
                 r.aux,
                 r.weight,
-                _stacked(S_j, n_columns),
+                S_j,
                 *common,
                 _ranks(blocks),
             )
@@ -1014,11 +1008,6 @@ def _score_of(
     )
 
 
-def _stacked(S_j: Sequence[np.ndarray], n_columns: int) -> np.ndarray:
-    """The embedded blocks stacked, shape ``(m, p, p)``."""
-    return np.reshape(np.array(S_j, dtype=float), (len(S_j), n_columns, n_columns))
-
-
 def _ranks(blocks: Sequence[PenaltyBlock]) -> np.ndarray:
     """Each block's rank, as floats, shape ``(m,)``."""
     return np.array([block.rank for block in blocks], dtype=float)
@@ -1029,7 +1018,7 @@ def _gaussian_profiled(
     y: np.ndarray,
     blocks: Sequence[PenaltyBlock],
     rho: np.ndarray,
-    S_j: Sequence[np.ndarray],
+    S_j: np.ndarray,
     S: np.ndarray,
     beta0: np.ndarray,
     derivatives: bool,
@@ -1068,7 +1057,7 @@ def _gaussian_profiled(
         return RemlScore(np.inf, None, None, pls, np.nan)
     rows = problem.rows
     # The penalties' stack goes to the device only when the derivatives read it.
-    extra = (_stacked(S_j, n_columns), _ranks(blocks)) if derivatives else ()
+    extra = (S_j, _ranks(blocks)) if derivatives else ()
     outputs = jax.device_get(
         _profiled_gaussian(
             rows.X,
