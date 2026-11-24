@@ -55,9 +55,11 @@ not the whole drop. ``visit_rate_statistics.third_clock_q7a`` compares Q7a of
 the fits with and without ``f_m``, per session and summarized; it is stored
 beside the rule's decision.
 
-The level of the reward coefficient is an open setting (:data:`REWARD_LEVELS`).
-At ``"session"`` (the default) the coefficient is in each session's fit, with
-the weak penalty. At ``"animal"`` there is ONE coefficient for each animal and
+The level of the reward coefficient (:data:`REWARD_LEVELS`): at ``"session"``
+(the default, and the paper's method, decided on 2026-11-23) the coefficient
+is in each session's fit, with the weak penalty at the decided prior SD
+(:data:`WEAK_PRIOR_SD`). ``"animal"`` is a CHECK, not the paper's method: ONE
+coefficient for each animal and
 kind, shared by that animal's sessions and unpenalized, while each session keeps
 its own baseline and its own clock curves (:func:`fit_animal_rewards`): it is
 the joint penalized fit of the animal's sessions with one shared reward column,
@@ -137,7 +139,8 @@ __all__ = [
     "STRETCH",
     "TIME_RANGE_CAPS_S",
     "UNIT",
-    "WEAK_PRIOR_SDS",
+    "WEAK_PRIOR_SD",
+    "WEAK_PRIOR_SD_SENSITIVITY",
     "CohortRows",
     "ThirdClockDecision",
     "VisitRateFit",
@@ -217,18 +220,24 @@ REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
 
 # --- OPEN (lead): the settings of the model's form --------------------------
 #
-# Each setting below is an open question of the project lead. None is decided
-# here; the model builds and fits for each allowed value. The defaults are the
+# Each setting below is an open question of the project lead, except where it
+# is marked DECIDED; the model builds and fits for each allowed value. The defaults are the
 # declared form and decide nothing: no real fit runs on the provisional
 # penalties.
 
-#: OPEN (lead): the prior SD of the weak penalty on every simple tested
-#: coefficient, in its reported unit (here a 0/1 step on the log rate); the
-#: log penalty is ``log(1 / SD^2)`` (``terms.log_penalty_from_prior_sd``).
-#: The candidates of the running simulation. The default
-#: (:class:`VisitRateSettings`) is the middle one, 2; the fit is also
-#: reported over the strength (a sensitivity analysis).
-WEAK_PRIOR_SDS: tuple[float, ...] = (1.0, 2.0, 4.0)
+#: DECIDED (lead, 2026-11-23, twenty-fifth round): the reward coefficient is
+#: fitted in each session with the weak penalty, like every simple tested
+#: coefficient of every model. The penalty is a Normal prior of mean 0 on the
+#: log rate ratio after a reward; its SD is this value, the author's call
+#: under the lead's "pick a penalty that's reasonable", not a number the lead
+#: chose. An SD of 2 says that a rate ratio within a factor of about 50 either
+#: way is plausible (``exp(1.96 * 2)``). The log penalty is ``log(1 / SD^2)``
+#: (``terms.log_penalty_from_prior_sd``).
+WEAK_PRIOR_SD = 2.0
+
+#: The stiffer and looser prior SDs reported beside :data:`WEAK_PRIOR_SD`
+#: (the convention's sensitivity pair).
+WEAK_PRIOR_SD_SENSITIVITY: tuple[float, float] = (1.0, 4.0)
 
 #: OPEN (lead): the clock penalty setting. Each clock's declared log penalty
 #: is to be set by ``calibration.log_penalty_for_edf`` on this model's own real
@@ -295,16 +304,19 @@ TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 #: option to build and test, not the declared test.
 REWARD_FORMS: tuple[str, ...] = ("coefficient", "time_varying")
 
-#: OPEN (lead): the level of the reward coefficient. ``"session"`` (the
-#: default, the declared Q2): the coefficient is in each session's fit, with
-#: the weak penalty, and Q2 is reduced session -> day -> animal. ``"animal"``:
+#: The level of the reward coefficient. ``"session"`` (the default and the
+#: paper's method, decided by the lead on 2026-11-23): the coefficient is in
+#: each session's fit, with the weak penalty, and Q2 is reduced session -> day
+#: -> animal. ``"animal"`` is a CHECK, NOT the paper's method, kept for the
+#: simulation that compares the two (whether it stays is a question for the
+#: lead):
 #: one coefficient for each animal and kind, shared by the animal's sessions
 #: and unpenalized, each session keeping its own baseline and clock curves
 #: (:func:`fit_animal_rewards`); Q2 over the cohort is the mean of the animals'
 #: coefficients with the t interval over the animals
 #: (``visit_rate_statistics.summarize_animal_rewards``). Only with the
 #: coefficient form of the reward effect. An option to build and compare in
-#: simulation, not the declared test.
+#: simulation, not the declared test, and not a method of the paper.
 REWARD_LEVELS: tuple[str, ...] = ("session", "animal")
 
 #: OPEN (lead): the reference window of Q1 (s since arrival). ``(0, 1)`` is
@@ -346,7 +358,8 @@ class VisitRateSettings:
     Attributes
     ----------
     weak_prior_sd : float
-        The weak penalty's prior SD (:data:`WEAK_PRIOR_SDS`; any positive
+        The weak penalty's prior SD: the decided :data:`WEAK_PRIOR_SD`, or
+        one of :data:`WEAK_PRIOR_SD_SENSITIVITY` (any positive
         value for a sensitivity analysis).
     clock_penalty : {"declared", "stiffer", "looser"}
         Which of :data:`CLOCK_LOG_PENALTIES` the curves take.
@@ -359,7 +372,8 @@ class VisitRateSettings:
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
     reward_level : {"session", "animal"}
-        :data:`REWARD_LEVELS`. At ``"animal"`` a session's design has no
+        :data:`REWARD_LEVELS`; ``"session"`` is the paper's method,
+        ``"animal"`` a CHECK only. At ``"animal"`` a session's design has no
         reward column (the coefficient enters its offset); only with the
         coefficient form.
     include_stretch_clock : bool
@@ -379,7 +393,7 @@ class VisitRateSettings:
         passes its own calibrated values.
     """
 
-    weak_prior_sd: float = 2.0
+    weak_prior_sd: float = WEAK_PRIOR_SD
     clock_penalty: Literal["declared", "stiffer", "looser"] = "declared"
     max_time_since_arrival_s: float | None = None
     reward_form: Literal["coefficient", "time_varying"] = "coefficient"
@@ -1259,6 +1273,10 @@ def fit_animal_rewards(
     allow_provisional: Literal["test", "simulation"] | None = None,
 ) -> AnimalRewardFit:
     """Model A with one reward coefficient for each animal, of one kind.
+
+    A CHECK, not the paper's method: the paper fits the reward coefficient in
+    each session with the weak penalty (:data:`WEAK_PRIOR_SD`; the lead,
+    2026-11-23). This fit is kept for the simulation that compares the two.
 
     Each animal's coefficient is shared by its sessions and unpenalized; each
     session keeps its own baseline and clock curves at the declared log
