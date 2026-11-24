@@ -28,13 +28,14 @@ from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_range
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 STATE_THRESHOLD = float(DEFAULT_NON_LOCAL_THRESHOLD)
 """A time bin is in a state class when that class's probability is above this."""
 STATE_CLASSES = ("local", "non_local", "no_spike", "other")
 """The state classes, in order: Local, non-local (Continuous plus Fragmented)
 or No-Spike probability above :data:`STATE_THRESHOLD`, or none of them."""
-EPOCH_COLUMNS = ("animal", "session_date", "epoch")
+EPOCH_COLUMNS = SESSION_COLUMNS
 """The columns that name an epoch in the stored counts."""
 
 

@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_range
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 PROBABILITY_BIN_EDGES = np.arange(51) / 50
 """The probability bins: 50 equal bins from 0 to 1, each holding the
@@ -42,7 +43,7 @@ SHARES = {
 }
 """The three shares of the time, by their word in a key: what each holds."""
 
-EPOCH_COLUMNS = ("animal", "session_date", "epoch")
+EPOCH_COLUMNS = SESSION_COLUMNS
 """The columns that name an epoch in :func:`probability_counts`' stored rows."""
 
 
