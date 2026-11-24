@@ -798,7 +798,15 @@ a test overrides the JAX functions. `newton.penalized_newton` pads the session's
 once and runs a host loop in Python and NumPy that holds every rule, status and count of
 "The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
-the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`). The
+the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`). A trial
+of the search takes its linear predictor as `eta + scale * (X @ step)`, and the accepted
+trial's starts the next iteration, kept on the device, so an iteration multiplies a vector
+by `X` once (`X @ step`) whatever its halvings, where it did once for `eta`, once for the
+step and once for each trial. The iteration returns the seven numbers per fit the loop
+reads at every step (`ok`, the decrement, `max |X step|`, whether the step was capped, the
+new `F` and `l`, whether a halving was found) stacked in one array, brought to the host in
+one transfer; `A`, the step and the candidate stay on the device until the loop reads them
+(`A` and the step only where a fit stops). The
 loop is written for a batch of fits on one design (state arrays with a leading axis of
 fits, each rule a vectorized expression over it), and the kernels map over that axis
 (`jax.vmap`); a session is a batch of one. A family is a static argument of the kernels
@@ -814,6 +822,20 @@ where SciPy raises, so `A` is "not positive definite" when `A` or its factor is 
 finite; on the CPU both call LAPACK's `potrf` (JAX 0.8.0 replaces the factor by NaN when
 `potrf` reports a failure, `jax/_src/lax/linalg.py`, `_cholesky_cpu_lowering`).
 `jax.scipy.linalg.cho_factor` reads one triangle, as SciPy's does.
+
+**No kernel multiplies by the transposed design.** The gradient is written `score @ X`,
+and every weighted Gram `X.T @ (w[:, None] * X)` (`likelihoods._gram`, for weights of
+either sign, as the information's derivatives need; the grouped softmax's per-group
+products alike). XLA folds that transpose into the product. Written `X.T @ score` and
+`(X.T * w) @ X`, the NumPy forms, it built the transposed design (36,864 x 76 at the rate
+model's size) on every iteration. One Newton iteration of the rate model took 90 ms (the
+least of four processes, each the least of 40 calls; one thread, under load, 2026-11-23),
+51 ms with the gradient as `score @ X`, and 46 ms with the Gram as well. The jaxpr cannot
+tell the forms apart (`X.T @ (w * X)` has a `transpose` there that XLA removes, and
+`dot_general(w * X, X)` has none but is compiled with the copy), so
+`tests/analysis/regression/test_newton.py` reads the optimized program of the iteration
+kernel and of the three information kernels of each family, on the CPU, and fails on a
+`transpose` whose shape has the padded row count.
 
 **How the log-likelihood is summed.** The last step of a fit is taken when `F` does not
 rise by more than `8 eps max(1, |F|)`, which only the rounding of `F` decides at the
@@ -835,9 +857,12 @@ fit in 100 to 200 on that sample, depends on the data and on the platform. The N
 had moved `F` by 16.8 eps |F| along the Bernoulli step; under an exact sum (`math.fsum`)
 the step changes `F` by -0.99 eps |F| there and lowers it by 4.1 eps |F| in the Poisson
 case, so the JAX fit is the better converged one. The per-row sum is within 1.5 eps |F| of
-the exact sum on fits of 500 to 20,000 rows, and the `F` of the evaluation kernel and of
-the iteration kernel's halving search agree exactly, so the allowance of 8 eps |F| covers
-the rounding of two evaluations with room to spare. Every stored case matches
+the exact sum on fits of 500 to 20,000 rows. The `F` of the iteration kernel's halving
+search, on the carried `eta + scale * (X @ step)`, differs from the evaluation kernel's on
+`X @ beta` at the same coefficients by at most 1.5 eps |F| (at the last step of 299 random
+fits of 40 to 20,000 rows; 44 of them differ at all, and none changed its status or step
+count against the search on `X @ beta`; 2026-11-23), so the allowance of 8 eps |F| covers
+the rounding of the two with room to spare. Every stored case matches
 (`tests/analysis/regression/data/numpy_reference/README.md`, "Differences from the NumPy
 fitter outside the stored cases").
 
@@ -885,9 +910,18 @@ same file fails when a module that imports `jax`, the regression fitter or
 also fails when a listed one is gone.
 
 **Padding.** `jit` compiles once for each new shape, so a session's rows are padded to a
-bucket: a multiple of 4,096 rows for the Poisson, Bernoulli and Gaussian families
-(`padding.pad_rows`), and of 1,024 rows and 64 groups for the grouped softmax
-(`padding.pad_groups`). Columns are not padded. A padded row has a design row of zeros, a
+bucket (`padding.bucket_size`): below a step, the next power of two and at least 256 rows
+(`SMALLEST_ROW_BUCKET`); from the step up, the next multiple of it. The step is 4,096 rows
+for the Poisson, Bernoulli and Gaussian families (`padding.pad_rows`: 256, 512, 1,024,
+2,048, then 4,096, 8,192, ...), and 1,024 rows for the grouped softmax, whose groups go to
+a multiple of 64 (`padding.pad_groups`: 256, 512, then 1,024, 2,048, ...). Columns are not
+padded. A Bernoulli fit of 300 rows padded to 4,096 spent most of its time on the padded
+rows; padded to 512 it took about half the time. Fits of 40 rows took the same time padded
+to 64, 128 or 256 rows (one thread, 100 calls each, 2026-11-23), so a smaller bucket would
+add compiled shapes for nothing. The grouped softmax's fits of 10 to 50 events (90 to 450
+rows) took 15 to 25 % less time below its step; at 100 events and more the bucket is the
+same. Groups stay at multiples of 64: a session has at least as many rows as groups.
+A padded row has a design row of zeros, a
 response of 0, an offset of 0 and a weight of 0, after the real rows. A kernel multiplies
 each row's terms by the weight, so a padded row adds exactly 0 to the log-likelihood, its
 gradient and its information; with a zero design row it adds nothing to the gradient or
@@ -916,8 +950,9 @@ measured (`tests/analysis/regression/test_likelihoods.py`).
 JAX traces a jitted function once for each new signature and compiles each trace; a
 program found in the persistent compilation cache is still traced (measured). So the count
 is the number of programs a process needed, whatever the cache holds: ten Poisson fits of
-ten row counts in two buckets trace each Newton kernel at most twice
-(`tests/analysis/regression/test_newton.py`).
+ten row counts in four buckets trace each Newton kernel once per bucket
+(`tests/analysis/regression/test_newton.py`). Each new bucket of a family costs its first
+fit about 2 to 3 s of compilation on one CPU thread.
 
 **Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
 so every module of the fitter that imports them (`sessions`, `calibration`, `record`,
@@ -943,23 +978,53 @@ median of 5; 2026-11-21) 18 ms to the score alone (54 to 72 ms) and 26 ms with t
 gradient and Hessian (165 to 191 ms).
 
 The fit at fixed penalties in JAX, against the NumPy solver before it, by
-`scripts/checks/time_regression_fitter.py` (one thread, pinned to one CPU, the median of
-5 calls after the first; every case under load, the 1-minute load average 37 to 70 on 96
-CPUs; 2026-11-23). NumPy at commit 7959aca7, JAX at 61e938c1:
+`scripts/checks/time_regression_fitter.py` (its `--child` cases) and two small Bernoulli fits
+of 23 columns through `reml.refit_session` (300 and 1,500 rows, 200 calls each). One
+thread, each process pinned to one CPU, the code versions run in turn in the same minutes
+(NumPy, JAX before, JAX after each change, then again), on a machine under heavy load
+(1-minute load average 60 to 130 on 96 CPUs, no idle core; 2026-11-23). Each cell is the
+least time over all calls of all rounds, then the median of the rounds' medians, in ms.
+NumPy at commit 7959aca7; JAX before the changes at 2592ef01 and after them at efc2bb3a:
 
-| Case | NumPy first (s) | NumPy median (s) | JAX first (s) | JAX median (s) | Peak RSS NumPy, JAX (MB) |
+| Case | Rounds | NumPy | JAX before | JAX after | After / NumPy |
 |---|---|---|---|---|---|
-| fit_rate (37,000 x 76) | 0.236 | 0.239 | 2.395 | 0.472 | 332, 837 |
-| fit_content (400 events x 9) | 0.014 | 0.013 | 7.973 | 0.019 | 266, 801 |
-| fit_bernoulli (20,000 x 23) | 0.035 | 0.034 | 2.686 | 0.071 | 274, 807 |
-| fit_gaussian (20,000 x 23) | 0.027 | 0.028 | 3.264 | 0.053 | 274, 817 |
-| fit_sessions_30 | 8.86 | 8.75 | 24.5 | 14.2 | 1454, 1454 |
-| calibration_30 | 134 | 126 | 227 | 228 | 1454, 1454 |
-| pytest tests/analysis/regression, cold and warm cache | 161, 160 | | 807, 811 | | 1005, 2156 |
+| fit_rate (37,000 x 76) | 9 | 242, 298 | 534, 690 | 245, 381 | 1.0, 1.3 |
+| fit_content (400 events x 9) | 8 | 12.4, 14.6 | 16.6, 20.0 | 11.3, 16.0 | 0.9, 1.1 |
+| fit_bernoulli (20,000 x 23) | 3 | 35, 53 | 45, 57 | 31, 52 | 0.9, 1.0 |
+| fit_gaussian (20,000 x 23) | 3 | 21, 37 | 33, 43 | 27, 35 | 1.2, 1.0 |
+| fit_sessions_30 | 3 | 8,855, 9,968 | 11,724, 13,778 | 7,249, 9,353 | 0.8, 0.9 |
+| Bernoulli, 300 x 23 | 8 | 0.92, 1.00 | 6.4, 9.0 | 2.4, 3.3 | 2.6, 3.3 |
+| Bernoulli, 1,500 x 23 | 8 | 1.8, 3.1 | 6.8, 9.3 | 3.9, 4.9 | 2.2, 1.6 |
 
-The first call includes the compilations (a new process, an empty in-process cache). A fit
-of real size takes about twice the NumPy time, as the prototype did. Small fits take
-longer still: most of the suite's added time is `test_simulation.py::test_coverage_and_size`
-(2,000 penalty selections on about 100 summed cells, 452 s), where each call of a kernel
-costs about 0.5 ms whatever the rows (padding those cells to 128 rows instead of 4,096
-changed 20 of those selections from 3.3 s to 3.0 s, against 0.7 s in NumPy).
+The times of one round can be twice those of another, so read the ratios of the least
+times; the Bernoulli and Gaussian cases at 20,000 rows, with three rounds, are within the
+noise of NumPy. What each change gave:
+
+- The gradient as `score @ X` and the Gram as `X.T @ (w[:, None] * X)` (no copy of the
+  transposed design, above): the rate model's Newton iteration from 90 to 46 ms, the whole
+  rate fit from 534 to 287 ms; the content fit's iteration from 2.4 to 2.1 ms.
+- The row buckets below the step: the fit of 300 rows from 5.9 to 3.2 ms, of 1,500 rows
+  from 6.9 to 5.1 ms. They added 44 programs to the 389 that `tests/analysis/regression`
+  without its slow tests traced, each new bucket of a family costing its first fit about
+  2 to 3 s of compilation.
+- The iteration's scalars in one transfer, and its arrays fetched when read: measured on
+  `penalized_newton` alone, the two versions called in turn in one process, the fit of 300
+  rows from 3.1 to 2.3 ms, of 1,500 rows from 3.8 to 3.2 ms, nothing at the rate size.
+- One transfer of the padded arrays: the same way, 300 rows from 2.4 to 2.0 ms, 1,500 rows
+  from 5.5 to 4.6 ms, nothing at the rate size.
+- The line search on the carried `eta + scale * (X @ step)`: the same way, the rate
+  model's `penalized_newton` from 244 to 220 ms (median 254 to 230), about 7 % of its whole
+  refit; the small fits did not change.
+
+Peak memory did not change (the rate case's process 856 to 876 MB before, 853 to 858
+after). `tests/analysis/regression` without its slow tests traced 373 programs before and
+435 after (44 of them the new buckets, 16 the test of the compiled programs, two the test
+of a batch of fits) and took 402 and 418 s on one CPU in the same minutes, so its time is
+in its compilations, not its fits. Its slow test of penalty selections on small cells
+(`test_simulation.py::test_coverage_and_size`, 2,000 selections of about 100 summed
+cells) took 415 s before and 183 s after, in the same minutes. What remains of a small fit
+is the host: the cost of each kernel call (about 0.3 ms for an iteration of 300 rows),
+the design check (`_unidentified`) and REML's rotations. At the rate size REML's copy of the design into the penalties'
+eigenbasis (`reml_and_derivatives`, in NumPy) takes 55 to 60 ms of a refit, and XLA's
+product for the Gram is slower than BLAS's `syrk` for an unweighted `X' X`, which XLA does
+not call.
