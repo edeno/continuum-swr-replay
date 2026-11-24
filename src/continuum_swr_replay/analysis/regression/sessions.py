@@ -179,6 +179,7 @@ class _Session:
         self.rounds = 0  # the refit rounds before the current fit
         self.no_fit = ""
         self.fitted_with: tuple[SessionData, list[str]] | None = None
+        self.X_kept: np.ndarray | None = None  # the rows kept, at the last judge
 
     @property
     def kept(self) -> np.ndarray:
@@ -236,9 +237,10 @@ class _Session:
             if why:
                 return why
             kept = self.kept
+            self.X_kept = self._kept_design(kept)  # the fit of this round reads it
             self.support = design_support(
                 self.design,
-                self._kept_design(kept),
+                self.X_kept,
                 {level: rows[kept] for level, rows in self.level_rows.items()},
                 self.unit[kept],
             )
@@ -372,7 +374,7 @@ class _Session:
         kept = self.kept
         left_out = self.left_out()
         inactive = np.array([c in left_out for c in self.design.coef_names])
-        X, y = self._kept_design(kept), self.y[kept]
+        X, y = self.X_kept, self.y[kept]
         if isinstance(self.lik, GroupedSoftmax):
             aux = np.unique(self.unit[kept], return_inverse=True)[1]
         elif isinstance(self.lik, Poisson):
@@ -562,6 +564,7 @@ def _record(
     or, with no ``refit``, of a fit that was not tried."""
     design = session.design
     kept = session.kept
+    session.X = session.X_kept = None  # the record reads the fit's own design
     p = len(design.coef_names)
     beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)  # no fit tried
     collinearity, edf = {}, {}
