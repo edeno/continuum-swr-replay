@@ -596,7 +596,7 @@ The per-session fitting loop: one design, every session fitted alone.
 
 The simulation engine: a planted truth drawn on a model's own rows, fitted by the real code.
 
-`Model`, `InsideScenario`, `OutsideScenario`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `draw_data_set`, `run`, `summarize`
+`Model`, `InsideScenario`, `OutsideScenario`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `PreparedDraws`, `prepare_draws`, `draw_data_set`, `run_columns`, `run`, `summarize`
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
