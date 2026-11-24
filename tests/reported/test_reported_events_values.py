@@ -108,11 +108,14 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
 
 
 def _quality_sessions() -> pd.DataFrame:
-    """Four sessions: errors 1, 3, 9 and none (median 3, mean 13/3); every state
-    fraction distinct, so a fraction filed under another state or movement
-    fails. Session d has no immobile bin."""
+    """Four sessions, two of animal a (errors 1 and 9) and two of b (3 and
+    none); every state fraction distinct, so a fraction filed under another
+    state or movement fails. b's second session has no immobile bin."""
     return pd.DataFrame(
         {
+            "animal": ["a", "a", "b", "b"],
+            "day": [1, 2, 1, 2],
+            "epoch": "02_r1",
             "median_error_cm": [1.0, 9.0, 3.0, NAN],
             "moving_Local_prob": [0.9, 0.8, 0.7, 0.95],
             "moving_No-Spike_prob": [0.05, 0.1, 0.2, 0.0],
@@ -128,7 +131,9 @@ def _quality_sessions() -> pd.DataFrame:
 
 def test_decoding_error_values_are_the_median_over_sessions_with_an_error():
     numbers = _numbers(builder.decoding_error_values(_quality_sessions(), "s"))
-    assert numbers == {"decoding_error_median_cm": 3.0, "decoding_error_sessions": 3}
+    # a's median of 1 and 9 is 5, b's only error 3: their mean 4 (the median
+    # over the three pooled sessions would be 3)
+    assert numbers == {"decoding_error_median_cm": 4.0, "decoding_error_sessions": 3}
 
 
 def test_state_fraction_values_name_each_movement_and_state():
@@ -137,16 +142,18 @@ def test_state_fraction_values_name_each_movement_and_state():
         + builder.immobile_state_fraction_values(_quality_sessions(), "s")
     )
     assert numbers == {
-        # the median over the four sessions: the mean of the middle two
-        "state_fraction_moving_local": pytest.approx(0.85),
-        "state_fraction_moving_no_spike": pytest.approx(0.075),
-        "state_fraction_moving_continuous": pytest.approx(0.045),
-        "state_fraction_moving_fragmented": pytest.approx(0.035),
-        # over the three sessions with an immobile bin
-        "state_fraction_immobile_local": pytest.approx(0.4),
-        "state_fraction_immobile_no_spike": pytest.approx(0.25),
-        "state_fraction_immobile_continuous": pytest.approx(0.22),
-        "state_fraction_immobile_fragmented": pytest.approx(0.12),
+        # each animal's mean over its sessions, then the mean over animals:
+        # moving Local a (0.9, 0.8) 0.85, b (0.7, 0.95) 0.825
+        "state_fraction_moving_local": pytest.approx((0.85 + 0.825) / 2),
+        "state_fraction_moving_no_spike": pytest.approx((0.075 + 0.1) / 2),
+        "state_fraction_moving_continuous": pytest.approx((0.045 + 0.04) / 2),
+        "state_fraction_moving_fragmented": pytest.approx((0.03 + 0.035) / 2),
+        # immobile: b's session without an immobile bin is not one of its
+        # sessions, so b's value is its first session's
+        "state_fraction_immobile_local": pytest.approx((0.4 + 0.4) / 2),
+        "state_fraction_immobile_no_spike": pytest.approx((0.25 + 0.25) / 2),
+        "state_fraction_immobile_continuous": pytest.approx((0.215 + 0.23) / 2),
+        "state_fraction_immobile_fragmented": pytest.approx((0.135 + 0.12) / 2),
     }
     values = _by_key(
         builder.state_fraction_values(_quality_sessions(), "s")

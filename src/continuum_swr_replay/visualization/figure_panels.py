@@ -727,7 +727,8 @@ def plot_state_fractions_by_movement(
     The fractions are
     :func:`~continuum_swr_replay.analysis.decode_quality.quality_metrics.state_fraction_statistics`'s
     over :func:`~continuum_swr_replay.analysis.decode_quality.quality_metrics.session_state_fractions`:
-    the median over sessions of each session's mean state probability, as the
+    each session's mean state probability, each animal's mean over its
+    sessions, then the mean over animals, as the
     events summary reports them.
 
     Parameters

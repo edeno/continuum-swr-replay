@@ -481,10 +481,10 @@ def decoding_error_values(sessions: pd.DataFrame, source: str) -> list[Value]:
             stats["median_error_cm"],
             "quantity",
             "sig2",
-            "median over sessions of each session's median Local-state decoding "
-            "error (the track-graph distance from the decoded to the actual "
-            "position, over time bins with Local probability above 0.5 outside "
-            "excluded time), sessions pooled",
+            "each session's median Local-state decoding error (the track-graph "
+            "distance from the decoded to the actual position, over time bins with "
+            "Local probability above 0.5 outside excluded time), each animal's "
+            "median over its sessions, then the mean over animals",
             "cm",
         ),
         make(
@@ -556,8 +556,8 @@ def _state_fraction_values(
             fractions.loc[movement, state],
             "fraction",
             "pct1",
-            f"median over sessions of each session's mean {state} over its "
-            f"{where} outside excluded time, sessions pooled",
+            f"each session's mean {state} over its {where} outside excluded time, "
+            "each animal's mean over its sessions, then the mean over animals",
         )
         for state in quality_metrics.STATE_PROBABILITY_COLUMNS
     ]
