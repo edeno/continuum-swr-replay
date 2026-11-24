@@ -16,6 +16,9 @@ import pytest  # noqa: E402
 
 from continuum_swr_replay.analysis.event_evidence import heldout_runs  # noqa: E402
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
+from continuum_swr_replay.visualization.simulated_run_panels import (  # noqa: E402
+    drawn_extent,
+)
 from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
 from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
     GAIN_SPLIT,
@@ -288,8 +291,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     by_letter = {figure.LETTERS[panel]: panel for panel in figure.PANELS}
     for column in columns:  # each panel's drawing starts at its column's edge
         starts = [
-            figure.drawn_extent(fig, figure.panel_axes(fig, by_letter[k])).x0
-            for k in column
+            drawn_extent(fig, figure.panel_axes(fig, by_letter[k])).x0 for k in column
         ]
         np.testing.assert_allclose(starts, starts[0], atol=1e-3)
     assert "Immobile, at wells" not in [
