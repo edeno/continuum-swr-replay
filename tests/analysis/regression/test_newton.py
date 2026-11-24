@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import likelihoods, newton, reml, runtime
+from continuum_swr_replay.analysis.regression import newton, reml, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     NEWTON_DECREMENT_TOL,
     NO_MAXIMUM_ETA_STEP,
@@ -45,6 +45,8 @@ from continuum_swr_replay.analysis.regression.reml import (
 )
 from continuum_swr_replay.analysis.regression.runtime import COMPILE_LOG
 from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+
+from .conftest import family_kernel, jax_family
 
 
 def test_hand_case_poisson_two_parameters() -> None:
@@ -162,8 +164,8 @@ def _logistic_data() -> tuple[np.ndarray, np.ndarray]:
 
 def _decrement(lik, X, y, aux, S, beta) -> float:
     eta = X @ beta
-    g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
-    A = lik.information(X, eta, y, aux) + S
+    g = X.T @ family_kernel(lik, "score", None, eta, y, aux) - S @ beta
+    A = family_kernel(lik, "information", X, eta, y, aux) + S
     return 0.5 * float(g @ np.linalg.solve(A, g))
 
 
@@ -246,10 +248,14 @@ def test_last_step_below_the_objective_rounding_is_taken() -> None:
     optimum = penalized_newton(lik, X, y, offset, S, np.zeros(5)).beta
     for _ in range(3):  # polish by plain Newton steps
         eta = X @ optimum
-        g = X.T @ lik.score_eta(eta, y, offset) - S @ optimum
-        optimum = optimum + np.linalg.solve(lik.information(X, eta, y, offset) + S, g)
-    A = lik.information(X, X @ optimum, y, offset) + S
-    F = -lik.loglik(X @ optimum, y, offset) + 0.5 * optimum @ S @ optimum
+        g = X.T @ family_kernel(lik, "score", None, eta, y, offset) - S @ optimum
+        information = family_kernel(lik, "information", X, eta, y, offset)
+        optimum = optimum + np.linalg.solve(information + S, g)
+    A = family_kernel(lik, "information", X, X @ optimum, y, offset) + S
+    F = (
+        -family_kernel(lik, "loglik", None, X @ optimum, y, offset)
+        + 0.5 * optimum @ S @ optimum
+    )
     # A start off the optimum along A's weakest direction, with a predicted
     # gain delta' A delta / 2 a tenth of the rounding of F.
     gain = 0.1 * abs(F) * np.finfo(float).eps
@@ -411,7 +417,7 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
         r["step"] = np.array([[to + 0.5]])
         fit = newton._last_step(
             problem, beta, r, np.array([True]), 3, newton.MAX_STEP_LENGTH
-        )(0)
+        )[0]
 
     # The fit stays where it was, with A and the decrement there by hand:
     # g = 1 - exp(-0.5), A = exp(-0.5), decrement g^2 / (2 A).
@@ -728,14 +734,14 @@ def test_no_kernel_copies_the_transposed_design(family: str) -> None:
                 np.float64(NEWTON_DECREMENT_TOL),
                 np.int64(3),
             ),
-            "_information_kernel": likelihoods._information_kernel.lower(
-                lik, r.X, eta, problem.Y[0], r.aux, r.weight
+            "_jax_information": jax_family.lower(
+                lik, "information", r.X, eta, problem.Y[0], r.aux, r.weight
             ),
-            "_dinformation_kernel": likelihoods._dinformation_kernel.lower(
-                lik, r.X, eta, problem.Y[0], r.aux, r.weight, eta
+            "_jax_dinformation": jax_family.lower(
+                lik, "dinformation", r.X, eta, problem.Y[0], r.aux, r.weight, eta
             ),
-            "_d2information_kernel": likelihoods._d2information_kernel.lower(
-                lik, r.X, eta, problem.Y[0], r.aux, r.weight, eta, eta
+            "_jax_d2information": jax_family.lower(
+                lik, "d2information", r.X, eta, problem.Y[0], r.aux, r.weight, eta, eta
             ),
         }
         # REML's kernel of the score and its derivatives in two log penalties.
@@ -883,8 +889,8 @@ def _poisson_probe():
 
 def _last_steps(monkeypatch: pytest.MonkeyPatch) -> list:
     """Record each call of ``newton._last_step`` (of a batch of one): its
-    problem, coefficients, full step and iteration, and, once the fit is
-    read, whether the step was taken."""
+    problem, coefficients, full step and iteration, and whether the step was
+    taken."""
     calls = []
     last_step = newton._last_step
 
@@ -892,14 +898,9 @@ def _last_steps(monkeypatch: pytest.MonkeyPatch) -> list:
         call = {"problem": problem, "beta": beta[0].copy(), "n_iter": n_iter}
         call["step"] = r["step"][0].copy()
         calls.append(call)
-        fit_of = last_step(problem, beta, r, members, n_iter, cap)
-
-        def fit(b):
-            out = fit_of(b)
-            call["taken"] = out.n_iter == n_iter + 1
-            return out
-
-        return fit
+        fits = last_step(problem, beta, r, members, n_iter, cap)
+        call["taken"] = fits[0].n_iter == n_iter + 1
+        return fits
 
     monkeypatch.setattr(newton, "_last_step", recorded)
     return calls

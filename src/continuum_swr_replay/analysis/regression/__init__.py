@@ -17,14 +17,15 @@ package may import it.
   names of terms and coefficients, the standardization and the design check.
 - ``collinearity``: how well the other terms explain each term, on the
   information-weighted design (VIF, mgcv's concurvity).
-- ``support``: the support rule of a simple term, the row rule for an
-  inactive level of a category, and the guard that a tested coefficient
-  carries a penalty.
-- ``sessions``: the per-session fitting loop, with the handling of a session
-  without a finite maximum.
+- ``support``: the support rule of a simple term and the guard that a
+  tested coefficient carries a penalty.
+- ``sessions``: the per-session fitting loop, with the row rule for an
+  inactive level of a category and the handling of a session without a
+  finite maximum.
 - ``calibration``: the declared log penalty of a per-session smooth, the one
   at which its median edf over the sessions is a target.
-- ``record``: the fit-row record and its parquet storage.
+- ``record``: the fit-row record and the causes of a session without a
+  kept fit.
 - ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
   coefficient differences) with their exact variance.
 - ``folds``: the one fold rule, five folds of whole trials balanced by
@@ -36,6 +37,8 @@ package may import it.
   other modules do not.
 - ``padding``: rows and groups padded to bucket sizes, with the weight that
   marks the real rows.
+- ``simulation``: the simulation engine: an outcome drawn from a planted
+  truth on a model's own rows, fitted and reduced by the real code.
 
 Submodules are imported by name; nothing is re-exported here.
 """

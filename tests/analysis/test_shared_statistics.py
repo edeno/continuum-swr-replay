@@ -965,3 +965,44 @@ def test_animal_mean_is_the_mean_over_the_animals_with_a_value_at_each_level():
     assert means.tolist() == pytest.approx([20.0, 80.0])
     with pytest.raises(ValueError):
         animal_mean(pd.concat([table, table.iloc[[0]]]), "bin_low", "percent")
+
+
+def test_session_value_statistics_take_each_animals_mean_or_median_of_its_sessions():
+    """a: sessions 1, 1 and 0 (mean 2/3, median 1); b: one session, 0.5. The
+    mean over animals of the means is 7/12, of the medians 3/4."""
+    from continuum_swr_replay.analysis.shared_statistics import session_value_statistics
+
+    values, animal = [1.0, 1.0, 0.0, 0.5], ["a", "a", "a", "b"]
+    mean = session_value_statistics(
+        values, animal, statistic="mean", n_boot=200, rng=np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(mean.per_animal.to_numpy(), [2 / 3, 0.5])
+    assert mean.estimate == pytest.approx(7 / 12)
+    assert mean.interval.low <= mean.estimate <= mean.interval.high
+    median = session_value_statistics(
+        values, animal, statistic="median", n_boot=200, rng=np.random.default_rng(0)
+    )
+    assert median.estimate == pytest.approx(0.75)
+    # the same replicates (one seed): each slot's copies of the sessions
+    np.testing.assert_array_equal(
+        np.isnan(mean.copy_values), np.isnan(median.copy_values)
+    )
+
+
+def test_session_value_statistics_of_equal_values_have_no_spread():
+    from continuum_swr_replay.analysis.shared_statistics import session_value_statistics
+
+    result = session_value_statistics(
+        [0.3] * 5, ["a", "a", "b", "c", "c"], statistic="median", n_boot=100,
+        rng=np.random.default_rng(1),
+    )  # fmt: skip
+    assert result.estimate == pytest.approx(0.3)
+    assert (result.interval.low, result.interval.high) == pytest.approx((0.3, 0.3))
+    with pytest.raises(ValueError, match="'mean' or 'median'"):
+        session_value_statistics(
+            [1.0], ["a"], statistic="sum", n_boot=1, rng=np.random.default_rng(0)
+        )
+    with pytest.raises(ValueError, match="finite"):
+        session_value_statistics(
+            [np.nan], ["a"], statistic="mean", n_boot=1, rng=np.random.default_rng(0)
+        )

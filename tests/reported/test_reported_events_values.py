@@ -87,9 +87,12 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
         "nonlocal_events_non_swr": 7,
         "nonlocal_events_swr_contained": 2,
         "nonlocal_events_swr_partial": 4,
-        "non_swr_fraction": pytest.approx(7 / 13),
-        "swr_contained_fraction": pytest.approx(2 / 13),
-        "swr_partial_fraction": pytest.approx(4 / 13),
+        # the headline shares are the animal-first shares (pooled over the 13
+        # events they would be 7/13, 2/13 and 4/13): a 3/4, b 2/5, c 1/2
+        # non-SWR; a 1/4, b 0, c 1/4 contained; a 0, b 3/5, c 1/4 partial
+        "non_swr_fraction": pytest.approx(0.55),
+        "swr_contained_fraction": pytest.approx(1 / 6),
+        "swr_partial_fraction": pytest.approx(0.85 / 3),
         # Figure 2d's bars: the mean over animals of each animal's shares
         "non_swr_fraction_animal_mean": pytest.approx(0.55),
         "swr_contained_fraction_animal_mean": pytest.approx(1 / 6),
@@ -105,11 +108,14 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
 
 
 def _quality_sessions() -> pd.DataFrame:
-    """Four sessions: errors 1, 3, 9 and none (median 3, mean 13/3); every state
-    fraction distinct, so a fraction filed under another state or movement
-    fails. Session d has no immobile bin."""
+    """Four sessions, two of animal a (errors 1 and 9) and two of b (3 and
+    none); every state fraction distinct, so a fraction filed under another
+    state or movement fails. b's second session has no immobile bin."""
     return pd.DataFrame(
         {
+            "animal": ["a", "a", "b", "b"],
+            "day": [1, 2, 1, 2],
+            "epoch": "02_r1",
             "median_error_cm": [1.0, 9.0, 3.0, NAN],
             "moving_Local_prob": [0.9, 0.8, 0.7, 0.95],
             "moving_No-Spike_prob": [0.05, 0.1, 0.2, 0.0],
@@ -125,7 +131,9 @@ def _quality_sessions() -> pd.DataFrame:
 
 def test_decoding_error_values_are_the_median_over_sessions_with_an_error():
     numbers = _numbers(builder.decoding_error_values(_quality_sessions(), "s"))
-    assert numbers == {"decoding_error_median_cm": 3.0, "decoding_error_sessions": 3}
+    # a's median of 1 and 9 is 5, b's only error 3: their mean 4 (the median
+    # over the three pooled sessions would be 3)
+    assert numbers == {"decoding_error_median_cm": 4.0, "decoding_error_sessions": 3}
 
 
 def test_state_fraction_values_name_each_movement_and_state():
@@ -134,16 +142,18 @@ def test_state_fraction_values_name_each_movement_and_state():
         + builder.immobile_state_fraction_values(_quality_sessions(), "s")
     )
     assert numbers == {
-        # the median over the four sessions: the mean of the middle two
-        "state_fraction_moving_local": pytest.approx(0.85),
-        "state_fraction_moving_no_spike": pytest.approx(0.075),
-        "state_fraction_moving_continuous": pytest.approx(0.045),
-        "state_fraction_moving_fragmented": pytest.approx(0.035),
-        # over the three sessions with an immobile bin
-        "state_fraction_immobile_local": pytest.approx(0.4),
-        "state_fraction_immobile_no_spike": pytest.approx(0.25),
-        "state_fraction_immobile_continuous": pytest.approx(0.22),
-        "state_fraction_immobile_fragmented": pytest.approx(0.12),
+        # each animal's mean over its sessions, then the mean over animals:
+        # moving Local a (0.9, 0.8) 0.85, b (0.7, 0.95) 0.825
+        "state_fraction_moving_local": pytest.approx((0.85 + 0.825) / 2),
+        "state_fraction_moving_no_spike": pytest.approx((0.075 + 0.1) / 2),
+        "state_fraction_moving_continuous": pytest.approx((0.045 + 0.04) / 2),
+        "state_fraction_moving_fragmented": pytest.approx((0.03 + 0.035) / 2),
+        # immobile: b's session without an immobile bin is not one of its
+        # sessions, so b's value is its first session's
+        "state_fraction_immobile_local": pytest.approx((0.4 + 0.4) / 2),
+        "state_fraction_immobile_no_spike": pytest.approx((0.25 + 0.25) / 2),
+        "state_fraction_immobile_continuous": pytest.approx((0.215 + 0.23) / 2),
+        "state_fraction_immobile_fragmented": pytest.approx((0.135 + 0.12) / 2),
     }
     values = _by_key(
         builder.state_fraction_values(_quality_sessions(), "s")
@@ -250,16 +260,18 @@ def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range
 def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
     values = _by_key(builder.boundary_offset_values(_events(), "s"))
     assert values["swr_overlapping_events"].value == 6
-    # starts 5, 10, 30, 50, 60, 300 ms; ends -50, -40, -30, -10, -5, 900 ms
-    assert values["start_offset_median_ms"].value == pytest.approx(40.0)
-    assert values["end_offset_median_ms"].value == pytest.approx(-20.0)
+    # one epoch per animal: starts a 10; b 5, 30, 50 (median 30); c 60, 300
+    # (180) ms -> (10 + 30 + 180) / 3 (pooled over the six: 40); ends a -10; b
+    # -5, -30, -40 (-30); c -50, 900 (425) -> 385 / 3 (pooled: -20)
+    assert values["start_offset_median_ms"].value == pytest.approx(220 / 3)
+    assert values["end_offset_median_ms"].value == pytest.approx(385 / 3)
     assert values["start_offset_median_ms"].unit == "ms"
-    # starts beyond 10 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
-    assert values["start_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["start_offset_beyond_fifty_ms_fraction"].value == 2 / 6
-    # ends beyond 10 ms: -50, -40, -30, 900; beyond 50: 900
-    assert values["end_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
+    # starts beyond 10 ms (strictly): a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1
+    assert values["start_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["start_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 3)
+    # ends beyond 10 ms: a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1/2
+    assert values["end_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["end_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 6)
 
 
 def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
@@ -284,9 +296,14 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_mean"
     ].value == pytest.approx(7 / 18)
-    assert values["timing_start_together_end_together_share"].value == 2 / 6
-    assert values["timing_start_later_end_earlier_share"].value == 3 / 6
-    assert values["timing_start_later_end_later_share"].value == 1 / 6
+    # the headline shares are the animals' means (pooled over the six events
+    # they would be 2/6, 3/6 and 1/6): together-together a 1, b 1/3, c 0
+    assert values["timing_start_together_end_together_share"].value == pytest.approx(
+        4 / 9
+    )
+    assert values["timing_start_later_end_earlier_share"].value == pytest.approx(7 / 18)
+    # later-later: a 0, b 0, c 1/2
+    assert values["timing_start_later_end_later_share"].value == pytest.approx(1 / 6)
     # later-earlier: a 0, b 2/3, c 1/2
     assert values["timing_start_later_end_earlier_share_animal_min"].value == 0.0
     assert values[
@@ -329,8 +346,9 @@ def _other_detector_events() -> pd.DataFrame:
 
 def test_nonlocal_found_values_are_figure_2es_right_bars():
     """For every detector Figure 2e draws, the share of the selected non-local
-    events its events overlap, pooled over events, with the lowest and highest
-    animal (an animal's share the mean over its epochs), from the function the
+    events its events overlap, the mean over animals (under the headline key
+    too), with the lowest and highest animal (an animal's share the mean over
+    its epochs), from the function the
     figure draws with; tagged with question 2b.3 and panel 2e."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
@@ -351,7 +369,7 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
     expected = {}
     for k, detector in enumerate(detectors):
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
-        expected[key] = (2 + k % 2) / 4
+        expected[key] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_mean"] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_min"] = min(0.75, k % 2)
         expected[f"{key}_animal_max"] = max(0.75, k % 2)
@@ -372,8 +390,8 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
     """The statistic of Figure 2e's left bars: for each detector the panel
     draws, the mean over animals of each animal's share of its events that
     overlap a non-local event and the lowest and highest animal, tagged to
-    the panel; for the criteria-only Widloski inventory, also pooled, for the
-    text."""
+    the panel; for the criteria-only Widloski inventory, also under the
+    headline key, for the text."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
     detectors = (*nonlocal_comparison.FIGURE_DETECTORS, "memoryless_criteria")
@@ -392,7 +410,7 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
     assert {k: v.value for k, v in values.items() if k.startswith(key)} == (
         pytest.approx(
             {
-                key: 0.5,
+                key: 0.375,
                 f"{key}_animal_mean": 0.375,
                 f"{key}_animal_min": 0.0,
                 f"{key}_animal_max": 0.75,
@@ -415,12 +433,15 @@ def test_other_detector_values_name_each_detector_and_each_state():
     }
     assert kay == {
         "events": 4,
-        "no_nonlocal_fraction": 0.75,
+        # the headline shares are the animals' means (a 1 and 2/3, b 0; pooled
+        # over the four events: 0.75 and 0.5)
+        "no_nonlocal_fraction": 0.5,
         "no_nonlocal_fraction_animal_min": 0.0,
         "no_nonlocal_fraction_animal_max": 1.0,
         "no_nonlocal_fraction_animal_mean": 0.5,
-        "mostly_local_fraction": 0.5,
+        "mostly_local_fraction": pytest.approx(1 / 3),
         "mostly_local_fraction_animal_mean": pytest.approx(1 / 3),
+        # b has no event overlapping no non-local event: it is left out
         "no_nonlocal_mostly_local_fraction": pytest.approx(2 / 3),
         "no_nonlocal_mostly_no_spike_fraction": pytest.approx(1 / 3),
         "no_nonlocal_mixed_fraction": 0.0,
@@ -442,8 +463,8 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert "yu_no_nonlocal_fraction_animal_min" not in numbers
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
-    # Figure 2c draws the main detector's animal means; its pooled shares no
-    # figure
+    # Figure 2c draws the main detector's animal means; its headline shares
+    # (the same numbers) no figure
     assert values["kay_mostly_local_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_no_nonlocal_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_mostly_local_fraction"].figures == ()
@@ -570,13 +591,18 @@ def test_gamma_db_values_name_each_band_and_class():
         }
     )
     assert _numbers(builder.gamma_db_values(reference, "s")) == {
-        "slow_gamma_db_median_non_swr": 1.0,
+        # each animal's median over its epochs, then the mean over animals: a
+        # (1, 3) 2, b -1 (the median over the three epochs would be 1)
+        "slow_gamma_db_median_non_swr": pytest.approx(0.5),
         "slow_gamma_db_animals_above_rest_non_swr": 1,
-        "slow_gamma_db_median_swr": 4.0,
+        # a (2, 4) 3, b 6 (over the epochs: 4)
+        "slow_gamma_db_median_swr": pytest.approx(4.5),
         "slow_gamma_db_animals_above_rest_swr": 2,
-        "fast_gamma_db_median_non_swr": -2.0,
+        # a (-3, -1) -2, b -2
+        "fast_gamma_db_median_non_swr": pytest.approx(-2.0),
         "fast_gamma_db_animals_above_rest_non_swr": 0,
-        "fast_gamma_db_median_swr": 0.5,
+        # a (0.5, 0.7) 0.6, b -0.2 (over the epochs: 0.5)
+        "fast_gamma_db_median_swr": pytest.approx(0.2),
         "fast_gamma_db_animals_above_rest_swr": 1,
     }
 
@@ -615,15 +641,17 @@ def test_spike_evidence_values_name_each_group_and_each_count():
         "evidence_epochs": 3,
         "evidence_animals": 2,
         "baseline_scored": 3,
-        "baseline_spikes_median": 15.0,
-        "baseline_tetrodes_median": 2.0,
-        "baseline_dll_per_spike_median": 0.2,
-        "baseline_gpi_distance_median_cm": 5.0,
+        # each epoch's median, each animal's median over its epochs, the mean
+        # over animals: a (10, 15) 12.5, b 20 (pooled over the rows: 15)
+        "baseline_spikes_median": pytest.approx(16.25),
+        "baseline_tetrodes_median": pytest.approx(3.0),
+        "baseline_dll_per_spike_median": pytest.approx(0.55),
+        "baseline_gpi_distance_median_cm": pytest.approx(6.0),
         "swr_remote_scored": 3,
-        "swr_remote_spikes_median": 35.0,
-        "swr_remote_tetrodes_median": 6.0,
-        "swr_remote_dll_per_spike_median": 2.2,
-        "swr_remote_gpi_distance_median_cm": 55.0,
+        "swr_remote_spikes_median": pytest.approx(36.25),
+        "swr_remote_tetrodes_median": pytest.approx(7.0),
+        "swr_remote_dll_per_spike_median": pytest.approx(2.55),
+        "swr_remote_gpi_distance_median_cm": pytest.approx(61.25),
         "swr_remote_epochs_above_baseline": 3,
         "swr_remote_epochs_scored": 3,
         "swr_remote_animals_above_baseline": 2,
@@ -1049,7 +1077,8 @@ def test_rest_theta_values_name_each_class():
         }
     )
     assert _numbers(builder.rest_theta_values(events, "s")) == {
-        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.7 / 3),
+        # a's epoch 0.3 (0.2, 0.4), b's 0.1: their mean (pooled: 0.7 / 3)
+        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.2),
         # a: half its events against 0.3 of its windows; b: none against 0.1
         "theta_like_animals_above_rest_matched_non_swr": 1,
         "theta_like_fraction_rest_matched_swr": pytest.approx(0.6),
@@ -1756,14 +1785,17 @@ def test_restriction_agreement_values_are_the_shares_found_again():
     )
     values = _by_key(builder.restriction_agreement_values(heldout, canonical, "s"))
     numbers = {key: value.value for key, value in values.items()}
-    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(0.75)
+    # each epoch's share, each animal's mean, the mean over animals: a 2/3, b 1
+    # (pooled over the four events: 3/4)
+    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(5 / 6)
     assert numbers["restriction_canonical_non_swr_events_found_again"] == 1.0
     assert numbers["restriction_canonical_swr_events_found_again"] == 0.5
     assert numbers["restriction_canonical_events_found_again_animal_min"] == (
         pytest.approx(2 / 3)
     )
     assert numbers["restriction_canonical_events_found_again_animal_max"] == 1.0
-    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(2 / 3)
+    # a 1/2, b 1 (pooled: 2/3)
+    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(0.75)
     assert numbers["restriction_heldout_non_swr_events_with_canonical"] == 0.5
     assert numbers["restriction_heldout_swr_events_with_canonical"] == 1.0
     assert numbers["restriction_heldout_events"] == 3

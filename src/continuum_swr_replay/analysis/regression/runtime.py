@@ -2,7 +2,8 @@
 kernels, and a log of the programs traced.
 
 - :func:`in_float64` goes on each public entry of the fitter that makes a JAX
-  array or runs a kernel. It checks the device (:func:`require_device`) and
+  array or runs a kernel. It checks the device
+  (:func:`continuum_swr_replay.runs.device.require_one_jax_device`) and
   turns JAX's 64-bit types on for that call only, in the calling thread. The
   decoder in the same process computes in float32, so the flag is never set for
   the whole process.
@@ -48,7 +49,6 @@ __all__ = [
     "float64_kernel",
     "in_float64",
     "live_programs",
-    "require_device",
 ]
 
 LIVE_PROGRAM_LIMIT = 256
@@ -63,22 +63,13 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
-def require_device() -> None:
-    """Refuse to start the fitter's JAX unless it can reach at most one card.
-
-    Raises
-    ------
-    continuum_swr_replay.runs.device.UnconfiguredDeviceError
-        When no device was chosen, with what to set
-        (:func:`continuum_swr_replay.runs.device.require_one_jax_device`).
-    """
-    require_one_jax_device("The regression fitter")
-
-
 def in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
     """Run `function` with JAX's 64-bit types on, for that call only.
 
-    The device is checked first (:func:`require_device`). A fresh
+    The device is checked first: the fitter's JAX refuses to start unless it
+    can reach at most one card
+    (:func:`continuum_swr_replay.runs.device.require_one_jax_device`, which
+    raises ``UnconfiguredDeviceError`` with what to set). A fresh
     ``jax.enable_x64(True)`` is entered on each call. The flag is thread-local:
     other threads, and this one after the call (also when it raises), keep
     the value they had.
@@ -102,7 +93,7 @@ def in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
 
     @wraps(function)
     def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        require_device()
+        require_one_jax_device("The regression fitter")
         _PROGRAMS.enter()
         try:
             with jax.enable_x64(True):

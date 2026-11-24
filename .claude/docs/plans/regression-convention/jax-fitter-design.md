@@ -73,7 +73,7 @@ average of 30 to 40 on 96 cores. The experiments are in the appendix.
 | `_objective` (348) | `F = -l + b'Sb/2` | fit |
 | `_newton_system` (361) | `g`, `A = H + S`, `cho_factor`, the step, the decrement | fit |
 | `_eta_step` (209) | `max |X step|` | fit |
-| `penalized_newton` loop (243–345), `_last_step` (427), `_runs_away_at_the_cap` (409), `_no_finite_maximum` (386) | the control rules and statuses | host control (Python and NumPy) |
+| `penalized_newton` loop (243–345), `_last_step` (427), `_runs_away_at_the_cap` (409), `_no_finite_maximum` (386; inlined 2026-11-24) | the control rules and statuses | host control (Python and NumPy) |
 | `running_away_columns` (214) | columns by their part of the step, with the 9-decimal tie rule | bookkeeping (kept in NumPy so that the order rule stays the same on every machine) |
 
 ### `reml.py`
@@ -81,7 +81,7 @@ average of 30 to 40 on 96 cores. The experiments are in the appendix.
 | Function (line) | What it computes | Fate |
 |---|---|---|
 | `PenaltyBlock.__post_init__` (188) | penalty rank, log pseudo-determinant, eigenbasis (`eigh`) | bookkeeping (once per block) |
-| `assemble_penalty`, `_embedded`, `_strength_blocks`, `_summed`, `free_basis`, `_log_pdet`, `_eigenbasis`, `_rotate`, `_rotate_both`, `_null_dimension` (540–637) | p×p bookkeeping | bookkeeping |
+| `assemble_penalty`, `_embedded`, `_strength_blocks` (both replaced by the penalty stack, 2026-11-24), `_summed`, `free_basis`, `_log_pdet`, `_eigenbasis`, `_rotate`, `_rotate_both`, `_null_dimension` (540–637) | p×p bookkeeping | bookkeeping |
 | the rotation `X[:, cols] @ V` in `reml_and_derivatives` (671) | design in the penalty eigenbasis, n×k×k per evaluation (18 ms per session, measured 2026-11-21) | bookkeeping at first; move to JAX if the benchmark says so |
 | `_half_log_det` (640), `_coefficient_derivatives` (645), `_covariance_and_edf` (654) | `log|A|/2`, `-A^-1 S_j b`, `A^-1`, edf | fit |
 | `_reml_in_basis` (781) | the score; its gradient and Hessian in rho (with `dinformation`, `d2information` and `cho_solve`) | fit |

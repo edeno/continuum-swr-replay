@@ -31,13 +31,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM
-from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
-    likelihood_advantage_statistics,
-)
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_medians,
     animal_session_values,
-    session_median_statistics,
+    session_value_statistics,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
@@ -146,12 +143,13 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``n_events``: the events.
         - ``n_non_swr``, ``n_swr_contained``, ``n_swr_partial``: the events of
           each class.
-        - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
-        - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
-          lying inside an SWR and overlapping one in part, pooled the same way.
+        - ``non_swr_fraction``, ``swr_contained_fraction``,
+          ``swr_partial_fraction``: the share overlapping no SWR, lying inside
+          an SWR and overlapping one in part, event -> epoch -> animal: the
+          mean over animals of each animal's own share of the class (Figure
+          2d's bars).
         - ``non_swr_fraction_animal_mean``, ``swr_contained_fraction_animal_mean``,
-          ``swr_partial_fraction_animal_mean``: the mean over animals of each
-          animal's own share of the class (Figure 2d's bars).
+          ``swr_partial_fraction_animal_mean``: the same numbers.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -187,11 +185,9 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "n_non_swr": counts["non_swr"],
         "n_swr_contained": counts["swr_contained"],
         "n_swr_partial": counts["swr_partial"],
-        "non_swr_fraction": counts["non_swr"] / counts["total"],
-        "swr_contained_fraction": counts["swr_contained"] / counts["total"],
-        "swr_partial_fraction": counts["swr_partial"] / counts["total"],
         **{
-            f"{overlap_class}_fraction_animal_mean": shares[overlap_class].mean()
+            f"{overlap_class}_fraction{suffix}": shares[overlap_class].mean()
+            for suffix in ("", "_animal_mean")
             for overlap_class in OVERLAP_CLASSES
         },
         "non_swr_fraction_animal_min": non_swr.min(),
@@ -366,33 +362,49 @@ def boundary_offset_distribution(
     return pd.concat(rows, ignore_index=True)
 
 
-def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
+def boundary_offset_statistics(
+    offsets: pd.DataFrame, events: pd.DataFrame
+) -> dict[str, float]:
     """The typical offset of an SWR-overlapping event's bounds from its SWR's.
+
+    Every statistic is event -> epoch -> animal: each epoch's value over its
+    SWR-overlapping events, each animal's value over its epochs with such an
+    event (the median for an offset, the mean for a share), then the mean over
+    animals.
 
     Parameters
     ----------
     offsets : pd.DataFrame, shape (n_overlapping_events, 2)
         The SWR-overlapping events' :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
 
     Returns
     -------
     statistics : dict
         ``n_overlapping``, the events overlapping an SWR;
-        ``start_offset_median_s`` and ``end_offset_median_s``, the medians of
-        their offsets; and, for each bound and each of :data:`OFFSET_TAILS_S`,
+        ``start_offset_median_s`` and ``end_offset_median_s``, the median
+        offsets; and, for each bound and each of :data:`OFFSET_TAILS_S`,
         ``{bound}_offset_beyond_{name}_fraction``, the share of the events whose
         offset is larger than that in magnitude.
     """
+    sessions = events.loc[offsets.index]
+    animal, session = sessions["animal"], sessions[_WITHIN_ANIMAL]
+
+    def animal_mean(values: pd.Series, statistic: str) -> float:
+        return float(animal_session_values(values, animal, session, statistic).mean())
+
     statistics = {
         "n_overlapping": len(offsets),
-        "start_offset_median_s": offsets["start_offset_s"].median(),
-        "end_offset_median_s": offsets["end_offset_s"].median(),
+        "start_offset_median_s": animal_mean(offsets["start_offset_s"], "median"),
+        "end_offset_median_s": animal_mean(offsets["end_offset_s"], "median"),
     }
     for bound in ("start", "end"):
         magnitude_us = _offset_us(offsets[f"{bound}_offset_s"]).abs()
         for name, tail_s in OFFSET_TAILS_S.items():
-            statistics[f"{bound}_offset_beyond_{name}_fraction"] = float(
-                (magnitude_us > round(1e6 * tail_s)).mean()
+            statistics[f"{bound}_offset_beyond_{name}_fraction"] = animal_mean(
+                (magnitude_us > round(1e6 * tail_s)).astype(float), "mean"
             )
     return statistics
 
@@ -467,7 +479,8 @@ def boundary_timing_statistics(
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
         order): ``share_animal_mean``, the mean over animals of each animal's
         share; ``animal_min`` and ``animal_max``, the lowest and highest
-        animal's share; ``share``, pooled over every event; ``n_events``, the
+        animal's share; ``share``, the same number as ``share_animal_mean``
+        (the headline share is animal-first); ``n_events``, the
         events in the cell; ``animals`` and ``animal_names``, each animal's
         share and its name, in sorted order. An animal's share of a cell is
         the mean over its epochs of each epoch's share of its pairs (event ->
@@ -496,7 +509,7 @@ def boundary_timing_statistics(
             "share_animal_mean": per_animal.mean(axis=1),
             "animal_min": per_animal.min(axis=1),
             "animal_max": per_animal.max(axis=1),
-            "share": counts / counts.sum(),
+            "share": per_animal.mean(axis=1),
             "n_events": counts,
             "animals": [row.to_numpy() for _, row in per_animal.iterrows()],
             "animal_names": [per_animal.columns.to_numpy()] * len(per_animal),
@@ -845,9 +858,9 @@ def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.Dat
     Returns
     -------
     statistics : pd.DataFrame, shape (2 * n_bands, 2)
-        Indexed by band and ``is_swr``: ``median`` over epochs, and
-        ``n_animals_above_rest``, the animals whose median over their epochs is
-        above 0 dB.
+        Indexed by band and ``is_swr``: ``median``, each animal's median over
+        its epochs, then the mean over animals; and ``n_animals_above_rest``,
+        the animals whose median over their epochs is above 0 dB.
 
     Raises
     ------
@@ -862,10 +875,10 @@ def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.Dat
                 raise ValueError(
                     f"{int(reference[column].isna().sum())} epochs have no {column}"
                 )
-            summary = session_median_statistics(reference[column], reference["animal"])
+            per_animal = animal_medians(reference[column], reference["animal"])
             rows[(band, is_swr)] = {
-                "median": summary["median"],
-                "n_animals_above_rest": summary["n_animals_positive"],
+                "median": float(per_animal.mean()),
+                "n_animals_above_rest": int((per_animal > 0).sum()),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(["band", "is_swr"])
 
@@ -875,9 +888,8 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     An event, or a quiet-rest window, is theta-like when its mean theta reaches
     its epoch's median running theta. Each event has windows of quiet rest with
-    as many bins as it has; the reference share of a class is the mean over its
-    events of their windows' theta-like share, so it carries the class's
-    durations.
+    as many bins as it has; the reference share of a class is taken over its
+    events' windows' theta-like shares, so it carries the class's durations.
 
     Parameters
     ----------
@@ -891,8 +903,10 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     statistics : pd.DataFrame, shape (2, 2)
-        Indexed by ``is_swr``: ``rest_theta_like_fraction``, the mean over the
-        class's events of ``rest_theta_like_share``, and
+        Indexed by ``is_swr``: ``rest_theta_like_fraction``, event -> epoch ->
+        animal: each epoch's mean over the class's events of
+        ``rest_theta_like_share``, each animal's mean over its epochs with an
+        event of the class, the mean over animals; and
         ``n_animals_above_rest``, the animals, of those with an event of the
         class, whose share of theta-like events is above their reference
         share. Both are event -> epoch -> animal: the mean over the animal's
@@ -940,7 +954,7 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
             }
         )
         rows[is_swr] = {
-            "rest_theta_like_fraction": group.rest_theta_like_share.mean(),
+            "rest_theta_like_fraction": per_animal.rest.mean(),
             "n_animals_above_rest": (per_animal.events > per_animal.rest).sum(),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("is_swr")
@@ -952,8 +966,9 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
 def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFrame:
     """Each group's spike evidence, against matched quiet windows.
 
-    Event-level medians, pooled over epochs; the animals' medians go through
-    their epochs.
+    Every median is row -> epoch -> animal: each epoch's median, each
+    animal's median over its epochs with a row of the group, the mean over
+    animals.
 
     Parameters
     ----------
@@ -974,7 +989,8 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         - ``n_scored``: rows scored.
         - ``spikes_median`` (spikes), ``tetrodes_median`` (tetrodes),
           ``dll_per_spike_median`` (nats per spike), ``gpi_distance_median_cm``
-          (cm): medians over the group's rows.
+          (cm): the group's medians, row -> epoch -> animal, then the mean over
+          animals.
         - ``n_epochs_scored``: epochs with a row of the group.
         - ``n_epochs_above_baseline``, ``n_animals_above_baseline``: of the
           epochs (animals) with a row of the group, those whose median
@@ -991,9 +1007,9 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         window to be compared with.
     """
 
-    def per_animal(rows: pd.DataFrame) -> pd.Series:
+    def per_animal(rows: pd.DataFrame, column: str = "dll_per_spike") -> pd.Series:
         return animal_session_values(
-            rows["dll_per_spike"], rows["animal"], rows["epoch_id"], "median"
+            rows[column], rows["animal"], rows["epoch_id"], "median"
         )
 
     base = metrics[metrics["group"] == baseline]
@@ -1012,10 +1028,12 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         is_baseline = group == baseline
         rows[group] = {
             "n_scored": len(group_rows),
-            "spikes_median": group_rows["n_spikes"].median(),
-            "tetrodes_median": group_rows["n_tetrodes"].median(),
-            "dll_per_spike_median": group_rows["dll_per_spike"].median(),
-            "gpi_distance_median_cm": group_rows["dist_to_gpi_peak"].median(),
+            "spikes_median": float(per_animal(group_rows, "n_spikes").mean()),
+            "tetrodes_median": float(per_animal(group_rows, "n_tetrodes").mean()),
+            "dll_per_spike_median": float(animal_median.mean()),
+            "gpi_distance_median_cm": float(
+                per_animal(group_rows, "dist_to_gpi_peak").mean()
+            ),
             "n_epochs_scored": len(epoch_median),
             "n_epochs_above_baseline": np.nan
             if is_baseline
@@ -1467,12 +1485,11 @@ def hpd_tight_share_statistics(
 ) -> dict:
     """The share of each class's events whose HPD coverage is below a cut.
 
-    Each epoch's share of its events of the class below ``cut_cm`` is reduced
-    as the project reduces a per-epoch share
-    (``likelihood_advantage.likelihood_advantage_statistics`` over one row per
-    epoch, as ``restriction_totals.outside_swr_gain_statistics`` reduces its
-    shares): each animal's median over its epochs, the mean over animals and
-    its 95 % nested bootstrap interval.
+    Each epoch's share of its events of the class below ``cut_cm``, each
+    animal's mean over its epochs with an event of the class, then the mean
+    over animals, with its 95 % interval from the nested bootstrap of the
+    animals and their epochs whose replicates take the same estimator
+    (``shared_statistics.session_value_statistics``).
 
     Parameters
     ----------
@@ -1484,10 +1501,11 @@ def hpd_tight_share_statistics(
     Returns
     -------
     dict
-        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``), with
-        ``likelihood_advantage_statistics``' columns; and
-        ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
-        their SWR share.
+        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``): ``animals`` (the
+        animals' shares, sorted animal order), ``animal_names``, ``estimate``,
+        ``ci_low``, ``ci_high``, ``n_epochs`` and ``n_animals``; and
+        ``n_animals_non_swr_higher``: the animals whose no-SWR share (the mean
+        over their epochs) is above their SWR share.
     """
     table = _class_table(events, "hpd_coverage_cm")
     shares = (
@@ -1495,9 +1513,26 @@ def hpd_tight_share_statistics(
         .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
         .mean()
     )
-    rows = likelihood_advantage_statistics(
-        shares, column="tight", n_boot=n_boot, seed=seed
-    ).loc[["no SWR", "SWR"]]
+    rows = {}
+    for group in ("no SWR", "SWR"):
+        mine = shares[shares["group"] == group].sort_values(["animal", "epoch_id"])
+        result = session_value_statistics(
+            mine["tight"].to_numpy(dtype=float),
+            mine["animal"].to_numpy(),
+            statistic="mean",
+            n_boot=n_boot,
+            rng=np.random.default_rng(seed),
+        )
+        rows[group] = {
+            "animals": result.per_animal.to_numpy(),
+            "animal_names": result.per_animal.index.to_numpy(),
+            "estimate": result.estimate,
+            "ci_low": result.interval.low,
+            "ci_high": result.interval.high,
+            "n_epochs": len(mine),
+            "n_animals": len(result.per_animal),
+        }
+    rows = pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
     by_group = {
         group: pd.Series(rows.loc[group, "animals"], rows.loc[group, "animal_names"])
         for group in rows.index

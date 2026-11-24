@@ -1261,8 +1261,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nheld-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        "mean posterior\nMean over animals of each animal's mean epoch bin median "
-        "(log-likelihood ratios) or mean (shares); 95 % nested-bootstrap interval; "
+        "mean posterior\nMean over animals of each animal's median epoch bin median "
+        "(log-likelihood ratios) or mean epoch bin mean (shares); 95 % "
+        "nested-bootstrap interval; "
         f"bins with < {MIN_BIN_WINDOWS} windows omitted",
         fontsize=9,
     )

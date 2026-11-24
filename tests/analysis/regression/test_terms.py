@@ -31,7 +31,6 @@ from continuum_swr_replay.analysis.regression.terms import (
     _small_terms,
     build_design,
     log_penalty_from_prior_sd,
-    prior_sd_from_log_penalty,
     standardization,
 )
 
@@ -95,7 +94,7 @@ def test_prior_sd_and_log_penalty() -> None:
     for sd in (0.5, 1.0, 2.0, 4.0):
         rho = log_penalty_from_prior_sd(sd)
         assert rho == pytest.approx(np.log(1.0 / sd**2), abs=1e-15)
-        assert prior_sd_from_log_penalty(rho) == pytest.approx(sd, rel=1e-15)
+        assert np.exp(-0.5 * rho) == pytest.approx(sd, rel=1e-15)
     assert log_penalty_from_prior_sd(1.0) == 0.0
     for bad in (0.0, -1.0, np.inf, np.nan):
         with pytest.raises(ValueError, match="prior SD"):

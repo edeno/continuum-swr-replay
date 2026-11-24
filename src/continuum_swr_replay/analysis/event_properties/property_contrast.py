@@ -124,6 +124,11 @@ def matched_difference(
     (both classes; by ``weights`` when given). A stratum with fewer than
     ``min_per_class`` events of either class is left out.
 
+    Pooled by design, unlike the project's event -> epoch -> animal rule: the
+    strata are cut on the pooled durations of all events (:func:`duration_strata`),
+    and the medians are over every event of a stratum, so it has no
+    epoch-then-animal form.
+
     Parameters
     ----------
     values : NDArray, shape (n_events,)

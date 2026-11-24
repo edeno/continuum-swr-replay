@@ -578,7 +578,7 @@ _No module-level public symbols._
 
 Linear functionals of a fit: a scalar ``c' beta`` and its exact variance.
 
-`Contrast`, `range_grid`, `range_mean_contrast`, `coefficient_contrast`, `evaluate_contrast`
+`Contrast`, `range_grid`, `range_mean_contrast`, `coefficient_contrast`, `used_coefficients`, `evaluate_contrast`
 
 ### `src/continuum_swr_replay/analysis/regression/folds.py`
 
@@ -590,7 +590,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Rows`, `Groups`, `Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
@@ -602,7 +602,7 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 Rows padded to a few bucket sizes, so that a jitted kernel compiles once per bucket rather than once per session.
 
-`bucket_size`, `group_starts`, `pad_values`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
+`bucket_size`, `group_starts`, `group_sizes`, `pad_values`, `Rows`, `Groups`, `pad_rows`, `pad_groups`
 
 ### `src/continuum_swr_replay/analysis/regression/pspline.py`
 
@@ -614,7 +614,7 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 The fit-row record: one row per (model, kind, session) of every stored fit.
 
-`NoFit`, `describe`, `FitRecord`, `records_frame`, `write_records`, `read_records`
+`NoFit`, `FitRecord`
 
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
@@ -626,7 +626,7 @@ Penalty strengths by restricted maximum likelihood (REML), with exact derivative
 
 How the fitter's JAX code runs: float64 for each call, one device, float64 kernels, and a log of the programs traced.
 
-`require_device`, `in_float64`, `live_programs`, `CompileLog`, `float64_kernel`
+`in_float64`, `live_programs`, `CompileLog`, `float64_kernel`
 
 ### `src/continuum_swr_replay/analysis/regression/sessions.py`
 
@@ -644,13 +644,13 @@ The simulation engine: a planted truth drawn on a model's own rows, fitted by th
 
 The support rule: whether a session's design can estimate a simple term.
 
-`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`, `terms_failing_share`
+`Removed`, `Support`, `level_support`, `binary_support`, `slope_support`, `design_support`, `require_tested_penalized`
 
 ### `src/continuum_swr_replay/analysis/regression/terms.py`
 
 Model terms and the design they build, the same for every session.
 
-`log_penalty_from_prior_sd`, `prior_sd_from_log_penalty`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
+`log_penalty_from_prior_sd`, `Category`, `Smooth`, `LinearFunctional`, `Slope`, `Offset`, `Standardization`, `standardization`, `DesignTerm`, `SessionDesign`, `Design`, `build_design`
 
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
@@ -1388,7 +1388,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`probability_bin_center`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
+`probability_bin_center`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_intervals`, `animal_step`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 

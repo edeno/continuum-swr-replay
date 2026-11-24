@@ -22,7 +22,7 @@ tested coefficient):
 
 - aa8f8425: `terms.Slope` and `terms.Category` take a required `penalty` (`"none"` or a fixed log
   penalty), the identity on each column as its own block; `terms.log_penalty_from_prior_sd` and
-  `prior_sd_from_log_penalty`; each record's edf of each penalized simple coefficient; the support rule
+  `prior_sd_from_log_penalty` (removed 2026-11-24: only a test called it); each record's edf of each penalized simple coefficient; the support rule
   counts units with rows on each side, not units with events (`support.py`; the argument `has_event` is
   removed). Tests: two cells against a root of the penalized score equations and against mgcv `paraPen`
   at a fixed `sp`, both to 1e-8; the penalty path; the blocks and edf; the grouped softmax counts
@@ -112,7 +112,7 @@ reported is decided (lead, 2026-11-21: with those terms missing).
   [designs.md#support-rule](designs.md#support-rule), evaluated before the fit from the design (units with
   a row on each side; never the events; built aa8f8425, which replaced the first rule on events); a
   `terms_failing_share(records)` that applies the 20 % rule over sessions (the value of the fitter's
-  `MAX_FAILING_SHARE`, imported, not copied). The minimum of 5 units each side is a constant defined in
+  `MAX_FAILING_SHARE`, imported, not copied; removed on 2026-11-24, unapplied: no fit read it). The minimum of 5 units each side is a constant defined in
   this module (new). A term that fails is made inactive in that session (`SessionData.active`); when it is
   a 0/1 role column, the session's rows with that role are dropped from its fit and counted in the
   record's `cohort_counts`, not merged into the reference role (found by simulation: merging inflated the

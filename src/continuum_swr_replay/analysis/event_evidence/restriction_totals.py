@@ -480,7 +480,9 @@ def epoch_outside_swr_gains(
         ``no_swr_events_full_minus_swr``, ``share_in_no_swr_events``,
         ``swr_events_outside_swr_full_minus_swr``,
         ``share_in_swr_events_outside_swr``, ``share_outside_events`` (1 minus
-        the two shares), ``outside_events_full_minus_swr``,
+        the two; ``share_in_no_swr_events`` and ``share_outside_events`` are
+        ratios of signed sums and can lie outside 0 to 1),
+        ``outside_events_full_minus_swr``,
         ``outside_events_gain_per_spike`` and ``outside_events_gain_per_s``
         (NaN without spikes, bins or a positive total, as each divides).
 
@@ -896,7 +898,7 @@ def outside_swr_subset_shares(
     interval.
 
     The share is the same in both score families, and it is a description of
-    the part, not an effect: an animal's value is the median over its epochs
+    the part, not an effect: an animal's value is the mean over its epochs
     (``shared_statistics.animal_session_values``), the estimate the mean over
     animals, and the lowest animal's value is given beside it. (A t interval
     of a share near 1 can pass 1.)
@@ -917,7 +919,7 @@ def outside_swr_subset_shares(
     rows = []
     for subset, threshold, epochs in _subset_epochs(time_sums, bin_s, SUBSETS):
         per_animal = animal_session_values(
-            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
+            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "mean"
         )
         rows.append(
             {

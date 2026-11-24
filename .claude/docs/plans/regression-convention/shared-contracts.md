@@ -249,7 +249,7 @@ A record whose `status` is not "converged", a failing support entry for a declar
 over the collinearity threshold is kept and flagged; the summary reads only passing rows and states the count
 left out. A session with a term in `left_out` is kept for its other terms and reported with that term
 missing (lead, 2026-11-21). A term with several columns and no penalty leaves a session whole. The
-causes are closed sets of codes, so that a summary counts sessions by cause; `record.describe` gives the
+causes are closed sets of codes, so that a summary counts sessions by cause; `record.describe` (removed 2026-11-24, with the parquet storage; only tests used it) gave the
 words.
 
 ## C8. The declared family of tests

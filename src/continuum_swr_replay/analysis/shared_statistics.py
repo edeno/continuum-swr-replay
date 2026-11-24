@@ -20,6 +20,9 @@
   :func:`weighted_median`.
 - :func:`bootstrap_interval`: the 95 % interval from those draws, a
   small-sample t correction over the animals.
+- :func:`session_value_statistics`: one value per session taken session ->
+  animal (its mean or median over its sessions) -> mean over animals, with the
+  interval of the nested bootstrap whose replicates take the same estimator.
 - :func:`animal_balanced_bootstrap`: a per-session number (or curve) taken
   session -> recording day -> animal as a mean of means, with its nested
   bootstrap draws (animals, then their sessions; the days are not resampled).
@@ -621,6 +624,13 @@ class BootstrapInterval(NamedTuple):
     sd: float
 
 
+def draws_sd_scale(n_top: int) -> float:
+    """``sqrt(n_top / (n_top - 1))``: the factor that turns the nested bootstrap
+    draws' SD of a mean over ``n_top`` animals into its standard error
+    (:func:`bootstrap_interval`)."""
+    return np.sqrt(n_top / (n_top - 1))
+
+
 def bootstrap_interval(
     estimate: float,
     draws: ArrayLike,
@@ -670,7 +680,7 @@ def bootstrap_interval(
     sd = float(values.std(ddof=1)) if values.size >= 2 else float("nan")
     if n_top < 2 or not np.isfinite(estimate) or not np.isfinite(sd):
         return BootstrapInterval(float("nan"), float("nan"), sd)
-    half = float(student_t.ppf(0.975, n_top - 1)) * np.sqrt(n_top / (n_top - 1)) * sd
+    half = float(student_t.ppf(0.975, n_top - 1)) * draws_sd_scale(n_top) * sd
     low, high = float(estimate - half), float(estimate + half)
     if bounds is not None:
         low, high = max(low, bounds[0]), min(high, bounds[1])
@@ -695,6 +705,83 @@ class AnimalBalancedDraws(NamedTuple):
     estimate: NDArray[np.float64]
     draws: NDArray[np.float64]
     n_animals: int
+
+
+class SessionValueStatistics(NamedTuple):
+    """:func:`session_value_statistics`' result.
+
+    Attributes
+    ----------
+    per_animal : pd.Series
+        Each animal's value, indexed by animal in sorted order.
+    estimate : float
+        Their mean.
+    interval : BootstrapInterval
+        Its 95 % interval.
+    copy_values : NDArray, shape (n_draws, n_animals, n_most)
+        Each replicate's session values, by drawn animal copy
+        (:func:`session_copy_values`), for other statistics of the same
+        replicates.
+    """
+
+    per_animal: pd.Series
+    estimate: float
+    interval: BootstrapInterval
+    copy_values: NDArray[np.float64]
+
+
+def session_value_statistics(
+    values: ArrayLike,
+    animal: ArrayLike,
+    *,
+    statistic: str,
+    n_boot: int,
+    rng: np.random.Generator,
+) -> SessionValueStatistics:
+    """The mean over animals of each animal's ``statistic`` over its sessions
+    of one value per session, and its 95 % interval.
+
+    The replicates are the nested bootstrap of the animals and their sessions
+    with every drawn copy apart (:func:`nested_bootstrap_copies`); a session's
+    value is not resampled (it is one number). Each replicate takes the same
+    estimator as the data: each drawn copy of an animal its ``statistic`` over
+    its drawn sessions, then the mean over the drawn animals. The interval is
+    :func:`bootstrap_interval` over the animals.
+
+    Parameters
+    ----------
+    values : array_like, shape (n_sessions,)
+        One finite value per session.
+    animal : array_like, shape (n_sessions,)
+        Each session's animal.
+    statistic : {"mean", "median"}
+        The animal step: the mean for a share, the median for a level or
+        another per-event quantity.
+    n_boot : int
+        Replicates.
+    rng : numpy.random.Generator
+        The replicates' source.
+
+    Raises
+    ------
+    ValueError
+        If ``statistic`` is neither, or a value is not finite.
+    """
+    if statistic not in ("mean", "median"):
+        raise ValueError(f"statistic must be 'mean' or 'median', not {statistic!r}")
+    values = np.asarray(values, dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("every session needs a finite value")
+    animal = np.asarray(animal)
+    per_animal = pd.Series(values).groupby(animal, sort=True).agg(statistic)
+    animal_codes, _ = nested_codes(animal, np.arange(values.size))
+    copies = nested_bootstrap_copies(animal_codes, rng, n_boot)
+    copy_values = session_copy_values(copies, lambda s, n: np.full(n, values[s]))
+    reduce = np.nanmean if statistic == "mean" else np.nanmedian
+    replicates = reduce(copy_values, axis=2).mean(axis=1)
+    estimate = float(per_animal.mean())
+    interval = bootstrap_interval(estimate, replicates, len(per_animal))
+    return SessionValueStatistics(per_animal, estimate, interval, copy_values)
 
 
 def _animal_balanced_weights(

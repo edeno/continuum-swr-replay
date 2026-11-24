@@ -19,7 +19,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the per-session fitting loop and the row rule for an inactive level |
 | `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
-| `record.py` | the fit-row record and its parquet storage |
+| `record.py` | the fit-row record and the closed set of causes of a session without a kept fit |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
@@ -282,7 +282,7 @@ in choosing the penalties); one without a fit has NaN coefficients, covariance, 
 score. `PooledFit.score` is the
 pooled score over `search.in_choice` only, so two models' scores are compared only on
 the same set. When more than `MAX_FAILING_SHARE` (20 %, the project's rule for reporting
-a model) of the sessions end without a fit (`PenaltySearch.share_without_fit`), the
+a model) of the sessions end without a fit (set aside and not fitted by their refits), the
 search raises, naming each with its statuses and the reason.
 
 In exact arithmetic the first refit, before any column is left out, cannot succeed:
@@ -297,7 +297,7 @@ fitted. A search that does not converge (50 steps, or a step no halving accepts)
 too, with the last log strengths, the gradient and the steps taken; there is no argument
 that returns an unconverged result. When sessions fail at only part of the grid, the
 search goes on from the finite points and records how many failed and why
-(`PenaltySearch.n_grid_not_finite`, `grid_failures`: the count per status).
+(`PenaltySearch.grid_failures`: the count per status).
 `fit_at_penalties` fits at given strengths without a search (and without the score's
 derivatives).
 Each session's fit carries its covariance `A^-1` (mgcv's `Vp`) and the edf per term and in
@@ -426,7 +426,7 @@ the `by` of another term is not a term, and its penalty is not read.
 
 A fixed log penalty `rho` on a simple coefficient is a Normal prior of mean 0 and SD
 `exp(-rho / 2)`: the fit minimizes `-l + exp(rho) b**2 / 2`
-(`terms.log_penalty_from_prior_sd` and `terms.prior_sd_from_log_penalty`). The
+(`terms.log_penalty_from_prior_sd`). The
 coefficient is in the unit the convention reports: a 0/1 column enters as it is (a step
 from 0 to 1), and a continuous column enters divided by its pooled SD (centered first
 when it is by a category), so its coefficient is per pooled SD and the prior SD is too.
@@ -517,8 +517,11 @@ the event counts before a fit. A level of a category passes when `MIN_UNITS = 5`
 have a row of the level. A 0/1 slope passes when 5 units have a row where it is 1 and 5
 have a row where it is 0. A continuous slope passes when 5 units have a row above the
 median of its rows and 5 have a row below it; a constant column fails. The units and the
-rule are in the module docstring. A term that fails in more than `MAX_FAILING_SHARE`
-(20 %) of the sessions with a fit leaves the per-session model (`terms_failing_share`).
+rule are in the module docstring. No share of sessions failing the rule drops a term
+from the model (the function that computed it, `terms_failing_share`, was never called and
+was removed on 2026-11-24); the constant `MAX_FAILING_SHARE` remains, because the penalty
+search and the rate model's third-clock decision (`visit_rate.third_clock_decision`) read
+it.
 A smooth and a lag functional have no counts; every term is judged by the design check.
 
 The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
@@ -601,9 +604,7 @@ in `sessions.py`'s docstring). A record
 whose status is not "converged" is kept; its readers flag it. Every cause is a code of a
 closed set, so that sessions can be counted by cause: `support.Removed` for a term left
 out (`left_out`, with the refit's round in `left_out_round`), `record.NoFit` for a
-session without a kept fit (`no_fit`); `record.describe` gives their words. `write_records` and
-`read_records` store the records through `tables.io` (`write_table`, `read_table`), the
-structured fields as JSON strings.
+session without a kept fit (`no_fit`).
 
 ## Contrasts
 
@@ -799,10 +800,10 @@ the refits, and REML's rotation of the design into the penalties' eigenbasis (be
 
 **The kernels and the host loop.** Each family has JAX functions of the padded rows and
 their weights (`_jax_loglik`, `_jax_score`, `_jax_information`, `_jax_dinformation`,
-`_jax_d2information`, `_jax_weighted_design`). The public methods (`loglik`,
-`score_eta`, `information`, `dinformation`, `d2information`, `weighted_design`) take
-NumPy arrays, pad them and run one jitted kernel on those functions; a likelihood made for
-a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
+`_jax_d2information`, `_jax_weighted_design`). The one public method on them,
+`weighted_design`, takes NumPy arrays, pads them and runs one jitted kernel; the tests call
+the other functions on NumPy rows the same way (`conftest.family_kernel`). A likelihood
+made for a test overrides the JAX functions. `newton.penalized_newton` pads the session's rows
 once and runs a host loop in Python and NumPy that holds every rule, status and count of
 "The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
@@ -860,7 +861,7 @@ design beyond its Gram; it is given the stack of penalties only when the derivat
 asked for, so it has two programs per shape, the score alone and the score with its
 derivatives). The rows are padded and moved once
 for a fit and its derivatives; the NumPy loops called the public `dinformation` and
-`d2information` once for each penalty and pair, each padding and moving `X` again. The
+`d2information` (since removed) once for each penalty and pair, each padding and moving `X` again. The
 penalties are the leading axis of the kernel's arrays (`S_j` of shape `(m, p, p)`): a new
 number of penalties is a new shape and so a new program, and a model has one. With
 `b_j = -A^-1 S_j b` and `E = X [b_1 ... b_m]`, the `m` matrices `A_j = S_j + dH(E_j)` are
@@ -965,10 +966,9 @@ jitted through `runtime.float64_kernel`, which refuses when it is traced with th
 or with a floating input that is not float64. A float64 array made inside the scope stays
 float64 after it, but arithmetic on it outside the scope is in float32.
 
-**One device.** `in_float64` first calls `runtime.require_device`, which is
-`runs.device.require_one_jax_device`: the fitter refuses to start unless this process
-configured a card (`configure_jax_gpu`), `JAX_PLATFORMS` excludes CUDA, or
-`CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
+**One device.** `in_float64` first calls `runs.device.require_one_jax_device`: the
+fitter refuses to start unless this process configured a card (`configure_jax_gpu`),
+`JAX_PLATFORMS` excludes CUDA, or `CUDA_VISIBLE_DEVICES` names at most one card. Only the environment is read, so the check
 starts no backend. The message says what to set. A runner that fits calls
 `runs.device.default_jax_platforms("cpu")` in `main` unless it asks for a GPU
 (`simulate_declared_penalty.py`, `compare_regression_to_mgcv.py`,
@@ -1024,11 +1024,13 @@ or a null space) it is "design not identified" at the start, log-likelihood 0, n
 where the penalty has full rank it is "converged" at its minimum, `beta = 0` whatever the
 start, with `A = S`, a decrement of 0 and a log-likelihood of 0 (the NumPy fitter raised
 there, by accident); a grouped softmax without rows is refused (`ValueError`, no groups).
-A per-row argument (`eta`, `d`, `d1`, `d2`, `y`, a per-row offset) needs one value per row
-on one axis: a column of shape (n, 1) is refused with its name and shape, since it would
-broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out -1536.6 for
--5.82). So is a scalar or a one-element array given for a per-row vector, which the NumPy
-code broadcast: that narrowing is intended. A single Poisson offset is still every row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
+A per-row argument of the weighted design (`eta`, `y`, a per-row offset) needs one value per
+row on one axis: a column of shape (n, 1) is refused with its name and shape, since it
+would broadcast against the padded rows (a Poisson log-likelihood of 6 rows came out
+-1536.6 for -5.82). So is a scalar or a one-element array given for a per-row vector, which
+the NumPy code broadcast: that narrowing is intended. When the rows are padded
+(`Poisson.pad`) a single Poisson offset is every row's, but a fit refuses it:
+`Poisson.check`, which `penalized_newton` calls at its entry, needs one offset per row. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
 every quantity unchanged, exactly, and the kernels equal the formulas written in NumPy in
 the test. The padded and unpadded log-likelihood, gradient, information and its two
 directional derivatives agree to 1e-12 of their largest entry for each family, the kernels
@@ -1072,6 +1074,23 @@ so that every program is stored) the same 700 fits took 554 s, a long driver's c
 `tests/analysis/regression` without its slow tests traces about 435 programs in one
 process, so it clears once or twice; the tests that count traces fix the limit high for
 their own run.
+
+The clear can fire only at the entry of an outermost call, so which functions carry
+`in_float64` decides where the bound holds. The per-session loop (`sessions.fit_sessions`)
+and the calibration (`calibration.log_penalty_for_edf`, which runs that loop at each trial
+penalty) do not carry it: each session's fit is an outermost call, the caches can be cleared
+between two sessions, and the live programs stay bounded through a whole cohort
+(`test_the_program_bound_holds_between_the_sessions_of_one_loop`,
+`test_the_program_bound_holds_during_a_calibration`). The penalty searches
+(`select_penalties`, `refine_penalties`, `fit_at_penalties`, `pooled_reml`), `refit_session`
+and `term_collinearity` do carry it, so that no clear falls between two evaluations of one
+search, which would compile every session's programs again at each evaluation
+(`test_a_search_clears_the_caches_at_most_once_at_its_entry`). **Inside one search the
+bound therefore does not hold**: a search keeps one set of programs for each row bucket and
+each number of active columns among its sessions. How many that is for a full cohort has
+not been measured; measure it (`runtime.live_programs()`) before a search over a whole
+cohort is run, and see the planned fixed-width kernels (inactive columns as a mask), which
+make the count the number of row buckets.
 
 **Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
 so every module of the fitter that imports them (`sessions`, `calibration`, `record`,

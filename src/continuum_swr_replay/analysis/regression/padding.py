@@ -25,23 +25,26 @@ a mean, a dispersion) must use ``n_real``, not the padded count.
 
 Everything here is NumPy; nothing imports JAX. The likelihoods
 (``likelihoods.Likelihood.pad``) pad with these functions before they call a
-kernel.
+kernel: :func:`pad_rows` and :func:`pad_groups` return the :class:`Rows` the
+kernels take, and a family only sets its ``aux``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, NamedTuple
 
 import numpy as np
 
 __all__ = [
     "GROUP_BUCKET",
-    "PaddedGroups",
-    "PaddedRows",
+    "Groups",
     "ROW_BUCKET",
+    "Rows",
     "SMALLEST_ROW_BUCKET",
     "SOFTMAX_ROW_BUCKET",
     "bucket_size",
+    "group_sizes",
     "group_starts",
     "pad_groups",
     "pad_rows",
@@ -103,6 +106,12 @@ def group_starts(groups: np.ndarray) -> np.ndarray:
     return np.flatnonzero(np.r_[True, groups[1:] != groups[:-1]])
 
 
+def group_sizes(starts: np.ndarray, n_rows: int) -> np.ndarray:
+    """Each group's number of rows, shape ``(n_groups,)``, from the index of
+    its first row (:func:`group_starts`) and the number of rows."""
+    return np.diff(starts, append=n_rows)
+
+
 def pad_values(
     values: np.ndarray, n_real: int, n_rows: int, name: str = "values"
 ) -> np.ndarray:
@@ -139,16 +148,17 @@ def pad_values(
     return out
 
 
-@dataclass(frozen=True)
-class PaddedRows:
-    """A session's rows padded to a bucket.
+class Rows(NamedTuple):
+    """A session's rows padded for a kernel (:func:`pad_rows`,
+    :func:`pad_groups`, ``Likelihood.pad``).
 
     Attributes
     ----------
-    X : np.ndarray, shape (n_bucket, n_columns)
+    X : np.ndarray, shape (n_bucket, p)
     y : np.ndarray, shape (n_bucket,)
-    offset : np.ndarray, shape (n_bucket,)
-        The Poisson offset, 0 on padded rows; zeros when none was given.
+    aux : object
+        The family's extra data as its kernels take it: the padded offset, the
+        scale, :class:`Groups`, or None.
     weight : np.ndarray, shape (n_bucket,)
         1 on a real row, 0 on a padded one.
     n_real : int
@@ -157,9 +167,29 @@ class PaddedRows:
 
     X: np.ndarray
     y: np.ndarray
-    offset: np.ndarray
+    aux: Any
     weight: np.ndarray
     n_real: int
+
+
+@dataclass(frozen=True)
+class Groups:
+    """The grouped softmax's ``aux`` in a kernel (``likelihoods`` registers
+    it as a JAX pytree: ``index`` its data, ``n_groups`` static).
+
+    Attributes
+    ----------
+    index : array of int, shape (n_bucket,)
+        Each row's group, numbered 0 to ``n_real_groups - 1`` in the order of
+        the input; every padded row is in group ``n_real_groups``. Sorted.
+    n_groups : int
+        The groups a kernel sums over (``num_segments``): the real ones, the
+        padding group and the empty groups after it; static, since
+        ``segment_sum`` needs it when traced.
+    """
+
+    index: Any
+    n_groups: int
 
 
 def pad_rows(
@@ -168,7 +198,7 @@ def pad_rows(
     offset: np.ndarray | None = None,
     step: int = ROW_BUCKET,
     smallest: int = SMALLEST_ROW_BUCKET,
-) -> PaddedRows:
+) -> Rows:
     """Pad a session's rows to their bucket (:func:`bucket_size`).
 
     Parameters
@@ -182,7 +212,8 @@ def pad_rows(
 
     Returns
     -------
-    PaddedRows
+    Rows
+        ``aux`` the offset padded with 0, or None when none was given.
 
     Raises
     ------
@@ -191,51 +222,21 @@ def pad_rows(
         of padded rows.
     """
     n_rows = np.shape(y)[0]
-    offset = np.zeros(n_rows) if offset is None else offset
-    if np.shape(X)[0] != n_rows or np.shape(offset) != (n_rows,):
+    offset_shape = (n_rows,) if offset is None else np.shape(offset)
+    if np.shape(X)[0] != n_rows or offset_shape != (n_rows,):
         raise ValueError(
-            f"X {np.shape(X)}, y {np.shape(y)} and offset {np.shape(offset)} "
+            f"X {np.shape(X)}, y {np.shape(y)} and offset {offset_shape} "
             "need one row each"
         )
     # No rows pad to one bucket of padded rows, whose every sum is 0.
     n_bucket = bucket_size(max(n_rows, 1), step, smallest)
-    return PaddedRows(
+    return Rows(
         X=pad_values(X, n_rows, n_bucket, "X"),
         y=pad_values(y, n_rows, n_bucket, "y"),
-        offset=pad_values(offset, n_rows, n_bucket, "offset"),
+        aux=None if offset is None else pad_values(offset, n_rows, n_bucket, "offset"),
         weight=pad_values(np.ones(n_rows), n_rows, n_bucket, "weight"),
         n_real=n_rows,
     )
-
-
-@dataclass(frozen=True)
-class PaddedGroups:
-    """A grouped-softmax session's rows and groups padded to buckets.
-
-    Attributes
-    ----------
-    X : np.ndarray, shape (n_bucket, n_columns)
-    y : np.ndarray, shape (n_bucket,)
-    group : np.ndarray of int, shape (n_bucket,)
-        Each row's group, numbered 0 to ``n_real_groups - 1`` in the order of
-        the input; every padded row is in group ``n_real_groups``. Sorted.
-    weight : np.ndarray, shape (n_bucket,)
-        1 on a real row, 0 on a padded one.
-    n_real : int
-        The real rows, which are the first `n_real`.
-    n_groups : int
-        The groups a kernel sums over (``num_segments``): the real ones, the
-        padding group and the empty groups after it.
-    n_real_groups : int
-    """
-
-    X: np.ndarray
-    y: np.ndarray
-    group: np.ndarray
-    weight: np.ndarray
-    n_real: int
-    n_groups: int
-    n_real_groups: int
 
 
 def pad_groups(
@@ -244,7 +245,7 @@ def pad_groups(
     groups: np.ndarray,
     row_step: int = SOFTMAX_ROW_BUCKET,
     group_step: int = GROUP_BUCKET,
-) -> PaddedGroups:
+) -> Rows:
     """Pad a grouped-softmax session's rows and groups to buckets.
 
     Parameters
@@ -260,7 +261,8 @@ def pad_groups(
 
     Returns
     -------
-    PaddedGroups
+    Rows
+        ``aux`` the rows' :class:`Groups`.
 
     Raises
     ------
@@ -277,14 +279,7 @@ def pad_groups(
     n_real_groups = starts.size
     group = np.full(padded.y.size, n_real_groups)
     group[: padded.n_real] = np.repeat(
-        np.arange(n_real_groups), np.diff(starts, append=padded.n_real)
+        np.arange(n_real_groups), group_sizes(starts, padded.n_real)
     )
-    return PaddedGroups(
-        X=padded.X,
-        y=padded.y,
-        group=group,
-        weight=padded.weight,
-        n_real=padded.n_real,
-        n_groups=bucket_size(n_real_groups + 1, group_step, group_step),
-        n_real_groups=n_real_groups,
-    )
+    n_groups = bucket_size(n_real_groups + 1, group_step, group_step)
+    return padded._replace(aux=Groups(group, n_groups))

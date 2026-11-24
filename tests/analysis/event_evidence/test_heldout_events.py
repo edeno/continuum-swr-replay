@@ -177,7 +177,7 @@ def test_shared_bin_events_both_ways():
         he.shared_bin_events(a, b[:-1])
 
 
-def test_found_again_statistics_pool_events_and_balance_animals():
+def test_found_again_statistics_average_epochs_then_animals():
     """Animal x: epoch x1 2 of 2 no-SWR events found, x2 0 of 1 SWR event and 1
     of 1 no-SWR event; animal y: 1 of 4 no-SWR events."""
     events = pd.DataFrame(
@@ -192,12 +192,16 @@ def test_found_again_statistics_pool_events_and_balance_animals():
     assert table.index.tolist() == ["all", "no SWR", "SWR"]
     assert table["n_events"].tolist() == [8, 7, 1]
     assert table["n_found"].tolist() == [4, 4, 0]
-    assert table.loc["all", "share"] == pytest.approx(0.5)
-    assert table.loc["no SWR", "share"] == pytest.approx(4 / 7)
+    # each epoch's share, each animal's mean, the mean over animals: all, x's
+    # epochs 1 and 0.5 (0.75) and y 0.25; no SWR, x 1 and y 0.25 (pooled over
+    # the events it would be 4 / 7)
+    assert table.loc["all", "share"] == pytest.approx((0.75 + 0.25) / 2)
+    assert table.loc["no SWR", "share"] == pytest.approx((1.0 + 0.25) / 2)
     # all: x's epochs 1 and 0.5, mean 0.75; y 0.25
     assert table.loc["all", "share_animal_min"] == pytest.approx(0.25)
     assert table.loc["all", "share_animal_max"] == pytest.approx(0.75)
     # no SWR: x's epochs 1 and 1; y 0.25
     assert table.loc["no SWR", "share_animal_max"] == pytest.approx(1.0)
+    # y has no SWR event: it is not one of the SWR group's animals
     assert table.loc["SWR", "n_animals"] == 1
     assert table.loc["SWR", "share"] == pytest.approx(0.0)
