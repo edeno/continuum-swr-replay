@@ -15,15 +15,20 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     distance_from_animal_shares,
     distance_to_nearest_well,
     even_content,
+    event_patch_counts,
     event_place_mass,
     event_place_shares,
+    event_start_end,
     event_well_counts,
     leaf_and_trunk_profiles,
     log2_density_against_even,
     log2_density_ratio,
+    patch_content_shares,
+    patch_count_shares,
     place_share_intervals,
     place_share_statistics,
     remote_well_share_by_extent,
+    start_end_shares,
     well_count_shares,
 )
 
@@ -529,3 +534,70 @@ def test_well_count_shares_go_event_then_epoch_then_animal():
     )
     shares = well_count_shares(events).loc[(False, "a")]
     assert shares.to_dict() == {"none": 0.125, "one": 0.75, "two or more": 0.125}
+
+
+def test_event_patch_counts_count_the_patches_that_hold_a_tenth_of_the_event():
+    """Arms 0, 1 and 6 are patch 1; arms 2, 3 and 7 patch 2; arm 4 patch 3.
+    Event 1: 9 time bins in patch 1 (a leaf arm and its trunk) and 1 in patch 2:
+    two patches. Event 2: 9.6 in patch 1 and 0.4 in patch 3: one."""
+    rows = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2],
+            "arm": [0, 6, 7, 1, 4],
+            "weight": [5.0, 4.0, 1.0, 9.6, 0.4],
+        }
+    )
+    assert event_patch_counts(rows).to_dict() == {1: 2, 2: 1}
+    events = pd.DataFrame(
+        {"animal": "a", "epoch_id": "e", "is_swr": False, "n_patches": [2, 1, 1, 3]}
+    )
+    shares = patch_count_shares(events).loc[(False, "a")]
+    assert shares.to_dict() == {"one": 0.5, "two": 0.25, "three": 0.25}
+
+
+def test_patch_content_shares_split_content_by_the_animals_patch_and_the_wells():
+    """The animal is in patch 1. Of 10 time bins of content: 2 at a well of
+    patch 1 (arm 0), 3 on patch 1's trunk (arm 6), 4 at a well of patch 2 (arm
+    3) and 1 on patch 3's leaf arm off its well."""
+    rows = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": "e",
+            "is_swr": False,
+            "arm": [0, 6, 3, 4],
+            "distance_to_well_cm": [5.0, 80.0, 5.0, 40.0],
+            "weight": [2.0, 3.0, 4.0, 1.0],
+            "current_patch": 1,
+        }
+    )
+    shares = patch_content_shares(rows).loc[(False, "a")]
+    assert shares.to_dict() == {
+        "own_patch_wells": 0.2,
+        "own_patch_elsewhere": 0.3,
+        "other_patch_wells": 0.4,
+        "other_patch_elsewhere": 0.1,
+    }
+
+
+def test_event_start_end_read_the_first_and_the_last_time_bin():
+    """Event 1 starts 5 cm from the animal and ends at a well 150 cm away;
+    event 2 (its bins given out of order) starts and ends far, off the wells."""
+    bins = pd.DataFrame(
+        {
+            "event_id": [1, 1, 1, 2, 2],
+            "time": [0.0, 0.002, 0.004, 1.002, 1.0],
+            "distance_to_animal_cm": [5.0, 60.0, 150.0, 90.0, 80.0],
+            "distance_to_well_cm": [5.0, 60.0, 4.0, 50.0, 60.0],
+        }
+    )
+    places = event_start_end(bins)
+    assert places.loc[1].to_dict() == {
+        "starts_near_animal": True,
+        "ends_near_animal": False,
+        "starts_at_remote_well": False,
+        "ends_at_remote_well": True,
+    }
+    assert not places.loc[2].any()
+    events = places.reset_index().assign(animal="a", epoch_id="e", is_swr=True)
+    shares = start_end_shares(events).loc[(True, "a")]
+    assert shares["starts_near_animal"] == 0.5 and shares["ends_at_remote_well"] == 0.5

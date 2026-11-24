@@ -133,10 +133,11 @@ FIGURES: dict[str, Figure] = {
     ),
     "S3": Figure(
         "Example SWR and no-SWR events, how fast their position distribution "
-        "moves, which of their content is at a well far from the animal, how "
-        "many wells an event represents, and slow and fast gamma during them",
+        "moves, which of their content is at a well far from the animal and in "
+        "which patch, how many wells an event represents and patches it spans, "
+        "where its content starts and ends, and slow and fast gamma during them",
         "scripts/figures/generate_supp_figure03.py",
-        "abcdefg",
+        "abcdefghij",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",

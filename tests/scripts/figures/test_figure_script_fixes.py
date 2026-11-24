@@ -1270,6 +1270,11 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(figure, "place_share_intervals", lambda along: None)
     monkeypatch.setattr(figure, "remote_well_share_by_extent", lambda e, **_: None)
     monkeypatch.setattr(figure, "well_count_shares", lambda e, **_: None)
+    monkeypatch.setattr(figure, "patch_count_shares", lambda e, **_: None)
+    monkeypatch.setattr(figure, "content_mass_by_patch", lambda e, *_: (None, []))
+    monkeypatch.setattr(figure, "patch_content_shares", lambda rows: None)
+    monkeypatch.setattr(figure, "with_event_start_end", lambda e, *_: (e, []))
+    monkeypatch.setattr(figure, "start_end_shares", lambda events: None)
     # panel a's session and examples are read after the references are checked
     monkeypatch.setattr(figure, "read_example_decode", lambda *_: None)
     monkeypatch.setattr(figure, "example_windows", lambda events: None)
@@ -1461,3 +1466,53 @@ def test_supp_figure03_examples_are_checked_against_the_event_table(offline):
         figure.example_windows(events.iloc[1:])
     with pytest.raises(AssertionError, match="not of its kind"):
         figure.example_windows(events.assign(is_swr=True))
+
+
+@pytest.mark.parametrize(
+    ("draw", "classes", "labels"),
+    [
+        (
+            "draw_patch_content",
+            (
+                "own_patch_wells",
+                "own_patch_elsewhere",
+                "other_patch_wells",
+                "other_patch_elsewhere",
+            ),
+            ["wells", "other", "wells", "other"],
+        ),
+        ("draw_patch_counts", ("one", "two", "three"), ["one", "two", "three"]),
+        (
+            "draw_start_end",
+            (
+                "starts_near_animal",
+                "ends_near_animal",
+                "starts_at_remote_well",
+                "ends_at_remote_well",
+            ),
+            ["starts", "ends", "starts", "ends"],
+        ),
+    ],
+)
+def test_supp_figure03_class_panels_draw_a_bar_per_class_and_kind(
+    offline, draw, classes, labels
+):
+    """Panels e, f and g: per class a bar per kind at the animals' mean, with a
+    dot per animal, and the classes named under the axis."""
+    import matplotlib.pyplot as plt
+
+    figure = offline("scripts.figures.generate_supp_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["a", "b"]], names=["is_swr", "animal"]
+    )
+    values = np.linspace(0.1, 0.4, 4)
+    shares = pd.DataFrame(
+        {name: values + 0.1 * k for k, name in enumerate(classes)}, index=index
+    )
+    fig, ax = plt.subplots()
+    getattr(figure, draw)(ax, shares)
+    assert len(ax.patches) == 2 * len(classes)
+    assert ax.patches[0].get_height() == pytest.approx(100 * values[:2].mean())
+    assert [t.get_text() for t in ax.get_xticklabels()] == labels
+    assert sum(len(c.get_offsets()) for c in ax.collections) == 2 * 2 * len(classes)
+    plt.close(fig)

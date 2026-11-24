@@ -204,6 +204,59 @@ def test_each_selected_event_gets_its_shares_of_content_time_at_wells(tmp_path):
         )
 
 
+def test_the_content_by_patch_is_summed_over_the_selected_events(tmp_path):
+    """Each event of the run has 2 time bins at a well on arm 0 and 1 off the
+    wells on arm 7; the rows of an epoch, animal, kind and patch of the animal
+    are one per arm and place, and the unselected event's are not read."""
+    events = select_visit_context(_labeled()).assign(current_patch=1)
+    rows = [
+        {
+            "event_id": event_id,
+            "epoch_id": "e",
+            "arm": arm,
+            "distance_to_well_cm": d_well,
+            "weight": weight,
+        }
+        for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
+        for arm, d_well, weight in ((0, 5.0, 2.0), (7, 80.0, 1.0))
+    ]
+    pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
+
+    by_patch, _ = builder.content_mass_by_patch(events, tmp_path, 1)
+
+    assert set(by_patch["current_patch"]) == {1}
+    n = events.groupby(["animal", "is_swr"]).size()
+    assert len(by_patch) == 2 * len(n)
+    at_well = by_patch[by_patch["arm"] == 0].set_index(["animal", "is_swr"])["weight"]
+    assert (at_well == 2.0 * n).all()
+    with pytest.raises(ValueError, match="no current patch"):
+        builder.content_mass_by_patch(events.assign(current_patch=np.nan), tmp_path, 1)
+
+
+def test_each_selected_event_gets_where_its_content_starts_and_ends(tmp_path):
+    """Every event's content is 5 cm from the animal at its first time bin and
+    at a well 150 cm away at its last."""
+    events = select_visit_context(_labeled())
+    rows = [
+        {
+            "event_id": event_id,
+            "epoch_id": "e",
+            "time": time,
+            "distance_to_animal_cm": d_animal,
+            "distance_to_well_cm": d_well,
+        }
+        for event_id in [*events["event_id"], 100 + 5]  # 105 is not selected
+        for time, d_animal, d_well in ((0.0, 5.0, 5.0), (0.002, 150.0, 4.0))
+    ]
+    pd.DataFrame(rows).to_parquet(tmp_path / "e.parquet")
+
+    joined, _ = builder.with_event_start_end(events, tmp_path, 1)
+
+    assert len(joined) == len(events)
+    assert joined["starts_near_animal"].all() and joined["ends_at_remote_well"].all()
+    assert not joined["ends_near_animal"].any()
+
+
 def test_an_output_not_made_over_the_subset_is_pending():
     assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
     assert "rerun it" in builder.subset_staleness({}, "out")
