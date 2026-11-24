@@ -42,7 +42,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from .likelihoods import Likelihood
+from .likelihoods import GroupedSoftmax, Likelihood
 from .reml import _positions
 from .runtime import in_float64
 
@@ -104,6 +104,7 @@ def concurvity(
     beta: np.ndarray,
     *,
     intercept: Sequence[int] | None,
+    size: np.ndarray | None = None,
 ) -> dict[str, dict[str, float]]:
     """mgcv's three concurvity measures of each term, on a given design.
 
@@ -121,6 +122,11 @@ def concurvity(
         in a fit of several sessions the baseline copies'. They are projected
         one after another, each on what the ones before it left, so the
         projection is onto their span. None (or empty) for none.
+    size : np.ndarray, shape (p,), or None
+        Each column's squared size before any projection, which the test of
+        a term that does not vary reads; ``sum(X**2)`` when None. Given when
+        ``X`` is already a reduced form of the design (:func:`term_collinearity`
+        by session).
 
     Returns
     -------
@@ -137,7 +143,8 @@ def concurvity(
     expected = np.setdiff1d(np.arange(X.shape[1]), projected)
     if np.sort(used).tolist() != expected.tolist():
         raise ValueError("the terms and the intercept must cover every column once")
-    size = np.sum(X**2, axis=0)  # each column's own size, before the projection
+    if size is None:  # each column's own size, before the projection
+        size = np.sum(X**2, axis=0)
     for column in projected:
         q = X[:, column] / np.linalg.norm(X[:, column])
         X = X - np.outer(q, q @ X)
@@ -207,6 +214,7 @@ def term_collinearity(
     terms: Mapping[str, np.ndarray],
     *,
     intercept: Sequence[int] | None,
+    session_copies: Sequence[tuple[slice, Sequence[int]]] | None = None,
 ) -> dict[str, dict[str, float]]:
     """Each term's collinearity with the others at a fit (the record's
     ``collinearity``).
@@ -229,6 +237,26 @@ def term_collinearity(
         The columns projected out first (:func:`concurvity`): the
         intercept's and the active baseline copies'; None (or empty) for
         none. Each must be active.
+    session_copies : sequence of (slice, sequence of int), or None
+        In a fit of several sessions with baseline copies, each session's
+        rows (contiguous) and its active copy columns. Then each session's
+        copies are projected out of its own rows (a copy is zero on the
+        other sessions' rows, also once weighted, so the copies of different
+        sessions are orthogonal): for each session, the weighted rows of its
+        copies and of the other active columns, the copies' range (their
+        singular directions above ``RANK_TOL``, as :func:`_range`) taken out
+        of the others, and the R of what is left; the blocks are stacked, and
+        :func:`concurvity` runs on them with the other columns of
+        ``intercept`` (a shared intercept) and each column's size before the
+        projection. The measures depend on the design only through ``X~' X~``,
+        so they are those of the projection of every copy out of the whole
+        design (to rounding), without its ``n x p`` copies per copy. One
+        difference: a copy that its session's other copies explain wholly
+        adds no direction here, while the projection one copy at a time
+        divides what rounding leaves of it by its norm and so projects out an
+        arbitrary direction (NaN for every term when the norm is exactly
+        zero). None: every column of ``intercept`` is projected out of the
+        whole design.
 
     Returns
     -------
@@ -248,14 +276,16 @@ def term_collinearity(
         for name, cols in terms.items()
         if active[np.asarray(cols, dtype=int)].any()
     }
-    Xa, ba = X[:, active], beta[active]
-    weighted = weighted_design(lik, Xa, y, aux, Xa @ ba)
-    measures = concurvity(
-        weighted,
-        kept,
-        ba,
-        intercept=[int(index[c]) for c in projected],
-    )
+    if session_copies is None:
+        Xa, ba = X[:, active], beta[active]
+        weighted = weighted_design(lik, Xa, y, aux, Xa @ ba)
+        measures = concurvity(
+            weighted, kept, ba, intercept=[int(index[c]) for c in projected]
+        )
+    else:
+        measures = _concurvity_by_session(
+            lik, X, y, aux, beta, terms, projected, session_copies
+        )
     out = {}
     for name, cols in kept.items():
         m = measures[name]
@@ -268,6 +298,53 @@ def term_collinearity(
         if "not_measured" in m:
             out[name]["not_measured"] = m["not_measured"]
     return out
+
+
+def _concurvity_by_session(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    beta: np.ndarray,
+    terms: Mapping[str, np.ndarray],
+    projected: list[int],
+    session_copies: Sequence[tuple[slice, Sequence[int]]],
+) -> dict[str, dict[str, float]]:
+    """:func:`concurvity` of the active term columns with each session's
+    copies projected out of its own rows (:func:`term_collinearity`,
+    ``session_copies``)."""
+    active = np.isfinite(beta)
+    copies = {int(c) for _, own in session_copies for c in own}
+    shared = [int(j) for j in np.flatnonzero(active) if int(j) not in copies]
+    place = {c: k for k, c in enumerate(shared)}
+    size = np.zeros(len(shared))
+    blocks = []
+    for rows, own in session_copies:
+        if rows.stop <= rows.start:
+            continue
+        columns = [*own, *shared]
+        Xs = X[rows][:, columns]
+        part = None if aux is None else np.asarray(aux)[rows]
+        if isinstance(lik, GroupedSoftmax):
+            part = part - part[0]  # the session's groups, numbered from 0
+        Ws = weighted_design(lik, Xs, y[rows], part, Xs @ beta[columns])
+        left = Ws[:, len(own) :]
+        size += np.sum(left**2, axis=0)
+        basis = _range(Ws[:, : len(own)])
+        left = left - basis @ (basis.T @ left)
+        blocks.append(np.linalg.qr(left, mode="r"))
+    kept = {
+        name: np.array([place[int(c)] for c in cols if active[c]])
+        for name, cols in terms.items()
+        if active[np.asarray(cols, dtype=int)].any()
+    }
+    return concurvity(
+        np.vstack(blocks),
+        kept,
+        beta[shared],
+        intercept=[place[c] for c in projected if c not in copies],
+        size=size,
+    )
 
 
 def separable(collinearity: Mapping[str, Mapping[str, float]]) -> dict[str, bool]:

@@ -530,6 +530,28 @@ def _fit_unit(
             return _record(session, identity, session.no_fit, refit)
 
 
+def _session_copies(
+    session: _Session, beta: np.ndarray
+) -> list[tuple[slice, list[int]]] | None:
+    """Each session's kept rows (contiguous in the fit's rows) and its active
+    baseline copies, for the collinearity record; None without copies."""
+    design = session.design
+    if not design.sessions:
+        return None
+    codes = session.session[session.kept]
+    bounds = np.searchsorted(codes, np.arange(len(design.sessions) + 1))
+    copies = {key: [] for key in design.sessions}
+    for term in design.terms:
+        if term.session is not None:
+            copies[term.session] += [
+                int(j) for j in term.columns if np.isfinite(beta[j])
+            ]
+    return [
+        (slice(int(bounds[s]), int(bounds[s + 1])), copies[key])
+        for s, key in enumerate(design.sessions)
+    ]
+
+
 def _record(
     session: _Session,
     identity: _Identity,
@@ -568,6 +590,7 @@ def _record(
                 beta,
                 design.term_columns,
                 intercept=projected,
+                session_copies=_session_copies(session, beta),
             )
             edf = _edf(design, last, block_terms, np.isfinite(beta))
     animal, session_date, epoch = (*identity.key, "", "")[:3]
