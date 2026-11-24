@@ -382,7 +382,7 @@ def test_each_panels_values_carry_its_letter(figure02):
     the figure places it; the restriction panel draws the summary's own
     definitions."""
     from continuum_swr_replay.analysis.event_evidence import restriction_totals
-    from continuum_swr_replay.reported import events
+    from continuum_swr_replay.reported.events.common import TAGS
 
     letter = {panel: f"2{figure02.LETTERS[panel]}" for panel in figure02.PANELS}
     for tag, panel in {
@@ -398,10 +398,10 @@ def test_each_panels_values_carry_its_letter(figure02):
         "tetrode_holdout_extra_figure": "left_out",
         "nonlocal_restriction_figure": "decoder_comparison",
     }.items():
-        assert events.TAGS[tag].figures == (letter[panel],), tag
+        assert TAGS[tag].figures == (letter[panel],), tag
     # the gain over local coding is the supplement's too
-    assert events.TAGS["tetrode_holdout"].figures[0] == letter["left_out"]
-    assert events.TAGS["shared_content"].figures == ()
+    assert TAGS["tetrode_holdout"].figures[0] == letter["left_out"]
+    assert TAGS["shared_content"].figures == ()
     # one definition of the drawn statistic and its choices, in the analysis
     # layer, used by both
     assert (
@@ -495,7 +495,7 @@ def test_the_event_overlap_panel_prints_the_digits_of_the_events_summary(figure0
     percents rounded by the summary's rule (a half rounds away from zero: 12.5
     % is 13), the title gives the count of every event, and each animal is one
     dot per bar."""
-    from continuum_swr_replay.reported.events import event_cohort_values
+    from continuum_swr_replay.reported.events.cohort import event_cohort_values
     from continuum_swr_replay.reported.formatting import formatted
 
     events = figure02_events()
@@ -556,7 +556,9 @@ def test_the_ripple_power_panel_writes_the_share_the_events_summary_gives(figure
     bottom axis, with the animals' mean."""
     from matplotlib.offsetbox import AnchoredOffsetbox
 
-    from continuum_swr_replay.reported.events import nonlocal_power_values
+    from continuum_swr_replay.reported.events.class_structure import (
+        nonlocal_power_values,
+    )
     from continuum_swr_replay.reported.formatting import formatted
     from continuum_swr_replay.visualization import signal_share_panels
 
