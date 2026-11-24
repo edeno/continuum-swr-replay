@@ -3329,17 +3329,21 @@ def restriction_outside_swr_values(
                 f"{_EPOCH_REDUCTION}",
                 unit=words,
             )
-        for measure, name, part in (
+        for measure, name, part, what in (
             (
                 "share_in_swr_events_outside_swr",
                 "share_in_heldout_swr_events_outside_swr",
                 "the time outside the SWR of the events detected from the held-out "
                 "decode that overlap an SWR",
+                "a share: in the data every epoch's lies between 0 and 1",
             ),
             (
                 "share_in_no_swr_events",
                 "share_in_heldout_non_swr_events",
                 "the events detected from the held-out decode with no SWR",
+                "a ratio, not a share: it can lie outside 0 to 1 (above 1 when "
+                "the full decoder does worse than the SWR-only decoder in the "
+                "rest of the time)",
             ),
         ):
             values += _share_interval(
@@ -3351,11 +3355,11 @@ def restriction_outside_swr_values(
                 "inside a well visit; an event that runs past the final poke-out "
                 "adds its bins before it only), divided by the gain summed over "
                 f"every one of the epoch's {_OUTSIDE_SWR_BINS} inside a well "
-                "visit (no value when that sum is not positive). Both are signed sums, so a share can "
-                "be above 1 or below 0 and the two shares need not add to 1. "
+                "visit (no value when that sum is not positive). Both are signed "
+                f"sums, so the two need not add to 1; this one is {what}. "
                 f"Over the cohort: {_EPOCH_REDUCTION}",
             )
-        # a share that is below 0 where the full decoder does worse: a
+        # a ratio that is below 0 where the full decoder does worse: a
         # unitless quantity, as a fraction must lie in [0, 1]
         row = statistics.loc[(family, "share_outside_events")]
         values += [
@@ -3365,14 +3369,15 @@ def restriction_outside_swr_values(
                 "quantity",
                 "dec2",
                 f"{scored}; the gain is the score {_FULL_MINUS_SWR}. Per epoch, 1 "
-                "minus the share of the gain in the events detected from the "
+                "minus the ratio of the gain in the events detected from the "
                 "held-out decode with no SWR and minus its share in the time "
-                "outside the SWR of those that overlap an SWR, so the three shares "
-                f"add to 1: the share of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
-                "inside a well visit that lies outside those events (no value when "
-                "the gain summed over those bins is not positive), as a fraction of "
-                "1, below 0 when the full decoder does worse than the SWR-only "
-                f"decoder there. Over the cohort: {_EPOCH_REDUCTION}",
+                "outside the SWR of those that overlap an SWR, so the three add to "
+                f"1: the ratio of the gain over the epoch's {_OUTSIDE_SWR_BINS} "
+                "inside a well visit that lies outside those events to the whole "
+                "gain (no value when the gain summed over those bins is not "
+                "positive). A ratio, not a share: it can lie outside 0 to 1, below "
+                "0 when the full decoder does worse than the SWR-only decoder "
+                f"there. Over the cohort: {_EPOCH_REDUCTION}",
             ),
             make_text(
                 f"{key}_share_outside_heldout_events_ci_low",

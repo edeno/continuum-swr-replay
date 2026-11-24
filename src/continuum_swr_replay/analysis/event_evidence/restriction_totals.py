@@ -480,7 +480,9 @@ def epoch_outside_swr_gains(
         ``no_swr_events_full_minus_swr``, ``share_in_no_swr_events``,
         ``swr_events_outside_swr_full_minus_swr``,
         ``share_in_swr_events_outside_swr``, ``share_outside_events`` (1 minus
-        the two shares), ``outside_events_full_minus_swr``,
+        the two; ``share_in_no_swr_events`` and ``share_outside_events`` are
+        ratios of signed sums and can lie outside 0 to 1),
+        ``outside_events_full_minus_swr``,
         ``outside_events_gain_per_spike`` and ``outside_events_gain_per_s``
         (NaN without spikes, bins or a positive total, as each divides).
 
