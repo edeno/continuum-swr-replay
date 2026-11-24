@@ -37,6 +37,7 @@ __all__ = [
     "evaluate_contrast",
     "range_grid",
     "range_mean_contrast",
+    "used_coefficients",
 ]
 
 GRID_STEP = 0.01
@@ -174,6 +175,12 @@ def coefficient_contrast(
     return c
 
 
+def used_coefficients(c: np.ndarray) -> np.ndarray:
+    """The coefficients a contrast reads: those with a non-zero entry in ``c``,
+    shape ``(n_coef,)``, or in any row of ``c``, shape ``(n_rows, n_coef)``."""
+    return np.flatnonzero(np.any(np.atleast_2d(c) != 0.0, axis=0))
+
+
 def evaluate_contrast(
     c: np.ndarray, beta: np.ndarray, covariance: np.ndarray
 ) -> Contrast:
@@ -210,7 +217,7 @@ def evaluate_contrast(
             f"a contrast of shape {c.shape} and a covariance of shape "
             f"{covariance.shape} for {n} coefficients"
         )
-    used = np.flatnonzero(c)
+    used = used_coefficients(c)
     c_used = c[used]
     estimate = float(c_used @ beta[used])
     variance = float(c_used @ covariance[np.ix_(used, used)] @ c_used)

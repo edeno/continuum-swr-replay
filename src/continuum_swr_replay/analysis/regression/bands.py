@@ -42,7 +42,10 @@ import numpy as np
 
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_bootstrap,
+    draws_sd_scale,
 )
+
+from .contrasts import used_coefficients
 
 __all__ = [
     "BAND_DRAWS",
@@ -154,7 +157,7 @@ def simultaneous_band(
         standard error is zero at a grid point.
     """
     C = np.asarray(curve_matrix, dtype=float)
-    used = np.flatnonzero(np.any(C != 0.0, axis=0))
+    used = used_coefficients(C)
     beta_used = np.asarray(beta, dtype=float)[used]
     V = np.asarray(covariance, dtype=float)[np.ix_(used, used)]
     if not (np.isfinite(beta_used).all() and np.isfinite(V).all()):
@@ -259,7 +262,7 @@ def across_session_band(
         n_animals,
         np.random.default_rng((seed, 1)),
     )
-    half = critical * sd * np.sqrt(n_animals / (n_animals - 1))
+    half = critical * sd * draws_sd_scale(n_animals)
     return Band(
         boot.estimate,
         boot.estimate - half,
