@@ -82,7 +82,7 @@ session with it. The fitting loop and the support rule read these.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Literal, NamedTuple
@@ -712,11 +712,22 @@ def _small_terms(X: np.ndarray, terms: Sequence[DesignTerm]) -> dict[str, float]
     ``SMALLEST_COLUMN_SIZE``, with that value (a smooth's columns measured
     together, as one term)."""
     size = np.max(np.abs(X), axis=0, initial=0.0)
+    return _below_smallest(
+        lambda term: float(np.max(size[term.columns], initial=0.0)), terms
+    )
+
+
+def _below_smallest(
+    largest: Callable[[DesignTerm], float], terms: Sequence[DesignTerm]
+) -> dict[str, float]:
+    """Each measured term, in the check's order, whose largest absolute value
+    (``largest(term)``) is above zero and below ``SMALLEST_COLUMN_SIZE``,
+    with that value."""
     out = {}
     for term in _check_order(terms):
-        largest = float(np.max(size[term.columns], initial=0.0))
-        if 0.0 < largest < SMALLEST_COLUMN_SIZE:
-            out[term.name] = largest
+        size = largest(term)
+        if 0.0 < size < SMALLEST_COLUMN_SIZE:
+            out[term.name] = size
     return out
 
 
@@ -914,12 +925,12 @@ class Design:
                     largest[t.name] = np.max(
                         np.abs(values[:, t.columns - start]), axis=1
                     )
-        small = {}
-        for term in _check_order(self.terms):
-            size = float(np.max(largest[term.name][~missing], initial=0.0))
-            if 0.0 < size < SMALLEST_COLUMN_SIZE:
-                small[term.name] = size
-        _refuse_small(small)
+        _refuse_small(
+            _below_smallest(
+                lambda term: float(np.max(largest[term.name][~missing], initial=0.0)),
+                self.terms,
+            )
+        )
 
     def missing_rows(self, rows: pd.DataFrame) -> np.ndarray:
         """True for a row with a missing value the design reads, shape
