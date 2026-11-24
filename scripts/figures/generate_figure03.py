@@ -607,13 +607,14 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 
-DISTANCE_XLABEL = "From the animal (cm)"
+DISTANCE_XLABEL = "Distance from\nthe animal (cm)"
 """The distance panel's x label, under its title "Content distance": each
 event's mean over its bins of the distance along the track of the decoded place
 from the animal's."""
-DISTANCE_YLABEL = "Events at most\nthis far (%)"
-"""The distance panel's y label: the percent of a class's events whose content
-lies at most that far from the animal."""
+DISTANCE_YLABEL = "Cumulative %\nof events"
+"""The distance panel's y label: the curve is cumulative, the percent of a
+class's events whose content lies at most as far from the animal as the x
+value."""
 DISTANCE_TICKS_CM = (5, 20, 100)
 
 

@@ -258,7 +258,7 @@ def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
     ax.set_xlabel("Speed (cm/s)")
-    ax.set_ylabel("Events at most\nthis fast (%)")
+    ax.set_ylabel("Cumulative %\nof events")
     ax.set_title("Distribution's speed", fontsize=SMALL_SIZE)
 
 
