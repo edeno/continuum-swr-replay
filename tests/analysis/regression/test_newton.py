@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import likelihoods, newton, runtime
+from continuum_swr_replay.analysis.regression import likelihoods, newton, reml, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     NEWTON_DECREMENT_TOL,
     NO_MAXIMUM_ETA_STEP,
@@ -682,7 +682,8 @@ def _transposes_of_rows(compiled_text: str, n_rows: int) -> list[str]:
 @pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
 def test_no_kernel_copies_the_transposed_design(family: str) -> None:
     """A canary for a copy of the transposed design (padded rows x columns)
-    in the compiled Newton iteration and information kernels, on the CPU.
+    in the compiled Newton iteration, information and REML derivative kernels,
+    on the CPU.
     ``X.T @ score`` and ``(X.T * w) @ X`` compiled to a ``transpose`` of the
     design (then a ``copy`` to another layout), about half of an iteration at
     the rate model's size; XLA folds ``X.T @ (w * X)`` into the product.
@@ -737,6 +738,42 @@ def test_no_kernel_copies_the_transposed_design(family: str) -> None:
                 lik, r.X, eta, problem.Y[0], r.aux, r.weight, eta, eta
             ),
         }
+        # REML's kernel of the score and its derivatives in two log penalties.
+        S_j = np.zeros((2, p, p))
+        S_j[0, 1:3, 1:3] = S_j[1, 3:, 3:] = np.eye(2)
+        masks, f = (S_j.diagonal(axis1=1, axis2=2) > 0) * 1.0, np.float64(0.0)
+        b, ranks = np.zeros(p), np.full(2, 2.0)
+        if family == "gaussian":
+            programs["_profiled_gaussian"] = reml._profiled_gaussian.lower(
+                r.X,
+                problem.Y,
+                r.weight,
+                np.eye(p),
+                b,
+                masks,
+                f,
+                np.int64(n),
+                np.int64(n - 1),
+                S_j,
+                ranks,
+            )
+        else:
+            programs["_laplace_derivatives"] = reml._laplace_derivatives.lower(
+                lik,
+                r.X,
+                problem.Y,
+                r.aux,
+                r.weight,
+                S_j,
+                np.eye(p),
+                np.eye(p),
+                b,
+                masks,
+                f,
+                f,
+                f,
+                ranks,
+            )
         for name, lowered in programs.items():
             text = lowered.compile().as_text()
             assert _transposes_of_rows(text, n_bucket) == [], name

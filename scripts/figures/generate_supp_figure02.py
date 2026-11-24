@@ -277,9 +277,6 @@ the order the text cites them, so their letters follow from it."""
 PANELS = tuple(panel for _, row in LAYOUT for panel, _, _ in row)
 """The panels in the order the text cites them."""
 LETTERS = dict(zip(PANELS, string.ascii_lowercase, strict=False))
-LETTER_HEIGHT = 0.0268
-"""A panel letter's height (figure height): the letters' tops sit this far
-above the highest drawn top of their row."""
 PANEL_GRIDS = {
     "boundary_timing": (1, 2),
     "nonlocal_mua": (2, 1),
@@ -715,8 +712,10 @@ def draw_no_spike_mua(ax: Axes, trace: dict) -> None:
     )
     ax.plot(t_ms, trace["median"], color=readable_text_color(NO_SPIKE_COLOR), lw=1.0)
     ax.axhline(trace["level"], color=REFERENCE_COLOR, lw=0.6, ls="--", zorder=3)
-    ax.text(
-        t_ms[-1], trace["level"], "outside\nperiods", ha="right", va="bottom",
+    # the level's name stands 2 pt above its line, not on it
+    ax.annotate(
+        "outside\nperiods", (t_ms[-1], trace["level"]), xytext=(0, 2),
+        textcoords="offset points", ha="right", va="bottom",
         fontsize=SMALL_SIZE, color=REFERENCE_COLOR,
     )  # fmt: skip
     ax.axvline(0, color="k", lw=0.5, ls=":")
@@ -970,7 +969,9 @@ def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
         ax.set_xlim(t_ms[0], t_ms[-1])
         ax.set_xticks([-100, 0, 100])
         ax.set_title(SIGNAL_LABELS[signal], fontsize=SMALL_SIZE, pad=3)
-        ax.yaxis.set_major_locator(MaxNLocator(3))
+        # at least three ticks inside the lines' range, so that the highest
+        # line can be read
+        ax.yaxis.set_major_locator(MaxNLocator(3, min_n_ticks=3))
     # the classes named past the last axis, clear of the lines
     for k, is_swr in enumerate(WINDOW_KINDS.values()):
         name, color = EVENT_KINDS[is_swr]
@@ -1162,8 +1163,6 @@ def generate_figure(inputs: dict) -> Figure:
         panels,
         rows=letter_rows,
         columns=list(letter_columns.values()),
-        above=LETTER_HEIGHT,
-        left_of=0.004,
     )
     check_placement(fig, panels)
     return fig

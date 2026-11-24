@@ -33,11 +33,13 @@ The public methods take and return NumPy arrays, and run in float64
 Each of the last six pads the rows (``pad``, with ``padding``) and runs one
 jitted kernel. The kernels compute from the family's JAX functions, which the
 Newton and REML kernels call too: ``_jax_loglik``, ``_jax_score``,
-``_jax_information``, ``_jax_dinformation``, ``_jax_d2information`` and
-``_jax_weighted_design``. Each takes the padded rows and their ``weight`` (1
-on a real row, 0 on a padded one) and multiplies every row's term by it, so a
-padded row adds exactly 0. A likelihood made for a test follows the protocol
-by overriding these.
+``_jax_information``, ``_jax_dinformation``, ``_jax_d2information``,
+``_jax_weighted_design`` and ``_jax_information_traces`` (the traces of the
+information's derivatives against a matrix, which REML's derivatives read).
+Each takes the padded rows and their ``weight`` (1 on a real row, 0 on a
+padded one) and multiplies every row's term by it, so a padded row adds
+exactly 0. A likelihood made for a test follows the protocol by overriding
+these.
 
 The information is the observed information. For the three diagonal families it
 is ``X' diag(w) X`` with weights ``w(eta)`` that do not depend on ``y``; their
@@ -196,6 +198,10 @@ class Likelihood(Protocol):
     def _jax_weighted_design(
         self, X: Any, eta: Any, y: Any, aux: Any, weight: Any
     ) -> Any: ...
+
+    def _jax_information_traces(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, M: Any, D: Any, E: Any
+    ) -> tuple[Any, Any]: ...
 
 
 # The kernels of the public methods: one program per family and padded shape.
@@ -375,6 +381,41 @@ class _Family:
         weighted = _weighted_design_kernel(self, r.X, eta, r.y, r.aux, r.weight)
         return np.array(weighted)[: r.n_real]
 
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of the information's derivatives against ``M``.
+
+        ``M`` is a symmetric ``(p, p)`` matrix, ``D`` has shape ``(n_rows, k)``
+        and ``E`` shape ``(n_rows, m)``, each column a direction of ``eta``.
+        Returns ``tr(M dinformation(D[:, a]))`` for each column ``a``, shape
+        ``(k,)``, and ``tr(M d2information(E[:, j], E[:, l]))`` for each pair,
+        shape ``(m, m)``, symmetric. Here each derivative is made and
+        multiplied by ``M``, one at a time (``jax.lax.map``): one
+        ``(p, p)`` product with the design per column and per pair ``j <= l``.
+        """
+
+        def against_M(information):
+            return jnp.sum(M * information)
+
+        def first(a):
+            d = jax.lax.dynamic_index_in_dim(D, a, axis=1, keepdims=False)
+            return against_M(self._jax_dinformation(X, eta, y, aux, weight, d))
+
+        m = E.shape[1]
+        rows, columns = jnp.triu_indices(m)
+
+        def second(pair):
+            j, k = pair
+            e_j = jax.lax.dynamic_index_in_dim(E, j, axis=1, keepdims=False)
+            e_k = jax.lax.dynamic_index_in_dim(E, k, axis=1, keepdims=False)
+            return against_M(self._jax_d2information(X, eta, y, aux, weight, e_j, e_k))
+
+        upper = jax.lax.map(second, (rows, columns))
+        pairs = jnp.zeros((m, m), M.dtype).at[rows, columns].set(upper)
+        return (
+            jax.lax.map(first, jnp.arange(D.shape[1])),
+            pairs.at[columns, rows].set(upper),
+        )
+
 
 class _DiagonalFamily(_Family):
     """A family whose information is ``X' diag(w(eta)) X``."""
@@ -403,6 +444,19 @@ class _DiagonalFamily(_Family):
 
     def _jax_weighted_design(self, X, eta, y, aux, weight):
         return X * jnp.sqrt(weight * self._jax_weights(eta, aux)[0])[:, None]
+
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of :meth:`_Family._jax_information_traces`, without
+        making the derivatives: with ``h_i = x_i' M x_i``,
+        ``tr(M X' diag(c) X) = sum_i c_i h_i``, so the traces are
+        ``(weight w' h) @ D`` and ``E' diag(weight w'' h) E``. One product of
+        the design with ``M`` in all; read from ``_jax_weights``, as the
+        directional derivatives are. The second is mirrored from its upper
+        triangle, so that it is exactly symmetric."""
+        _, w1, w2 = self._jax_weights(eta, aux)
+        h = jnp.sum((X @ M) * X, axis=1)
+        second = _gram(E, weight * w2 * h)
+        return (weight * w1 * h) @ D, jnp.triu(second) + jnp.triu(second, 1).T
 
 
 class Poisson(_DiagonalFamily):

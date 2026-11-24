@@ -15,6 +15,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
@@ -619,3 +620,66 @@ def read_trigger_windows(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         n_events=[records[e]["n_events"]["total"] for e in epochs["epoch_id"]],
     )
     return windows, checked_reference(epochs, folder, "trigger windows")
+
+
+EXAMPLE_SESSION_RERUN = "scripts/decoding/store_example_session.py"
+"""The runner that stores an example session's recording."""
+
+
+def read_example_session(
+    folder: Path, epoch_id: str, decode_sha256: str
+) -> tuple[pd.Series, list[np.ndarray]]:
+    """An example epoch's stored ripple trace and HPC spikes
+    (``scripts/decoding/store_example_session.py``).
+
+    Parameters
+    ----------
+    folder : Path
+        The epoch's folder, with ``ripple.parquet``, ``spikes.parquet`` and
+        ``manifest.json``.
+    epoch_id : str
+        The epoch.
+    decode_sha256 : str
+        The epoch's decode frame's sha256, as the event features run records it.
+
+    Returns
+    -------
+    trace : pd.Series
+        The z-scored ripple consensus trace, indexed by time (s).
+    spikes : list of np.ndarray
+        Each HPC tetrode's spike times (s), in the stored order.
+
+    Raises
+    ------
+    ValueError
+        If the folder holds no stored session, or it records another epoch,
+        another decode frame or another SWR source than the current one.
+    """
+    if not (folder / "manifest.json").exists():
+        raise ValueError(f"{rel(folder)} holds no stored session")
+    manifest = read_output_manifest(folder)
+    what = rel(folder)
+    notes = [
+        f"it records the epoch {manifest.get('epoch_id')!r}, not {epoch_id!r}"
+        if manifest.get("epoch_id") != epoch_id
+        else None,
+        f"it was made from another decode frame (sha256 "
+        f"{str(manifest.get('decode_sha256'))[:12]}, current {decode_sha256[:12]})"
+        if manifest.get("decode_sha256") != decode_sha256
+        else None,
+        f"it records the SWR source {manifest.get('swr_source')!r}, not the "
+        f"current {swr_source.swr_source_name()!r}"
+        if manifest.get("swr_source") != swr_source.swr_source_name()
+        else None,
+    ]
+    notes = [note for note in notes if note is not None]
+    if notes:
+        raise ValueError(f"{what} is not current: {'; '.join(notes)}")
+    ripple = pd.read_parquet(folder / "ripple.parquet")
+    spikes = pd.read_parquet(folder / "spikes.parquet")
+    trace = pd.Series(ripple["zscore"].to_numpy(), index=ripple["time"].to_numpy())
+    by_tetrode = [
+        spikes.loc[spikes["tetrode"] == k, "time"].to_numpy()
+        for k in range(manifest["n_tetrodes"])
+    ]
+    return trace, by_tetrode

@@ -84,8 +84,6 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     event_table_epochs,
-    ripple_power_inputs,
-    swr_epoch_id,
 )
 from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
     read_tetrode_holdout,
@@ -134,7 +132,6 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     well_visit_times,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_mean
-from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_epoch_ids,
 )
@@ -147,20 +144,25 @@ from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+    EXAMPLE_EPOCH,
+    EXAMPLE_NWB_FILE,
 )
 from continuum_swr_replay.paths import (
+    EXAMPLE_SESSION_DIR,
     PARTICIPATION_NAME,
     event_features_root,
     processed_data_dir,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.inputs import (
+    EXAMPLE_SESSION_RERUN,
     EventsInputs,
     default_inputs,
     event_table_staleness,
     panel_refusal,
     participation_staleness,
     read_checked,
+    read_example_session,
     read_figure_restriction,
     read_trigger_windows,
 )
@@ -239,12 +241,9 @@ FIGURE = "Figure 2"
 # Data choices
 # ---------------------------------------------------------------------------
 
-EXAMPLE_NWB_FILE = "wilbur20210329_.nwb"
-EXAMPLE_EPOCH = "02_r1"
-"""The example session of panels a and b."""
 SESSION_INPUTS = ("data", "results", "detector", "env")
-"""The example session's inputs (panels a and b): ``load_data``'s data and the
-decode's results, detector and environment (:func:`read_session`)."""
+"""The example session's inputs (panels a and b): its data, and the decode's
+results, detector and environment (:func:`read_session`)."""
 OVERVIEW_START_S = 1617036555.9
 OVERVIEW_DURATION_S = 12.6
 """Panel a: a run and the rest after it in the example session (start and
@@ -667,27 +666,59 @@ def read_windows(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         ) from error
 
 
+POSITION_COLUMNS = (
+    "head_position_x",
+    "head_position_y",
+    "head_speed",
+    "linear_position",
+)
+"""The position the example session's panels draw, from its decode frame."""
+
+
 def read_session(nwb_file_name: str, epoch_name: str) -> dict:
-    """The example session of panels a and b: ``load_data``'s data, with the
-    ripple trace of the SWR source (the Kay consensus over rule R-T's tetrodes)
-    and the source's SWRs as ``ripple_times`` (the ones the event table's
-    classes are computed against, from the epoch's decode frame), and the
-    decode's results, detector and environment (``load_results``)."""
-    logging.info(f"Loading session {nwb_file_name} {epoch_name}...")
-    data = dict(
-        load_data(
-            nwb_file_name,
-            epoch_name,
-            ripple_power=ripple_power_inputs(swr_epoch_id(nwb_file_name, epoch_name)),
-        )
-    )
+    """The example session of panels a and b, from stored outputs alone.
+
+    ``data``: the position (:data:`POSITION_COLUMNS`) and the SWR source's SWRs
+    (``ripple_times``, the ones the event table's classes are computed
+    against) from the epoch's decode frame; the track graph, its edge order and
+    spacing from the decode's environment; the ripple trace of the SWR source
+    and the HPC tetrodes' spikes stored by
+    ``scripts/decoding/store_example_session.py``
+    (``reported.inputs.read_example_session``). ``results``, ``detector`` and
+    ``env``: the decode's (``load_results``).
+
+    Raises
+    ------
+    ValueError
+        If the stored session is not current: refused as panel a.
+    """
     identifier = format_epoch_identifier(nwb_file_name, epoch_name, "HPC")
-    data["ripple_times"] = swr_intervals(
-        read_dot_with_swr_source(inventory_run.decode_path(identifier))
-    )
+    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    try:
+        trace, spikes = read_example_session(
+            processed_data_dir() / EXAMPLE_SESSION_DIR / identifier,
+            identifier,
+            features["epochs"][identifier]["decode"]["sha256"],
+        )
+    except ValueError as error:
+        raise ValueError(
+            panel_refusal(
+                FIGURE, LETTERS["overview"], str(error), EXAMPLE_SESSION_RERUN
+            )
+        ) from error
+    frame = read_dot_with_swr_source(inventory_run.decode_path(identifier))
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", root=processed_data_dir()
     )
+    data = {
+        "position_info": frame[list(POSITION_COLUMNS)],
+        "track_graph": env.track_graph,
+        "linear_edge_order": env.edge_order,
+        "linear_edge_spacing": env.edge_spacing,
+        "zscored_ripple_consensus_trace": trace,
+        "ripple_times": swr_intervals(frame),
+        "spike_times": {"HPC": spikes},
+    }
     return {"data": data, "results": results, "detector": detector, "env": env}
 
 
@@ -1613,14 +1644,10 @@ def generate_figure(inputs: dict) -> Figure:
         lettered,
         rows=LETTER_ROWS,
         columns=LETTER_COLUMNS,
-        above=0.002,
-        left_of=0.004,
-        ceiling=0.985,
-        va="bottom",
         heights={
-            # panel a's letter sits at the top of its decode, not of the track
+            # panel a's letter stands above its decode, not above the track
             # drawing
-            LETTERS["overview"]: decode_axes[0].get_position().y1 + 0.004,
+            LETTERS["overview"]: decode_axes[:1],
             # the legend drawn above the traces' axes would lift the row's
             # letters away from the row's other panels
             LETTERS["event_traces"]: [],

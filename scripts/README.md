@@ -31,6 +31,7 @@ them importable.
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
 - `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions (the immobile ones inside the well visits) and calibration curve, which the events summary reads.
+- `store_example_session.py` — one epoch's ripple trace (the SWR source's) and HPC spikes, read once from the lab database with `load_data` and stored whole (`Processed-Data/example_session/<epoch_id>`, default the example session of `parameters`), which Figure 2's panels a and b draw beside the epoch's decode.
 - `measure_nonlocal_probability.py` — each analyzed epoch's immobile time bins inside the well visits counted in 50 equal bins of non-local probability (`Processed-Data/nonlocal_probability`), for Figure 2's supplement, panel c, and the events summary's `nonlocal_probability_*` shares.
 
 ## `detection/` — the event detectors (Part 1)

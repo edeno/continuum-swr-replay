@@ -6,15 +6,15 @@ between those edges (:func:`fit_panel`), and the letters' rows and columns
 follow from the same rows (:func:`letter_layout`, :func:`place_letters`).
 
 The letters follow convention 10 of ``docs/development.md``: the letters of a
-row sit at one height, just above the highest of the row's drawn tops, and the
-letters of a column at one left edge, the leftmost of the column's drawn
-extents. Every extent is measured on the drawn figure (``drawn_extent``), so
+row sit at one height, their bottom edge :data:`LETTER_GAP_PT` above the
+highest of the row's drawn tops, and the letters of a column at one left edge,
+:data:`LETTER_LEFT_PT` left of the leftmost of the column's drawn extents, the
+same distances in points in every figure. Every extent is measured on the drawn figure (``drawn_extent``), so
 the figure must be drawn (``fig.draw_without_rendering()``) before a letter is
 placed.
 """
 
 from collections.abc import Mapping, Sequence
-from numbers import Real
 from typing import Any, Literal
 
 from matplotlib.axes import Axes
@@ -30,6 +30,8 @@ from continuum_swr_replay.visualization.publication_style import (
 __all__ = [
     "FIT_PASSES",
     "FIT_TOLERANCE_PT",
+    "LETTER_GAP_PT",
+    "LETTER_LEFT_PT",
     "fit_panel",
     "letter_layout",
     "panel_spans",
@@ -217,26 +219,32 @@ def fit_panel(
     )
 
 
+LETTER_GAP_PT = 1.0
+"""How far a row's letters stand above the highest of its panels' drawn tops:
+from that top to the letters' bottom edge (points), in every figure."""
+LETTER_LEFT_PT = 2.0
+"""How far a column's letters stand left of the leftmost of its panels' drawn
+extents: from that edge to the letters' left edge (points), in every figure."""
+
+
 def place_letters(
     fig: Figure,
     panels: Mapping[str, Sequence[Axes]],
     rows: Sequence[str] = (),
     columns: Sequence[str] = (),
     *,
-    above: float,
-    left_of: float = 0.0,
-    ceiling: float | None = None,
-    floor: float | None = 0.0,
-    va: Literal["top", "bottom"] = "top",
-    heights: Mapping[str, Sequence[Axes] | float] | None = None,
+    heights: Mapping[str, Sequence[Axes]] | None = None,
+    ceiling: float = 1.0,
 ) -> dict[str, Text]:
-    """Write each panel's letter, aligned by row and by column.
+    """Write each panel's letter, aligned by row and by column (convention 10).
 
-    The letters of a row (each string of ``rows``, such as ``"cdef"``) sit
-    ``above`` the highest of their panels' drawn tops, at most at ``ceiling``;
-    the letters of a column (each string of ``columns``, such as ``"dh"``) sit
-    ``left_of`` the leftmost of their panels' drawn extents, at least at
-    ``floor``. A letter in no row or no column is placed by its own
+    The letters of a row (each string of ``rows``, such as ``"cdef"``) have
+    their bottom edge :data:`LETTER_GAP_PT` above the highest of their panels'
+    drawn tops; the letters of a column (each string of ``columns``, such as
+    ``"dh"``) have their left edge :data:`LETTER_LEFT_PT` left of the leftmost
+    of their panels' drawn extents. A letter stays on the page: its top no
+    higher than ``ceiling`` (the figure's top), its left edge no further left
+    than the figure's left edge. A letter in no row or no column is placed by its own
     panel. The figure must already be drawn.
 
     Parameters
@@ -247,26 +255,15 @@ def place_letters(
     rows, columns : sequence of str
         The letters that share a height, and the letters that share a left
         edge.
-    above : float
-        From a row's highest drawn top to its letters' ``va`` edge (figure
-        height).
-    left_of : float, optional
-        From a column's leftmost drawn extent to its letters' left edge (figure
-        width).
+    heights : Mapping[str, Sequence[Axes]], optional
+        By letter, which of its panel's axes set its row's height in place of
+        the panel's whole drawn extent (none: the panel does not count, as
+        when a legend above it would lift the row's letters away from the
+        others).
     ceiling : float, optional
-        The highest a row's letters may sit (figure height); no limit when not
-        given.
-    floor : float or None, optional
-        The leftmost a column's letters may sit (figure width): by default the
-        figure's left edge; no limit when None.
-    va : {"top", "bottom"}, optional
-        The edge of each letter its height places.
-    heights : Mapping[str, Sequence[Axes] | float], optional
-        By letter, which part of its panel sets its row's height in place of the
-        panel's whole drawn extent: the axes whose drawn tops count (none: the
-        panel does not count, as when a legend above it would lift the row's
-        letters away from the others), or the letter's own height (figure
-        height).
+        The highest a letter's top may stand (figure height): by default the
+        figure's top. A figure at the journal's full height names its highest
+        drawn top, so that no letter adds to its height.
 
     Returns
     -------
@@ -274,42 +271,42 @@ def place_letters(
         Each letter's text, in the order of ``panels``.
     """
     heights = heights or {}
+    width_in, height_in = fig.get_size_inches()
+    gap = LETTER_GAP_PT / 72 / height_in
+    left_of = LETTER_LEFT_PT / 72 / width_in
     extents = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
     rows = [*rows, *(name for name in panels if not any(name in r for r in rows))]
     columns = [
         *columns,
         *(name for name in panels if not any(name in c for c in columns)),
     ]
-    y = {}
-    for row in rows:
-        tops = [
-            drawn_extent(fig, axes).y1
-            for axes in (heights.get(name, panels[name]) for name in row)
-            if not isinstance(axes, Real) and len(axes) > 0
-        ]
-        for name in row:
-            given = heights.get(name)
-            if isinstance(given, Real):
-                y[name] = float(given)
-            else:
-                y[name] = max(tops) + above
-                if ceiling is not None:
-                    y[name] = min(y[name], ceiling)
-    x = {}
-    for column in columns:
-        edge = min(extents[name].x0 for name in column) - left_of
-        if floor is not None:
-            edge = max(edge, floor)
-        x.update(dict.fromkeys(column, edge))
-    return {
+    texts = {
         name: fig.text(
-            x[name],
-            y[name],
+            0.0,
+            0.0,
             name,
             fontsize=PANEL_LETTER_SIZE,
             fontweight="bold",
             ha="left",
-            va=va,
+            va="bottom",
         )
         for name in panels
     }
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+    letter_height = max(
+        text.get_window_extent(renderer).height for text in texts.values()
+    ) / (height_in * fig.dpi)
+    for row in rows:
+        tops = [
+            drawn_extent(fig, axes).y1
+            for axes in (heights.get(name, panels[name]) for name in row)
+            if len(axes) > 0
+        ]
+        y = min(max(tops) + gap, ceiling - letter_height)
+        for name in row:
+            texts[name].set_y(y)
+    for column in columns:
+        x = max(min(extents[name].x0 for name in column) - left_of, 0.0)
+        for name in column:
+            texts[name].set_x(x)
+    return texts
