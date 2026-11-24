@@ -231,7 +231,10 @@ def test_window_rows_and_sums():
     )
 
 
-def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
+def _window_rows() -> pd.DataFrame:
+    """Two windows of two tetrodes each, with the columns
+    :func:`~continuum_swr_replay.analysis.event_evidence.tetrode_holdout.window_scores`
+    reads: window 0 has donor window 1, window 1 (a control) none."""
     rows = pd.DataFrame(
         {
             "epoch_id": "e1",
@@ -247,9 +250,27 @@ def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
             "n_spikes": [3, 1, 0, 0],
             "spread_cm": [40.0, 60.0, 5.0, 7.0],
             "nonlocal_prob": [0.9, 1.0, 0.0, 0.0],
+            "gain_rate": [2.0, 0.0, 0.5, -0.5],
+            "agreement_rate": [0.5, -0.5, 0.0, 0.0],
+            "hpd_cm": [30.0, 50.0, 4.0, 6.0],
+            "agreement_null": [-1.0, -2.0, np.nan, np.nan],
+            "agreement_null_silent": [0.0, -0.5, np.nan, np.nan],
+            "agreement_null_rate": [-1.0, -1.0, np.nan, np.nan],
+            "n_null_bins": [10, 10, 0, 0],
+            "n_null_spikes": [2, 1, 0, 0],
+            "spread_null_cm": [80.0, 100.0, np.nan, np.nan],
+            "hpd_null_cm": [90.0, 110.0, np.nan, np.nan],
+            "null_window_id": [1, 1, -1, -1],
+            "mark_information": [3.0, 1.0, 0.0, 0.0],
+            "spike_information": [4.0, 2.0, 0.0, 0.0],
+            "n_information_spikes": [3, 1, 0, 0],
         }
     )
-    windows = th.window_scores(rows).set_index("window_id")
+    return rows
+
+
+def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
+    windows = th.window_scores(_window_rows()).set_index("window_id")
     event = windows.loc[0]
     assert event["gain_per_spike"] == pytest.approx(4.0 / 4)
     # the spiking bins' gain: 4 - (-1) = 5 over 4 spikes
@@ -440,47 +461,8 @@ def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
     }
 
 
-def _extra_rows() -> pd.DataFrame:
-    """:func:`test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes`'
-    rows with the extra columns: window 0 has donor window 1, window 1 (a
-    control) none."""
-    rows = pd.DataFrame(
-        {
-            "epoch_id": "e1",
-            "animal": "a",
-            "window_id": [0, 0, 1, 1],
-            "event_id": [7, 7, 7, 7],
-            "kind": ["event", "event", "control", "control"],
-            "group": "no SWR",
-            "gain": [3.0, 1.0, 0.5, -0.5],
-            "gain_silent": [-1.0, 0.0, 0.0, 0.0],
-            "agreement": [1.0, 1.0, 0.0, 0.0],
-            "agreement_silent": [0.0, 0.0, 0.0, 0.0],
-            "n_spikes": [3, 1, 0, 0],
-            "spread_cm": [40.0, 60.0, 5.0, 7.0],
-            "nonlocal_prob": [0.9, 1.0, 0.0, 0.0],
-            "gain_rate": [2.0, 0.0, 0.5, -0.5],
-            "agreement_rate": [0.5, -0.5, 0.0, 0.0],
-            "hpd_cm": [30.0, 50.0, 4.0, 6.0],
-            "agreement_null": [-1.0, -2.0, np.nan, np.nan],
-            "agreement_null_silent": [0.0, -0.5, np.nan, np.nan],
-            "agreement_null_rate": [-1.0, -1.0, np.nan, np.nan],
-            "n_null_bins": [10, 10, 0, 0],
-            "n_null_spikes": [2, 1, 0, 0],
-            "spread_null_cm": [80.0, 100.0, np.nan, np.nan],
-            "hpd_null_cm": [90.0, 110.0, np.nan, np.nan],
-            "null_window_id": [1, 1, -1, -1],
-            "mark_information": [3.0, 1.0, 0.0, 0.0],
-            "spike_information": [4.0, 2.0, 0.0, 0.0],
-            "n_information_spikes": [3, 1, 0, 0],
-        }
-    )
-    assert set(th.EXTRA_COLUMNS) <= set(rows.columns)
-    return rows
-
-
-def test_window_scores_carry_the_extra_columns_when_the_table_has_them():
-    windows = th.window_scores(_extra_rows()).set_index("window_id")
+def test_window_scores_carry_the_extra_scores():
+    windows = th.window_scores(_window_rows()).set_index("window_id")
     event = windows.loc[0]
     # rate part 2 of the gain 4, mark part 2, over 4 spikes
     assert event["gain_rate_per_spike"] == pytest.approx(0.5)
@@ -498,16 +480,19 @@ def test_window_scores_carry_the_extra_columns_when_the_table_has_them():
     # no donor: the reference is NaN, not 0
     assert np.isnan(windows.loc[1, "agreement_null"])
     assert np.isnan(windows.loc[1, "agreement_null_per_spike"])
-    # a canonical table gives the canonical columns, the same values
-    canonical = _extra_rows().drop(columns=list(th.EXTRA_COLUMNS))
-    plain = th.window_scores(canonical)
-    pd.testing.assert_frame_equal(
-        plain, th.window_scores(_extra_rows())[list(plain.columns)]
-    )
-    assert "hpd_cm" not in plain.columns
-    with pytest.raises(ValueError, match="--extra-scores"):
-        th.require_extra_columns(canonical, "the HPD bins")
-    th.require_extra_columns(_extra_rows(), "the HPD bins")
+
+
+def test_a_table_without_the_extra_scores_is_refused_naming_the_runner():
+    """A table made before the run computed the extra scores is refused, not
+    half-read."""
+    old = _window_rows().drop(columns=["hpd_cm", "agreement_null"])
+    with pytest.raises(ValueError, match=r"score_tetrode_holdout\.py") as error:
+        th.window_scores(old)
+    assert "hpd_cm" in str(error.value) and "agreement_null" in str(error.value)
+    # the reader's contract is every column of the run
+    with pytest.raises(ValueError, match="'population'"):
+        th.require_run_columns(_window_rows(), "the run")
+    th.require_run_columns(_window_rows(), "a window", ["hpd_cm"])
 
 
 def test_the_mark_part_is_the_marks_score_given_the_count():

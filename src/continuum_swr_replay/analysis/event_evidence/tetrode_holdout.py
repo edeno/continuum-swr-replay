@@ -987,14 +987,12 @@ def holdout_scores(
     folds: NDArray,
     margin_bins: int,
     refit: Callable[..., dict] = refit_encoding,
-    extras: bool = False,
     null_seed: int = 0,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
     """The held-out score of every window, one row per window and tetrode.
 
-    With ``extras``, three more things per window and tetrode
-    (:data:`EXTRA_COLUMNS`):
+    Besides the scores, three more things per window and tetrode:
 
     - the width of the other tetrodes' distribution as the event table
       measures a posterior's: ``hpd_cm``, the mean over the scored bins of its
@@ -1052,7 +1050,9 @@ def holdout_scores(
     is_training, is_missing : ndarray of bool, shape (n_time,)
         The decode's masks.
     windows : pd.DataFrame
-        ``window_id``, ``s`` and ``e`` (first and last bin, inclusive).
+        ``window_id``, ``s`` and ``e`` (first and last bin, inclusive), and
+        ``kind`` and ``group``, which the reference's donors are drawn by
+        (:func:`null_donors`).
     n_folds : int
     folds : ndarray of int, shape (n_time,)
         Each bin's fold, 0 .. n_folds - 1 (for example :func:`epoch_folds`).
@@ -1062,6 +1062,8 @@ def holdout_scores(
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
         an encoding model.
+    null_seed : int
+        The seed of the shuffled-window reference's donors (:func:`null_donors`).
     log : callable
 
     Returns
@@ -1076,10 +1078,13 @@ def holdout_scores(
         ``agreement_silent`` (the part of each from bins where the tetrode did
         not spike) and ``spread_cm`` (the mean over scored bins of the
         population distribution's effective width, ``exp(entropy)`` place bins
-        times the place-bin size); with ``extras``, :data:`EXTRA_COLUMNS`.
+        times the place-bin size), then ``gain_rate``, ``agreement_rate``,
+        ``hpd_cm``, the reference's columns, ``null_window_id`` and the place
+        information's (above). With the runner's keys, a stored table's
+        columns are :data:`RUN_COLUMNS`.
     record : dict
-        Timings and checks; with ``extras``, ``n_null_windows`` (event windows
-        with a donor) and ``n_event_windows_spanning_folds``.
+        Timings and checks, ``n_null_windows`` (event windows with a donor),
+        ``n_event_windows_spanning_folds`` and ``information_places``.
     """
     started = clock.time()
     time = np.asarray(time, dtype=float)
@@ -1118,41 +1123,40 @@ def holdout_scores(
     bin_cm = float(np.median(np.diff(np.sort(centers.ravel()))))
     missing = is_missing[rows]
     n_bins = e - s + 1
-    if extras:
-        donors = null_donors(windows, folds, null_seed)
-        receiver, donor_row, owner = null_pairs(windows, donors, rows)
-        record["n_null_windows"] = int((donors >= 0).sum())
-        record["n_event_windows_spanning_folds"] = int(
-            sum(
-                (windows["kind"].to_numpy()[w] == "event")
-                and not (np.asarray(folds)[s[w] : e[w] + 1] == folds[s[w]]).all()
-                for w in range(len(windows))
-            )
+    donors = null_donors(windows, folds, null_seed)
+    receiver, donor_row, owner = null_pairs(windows, donors, rows)
+    record["n_null_windows"] = int((donors >= 0).sum())
+    record["n_event_windows_spanning_folds"] = int(
+        sum(
+            (windows["kind"].to_numpy()[w] == "event")
+            and not (np.asarray(folds)[s[w] : e[w] + 1] == folds[s[w]]).all()
+            for w in range(len(windows))
         )
-        has_donor = donors >= 0
-        null_window_id = np.where(
-            has_donor, windows["window_id"].to_numpy()[np.maximum(donors, 0)], -1
+    )
+    has_donor = donors >= 0
+    null_window_id = np.where(
+        has_donor, windows["window_id"].to_numpy()[np.maximum(donors, 0)], -1
+    )
+    # each spike's place information, summed per scored row and tetrode
+    information = spike_information(terms)
+    record["information_places"] = information["n_places"].tolist()
+    position = np.searchsorted(rows, terms.time_bin)
+    in_rows = (position < rows.size) & (
+        rows[np.minimum(position, rows.size - 1)] == terms.time_bin
+    )
+    kept = in_rows & information["counted"]
+    row_information = {
+        name: np.zeros((rows.size, terms.n_tetrodes))
+        for name in ("mark", "spike", "counted")
+    }
+    for name in ("mark", "spike"):
+        np.add.at(
+            row_information[name],
+            (position[kept], terms.tetrode[kept]),
+            information[name][kept],
         )
-        # each spike's place information, summed per scored row and tetrode
-        information = spike_information(terms)
-        record["information_places"] = information["n_places"].tolist()
-        position = np.searchsorted(rows, terms.time_bin)
-        in_rows = (position < rows.size) & (
-            rows[np.minimum(position, rows.size - 1)] == terms.time_bin
-        )
-        kept = in_rows & information["counted"]
-        row_information = {
-            name: np.zeros((rows.size, terms.n_tetrodes))
-            for name in ("mark", "spike", "counted")
-        }
-        for name in ("mark", "spike"):
-            np.add.at(
-                row_information[name],
-                (position[kept], terms.tetrode[kept]),
-                information[name][kept],
-            )
-        np.add.at(row_information["counted"], (position[kept], terms.tetrode[kept]), 1)
-        del information
+    np.add.at(row_information["counted"], (position[kept], terms.tetrode[kept]), 1)
+    del information
 
     parts = []
     record["smooth_s"] = []
@@ -1199,44 +1203,39 @@ def holdout_scores(
             "agreement_silent": np.where(silent, population - uniform, 0.0),
             "spread_cm": np.where(scored, np.exp(entropy) * bin_cm, 0.0),
         }
-        if extras:
-            rate = rate_terms(terms.ground[terms.block[rows], k], counts[:, k])
-            population_rate = predictive_log_score(rate, distribution)
-            uniform_rate = logsumexp(rate, axis=1) - np.log(rate.shape[1])
-            local_rate = logsumexp(rate + log_local_weights, axis=1)
-            width = np.exp(entropy) * bin_cm
-            hpd = hpd_lengths(distribution, environment)
-            per_bin |= {
-                "gain_rate": np.where(scored, population_rate - local_rate, 0.0),
-                "agreement_rate": np.where(scored, population_rate - uniform_rate, 0.0),
-                "hpd_cm": np.where(scored, hpd, 0.0),
-                "mark_information": np.where(
-                    scored, row_information["mark"][:, k], 0.0
-                ),
-                "spike_information": np.where(
-                    scored, row_information["spike"][:, k], 0.0
-                ),
-                "n_information_spikes": np.where(
-                    scored, row_information["counted"][:, k], 0.0
-                ),
-            }
-            null = _null_sums(
-                mine,
-                rate,
-                distribution,
-                uniform,
-                uniform_rate,
-                scored & np.isfinite(hpd),
-                missing,
-                counts[:, k],
-                width,
-                hpd,
-                receiver,
-                donor_row,
-                owner,
-                len(windows),
-            )
-            del rate
+        rate = rate_terms(terms.ground[terms.block[rows], k], counts[:, k])
+        population_rate = predictive_log_score(rate, distribution)
+        uniform_rate = logsumexp(rate, axis=1) - np.log(rate.shape[1])
+        local_rate = logsumexp(rate + log_local_weights, axis=1)
+        width = np.exp(entropy) * bin_cm
+        hpd = hpd_lengths(distribution, environment)
+        per_bin |= {
+            "gain_rate": np.where(scored, population_rate - local_rate, 0.0),
+            "agreement_rate": np.where(scored, population_rate - uniform_rate, 0.0),
+            "hpd_cm": np.where(scored, hpd, 0.0),
+            "mark_information": np.where(scored, row_information["mark"][:, k], 0.0),
+            "spike_information": np.where(scored, row_information["spike"][:, k], 0.0),
+            "n_information_spikes": np.where(
+                scored, row_information["counted"][:, k], 0.0
+            ),
+        }
+        null = _null_sums(
+            mine,
+            rate,
+            distribution,
+            uniform,
+            uniform_rate,
+            scored & np.isfinite(hpd),
+            missing,
+            counts[:, k],
+            width,
+            hpd,
+            receiver,
+            donor_row,
+            owner,
+            len(windows),
+        )
+        del rate
         sums = dict(
             zip(
                 per_bin,
@@ -1261,28 +1260,21 @@ def holdout_scores(
                     "agreement_silent": sums["agreement_silent"],
                     "spread_cm": sums["spread_cm"]
                     / np.maximum(sums["n_scored_bins"], 1),
-                    **(
-                        {
-                            "gain_rate": sums["gain_rate"],
-                            "agreement_rate": sums["agreement_rate"],
-                            "hpd_cm": sums["hpd_cm"]
-                            / np.maximum(sums["n_scored_bins"], 1),
-                            "mark_information": sums["mark_information"],
-                            "spike_information": sums["spike_information"],
-                            "n_information_spikes": np.rint(
-                                sums["n_information_spikes"]
-                            ).astype(np.int64),
-                            **{
-                                name: np.where(has_donor, values, np.nan)
-                                for name, values in null.items()
-                            },
-                            "n_null_bins": null["n_null_bins"].astype(np.int64),
-                            "n_null_spikes": null["n_null_spikes"].astype(np.int64),
-                            "null_window_id": null_window_id,
-                        }
-                        if extras
-                        else {}
-                    ),
+                    "gain_rate": sums["gain_rate"],
+                    "agreement_rate": sums["agreement_rate"],
+                    "hpd_cm": sums["hpd_cm"] / np.maximum(sums["n_scored_bins"], 1),
+                    "mark_information": sums["mark_information"],
+                    "spike_information": sums["spike_information"],
+                    "n_information_spikes": np.rint(
+                        sums["n_information_spikes"]
+                    ).astype(np.int64),
+                    **{
+                        name: np.where(has_donor, values, np.nan)
+                        for name, values in null.items()
+                    },
+                    "n_null_bins": null["n_null_bins"].astype(np.int64),
+                    "n_null_spikes": null["n_null_spikes"].astype(np.int64),
+                    "null_window_id": null_window_id,
                 }
             )
         )
@@ -1313,7 +1305,7 @@ def _null_sums(
     n_windows: int,
 ) -> dict[str, NDArray]:
     """One tetrode's shuffled-window reference, summed per window
-    (:func:`holdout_scores` with ``extras``): each receiving bin's terms scored
+    (:func:`holdout_scores`): each receiving bin's terms scored
     under its donor bin's distribution. Arrays are over the scored rows;
     ``receiver``, ``donor`` and ``owner`` are :func:`null_pairs`'."""
     weights = distribution[donor]
@@ -1341,10 +1333,26 @@ def _null_sums(
         }
 
 
-EXTRA_COLUMNS = (
+RUN_COLUMNS = (
+    "window_id",
+    "tetrode",
+    "n_bins",
+    "n_scored_bins",
+    "n_spikes",
+    "population",
+    "local",
+    "local_bin",
+    "uniform",
+    "nonlocal_prob",
+    "gain_silent",
+    "agreement_silent",
+    "spread_cm",
     "gain_rate",
     "agreement_rate",
     "hpd_cm",
+    "mark_information",
+    "spike_information",
+    "n_information_spikes",
     "agreement_null",
     "agreement_null_silent",
     "agreement_null_rate",
@@ -1353,17 +1361,26 @@ EXTRA_COLUMNS = (
     "spread_null_cm",
     "hpd_null_cm",
     "null_window_id",
-    "mark_information",
-    "spike_information",
-    "n_information_spikes",
+    "gain",
+    "gain_bin",
+    "agreement",
+    "event_id",
+    "kind",
+    "group",
+    "epoch_id",
+    "animal",
 )
-"""The columns :func:`holdout_scores` adds with ``extras`` (a run made with
-``--extra-scores``); the canonical run's tables have none of them."""
+"""The columns of the held-out tetrode run's per-epoch table, in order:
+:func:`holdout_scores`' and the runner's keys (``event_id``, ``kind``,
+``group``, ``epoch_id``, ``animal``)."""
 
 #: The per-tetrode sums :func:`window_scores` adds over a window's tetrodes.
-_SUMMED = ("gain", "gain_silent", "agreement", "agreement_silent", "n_spikes")
-
-_SUMMED_EXTRA = (
+_SUMMED = (
+    "gain",
+    "gain_silent",
+    "agreement",
+    "agreement_silent",
+    "n_spikes",
     "gain_rate",
     "agreement_rate",
     "agreement_null",
@@ -1375,28 +1392,32 @@ _SUMMED_EXTRA = (
     "spike_information",
     "n_information_spikes",
 )
-"""The per-tetrode sums of :data:`EXTRA_COLUMNS` :func:`window_scores` adds
-when the table has them."""
 
-_MEANS_EXTRA = ("hpd_cm", "spread_null_cm", "hpd_null_cm")
-"""The per-tetrode means of :data:`EXTRA_COLUMNS` :func:`window_scores` takes
-when the table has them."""
+_MEANS = ("spread_cm", "nonlocal_prob", "hpd_cm", "spread_null_cm", "hpd_null_cm")
+"""The per-tetrode means :func:`window_scores` takes over a window's tetrodes."""
 
 
-def require_extra_columns(table: pd.DataFrame, what: str) -> None:
-    """Refuse a table of the canonical held-out tetrode run where ``what``
-    needs the columns a run with ``--extra-scores`` adds.
+_WINDOW_KEYS = ("epoch_id", "animal", "window_id", "event_id", "kind", "group")
+"""The keys of a window in :func:`window_scores`."""
+
+
+def require_run_columns(
+    table: pd.DataFrame, what: str, columns: Sequence[str] = RUN_COLUMNS
+) -> None:
+    """Refuse a held-out tetrode table without every one of ``columns`` (by
+    default all of :data:`RUN_COLUMNS`; a table made before the run computed
+    the extra scores has not).
 
     Raises
     ------
     ValueError
-        Naming the missing columns and the run that makes them.
+        Naming the missing columns and the runner that makes them.
     """
-    if missing := [c for c in EXTRA_COLUMNS if c not in table.columns]:
+    if missing := [c for c in columns if c not in table.columns]:
         raise ValueError(
-            f"{what} needs {missing}, which only a held-out tetrode run made with "
-            "--extra-scores has (scripts/event_evidence/score_tetrode_holdout.py "
-            "--extra-scores --output-dir <new folder>); the canonical run has not"
+            f"{what} has no columns {missing}: it is not a table of the held-out "
+            "tetrode run. Run scripts/event_evidence/score_tetrode_holdout.py "
+            "again into this folder."
         )
 
 
@@ -1406,47 +1427,44 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     table : pd.DataFrame
-        The run's rows, one per window and tetrode (:func:`holdout_scores` with
-        the runner's ``epoch_id``, ``animal``, ``event_id``, ``kind`` and
-        ``group``).
+        The run's rows, one per window and tetrode (:data:`RUN_COLUMNS`).
 
     Returns
     -------
     pd.DataFrame
         One row per window: the keys, the sums over tetrodes of
-        :data:`_SUMMED`, the mean over tetrodes of ``spread_cm`` and
-        ``nonlocal_prob``, and per spike of the window (NaN without spikes):
-        ``gain_per_spike``, ``spiking_gain_per_spike`` (the gain of the bins
-        where the scored tetrode spiked), ``silent_gain_per_spike`` (that of
-        the bins where it was silent; the two add to ``gain_per_spike``) and
-        ``agreement_per_spike``. For a table with :data:`EXTRA_COLUMNS` (a run
-        with ``--extra-scores``), also the sums over tetrodes of
-        :data:`_SUMMED_EXTRA` (NaN in the reference's for a window without a
-        donor), the means over tetrodes of :data:`_MEANS_EXTRA`,
-        ``null_window_id``, and per spike: ``gain_rate_per_spike``,
+        :data:`_SUMMED` (NaN in the reference's for a window without a donor),
+        the means over tetrodes of :data:`_MEANS`, ``null_window_id``, and per
+        spike of the window (NaN without spikes): ``gain_per_spike``,
+        ``spiking_gain_per_spike`` (the gain of the bins where the scored
+        tetrode spiked), ``silent_gain_per_spike`` (that of the bins where it
+        was silent; the two add to ``gain_per_spike``),
+        ``agreement_per_spike``, ``gain_rate_per_spike``,
         ``gain_mark_per_spike``, ``agreement_rate_per_spike`` and
         ``agreement_mark_per_spike`` (each pair adds to its score per spike),
         ``mark_information_per_spike`` and ``spike_information_per_spike``
-        (over ``n_information_spikes``),
-        ``agreement_null_per_spike`` (over the spikes of the bins the
-        reference scored, ``n_null_spikes``) and
+        (over ``n_information_spikes``), ``agreement_null_per_spike`` (over the
+        spikes of the bins the reference scored, ``n_null_spikes``) and
         ``agreement_minus_null_per_spike`` (the agreement per spike minus the
-        reference's, NaN without a donor). A canonical table gives the
-        canonical columns only (:func:`require_extra_columns` refuses it where
-        they are needed).
+        reference's, NaN without a donor).
+
+    Raises
+    ------
+    ValueError
+        If ``table`` lacks a column this reads (:func:`require_run_columns`).
     """
-    keys = ["epoch_id", "animal", "window_id", "event_id", "kind", "group"]
-    grouped = table.groupby(keys, sort=False)
-    extra = all(c in table.columns for c in EXTRA_COLUMNS)
-    means = ["spread_cm", "nonlocal_prob", *(_MEANS_EXTRA if extra else ())]
+    require_run_columns(
+        table,
+        "the held-out tetrode table",
+        (*_WINDOW_KEYS, *_SUMMED, *_MEANS, "null_window_id"),
+    )
+    grouped = table.groupby(list(_WINDOW_KEYS), sort=False)
     windows = grouped[list(_SUMMED)].sum()
-    if extra:
-        windows[list(_SUMMED_EXTRA)] = grouped[list(_SUMMED_EXTRA)].sum()
-        # a window without a donor keeps NaN in the reference's sums
-        null = [c for c in _SUMMED_EXTRA if c.startswith("agreement_null")]
-        windows[null] = grouped[null].sum(min_count=1)
-        windows["null_window_id"] = grouped["null_window_id"].first()
-    windows[means] = grouped[means].mean()
+    # a window without a donor keeps NaN in the reference's sums
+    null = [c for c in _SUMMED if c.startswith("agreement_null")]
+    windows[null] = grouped[null].sum(min_count=1)
+    windows["null_window_id"] = grouped["null_window_id"].first()
+    windows[list(_MEANS)] = grouped[list(_MEANS)].mean()
     windows = windows.reset_index()
     spikes = windows["n_spikes"].where(windows["n_spikes"] > 0)
     windows["gain_per_spike"] = windows["gain"] / spikes
@@ -1455,29 +1473,22 @@ def window_scores(table: pd.DataFrame) -> pd.DataFrame:
     ) / spikes
     windows["silent_gain_per_spike"] = windows["gain_silent"] / spikes
     windows["agreement_per_spike"] = windows["agreement"] / spikes
-    if extra:
-        windows["gain_rate_per_spike"] = windows["gain_rate"] / spikes
-        windows["gain_mark_per_spike"] = (
-            windows["gain"] - windows["gain_rate"]
-        ) / spikes
-        windows["agreement_rate_per_spike"] = windows["agreement_rate"] / spikes
-        windows["agreement_mark_per_spike"] = (
-            windows["agreement"] - windows["agreement_rate"]
-        ) / spikes
-        informative = windows["n_information_spikes"].where(
-            windows["n_information_spikes"] > 0
-        )
-        windows["mark_information_per_spike"] = (
-            windows["mark_information"] / informative
-        )
-        windows["spike_information_per_spike"] = (
-            windows["spike_information"] / informative
-        )
-        null_spikes = windows["n_null_spikes"].where(windows["n_null_spikes"] > 0)
-        windows["agreement_null_per_spike"] = windows["agreement_null"] / null_spikes
-        windows["agreement_minus_null_per_spike"] = (
-            windows["agreement_per_spike"] - windows["agreement_null_per_spike"]
-        )
+    windows["gain_rate_per_spike"] = windows["gain_rate"] / spikes
+    windows["gain_mark_per_spike"] = (windows["gain"] - windows["gain_rate"]) / spikes
+    windows["agreement_rate_per_spike"] = windows["agreement_rate"] / spikes
+    windows["agreement_mark_per_spike"] = (
+        windows["agreement"] - windows["agreement_rate"]
+    ) / spikes
+    informative = windows["n_information_spikes"].where(
+        windows["n_information_spikes"] > 0
+    )
+    windows["mark_information_per_spike"] = windows["mark_information"] / informative
+    windows["spike_information_per_spike"] = windows["spike_information"] / informative
+    null_spikes = windows["n_null_spikes"].where(windows["n_null_spikes"] > 0)
+    windows["agreement_null_per_spike"] = windows["agreement_null"] / null_spikes
+    windows["agreement_minus_null_per_spike"] = (
+        windows["agreement_per_spike"] - windows["agreement_null_per_spike"]
+    )
     return windows
 
 
