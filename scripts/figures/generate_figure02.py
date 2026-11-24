@@ -341,6 +341,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     LINE_WIDTH_LIMITS_PT,
     SMALL_SIZE,
     check_journal_limits,
+    check_placement,
     drawn_extent,
 )
 
@@ -940,8 +941,11 @@ def draw_overview(
         ha="right", va="bottom", fontsize=SMALL_SIZE, color=C_SWR,
     )  # fmt: skip
     ax_rip.set_ylim(-2, 8)
-    ax_rip.set_yticks([0, 5])
     draw_state_stack(ax_st, results, sl, start)
+    # the thin strips name one tick each: two labels on a strip touch the
+    # neighboring strips' labels
+    ax_rip.set_yticks([0, 5], ["", "5"])
+    ax_st.set_yticks([0, 1], ["", "1"])
     ax_sp.fill_between(t_pos, speed, color=C_QUIET, lw=0)
     ax_sp.axhline(DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="k", ls=":", lw=0.5)
     ax_sp.text(
@@ -1580,7 +1584,7 @@ def draw_share_by_power(
     below = nonlocal_below_threshold_statistics(counts, level)
     draw_share_by_signal(
         ax_spread, ax_share, counts, threshold=level,
-        threshold_label="SWR\nthreshold", threshold_color=C_SWR,
+        threshold_label="SWR threshold", threshold_color=C_SWR,
         xlabel="Ripple power (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "
         "below\nthreshold", states=states,
@@ -1869,17 +1873,18 @@ def generate_figure(
         box = ax.get_position()
         ax.set_position((decode_left, box.y0, box.x1 - decode_left, box.height))
     fig.draw_without_rendering()
+    lettered = {
+        "a": [ax_a],
+        "b": [ax_b],
+        "c": [ax_c],
+        "d": [ax_d],
+        "e": [ax_e, ax_e2],
+        "f": [ax_f1, ax_f2],
+        **{BOTTOM_LETTERS[p]: bottom_axes[p] for p in BOTTOM_PANELS},
+    }
     place_letters(
         fig,
-        {
-            "a": [ax_a],
-            "b": [ax_b],
-            "c": [ax_c],
-            "d": [ax_d],
-            "e": [ax_e, ax_e2],
-            "f": [ax_f1, ax_f2],
-            **{BOTTOM_LETTERS[p]: bottom_axes[p] for p in BOTTOM_PANELS},
-        },
+        lettered,
         rows=[
             "a",
             "b",
@@ -1900,6 +1905,7 @@ def generate_figure(
             BOTTOM_LETTERS["traces"]: [],
         },
     )
+    check_placement(fig, lettered)
     return fig
 
 
