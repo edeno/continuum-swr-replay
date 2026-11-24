@@ -802,10 +802,14 @@ the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`
 loop is written for a batch of fits on one design (state arrays with a leading axis of
 fits, each rule a vectorized expression over it), and the kernels map over that axis
 (`jax.vmap`); a session is a batch of one. A family is a static argument of the kernels
-(two families are equal when they are of the same class). The rule constants
-(`MAX_STEP_HALVINGS`, `NEWTON_DECREMENT_TOL`, the step cap) are read on the host at each
-call and passed to the kernel as arguments, so a changed value takes effect in a kernel
-already compiled (`tests/analysis/regression/test_newton.py`). JAX's Cholesky gives NaN
+(two families are equal when they are of the same class, so a family keeps no parameter
+on the object: what changes its result travels in `aux`, and an object with an attribute
+of its own is refused). The rule constants `NEWTON_DECREMENT_TOL`, `MAX_STEP_HALVINGS`,
+`NO_MAXIMUM_ETA_STEP`, `NO_MAXIMUM_CAPPED_STEPS`, `IDENTIFIABILITY_TOL` and
+`RUNNING_AWAY_TIE_DECIMALS` are read from `newton` at each call; the first two, with the
+step cap, are passed to the iteration kernel as arguments, so a changed value takes effect
+in a kernel already compiled (`tests/analysis/regression/test_newton.py`). The defaults of
+`max_iter` and `max_step` are `NEWTON_MAX_STEPS` and `MAX_STEP_LENGTH` as imported. JAX's Cholesky gives NaN
 where SciPy raises, so `A` is "not positive definite" when `A` or its factor is not
 finite; on the CPU both call LAPACK's `potrf` (JAX 0.8.0 replaces the factor by NaN when
 `potrf` reports a failure, `jax/_src/lax/linalg.py`, `_cholesky_cpu_lowering`).
@@ -819,6 +823,23 @@ decrement, above the allowance (1.3e-12), and the fit refused a last step NumPy 
 (`select.poisson_two_smooths`, a step count one lower). Each row's terms are therefore
 combined before one sum (`sum w (y log mu - mu)`; for the grouped softmax `y log p` per
 row): there the same two points differed by 0 to 1.1e-13.
+
+The JAX fitter therefore takes some last steps the NumPy fitter refused, and the two can
+differ by one Newton step outside the stored references. In 216 fits drawn at random by
+an independent review (200 Newton fits, 16 REML scores; 2026-11-23), 2 took one more step
+(a Bernoulli fit of 2,500 rows, 9 steps to 10; the inner fit of a Poisson REML score of
+4,096 rows, 4 to 5); no status differed. Where it happens, the outputs differ by about
+the stop's tolerance, 1e-8 (1.6e-8 in the REML score, log-likelihood, gradient and Hessian
+of the Poisson case), not by the references' rule of `1e-11 + 1e-9 |b|`. The rate, about 1
+fit in 100 to 200 on that sample, depends on the data and on the platform. The NumPy sum
+had moved `F` by 16.8 eps |F| along the Bernoulli step; under an exact sum (`math.fsum`)
+the step changes `F` by -0.99 eps |F| there and lowers it by 4.1 eps |F| in the Poisson
+case, so the JAX fit is the better converged one. The per-row sum is within 1.5 eps |F| of
+the exact sum on fits of 500 to 20,000 rows, and the `F` of the evaluation kernel and of
+the iteration kernel's halving search agree exactly, so the allowance of 8 eps |F| covers
+the rounding of two evaluations with room to spare. Every stored case matches
+(`tests/analysis/regression/data/numpy_reference/README.md`, "Differences from the NumPy
+fitter outside the stored cases").
 
 **Float64 for each call.** Every public entry that makes a JAX array or runs a kernel
 carries `runtime.in_float64`, which enters a fresh `jax.enable_x64(True)` for that call.
@@ -877,7 +898,12 @@ bucket have no rows. A group with no rows has `log(sum exp) = -inf`; the log-lik
 summed by row (`y log p`), so no row reads that group and it adds 0 (a per-group sum would
 give `n_g log(sum exp) = 0 * -inf`). Every quantity that depends on the number of rows uses
 the real count: the Gaussian's normalizing constant and the profiled Gaussian's degrees of
-freedom. The padded and unpadded log-likelihood, gradient, information and its two
+freedom. No rows pad to one bucket of padded rows, every sum 0: a fit without rows is
+"design not identified" with a log-likelihood of 0, as before. A per-row argument
+(`eta`, `d`, `d1`, `d2`) needs one value per row, and a single Poisson offset is every
+row's. Junk in the padded rows (a random design, a response of 5, an offset of 2) leaves
+every quantity unchanged, exactly, and the kernels equal the formulas written in NumPy in
+the test. The padded and unpadded log-likelihood, gradient, information and its two
 directional derivatives agree to 1e-12 of their largest entry for each family, the kernels
 on the padded rows against the same kernels on the rows unpadded, with groups that have no
 rows, and so do the profiled Gaussian's scale and score

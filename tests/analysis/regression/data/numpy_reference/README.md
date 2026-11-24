@@ -108,6 +108,34 @@ comments in `_regression_reference.py` give the old margins): `select.poisson_tw
 its log penalty there is set by the tolerance (a last decrement 0.93 times it), so
 `select.gaussian_two_smooths_six_steps` gives its second smooth an effect instead.
 
+## Differences from the NumPy fitter outside the stored cases
+
+Every stored case matches the JAX fitter by the rule above. Outside them the two fitters
+can differ by one Newton step, which then moves the outputs by about the convergence
+tolerance rather than by the rule.
+
+- **What differs.** In 216 fits drawn at random by an independent review (2026-11-23: 200
+  Newton fits, 50 of each family, and 16 REML scores at fixed log penalties), 2 took one
+  step more than the NumPy fitter at 7959aca7: a Bernoulli fit of 2,500 rows (9 steps to
+  10) and the inner fit of a Poisson REML score of 4,096 rows (4 to 5). No status
+  differed. Where a step count differs the outputs differ by about the tolerance of the
+  stop, 1e-8 (the REML score, log-likelihood, gradient and Hessian of the Poisson case by
+  about 1.6e-8 absolute), not by `1e-11 + 1e-9 |b|`. About 1 fit in 100 to 200 on that
+  sample; the rate depends on the data and on the platform, since it is set by rounding.
+- **Why.** At the stop the fit takes its last full step when `F` does not rise by more
+  than `8 eps max(1, |F|)` (`newton._last_step`). The NumPy fitter summed the
+  log-likelihood as two dot products (`y' log mu - 1' mu`), whose rounding moved `F` by
+  more than that allowance between two points a decrement of about 1e-15 apart: in the
+  Bernoulli case `F` rose 16.8 eps |F| with the step, and the step was refused. The JAX
+  fitter sums each row's terms once; its `F` is within 1.5 eps |F| of an exact sum
+  (`math.fsum`) on fits of 500 to 20,000 rows, and it takes the step. Under the exact
+  sum the step moves `F` by -0.99 eps |F| in the Bernoulli case and lowers it by
+  4.1 eps |F| in the Poisson case: the JAX fit is the better converged one.
+- **Where it is checked.** `tests/analysis/regression/test_newton.py`
+  (`test_a_last_step_the_numpy_sum_refused_is_taken`,
+  `test_a_reml_fit_takes_the_last_step_the_numpy_sum_refused`) rebuilds both cases from
+  their seeds and checks the step against the exact sum. No stored file was changed.
+
 ## The simulation engine's fixed-seed tables
 
 Two more files in this folder are written by the simulation engine and compared by its
