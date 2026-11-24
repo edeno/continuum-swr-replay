@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate Supplementary Figure S3, the supplement to Figure 3: slow and fast
-gamma during SWR and no-SWR events, how far their content lies from the
-animal, and how fast their position distribution moves.
+gamma during SWR and no-SWR events, and how fast their position distribution
+moves.
 
 The immobile non-local events of the canonical event table that start inside
 a well visit (``cohort_selection.select_visit_context``), split by whether
@@ -18,22 +18,7 @@ The animal values are ``event_statistics.animal_signal_levels`` with
 ``scripts/event_properties/measure_event_gamma.py``). This was Figure 3's last
 panel; ripple power, MUA, theta and head speed around the events are Figure 2's.
 
-c — How far the content lies from the animal, no-SWR against SWR events. Each event's distance is the mean over
-    its bins of the absolute distance (cm along the track) of the decoded
-    place from the animal's (``mean_abs_ahead_behind_cm`` of the canonical
-    event table). Its cumulative distribution on a log axis, the percent of a
-    class's events whose content lies within each distance (the bins of
-    ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per animal
-    and their mean in bold (``event_statistics.content_distance_distribution``,
-    each animal's distribution), with dotted lines at 20 cm (near) and 100 cm
-    (remote, ``constants.REMOTE_CM``): the heights there are the shares under
-    20 cm and under 100 cm. The events summary reports each class's share under
-    20 cm, 20 to 100 cm and 100 cm or more
-    (``event_statistics.content_distance_band_statistics``: the mean over
-    animals of each animal's share, the mean over its epochs of each epoch's
-    share; the ``content_distance_*`` values, tagged S3c).
-
-d — How fast the position distribution moves, no-SWR against SWR events: each
+c — How fast the position distribution moves, no-SWR against SWR events: each
     event's transport-slope speed (``event_speed.transport_slope_speed``; the
     event-speed run, ``scripts/event_properties/measure_event_speed.py``), the
     slope, at least 0, of the earth mover's distance on the track between the
@@ -63,10 +48,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from matplotlib.ticker import NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
@@ -74,11 +57,8 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     select_visit_context,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    DISTANCE_BIN_EDGES_CM,
-    NEAR_CM,
     TRANSPORT_SPEED_BIN_EDGES_CM_S,
     animal_signal_levels,
-    content_distance_distribution,
     transport_speed_distribution,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
@@ -95,7 +75,6 @@ from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
-    REFERENCE_COLOR,
     name_groups,
 )
 from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, COLORS
@@ -133,9 +112,8 @@ SIGNALS = tuple(
 
 
 def read_inputs() -> dict:
-    """The events with their gamma, each epoch's rest and running levels, the
-    selected events' ``content_distance_distribution`` (``distance``) and their
-    ``transport_speed_distribution`` (``speed``).
+    """The events with their gamma, each epoch's rest and running levels, and
+    the selected events' ``transport_speed_distribution`` (``speed``).
 
     Raises
     ------
@@ -160,14 +138,12 @@ def read_inputs() -> dict:
         if note is not None:
             raise ValueError(note)
     # panel c: the selected events, as the events summary reads them
-    distance = content_distance_distribution(selected)
     with_speed, _ = with_event_speed(
         selected, inputs.event_speed, len(analyzed_epoch_ids())
     )
     return {
         "events": events,
         "reference": reference,
-        "distance": distance,
         "speed": transport_speed_distribution(with_speed),
     }
 
@@ -198,50 +174,11 @@ def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
     axes[0].set_ylabel("Power (z)")
 
 
-DISTANCE_XLABEL = "From the animal (cm)"
-"""The distance panel's x label, under its title "Content distance": each
-event's mean over its bins of the distance along the track of the decoded place
-from the animal's."""
-DISTANCE_YLABEL = "Events at most\nthis far (%)"
-"""The distance panel's y label: the percent of a class's events whose content
-lies at most that far from the animal."""
-DISTANCE_TICKS_CM = (5, 20, 100)
-
-
-def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
-    """Panel c, the distance panel: for no-SWR and SWR events, the percent of the
-    class's events whose content lies within each distance of the animal (the
-    distribution's bins summed up to each bin's high edge) on a log axis, a
-    thin line per animal and their mean in bold in the class's color, the
-    classes named in their colors, and dotted lines at 20 cm (near) and
-    100 cm (remote), where the heights are the shares under 20 cm and under
-    100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
-    for group, color in GROUP_COLORS.items():
-        mine = distribution[distribution["group"] == group]
-        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
-        within = by_animal.cumsum()
-        edges = within.index.to_numpy()
-        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
-        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
-    for cut in (NEAR_CM, REMOTE_CM):
-        ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
-    name_groups(ax, 0.02, 1.0, 0.1, "left")
-    ax.set_xscale("log")
-    ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
-    ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
-    ax.xaxis.set_minor_locator(NullLocator())
-    ax.set_ylim(0, 100)
-    ax.set_yticks([0, 50, 100])
-    ax.set_xlabel(DISTANCE_XLABEL)
-    ax.set_ylabel(DISTANCE_YLABEL)
-    ax.set_title("Content distance", fontsize=SMALL_SIZE)
-
-
 SPEED_TICKS_CM_S = (0, 500, 1000)
 
 
 def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
-    """Panel d, the speed panel: for no-SWR and SWR events, the percent of the
+    """Panel c, the speed panel: for no-SWR and SWR events, the percent of the
     class's events (with a speed) whose transport-slope speed is at most each
     speed, a thin line per animal and their mean in bold in the class's color
     (``distribution``: :func:`read_inputs`' ``speed``)."""
@@ -264,11 +201,10 @@ def draw_transport_speed(ax: Axes, distribution: pd.DataFrame) -> None:
 
 def generate_figure(inputs: dict):
     """Build the figure from :func:`read_inputs`."""
-    fig, axes = plt.subplots(1, 4, figsize=(WIDTH, HEIGHT))
-    fig.subplots_adjust(left=0.08, right=0.99, top=0.76, bottom=0.2, wspace=0.62)
+    fig, axes = plt.subplots(1, 3, figsize=(WIDTH, HEIGHT))
+    fig.subplots_adjust(left=0.09, right=0.99, top=0.76, bottom=0.2, wspace=0.45)
     draw_gamma(axes[:2], inputs["events"], inputs["reference"])
-    draw_content_distance(axes[2], inputs["distance"])
-    draw_transport_speed(axes[3], inputs["speed"])
+    draw_transport_speed(axes[2], inputs["speed"])
     # the key of the gamma panels, centered over them
     middle = (axes[0].get_position().x0 + axes[1].get_position().x1) / 2
     handles = [
@@ -281,8 +217,8 @@ def generate_figure(inputs: dict):
         columnspacing=1.5,
     )  # fmt: skip
     fig.draw_without_rendering()
-    panels = dict(zip("abcd", ([ax] for ax in axes), strict=True))
-    place_letters(fig, panels, rows=["abcd"], above=0.02, left_of=0.004)
+    panels = dict(zip("abc", ([ax] for ax in axes), strict=True))
+    place_letters(fig, panels, rows=["abc"], above=0.02, left_of=0.004)
     check_placement(fig, panels)
     return fig
 

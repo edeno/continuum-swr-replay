@@ -104,7 +104,7 @@ FIGURES: dict[str, Figure] = {
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdef",
+        "abcdefg",
     ),
     "5": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -132,11 +132,10 @@ FIGURES: dict[str, Figure] = {
         "abcdefghijkl",
     ),
     "S3": Figure(
-        "Slow and fast gamma during SWR and no-SWR events, how far their "
-        "content lies from the animal, and how fast their position distribution "
-        "moves",
+        "Slow and fast gamma during SWR and no-SWR events, and how fast their "
+        "position distribution moves",
         "scripts/figures/generate_supp_figure03.py",
-        "abcd",
+        "abc",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -297,12 +296,12 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3e", "3f", "S3c"),
+        figures=("3e", "3f", "3g"),
     ),
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3d", "S3d"),
+        figures=("3d", "S3c"),
     ),
     Question(
         "2d.3",

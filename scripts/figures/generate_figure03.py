@@ -34,12 +34,26 @@ Each row asks one thing:
             arms) and from the junctions out to the wells (leaf arms), against
             what content spread evenly over the track would give (the dashed
             line; ``content_along_arms.even_content``).
+        g — How far the content lies from the animal, no-SWR against SWR events. Each event's distance is the mean over
+        its bins of the absolute distance (cm along the track) of the decoded
+        place from the animal's (``mean_abs_ahead_behind_cm`` of the canonical
+        event table). Its cumulative distribution on a log axis, the percent of a
+        class's events whose content lies within each distance (the bins of
+        ``event_statistics.DISTANCE_BIN_EDGES_CM`` summed), a thin line per animal
+        and their mean in bold (``event_statistics.content_distance_distribution``,
+        each animal's distribution), with dotted lines at 20 cm (near) and 100 cm
+        (remote, ``constants.REMOTE_CM``): the heights there are the shares under
+        20 cm and under 100 cm. The events summary reports each class's share under
+        20 cm, 20 to 100 cm and 100 cm or more
+        (``event_statistics.content_distance_band_statistics``: the mean over
+        animals of each animal's share, the mean over its epochs of each epoch's
+        share; the ``content_distance_*`` values, tagged 3g).
 
-The figure describes the content from the decode and the track alone. What needs
-the animal's behavior to say is left to the behavior figure: content by distance
-from the animal and by which well it is at
-(``content_along_arms.distance_from_animal_shares``, once a panel here), by the
-animal's choices and rewards, and when the events happen. The state the events
+The animal is at a well in every one of these events, so g answers what e and f
+leave open: whether the content at wells is at the animal's own. What needs the
+animal's choices and rewards to say, and when the events happen, is left to the
+behavior figure (content by which well the animal is at:
+``content_along_arms.distance_from_animal_shares``). The state the events
 occur in is not drawn here either: ripple power, MUA, theta and head speed
 around the events are Figure 2's, and slow and fast gamma during them are a
 supplementary figure (``generate_supp_figure03.py``).
@@ -85,11 +99,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
@@ -106,8 +123,11 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
+    DISTANCE_BIN_EDGES_CM,
+    NEAR_CM,
     animal_class_medians,
     class_medians,
+    content_distance_distribution,
     state_composition_statistics,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
@@ -121,6 +141,11 @@ from continuum_swr_replay.reported.events import (
     with_event_speed,
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
+from continuum_swr_replay.visualization.heldout_gain_panels import (
+    GROUP_COLORS,
+    REFERENCE_COLOR,
+    name_groups,
+)
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.simulated_run_panels import (
@@ -204,12 +229,15 @@ def read_inputs() -> dict:
             "distance_to_animal_cm",
         ],
     )
+    # panel g: the selected events, as the events summary reads them
+    distance = content_distance_distribution(events)
     events, _ = with_event_speed(events, inputs.event_speed, n_epochs)
     density = content_density_along_arms(along, N_SEGMENTS)
     even = even_content(along, AT_WELL_CM)
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
+        "distance": distance,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "profiles": leaf_and_trunk_profiles(density),
         "even": even,
@@ -479,7 +507,8 @@ def label_track(ax, track_graph) -> None:
 
 def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) -> None:
     """Content time per cm along the trunk arms (center to junction) and the
-    leaf arms (junction to well), each kind, with its share at a well; and what
+    leaf arms (junction to well), each kind, with its share at a well (the
+    percents under the title, which says what they are); and what
     content spread evenly over the track would give (``even``:
     ``content_along_arms.even_content``), a flat line and its share at a well."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
@@ -491,7 +520,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
         color="0.4", fontsize=SMALL_SIZE,
     )  # fmt: skip
     ax.text(
-        0.03, 0.79, f"even: {100 * even['at_well_fraction']:.0f}% at a well",
+        0.03, 0.79, f"even: {100 * even['at_well_fraction']:.0f}%",
         transform=ax.transAxes, color="0.4", ha="left", va="top",
         fontsize=SMALL_SIZE,
     )  # fmt: skip
@@ -502,7 +531,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
         ax.plot(1 + x, 100 * leaf, color=color)
         ax.text(
             0.03, 0.97 - 0.09 * is_swr,
-            f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}% at a well",
+            f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}%",
             transform=ax.transAxes, color=color, ha="left", va="top",
             fontsize=SMALL_SIZE,
         )  # fmt: skip
@@ -518,7 +547,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) 
         )  # fmt: skip
     ax.set_ylabel("% content time per cm")
     ax.set_title(
-        f"at a well: <{AT_WELL_CM:.0f} cm from one", fontsize=SMALL_SIZE, pad=8
+        f"% at a well (<{AT_WELL_CM:.0f} cm from one)", fontsize=SMALL_SIZE, pad=8
     )
 
 
@@ -549,9 +578,48 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 # Figure
 # ---------------------------------------------------------------------------
 
+DISTANCE_XLABEL = "From the animal (cm)"
+"""The distance panel's x label, under its title "Content distance": each
+event's mean over its bins of the distance along the track of the decoded place
+from the animal's."""
+DISTANCE_YLABEL = "Events at most\nthis far (%)"
+"""The distance panel's y label: the percent of a class's events whose content
+lies at most that far from the animal."""
+DISTANCE_TICKS_CM = (5, 20, 100)
+
+
+def draw_content_distance(ax: Axes, distribution: pd.DataFrame) -> None:
+    """Panel g, the distance panel: for no-SWR and SWR events, the percent of the
+    class's events whose content lies within each distance of the animal (the
+    distribution's bins summed up to each bin's high edge) on a log axis, a
+    thin line per animal and their mean in bold in the class's color, the
+    classes named in their colors, and dotted lines at 20 cm (near) and
+    100 cm (remote), where the heights are the shares under 20 cm and under
+    100 cm (``distribution``: :func:`read_inputs`' ``distance``)."""
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        by_animal = mine.pivot(index="bin_high", columns="animal", values="percent")
+        within = by_animal.cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
+    for cut in (NEAR_CM, REMOTE_CM):
+        ax.axvline(cut, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
+    name_groups(ax, 0.02, 1.0, 0.1, "left")
+    ax.set_xscale("log")
+    ax.set_xlim(DISTANCE_BIN_EDGES_CM[0], DISTANCE_BIN_EDGES_CM[-1])
+    ax.set_xticks(DISTANCE_TICKS_CM, [f"{t:g}" for t in DISTANCE_TICKS_CM])
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
+    ax.set_xlabel(DISTANCE_XLABEL)
+    ax.set_ylabel(DISTANCE_YLABEL)
+    ax.set_title("Content distance", fontsize=SMALL_SIZE, pad=8)
+
+
 # The panel letters as they sit in the figure: the letters of a row share a
 # height, the letters of a column a left edge.
-LETTER_ROWS = ("abcd", "ef")
+LETTER_ROWS = ("abcd", "efg")
 LETTER_COLUMNS = ("ae", "b", "cf", "d")
 
 
@@ -599,13 +667,17 @@ def generate_figure(inputs: dict):
         ax_e, inputs["track_graph"], inputs["edge_order"], inputs["against_even"]
     )
     label_track(ax_e[0], inputs["track_graph"])
-    ax_f = fig.add_subplot(grid[1, 2:])
+    # f and g share the right half: f the wider, for its two arms and its key
+    f_g_grid = grid[1, 2:].subgridspec(1, 2, width_ratios=[1.5, 1.0], wspace=0.6)
+    ax_f = fig.add_subplot(f_g_grid[0])
     draw_profiles(ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"])
+    ax_g = fig.add_subplot(f_g_grid[1])
+    draw_content_distance(ax_g, inputs["distance"])
 
     fig.draw_without_rendering()
     panels_by_letter = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
-        "e": [ax_e_frame, *ax_e], "f": [ax_f],
+        "e": [ax_e_frame, *ax_e], "f": [ax_f], "g": [ax_g],
     }  # fmt: skip
     place_letters(
         fig, panels_by_letter, LETTER_ROWS, LETTER_COLUMNS, above=0.02,

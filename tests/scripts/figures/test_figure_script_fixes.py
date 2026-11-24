@@ -1679,21 +1679,22 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     np.testing.assert_allclose(line.get_ydata(), 0.2)  # % per cm
     texts = [text.get_text() for text in ax.texts]
     assert "even" in texts
-    assert "even: 25% at a well" in texts
+    assert "even: 25%" in texts
     plt.close(fig)
 
 
-def test_figure03_draws_six_panels_from_the_decode_and_the_track(offline):
-    """Figure 3 is a to f, and the script's letters are the question list's.
-    Gamma during the events is the supplementary figure's, and content against
-    the animal is the behavior figure's: neither is drawn here."""
+def test_figure03_draws_seven_panels(offline):
+    """Figure 3 is a to g, and the script's letters are the question list's.
+    Gamma during the events is the supplementary figure's; how far the content
+    lies from the animal is panel g (the lead, 2026-11-24)."""
     from continuum_swr_replay.reported.questions import FIGURES
 
     figure03 = offline("scripts.figures.generate_figure03")
-    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdef"
+    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdefg"
+    # g is alone in its column: every other letter shares a column's left edge
     assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdef")
     assert not hasattr(figure03, "draw_brain_state")
-    assert not hasattr(figure03, "draw_distance_from_animal")
+    assert hasattr(figure03, "draw_content_distance")
 
 
 def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
@@ -2079,8 +2080,7 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(
         figure, "with_brain_state", lambda events, inputs, n: (events, levels, levels)
     )
-    # panels c and d's distributions are the analysis layer's, tested there
-    monkeypatch.setattr(figure, "content_distance_distribution", lambda events: None)
+    # panel c's distribution is the analysis layer's, tested there
     monkeypatch.setattr(figure, "with_event_speed", lambda events, *_: (events, []))
     monkeypatch.setattr(figure, "transport_speed_distribution", lambda events: None)
     note = "was not made over" if problem == "subset" else "records no session-cache"
@@ -2559,10 +2559,10 @@ def _distance() -> pd.DataFrame:
     return content_distance_distribution(_distance_events())
 
 
-def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_class(
+def test_the_figure03_distance_panel_draws_the_content_distance_of_each_class(
     offline,
 ):
-    """Figure 3's supplement, panel c: for each class, the percent of events within each distance (the bins
+    """Figure 3, panel g: for each class, the percent of events within each distance (the bins
     summed), a thin line per animal and their mean in bold, in the class's
     color, on a log x axis; dotted lines at 20 cm and 100 cm; the classes
     named in their colors; a y axis from 0 to 100."""
@@ -2571,7 +2571,7 @@ def test_the_supp_figure03_distance_panel_draws_the_content_distance_of_each_cla
 
     from continuum_swr_replay.visualization import heldout_gain_panels as panels
 
-    figure = offline("scripts.figures.generate_supp_figure03")
+    figure = offline("scripts.figures.generate_figure03")
     distribution = _distance()
     fig, ax = plt.subplots()
     figure.draw_content_distance(ax, distribution)

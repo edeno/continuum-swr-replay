@@ -338,10 +338,10 @@ TAGS = {
     "extent": Tags(("2d.3",), ("3c",)),
     "arms": Tags(("2d.3",)),
     "speed": Tags(("2d.2",), ("3d",)),
-    "transport_speed": Tags(("2d.2",), ("S3d",)),
+    "transport_speed": Tags(("2d.2",), ("S3c",)),
     "certainty": Tags(("2d.5",)),
     "hpd": Tags(("2d.5",), ("S2k",)),
-    "content_distance": Tags(("2d.1",), ("S3c",)),
+    "content_distance": Tags(("2d.1",), ("3g",)),
     "content_distance_pooled": Tags(("2d.1",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
@@ -4892,7 +4892,7 @@ _SPEED_PROPERTIES = ("speed", "transport_speed")
 def speed_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.2: how fast the events' content moves, non-SWR against SWR,
     as :func:`property_values`: the MAP line-fit speed (Figure 3d) and the
-    transport-slope speed (the supplement's S3d), read from the event-speed
+    transport-slope speed (the supplement's S3c), read from the event-speed
     output (``analysis/event_properties/event_speed.py`` has the two
     definitions)."""
     values = []
@@ -5011,7 +5011,7 @@ _DISTANCE_BANDS = {
 
 
 def content_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.1 and the distance panel of Figure 3's supplement (S3c): for
+    """Question 2d.1 and the distance panel of Figure 3 (3g): for
     each class, the share of the events whose content lies under 20 cm, 20 to
     100 cm, and 100 cm or more from the animal (the mean over the event's bins
     of the absolute distance along the track of the decoded place from the

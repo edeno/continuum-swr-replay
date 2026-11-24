@@ -943,7 +943,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     """Per class and band (under 20 cm, 20 to 100 cm, 100 cm or more): the
     share pooled over events with no figure, and the mean over animals of each
     animal's share with the lowest and highest animal, tagged to the
-    supplement's distance panel; and the two cuts."""
+    figure's distance panel (3g); and the two cuts."""
     from tests.analysis.event_properties.test_event_statistics import (
         _distance_events,
     )
@@ -963,7 +963,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     for name, value in values.items():
         assert value.questions == ("2d.1",)
         pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S3c",)), name
+        assert value.figures == (() if pooled else ("3g",)), name
     assert "under 20 cm from the animal" in values[key].description
 
 
