@@ -135,3 +135,36 @@ def test_the_entry_refuses_before_running_when_no_device_was_chosen(monkeypatch)
     with pytest.raises(device.UnconfiguredDeviceError, match="JAX_PLATFORMS=cpu"):
         in_float64(lambda: ran.append(True))()
     assert ran == []
+
+
+def test_the_fitters_public_calls_leave_the_flag_as_it_was():
+    """A fit, a REML score, a likelihood method and the weighted design, in
+    this thread and in another: the process's flag is off before and after."""
+    from continuum_swr_replay.analysis.regression.collinearity import weighted_design
+    from continuum_swr_replay.analysis.regression.likelihoods import Gaussian, Poisson
+    from continuum_swr_replay.analysis.regression.newton import penalized_newton
+    from continuum_swr_replay.analysis.regression.reml import (
+        PenaltyBlock,
+        reml_and_derivatives,
+    )
+
+    rng = np.random.default_rng(0)
+    X = np.column_stack([np.ones(50), rng.normal(size=(50, 2))])
+    y = rng.poisson(1.0, size=50).astype(float)
+    offset = np.zeros(50)
+    blocks = [PenaltyBlock(np.array([1, 2]), np.eye(2))]
+
+    def calls():
+        fit = penalized_newton(Poisson(), X, y, offset, np.zeros((3, 3)), np.zeros(3))
+        reml_and_derivatives(Poisson(), X, y, offset, blocks, [0.0])
+        reml_and_derivatives(Gaussian(), X, y, None, blocks, [0.0])
+        Poisson().information(X, X @ fit.beta, y, offset)
+        weighted_design(Poisson(), X, y, offset, X @ fit.beta)
+        return jax.config.x64_enabled
+
+    assert not jax.config.x64_enabled
+    calls()
+    assert not jax.config.x64_enabled
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert not pool.submit(calls).result()
+    assert jnp.asarray(np.ones(2)).dtype == jnp.float32

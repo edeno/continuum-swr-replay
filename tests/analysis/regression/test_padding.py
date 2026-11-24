@@ -5,7 +5,8 @@ The likelihoods' kernels run on padded rows (each row's terms times its
 weight) and on the same rows unpadded (every weight 1): the log-likelihood,
 the coefficient gradient, the information and its two directional
 derivatives agree, and every value is finite, also for a softmax with groups
-that have no rows.
+that have no rows. The profiled Gaussian's scale and score count the real rows
+only.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from continuum_swr_replay.analysis.regression import likelihoods, reml
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
@@ -222,6 +224,35 @@ def test_the_public_methods_pad_and_return_the_real_rows():
     np.testing.assert_allclose(score, y - np.exp(eta + aux), rtol=1e-14)
     weighted = lik.weighted_design(X, y, aux, eta)
     assert weighted.shape == X.shape
+
+
+@pytest.mark.parametrize("step", [ROW_BUCKET, 7])
+def test_the_profiled_gaussian_counts_the_real_rows(step):
+    """The scale ``D_p / (n - M_p)``, the score and the log-likelihood at the
+    scale do not move with the padding."""
+    lik, X, beta, y, _ = _diagonal_case("gaussian")
+    S = np.diag([0.0, 2.0, 2.0, 2.0, 2.0])
+    masks = np.zeros((1, N_COLUMNS))
+    masks[0, 1:] = 1.0
+
+    def summary(padded):
+        with jax.enable_x64(True):
+            return jax.device_get(
+                reml._profiled_gaussian(
+                    padded.X,
+                    padded.y,
+                    padded.weight,
+                    S,
+                    beta,
+                    masks,
+                    np.float64(0.0),
+                    np.int64(y.size),
+                    np.int64(y.size - 1),
+                )
+            )
+
+    _assert_equal(summary(pad_rows(X, y, step=step)), summary(pad_rows(X, y, step=300)))
+    assert likelihoods.Gaussian.quadratic
 
 
 def test_an_offset_of_minus_infinity_would_give_nan():

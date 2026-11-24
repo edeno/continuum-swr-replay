@@ -578,7 +578,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`, `draw`
+`Rows`, `Groups`, `Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `GroupedSoftmax`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
@@ -590,7 +590,7 @@ Penalized Newton fit at fixed penalty strengths, in float64.
 
 Rows padded to a few bucket sizes, so that a jitted kernel compiles once per bucket rather than once per session.
 
-`bucket_size`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
+`bucket_size`, `group_starts`, `pad_values`, `PaddedRows`, `pad_rows`, `PaddedGroups`, `pad_groups`
 
 ### `src/continuum_swr_replay/analysis/regression/pspline.py`
 
