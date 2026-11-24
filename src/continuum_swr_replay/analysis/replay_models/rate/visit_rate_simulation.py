@@ -137,7 +137,7 @@ RATE_TABLE_SHRINK_S = 50.0
 RATE_TABLE_FLOOR = 5e-4
 #: The smoothing of the stored model-free curves: knot spacing (s) and log
 #: penalty of each clock's P-spline.
-SMOOTHING = {vr.ARRIVAL: (0.5, 0.0), vr.LEAVING: (0.1, 0.0)}
+SMOOTHING = {vr.ARRIVAL: (0.5, 4.0), vr.LEAVING: (0.1, 4.0)}
 #: The stored model-free curves, under the replay-content root.
 DESCRIPTIVE = Path("models_convention") / "descriptive" / "visit_clock_curves.parquet"
 
