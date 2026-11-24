@@ -1,13 +1,15 @@
 #!/usr/bin/env python
-"""Per-bin scores of the three non-local restriction models on every analyzed epoch.
+"""Per-bin scores of the four non-local restriction models on every analyzed epoch.
 
 For each analyzed HPC epoch (``data_loaders.epoch_register.analyzed_epoch_ids``):
-the decoders ``none``, ``swr`` and ``full``, which differ only in when the two
+the decoders ``none``, ``swr``, ``full`` and ``swr_allowed``
+(``nonlocal_restriction.ALL_MODELS``), which differ only in when the two
 Non-Local states may be occupied, scored at every bin with a likelihood held
 out by folds of whole trials (``analysis.event_evidence.nonlocal_restriction``).
 ``swr`` is non-local in every bin inside a detected SWR of the epoch's SWR source
 (``swr_source.epoch_source(epoch_id).events``, the Kay inventory), whether or
-not the SWR was immobile as a whole event, and local everywhere else. That is
+not the SWR was immobile as a whole event, and local everywhere else; ``swr_allowed`` allows every state inside such a bin and
+only the local states elsewhere. That is
 deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
 analyzed-time rule keeps.
 
@@ -37,9 +39,8 @@ the record one entry per fold (``folds``: the fitted discrete transitions and
 initial distribution and their largest differences from the canonical, the EM
 iterations, convergence and marginal trace, each stage's seconds, the model
 checks, the device's peak memory). The header's settings record the fit
-(``"fit": "folds"``) and the EM settings; an earlier version of this runner
-held out only the encodings, and its header records no ``fit``, so a resume or
-a gather cannot mix the two. A fold fit costs about what the canonical decode
+(``"fit": "folds"``) and the EM settings, so a resume or a gather cannot mix
+runs of another fit. A fold fit costs about what the canonical decode
 costs, five times an epoch.
 
 Each bin is labeled (``nonlocal_restriction.bin_categories``): ``excluded``
@@ -55,7 +56,7 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
   and two-sided score) with ``epoch_id`` and ``animal``; the table downstream
   statistics read;
 - ``{epoch_id}_nonlocal_restriction_bins.parquet``: one row per bin, ``time``,
-  the six float32 score columns, ``in_swr``, ``block`` (the bin's fold),
+  the eight float32 score columns, ``in_swr``, ``block`` (the bin's fold),
   ``place_sampling_s`` (the seconds its fold's encoding was fit on at the
   animal's place bin) and ``category``, so a later per-event or
   per-ripple-power analysis needs no rerun;
@@ -92,28 +93,28 @@ Each worker is given one GPU, ``--workers-per-gpu`` to a card, as in
 across hosts writing into one folder.
 
 **Scored from a stored fit** (``--from-stored-fit <run folder>``): the models
-of ``--models`` (by default all four, ``nonlocal_restriction.ALL_MODELS``: the
-three and ``swr_allowed``, every state inside SWRs and the local states outside
-them) scored with each fold's decoder rebuilt from the stored run's record
+of ``--models`` (by default all four) scored with each fold's decoder rebuilt from the stored run's record
 (``nonlocal_restriction.stored_fold_fit``: the encoding fit as the fold fit
 fits it, the stored discrete transitions and initial distribution, no EM).
 Per epoch the stored record must be ``ok`` and of the same inputs (the
 SHA-256 of the decode frame, the detector and the SWR source's files, and the
 margin in bins) and folds: by the trials' digest where the stored record has
-one, otherwise (the canonical run's records) by the folds made now against the
+one, otherwise by the folds made now against the
 stored per-bin ``block`` at every bin and the folds' ``n_segments`` and
 ``n_groups`` (``stored_folds_check`` in the record: ``"digest"`` or
 ``"block_column"``); the tables are those above, with the new
 model's columns, and the record's folds also hold
 ``stored_score_difference``: the largest absolute per-bin difference of each
 score scored again (of ``none``, ``swr``, ``full``) from the stored run's, over
-the fold's bins, and ``stored_score_difference_max`` its largest. A model of
-the three not in ``--models`` is copied from the stored per-bin table
-(``copied_from_stored`` in the record). The header records the models, the
-fit's source (``fit_source``: ``"stored"``) and the stored run as an input
-(``stored_fit``: its folder and manifest digest). It writes into
-``--output-dir``, by default ``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``,
-never into the canonical folder or the stored run's.
+the fold's bins, and ``stored_score_difference_max`` its largest; each fold's
+fit facts are those of the stored record, so the new run's records hold them
+too. A model of the three not in ``--models`` is copied from the stored per-bin
+table (``copied_from_stored`` in the record). The header records the models,
+the fit's source (``fit_source``: ``"stored"``) and the stored run as an input
+(``stored_fit``: its folder and manifest digest, kept as the record of where
+the fit came from). It needs ``--output-dir``, which is neither the restriction
+run's folder nor the stored run's. The stored restriction run was made this
+way, from a run of the three models.
 
 Usage::
 
@@ -127,7 +128,7 @@ Usage::
         --gpus 1 2 4 5 6 7 8 --shards 0 --n-shards 2
     uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py \\
         --from-stored-fit Processed-Data/event_nonlocal_restriction \\
-        --epochs wilbur20210329_02_r1_HPC --gpus 1
+        --output-dir <new folder> --epochs wilbur20210329_02_r1_HPC --gpus 1
 """
 
 from __future__ import annotations
@@ -154,7 +155,6 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
-    EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR,
     NONLOCAL_RESTRICTION_BINS_NAME,
     NONLOCAL_RESTRICTION_NAME,
     processed_data_dir,
@@ -226,8 +226,7 @@ def stored_record(
 
     Each input's SHA-256 must be the stored record's, and its margin in bins.
     The folds are checked by the trials' digest when the stored record holds
-    one (``"digest"``). A record without one (the canonical run's: the
-    runner recorded the trials only from 2026-11-21) is checked on the folds
+    one (``"digest"``). A record without one is checked on the folds
     themselves (``"block_column"``): the folds made now must be the stored
     per-bin table's ``block`` at every bin of the same time axis, and the
     folds' ``n_segments`` and ``n_groups`` the stored record's, as
@@ -314,7 +313,7 @@ def run_epoch(
     data_dir: Path,
     output: Path,
     stored_dir: Path | None = None,
-    models: tuple[str, ...] = nr.MODELS,
+    models: tuple[str, ...] = nr.ALL_MODELS,
 ) -> dict:
     """Score one epoch, write its two tables and return its record.
 
@@ -467,8 +466,7 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         default=None,
         help="a restriction run folder: rebuild each fold's fit from its records "
-        "(no EM) and score --models; writes into --output-dir, by default "
-        f"{EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR}",
+        "(no EM) and score --models; needs --output-dir",
     )
     parser.add_argument(
         "--models",
@@ -485,23 +483,23 @@ def main(argv: list[str] | None = None) -> None:
     if stored_dir is None:
         if args.models is not None:
             parser.error("--models needs --from-stored-fit")
-        models = nr.MODELS
+        models = nr.ALL_MODELS
         output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
     else:
         models = tuple(m for m in nr.ALL_MODELS if m in (args.models or nr.ALL_MODELS))
         if "full" not in models:
             parser.error("--models must include full")
-        output = (
-            args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR
-        )
+        if args.output_dir is None:
+            parser.error("--from-stored-fit needs --output-dir")
+        output = args.output_dir
         refused = {
             (data_dir / EVENT_NONLOCAL_RESTRICTION_DIR).resolve(),
             stored_dir.resolve(),
         }
         if output.resolve() in refused:
             parser.error(
-                f"--output-dir {output} is the canonical restriction run or the "
-                "stored one; a run from a stored fit writes elsewhere"
+                f"--output-dir {output} is the restriction run or the stored "
+                "one; a run from a stored fit writes elsewhere"
             )
     header = {
         "produced_by": PRODUCED_BY,

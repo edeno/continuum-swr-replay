@@ -447,43 +447,50 @@ def test_a_stored_record_of_other_inputs_is_refused(tmp_path, patched):
         patched(_frame(), _record(), stored, nr.ALL_MODELS)
 
 
-def test_a_run_from_a_stored_fit_never_writes_into_the_canonical_folder(
+def test_a_run_from_a_stored_fit_writes_only_into_a_folder_of_its_own(
     tmp_path, monkeypatch
 ):
+    """A pass from a stored fit needs ``--output-dir`` and refuses the stored
+    run's folder and the restriction run's; a default run scores all four
+    models into the restriction run's folder."""
     gathered = {}
     monkeypatch.setattr(
         runner,
         "gather_manifest",
         lambda output, name, header: gathered.update(output=output, header=header),
     )
-    stored = tmp_path / "event_nonlocal_restriction"
+    stored = tmp_path / "stored_run"
     stored.mkdir()
     (stored / "manifest.json").write_text("{}")
-    for output in (stored, None):
-        arguments = ["--gather", "--data-dir", str(tmp_path), "--from-stored-fit"]
-        arguments += [str(stored)]
-        if output is not None:
-            arguments += ["--output-dir", str(output)]
-            with pytest.raises(SystemExit):
-                runner.main(arguments)
-        else:
-            runner.main(arguments)
-    assert gathered["output"] == tmp_path / "event_nonlocal_restriction_swr_allowed"
+    arguments = ["--gather", "--data-dir", str(tmp_path), "--from-stored-fit"]
+    arguments += [str(stored)]
+    for output in (None, stored, tmp_path / "event_nonlocal_restriction"):
+        with pytest.raises(SystemExit):
+            runner.main(
+                arguments + ([] if output is None else ["--output-dir", str(output)])
+            )
+    runner.main(arguments + ["--output-dir", str(tmp_path / "new")])
+    assert gathered["output"] == tmp_path / "new"
     header = gathered["header"]
     assert header["settings"]["models"] == list(nr.ALL_MODELS)
     assert header["settings"]["fit"] == "folds"
     assert header["settings"]["fit_source"] == "stored"
     assert header["inputs"]["stored_fit"]["path"] == str(stored)
+    runner.main(["--gather", "--data-dir", str(tmp_path)])
+    assert gathered["output"] == tmp_path / "event_nonlocal_restriction"
+    assert gathered["header"]["settings"]["models"] == list(nr.ALL_MODELS)
+    assert "fit_source" not in gathered["header"]["settings"]
+    assert gathered["header"]["inputs"] == {}
     with pytest.raises(SystemExit):
         runner.main(["--gather", "--data-dir", str(tmp_path), "--models", "full"])
     with pytest.raises(SystemExit):
         runner.main(
-            ["--gather", "--from-stored-fit", str(stored), "--models", "none", "swr"]
+            arguments + ["--output-dir", str(tmp_path / "new"), "--models", "none"]
         )
 
 
 def _without_trials_digest(stored, **changes):
-    """The stored record as the canonical run wrote it: no trials digest."""
+    """The stored record without its trials digest."""
     path = stored / f"{EPOCH}_{NONLOCAL_RESTRICTION_NAME}.json"
     record = json.loads(path.read_text())
     del record["epoch_inputs"]["trials"]
