@@ -3762,7 +3762,7 @@ def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
     """
     make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
     stats = event_statistics.nonlocal_below_threshold_statistics(
-        nonlocal_by_signal.animal_nonlocal_counts(counts, "ripple_power"),
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "ripple_power"),
         KAY_ZSCORE_THRESHOLD,
     )
     key = "nonlocal_time_below_swr_threshold_fraction"
@@ -3907,7 +3907,7 @@ def nonlocal_mua_values(counts: pd.DataFrame, source: str) -> list[Value]:
         nonlocal_by_signal.nonlocal_counts(counts, "mua"), level
     )
     below = event_statistics.nonlocal_below_threshold_statistics(
-        nonlocal_by_signal.animal_nonlocal_counts(counts, "mua"), level
+        nonlocal_by_signal.animal_nonlocal_shares(counts, "mua"), level
     )
     nonlocal_ = f"non-local probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}"
     level_words = (

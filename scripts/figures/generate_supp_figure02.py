@@ -17,7 +17,7 @@ question, and the analysis function it draws:
         the SWR detector (``rule_sweep.sweep_statistics``).
     f — each event's start and end against its SWR's
         (``event_statistics.boundary_timing_statistics``).
-    g — where non-local time sits in MUA (``nonlocal_by_signal.animal_nonlocal_counts``).
+    g — where non-local time sits in MUA (``nonlocal_by_signal.animal_nonlocal_shares``).
     h — Figure 2j's first comparison by bins with and without a spike
         (``tetrode_holdout.holdout_statistics``).
     i — Figure 2k's gain outside SWRs, away from the SWRs
@@ -105,7 +105,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
     DETECTION_LEVELS,
     MUA_LEVEL_Z,
-    animal_nonlocal_counts,
+    animal_nonlocal_shares,
 )
 from continuum_swr_replay.analysis.event_properties.rule_sweep import (
     RULE,
@@ -404,7 +404,7 @@ def read_inputs() -> dict:
         decoder-quality run's table (each animal's values and the statistics);
         ``rule_sweep``, :func:`read_rule_sweep`; ``boundary_timing``, the
         selected events' ``boundary_timing_statistics``; ``nonlocal_mua``,
-        :func:`read_mua_counts` and :func:`read_mua_states`; ``left_out_split``,
+        :func:`read_mua_shares` and :func:`read_mua_states`; ``left_out_split``,
         by column of ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics``
         of the events of the held-out tetrode run that start inside a well
         visit, indexed by group (a run not held out in folds of whole trials is
@@ -446,7 +446,7 @@ def read_inputs() -> dict:
         "rule_sweep": read_rule_sweep(inputs.event_rule_sweep, inputs.event_table),
         "boundary_timing": boundary_timing_statistics(boundary_offsets(events), events),
         "nonlocal_mua": (
-            read_mua_counts(inputs.nonlocal_by_signal),
+            read_mua_shares(inputs.nonlocal_by_signal),
             read_mua_states(inputs.state_by_signal),
         ),
         "left_out_split": {
@@ -596,10 +596,11 @@ def read_rule_sweep(folder: Path, event_table: Path) -> pd.DataFrame:
     return sweep_statistics(counts)
 
 
-def read_mua_counts(folder: Path) -> pd.DataFrame:
-    """The MUA panel's counts: each animal's immobile time bins inside the well
-    visits, and its non-local ones, by MUA (``nonlocal_by_signal.animal_nonlocal_counts``
-    of the stored counts), as the events summary reads them.
+def read_mua_shares(folder: Path) -> pd.DataFrame:
+    """The MUA panel's shares: each animal's non-local share of its immobile
+    time bins inside the well visits, by MUA
+    (``nonlocal_by_signal.animal_nonlocal_shares`` of the stored counts), as the
+    events summary reads them.
 
     Raises
     ------
@@ -619,12 +620,12 @@ def read_mua_counts(folder: Path) -> pd.DataFrame:
                 "scripts/event_properties/measure_nonlocal_by_signal.py",
             )
         ) from error
-    return animal_nonlocal_counts(counts, "mua")
+    return animal_nonlocal_shares(counts, "mua")
 
 
 def read_mua_states(folder: Path) -> pd.DataFrame:
     """The MUA panel's top strip: ``state_by_signal.state_distribution`` of the
-    stored counts by MUA and decoder state, refused as :func:`read_mua_counts`
+    stored counts by MUA and decoder state, refused as :func:`read_mua_shares`
     refuses its counts."""
     try:
         counts = read_checked(folder, "counts by signal and state")
@@ -886,7 +887,7 @@ def draw_boundary_timing(ax_cases: Axes, ax: Axes, timing: pd.DataFrame) -> None
 
 
 def draw_nonlocal_mua(
-    ax_spread: Axes, ax_share: Axes, counts: pd.DataFrame, states: pd.DataFrame
+    ax_spread: Axes, ax_share: Axes, shares: pd.DataFrame, states: pd.DataFrame
 ) -> None:
     """The MUA panel, drawn as Figure 2i draws ripple power
     (``signal_share_panels.draw_share_by_signal``): where confident Local and
@@ -894,11 +895,11 @@ def draw_nonlocal_mua(
     ``nonlocal_mua``) and the share of immobile bins decoded non-local at each
     MUA level (bottom), with the MUA level of the reported values and the
     share of non-local time below it (``nonlocal_below_threshold_statistics``,
-    the events summary's value; ``counts``: :func:`read_inputs`' ``nonlocal_mua``)."""
+    the events summary's value; ``shares``: :func:`read_inputs`' ``nonlocal_mua``)."""
     level = DETECTION_LEVELS["mua"]
-    below = nonlocal_below_threshold_statistics(counts, level)
+    below = nonlocal_below_threshold_statistics(shares, level)
     draw_share_by_signal(
-        ax_spread, ax_share, counts, threshold=level,
+        ax_spread, ax_share, shares, threshold=level,
         threshold_label=f"{MUA_LEVEL_Z:g} z", threshold_color=REFERENCE_COLOR,
         xlabel="MUA (z)",
         below_note=f"{format_number(below['fraction_animal_mean'], 'pctnum')}% "

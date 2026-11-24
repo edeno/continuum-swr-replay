@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
     analyzed_time,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (  # noqa: E402
-    animal_signal_counts,
+    animal_signal_shares,
     boundary_offset_distribution,
     boundary_offsets,
     overlap_class_animal_shares,
@@ -320,7 +320,7 @@ def _inputs(figure02) -> dict:
         "event_traces": _triggered(),
         "participation": _participation(),
         "nonlocal_ripple_power": (
-            animal_signal_counts(nonlocal_counts(counts, "ripple_power")),
+            animal_signal_shares(nonlocal_counts(counts, "ripple_power")),
             states,
         ),
         "left_out": {
@@ -566,7 +566,7 @@ def test_the_ripple_power_panel_writes_the_share_the_events_summary_gives(figure
     figure02.draw_share_by_power(
         ax_spread,
         ax_share,
-        animal_signal_counts(nonlocal_counts(counts, "ripple_power")),
+        animal_signal_shares(nonlocal_counts(counts, "ripple_power")),
         states,
     )
     value = {v.key: v for v in nonlocal_power_values(counts, "s")}[
@@ -846,7 +846,7 @@ def _one_event_outside(figure02, root: Path, monkeypatch):
         "example_windows": lambda *args: {},
         "read_checked": lambda folder, name, file="counts.parquet": None,
         "reference_medians": lambda *args: None,
-        "animal_nonlocal_counts": lambda *args: None,
+        "animal_nonlocal_shares": lambda *args: None,
         "state_distribution": lambda *args: None,
         "event_table_epochs": lambda *args: ["e"],
         "window_scores": lambda table: table.assign(kind="event"),

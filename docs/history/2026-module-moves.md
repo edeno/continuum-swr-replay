@@ -914,3 +914,16 @@ first, then drawn), and what they share moved into shared modules. Paths are und
 | `scripts/figures/generate_figure02.py`: `CLASS_ORDER`, `CLASS_COLORS`, `CLASS_LABELS`, `C_NO_SWR`, `DECODER_TIMES`, `DECODER_OUTSIDE`; `generate_supp_figure02.py`: `TRACE_CLASSES`, `TRACE_LABELS`, `OUTSIDE_LABEL`, `TRIGGER_WINDOW_S`; `generate_figure03.py` and `generate_supp_figure03.py`: `KINDS`; `visualization/figure_panels.py`: `_EVENT_CLASSES` (removed) | `visualization/palettes.py`: `EVENT_KINDS`, `OVERLAP_CLASSES`, `SIGNAL_LABELS`; `visualization/heldout_gain_panels.py`: `DIFFERENCE_LABELS`, `EVENTS_LABELS`; `analysis/event_properties/triggered_analysis.py`: `WINDOW_KINDS`, `TRIGGERED_WINDOW_S` |
 | `scripts/figures/generate_figure02.py`: its render cache (`_compute_figure_inputs`, `_figure02_cache_path`, the four fingerprint functions, `FIGURE02_CACHE_VERSION`, `Processed-Data/intermediates/*_figure02_*_cache.joblib`), `--force-recompute` and `frame_event_counts` (removed) | `Processed-Data/event_trigger_windows/` (`scripts/event_properties/measure_trigger_windows.py`), read by `reported.inputs.read_trigger_windows`; `triggered_analysis.frame_event_counts`; the example session is loaded at each render (`read_session`) |
 | `scripts/figures/generate_supp_figure02.py`: `read_frame_traces`, `_epoch_keys`, `_frame_epoch`, `--workers`, `NO_SPIKE_WORKERS`, `NO_SPIKE_SIGNAL` (removed) | `read_traces`, from `event_trigger_windows/` (`triggered_analysis.stored_no_spike_trace`, `stored_animal_window_medians`, `NO_SPIKE_SIGNAL`) |
+
+## The per-animal shares by signal, 2026-11-24
+
+The per-animal table by ripple power and MUA holds shares since the averaging rule
+(each epoch's share, then the animal's mean over its epochs), so its functions were
+renamed. `nonlocal_by_signal.nonlocal_counts` still returns per-epoch counts and keeps
+its name.
+
+| Old place | New place |
+|---|---|
+| `analysis.event_properties.event_statistics.animal_signal_counts` | `event_statistics.animal_signal_shares` |
+| `analysis.event_properties.nonlocal_by_signal.animal_nonlocal_counts` | `nonlocal_by_signal.animal_nonlocal_shares` |
+| `scripts/figures/generate_supp_figure02.py`: `read_mua_counts` | `read_mua_shares` |

@@ -1083,7 +1083,7 @@ def peak_ripple_mode_statistics(
     }
 
 
-def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
+def animal_signal_shares(epoch_counts: pd.DataFrame) -> pd.DataFrame:
     """Each animal's shares of its time bins by the level of a signal (ripple
     power or MUA), epoch -> animal: each epoch's share, then the mean over the
     animal's epochs.
@@ -1097,7 +1097,7 @@ def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, 6)
+    shares : pd.DataFrame, shape (n_animals * n_signal_bins, 6)
         One row per animal and signal bin, in that order: ``animal``,
         ``signal_low``, ``signal_high``, ``share`` (the mean over the animal's
         epochs with a time bin in the signal bin of each epoch's non-local
@@ -1123,20 +1123,20 @@ def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _require_edge(counts: pd.DataFrame, threshold: float) -> None:
-    if not (counts["signal_low"] == threshold).any():
+def _require_edge(table: pd.DataFrame, threshold: float) -> None:
+    if not (table["signal_low"] == threshold).any():
         raise ValueError(f"{threshold} is not an edge of the signal's bins")
 
 
 def nonlocal_below_threshold_statistics(
-    counts: pd.DataFrame, threshold: float
+    shares: pd.DataFrame, threshold: float
 ) -> dict[str, float]:
     """How much of the non-local time has a signal below a threshold.
 
     Parameters
     ----------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
-        :func:`animal_signal_counts`.
+    shares : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
+        :func:`animal_signal_shares`.
     threshold : float
         The signal's level, z; an edge of its bins.
 
@@ -1155,11 +1155,11 @@ def nonlocal_below_threshold_statistics(
     ValueError
         If ``threshold`` is not an edge of the signal's bins.
     """
-    _require_edge(counts, threshold)
+    _require_edge(shares, threshold)
     # the mean over epochs of each bin's fraction, summed over the bins below,
     # is the mean over the same epochs of each epoch's fraction below
     below = (
-        counts[counts["signal_high"] <= threshold]
+        shares[shares["signal_high"] <= threshold]
         .groupby("animal")["nonlocal_fraction"]
         .sum()
     )
@@ -1180,7 +1180,7 @@ def nonlocal_share_above_statistics(
     Parameters
     ----------
     epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
-        As :func:`animal_signal_counts` takes them.
+        As :func:`animal_signal_shares` takes them.
     threshold : float
         The level, z; an edge of the signal's bins.
 

@@ -71,7 +71,7 @@ SHADE_COLOR = COLORS["All Events"]
 def draw_share_by_signal(
     ax_spread: Axes,
     ax_share: Axes,
-    counts: pd.DataFrame,
+    shares: pd.DataFrame,
     *,
     threshold: float,
     threshold_label: str,
@@ -95,8 +95,8 @@ def draw_share_by_signal(
     Parameters
     ----------
     ax_spread, ax_share : Axes
-    counts : pd.DataFrame
-        ``event_statistics.animal_signal_counts`` of the stored per-epoch counts
+    shares : pd.DataFrame
+        ``event_statistics.animal_signal_shares`` of the stored per-epoch counts
         (the bottom axis).
     threshold : float
         z; an edge of the signal's bins.
@@ -107,8 +107,8 @@ def draw_share_by_signal(
         ``state_by_signal.state_distribution`` of the signal: ``state``,
         ``animal``, ``signal_low``, ``signal_high`` and ``percent``.
     """
-    drawn = counts[
-        np.isfinite(counts["signal_low"]) & np.isfinite(counts["signal_high"])
+    drawn = shares[
+        np.isfinite(shares["signal_low"]) & np.isfinite(shares["signal_high"])
     ]
     width = (drawn["signal_high"] - drawn["signal_low"]).iloc[0]
     percent = drawn.assign(percent=100 * drawn["share"])
