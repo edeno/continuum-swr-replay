@@ -482,7 +482,7 @@ def _edf(
     the category's entry is the sum of those: a total over all entries
     counts the levels twice."""
     penalized = dict(zip(block_terms, fit.edf.tolist(), strict=True))
-    terms = [t for t in design.terms if t.kind != "intercept" and t.session is None]
+    terms = [t for t in design.terms if t.kind != "intercept" and not t.is_copy]
     part = {
         t.name: penalized.get(t.name, float(active[t.columns].sum())) for t in terms
     }
@@ -542,7 +542,7 @@ def _session_copies(
     bounds = np.searchsorted(codes, np.arange(len(design.sessions) + 1))
     copies = {key: [] for key in design.sessions}
     for term in design.terms:
-        if term.session is not None:
+        if term.is_copy:
             copies[term.session] += [
                 int(j) for j in term.columns if np.isfinite(beta[j])
             ]

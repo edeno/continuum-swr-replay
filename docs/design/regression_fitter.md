@@ -419,8 +419,8 @@ the intercept becomes one 0/1 column per session, each coded level of a category
 column per session, so each session keeps the reference level. A copy is named
 `<name>@<animal>/<session_date>/<epoch>`, and the record's `sessions` lists each session's
 copies by name, so a reader does not split the names. A copy is a level of its session:
-the loop judges and drops it as a level. A copy keeps the term's declared penalty (the
-intercept and the arm category have none). No declared contrast reads a baseline
+the loop judges and drops it as a level. A baseline carries no penalty, and no term may be
+fitted `by` a baseline category; `build_design` refuses both. No declared contrast reads a baseline
 (`test_declared_tests.py::test_no_contrast_reads_a_baseline`), and the simulation engine
 refuses an estimand that does. The collinearity record projects the copies out, as it does
 the intercept; the edf and `Design.term_columns` do not hold them. In a fit of one session

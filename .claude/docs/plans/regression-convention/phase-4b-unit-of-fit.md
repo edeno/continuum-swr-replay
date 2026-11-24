@@ -236,8 +236,10 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    baseline=(...))`: the intercept for the rate model, the arm category for content). In a fit of k
    sessions each baseline term is replaced by k copies, each zero outside its session's rows; the
    intercept becomes k session indicators; the arm category keeps its reference arm in each copy. A
-   copy's coefficient is named `<name>@<animal>/<session_date>/<epoch>`. A copy keeps the term's
-   declared penalty (the intercept and the arm category have none; amended 2026-11-24), is never tested, and counted by the support rule on its session's rows; a session whose copy fails has its rows
+   copy's coefficient is named `<name>@<animal>/<session_date>/<epoch>`. A baseline carries no
+   penalty and no term is fitted `by` a baseline category (`build_design` refuses both; amended
+   2026-11-24; a penalized baseline, as design D needs, adds one penalty block over a term's copies
+   then), is never tested, and counted by the support rule on its session's rows; a session whose copy fails has its rows
    dropped from the unit and counted (question 8). In a fit of one session nothing changes. Tests:
    - `test_terms.py::test_baseline_copies_per_session` (names, columns, zeros outside the session);
    - `test_sessions.py::test_rate_baselines_match_separate_intercepts` (Poisson: k sessions sharing only a

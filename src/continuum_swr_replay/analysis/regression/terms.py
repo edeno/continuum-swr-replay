@@ -96,8 +96,11 @@ level), with no dependents and its ``session`` set to the key. So the loop
 judges and drops it as a level, on its session's rows: an intercept copy that
 fails the support rule, or that the refit leaves out, drops its session's rows
 from the fit; a level copy that fails drops that level's rows in its session
-only. A copy keeps the base term's declared penalty (the intercept has none).
-A baseline is never tested and never read by a contrast. The collinearity
+only. This is the one statement of the rule; the loop (:mod:`.sessions`)
+applies it. A baseline carries no penalty, and no term may be fitted ``by`` a
+baseline category (such a term could not leave one session's rows when that
+session's copy of the level fails): :func:`build_design` refuses both. A
+baseline is never tested and never read by a contrast. The collinearity
 record projects the copies out, as it does the intercept, and neither the edf
 nor :attr:`Design.term_columns` holds them. In a fit of one session nothing is
 copied.
@@ -112,6 +115,8 @@ from typing import Literal, NamedTuple
 
 import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.tables.session_keys import SessionKey
 
 from .constants import LOG_PENALTY_BOUNDS
 from .pspline import PSplineBasis, sum_to_zero_constraint
@@ -131,6 +136,7 @@ __all__ = [
     "Smooth",
     "Standardization",
     "build_design",
+    "copy_name",
     "log_penalty_from_prior_sd",
     "standardization",
 ]
@@ -148,8 +154,12 @@ SMALLEST_COLUMN_SIZE = 1e-2
 #: The intercept's coefficient and term name.
 INTERCEPT = "(Intercept)"
 
-#: A session's key, ``(animal, session_date, epoch)``.
-SessionKey = tuple[str, str, str]
+
+def copy_name(name: str, key: SessionKey) -> str:
+    """The name of a session's copy of a baseline term or coefficient:
+    ``<name>@<animal>/<session_date>/<epoch>``."""
+    return f"{name}@{'/'.join(key)}"
+
 
 Penalty = Literal["none"] | float
 
@@ -454,6 +464,11 @@ class DesignTerm:
     block: int | None = None
     dependents: tuple[str, ...] = ()
     session: tuple | None = None
+
+    @property
+    def is_copy(self) -> bool:
+        """A session's copy of a baseline term (module docstring)."""
+        return self.session is not None
 
     @property
     def reads(self) -> tuple | None:
@@ -834,10 +849,9 @@ class Design:
     baseline: tuple[str, ...] = ()
     sessions: tuple[SessionKey, ...] = ()
     # A design with copies: the design of the pooled rows, and for each column
-    # the base column it copies and the session it is not zero on (-1: all).
+    # the base column it copies.
     _base: Design | None = field(default=None, repr=False)
     _source: np.ndarray | None = field(default=None, repr=False)
-    _copy_session: np.ndarray | None = field(default=None, repr=False)
 
     @cached_property
     def by_name(self) -> dict[str, DesignTerm]:
@@ -860,7 +874,7 @@ class Design:
         intercept and the baseline copies are not terms)."""
         out: dict[str, list[np.ndarray]] = {}
         for term in self.terms:
-            if term.kind != "intercept" and term.session is None:
+            if term.kind != "intercept" and not term.is_copy:
                 out.setdefault(term.term, []).append(term.columns)
         return {name: np.concatenate(parts) for name, parts in out.items()}
 
@@ -871,7 +885,7 @@ class Design:
         return [
             int(j)
             for term in self.terms
-            if term.kind == "intercept" or term.session is not None
+            if term.kind == "intercept" or term.is_copy
             for j in term.columns
         ]
 
@@ -880,7 +894,7 @@ class Design:
         column order; empty without copies."""
         out: dict[tuple, list[str]] = {key: [] for key in self.sessions}
         for term in self.terms:
-            if term.session is not None:
+            if term.is_copy:
                 out[term.session] += [self.coef_names[j] for j in term.columns]
         return out
 
@@ -901,54 +915,40 @@ class Design:
         """
         if len(keys) < 2 or not self.baseline:
             return self
-        if self._base is not None:
-            raise ValueError("the design already holds the copies of a fit")
-        terms, source, copy_session, blocks, rho, names = [], [], [], [], [], []
-
-        def place(term: DesignTerm, session: int, key: tuple | None) -> None:
-            columns = np.arange(len(source), len(source) + term.columns.size)
-            source.extend(term.columns.tolist())
-            copy_session.extend([session] * term.columns.size)
-            block = None
-            if term.block is not None:
-                block = len(blocks)
-                blocks.append(PenaltyBlock(columns, self.blocks[term.block].S))
-                rho.append(self.log_penalties[term.block])
-            if key is None:
-                names.extend(self.coef_names[j] for j in term.columns)
-                terms.append(replace(term, columns=columns, block=block))
-                return
-            name = f"{term.name}@{'/'.join(key)}"
-            level = (INTERCEPT, key) if term.level is None else (*term.level, key)
-            names.append(name)
-            terms.append(
-                DesignTerm(
-                    name,
-                    term.term,
-                    "level",
-                    columns,
-                    level=level,
-                    block=block,
-                    session=tuple(key),
-                )
-            )
-
+        terms, source, blocks, names = [], [], [], []
         for term in self.terms:
-            if term.term in self.baseline:
-                for s, key in enumerate(keys):
-                    place(term, s, key)
-            else:
-                place(term, -1, None)
+            copied = term.term in self.baseline
+            for key in keys if copied else [None]:
+                columns = np.arange(len(source), len(source) + term.columns.size)
+                source.extend(term.columns.tolist())
+                if not copied:  # a baseline has no penalty (build_design)
+                    block = None
+                    if term.block is not None:
+                        block = len(blocks)
+                        blocks.append(PenaltyBlock(columns, self.blocks[term.block].S))
+                    names.extend(self.coef_names[j] for j in term.columns)
+                    terms.append(replace(term, columns=columns, block=block))
+                    continue
+                level = (INTERCEPT, key) if term.level is None else (*term.level, key)
+                names.append(copy_name(term.name, key))
+                terms.append(
+                    DesignTerm(
+                        names[-1],
+                        term.term,
+                        "level",
+                        columns,
+                        level=level,
+                        session=tuple(key),
+                    )
+                )
         return replace(
             self,
             terms=tuple(terms),
             coef_names=tuple(names),
             blocks=tuple(blocks),
-            log_penalties=np.array(rho, dtype=float),
             sessions=tuple(tuple(key) for key in keys),
             _base=self,
             _source=np.array(source, dtype=int),
-            _copy_session=np.array(copy_session, dtype=int),
         )
 
     @property
@@ -1016,8 +1016,9 @@ class Design:
         ----------
         rows : pd.DataFrame
         session : np.ndarray of int, shape (n_rows,), or None
-            Each row's place in :attr:`sessions`; required for a design with
-            copies (:meth:`for_sessions`), not read otherwise.
+            Each row's place in :attr:`sessions`, each session's rows
+            together and in that order; required for a design with copies
+            (:meth:`for_sessions`), not read otherwise.
 
         Raises
         ------
@@ -1049,26 +1050,29 @@ class Design:
         self, rows: pd.DataFrame, session: np.ndarray | None
     ) -> SessionDesign:
         """:meth:`build` of a design with copies: the base design's columns,
-        each copy zero outside its session's rows."""
+        each copy zero outside its session's rows (which lie together)."""
         if session is None or len(session) != len(rows):
             raise ValueError("a design with baseline copies needs each row's session")
         base = self._base.build(rows)
-        X = base.X[:, self._source]
-        copies = np.flatnonzero(self._copy_session >= 0)
-        outside = session[:, None] != self._copy_session[copies][None, :]
-        part = X[:, copies]
-        part[outside] = 0.0
-        X[:, copies] = part
+        X = np.zeros((len(rows), len(self.coef_names)))
+        place = {key: s for s, key in enumerate(self.sessions)}
+        bounds = np.searchsorted(session, np.arange(len(self.sessions) + 1))
         level_rows = dict(base.level_rows)
         for term in self.terms:
-            if term.session is not None:
-                s = self.sessions.index(term.session)
-                own = session == s
-                level_rows[term.level] = (
-                    own
-                    if term.level[0] == INTERCEPT
-                    else own & level_rows[term.level[:2]]
-                )
+            source = self._source[term.columns]
+            if not term.is_copy:
+                X[:, term.columns] = base.X[:, source]
+                continue
+            s = place[term.session]
+            own = slice(bounds[s], bounds[s + 1])
+            X[own, term.columns] = base.X[own, source]
+            rows_of = np.zeros(len(rows), dtype=bool)
+            rows_of[own] = True
+            level_rows[term.level] = (
+                rows_of
+                if term.level[0] == INTERCEPT
+                else rows_of & level_rows[term.level[:2]]
+            )
         return SessionDesign(X, base.offset, base.missing, level_rows)
 
     def _offset(self, rows: pd.DataFrame) -> np.ndarray | None:
@@ -1260,13 +1264,27 @@ def build_design(
         offset=offsets[0] if offsets else None,
         _built=tuple(pieces),
     )
-    categories = [t.column for t in terms if isinstance(t, Category)]
-    allowed = [INTERCEPT] * intercept + categories
+    categories = {t.column: t for t in terms if isinstance(t, Category)}
+    allowed = [INTERCEPT] * intercept + list(categories)
     wrong = [name for name in baseline if name not in allowed]
     if wrong or len(set(baseline)) != len(baseline):
         raise ValueError(
             f"a baseline is the intercept or a category term, once: {list(baseline)} "
             f"(the design's: {allowed})"
+        )
+    penalized = [
+        n for n in baseline if n in categories and categories[n].penalty != "none"
+    ]
+    if penalized:
+        raise ValueError(f"a baseline has no penalty: {penalized}")
+    by_baseline = [
+        b.name
+        for b in built
+        if getattr(b.term, "by", None) is not None and b.term.by.column in baseline
+    ]
+    if by_baseline:
+        raise ValueError(
+            f"terms by the baseline category cannot leave one session: {by_baseline}"
         )
     design = replace(design, baseline=tuple(baseline))
     design._check_pooled(pooled_rows, levels)

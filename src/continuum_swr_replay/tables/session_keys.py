@@ -39,6 +39,9 @@ SESSION_COLUMNS: tuple[str, ...] = row_keys(table="event")[:3]
 # The hippocampus event table's date column is ``day``, not ``session_date``.
 SESSION_COLUMNS_DAY: tuple[str, ...] = ("animal", "day", "epoch")
 
+#: A session's key, ``(animal, session_date, epoch)``.
+SessionKey = tuple[str, str, str]
+
 #: The unit of a fit: one fit for each session, for each recording day of an
 #: animal, or for each animal.
 FitBy = Literal["session", "day", "animal"]
@@ -55,6 +58,7 @@ __all__ = [
     "FitBy",
     "SESSION_COLUMNS",
     "SESSION_COLUMNS_DAY",
+    "SessionKey",
     "session_key_set",
     "n_sessions",
     "session_key_frame",

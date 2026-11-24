@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     fit_at_penalties,
 )
 from continuum_swr_replay.analysis.regression.terms import (
+    INTERCEPT,
     SMALLEST_COLUMN_SIZE,
     Category,
     DesignTerm,
@@ -30,6 +31,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     _refuse_small,
     _small_terms,
     build_design,
+    copy_name,
     log_penalty_from_prior_sd,
     standardization,
 )
@@ -675,3 +677,27 @@ def test_a_baseline_is_the_intercept_or_a_category() -> None:
             build_design(
                 [arm, Slope("x", 0.0)], rows, intercept=intercept, baseline=baseline
             )
+
+
+def test_a_term_by_a_baseline_category_is_refused() -> None:
+    """A term fitted for a level of a baseline category would have to leave
+    one session's rows when that session's copy of the level fails, which a
+    shared term cannot: build_design refuses it. A penalized baseline is
+    refused too (a copy carries no penalty block)."""
+    rows = pd.DataFrame({"arm": ["a", "b", "a", "b"], "x": [0.5, 1.0, 2.0, -1.0]})
+    arm = Category("arm", ("a", "b"), reference="a", penalty="none")
+    with pytest.raises(ValueError, match="by the baseline category"):
+        build_design(
+            [arm, Slope("x", 0.0, by=arm)], rows, intercept=True, baseline=("arm",)
+        )
+    weak = Category("arm", ("a", "b"), reference="a", penalty=0.0)
+    with pytest.raises(ValueError, match="no penalty"):
+        build_design([weak], rows, intercept=True, baseline=("arm",))
+    # Not a baseline: both are allowed.
+    build_design([arm, Slope("x", 0.0, by=arm)], rows, intercept=True)
+
+
+def test_a_copy_is_named_by_its_session() -> None:
+    key = ("an", "d1", "e1")
+    assert copy_name("arm[b]", key) == "arm[b]@an/d1/e1"
+    assert copy_name(INTERCEPT, key) == "(Intercept)@an/d1/e1"
