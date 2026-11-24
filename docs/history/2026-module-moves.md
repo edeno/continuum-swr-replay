@@ -894,3 +894,23 @@ removed. `event_bin_facts`' records keep the deleted run's record digest
 | `paths.EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR`, `..._SWR_ALLOWED_HELDOUT_EVENTS_DIR`, `..._SWR_ALLOWED_WINDOWS_DIR` (removed) | `paths.EVENT_NONLOCAL_RESTRICTION_DIR`, `..._HELDOUT_EVENTS_DIR`, `..._WINDOWS_DIR` |
 | `EventsInputs.nonlocal_restriction_swr_allowed`, `nonlocal_restriction_swr_allowed_heldout_events` (removed) | `EventsInputs.nonlocal_restriction`, `nonlocal_restriction_heldout_events` |
 | `REFUSED_FOUR` in `scripts/figures/generate_supp_figure02.py` (removed) | panel l reads panel i's runs |
+
+## The regression fitter's test-only code, 2026-11-24
+
+Public code of `analysis/regression/` that only the package's own tests used was removed
+(the lead, 2026-11-24: "yes remove"), and the padded rows got one container. No result
+changed: the stored reference outputs (`tests/analysis/regression/data/numpy_reference/`)
+pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
+
+| Old place | Why it went, and what replaces it | Commit |
+|---|---|---|
+| `Likelihood.loglik`, `score_eta`, `information`, `dinformation`, `d2information` (removed) | only tests called them; the kernels call the families' `_jax_*` functions, which the tests now call through `tests/analysis/regression/conftest.py:family_kernel`; `weighted_design` stays | e6a115fd |
+| `record.write_records`, `read_records`, `records_frame`, `JSON_FIELDS`, `describe` (removed) | only `test_record.py` used the parquet storage and the words of the causes; `FitRecord` and `NoFit` stay | 1bfcb448 |
+| `support.terms_failing_share` (removed) | its 20 % rule was never applied by a fit; `constants.MAX_FAILING_SHARE` stays (the penalty search and `visit_rate.third_clock_decision` read it) | dcd7dbd4 |
+| `terms.prior_sd_from_log_penalty` (removed) | only a test called it; the prior SD of a log penalty `rho` is `exp(-rho / 2)` | c82dd554 |
+| `reml.PenaltySearch.n_grid_not_finite`, `share_without_fit` (removed) | only tests read them; `sum(search.grid_failures.values())`, and the share of `search.set_aside` not `fitted` | c82dd554 |
+| `reml.SetAsideSession.running_away` (removed) | only tests read it; `reference.fit.running_away` | c82dd554 |
+| `runtime.require_device` (removed) | a one-line wrapper; `in_float64` calls `runs.device.require_one_jax_device` | c82dd554 |
+| `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
+| `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
+| `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |
