@@ -257,6 +257,41 @@ def test_each_selected_event_gets_where_its_content_starts_and_ends(tmp_path):
     assert not joined["ends_near_animal"].any()
 
 
+def test_gamma_around_event_starts_is_read_for_the_selected_events(tmp_path):
+    """One epoch whose slow gamma is the sample number and fast gamma its
+    negative; every selected event starts at sample 200, so each kind's median
+    trace is the samples 125 to 275 (0.3 s at 500 Hz)."""
+    events = select_visit_context(_labeled())
+    events = events.assign(
+        animal="a", session_date=1, epoch="e1", event_start_s=200 * 0.002
+    )
+    pd.DataFrame(
+        {"epoch_id": ["x"], "animal": ["a"], "session_date": [1], "epoch": ["e1"]}
+    ).to_parquet(tmp_path / "reference.parquet")
+    sample = np.arange(400.0)
+    pd.DataFrame(
+        {"time": sample * 0.002, "slow_gamma_z": sample, "fast_gamma_z": -sample}
+    ).to_parquet(tmp_path / "x_gamma_z.parquet")
+
+    curves, paths = builder.gamma_triggered_curves(events, tmp_path, 1)
+
+    assert [path.name for path in paths] == ["x_gamma_z.parquet"]
+    np.testing.assert_allclose(
+        curves["slow_gamma"]["time"][[0, 75, -1]], [-0.15, 0, 0.15]
+    )
+    for kind in ("overlap", "no_overlap"):
+        np.testing.assert_allclose(
+            curves["slow_gamma"][f"{kind}_median"], np.arange(125.0, 276.0)
+        )
+        np.testing.assert_allclose(
+            curves["fast_gamma"][f"{kind}_q75"], -np.arange(125.0, 276.0)
+        )
+    with pytest.raises(ValueError, match="not 2"):
+        builder.gamma_triggered_curves(events, tmp_path, 2)
+    with pytest.raises(ValueError, match="no gamma for an event's epoch"):
+        builder.gamma_triggered_curves(events.assign(epoch="e9"), tmp_path, 1)
+
+
 def test_an_output_not_made_over_the_subset_is_pending():
     assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
     assert "rerun it" in builder.subset_staleness({}, "out")

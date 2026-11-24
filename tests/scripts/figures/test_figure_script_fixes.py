@@ -1127,60 +1127,44 @@ def test_figure03_draws_seven_panels(offline):
     assert hasattr(figure03, "draw_content_distance")
 
 
-def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
-    offline,
-):
-    """The supplementary gamma figure: per band and kind, each animal's event
-    level (``event_statistics.animal_signal_levels`` with ``matched``) between
-    its quiet-rest and running levels, in the kind's color."""
+def test_the_gamma_panels_draw_each_kind_s_trace_and_the_two_levels(offline):
+    """The supplement's gamma panels: per band, each kind's median trace
+    around event starts in the kind's color over its quartile band, and the
+    band's quiet-rest and running levels as dashed lines."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
 
-    from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        animal_signal_levels,
-    )
-
     figure = offline("scripts.figures.generate_supp_figure03")
-    rng = np.random.default_rng(0)
-    epochs = [("a", "e1"), ("a", "e2"), ("b", "e1")]
-    events = pd.DataFrame(
-        [
-            {"animal": animal, "session_date": "d1", "epoch": epoch, "is_swr": is_swr}
-            for animal, epoch in epochs
-            for is_swr in (False, True)
-            for _ in range(4)
-        ]
-    )
-    reference = pd.DataFrame(epochs, columns=["animal", "epoch"]).assign(
-        session_date="d1"
-    )
-    for band, column, _ in figure.SIGNALS:
-        events[column] = rng.normal(size=len(events))
-        for regime in ("rest", "running"):
-            for group in ("non_swr", "swr"):
-                reference[f"{band}_{regime}_matched_{group}"] = rng.normal(size=3)
+    time = np.array([-0.002, 0.0, 0.002])
+    curves, levels = {}, {}
+    for k, (band, _, _) in enumerate(figure.SIGNALS):
+        curves[band] = {"time": time}
+        for j, kind in enumerate(figure.WINDOW_KINDS):
+            for i, label in enumerate(("q25", "median", "q75")):
+                curves[band][f"{kind}_{label}"] = np.full(3, k + j + 0.1 * i)
+        levels[band] = {"rest": -1.0 - k, "running": 3.0 + k}
+    levels = pd.DataFrame(levels).T
 
     fig, axes = plt.subplots(1, 2)
-    figure.draw_gamma(axes, events, reference)
+    figure.draw_gamma(axes, curves, levels)
     assert [ax.get_title() for ax in axes] == [
         "Slow gamma (25–55 Hz)",
         "Fast gamma (65–100 Hz)",
     ]
-    for ax, (band, column, _) in zip(axes, figure.SIGNALS, strict=True):
-        levels = animal_signal_levels(events, reference, band, column, matched=True)
-        # per kind, three sets of dots: rest, events, running
-        dots = ax.collections
-        assert len(dots) == 6
-        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
-            rest, event, running = dots[3 * k : 3 * k + 3]
-            for drawn, word in ((rest, "rest"), (event, "event"), (running, "running")):
-                np.testing.assert_allclose(
-                    drawn.get_offsets()[:, 1], levels.loc[is_swr, word]
-                )
-            np.testing.assert_allclose(event.get_facecolors()[0], to_rgba(color))
-            np.testing.assert_allclose(rest.get_facecolors()[0], to_rgba("white"))
-            np.testing.assert_allclose(running.get_facecolors()[0], to_rgba("black"))
-        assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    for k, ax in enumerate(axes):
+        traces = [line for line in ax.lines if len(line.get_xdata()) == 3]
+        assert len(traces) == 2 and len(ax.collections) == 2
+        for (kind, is_swr), line in zip(
+            figure.WINDOW_KINDS.items(), traces, strict=True
+        ):
+            band = figure.SIGNALS[k][0]
+            np.testing.assert_allclose(line.get_xdata(), [-2.0, 0.0, 2.0])
+            np.testing.assert_allclose(line.get_ydata(), curves[band][f"{kind}_median"])
+            assert to_rgba(line.get_color()) == to_rgba(EVENT_KINDS[is_swr][1])
+        dashed = sorted(
+            line.get_ydata()[0] for line in ax.lines if line.get_linestyle() == "--"
+        )
+        assert dashed == [-1.0 - k, 3.0 + k]
     plt.close(fig)
 
 
@@ -1275,6 +1259,8 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
     monkeypatch.setattr(figure, "patch_content_shares", lambda rows: None)
     monkeypatch.setattr(figure, "with_event_start_end", lambda e, *_: (e, []))
     monkeypatch.setattr(figure, "start_end_shares", lambda events: None)
+    monkeypatch.setattr(figure, "gamma_triggered_curves", lambda e, *_: (None, []))
+    monkeypatch.setattr(figure, "reference_medians", lambda table, signals: table)
     # panel a's session and examples are read after the references are checked
     monkeypatch.setattr(figure, "read_example_decode", lambda *_: None)
     monkeypatch.setattr(figure, "example_windows", lambda events: None)
@@ -1286,7 +1272,7 @@ def test_the_gamma_figure_refuses_a_reference_not_made_over_the_subset(
         (tmp_path / folder / "manifest.json").write_text(
             json.dumps({"subset": ANALYZED_SUBSET, "session_cache": current})
         )
-        assert figure.read_inputs()["reference"] is levels
+        assert figure.read_inputs()["gamma_levels"] is levels
         entry.write_bytes(b"other visits")
         with pytest.raises(ValueError, match="other well visits than the current"):
             figure.read_inputs()

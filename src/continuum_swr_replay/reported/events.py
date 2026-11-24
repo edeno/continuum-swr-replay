@@ -179,11 +179,13 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
+    gamma_power,
     low_rate_places,
     nonlocal_by_signal,
     resolved_content,
     rule_sweep,
     state_by_signal,
+    triggered_analysis,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
@@ -206,7 +208,10 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_epoch_ids,
     require_analyzed_epochs,
 )
-from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    SAMPLING_FREQUENCY,
+)
 from continuum_swr_replay.paths import (
     CANONICAL_EVENTS_FOUND_NAME,
     CONTENT_PLACE_RATE_NAME,
@@ -5249,6 +5254,65 @@ def with_event_speed(
     if joined[EVENT_SPEED_COLUMNS[0]].isna().any():
         raise ValueError("an event has no MAP line-fit speed")
     return joined, paths
+
+
+def gamma_triggered_curves(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[dict[str, dict], list[Path]]:
+    """Slow and fast gamma around the starts of the events of ``events``, by
+    kind (``triggered_analysis.kind_triggered_curves``, keyed by band), from
+    the gamma pass's per-bin z-scored power
+    (``<epoch>_gamma_z.parquet``, on the decode's time grid), over
+    ``triggered_analysis.TRIGGERED_WINDOW_S``; and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs' traces, or an event's
+        epoch has none.
+    """
+    paths = sorted(folder.glob("*_gamma_z.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs' gamma, not {n_epochs}")
+    n_each_side = int(
+        round(triggered_analysis.TRIGGERED_WINDOW_S / 2 * SAMPLING_FREQUENCY)
+    )
+    # the gamma pass's own table names each epoch's file
+    keys = ["animal", "session_date", "epoch"]
+    named = pd.read_parquet(folder / "reference.parquet", columns=["epoch_id", *keys])
+    epoch_id = events[keys].merge(named, on=keys, how="left", validate="m:1")[
+        "epoch_id"
+    ]
+    if epoch_id.isna().any():
+        raise ValueError(f"{folder} has no gamma for an event's epoch")
+    by_path = {path.name.removesuffix("_gamma_z.parquet"): path for path in paths}
+    if not set(epoch_id).issubset(by_path):
+        raise ValueError(f"{folder} has no gamma for an event's epoch")
+    windows: dict[str, list] = {band: [] for band in gamma_power.GAMMA_BANDS}
+    kept = []
+    for epoch, mine in events.groupby(epoch_id.to_numpy()):
+        trace = pd.read_parquet(by_path[epoch])
+        for band in windows:
+            windows[band].append(
+                triggered_analysis.windows_at(
+                    trace["time"].to_numpy(),
+                    trace[f"{band}_z"].to_numpy(),
+                    mine["event_start_s"].to_numpy(),
+                    n_each_side,
+                )
+            )
+        kept.append(mine)
+    kept = pd.concat(kept)
+    labels = triggered_analysis.epoch_labels(kept["session_date"], kept["epoch"])
+    return {
+        band: triggered_analysis.kind_triggered_curves(
+            np.concatenate(windows[band]),
+            kept["is_swr"].to_numpy(dtype=bool),
+            kept["animal"].to_numpy(),
+            labels,
+        )
+        for band in windows
+    }, paths
 
 
 def with_brain_state(

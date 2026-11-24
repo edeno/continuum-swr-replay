@@ -75,17 +75,18 @@ h — Whether the events whose content stays in one place are the ones at a
     then animal).
 
 i, j — Whether the two kinds differ in the local field potential: for each
-    band of ``gamma_power.GAMMA_BANDS`` (i, slow gamma; j, fast gamma) and each
-    kind of event, every animal's level during the events, between the levels
-    of the same epochs' quiet-rest and running windows as long as the kind's
-    events; quiet rest is the rest inside a well visit. An event's gamma is a
-    mean over its bins, and a mean of skewed power over a window sits above the
-    median of single bins, so the reference is windows of the events' own
-    length. The animal values are ``event_statistics.animal_signal_levels``
-    with ``matched``: the values the events summary's ``<band>_animals_*``
-    counts compare (``paper/reported/events.json``; the gamma run is
-    ``scripts/event_properties/measure_event_gamma.py``). Ripple power, MUA,
-    theta and head speed around the events are Figure 2's.
+    band of ``gamma_power.GAMMA_BANDS`` (i, slow gamma; j, fast gamma), the
+    band's z-scored power around event starts, each kind, drawn as Figure 2g
+    draws ripple power and theta: the line is the mean over animals of each
+    animal's median (the median over its epochs of the epoch's median over its
+    events), the band the same of the quartiles
+    (``triggered_analysis.kind_triggered_curves``, from the gamma run's per-bin
+    power, ``scripts/event_properties/measure_event_gamma.py``). The dashed
+    lines are the band's level in quiet rest inside a well visit (gray) and
+    while running (black) (``event_statistics.reference_medians``). The events
+    summary's ``<band>_animals_*`` counts compare each animal's level over
+    whole events with windows of the events' length
+    (``paper/reported/events.json``); no panel draws those.
 
 Usage
 -----
@@ -126,10 +127,13 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     TRANSPORT_SPEED_BIN_EDGES_CM_S,
-    animal_signal_levels,
+    reference_medians,
     transport_speed_distribution,
 )
 from continuum_swr_replay.analysis.event_properties.gamma_power import GAMMA_BANDS
+from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+    WINDOW_KINDS,
+)
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     time_mask_staleness,
 )
@@ -138,6 +142,7 @@ from continuum_swr_replay.parameters import EXAMPLE_EPOCH, EXAMPLE_NWB_FILE
 from continuum_swr_replay.reported.events import (
     content_mass_along_arms,
     content_mass_by_patch,
+    gamma_triggered_curves,
     with_brain_state,
     with_event_place_shares,
     with_event_speed,
@@ -151,7 +156,11 @@ from continuum_swr_replay.visualization.heldout_gain_panels import (
     GROUP_COLORS,
     name_groups,
 )
-from continuum_swr_replay.visualization.palettes import ANIMAL_LINE_COLOR, EVENT_KINDS
+from continuum_swr_replay.visualization.palettes import (
+    ANIMAL_LINE_COLOR,
+    EVENT_KINDS,
+    REFERENCE_COLOR,
+)
 from continuum_swr_replay.visualization.panel_layout import place_letters
 from continuum_swr_replay.visualization.publication_style import (
     SMALL_SIZE,
@@ -172,9 +181,6 @@ WIDTH = 6.5
 # The journal's page is 20 cm tall with the saving margin.
 HEIGHT = 7.6
 
-# The rest and running levels: neutral, not decoder-state colors.
-C_REST = "white"
-C_RUN = "black"
 # Each panel: (band, event column, title).
 SIGNALS = tuple(
     (band, f"{band}_z", f"{name} gamma ({low:.0f}–{high:.0f} Hz)")
@@ -231,8 +237,8 @@ def read_inputs() -> dict:
         with_places, inputs.content_along_arms, n_epochs
     )
     return {
-        "events": events,
-        "reference": reference,
+        "gamma": gamma_triggered_curves(selected, inputs.event_gamma, n_epochs)[0],
+        "gamma_levels": reference_medians(gamma_reference, list(GAMMA_BANDS)),
         "speed": transport_speed_distribution(with_speed),
         "places": content_place_shares(along),
         "place_intervals": place_share_intervals(along),
@@ -248,29 +254,32 @@ def read_inputs() -> dict:
     }
 
 
-def draw_gamma(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
-    """Each animal's level of each band in each kind of event, between the
-    levels of quiet-rest (white) and running (black) windows as long as the
-    kind's events (``axes``: one per band)."""
-    for ax, (band, column, title) in zip(axes, SIGNALS, strict=True):
-        levels = animal_signal_levels(events, reference, band, column, matched=True)
-        centers = []
-        for k, (is_swr, (_, color)) in enumerate(EVENT_KINDS.items()):
-            x = 3.7 * k + np.arange(3)
-            values = levels.loc[is_swr, ["rest", "event", "running"]]
-            for _, row in values.iterrows():
-                ax.plot(x, row.to_numpy(), color=ANIMAL_LINE_COLOR, lw=0.5, zorder=1)
-            for i, dot_color in enumerate((C_REST, color, C_RUN)):
-                ax.scatter(
-                    np.full(len(values), x[i]), values.iloc[:, i], s=9,
-                    color=dot_color, edgecolors="black", linewidths=0.5, zorder=2,
-                )  # fmt: skip
-            centers.append(x[1])
-        ax.axhline(0, color="0.85", lw=0.5, zorder=0)
+def draw_gamma(axes, curves: dict, levels: pd.DataFrame) -> None:
+    """Each band's power around event starts, each kind (``axes``: one per
+    band), as Figure 2g draws ripple power and theta: the line is the mean over
+    animals of each animal's median (the median over its epochs of each
+    epoch's median over its events), the band the same of the quartiles
+    (``curves``: ``reported.events.gamma_triggered_curves``). The dashed lines
+    are the band's level in quiet rest (gray) and while running (black),
+    each animal's median over its epochs, then the mean over animals
+    (``levels``: ``event_statistics.reference_medians``)."""
+    for ax, (band, _, title) in zip(axes, SIGNALS, strict=True):
+        curve = curves[band]
+        t_ms = 1000 * np.asarray(curve["time"])
+        for kind, is_swr in WINDOW_KINDS.items():
+            color = EVENT_KINDS[is_swr][1]
+            ax.fill_between(
+                t_ms, curve[f"{kind}_q25"], curve[f"{kind}_q75"], color=color,
+                alpha=0.25, lw=0,
+            )  # fmt: skip
+            ax.plot(t_ms, curve[f"{kind}_median"], color=color, lw=1.0)
+        for regime, color in (("rest", REFERENCE_COLOR), ("running", "k")):
+            ax.axhline(levels.loc[band, regime], color=color, lw=0.6, ls="--", zorder=3)
+        ax.axvline(0, color="k", lw=0.5, ls=":")
+        ax.set_xlim(t_ms[0], t_ms[-1])
+        ax.set_xticks([-100, 0, 100])
+        ax.set_xlabel("Time from event start (ms)")
         ax.set_title(title, fontsize=SMALL_SIZE)
-        # One label per kind; the key says which dots are rest and running.
-        ax.set_xticks(centers, [name for name, _ in EVENT_KINDS.values()])
-        ax.set_xlim(-0.7, centers[-1] + 1.7)
     axes[0].set_ylabel("Power (z)")
 
 
@@ -503,16 +512,17 @@ def generate_figure(inputs: dict):
     draw_patch_counts(ax_f, inputs["patch_counts"])
     draw_start_end(ax_g, inputs["start_end"])
     draw_remote_well_by_extent(ax_h, inputs["by_extent"])
-    draw_gamma((ax_i, ax_j), inputs["events"], inputs["reference"])
-    # the gamma panels' key, inside the first of them
-    handles = [
-        plt.Line2D([], [], marker="o", ls="", ms=3, mfc=color, mec="black", mew=0.5)
-        for color in (C_REST, C_RUN)
-    ]
-    ax_i.legend(
-        handles, ["quiet rest", "running"], frameon=False, loc="upper left",
-        handletextpad=0.1, borderaxespad=0.0, fontsize=SMALL_SIZE,
-    )  # fmt: skip
+    draw_gamma((ax_i, ax_j), inputs["gamma"], inputs["gamma_levels"])
+    # the dashed lines' names, in the fast-gamma panel, where the two levels
+    # are apart (in slow gamma they nearly coincide)
+    for regime, color in (("rest", REFERENCE_COLOR), ("running", "k")):
+        ax_j.annotate(
+            "quiet rest" if regime == "rest" else regime,
+            (0.03, inputs["gamma_levels"].loc[SIGNALS[1][0], regime]),
+            xycoords=ax_j.get_yaxis_transform(), xytext=(0, 1),
+            textcoords="offset points", ha="left", va="bottom", color=color,
+            fontsize=SMALL_SIZE,
+        )  # fmt: skip
     fig.draw_without_rendering()
     panels = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d], "e": [ax_e],
