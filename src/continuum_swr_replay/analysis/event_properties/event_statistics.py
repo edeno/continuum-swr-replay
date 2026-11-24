@@ -31,12 +31,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM
-from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
-    likelihood_advantage_statistics,
-)
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_medians,
     animal_session_values,
+    session_value_statistics,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
@@ -1487,12 +1485,11 @@ def hpd_tight_share_statistics(
 ) -> dict:
     """The share of each class's events whose HPD coverage is below a cut.
 
-    Each epoch's share of its events of the class below ``cut_cm`` is reduced
-    as the project reduces a per-epoch share
-    (``likelihood_advantage.likelihood_advantage_statistics`` over one row per
-    epoch, as ``restriction_totals.outside_swr_gain_statistics`` reduces its
-    shares): each animal's median over its epochs, the mean over animals and
-    its 95 % nested bootstrap interval.
+    Each epoch's share of its events of the class below ``cut_cm``, each
+    animal's mean over its epochs with an event of the class, then the mean
+    over animals, with its 95 % interval from the nested bootstrap of the
+    animals and their epochs whose replicates take the same estimator
+    (``shared_statistics.session_value_statistics``).
 
     Parameters
     ----------
@@ -1504,10 +1501,11 @@ def hpd_tight_share_statistics(
     Returns
     -------
     dict
-        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``), with
-        ``likelihood_advantage_statistics``' columns; and
-        ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
-        their SWR share.
+        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``): ``animals`` (the
+        animals' shares, sorted animal order), ``animal_names``, ``estimate``,
+        ``ci_low``, ``ci_high``, ``n_epochs`` and ``n_animals``; and
+        ``n_animals_non_swr_higher``: the animals whose no-SWR share (the mean
+        over their epochs) is above their SWR share.
     """
     table = _class_table(events, "hpd_coverage_cm")
     shares = (
@@ -1515,9 +1513,26 @@ def hpd_tight_share_statistics(
         .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
         .mean()
     )
-    rows = likelihood_advantage_statistics(
-        shares, column="tight", n_boot=n_boot, seed=seed
-    ).loc[["no SWR", "SWR"]]
+    rows = {}
+    for group in ("no SWR", "SWR"):
+        mine = shares[shares["group"] == group].sort_values(["animal", "epoch_id"])
+        result = session_value_statistics(
+            mine["tight"].to_numpy(dtype=float),
+            mine["animal"].to_numpy(),
+            statistic="mean",
+            n_boot=n_boot,
+            rng=np.random.default_rng(seed),
+        )
+        rows[group] = {
+            "animals": result.per_animal.to_numpy(),
+            "animal_names": result.per_animal.index.to_numpy(),
+            "estimate": result.estimate,
+            "ci_low": result.interval.low,
+            "ci_high": result.interval.high,
+            "n_epochs": len(mine),
+            "n_animals": len(result.per_animal),
+        }
+    rows = pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
     by_group = {
         group: pd.Series(rows.loc[group, "animals"], rows.loc[group, "animal_names"])
         for group in rows.index

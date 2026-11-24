@@ -376,7 +376,7 @@ def test_time_sums_of_the_earlier_design_are_refused():
         rt.epoch_outside_swr_gains(earlier, _bin_s(), _windows())
 
 
-def test_subset_shares_are_the_mean_over_animals_of_their_epoch_medians():
+def test_subset_shares_are_the_mean_over_animals_of_their_epoch_shares():
     """a1 keeps bins 3-6 of 1-6 beyond 0.25 s (2 bins); b1 has the scoring
     mask at bins 0 and 7, so only bins 3 and 4 are more than 2 bins from it:
     animals 4/6 and 2/6, no bootstrap."""
@@ -390,6 +390,29 @@ def test_subset_shares_are_the_mean_over_animals_of_their_epoch_medians():
     share = shares.loc[("beyond_swr_margin", 0.25)]
     assert share["estimate"] == pytest.approx((4 / 6 + 2 / 6) / 2)
     assert share["animal_min"] == pytest.approx(2 / 6)
+
+
+def test_subset_shares_take_the_mean_of_an_animals_epochs():
+    """a: epochs a1 and a3 keep 4 of 6 bins beyond 0.25 s, a2 (the scoring
+    mask at bins 0 and 7) 2 of 6: a's mean 10/18 (its median would be 4/6);
+    b: one epoch like a2, 2/6. The mean over animals is (10/18 + 2/6) / 2."""
+    bins, facts, windows = _keyed_bins()
+    bins["in_swr"] = np.isin(np.arange(8), [0, 7])
+    masked = rt.restriction_time_sums(bins, facts, windows)
+    sums = pd.concat(
+        [
+            _keyed_sums(),
+            masked.assign(epoch_id="a2", animal="a"),
+            _keyed_sums().assign(epoch_id="a3"),
+            masked.assign(epoch_id="b1", animal="b"),
+        ],
+        ignore_index=True,
+    )
+    bin_s = pd.Series(0.1, index=["a1", "a2", "a3", "b1"])
+    share = rt.outside_swr_subset_shares(sums, bin_s).loc[("beyond_swr_margin", 0.25)]
+    assert share["estimate"] == pytest.approx((10 / 18 + 2 / 6) / 2)
+    assert share["animal_min"] == pytest.approx(2 / 6)
+    assert share["n_epochs"] == 4
 
 
 def _four_model_time_sums() -> pd.DataFrame:

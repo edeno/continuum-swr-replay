@@ -169,3 +169,18 @@ def test_the_reference_is_read_over_the_donors_of_the_same_width():
         windows, n_boot=20, column="agreement_null_per_spike"
     )
     assert unmatched.loc[narrow, "estimate"] == pytest.approx(-0.3)
+
+
+def test_the_share_above_zero_is_the_mean_of_an_animals_epochs():
+    """Narrow no-SWR events: a's epochs a1 (1, 2, -1: 2/3 above zero), a2
+    (3, 5: 1) and a3 (-1: 0) -> a's mean 5/9 (its median would be 2/3); b's
+    one epoch (0.5, -0.5, -2: 1/3). The mean over animals is 4/9."""
+    windows = pd.concat(
+        [_windows(), _windows().iloc[[2]].assign(epoch_id="a3")], ignore_index=True
+    )
+    narrow = agreement_by_width_statistics(windows, n_boot=20, seed=1).loc[
+        ("<25", "no SWR")
+    ]
+    assert narrow["share_positive"] == pytest.approx((5 / 9 + 1 / 3) / 2)
+    assert narrow["share_positive_animal_min"] == pytest.approx(1 / 3)
+    assert narrow["share_positive_animal_max"] == pytest.approx(5 / 9)

@@ -951,13 +951,13 @@ def test_content_distance_band_statistics_take_each_animal_over_its_epochs():
 
 
 def test_hpd_tight_share_statistics_reduce_each_epochs_share():
-    """Each epoch's share of a class below the cut, each animal's median over
+    """Each epoch's share of a class below the cut, each animal's mean over
     its epochs, the mean over animals with its interval
-    (``likelihood_advantage_statistics`` over one row per epoch), and the
-    animals whose no-SWR share is the higher."""
+    (``shared_statistics.session_value_statistics``), and the animals whose
+    no-SWR share is the higher."""
     result = stats.hpd_tight_share_statistics(_hpd_events(), cut_cm=50.0, n_boot=200)
     rows = result["rows"]
-    # no SWR: a's epochs 2/3 and 1 -> median 5/6; b 0
+    # no SWR: a's epochs 2/3 and 1 -> mean 5/6; b 0
     np.testing.assert_allclose(rows.loc["no SWR", "animals"], [5 / 6, 0.0])
     assert rows.loc["no SWR", "estimate"] == pytest.approx(5 / 12)
     # SWR: a's epochs 0 and 1/2 -> 1/4; b 1
@@ -966,6 +966,30 @@ def test_hpd_tight_share_statistics_reduce_each_epochs_share():
     for group in rows.index:
         assert rows.loc[group, "ci_low"] <= rows.loc[group, "estimate"]
         assert rows.loc[group, "estimate"] <= rows.loc[group, "ci_high"]
+
+
+def test_hpd_tight_share_statistics_take_the_mean_of_an_animals_epochs():
+    """a: three epochs with no-SWR shares below 50 cm of 1 (10 cm), 1 (20 cm)
+    and 0 (300 cm); its third epoch has no SWR event and is not one of its
+    epochs for that class. b: one epoch, 1 of 2. No SWR: a's mean 2/3 (its
+    median would be 1), b 1/2 -> 7/12. SWR: a (0, 1) 1/2, b 0 -> 1/4."""
+    events = pd.DataFrame(
+        {
+            "animal": ["a"] * 5 + ["b"] * 3,
+            "session_date": [1, 1, 2, 2, 3, 1, 1, 1],
+            "epoch": "02_r1",
+            "is_swr": [False, True, False, True, False, False, False, True],
+            "hpd_coverage_cm": [10.0, 400.0, 20.0, 30.0, 300.0, 10.0, 300.0, 300.0],
+        }
+    )
+    result = stats.hpd_tight_share_statistics(events, cut_cm=50.0, n_boot=200)
+    rows = result["rows"]
+    np.testing.assert_allclose(rows.loc["no SWR", "animals"], [2 / 3, 0.5])
+    assert rows.loc["no SWR", "estimate"] == pytest.approx(7 / 12)
+    assert rows.loc["no SWR", "n_epochs"] == 4
+    np.testing.assert_allclose(rows.loc["SWR", "animals"], [0.5, 0.0])
+    assert rows.loc["SWR", "n_epochs"] == 3
+    assert result["n_animals_non_swr_higher"] == 2
 
 
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():

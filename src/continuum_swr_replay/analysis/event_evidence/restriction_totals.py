@@ -896,7 +896,7 @@ def outside_swr_subset_shares(
     interval.
 
     The share is the same in both score families, and it is a description of
-    the part, not an effect: an animal's value is the median over its epochs
+    the part, not an effect: an animal's value is the mean over its epochs
     (``shared_statistics.animal_session_values``), the estimate the mean over
     animals, and the lowest animal's value is given beside it. (A t interval
     of a share near 1 can pass 1.)
@@ -917,7 +917,7 @@ def outside_swr_subset_shares(
     rows = []
     for subset, threshold, epochs in _subset_epochs(time_sums, bin_s, SUBSETS):
         per_animal = animal_session_values(
-            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
+            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "mean"
         )
         rows.append(
             {

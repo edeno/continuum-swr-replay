@@ -2378,7 +2378,7 @@ def shared_content_values(windows: pd.DataFrame, source: str) -> list[Value]:
                     "fraction",
                     "pct",
                     f"share of the {where} whose agreement per spike is above zero: "
-                    "per epoch, then each animal's median over its epochs, then the "
+                    "per epoch, then each animal's mean over its epochs, then the "
                     "mean over animals",
                 ),
                 make(
@@ -3500,7 +3500,7 @@ def restriction_outside_swr_part_values(
                     row["estimate"],
                     "fraction",
                     "pct",
-                    f"{share}: mean over animals of each animal's median over its "
+                    f"{share}: mean over animals of each animal's mean over its "
                     "epochs; no interval is given (a t interval of a share near 1 "
                     "can pass 1), the lowest animal's value is given beside it",
                 ),
@@ -3510,7 +3510,7 @@ def restriction_outside_swr_part_values(
                     "fraction",
                     "pct",
                     f"lowest of the animals' values of the {share}, each animal's "
-                    "the median over its epochs",
+                    "the mean over its epochs",
                 ),
             ]
     return values
@@ -4548,9 +4548,10 @@ def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
         f"{cut:g} cm"
     )
     reduction = (
-        "each epoch's share, each animal's median over its epochs, the mean over "
+        "each epoch's share, each animal's mean over its epochs, the mean over "
         "animals; 95 % interval from the nested bootstrap of the animals and "
-        "their epochs, small-sample t correction"
+        "their epochs (each replicate takes the same estimator), small-sample t "
+        "correction"
     )
     values = [
         make(
@@ -4579,7 +4580,7 @@ def hpd_tight_values(events: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "count",
             "animals whose share of non-SWR events with a tight posterior (the "
-            "median over its epochs) is above their share of SWR events",
+            "mean over its epochs) is above their share of SWR events",
         )
     )
     return values
