@@ -44,6 +44,8 @@ The numerical work runs in JAX, in float64 (``runtime``), on the rows padded
 to a bucket (``Likelihood.pad``): one jitted kernel evaluates ``F`` at given
 coefficients, and one makes a Newton iteration (``A``, its Cholesky factor,
 the step, the decrement, ``max |X step|`` and the step-halving search). The
+linear predictor is carried on the device from one iteration to the next,
+``eta + scale * (X @ step)``, rather than recomputed as ``X @ beta``. The
 rules above, the statuses and the design check are a host loop in Python and
 NumPy around them. That loop is written for a batch of fits on one design (a
 leading axis of fits, one per fit; :func:`penalized_newton` fits one), and
@@ -257,19 +259,22 @@ def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
 
 
 def _objective_one(lik, X, y, aux, weight, S, beta):
-    """``F(beta) = -l(beta) + beta' S beta / 2``, and ``l(beta)``, of one fit."""
-    loglik = lik._jax_loglik(X @ beta, y, aux, weight)
-    return -loglik + 0.5 * beta @ S @ beta, loglik
+    """``F(beta) = -l(beta) + beta' S beta / 2``, ``l(beta)`` and
+    ``eta = X @ beta``, of one fit."""
+    eta = X @ beta
+    loglik = lik._jax_loglik(eta, y, aux, weight)
+    return -loglik + 0.5 * beta @ S @ beta, loglik, eta
 
 
 @float64_kernel(static_argnames=("lik",))
 def _evaluate(lik, X, Y, aux, weight, S, beta):
     """``F`` and ``l`` of each fit of the batch, stacked in one array of shape
-    ``(2, B)``; ``Y`` and ``beta`` have a leading axis of fits."""
-    F, loglik = jax.vmap(lambda y, b: _objective_one(lik, X, y, aux, weight, S, b))(
-        Y, beta
-    )
-    return jnp.stack([F, loglik])
+    ``(2, B)``, and ``eta``, shape ``(B, n_bucket)``; ``Y`` and ``beta`` have
+    a leading axis of fits."""
+    F, loglik, eta = jax.vmap(
+        lambda y, b: _objective_one(lik, X, y, aux, weight, S, b)
+    )(Y, beta)
+    return jnp.stack([F, loglik]), eta
 
 
 #: The scalars of an iteration of one fit, in the order of the kernel's stack;
@@ -287,9 +292,10 @@ _FLAGS = ("ok", "capped", "halving_ok")
 
 
 def _iteration_one(
-    lik, X, y, aux, weight, S, beta, F, cap, decrement_tol, n_halvings
+    lik, X, y, aux, weight, S, beta, eta, F, cap, decrement_tol, n_halvings
 ) -> dict[str, Any]:
-    """One Newton iteration of one fit from ``beta``, whose objective is ``F``.
+    """One Newton iteration of one fit from ``beta``, whose linear predictor is
+    ``eta`` and objective ``F``.
 
     The system: ``g`` the gradient of ``-F``, ``A = H + S``, its Cholesky
     factor (``ok`` when ``A`` and the factor are finite), the step
@@ -298,10 +304,12 @@ def _iteration_one(
     shortened to ``cap`` (``capped``) and halved, at most ``n_halvings``
     times, until ``F`` is finite and does not rise: the ``candidate``, its
     ``F_new`` and ``loglik_new``, and ``halving_ok`` when one was found.
-    Returned as the scalars in one array, in the order of ``_SCALARS``, and
-    ``A``, ``step`` and ``candidate`` by name.
+    A trial's linear predictor is ``eta + scale * (X @ step)``, so the
+    iteration multiplies by ``X`` twice whatever the halvings, and the
+    candidate's is returned to start the next iteration. Returned as the
+    scalars in one array, in the order of ``_SCALARS``, and ``A``, ``step``,
+    ``candidate`` and its ``eta`` by name.
     """
-    eta = X @ beta
     # score @ X, not X.T @ score: XLA would copy the transposed design.
     g = lik._jax_score(eta, y, aux, weight) @ X - S @ beta
     A = lik._jax_information(X, eta, y, aux, weight) + S
@@ -311,21 +319,25 @@ def _iteration_one(
     decrement = 0.5 * (g @ step)
     # initial=0: a fit with no columns has no step to shorten.
     ratio = cap / jnp.max(jnp.abs(step), initial=0.0)
+    eta_step = X @ step
     scale0 = jnp.where(ratio < 1.0, ratio, 1.0)  # Python's min(1.0, ratio)
 
     def untried(state):
-        k, _, _, _, _, found = state
+        k, _, _, _, _, _, found = state
         return (k < n_halvings) & ~found
 
     def try_scale(state):
-        k, scale, _, _, _, _ = state
+        k, scale, _, _, _, _, _ = state
         candidate = beta + scale * step
-        F_new, loglik_new = _objective_one(lik, X, y, aux, weight, S, candidate)
+        eta_new = eta + scale * eta_step
+        loglik_new = lik._jax_loglik(eta_new, y, aux, weight)
+        F_new = -loglik_new + 0.5 * candidate @ S @ candidate
         found = jnp.isfinite(F_new) & (F_new <= F)
         return (
             k + 1,
             jnp.where(found, scale, 0.5 * scale),
             candidate,
+            eta_new,
             F_new,
             loglik_new,
             found,
@@ -333,13 +345,13 @@ def _iteration_one(
 
     search = ok & ~(decrement < decrement_tol)
     start = jnp.where(search, 0, n_halvings)
-    _, _, candidate, F_new, loglik_new, found = jax.lax.while_loop(
-        untried, try_scale, (start, scale0, beta, F, jnp.nan * F, jnp.array(False))
+    _, _, candidate, eta_new, F_new, loglik_new, found = jax.lax.while_loop(
+        untried, try_scale, (start, scale0, beta, eta, F, jnp.nan * F, jnp.array(False))
     )
     scalars = {
         "ok": ok,
         "decrement": decrement,
-        "eta_step": jnp.max(jnp.abs(X @ step)),
+        "eta_step": jnp.max(jnp.abs(eta_step)),
         "capped": scale0 < 1.0,
         "F_new": F_new,
         "loglik_new": loglik_new,
@@ -348,18 +360,18 @@ def _iteration_one(
     stacked = jnp.stack(
         [jnp.asarray(scalars[name], dtype=F.dtype) for name in _SCALARS]
     )
-    return stacked, {"A": A, "step": step, "candidate": candidate}
+    return stacked, {"A": A, "step": step, "candidate": candidate, "eta": eta_new}
 
 
 @float64_kernel(static_argnames=("lik",))
-def _iterate(lik, X, Y, aux, weight, S, beta, F, cap, decrement_tol, n_halvings):
+def _iterate(lik, X, Y, aux, weight, S, beta, eta, F, cap, decrement_tol, n_halvings):
     """:func:`_iteration_one` of each fit of the batch; every output has a
     leading axis of fits (the scalars, shape ``(B, len(_SCALARS))``)."""
     return jax.vmap(
-        lambda y, b, f: _iteration_one(
-            lik, X, y, aux, weight, S, b, f, cap, decrement_tol, n_halvings
+        lambda y, b, e, f: _iteration_one(
+            lik, X, y, aux, weight, S, b, e, f, cap, decrement_tol, n_halvings
         )
-    )(Y, beta, F)
+    )(Y, beta, eta, F)
 
 
 @dataclass(frozen=True)
@@ -404,17 +416,22 @@ class _Problem:
         rows = Rows(X_device, None, aux_device, weight, padded.n_real)
         return cls(lik, X, aux, S, rows, Y, S_device)
 
-    def evaluate(self, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """``(F, l)`` at ``beta`` of shape ``(B, p)``, each shape ``(B,)``."""
+    def evaluate(self, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray, Any]:
+        """``F`` and ``l`` at ``beta`` of shape ``(B, p)``, each shape ``(B,)``,
+        and ``eta``, shape ``(B, n_bucket)``, left on the device."""
         r = self.rows
-        F, loglik = np.array(
-            _evaluate(self.lik, r.X, self.Y, r.aux, r.weight, self.S_device, beta)
+        stacked, eta = _evaluate(
+            self.lik, r.X, self.Y, r.aux, r.weight, self.S_device, beta
         )
-        return F, loglik
+        F, loglik = np.array(stacked)
+        return F, loglik, eta
 
-    def iterate(self, beta: np.ndarray, F: np.ndarray, cap: float) -> _Iteration:
-        """:func:`_iteration_one` at ``beta`` (B, p) with objectives ``F``
-        (B,), the rule constants read now."""
+    def iterate(
+        self, beta: np.ndarray, eta: Any, F: np.ndarray, cap: float
+    ) -> _Iteration:
+        """:func:`_iteration_one` at ``beta`` (B, p), whose linear predictors
+        are ``eta`` (B, n_bucket; on the device) and objectives ``F`` (B,),
+        the rule constants read now."""
         r = self.rows
         scalars, arrays = _iterate(
             self.lik,
@@ -424,6 +441,7 @@ class _Problem:
             r.weight,
             self.S_device,
             beta,
+            eta,
             F,
             np.float64(cap),
             np.float64(NEWTON_DECREMENT_TOL),
@@ -438,7 +456,8 @@ class _Iteration(dict):
     The scalars of every fit (``_SCALARS``, shape ``(B,)`` each; the flags as
     bools) come over in one transfer. ``A``, ``step`` and ``candidate`` stay
     on the device until first read, since the loop reads ``A`` and ``step``
-    only where a fit stops, then as NumPy arrays.
+    only where a fit stops, then as NumPy arrays; the candidates' ``eta``
+    stays there (:meth:`on_device`).
     """
 
     def __init__(self, scalars: np.ndarray, arrays: dict[str, Any]) -> None:
@@ -451,6 +470,10 @@ class _Iteration(dict):
     def __missing__(self, name: str) -> np.ndarray:
         self[name] = value = np.asarray(self._device[name])
         return value
+
+    def on_device(self, name: str) -> Any:
+        """Output ``name`` as the kernel returned it, not brought over."""
+        return self._device[name]
 
 
 @in_float64
@@ -528,7 +551,7 @@ def _fit(
     n_fits, p = beta0.shape
     cap = np.inf if lik.quadratic else max_step
     beta = beta0.copy()
-    F, loglik = problem.evaluate(beta)
+    F, loglik, eta = problem.evaluate(beta)
     unidentified = _unidentified(
         lik.identifying_design(problem.X, problem.aux),
         _free_columns(problem.S) if free_basis is None else free_basis,
@@ -577,7 +600,7 @@ def _fit(
                 )
 
     for n_iter in range(max_iter + 1):
-        r = problem.iterate(beta, F, cap)
+        r = problem.iterate(beta, eta, F, cap)
         stop(stepping & ~r["ok"], r, NOT_POSITIVE_DEFINITE, n_iter)
         small = stepping & r["ok"] & (r["decrement"] < NEWTON_DECREMENT_TOL)
         runs_away = small & (not lik.quadratic) & (r["eta_step"] > NO_MAXIMUM_ETA_STEP)
@@ -597,6 +620,12 @@ def _fit(
             break
         capped_and_fell[stepping, n_iter] = (r["capped"] & (r["F_new"] < F))[stepping]
         beta[stepping] = r["candidate"][stepping]
+        # The candidates' eta stays on the device (the next iteration's start).
+        eta = (
+            r.on_device("eta")
+            if stepping.all()
+            else jnp.where(stepping[:, None], r.on_device("eta"), eta)
+        )
         F[stepping] = r["F_new"][stepping]
         loglik[stepping] = r["loglik_new"][stepping]
     if stepping.any():
@@ -685,11 +714,11 @@ def _last_step(
         The member's index to its ``NewtonFit``.
     """
     moved = np.where(members[:, None], beta + r["step"], beta)
-    F_new, loglik_new = problem.evaluate(moved)
+    F_new, loglik_new, eta_moved = problem.evaluate(moved)
     rounding = 8.0 * np.finfo(float).eps * np.maximum(1.0, np.abs(F))
     take = members & np.isfinite(F_new) & (F_new <= F + rounding)
     if take.any():
-        landed = problem.iterate(moved, F_new, cap)
+        landed = problem.iterate(moved, eta_moved, F_new, cap)
         take &= landed["ok"] & (landed["decrement"] < NEWTON_DECREMENT_TOL)
 
     def fit(b: int) -> NewtonFit:

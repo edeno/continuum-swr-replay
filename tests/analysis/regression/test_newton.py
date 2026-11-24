@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import re
 
@@ -403,8 +404,8 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
     beta = np.array([[-0.5]])
     with jax.enable_x64(True):
         problem = newton._Problem.of(lik, X, y, offset, S)
-        F, loglik = problem.evaluate(beta)
-        r = problem.iterate(beta, F, newton.MAX_STEP_LENGTH)
+        F, loglik, eta = problem.evaluate(beta)
+        r = problem.iterate(beta, eta, F, newton.MAX_STEP_LENGTH)
         assert r["decrement"][0] == pytest.approx(0.128, abs=1e-3)
         r["step"] = np.array([[to + 0.5]])
         fit = newton._last_step(
@@ -545,6 +546,34 @@ def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
         }
 
 
+def test_a_batch_of_fits_equals_each_fit_alone() -> None:
+    """Two fits on one design in one batch, one converging and one separated
+    (it stops with no finite maximum, later): each ends as it does alone, so
+    the linear predictor carried for the fits still stepping is theirs."""
+    X, y = _logistic_data()
+    separated = (X[:, 1] > 0).astype(float)
+    S, start = np.zeros((2, 2)), np.zeros(2)
+    alone = [
+        penalized_newton(Bernoulli(), X, r, None, S, start) for r in (y, separated)
+    ]
+    with jax.enable_x64(True):
+        one = newton._Problem.of(Bernoulli(), X, y, None, S)
+        other = newton._Problem.of(Bernoulli(), X, separated, None, S)
+        Y = jax.device_put(np.concatenate([np.asarray(one.Y), np.asarray(other.Y)]))
+        batch = newton._fit(
+            dataclasses.replace(one, Y=Y),
+            np.zeros((2, 2)),
+            None,
+            newton.NEWTON_MAX_STEPS,
+            newton.MAX_STEP_LENGTH,
+        )
+    assert [f.status for f in alone] == [CONVERGED, NO_FINITE_MAXIMUM]
+    assert alone[0].n_iter < alone[1].n_iter
+    for got, want in zip(batch, alone, strict=True):
+        assert (got.status, got.n_iter) == (want.status, want.n_iter)
+        np.testing.assert_allclose(got.beta, want.beta, rtol=1e-12, atol=1e-12)
+
+
 def _transposes_of_rows(compiled_text: str, n_rows: int) -> list[str]:
     """The ``transpose`` instructions of an optimized HLO program whose shape
     has ``n_rows`` as a dimension."""
@@ -594,6 +623,7 @@ def test_no_kernel_copies_the_transposed_design(family: str) -> None:
                 r.weight,
                 problem.S_device,
                 beta,
+                eta[None],
                 F,
                 np.float64(1.0),
                 np.float64(NEWTON_DECREMENT_TOL),
