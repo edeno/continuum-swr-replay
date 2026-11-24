@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.regression import calibration
+from continuum_swr_replay.analysis.regression import calibration, runtime
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
 from continuum_swr_replay.analysis.regression.sessions import fit_sessions
@@ -76,6 +77,24 @@ def test_the_penalty_gives_the_target_median_edf(rate_sessions) -> None:
         rtol=0,
         atol=1e-12,
     )
+
+
+def test_the_program_bound_holds_during_a_calibration(
+    monkeypatch: pytest.MonkeyPatch, rate_sessions
+) -> None:
+    """With the program limit patched to 0, JAX's caches are cleared before
+    every session's fit of a calibration, not once at its entry: a
+    calibration fits every session at each trial penalty, and the live
+    programs stay bounded through it. The penalty found is the same."""
+    design = _design(pd.concat(rate_sessions.values(), ignore_index=True))
+    unbounded = _calibrate(design, rate_sessions, 4.0)
+    clears = []
+    clear = jax.clear_caches
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 0)
+    monkeypatch.setattr(jax, "clear_caches", lambda: (clears.append(True), clear()))
+    bounded = _calibrate(design, rate_sessions, 4.0)
+    assert len(clears) >= 2 * len(rate_sessions)
+    assert bounded.log_penalty == unbounded.log_penalty
 
 
 def test_edf_falls_as_the_penalty_rises(rate_sessions) -> None:

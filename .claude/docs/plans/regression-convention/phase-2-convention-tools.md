@@ -22,7 +22,7 @@ tested coefficient):
 
 - aa8f8425: `terms.Slope` and `terms.Category` take a required `penalty` (`"none"` or a fixed log
   penalty), the identity on each column as its own block; `terms.log_penalty_from_prior_sd` and
-  `prior_sd_from_log_penalty`; each record's edf of each penalized simple coefficient; the support rule
+  `prior_sd_from_log_penalty` (removed 2026-11-24: only a test called it); each record's edf of each penalized simple coefficient; the support rule
   counts units with rows on each side, not units with events (`support.py`; the argument `has_event` is
   removed). Tests: two cells against a root of the penalized score equations and against mgcv `paraPen`
   at a fixed `sp`, both to 1e-8; the penalty path; the blocks and edf; the grouped softmax counts

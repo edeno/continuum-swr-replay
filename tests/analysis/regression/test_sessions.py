@@ -3,10 +3,13 @@ without a finite maximum, records."""
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import pandas as pd
 import pytest
 from scipy.optimize import brentq
+
+from continuum_swr_replay.analysis.regression import runtime
 
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
@@ -279,6 +282,29 @@ def test_rate_sessions_are_fitted_and_recorded(rate_sessions) -> None:
         }
         assert set(record.standardization) == {"x"}
         assert record.cohort_counts["rows_missing_values"] == 0
+
+
+def test_the_program_bound_holds_between_the_sessions_of_one_loop(
+    monkeypatch: pytest.MonkeyPatch, rate_sessions
+) -> None:
+    """With the program limit patched to 0, JAX's caches are cleared before
+    every session's fit (each is an outermost call of the fitter), so the
+    live programs stay bounded during a loop over a whole cohort; the records
+    are the ones the loop gives without the bound."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    design = _rate_design(pooled)
+    fit = {"response": "count", "unit": "well_visit_id"}
+    unbounded = _fit(design, rate_sessions, Poisson(), **fit)
+    clears = []
+    clear = jax.clear_caches
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 0)
+    monkeypatch.setattr(jax, "clear_caches", lambda: (clears.append(True), clear()))
+    bounded = _fit(design, rate_sessions, Poisson(), **fit)
+    assert len(clears) >= len(rate_sessions)
+    for got, want in zip(bounded, unbounded, strict=True):
+        assert (got.status, got.n_iter) == (want.status, want.n_iter)
+        assert got.coef == want.coef
+        assert got.vcov == want.vcov
 
 
 def test_a_design_not_identified_at_the_first_fit_names_the_session(

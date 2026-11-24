@@ -248,11 +248,23 @@ class PenaltyBlock:
 
     def at_columns(self, columns: np.ndarray) -> PenaltyBlock:
         """The same penalty on other ``columns``, its decomposition (and its
-        block in the eigenbasis, once read) copied, not computed again."""
+        block in the eigenbasis, once read) copied, not computed again.
+
+        Raises
+        ------
+        ValueError
+            If ``columns`` does not have one column for each row of ``S``.
+        """
+        columns = np.asarray(columns, dtype=int)
+        if columns.shape != (self.S.shape[0],):
+            raise ValueError(
+                f"columns has shape {columns.shape}; the penalty has "
+                f"{self.S.shape[0]} columns"
+            )
         block = object.__new__(PenaltyBlock)
         for name in ("S", "rank", "log_pdet", "eigenvalues", "eigenvectors"):
             object.__setattr__(block, name, getattr(self, name))
-        object.__setattr__(block, "columns", np.asarray(columns, dtype=int))
+        object.__setattr__(block, "columns", columns)
         if "in_eigenbasis" in self.__dict__:
             block.__dict__["in_eigenbasis"] = self.in_eigenbasis.at_columns(columns)
         return block

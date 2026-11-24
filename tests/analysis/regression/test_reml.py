@@ -370,6 +370,17 @@ def test_block_rank_is_the_penalty_rank() -> None:
     assert blocks[0].log_pdet == pytest.approx(np.log(positive).sum(), rel=1e-12)
 
 
+def test_a_block_moved_to_other_columns_keeps_its_size() -> None:
+    """``at_columns`` copies the decomposition to other columns and refuses a
+    column set of another length, as building the block again would."""
+    block = PenaltyBlock(np.arange(2, 5), np.diag([1.0, 2.0, 0.0]))
+    moved = block.at_columns(np.array([0, 3, 7]))
+    np.testing.assert_array_equal(moved.columns, [0, 3, 7])
+    assert moved.S is block.S and moved.rank == block.rank == 2
+    with pytest.raises(ValueError, match="the penalty has 3 columns"):
+        block.at_columns(np.array([0, 3]))
+
+
 def test_overlapping_blocks_are_refused() -> None:
     lik, data, blocks = _session("poisson", 2, seed=2)
     overlapping = [blocks[0], PenaltyBlock(blocks[1].columns - 1, blocks[1].S)]

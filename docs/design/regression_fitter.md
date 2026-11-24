@@ -1075,6 +1075,23 @@ so that every program is stored) the same 700 fits took 554 s, a long driver's c
 process, so it clears once or twice; the tests that count traces fix the limit high for
 their own run.
 
+The clear can fire only at the entry of an outermost call, so which functions carry
+`in_float64` decides where the bound holds. The per-session loop (`sessions.fit_sessions`)
+and the calibration (`calibration.log_penalty_for_edf`, which runs that loop at each trial
+penalty) do not carry it: each session's fit is an outermost call, the caches can be cleared
+between two sessions, and the live programs stay bounded through a whole cohort
+(`test_the_program_bound_holds_between_the_sessions_of_one_loop`,
+`test_the_program_bound_holds_during_a_calibration`). The penalty searches
+(`select_penalties`, `refine_penalties`, `fit_at_penalties`, `pooled_reml`), `refit_session`
+and `term_collinearity` do carry it, so that no clear falls between two evaluations of one
+search, which would compile every session's programs again at each evaluation
+(`test_a_search_clears_the_caches_at_most_once_at_its_entry`). **Inside one search the
+bound therefore does not hold**: a search keeps one set of programs for each row bucket and
+each number of active columns among its sessions. How many that is for a full cohort has
+not been measured; measure it (`runtime.live_programs()`) before a search over a whole
+cohort is run, and see the planned fixed-width kernels (inactive columns as a mask), which
+make the count the number of row buckets.
+
 **Importing the fitter imports JAX.** `likelihoods`, `newton` and `reml` import JAX, and
 so every module of the fitter that imports them (`sessions`, `calibration`, `record`,
 `terms`, `support`, `collinearity`, `simulation`) and the modules that import those (the

@@ -82,7 +82,7 @@ direction). `in_null_space(session, blocks)` flags, per block, a term shrunk to 
 straight line). `search` is a `PenaltySearch` (None from `fit_at_penalties`): `reference_rho`, `in_choice`
 (the sessions whose scores chose the penalties; `PooledFit.score` is over these only), `set_aside`
 (`SetAsideSession`s with `reference`, `refits`, `left_out`, `reason` and `fitted`), `grid_failures` per
-status, `n_outer_steps`, `at_boundary` per term and `share_without_fit`. A set-aside session has its refit
+status, `n_outer_steps`, `at_boundary` per term and `share_without_fit` (removed 2026-11-24: the share of `set_aside` not `fitted`). A set-aside session has its refit
 in `sessions`, NaN at the columns left out, or NaN values when it has no fit.
 
 **Statuses** (`newton.FitStatus`; `NewtonFit.converged` is true only for the first): "converged", "design
