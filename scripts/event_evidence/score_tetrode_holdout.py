@@ -28,13 +28,11 @@ The trials are ``load_data``'s (parsed from the DIO events), not the session
 cache's, and each epoch's record keeps their digest (``_per_event_run.trials_input``).
 
 Writes ``{epoch_id}_tetrode_holdout.parquet`` per epoch (one row per window and
-tetrode: ``window_id`` (the window's number in the epoch), ``event_id`` (the
-event's, or for a control the event it matches), ``kind`` (``"event"`` or ``"control"``),
-``group``, ``tetrode``, ``n_bins``, ``n_scored_bins``, ``n_spikes``,
-``population``, ``local``, ``local_bin``, ``gain``, ``gain_bin``,
-``nonlocal_prob``, ``gain_silent``, ``agreement``, ``agreement_silent``,
-``uniform``, ``spread_cm`` and the extra scores below; the columns are
-``tetrode_holdout.RUN_COLUMNS``), each epoch's record
+tetrode, the columns ``tetrode_holdout.RUN_COLUMNS`` in that order: the scores
+of ``tetrode_holdout.holdout_scores``, the extra scores below among them, and
+``event_id`` (the event's, or for a control the event it matches), ``kind``
+(``"event"`` or ``"control"``), ``group``, ``epoch_id`` and ``animal``), each
+epoch's record
 ``{epoch_id}_tetrode_holdout.json`` (status, the fold design and its margin in
 bins, the folds' ``n_segments``, ``n_groups`` and ``trial_bin_share``,
 the digest and number of the trials the folds were made from
@@ -63,8 +61,9 @@ reference of the agreement (``agreement_null``, ``agreement_null_silent``,
 with ``--null-seed``, and the place information of the scored tetrode's spikes
 (``mark_information``, ``spike_information``, ``n_information_spikes``;
 ``tetrode_holdout.spike_information``). The header's settings record
-``extra_scores`` (the HPD coverage, the seed and the donor rule), so a run with
-another seed neither resumes nor gathers with the stored one (seed 0).
+``extra_scores`` (``tetrode_holdout.reference_settings``: the HPD coverage, the
+seed and the donor rule), so a run with another seed neither resumes nor
+gathers with the stored one (seed 0).
 
 Usage::
 
@@ -182,7 +181,10 @@ def run_epoch(
     table = scores.join(columns, on="window_id").assign(
         epoch_id=epoch_id, animal=parse_epoch_identifier(epoch_id).animal
     )
-    write_table(table, output_path(epoch_id, output, TETRODE_HOLDOUT_NAME))
+    write_table(
+        table[list(th.RUN_COLUMNS)],
+        output_path(epoch_id, output, TETRODE_HOLDOUT_NAME),
+    )
     return {
         "status": "ok",
         "n_windows": len(windows),
@@ -221,11 +223,7 @@ def main(argv: list[str] | None = None) -> None:
         "settings": {
             "n_folds": N_FOLDS,
             **th.fold_settings(),
-            "extra_scores": {
-                "hpd_coverage": th.HPD_COVERAGE,
-                "null_seed": args.null_seed,
-                "null_donor_rule": th.NULL_DONOR_RULE,
-            },
+            "extra_scores": th.reference_settings(args.null_seed),
         },
         "inputs": {
             "event_table": file_input(event_table),
