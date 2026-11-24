@@ -63,6 +63,7 @@ from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_
 from continuum_swr_replay.paths import inventory_comparison_root
 from continuum_swr_replay.runs.io import ok_epochs, ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 COVERINGS = {
     "kay": ("kay",),
@@ -661,10 +662,6 @@ def _selected(table: pd.DataFrame, event_ids: Iterable[object]) -> np.ndarray:
     )
 
 
-_LEFT_OUT_SESSION = ["animal", "day", "epoch"]
-"""The columns that name an epoch in the run's and the inventory run's tables."""
-
-
 def left_out_epoch_seconds(
     run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
 ) -> pd.DataFrame:
@@ -712,7 +709,7 @@ def left_out_epoch_seconds(
         table = pd.read_parquet(
             path,
             columns=[
-                *_LEFT_OUT_SESSION,
+                *SESSION_COLUMNS_DAY,
                 "detector",
                 "event_key",
                 "event_start_s",
@@ -729,7 +726,7 @@ def left_out_epoch_seconds(
                 kay["event_start_s"].to_numpy(dtype=np.float64), *visits[identifier]
             )
         ]
-        row = dict(table[_LEFT_OUT_SESSION].iloc[0])
+        row = dict(table[list(SESSION_COLUMNS_DAY)].iloc[0])
         row["nonlocal"] = intervals.total_duration(nonlocal_)
         row["kay"] = intervals.total_duration(_intervals(kay, ("kay",)))
         for name, detectors in COVERINGS.items():
@@ -871,7 +868,7 @@ def left_out_statistics(
         detector observed.
     """
     event_ids = list(event_ids)
-    session = _LEFT_OUT_SESSION
+    session = list(SESSION_COLUMNS_DAY)
     availability = detector_availability(
         typed_table(
             map(read_table, _epoch_paths(inventory_dir, "observations")),

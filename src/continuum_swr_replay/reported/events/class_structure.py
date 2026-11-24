@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.event_properties import (
     event_statistics,
     nonlocal_by_signal,
@@ -20,7 +17,7 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.paths import ROOT_DIR
+from continuum_swr_replay.paths import ROOT_DIR, STATE_SPACE_FEATURES_RUN
 from continuum_swr_replay.reported.events.common import (
     EVENTS_SUBSET,
     TAGS,

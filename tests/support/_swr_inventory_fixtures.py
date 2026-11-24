@@ -203,10 +203,10 @@ def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) 
     The data root becomes the root `inventory` was written under; `artifacts`
     must have been written under the same one.
     """
-    from continuum_swr_replay.analysis.event_definition import swr_source
+    from continuum_swr_replay import paths
 
     _use_root(monkeypatch, _root_of(inventory.parent, swr_inventory_root))
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
+    monkeypatch.setattr(paths, "SWR_INVENTORY_RUN", inventory.name)
     if artifacts is not None:
         use_artifact_run(monkeypatch, artifacts)
 
@@ -218,10 +218,10 @@ def use_artifact_run(monkeypatch, artifacts: Path) -> None:
     inventory, if any, was written under too), and the configured artifact run
     its run id.
     """
-    from continuum_swr_replay.analysis.event_definition import swr_source
+    from continuum_swr_replay import paths
 
     _use_root(monkeypatch, _root_of(artifacts.parent, artifact_intervals_root))
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+    monkeypatch.setattr(paths, "ARTIFACT_INTERVALS_RUN", artifacts.name)
 
 
 def _use_root(monkeypatch, root: Path) -> None:

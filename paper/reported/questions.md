@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `c8cecb1776a9` | yes | 32 | 0 |
-| `detection.json` | `c8cecb1776a9` | yes | 172 | 0 |
-| `events.json` | `c8cecb1776a9` | yes | 1764 | 0 |
-| `behavior.json` | `c8cecb1776a9` | yes | 922 | 0 |
-| `mpfc.json` | `c8cecb1776a9` | yes | 604 | 0 |
+| `survey.json` | `4e793986f2da` | yes | 32 | 0 |
+| `detection.json` | `4e793986f2da` | yes | 172 | 0 |
+| `events.json` | `4e793986f2da` | yes | 1764 | 0 |
+| `behavior.json` | `4e793986f2da` | yes | 922 | 0 |
+| `mpfc.json` | `4e793986f2da` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -507,36 +507,36 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileCiHigh` | 8.1 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileCiLow` | 4.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose median over their epochs of the held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiHigh` | 7.4 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiLow` | 4.2 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutContinuousImmobileEpochs` | 242 |  | epochs with Non-Local Continuous bouts, immobile scored | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutContinuousImmobileEpochsPositive` | 239 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileEstimate` | 6.1 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningCiHigh` | −0.47 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningCiLow` | −1.9 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEstimate` | 5.8 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's median over its epochs of each epoch's median over its bouts | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose median over their epochs of the held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiHigh` | −0.51 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiLow` | −1.5 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutContinuousRunningEpochs` | 242 |  | epochs with Non-Local Continuous bouts, running scored | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutContinuousRunningEpochsPositive` | 23 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningEstimate` | −1.2 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.83 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.59 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEstimate` | −0.99 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's median over its epochs of each epoch's median over its bouts | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose median over their epochs of the held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.60 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.56 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutFragmentedImmobileMismatchedEpochs` | 242 |  | epochs with Non-Local Fragmented bouts, immobile scored | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive` | 117 |  | epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.12 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileCiHigh` | 4.4 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileCiLow` | 1.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.023 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's median over its epochs of each epoch's median over its bouts | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose median over their epochs of the held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiHigh` | 4.3 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiLow` | 0.99 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutLocalImmobileEpochs` | 242 |  | epochs with Local bouts, immobile scored | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutLocalImmobileEpochsPositive` | 242 |  | epochs whose median held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileEstimate` | 2.8 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.7 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.7 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEstimate` | 2.6 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's median over its epochs of each epoch's median over its bouts | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose median over their epochs of the held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.8 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.8 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutNoSpikeImmobileEpochs` | 241 |  | epochs with No-Spike bouts, immobile scored | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutNoSpikeImmobileEpochsPositive` | 241 |  | epochs whose median held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.7 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.8 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's median over its epochs of each epoch's median over its bouts | `detection.state_evidence_values` |  |
 | `\DetectionStateEvidenceAnimals` | 5 |  | animals in the held-out tetrode run | `detection.state_evidence_values` |  |
 | `\DetectionStateEvidenceEpochs` | 242 |  | epochs the held-out tetrode run lists | `detection.state_evidence_values` |  |
 | `\DetectionStateEvidenceEpochsOk` | 242 |  | of those, epochs that passed every check of the run (status ok) | `detection.state_evidence_values` |  |

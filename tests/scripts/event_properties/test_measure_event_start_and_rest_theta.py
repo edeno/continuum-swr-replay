@@ -17,9 +17,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    STATE_SPACE_FEATURES_RUN,
-)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
 )
@@ -27,6 +24,7 @@ from continuum_swr_replay.analysis.event_properties import start_and_rest_theta
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
+    STATE_SPACE_FEATURES_RUN,
     event_features_root,
     replay_content_dir,
     table_path,

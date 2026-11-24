@@ -19,7 +19,7 @@ Per epoch:
    ``filter_ripple_lfp_time`` drops them, and ``head_speed`` is interpolated
    linearly onto the LFP times.
 3. **Artifacts.** The epoch's artifact intervals are the configured artifact
-   run's cores (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the
+   run's cores (``paths.ARTIFACT_INTERVALS_RUN``, read once when the
    run starts and recorded in its settings) padded by the one table every
    stage uses (``event_definition.artifact_masks.PADDING_S``: S by 1 s, a step with an LFP
    signature by 0.3 s, a spike-only line by 0.1 s). Their time is the artifact
