@@ -1009,6 +1009,13 @@ def _by_session(frames: list[pd.DataFrame]) -> dict:
 
 
 def _records(design, sessions, lik, response: str, unit: str) -> list[dict]:
+    """The records of ``fit_sessions``, without ``fit_by`` and ``sessions``.
+
+    The references are of the NumPy fitter, whose record had no unit of the
+    fit. Every case here is a per-session fit, where the two fields repeat what
+    the record already holds; that is checked here before they are left out of
+    the comparison.
+    """
     with np.errstate(over="ignore", invalid="ignore"):
         records = fit_sessions(
             design,
@@ -1020,7 +1027,26 @@ def _records(design, sessions, lik, response: str, unit: str) -> list[dict]:
             unit=unit,
             table_sha256={"t": "0" * 64},
         )
-    return [asdict(r) for r in records]
+    out = []
+    for r in records:
+        record = asdict(r)
+        key = (r.animal, r.session_date, r.epoch)
+        if record.pop("fit_by") != "session":
+            raise AssertionError(f"session {key}: fit_by {r.fit_by!r}, not 'session'")
+        entries = record.pop("sessions")
+        if (
+            len(entries) != 1
+            or tuple(entries[0][k] for k in ("animal", "session_date", "epoch")) != key
+        ):
+            raise AssertionError(f"session {key}: sessions {entries!r}")
+        for field in ("n_rows", "n_units", "n_events"):
+            if entries[0][field] != record[field]:
+                raise AssertionError(
+                    f"session {key}: sessions[0][{field!r}] {entries[0][field]!r}, "
+                    f"the record's {record[field]!r}"
+                )
+        out.append(record)
+    return out
 
 
 def _rate_sessions() -> dict:
