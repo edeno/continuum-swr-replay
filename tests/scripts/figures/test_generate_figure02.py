@@ -368,6 +368,15 @@ def test_the_figure_draws_its_panels_in_the_cited_order(figure02, drawn):
     figure02.check_journal_limits(drawn)
 
 
+def test_the_figure_is_placed_in_the_font_of_a_machine_without_arial(figure02):
+    """The figure settles and passes ``check_placement`` (in
+    :func:`generate_figure`) in DejaVu Sans too, the font matplotlib falls back
+    to (the continuous-integration machine's), whose glyphs are wider."""
+    with matplotlib.rc_context({"font.family": "DejaVu Sans"}):
+        fig = figure02.generate_figure(_inputs(figure02))
+    plt.close(fig)
+
+
 def test_each_panels_values_carry_its_letter(figure02):
     """The events summary tags each panel's values with the panel's letter, as
     the figure places it; the restriction panel draws the summary's own

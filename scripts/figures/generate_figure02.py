@@ -1152,11 +1152,13 @@ def draw_overview(
     )
     label_reward_well(ax_track, data["track_graph"])
     rows = gs[1].subgridspec(
-        5, 1, height_ratios=[1.3, 1.3, 0.42, 0.42, 0.42], hspace=0.14
+        5, 1, height_ratios=[1.2, 1.45, 0.42, 0.42, 0.42], hspace=0.14
     )
     ax_pos, ax_lane, ax_rip, ax_st, ax_sp = (fig.add_subplot(rows[i]) for i in range(5))
     draw_posterior(ax_pos, data, results, env, sl, start, max_pos)
-    add_track_strip(ax_pos, data, max_pos)
+    strip = add_track_strip(ax_pos, data, max_pos)
+    # the top only: a 0 at the strip's foot would sit on the lanes' first name
+    strip.set_yticks([0, max_pos], ["", f"{max_pos:g}"])
     ax_pos.text(
         0.48, 0.45, "animal's position", transform=ax_pos.transAxes,
         color=ANIMAL_POS_COLOR, fontsize=SMALL_SIZE, ha="left", va="top",
@@ -1807,7 +1809,7 @@ def generate_figure(inputs: dict) -> Figure:
     ax_participation = fig.add_subplot(cells["participation"])
     draw_participation(ax_participation, inputs["participation"])
     power_grid = cells["nonlocal_ripple_power"].subgridspec(
-        2, 1, height_ratios=[1.5, 1.6], hspace=0.2
+        2, 1, height_ratios=[1.5, 1.6], hspace=0.3
     )
     ax_spread = fig.add_subplot(power_grid[0])
     ax_share = fig.add_subplot(power_grid[1], sharex=ax_spread)
