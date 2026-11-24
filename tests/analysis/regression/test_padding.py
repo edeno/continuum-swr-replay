@@ -22,7 +22,6 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
     GroupedSoftmax,
-    Groups,
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.padding import (
@@ -30,6 +29,7 @@ from continuum_swr_replay.analysis.regression.padding import (
     ROW_BUCKET,
     SMALLEST_ROW_BUCKET,
     SOFTMAX_ROW_BUCKET,
+    Groups,
     bucket_size,
     pad_groups,
     pad_rows,
@@ -167,10 +167,10 @@ def test_padded_rows_follow_the_real_ones_with_zeros():
     assert padded.X.shape == (8, 2) and padded.n_real == 5
     np.testing.assert_array_equal(padded.X[:5], X)
     np.testing.assert_array_equal(padded.y[:5], y)
-    np.testing.assert_array_equal(padded.offset[:5], offset)
+    np.testing.assert_array_equal(padded.aux[:5], offset)
     np.testing.assert_array_equal(padded.weight, [1, 1, 1, 1, 1, 0, 0, 0])
     assert not padded.X[5:].any() and not padded.y[5:].any()
-    assert not padded.offset[5:].any()
+    assert not padded.aux[5:].any()
     with pytest.raises(ValueError, match="one row each"):
         pad_rows(X, y[:4])
 
@@ -179,8 +179,8 @@ def test_padded_groups_number_the_groups_and_put_padding_in_one_more():
     X = np.ones((5, 1))
     padded = pad_groups(X, np.ones(5), np.array([10, 10, 12, 30, 30]), row_step=4)
 
-    np.testing.assert_array_equal(padded.group, [0, 0, 1, 2, 2, 3, 3, 3])
-    assert (padded.n_real_groups, padded.n_groups) == (3, GROUP_BUCKET)
+    np.testing.assert_array_equal(padded.aux.index, [0, 0, 1, 2, 2, 3, 3, 3])
+    assert padded.aux.n_groups == GROUP_BUCKET  # 3 real groups and the padding one
     np.testing.assert_array_equal(padded.weight, [1] * 5 + [0] * 3)
     with pytest.raises(ValueError, match="sorted"):
         pad_groups(X, np.ones(5), np.array([1, 0, 0, 2, 2]))
@@ -194,7 +194,7 @@ def test_a_padded_diagonal_family_equals_the_unpadded_fit(family, step):
     rng = np.random.default_rng(1)
     d1, d2 = rng.normal(size=(2, y.size))
     padded = pad_rows(X, y, aux if family == "poisson" else None, step=step)
-    padded_aux = padded.offset if family == "poisson" else aux
+    padded_aux = padded.aux if family == "poisson" else aux
     n = padded.y.size
 
     _assert_equal(
@@ -229,19 +229,19 @@ def test_a_padded_softmax_equals_the_unpadded_fit(n_groups, row_step):
     lik = GroupedSoftmax()
     n_padded_rows = padded.y.size - padded.n_real
     assert (n_padded_rows == 0) == (row_step is None)
-    assert padded.n_groups > padded.n_real_groups
+    assert padded.aux.n_groups > n_groups
     rng = np.random.default_rng(2)
     d1, d2 = rng.normal(size=(2, y.size))
     n = padded.y.size
     unpadded = pad_groups(X, y, ids, row_step=y.size, group_step=1)
-    assert unpadded.n_groups == n_groups + 1  # one padding group, with no rows
+    assert unpadded.aux.n_groups == n_groups + 1  # one padding group, with no rows
 
     _assert_equal(
         _kernels(
             lik,
             padded.X,
             padded.y,
-            Groups(padded.group, padded.n_groups),
+            padded.aux,
             padded.weight,
             beta,
             pad_values(d1, y.size, n),
@@ -251,7 +251,7 @@ def test_a_padded_softmax_equals_the_unpadded_fit(n_groups, row_step):
             lik,
             X,
             y,
-            Groups(unpadded.group, n_groups),
+            Groups(unpadded.aux.index, n_groups),
             np.ones(y.size),
             beta,
             d1,
@@ -300,12 +300,12 @@ def test_the_padded_kernels_equal_the_numpy_formulas(family):
         lik, aux, padded_aux = (
             GroupedSoftmax(),
             ids,
-            Groups(padded.group, padded.n_groups),
+            padded.aux,
         )
     else:
         lik, X, beta, y, aux = _diagonal_case(family)
         padded = pad_rows(X, y, aux if family == "poisson" else None)
-        padded_aux = padded.offset if family == "poisson" else aux
+        padded_aux = padded.aux if family == "poisson" else aux
     d = pad_values(rng.normal(size=y.size), y.size, padded.y.size)
     got = _kernels(lik, padded.X, padded.y, padded_aux, padded.weight, beta, d, d)
     _assert_equal(got[:3], _numpy_reference(family, X, beta, y, aux))
@@ -320,11 +320,11 @@ def test_junk_in_the_padded_rows_changes_nothing(family):
     if family == "softmax":
         X, beta, y, ids = _softmax_case(40)
         padded = pad_groups(X, y, ids)
-        lik, aux = GroupedSoftmax(), Groups(padded.group, padded.n_groups)
+        lik, aux = GroupedSoftmax(), padded.aux
     else:
         lik, X, beta, y, aux = _diagonal_case(family)
         padded = pad_rows(X, y, aux if family == "poisson" else None)
-        aux = padded.offset if family == "poisson" else aux
+        aux = padded.aux if family == "poisson" else aux
     n, n_bucket = padded.n_real, padded.y.size
     d1, d2 = (pad_values(rng.normal(size=n), n, n_bucket) for _ in range(2))
     clean = _kernels(lik, padded.X, padded.y, aux, padded.weight, beta, d1, d2)
@@ -428,15 +428,15 @@ def _derivative_cases(family: str, step: int | None):
         lik = GroupedSoftmax()
         padded = pad_groups(X, y, ids, row_step=step or y.size)
         unpadded = pad_groups(X, y, ids, row_step=y.size, group_step=1)
-        rows = (X, y, Groups(unpadded.group, 40), np.ones(y.size))
-        aux = Groups(padded.group, padded.n_groups)
+        rows = (X, y, Groups(unpadded.aux.index, 40), np.ones(y.size))
+        aux = padded.aux
         information = family_kernel(lik, "information", X, X @ beta, y, ids)
     else:
         lik, X, beta, y, aux = _diagonal_case(family)
         padded = pad_rows(X, y, aux if family == "poisson" else None, step=step)
         rows = (X, y, aux, np.ones(y.size))
         information = family_kernel(lik, "information", X, X @ beta, y, aux)
-        aux = padded.offset if family == "poisson" else aux
+        aux = padded.aux if family == "poisson" else aux
     # The first column is constant, which the softmax cannot see: a unit on
     # its diagonal keeps A positive definite.
     A = information + _two_penalties()[0].sum(axis=0) + np.diag(np.eye(N_COLUMNS)[0])
@@ -523,6 +523,6 @@ def test_an_offset_of_minus_infinity_would_give_nan():
         weight, y, eta = jnp.array([1.0, 0.0]), jnp.zeros(2), jnp.zeros(2)
         assert jnp.isnan(jnp.sum(weight * (y * (eta + offset) - jnp.exp(eta + offset))))
         padded = pad_rows(np.zeros((1, 1)), np.zeros(1), np.zeros(1), step=2)
-        offset = jnp.asarray(padded.offset)
+        offset = jnp.asarray(padded.aux)
         terms = jnp.asarray(padded.y) * offset - jnp.exp(offset)
         assert jnp.isfinite(jnp.sum(jnp.asarray(padded.weight) * terms))

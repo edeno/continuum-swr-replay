@@ -81,7 +81,8 @@ from .constants import (
     NO_MAXIMUM_ETA_STEP,
     RUNNING_AWAY_TIE_DECIMALS,
 )
-from .likelihoods import Likelihood, Rows
+from .likelihoods import Likelihood
+from .padding import Rows
 from .runtime import float64_kernel, in_float64
 
 __all__ = [

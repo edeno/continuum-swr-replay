@@ -66,69 +66,33 @@ cap on its length.
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Protocol
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy.special import expit
 
-from .padding import group_sizes, group_starts, pad_groups, pad_rows, pad_values
+from .padding import (
+    Groups,
+    Rows,
+    group_sizes,
+    group_starts,
+    pad_groups,
+    pad_rows,
+    pad_values,
+)
 from .runtime import float64_kernel, in_float64
 
 __all__ = [
     "Bernoulli",
     "Gaussian",
     "GroupedSoftmax",
-    "Groups",
     "Likelihood",
     "Poisson",
-    "Rows",
     "draw",
     "group_starts",
 ]
-
-
-class Rows(NamedTuple):
-    """A session's rows padded for a kernel (``Likelihood.pad``).
-
-    Attributes
-    ----------
-    X : np.ndarray, shape (n_bucket, p)
-    y : np.ndarray, shape (n_bucket,)
-    aux : object
-        The family's extra data as its kernels take it: the padded offset, the
-        scale, :class:`Groups`, or None.
-    weight : np.ndarray, shape (n_bucket,)
-        1 on a real row, 0 on a padded one.
-    n_real : int
-        The real rows, which are the first `n_real`.
-    """
-
-    X: np.ndarray
-    y: np.ndarray
-    aux: Any
-    weight: np.ndarray
-    n_real: int
-
-
-@dataclass(frozen=True)
-class Groups:
-    """The grouped softmax's ``aux`` in a kernel.
-
-    Attributes
-    ----------
-    index : array of int, shape (n_bucket,)
-        Each row's group, 0 to ``n_groups - 1``, sorted; the padded rows are in
-        one group after the real ones.
-    n_groups : int
-        The groups summed over, padded (``padding.pad_groups``); static, since
-        ``segment_sum`` needs it when traced.
-    """
-
-    index: Any
-    n_groups: int
 
 
 jax.tree_util.register_dataclass(
@@ -397,8 +361,7 @@ class Poisson(_DiagonalFamily):
         offset = np.asarray(aux, dtype=float)
         if offset.ndim == 0:  # one offset for every row
             offset = np.full(np.shape(y), float(offset))
-        padded = pad_rows(X, y, _one_axis(offset, "offset"))
-        return Rows(padded.X, padded.y, padded.offset, padded.weight, padded.n_real)
+        return pad_rows(X, y, _one_axis(offset, "offset"))
 
     def _jax_loglik(self, eta, y, aux, weight):
         log_mu = eta + aux
@@ -432,8 +395,7 @@ class Bernoulli(_DiagonalFamily):
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
         """The rows padded to their bucket (``padding.pad_rows``); no aux."""
-        padded = pad_rows(X, y)
-        return Rows(padded.X, padded.y, None, padded.weight, padded.n_real)
+        return pad_rows(X, y)
 
     def _jax_loglik(self, eta, y, aux, weight):
         return jnp.sum(weight * (y * eta - jnp.logaddexp(0.0, eta)))
@@ -466,9 +428,7 @@ class Gaussian(_DiagonalFamily):
     def pad(self, X: np.ndarray, y: np.ndarray, aux: float | None) -> Rows:
         """The rows padded to their bucket (``padding.pad_rows``); the scale
         as a float64 (None stays None: the weighted design does not read it)."""
-        padded = pad_rows(X, y)
-        scale = None if aux is None else np.float64(aux)
-        return Rows(padded.X, padded.y, scale, padded.weight, padded.n_real)
+        return pad_rows(X, y)._replace(aux=None if aux is None else np.float64(aux))
 
     def _jax_loglik(self, eta, y, aux, weight):
         residual = y - eta
@@ -542,9 +502,7 @@ class GroupedSoftmax(_Family):
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
         """The rows and groups padded (``padding.pad_groups``)."""
-        padded = pad_groups(X, y, aux)
-        groups = Groups(padded.group, padded.n_groups)
-        return Rows(padded.X, padded.y, groups, padded.weight, padded.n_real)
+        return pad_groups(X, y, aux)
 
     @staticmethod
     def _per_group(values: Any, groups: Groups) -> Any:

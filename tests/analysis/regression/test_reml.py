@@ -23,7 +23,6 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     Gaussian,
     GroupedSoftmax,
-    Groups,
     Poisson,
 )
 from continuum_swr_replay.analysis.regression.newton import (
@@ -34,6 +33,7 @@ from continuum_swr_replay.analysis.regression.newton import (
     STEP_LIMIT,
     penalized_newton,
 )
+from continuum_swr_replay.analysis.regression.padding import Groups
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.reml import (
     PenaltyBlock,
