@@ -153,6 +153,10 @@ STATE_BY_SIGNAL_DIR = "state_by_signal"
 """Each epoch's immobile time bins inside the well visits by ripple power and
 by MUA and by decoder state class
 (``scripts/event_properties/measure_state_by_signal.py``)."""
+EVENT_TRIGGER_WINDOWS_DIR = "event_trigger_windows"
+"""Each epoch's windows of the per-time-bin signals around its non-local events'
+starts and its No-Spike periods' starts, Figure 2g's and its supplement's
+(``scripts/event_properties/measure_trigger_windows.py``)."""
 NONLOCAL_PROBABILITY_DIR = "nonlocal_probability"
 """Each epoch's immobile time bins inside the well visits by non-local
 probability, in 50 equal bins

@@ -7,7 +7,9 @@ the one the run recorded), over the time inside the well visits read from the
 session cache (``event_tables.prepare_data.well_visit_times``), and write one
 ``counts.parquet`` with a ``manifest.json`` beside it. :func:`run` does that;
 each script gives its own measurement of one epoch, its output folder and the
-manifest keys that say what it counted.
+manifest keys that say what it counted. ``measure_trigger_windows.py`` writes
+its windows the same way (``windows.parquet``), its measurement given the
+epoch's well visits.
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
@@ -37,9 +38,10 @@ from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import described_commit
 from continuum_swr_replay.tables.io import write_atomically
 
-Measure = Callable[[pd.DataFrame, np.ndarray], tuple[pd.DataFrame, dict]]
+Measure = Callable[..., tuple[pd.DataFrame, dict]]
 """One epoch's measurement: given its decode frame and whether each bin is
-inside a well visit, its counts and its manifest record."""
+inside a well visit (and, for a runner that asks, the visits' arrival and
+departure times), its rows and its manifest record."""
 
 BINS = (
     f"head_speed below {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:g} cm/s, inside a "
@@ -48,7 +50,9 @@ BINS = (
 """The manifest's ``bins``: the time every counts run counts."""
 
 
-def _epoch(job: tuple[str, str], measure: Measure) -> tuple[pd.DataFrame, dict]:
+def _epoch(
+    job: tuple[str, str], measure: Measure, with_visits: bool = False
+) -> tuple[pd.DataFrame, dict]:
     """One epoch's counts, after its ``epoch_id``, ``animal``,
     ``session_date``, ``epoch`` and ``decode_sha256``, and its record."""
     identifier, expected_sha256 = job
@@ -56,8 +60,11 @@ def _epoch(job: tuple[str, str], measure: Measure) -> tuple[pd.DataFrame, dict]:
         inventory_run.decode_path(identifier), expected_sha256
     )
     animal, day, epoch = (dot[c].iloc[0] for c in ("animal", "day", "epoch"))
-    in_visit = in_well_visit(dot.index.to_numpy(), *well_visit_times(identifier))
-    counts, record = measure(dot, in_visit)
+    visits = well_visit_times(identifier)
+    in_visit = in_well_visit(dot.index.to_numpy(), *visits)
+    counts, record = (
+        measure(dot, in_visit, visits) if with_visits else measure(dot, in_visit)
+    )
     counts.insert(0, "decode_sha256", expected_sha256)
     counts.insert(0, "epoch", str(epoch))
     counts.insert(0, "session_date", int(day))
@@ -74,6 +81,8 @@ def run(
     output_name: str,
     measure: Measure,
     counted: Mapping[str, object],
+    output_file: str = "counts.parquet",
+    with_visits: bool = False,
 ) -> None:
     """Parse the runner's arguments, count every epoch and write the counts and
     the manifest.
@@ -94,6 +103,11 @@ def run(
         processes).
     counted : mapping
         The manifest's keys after ``bins``, in order: what the counts are by.
+    output_file : str, optional
+        The table's file name in the output folder.
+    with_visits : bool, optional
+        Give ``measure`` the epoch's well visits (arrival and departure times)
+        as its third argument.
     """
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--event-features-run", required=True)
@@ -113,13 +127,14 @@ def run(
     ]
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         tables, records = zip(
-            *pool.map(partial(_epoch, measure=measure), jobs), strict=True
+            *pool.map(partial(_epoch, measure=measure, with_visits=with_visits), jobs),
+            strict=True,
         )
     out_dir = args.output_dir or processed_data_dir() / output_name
     out_dir.mkdir(parents=True, exist_ok=True)
     table = pd.concat(tables, ignore_index=True)
     write_atomically(
-        out_dir / "counts.parquet", lambda path: table.to_parquet(path, index=False)
+        out_dir / output_file, lambda path: table.to_parquet(path, index=False)
     )
     write_json(
         out_dir / "manifest.json",
@@ -140,4 +155,4 @@ def run(
         indent=1,
         final_newline=True,
     )
-    print(f"wrote {len(tables)} epochs to {out_dir / 'counts.parquet'}")
+    print(f"wrote {len(tables)} epochs to {out_dir / output_file}")

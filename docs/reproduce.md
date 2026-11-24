@@ -86,7 +86,9 @@ after a change to fitting code only, start at step 6.
       4 and 5);
    7. on the CPU, from stored outputs only: `scripts/event_properties/measure_nonlocal_by_signal.py`
       (Figure 2i and the MUA panel of its supplement), `scripts/event_properties/measure_state_by_signal.py`
-      (their top strips, by decoder state), `scripts/decoding/measure_nonlocal_probability.py`
+      (their top strips, by decoder state), `scripts/event_properties/measure_trigger_windows.py`
+      (the windows around event starts and No-Spike starts of Figure 2g and its supplement, and the
+      frames' event counts), `scripts/decoding/measure_nonlocal_probability.py`
       (the immobile time by non-local probability, panel c of Figure 2's supplement), `scripts/event_properties/sweep_event_rule.py`
       (the event rule's sensitivity check; reads the event table) and
       `summarize_state_calibration_in_visits.py` (the state calibration inside the well visits, from
@@ -107,6 +109,7 @@ after a change to fitting code only, start at step 6.
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_nonlocal_by_signal.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/decoding/measure_nonlocal_probability.py --event-features-run e2331f976fd1 --n-workers 8
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_state_by_signal.py --event-features-run e2331f976fd1 --n-workers 8
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_trigger_windows.py --event-features-run e2331f976fd1 --n-workers 8
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/sweep_event_rule.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/summarize_state_calibration_in_visits.py
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_content_place_rate.py --workers 8

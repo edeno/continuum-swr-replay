@@ -552,3 +552,172 @@ def test_animal_window_medians_are_each_animals_median_over_its_events():
     np.testing.assert_allclose(medians["a"], [2.0, 6.0])
     np.testing.assert_allclose(medians["b"], [10.0, 20.0])
     np.testing.assert_allclose(medians.index, [-0.002, 0.0])
+
+
+def _windows(values: np.ndarray, animals: list[str], labels: list[int]):
+    """Two-lag windows of the four triggered signals, the same values for each,
+    their event index carrying ``animal``, ``day``, ``epoch`` and
+    ``non_local_event``."""
+    import xarray as xr
+
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        TRIGGERED_SIGNALS,
+    )
+
+    index = pd.MultiIndex.from_arrays(
+        [animals, [1] * len(animals), ["02_r1"] * len(animals), labels],
+        names=["animal", "day", "epoch", "non_local_event"],
+    )
+    return xr.DataArray(
+        np.repeat(values[:, :, None], len(TRIGGERED_SIGNALS), axis=2),
+        dims=("event", "time", "signal"),
+        coords={
+            "event": index,
+            "time": [-0.002, 0.0, 0.002],
+            "signal": list(TRIGGERED_SIGNALS),
+        },
+    )
+
+
+def test_an_epochs_trigger_windows_are_stored_a_row_per_window_and_signal(
+    monkeypatch,
+):
+    """Each event window of each signal and each No-Spike window is one row,
+    its lags in columns by their offset in samples; the record holds the
+    frame's events by SWR overlap and the MUA level outside the periods."""
+    import xarray as xr
+
+    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
+
+    frame = pd.DataFrame(
+        {"animal": "a", "day": 1, "epoch": "02_r1"}, index=[0.0, 0.002, 0.004]
+    )
+    event_types = {
+        "non_local_event_immobile": pd.DataFrame(
+            {"animal": "a", "day": 1, "epoch": "02_r1", "non_local_event": [4, 4, 7]}
+        ),
+        "non_local_event_immobile_overlap_SWR_event": pd.DataFrame(
+            {"animal": "a", "day": 1, "epoch": "02_r1", "non_local_event": [7]}
+        ),
+        "non_local_event_immobile_no_overlap_SWR_event": pd.DataFrame(
+            {"animal": "a", "day": 1, "epoch": "02_r1", "non_local_event": [4, 4]}
+        ),
+    }
+    monkeypatch.setattr(
+        ta,
+        "triggered_windows",
+        lambda frame, types, signals, window_sec: {
+            "no_overlap": _windows(np.array([[1.0, 2.0, 3.0]]), ["a"], [4]),
+            "overlap": _windows(np.array([[4.0, 5.0, 6.0]]), ["a"], [7]),
+        },
+    )
+    periods = pd.DataFrame(
+        {"start_time": [0.002, 0.004], "end_time": [0.004, 0.006], "duration": 0.002}
+    )
+    monkeypatch.setattr(ta, "no_spike_periods", lambda *args: periods)
+    monkeypatch.setattr(ta, "level_outside_periods", lambda *args: 0.25)
+
+    def signal_windows(frame, event_times, signals, window_sec, event_id_col):
+        index = pd.MultiIndex.from_arrays(
+            [["a"] * 2, [1] * 2, ["02_r1"] * 2, event_times[event_id_col]],
+            names=["animal", "day", "epoch", event_id_col],
+        )
+        return xr.DataArray(
+            np.array([[7.0, 8.0, 9.0], [0.0, 1.0, 2.0]])[:, :, None],
+            dims=("event", "time", "signal"),
+            coords={"event": index, "time": [-0.002, 0.0, 0.002], "signal": signals},
+        )
+
+    monkeypatch.setattr(ta, "get_signal_windows", signal_windows)
+    rows, record = ta.epoch_trigger_windows(
+        frame, event_types, np.array([0.0]), np.array([1.0])
+    )
+    assert list(rows.columns) == [*ta.WINDOW_ROW_KEYS, "lag-001", "lag+000", "lag+001"]
+    assert len(rows) == 2 * len(ta.TRIGGERED_SIGNALS) + 2
+    no_spike = rows[rows["kind"] == ta.NO_SPIKE_KIND]
+    assert no_spike["non_local_event"].tolist() == [0, 1]
+    assert set(no_spike["signal"]) == {ta.NO_SPIKE_SIGNAL}
+    overlap = rows[(rows["kind"] == "overlap") & (rows["signal"] == "SWR_zscore")]
+    assert overlap["non_local_event"].tolist() == [7]
+    np.testing.assert_allclose(overlap.iloc[0, 3:].to_numpy(float), [4.0, 5.0, 6.0])
+    assert record == {
+        "n_events": {"swr": 1, "non_swr": 1, "total": 2},
+        "no_spike_level": 0.25,
+        "n_no_spike_periods": 2,
+    }
+
+
+def _stored_rows() -> pd.DataFrame:
+    """Stored windows of two animals: a's events 1 and 2 (no SWR) and 3 (SWR)
+    in one epoch, b's event 1 (no SWR); and a No-Spike window of each."""
+    from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+        NO_SPIKE_KIND,
+        NO_SPIKE_SIGNAL,
+        TRIGGERED_SIGNALS,
+    )
+
+    rows = []
+    for animal, kind, label, values in (
+        ("a", "no_overlap", 1, [1.0, 2.0, 3.0]),
+        ("a", "no_overlap", 2, [3.0, 4.0, 5.0]),
+        ("a", "overlap", 3, [9.0, 9.0, 9.0]),
+        ("b", "no_overlap", 1, [5.0, 6.0, 7.0]),
+        ("b", "overlap", 2, [1.0, 1.0, 1.0]),
+    ):
+        for signal in TRIGGERED_SIGNALS:
+            rows.append((animal, kind, signal, label, *values))
+    rows.append(("a", NO_SPIKE_KIND, NO_SPIKE_SIGNAL, 0, 2.0, 0.0, -2.0))
+    rows.append(("b", NO_SPIKE_KIND, NO_SPIKE_SIGNAL, 0, 4.0, 2.0, 0.0))
+    table = pd.DataFrame(
+        rows,
+        columns=[
+            "animal", "kind", "signal", "non_local_event",
+            "lag-001", "lag+000", "lag+001",
+        ],
+    )  # fmt: skip
+    return table.assign(session_date=1, epoch="02_r1")
+
+
+def test_the_stored_windows_give_figure_2gs_curves_and_the_supplements_traces():
+    """Figure 2g's quartiles are the animal-balanced quartiles of the stored
+    windows (no SWR: a's median of 1, 3 and b's 5 -> mean (2 + 5) / 2 = 3.5 at
+    the first lag), the supplement's traces each animal's median, and the time
+    axis the offsets over the sampling frequency."""
+    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
+    from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+
+    rows = _stored_rows()
+    curves = ta.stored_triggered_curves(rows)
+    curve = curves["MUA_zscore"]
+    np.testing.assert_allclose(curve["no_overlap_median"], [3.5, 4.5, 5.5])
+    np.testing.assert_allclose(curve["overlap_median"], [5.0, 5.0, 5.0])
+    np.testing.assert_allclose(curve["time"], np.array([-1, 0, 1]) / SAMPLING_FREQUENCY)
+    traces = ta.stored_animal_window_medians(rows)
+    np.testing.assert_allclose(traces["no_overlap"]["SWR_zscore"]["a"], [2.0, 3.0, 4.0])
+    np.testing.assert_allclose(traces["overlap"]["SWR_zscore"]["b"], [1.0, 1.0, 1.0])
+    epochs = pd.DataFrame(
+        {"animal": ["a", "a", "b"], "no_spike_level": [0.0, 1.0, 2.0]}
+    )
+    trace = ta.stored_no_spike_trace(rows, epochs)
+    np.testing.assert_allclose(trace["median"], [3.0, 1.0, -1.0])
+    # a's median over its epochs 0.5, b's 2 -> 1.25
+    assert trace["level"] == pytest.approx(1.25)
+
+
+def test_the_stored_windows_of_the_selected_events_are_kept_with_every_period():
+    from continuum_swr_replay.analysis.event_properties import triggered_analysis as ta
+
+    rows = _stored_rows()
+    events = pd.DataFrame(
+        {"animal": ["a", "b"], "session_date": 1, "epoch": "02_r1",
+         "non_local_event": [3, 1]}
+    )  # fmt: skip
+    kept = ta.stored_windows_of(rows, events)
+    assert set(
+        zip(kept["animal"], kept["kind"], kept["non_local_event"], strict=True)
+    ) == {
+        ("a", "overlap", 3),
+        ("b", "no_overlap", 1),
+        ("a", ta.NO_SPIKE_KIND, 0),
+        ("b", ta.NO_SPIKE_KIND, 0),
+    }
