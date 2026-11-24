@@ -455,6 +455,34 @@ def content_class_animal_shares(events: pd.DataFrame, detector: str) -> pd.DataF
     )
 
 
+def content_class_means(statistics: pd.Series) -> pd.Series:
+    """The mean over animals of the animals' shares of a detector's events in
+    each content class, from its row of :func:`other_detector_statistics`:
+    with non-local activity, one minus ``no_nonlocal_fraction_animal_mean``;
+    mostly Local, ``mostly_local_fraction_animal_mean``; and the other events,
+    the rest of those with no non-local activity.
+
+    Parameters
+    ----------
+    statistics : pd.Series
+        One detector's row of :func:`other_detector_statistics`.
+
+    Returns
+    -------
+    pd.Series, shape (3,)
+        Indexed by :data:`CONTENT_CLASSES`.
+    """
+    no_nonlocal = statistics["no_nonlocal_fraction_animal_mean"]
+    mostly_local = statistics["mostly_local_fraction_animal_mean"]
+    return pd.Series(
+        {
+            "with_nonlocal": 1 - no_nonlocal,
+            "mostly_local": mostly_local,
+            "other": no_nonlocal - mostly_local,
+        }
+    )
+
+
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """For each other detector, how its events sit against the non-local events.
 

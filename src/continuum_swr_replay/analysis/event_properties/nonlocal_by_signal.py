@@ -12,7 +12,7 @@ Figure 2's supplement cannot disagree.
 
 :func:`rest_signal_counts` makes one epoch's table; :func:`nonlocal_counts`
 sums it, for one signal, into the bins and the non-local bins of each signal
-bin, the table ``event_statistics.animal_signal_counts`` reads.
+bin, the table ``event_statistics.animal_signal_shares`` reads.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    animal_signal_counts,
+    animal_signal_shares,
 )
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -240,11 +240,11 @@ def nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
     )
 
 
-def animal_nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
-    """Each animal's immobile time bins, and its non-local ones, by the level of
-    ``signal``: ``event_statistics.animal_signal_counts`` of
-    :func:`nonlocal_counts`, the counts Figure 2i, its supplement and the events
-    summary read.
+def animal_nonlocal_shares(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
+    """Each animal's non-local shares of its immobile time bins by the level of
+    ``signal`` (each epoch's, then the mean over the animal's epochs):
+    ``event_statistics.animal_signal_shares`` of :func:`nonlocal_counts`, what
+    Figure 2i, its supplement and the events summary read.
 
     Parameters
     ----------
@@ -257,6 +257,6 @@ def animal_nonlocal_counts(counts: pd.DataFrame, signal: str) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        ``event_statistics.animal_signal_counts``' rows.
+        ``event_statistics.animal_signal_shares``' rows.
     """
-    return animal_signal_counts(nonlocal_counts(counts, signal))
+    return animal_signal_shares(nonlocal_counts(counts, signal))

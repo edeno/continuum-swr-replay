@@ -63,20 +63,22 @@ from continuum_swr_replay.visualization.palettes import (
     text_color_on,
 )
 from continuum_swr_replay.visualization.panel_layout import place_letters
+from continuum_swr_replay.visualization.publication_style import (
+    LABEL_SIZE,
+    SMALL_SIZE,
+    check_journal_limits,
+    drawn_extent,
+)
 from continuum_swr_replay.visualization.simulated_run_panels import (
     ANIMAL_POS_COLOR,
     DATA_LEFT,
     DATA_RIGHT,
     FIGURE_WIDTH,
-    LABEL_SIZE,
     NON_LOCAL_COLOR,
     NON_LOCAL_SHADE,
     NON_LOCAL_SHADE_ALPHA,
-    SMALL_SIZE,
     STATE_COLORS,
     axes_added,
-    check_journal_limits,
-    drawn_extent,
     example_badge,
     plot_posterior,
     plot_raster,
@@ -938,13 +940,13 @@ def generate_figure() -> Figure:
     space_rows_evenly(fig, rows)
 
     # Panel letters: a, d and e share a left edge; a, b and c share a top edge.
+    # The figure is at the journal's full height: no letter adds to it.
     place_letters(
         fig,
         {"a": [ax_a], "b": axes_b, "c": axes_c, "d": axes_d, "e": axes_e},
         rows=["abc"],
         columns=["ade"],
-        above=0.0,
-        floor=None,
+        ceiling=drawn_extent(fig, rows[0]).y1,
     )
 
     return fig

@@ -171,6 +171,43 @@ def test_boundary_timing_classes_each_bound_against_the_tolerance():
     assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.010
 
 
+def test_boundary_offset_distribution_takes_each_animal_over_its_epochs():
+    """Bins of 10 ms from -20 to 20 ms. Animal a: epoch e1's two starts at -15
+    and +5 ms, epoch e2's one at +5 ms; b: one start at +30 ms, beyond the bins.
+    a's percent in [0, 10) is the mean over its epochs, (50 + 100) / 2 = 75,
+    in [-20, -10) (50 + 0) / 2 = 25; b's pair counts beyond the bins, so its
+    bins hold 0."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.015, 0.005, 0.005, 0.030],
+            "end_offset_s": [0.0, 0.0, 0.0, 0.020],
+        },
+        index=[10, 11, 12, 13],
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "c"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e1", "e1"],
+        },
+        index=[10, 11, 12, 13, 99],
+    )
+    edges = np.array([-0.020, -0.010, 0.0, 0.010, 0.020])
+    table = stats.boundary_offset_distribution(offsets, events, edges)
+    start = table[table["bound"] == "start"].pivot(
+        index="bin_low", columns="animal", values="percent"
+    )
+    assert start["a"].tolist() == pytest.approx([25.0, 0.0, 75.0, 0.0])
+    assert start["b"].tolist() == pytest.approx([0.0] * 4)
+    # an end at the last edge is in the last bin, as np.histogram puts it
+    end = table[table["bound"] == "end"].pivot(
+        index="bin_low", columns="animal", values="percent"
+    )
+    assert end["a"].tolist() == pytest.approx([0.0, 0.0, 100.0, 0.0])
+    assert end["b"].tolist() == pytest.approx([0.0, 0.0, 0.0, 100.0])
+    assert set(table.columns) == {"bound", "animal", "bin_low", "bin_high", "percent"}
+
+
 def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
     """Animal a: epoch 1 (earlier, later) and (together, together), epoch 2
     (together, together); b: (earlier, later). Pooled over 4 events. a's
@@ -280,19 +317,39 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     return events.assign(session_date="d1"), reference
 
 
-def test_reference_medians_are_medians_over_epochs():
+def test_reference_medians_are_each_animals_median_then_the_mean():
     _, reference = _signal_tables()
     levels = stats.reference_medians(reference, ["theta"])
-    assert levels.loc["theta", "running"] == 1.0
-    assert levels.loc["theta", "rest"] == -0.5
+    # running: a's median of 1 and 2, 1.5, and b's 1 (pooled: 1)
+    assert levels.loc["theta", "running"] == pytest.approx(1.25)
+    # rest: a's median of -1 and 0, -0.5, and b's -0.5
+    assert levels.loc["theta", "rest"] == pytest.approx(-0.5)
+
+
+def test_reference_medians_leave_out_an_epoch_without_a_level():
+    """a has three epochs (1, 2, 6: median 2), b two, one of them without a
+    level (0): the mean is 1, where the median over the four levels would be
+    1.5. The mean of a's epochs would be 3, which a median does not take."""
+    reference = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "b"],
+            "theta_running_median": [1.0, 2.0, 6.0, 0.0, np.nan],
+            "theta_rest_median": [-1.0, -1.0, 5.0, np.nan, -3.0],
+        }
+    )
+    levels = stats.reference_medians(reference, ["theta"])
+    assert levels.loc["theta", "running"] == pytest.approx(1.0)
+    # rest: a -1, b -3
+    assert levels.loc["theta", "rest"] == pytest.approx(-2.0)
 
 
 def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels():
     events, reference = _signal_tables()
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # -1, 0.8, 1, 1.1, 1.2, 1.3, 5: the median is 1.1 (the mean is 1.34)
-    assert non_swr["median"] == pytest.approx(1.1)
+    # a's median of its epochs' medians 1.1 (e1) and 1.2 (e2), 1.15, and b's
+    # 1.0: 1.075 (pooled over the seven events the median would be 1.1)
+    assert non_swr["median"] == pytest.approx(1.075)
     # a: the median of its epochs' medians 1.1 and 1.2 is 1.15, against 1.5,
     # the median of its two epochs' running levels: below (against the levels
     # 1, 1, 1, 2 of its events' epochs, median 1.0, it would not be). b: 1.0
@@ -300,12 +357,14 @@ def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels(
     assert non_swr["n_animals_below_running"] == 1
     # a: 1.15 against rest -0.5; b: 1.0 against -0.5
     assert non_swr["n_animals_above_rest"] == 2
-    # 1.1, 1.3 and 5.0 reach their epoch's 1.0, and b's 1.0 equals it, which
-    # reaches it; 0.8 and -1.0 do not, and 1.2 does not reach e2's 2.0
-    assert non_swr["reaches_running_fraction"] == pytest.approx(4 / 7)
+    # a: e1's 1.1 and 1.3 reach its 1.0, 0.8 does not (2 / 3); e2's 1.2 does
+    # not reach 2.0 (0): a 1 / 3. b: 5.0 and 1.0 (equal) reach 1.0, -1.0 does
+    # not: 2 / 3. Their mean is 0.5 (pooled over the events, 4 / 7)
+    assert non_swr["reaches_running_fraction"] == pytest.approx(0.5)
     swr = result.loc[("theta", True)]
-    # -0.9, -0.85, -0.8, -0.7, 0.0
-    assert swr["median"] == pytest.approx(-0.8)
+    # a: the median of -0.8 (e1) and -0.85 (e2), -0.825; b: 0.0 (pooled over
+    # -0.9, -0.85, -0.8, -0.7, 0.0 the median would be -0.8)
+    assert swr["median"] == pytest.approx(-0.4125)
     assert swr["n_animals_below_running"] == 2
     # a: the median of -0.8 (e1) and -0.85 (e2) is -0.825, against -0.5, the
     # median of its epochs' rest levels -1 and 0: not above (against its
@@ -376,12 +435,23 @@ def test_matched_statistics_count_animals_against_their_class_s_windows():
     assert result.loc[("theta", False), "n_animals_above_rest"] == 2
     # no SWR, a: 1.15 below 1.7; b: 1.0 below 1.2 (it equals the running median)
     assert result.loc[("theta", False), "n_animals_below_running"] == 2
+    # each animal's median over its epochs, then the mean: no SWR, running a
+    # 1.7 (1.2, 2.2), b 1.2; rest a -0.4 (-0.9, 0.1), b -0.4
     levels = stats.matched_reference_medians(_matched_reference(), ["theta"])
     assert levels.loc[("theta", False)].to_dict() == pytest.approx(
-        {"running": 1.2, "rest": -0.4}
+        {"running": 1.45, "rest": -0.4}
     )
+    # SWR, running a 1.9 (1.4, 2.4), b 1.4; rest a -0.8 (-0.7, -0.9), b 0.2
     assert levels.loc[("theta", True)].to_dict() == pytest.approx(
-        {"running": 1.4, "rest": -0.7}
+        {"running": 1.65, "rest": -0.3}
+    )
+    # an epoch with no event of a class has no level and is left out: a's
+    # first epoch without SWR windows leaves a 2.4 and -0.9
+    without = _matched_reference()
+    without.loc[0, ["theta_running_matched_swr", "theta_rest_matched_swr"]] = np.nan
+    levels = stats.matched_reference_medians(without, ["theta"])
+    assert levels.loc[("theta", True)].to_dict() == pytest.approx(
+        {"running": (2.4 + 1.4) / 2, "rest": (-0.9 + 0.2) / 2}
     )
 
 
@@ -418,11 +488,18 @@ def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
     )
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # pooled, the median event is 0.5; a's value is the mean of its two epochs'
-    # medians, -0.75: below running (0), above rest (-1)
-    assert non_swr["median"] == pytest.approx(0.5)
+    # a's value is the median of its two epochs' medians, -0.75 (pooled, the
+    # median event would be 0.5): below running (0), above rest (-1)
+    assert non_swr["median"] == pytest.approx(-0.75)
     assert non_swr["n_animals_below_running"] == 1
     assert non_swr["n_animals_above_rest"] == 1
+    # e1 reaches 0 in none of one event, e2 in three of three: (0 + 1) / 2
+    assert non_swr["reaches_running_fraction"] == pytest.approx(0.5)
+    # e2 has no SWR event, so it is not one of a's epochs for that class: a's
+    # value is e1's 0.0, which reaches the running level
+    swr = result.loc[("theta", True)]
+    assert swr["median"] == pytest.approx(0.0)
+    assert swr["reaches_running_fraction"] == pytest.approx(1.0)
 
 
 def test_event_signal_statistics_refuse_an_epoch_without_a_reference():
@@ -761,18 +838,32 @@ def _hpd_events() -> pd.DataFrame:
     )  # fmt: skip
 
 
-def test_hpd_distribution_gives_each_animals_percent_per_bin():
-    """Per animal and class, the percent of its events (with a value) in each
-    bin of the edges."""
+def test_hpd_distribution_takes_each_animal_over_its_epochs():
+    """Per animal and class, the mean over its epochs of each epoch's percent
+    of its events (with a value) in each bin. a, no SWR: epoch 1 holds 10, 20,
+    300 cm (2/3 below 50 cm), epoch 2 30 (all below), so (200/3 + 100) / 2 =
+    250/3 below 50 cm and (100/3 + 0) / 2 = 50/3 above; a, SWR: epoch 1 400,
+    epoch 2 20 and 300, so (0 + 50) / 2 = 25 below and (100 + 50) / 2 = 75
+    above. b has one epoch; its SWR event without a value is left out, and an
+    event beyond the bins counts in its epoch's events (b, no SWR: 300, 400 and
+    600 cm, so 200/3 in the upper bin and the rest in no bin)."""
     edges = np.array([5.0, 50.0, 500.0])
-    table = stats.hpd_distribution(_hpd_events(), edges).set_index(
+    events = pd.concat(
+        [
+            _hpd_events(),
+            _hpd_events().iloc[[7]].assign(hpd_coverage_cm=600.0),
+        ],
+        ignore_index=True,
+    )
+    table = stats.hpd_distribution(events, edges).set_index(
         ["animal", "group", "bin_low"]
     )["percent"]
-    # a, no SWR: 10, 20, 30 below 50 and 300 above
-    assert table[("a", "no SWR", 5.0)] == pytest.approx(75.0)
-    assert table[("a", "no SWR", 50.0)] == pytest.approx(25.0)
-    assert table[("a", "SWR", 5.0)] == pytest.approx(100 / 3)
+    assert table[("a", "no SWR", 5.0)] == pytest.approx(250 / 3)
+    assert table[("a", "no SWR", 50.0)] == pytest.approx(50 / 3)
+    assert table[("a", "SWR", 5.0)] == pytest.approx(25.0)
+    assert table[("a", "SWR", 50.0)] == pytest.approx(75.0)
     assert table[("b", "no SWR", 5.0)] == 0.0
+    assert table[("b", "no SWR", 50.0)] == pytest.approx(200 / 3)
     assert table[("b", "SWR", 5.0)] == pytest.approx(100.0)
     assert len(table) == 2 * 2 * 2
 
@@ -1037,8 +1128,9 @@ def test_overlap_class_animal_shares_are_epoch_then_animal_means():
 def _epoch_power_counts() -> pd.DataFrame:
     """Two animals' epochs over three power bins split at 2 z.
 
-    Animal a: 40 non-local bins, 30 of them below 2 z (two epochs); animal b:
-    4 non-local bins, 1 below.
+    Animal a: two epochs, a1 with 14 non-local bins (10 below 2 z) and no time
+    bin at or above 4 z, a2 with 26 (20 below 2 z); animal b: one epoch with 4
+    non-local bins, 1 below.
     """
     rows = [
         # epoch, animal, signal_low, signal_high, n_bins, n_nonlocal
@@ -1065,57 +1157,97 @@ def _epoch_power_counts() -> pd.DataFrame:
     )
 
 
-def test_animal_signal_counts_sum_the_epochs_of_each_animal_and_bin():
-    counts = stats.animal_signal_counts(_epoch_power_counts())
-    a = counts[counts["animal"] == "a"].set_index("signal_low")
-    assert a["n_bins"].tolist() == [400, 20, 1]
-    assert a["n_nonlocal"].tolist() == [30, 9, 1]
-    assert a["share"].tolist() == pytest.approx([30 / 400, 9 / 20, 1.0])
-    # each animal's non-local bins, spread over the power bins
-    assert a["nonlocal_fraction"].tolist() == pytest.approx([0.75, 0.225, 0.025])
-    b = counts[counts["animal"] == "b"].set_index("signal_low")
+def test_animal_signal_shares_are_each_epochs_shares_then_the_animals_mean():
+    shares = stats.animal_signal_shares(_epoch_power_counts())
+    a = shares[shares["animal"] == "a"].set_index("signal_low")
+    # below 2 z: a1 10 / 100, a2 20 / 300 (pooled: 30 / 400); 2 to 4 z: 0.4,
+    # 0.5; at or above 4 z a1 has no time bin, so a's share is a2's
+    assert a["share"].tolist() == pytest.approx([(0.1 + 20 / 300) / 2, 0.45, 1.0])
+    assert a["n_epochs"].tolist() == [2, 2, 1]
+    # each epoch's non-local bins spread over the power bins, then the mean
+    # (a1 has none at or above 4 z: 0, not left out)
+    assert a["nonlocal_fraction"].tolist() == pytest.approx(
+        [(10 / 14 + 20 / 26) / 2, (4 / 14 + 5 / 26) / 2, (0 + 1 / 26) / 2]
+    )
+    b = shares[shares["animal"] == "b"].set_index("signal_low")
     assert b["nonlocal_fraction"].tolist() == pytest.approx([0.25, 0.5, 0.25])
+    assert list(shares.columns) == [
+        "animal", "signal_low", "signal_high", "share", "nonlocal_fraction",
+        "n_epochs",
+    ]  # fmt: skip
 
 
-def test_animal_signal_counts_give_no_share_where_an_animal_has_no_bin():
+def test_animal_signal_shares_give_no_share_where_an_animal_has_no_bin():
     epochs = _epoch_power_counts()
     epochs = epochs[epochs["animal"] == "b"].assign(
         n_bins=[50, 0, 1], n_nonlocal=[1, 0, 1]
     )
-    counts = stats.animal_signal_counts(epochs).set_index("signal_low")
-    assert np.isnan(counts.loc[2.0, "share"])
-    assert counts.loc[2.0, "nonlocal_fraction"] == 0.0
+    shares = stats.animal_signal_shares(epochs).set_index("signal_low")
+    assert np.isnan(shares.loc[2.0, "share"])
+    assert shares.loc[2.0, "n_epochs"] == 0
+    assert shares.loc[2.0, "nonlocal_fraction"] == 0.0
 
 
-def test_nonlocal_below_threshold_statistics_weigh_each_animal_once():
-    counts = stats.animal_signal_counts(_epoch_power_counts())
-    statistics = stats.nonlocal_below_threshold_statistics(counts, threshold=2.0)
-    # animal a 0.75, animal b 0.25: their mean, not the pooled 31 / 44
+def test_an_epoch_with_no_nonlocal_bin_is_left_out_of_the_fractions():
+    """a3 has time bins but none decoded non-local: it counts in the share of
+    its bin (0) but not in a's spread of non-local time."""
+    epochs = pd.concat(
+        [
+            _epoch_power_counts(),
+            pd.DataFrame(
+                {
+                    "epoch_id": "a3", "animal": "a",
+                    "signal_low": [-np.inf, 2.0, 4.0],
+                    "signal_high": [2.0, 4.0, np.inf],
+                    "n_bins": [5, 0, 0], "n_nonlocal": 0,
+                }
+            ),
+        ],
+        ignore_index=True,
+    )  # fmt: skip
+    shares = stats.animal_signal_shares(epochs)
+    a = shares[shares["animal"] == "a"].set_index("signal_low")
+    assert a.loc[-np.inf, "share"] == pytest.approx((0.1 + 20 / 300 + 0.0) / 3)
+    assert a.loc[-np.inf, "nonlocal_fraction"] == pytest.approx((10 / 14 + 20 / 26) / 2)
+    # nor in the share above 2 z, where it has no time bin
+    statistics = stats.nonlocal_share_above_statistics(epochs, threshold=2.0)
+    assert statistics["share_animal_min"] == pytest.approx((0.4 + 6 / 11) / 2)
+
+
+def test_nonlocal_below_threshold_statistics_weigh_each_epoch_then_each_animal():
+    shares = stats.animal_signal_shares(_epoch_power_counts())
+    statistics = stats.nonlocal_below_threshold_statistics(shares, threshold=2.0)
+    # a: the mean of a1's 10 / 14 and a2's 20 / 26 (pooled: 30 / 40); b 0.25
+    a = (10 / 14 + 20 / 26) / 2
     assert statistics == {
-        "fraction_animal_mean": pytest.approx(0.5),
+        "fraction_animal_mean": pytest.approx((a + 0.25) / 2),
         "fraction_animal_min": pytest.approx(0.25),
-        "fraction_animal_max": pytest.approx(0.75),
+        "fraction_animal_max": pytest.approx(a),
         "n_animals": 2,
     }
-    above = stats.nonlocal_below_threshold_statistics(counts, threshold=4.0)
-    assert above["fraction_animal_mean"] == pytest.approx((0.975 + 0.75) / 2)
+    above = stats.nonlocal_below_threshold_statistics(shares, threshold=4.0)
+    assert above["fraction_animal_mean"] == pytest.approx(
+        ((1.0 + 25 / 26) / 2 + 0.75) / 2
+    )
 
 
-def test_nonlocal_share_above_statistics_pool_each_animals_bins_above_the_level():
-    counts = stats.animal_signal_counts(_epoch_power_counts())
-    statistics = stats.nonlocal_share_above_statistics(counts, threshold=2.0)
-    # a: (9 + 1) / (20 + 1); b: (2 + 1) / (4 + 1)
+def test_nonlocal_share_above_statistics_are_each_epochs_share_then_the_mean():
+    epochs = _epoch_power_counts()
+    statistics = stats.nonlocal_share_above_statistics(epochs, threshold=2.0)
+    # a: a1 (4 + 0) / (10 + 0), a2 (5 + 1) / (10 + 1), their mean (pooled
+    # 10 / 21); b: (2 + 1) / (4 + 1)
+    a = (0.4 + 6 / 11) / 2
     assert statistics == {
-        "share_animal_mean": pytest.approx((10 / 21 + 3 / 5) / 2),
-        "share_animal_min": pytest.approx(10 / 21),
-        "share_animal_max": pytest.approx(3 / 5),
+        "share_animal_mean": pytest.approx((a + 0.6) / 2),
+        "share_animal_min": pytest.approx(a),
+        "share_animal_max": pytest.approx(0.6),
         "n_animals": 2,
     }
     with pytest.raises(ValueError, match="not an edge"):
-        stats.nonlocal_share_above_statistics(counts, threshold=3.0)
+        stats.nonlocal_share_above_statistics(epochs, threshold=3.0)
 
 
 def test_nonlocal_below_threshold_statistics_refuse_a_threshold_between_edges():
-    counts = stats.animal_signal_counts(_epoch_power_counts())
+    shares = stats.animal_signal_shares(_epoch_power_counts())
     with pytest.raises(ValueError, match="not an edge"):
-        stats.nonlocal_below_threshold_statistics(counts, threshold=3.0)
+        stats.nonlocal_below_threshold_statistics(shares, threshold=3.0)

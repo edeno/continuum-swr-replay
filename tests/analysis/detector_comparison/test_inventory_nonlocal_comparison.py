@@ -602,6 +602,14 @@ def test_content_classes_and_their_animal_shares():
     # a: epoch (d1) 1/2 with, 1/2 mostly Local; epoch (d2) all other -> means
     assert shares.loc["a"].tolist() == pytest.approx([0.25, 0.25, 0.5])
     assert shares.loc["b"].tolist() == pytest.approx([0.5, 0.0, 0.5])
+    # Figure 2c's bars: the means over animals, from the statistics the
+    # events summary's kay_* values read (0.375, 0.125 and 0.5)
+    means = comparison.content_class_means(
+        comparison.other_detector_statistics(events).loc["kay"]
+    )
+    assert list(means.index) == list(comparison.CONTENT_CLASSES)
+    assert means.tolist() == pytest.approx(shares.mean().tolist())
+    assert means.tolist() == pytest.approx([0.375, 0.125, 0.5])
 
 
 def _write_features(run_dir, starts: dict[str, float]) -> None:

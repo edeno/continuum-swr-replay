@@ -21,6 +21,7 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
+    EVENT_TRIGGER_WINDOWS_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
     event_features_root,
     replay_content_dir,
@@ -33,6 +34,7 @@ from scripts.event_properties import measure_brain_state_reference as brain_stat
 from scripts.event_properties import measure_event_gamma as gamma
 from scripts.event_properties import measure_nonlocal_by_signal as power
 from scripts.event_properties import measure_ripple_class_structure as structure
+from scripts.event_properties import measure_trigger_windows as trigger
 from tests.support._session_cache_fixtures import write_session_cache_entries
 
 EPOCH = "j1620210706_02_r1_HPC"
@@ -138,6 +140,30 @@ def test_the_counts_by_signal_are_over_the_immobile_time_inside_the_visits(
         "n_immobile_bins_in_visit": int(((TIME >= 0.1) & (TIME < 0.3)).sum()),
         "n_immobile_bins_outside_visit": int((TIME < 0.1).sum()),
     }
+
+
+def test_the_trigger_windows_are_stored_with_the_epochs_visits(decoded, monkeypatch):
+    """The windows runner gives its measure the epoch's well visits and writes
+    its rows to ``windows.parquet``, with the record of each epoch."""
+    _features_run("run1")
+    seen = []
+
+    def windows(dot, event_types, arrival, departure):
+        seen.append((arrival, departure))
+        rows = pd.DataFrame({"kind": ["no_spike"], "signal": "MUA_zscore"})
+        return rows, {"no_spike_level": 0.5}
+
+    monkeypatch.setattr(trigger, "epoch_trigger_windows", windows)
+    monkeypatch.setattr(trigger, "get_event_types", lambda dot: {})
+    trigger.main(["--event-features-run", "run1"])
+    assert seen == [VISITS]
+    folder = epoch_counts.processed_data_dir() / EVENT_TRIGGER_WINDOWS_DIR
+    manifest = json.loads((folder / "manifest.json").read_text())
+    assert manifest["subset"] == ANALYZED_SUBSET
+    assert manifest["session_cache"]["sha256"] == files_sha256(decoded)
+    assert manifest["epochs"][EPOCH] == {"status": "ok", "no_spike_level": 0.5}
+    stored = pd.read_parquet(folder / "windows.parquet")
+    assert stored[["epoch_id", "kind"]].values.tolist() == [[EPOCH, "no_spike"]]
 
 
 @pytest.fixture
