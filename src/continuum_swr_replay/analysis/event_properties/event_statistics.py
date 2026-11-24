@@ -298,6 +298,73 @@ OFFSET_TAILS_S = {"ten_ms": 0.010, "fifty_ms": 0.050}
 tail (:func:`boundary_offset_statistics`), by the name its statistic carries."""
 
 
+OFFSET_BIN_EDGES_S = np.arange(-100, 101, 5) / 1000
+"""The bins of each event bound's offset from its SWR's (s): 5 ms wide, from
+-100 to 100 ms."""
+
+
+def boundary_offset_distribution(
+    offsets: pd.DataFrame,
+    events: pd.DataFrame,
+    edges: np.ndarray = OFFSET_BIN_EDGES_S,
+) -> pd.DataFrame:
+    """Each animal's distribution of its events' start and end offsets from
+    their SWR's.
+
+    An animal's percent in a bin is the mean over its epochs of each epoch's
+    percent of its event-SWR pairs in the bin (pair -> epoch -> animal); an
+    epoch's percent counts all its pairs, those beyond the bins too.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (s); a bin holds its low edge and not its high
+        one, the last bin its high edge too.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per bound, animal and bin: ``bound`` (``"start"``,
+        ``"end"``), ``animal``, ``bin_low``, ``bin_high`` and ``percent``.
+    """
+    sessions = events.loc[offsets.index]
+    rows = []
+    for bound in ("start", "end"):
+        bins = pd.cut(
+            offsets[f"{bound}_offset_s"],
+            edges,
+            right=False,
+            labels=False,
+            include_lowest=True,
+        )
+        # the last bin holds its high edge, as np.histogram's does
+        bins = bins.mask(offsets[f"{bound}_offset_s"] == edges[-1], len(edges) - 2)
+        for k in range(len(edges) - 1):
+            per_animal = animal_session_values(
+                100 * (bins == k).astype(float),
+                sessions["animal"],
+                sessions[_WITHIN_ANIMAL],
+                "mean",
+            )
+            rows.append(
+                pd.DataFrame(
+                    {
+                        "bound": bound,
+                        "animal": per_animal.index,
+                        "bin_low": edges[k],
+                        "bin_high": edges[k + 1],
+                        "percent": per_animal.to_numpy(),
+                    }
+                )
+            )
+    return pd.concat(rows, ignore_index=True)
+
+
 def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     """The typical offset of an SWR-overlapping event's bounds from its SWR's.
 

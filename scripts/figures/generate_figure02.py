@@ -15,7 +15,8 @@ decoded place. Each panel's question, and the analysis function it draws:
         (``event_statistics.overlap_class_statistics``).
     e — for every SWR definition, MUA and the Widloski detector, c's and d's
         questions (``nonlocal_comparison.nonlocal_events_overlapped``).
-    f — event bounds against their SWR's (``event_statistics.boundary_offsets``).
+    f — event bounds against their SWR's
+        (``event_statistics.boundary_offset_distribution``).
     g — ripple power, MUA, theta power and speed around event starts
         (``triggered_analysis.compute_triggered_average_curves``,
         ``event_statistics.reference_medians``).
@@ -113,6 +114,7 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    boundary_offset_distribution,
     boundary_offsets,
     nonlocal_below_threshold_statistics,
     overlap_class_animal_shares,
@@ -137,6 +139,7 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
     well_visit_times,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_mean
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_decode_files,
@@ -274,8 +277,6 @@ LOCAL_SWR_START_S = 1617036373.982971
 non-local event overlaps it and the decode is Local through it."""
 EXAMPLE_HALF_WINDOW_S = 0.2
 """Panel b: half the window around each example's center (s)."""
-OFFSET_BINS_MS = np.arange(-100, 101, 5)
-"""Panel f's bins, ms: event bound minus SWR bound."""
 
 # ---------------------------------------------------------------------------
 # Layout
@@ -379,6 +380,13 @@ C_NOSPIKE = COLORS["No-Spike"]
 C_OTHER = "white"
 """Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
 mixed-state, not No-Spike)."""
+CONTENT_CLASS_STYLES = {
+    "with_nonlocal": ("With non-local", COLORS["Non-Local"]),
+    "mostly_local": ("Mostly Local", COLORS["Local"]),
+    "other": ("Other", C_OTHER),
+}
+"""Panel c's content classes (``nonlocal_comparison.CONTENT_CLASSES``), top to
+bottom: each one's name and color."""
 C_REFERENCE = REFERENCE_COLOR
 """A reference level (panels j and k's zeros, panel g's between-events level): a neutral
 gray, not the No-Spike state's."""
@@ -439,7 +447,7 @@ def read_inputs(
         ``overlap_class_statistics`` and ``overlap_class_animal_shares`` of the
         selected events; ``detector_overlap``, the share of non-local events each
         detector overlaps and the share of its events that overlap one;
-        ``boundary_offsets``, ``boundary_offsets`` and the events' animals;
+        ``boundary_offsets``, ``boundary_offset_distribution``;
         ``event_traces``, the triggered curves and ``reference_medians``;
         ``participation``, :func:`read_participation`;
         ``nonlocal_ripple_power``, the counts by ripple power and the states by
@@ -508,7 +516,9 @@ def read_inputs(
             overlap_class_animal_shares(events),
         ),
         "detector_overlap": (cached["overlap"], cached["with_nonlocal"]),
-        "boundary_offsets": (boundary_offsets(events), events["animal"]),
+        "boundary_offsets": boundary_offset_distribution(
+            boundary_offsets(events), events
+        ),
         "event_traces": (
             cached["triggered_curves"],
             reference_medians(
@@ -1226,14 +1236,14 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     """Panel c: the SWRs by content.
 
     Dots are the animals (``content_class_animal_shares``), bars their mean
-    (``other_detector_statistics``' ``*_animal_mean``); the count is every SWR.
+    (``nonlocal_comparison.content_class_means`` of
+    ``other_detector_statistics``' row, the events summary's ``kay_*`` values);
+    the count is every SWR.
     """
-    no_nonlocal = kay["no_nonlocal_fraction_animal_mean"]
-    mostly_local = kay["mostly_local_fraction_animal_mean"]
+    means = nonlocal_comparison.content_class_means(kay)
     rows = [
-        ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, True),
-        ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, False),
-        ("Other", no_nonlocal - mostly_local, animals["other"], C_OTHER, False),
+        (name, means[c], animals[c], color, c == "with_nonlocal")
+        for c, (name, color) in CONTENT_CLASS_STYLES.items()
     ]
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
@@ -1308,30 +1318,28 @@ def draw_detector_overlap(
     ax_caught.spines["left"].set_visible(False)
 
 
-def draw_offsets(
-    ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame, animal: pd.Series
-) -> None:
+def draw_offsets(ax_start: Axes, ax_end: Axes, distribution: pd.DataFrame) -> None:
     """Panel f: event minus SWR start (top) and end (bottom), as the percent of
     event-SWR pairs in each 5 ms bin on a log axis.
 
-    Bars are the animals' mean, outlines the animals. ``offsets`` are
-    ``boundary_offsets``; ``animal`` is the event table's column, matched on the
-    index. An animal's percent counts all its pairs, those beyond the bins too.
+    Bars are the mean over animals (``shared_statistics.animal_mean``), outlines
+    the animals (``distribution``: ``event_statistics.boundary_offset_distribution``,
+    each animal's mean over its epochs of each epoch's percent).
     """
-    width = np.diff(OFFSET_BINS_MS)[0]
-    centers = OFFSET_BINS_MS[:-1] + width / 2
     for ax, bound, label in ((ax_start, "start", "Start"), (ax_end, "end", "End")):
-        offsets_ms = 1000 * offsets[f"{bound}_offset_s"]
-        shares = np.column_stack(
-            [
-                100 * np.histogram(values, OFFSET_BINS_MS)[0] / len(values)
-                for _, values in offsets_ms.groupby(animal)
-            ]
-        )
-        ax.bar(centers, shares.mean(axis=1), width=width, color="#bbbbbb", lw=0)
-        ax.step(centers, shares, where="mid", color="k", lw=0.5, alpha=0.35)
+        mine = distribution[distribution["bound"] == bound]
+        by_animal = mine.pivot(index="bin_low", columns="animal", values="percent")
+        high = mine.groupby("bin_low")["bin_high"].first()
+        low_ms, high_ms = 1000 * by_animal.index.to_numpy(), 1000 * high.to_numpy()
+        centers = (low_ms + high_ms) / 2
+        ax.bar(
+            centers, animal_mean(mine, "bin_low", "percent").to_numpy(),
+            width=high_ms - low_ms, color="#bbbbbb", lw=0,
+        )  # fmt: skip
+        ax.step(centers, by_animal.to_numpy(), where="mid", color="k", lw=0.5,
+                alpha=0.35)  # fmt: skip
         ax.axvline(0, color="k", lw=0.5, ls=":")
-        ax.set_xlim(OFFSET_BINS_MS[0], OFFSET_BINS_MS[-1])
+        ax.set_xlim(low_ms[0], high_ms[-1])
         ax.set_yscale("log")
         ax.set_ylim(0.03, 60)
         ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
@@ -1653,7 +1661,7 @@ def generate_figure(inputs: dict) -> Figure:
     offsets_grid = row3[3].subgridspec(2, 1, hspace=0.35)
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
-    draw_offsets(ax_f1, ax_f2, *inputs["boundary_offsets"])
+    draw_offsets(ax_f1, ax_f2, inputs["boundary_offsets"])
     cells = {}
     # the grids set the bottom panels' heights; fit_panel then places them across
     for k, row in enumerate(BOTTOM_LAYOUT, start=len(TOP_LAYOUT)):

@@ -191,6 +191,15 @@ CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
 
 PROBABILITY_BINS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0000001)
 PROBABILITY_BIN_LABELS = ("0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0")
+
+
+def probability_bin_center(label: str) -> float:
+    """The center of a probability bin named by :data:`PROBABILITY_BIN_LABELS`
+    (``"0.2-0.4"``: 0.3)."""
+    low, high = (float(edge) for edge in label.split("-"))
+    return (low + high) / 2
+
+
 MIN_BIN_WINDOWS = 10
 """Windows a calibration bin needs for a verdict (pooled over epochs) or to
 count toward an epoch's slope (within the epoch)."""

@@ -94,6 +94,9 @@ from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
     outside_swr_subset_statistics,
     swr_allowed_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.state_evidence.summary import (
+    probability_bin_center,
+)
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     holdout_statistics,
     window_scores,
@@ -133,7 +136,7 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     well_visit_times,
 )
-from continuum_swr_replay.analysis.shared_statistics import animal_medians
+from continuum_swr_replay.analysis.shared_statistics import animal_mean, animal_medians
 from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_decode_files,
     analyzed_epoch_ids,
@@ -769,11 +772,11 @@ def draw_state_calibration(ax: Axes, bins: pd.DataFrame) -> None:
     bins come from the decode with every tetrode, only the remote place is held
     out by the tetrode split, and the encodings are fit on running time in other
     time blocks."""
-    centers = np.arange(0.1, 1.0, 0.2)
     ends = []
     for k, (state, color) in enumerate(CALIBRATION_COLORS.items()):
         mine = bins[bins["state"] == state]
         estimate = mine["animal_estimate"].to_numpy()
+        centers = mine["pbin"].map(probability_bin_center).to_numpy()
         x = centers + (k - 1) * CALIBRATION_DODGE
         ax.errorbar(
             x, estimate,
@@ -836,14 +839,17 @@ def draw_nonlocal_probability(ax: Axes, distribution: pd.DataFrame) -> None:
     """The non-local probability panel: how the immobile time inside the well
     visits is spread over the decoder's non-local probability, the percent of
     the time per bin of 0.02 on a log axis, a thin line per animal and their
-    mean in bold, with the event rule's cut (0.8) dotted and named "used"
+    mean in bold (``shared_statistics.animal_mean``), with the event rule's cut (0.8) dotted and named "used"
     (``distribution``: :func:`read_inputs`' ``nonlocal_probability``,
     ``nonlocal_probability.animal_probability_distribution``)."""
     by_animal = distribution.pivot(index="bin_low", columns="animal", values="percent")
     high = distribution.groupby("bin_low")["bin_high"].first()
     center = (by_animal.index.to_numpy() + high.to_numpy()) / 2
     ax.plot(center, by_animal.to_numpy(), color=ANIMAL_LINE_COLOR, lw=0.5)
-    ax.plot(center, by_animal.mean(axis=1).to_numpy(), color="black", lw=1.2)
+    ax.plot(
+        center, animal_mean(distribution, "bin_low", "percent").to_numpy(),
+        color="black", lw=1.2,
+    )  # fmt: skip
     ax.set_yscale("log")
     ax.set_yticks([0.1, 1, 10, 100], ["0.1", "1", "10", "100"])
     ax.yaxis.set_minor_locator(NullLocator())
@@ -1089,7 +1095,7 @@ def draw_event_traces(axes: Sequence[Axes], traces: dict) -> None:
 def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
     """The posterior-spread panel: for no-SWR and SWR events, the percent of
     the class's events in each HPD coverage bin on a log axis, a thin line per
-    animal and their mean in bold in the class's color, the classes named in
+    animal and their mean in bold (``shared_statistics.animal_mean``) in the class's color, the classes named in
     their colors, and a dotted line at the tight cut
     (``distribution``: :func:`read_inputs`' ``hpd``)."""
     for group, color in GROUP_COLORS.items():
@@ -1098,7 +1104,10 @@ def draw_hpd(ax: Axes, distribution: pd.DataFrame) -> None:
         high = mine.groupby("bin_low")["bin_high"].first()
         center = np.sqrt(by_animal.index.to_numpy() * high.to_numpy())
         ax.plot(center, by_animal.to_numpy(), color=color, lw=0.5, alpha=0.5)
-        ax.plot(center, by_animal.mean(axis=1).to_numpy(), color=color, lw=1.2)
+        ax.plot(
+            center, animal_mean(mine, "bin_low", "percent").to_numpy(), color=color,
+            lw=1.2,
+        )  # fmt: skip
     ax.axvline(HPD_TIGHT_CM, color=REFERENCE_COLOR, lw=0.6, ls=":", zorder=1)
     ax.text(
         HPD_TIGHT_CM / 1.08, 0.98, f"{HPD_TIGHT_CM:g} cm",

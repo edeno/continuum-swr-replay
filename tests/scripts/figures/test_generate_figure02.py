@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (  # noqa: E402
     animal_signal_counts,
+    boundary_offset_distribution,
     boundary_offsets,
     overlap_class_animal_shares,
     overlap_class_statistics,
@@ -315,7 +316,9 @@ def _inputs(figure02) -> dict:
             overlap_class_animal_shares(events),
         ),
         "detector_overlap": (_detector_shares(1.0), _detector_shares(0.8)),
-        "boundary_offsets": (boundary_offsets(events), events["animal"]),
+        "boundary_offsets": boundary_offset_distribution(
+            boundary_offsets(events), events
+        ),
         "event_traces": _triggered(),
         "participation": _participation(),
         "nonlocal_ripple_power": (

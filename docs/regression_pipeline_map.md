@@ -278,7 +278,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_distribution`, `boundary_offset_statistics`, `boundary_timing_classes`, `boundary_timing_statistics`, `boundary_both_ends_differ_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_signal_counts`, `nonlocal_below_threshold_statistics`, `nonlocal_share_above_statistics`, `main_step_fits`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `hpd_distribution`, `hpd_tight_share_statistics`, `content_distance_distribution`, `content_distance_band_statistics`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -1358,7 +1358,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
+`probability_bin_center`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`, `calibration_windows_in_well_visits`, `mark_bouts_in_well_visits`, `bout_visit_counts`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 

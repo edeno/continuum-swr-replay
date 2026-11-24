@@ -947,3 +947,21 @@ def test_a_missing_label_is_refused_by_name(column):
             stats.animal_balanced_bootstrap(
                 t.value, t.animal, t.day, n_draws=10, seed=0
             )
+
+
+def test_animal_mean_is_the_mean_over_the_animals_with_a_value_at_each_level():
+    from continuum_swr_replay.analysis.shared_statistics import animal_mean
+
+    table = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c"],
+            "bin_low": [0.0, 1.0, 0.0, 1.0, 0.0],
+            "percent": [10.0, 90.0, 30.0, 70.0, np.nan],
+        }
+    )
+    means = animal_mean(table, "bin_low", "percent")
+    # bin 0: a 10, b 30 (c has no value) -> 20; bin 1: a 90, b 70 -> 80
+    assert means.index.tolist() == [0.0, 1.0]
+    assert means.tolist() == pytest.approx([20.0, 80.0])
+    with pytest.raises(ValueError):
+        animal_mean(pd.concat([table, table.iloc[[0]]]), "bin_low", "percent")

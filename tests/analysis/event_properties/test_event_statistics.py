@@ -171,6 +171,43 @@ def test_boundary_timing_classes_each_bound_against_the_tolerance():
     assert stats.OFFSET_TAILS_S[stats.TIMING_TOLERANCE] == 0.010
 
 
+def test_boundary_offset_distribution_takes_each_animal_over_its_epochs():
+    """Bins of 10 ms from -20 to 20 ms. Animal a: epoch e1's two starts at -15
+    and +5 ms, epoch e2's one at +5 ms; b: one start at +30 ms, beyond the bins.
+    a's percent in [0, 10) is the mean over its epochs, (50 + 100) / 2 = 75,
+    in [-20, -10) (50 + 0) / 2 = 25; b's pair counts beyond the bins, so its
+    bins hold 0."""
+    offsets = pd.DataFrame(
+        {
+            "start_offset_s": [-0.015, 0.005, 0.005, 0.030],
+            "end_offset_s": [0.0, 0.0, 0.0, 0.020],
+        },
+        index=[10, 11, 12, 13],
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "c"],
+            "session_date": [1, 1, 1, 1, 1],
+            "epoch": ["e1", "e1", "e2", "e1", "e1"],
+        },
+        index=[10, 11, 12, 13, 99],
+    )
+    edges = np.array([-0.020, -0.010, 0.0, 0.010, 0.020])
+    table = stats.boundary_offset_distribution(offsets, events, edges)
+    start = table[table["bound"] == "start"].pivot(
+        index="bin_low", columns="animal", values="percent"
+    )
+    assert start["a"].tolist() == pytest.approx([25.0, 0.0, 75.0, 0.0])
+    assert start["b"].tolist() == pytest.approx([0.0] * 4)
+    # an end at the last edge is in the last bin, as np.histogram puts it
+    end = table[table["bound"] == "end"].pivot(
+        index="bin_low", columns="animal", values="percent"
+    )
+    assert end["a"].tolist() == pytest.approx([0.0, 0.0, 100.0, 0.0])
+    assert end["b"].tolist() == pytest.approx([0.0, 0.0, 0.0, 100.0])
+    assert set(table.columns) == {"bound", "animal", "bin_low", "bin_high", "percent"}
+
+
 def test_boundary_timing_statistics_take_each_animal_over_its_epochs():
     """Animal a: epoch 1 (earlier, later) and (together, together), epoch 2
     (together, together); b: (earlier, later). Pooled over 4 events. a's

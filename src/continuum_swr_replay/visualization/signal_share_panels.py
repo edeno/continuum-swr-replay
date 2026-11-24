@@ -3,7 +3,8 @@ MUA counterpart on Figure 2's supplement draw it the same way.
 
 Top, how confident Local time and confident non-local time are spread over the
 signal (each class's percent of its time in each signal bin; the mean over
-animals of each animal's mean over its epochs, in the class's color), the part
+animals, ``shared_statistics.animal_mean``, of each animal's mean over its
+epochs, in the class's color), the part
 of the non-local curve below the threshold shaded and the share of non-local
 time below it written; bottom, the share of immobile bins decoded non-local at
 each level, one thin line per animal and their mean in bold. A dashed line at
@@ -17,6 +18,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 
+from continuum_swr_replay.analysis.shared_statistics import animal_mean
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.publication_style import SMALL_SIZE
 
@@ -109,19 +111,18 @@ def draw_share_by_signal(
         np.isfinite(counts["signal_low"]) & np.isfinite(counts["signal_high"])
     ]
     width = (drawn["signal_high"] - drawn["signal_low"]).iloc[0]
-    by_animal = 100 * drawn.pivot(index="signal_low", columns="animal", values="share")
+    percent = drawn.assign(percent=100 * drawn["share"])
+    by_animal = percent.pivot(index="signal_low", columns="animal", values="percent")
     center = by_animal.index + width / 2
     ax_share.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax_share.plot(center, by_animal.mean(axis=1), color="k", lw=1.0)
+    ax_share.plot(
+        center, animal_mean(percent, "signal_low", "percent"), color="k", lw=1.0
+    )
     finite = states[
         np.isfinite(states["signal_low"]) & np.isfinite(states["signal_high"])
     ]
     for state, (_, color) in STATE_STYLES.items():
-        mean = (
-            finite[finite["state"] == state]
-            .pivot(index="signal_low", columns="animal", values="percent")
-            .mean(axis=1)
-        )
+        mean = animal_mean(finite[finite["state"] == state], "signal_low", "percent")
         middle = mean.index + width / 2
         ax_spread.plot(middle, mean.to_numpy(), color=color, lw=1.0)
         if state == "non_local":

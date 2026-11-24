@@ -28,6 +28,9 @@
   animal; the signed-rank p over recording days; and a scalar estimand's
   summary over sessions (the animal-balanced estimate, its interval, the
   animals with its sign and the day-level p).
+- :func:`animal_mean`: at each level of a per-animal table (a bin, a lag), the
+  mean over animals of the animals' values: the bold line beside one thin line
+  per animal.
 - :func:`session_mean_curve`, :func:`animal_balanced_curve` and
   :func:`animal_curve_sem`: a curve (one value per lag) taken unit -> session
   -> animal, the mean over animals of each animal's mean over its sessions, and
@@ -1150,6 +1153,33 @@ def weighted_medians(values_sorted: NDArray, weights: NDArray) -> NDArray:
 
 
 # --- curves over sessions and animals ----------------------------------------------
+
+
+def animal_mean(table: pd.DataFrame, index: str, value: str) -> pd.Series:
+    """The mean over animals of each animal's ``value`` at each level of
+    ``index``.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        One row per animal and level: ``animal``, ``index`` and ``value``.
+    index : str
+        The column of the levels (a bin's edge, a lag).
+    value : str
+        The column of each animal's value.
+
+    Returns
+    -------
+    pd.Series, shape (n_levels,)
+        Indexed by the levels in sorted order: the mean over the animals with
+        a value at the level (a missing value is left out).
+
+    Raises
+    ------
+    ValueError
+        If an animal has two rows at one level.
+    """
+    return table.pivot(index=index, columns="animal", values=value).mean(axis=1)
 
 
 def session_mean_curve(unit_curves: NDArray) -> NDArray:
