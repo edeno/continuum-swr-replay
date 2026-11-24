@@ -110,6 +110,8 @@ def unit_summary(
             f"one value per {fit_by}: the index must have the levels {columns}, "
             f"not {values.index.nlevels}"
         )
+    if values.index.duplicated().any():
+        raise ValueError(f"one value per {fit_by}: a {fit_by} has more than one value")
     if fit_by == "animal":
         found = animal_mean_interval(values)
         if found["n_animals"] == 0:

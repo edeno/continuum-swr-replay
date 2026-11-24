@@ -531,7 +531,9 @@ mgcv's "para" term keeps the intercept, so it is not compared.
 
 In a fit of several sessions the intercept and every active baseline copy are projected out
 first. A copy is zero on the other sessions' rows, also once weighted, so each session's copies
-are projected out of its own rows: one QR per session, the blocks stacked and reduced, the same
+are projected out of its own rows: for each session the range of its copies (by a singular value
+decomposition, so that a rank-deficient set of copies is handled) is taken out and what is left is
+reduced by a QR, the sessions' blocks are stacked and reduced, and the same
 per-term measures on them (`term_collinearity`, `session_copies`). It equals the projection of
 every copy out of the whole design to 1e-10 (`test_collinearity.py::
 test_copies_by_session_equal_the_sequential_projection`); a copy that its session's other copies

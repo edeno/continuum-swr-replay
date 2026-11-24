@@ -172,3 +172,19 @@ def test_unit_values_and_estimate_of_records() -> None:
         assert units.unit_estimate(values, fit_by) == summary["estimate"]
     assert records[0].unit_key == ("a0",)
     assert np.isnan(units.unit_estimate(values * np.nan, "animal"))
+
+
+@pytest.mark.parametrize(
+    ("fit_by", "key"),
+    [("session", ("a", "d1", "e1")), ("day", ("a", "d1")), ("animal", ("a",))],
+)
+def test_a_unit_given_twice_is_refused_also_when_one_value_is_missing(
+    fit_by: str, key: tuple
+) -> None:
+    """Two values for one unit are refused at every unit, whether or not one of
+    them is NaN (a NaN is left out only after the keys are checked), and the
+    message names the unit."""
+    index = pd.MultiIndex.from_tuples([key, key, tuple("b" + part for part in key)])
+    values = pd.Series([1.0, np.nan, 2.0], index=index)
+    with pytest.raises(ValueError, match=f"one value per {fit_by}"):
+        units.unit_summary(values, fit_by, n_draws=10, seed=0)

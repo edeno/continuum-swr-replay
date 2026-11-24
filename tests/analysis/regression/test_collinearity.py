@@ -313,8 +313,9 @@ def _unit(kind: str, n_sessions: int, seed: int = 0, shared_intercept: bool = Fa
 def test_copies_by_session_equal_the_sequential_projection(
     kind, n_sessions, shared_intercept
 ) -> None:
-    """Projecting each session's copies out of its own rows (one QR per
-    session, the blocks stacked and reduced) gives the measures of the
+    """Projecting each session's copies out of its own rows (the range of
+    its copies taken out, a QR of what is left, the blocks stacked and
+    reduced) gives the measures of the
     sequential projection of every copy out of the whole design, to 1e-10, on
     a day-like and an animal-like unit, under the Poisson (intercept copies;
     a shared intercept with category copies) and the grouped softmax."""
