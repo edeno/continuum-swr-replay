@@ -73,6 +73,7 @@ Each is over the events that start inside a well visit and the time inside one
 `measure_ripple_class_structure.py` measure every event, and their readers select.
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
+- `measure_content_mass_along_arms.py` — each event's posterior mass at each place along the arms, the content of Figure 3 e and f (`analysis/event_properties/content_along_arms.py`).
 - `measure_event_speed.py` — each event's speed along the track, from its MAP positions and from its Continuous-state position distributions (`analysis/event_properties/event_speed.py`).
 - `sweep_event_rule.py` — each epoch's non-local events, and those with no SWR, at other settings of the event rule (the sensitivity check of Figure 2's supplement; the canonical events are not changed).
 - `measure_nonlocal_by_signal.py` — each epoch's immobile time bins by ripple power, by MUA and by non-local probability (Figure 2i and the MUA panel of Figure 2's supplement).

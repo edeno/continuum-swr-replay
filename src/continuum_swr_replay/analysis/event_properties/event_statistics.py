@@ -1569,7 +1569,9 @@ AT_WELL_CM = 20.0
 at a well."""
 
 
-def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, float]:
+def quadrant_fractions(
+    d_animal: np.ndarray, d_well: np.ndarray, weights: np.ndarray | None = None
+) -> dict[str, float]:
     """Fraction of content *timebins* in each (far × at-well) quadrant.
 
     Timebin-weighted (where the decoded content spends its time), not
@@ -1585,19 +1587,27 @@ def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, fl
     d_well : np.ndarray, shape (n_bins,)
         The same bins' track distance (cm) from the content to the nearest
         reward well. At a well means below :data:`AT_WELL_CM`.
+    weights : np.ndarray, shape (n_bins,), optional
+        How much content time each row stands for (the posterior mass of a
+        place, summed over time bins); every row counts once when None.
 
     Returns
     -------
     dict of str to float
-        The share of the bins in each of :data:`OCCUPANCY_QUADRANTS`.
+        The share of the bins (of the weight) in each of
+        :data:`OCCUPANCY_QUADRANTS`.
     """
     far = d_animal > FAR_CM
     at_well = d_well < AT_WELL_CM
+
+    def share(mask: np.ndarray) -> float:
+        return float(np.average(mask, weights=weights))
+
     return {
-        "remote_well": float((far & at_well).mean()),
-        "own_well": float((~far & at_well).mean()),
-        "remote_path": float((far & ~at_well).mean()),
-        "near_off": float((~far & ~at_well).mean()),
+        "remote_well": share(far & at_well),
+        "own_well": share(~far & at_well),
+        "remote_path": share(far & ~at_well),
+        "near_off": share(~far & ~at_well),
     }
 
 

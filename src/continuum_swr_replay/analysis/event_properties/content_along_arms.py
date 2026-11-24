@@ -1,6 +1,14 @@
 """Where along the track event content sits: each time bin's arm and place on it.
 
-An event's content at a time bin is its MAP position. On the track graph every
+An event's content at a time bin is its MAP position, or, read as a whole, its
+position distribution: the posterior of the two non-local states over the
+place bins, renormalized (:func:`event_place_mass`). A table of content is then
+one row per time bin (the MAP) or one row per place with a ``weight``, the
+posterior mass the place holds summed over time bins (:data:`WEIGHT`); every
+statistic here takes either. The MAP of a time bin whose posterior is a smooth
+bump at a well is the bump's one highest place bin, so MAP content piles on a
+single place bin beside each well and each junction; the mass does not.
+On the track graph every
 arm runs from the first to the second node of its edge in the linearization
 order, which all epochs share: the three trunk arms from the center junction out
 to a patch junction, the six leaf arms from their patch junction out to the well
@@ -30,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    FAR_CM,
     OCCUPANCY_PLACES,
     quadrant_fractions,
 )
@@ -37,6 +46,71 @@ from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
 
 CENTER_NODE = 9
 """The track graph's center junction."""
+
+WEIGHT = "weight"
+"""The column of a content table that holds each row's content time (posterior
+mass summed over time bins); a table without it has one time bin per row."""
+
+
+def _weights(bins: pd.DataFrame) -> pd.Series:
+    """Each row's content time: :data:`WEIGHT`, or 1 where the table has none."""
+    if WEIGHT in bins:
+        return bins[WEIGHT].astype(float)
+    return pd.Series(1.0, index=bins.index)
+
+
+def event_place_mass(
+    event_id: np.ndarray,
+    mass: np.ndarray,
+    distance_to_animal_cm: np.ndarray,
+    far_cm: float = FAR_CM,
+) -> pd.DataFrame:
+    """Each event's content time at each place, split by whether the animal is near.
+
+    Parameters
+    ----------
+    event_id : np.ndarray, shape (n_time_bins,)
+        The event of each time bin; an event's bins are together.
+    mass : np.ndarray, shape (n_time_bins, n_places)
+        Each time bin's position distribution over the places; a row sums to 1.
+    distance_to_animal_cm : np.ndarray, shape (n_time_bins, n_places)
+        The track distance from each place to the animal at each time bin.
+    far_cm : float, optional
+        A place is far from the animal beyond this.
+
+    Returns
+    -------
+    table : pd.DataFrame
+        One row per event, place and side (far or near) that holds mass:
+        ``event_id``, ``place`` (the column of ``mass``), ``far``,
+        :data:`WEIGHT` (the mass summed over the event's time bins on that
+        side, so an event's weights sum to its number of time bins) and
+        ``distance_to_animal_cm`` (the mass-weighted mean distance on that
+        side).
+    """
+    event_id = np.asarray(event_id)
+    mass = np.asarray(mass, dtype=np.float64)
+    distance = np.asarray(distance_to_animal_cm, dtype=np.float64)
+    starts = np.flatnonzero(np.r_[True, event_id[1:] != event_id[:-1]])
+    frames = []
+    for far in (True, False):
+        side = mass * ((distance > far_cm) == far)
+        weight = np.add.reduceat(side, starts, axis=0)
+        moment = np.add.reduceat(side * distance, starts, axis=0)
+        event, place = np.nonzero(weight)
+        frames.append(
+            pd.DataFrame(
+                {
+                    "event_id": event_id[starts][event],
+                    "place": place,
+                    "far": far,
+                    WEIGHT: weight[event, place],
+                    "distance_to_animal_cm": moment[event, place]
+                    / weight[event, place],
+                }
+            )
+        )
+    return pd.concat(frames, ignore_index=True)
 
 
 def check_arm_orientation(
@@ -245,7 +319,9 @@ def even_content(bins: pd.DataFrame, at_well_cm: float) -> dict[str, float]:
     }
 
 
-def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFrame:
+def content_density_along_arms(
+    bins: pd.DataFrame, n_segments: int, by_animal: bool = False
+) -> pd.DataFrame:
     """Each kind's content time per cm along every arm, the animals' mean.
 
     Each arm is cut into ``n_segments`` equal segments. A decoded position is a
@@ -266,23 +342,28 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
     bins : pd.DataFrame, shape (n_bins, n_columns)
         One row per event time bin, with ``animal``, ``epoch_id``, ``is_swr``,
         ``arm``, ``arm_length_cm``, ``place_bin`` and ``n_place_bins``
-        (:func:`arm_positions`).
+        (:func:`arm_positions`); with :data:`WEIGHT`, one row per place and its
+        content time.
     n_segments : int
         Segments per arm.
+    by_animal : bool, optional
+        Return each animal's densities (the mean over its epochs), not the
+        animals' mean.
 
     Returns
     -------
     density : pd.DataFrame, shape (2 * n_arms * n_segments, 1)
         ``density_per_cm``, indexed by ``is_swr``, ``arm`` and ``segment``
-        (0 at the arm's first node). Every arm and segment of the arms in
-        ``bins`` is present, 0 where no content falls.
+        (0 at the arm's first node), and by ``animal`` after ``is_swr`` with
+        ``by_animal``. Every arm and segment of the arms in ``bins`` is
+        present, 0 where no content falls.
     """
     segment_cm = arm_lengths_cm(bins) / n_segments
     # Time bins per place bin, then the part of each place bin in each segment.
     counts = (
-        bins.groupby([*_EPOCH_KEYS, "arm", "place_bin", "n_place_bins"])
-        .size()
-        .rename("n_time_bins")
+        bins.assign(n_time_bins=_weights(bins))
+        .groupby([*_EPOCH_KEYS, "arm", "place_bin", "n_place_bins"])["n_time_bins"]
+        .sum()
         .reset_index()
     )
     low = (counts["place_bin"] / counts["n_place_bins"]).to_numpy()[:, None]
@@ -307,7 +388,12 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
     share = per_cell.div(per_cell.sum(axis=1), axis=0)
     per_epoch = share.melt(ignore_index=False, value_name="share").reset_index()
     per_epoch["density_per_cm"] = per_epoch["share"] / per_epoch["arm"].map(segment_cm)
-    return _animals_mean(per_epoch.drop(columns="share"), ["arm", "segment"])
+    per_epoch = per_epoch.drop(columns="share")
+    if by_animal:
+        return per_epoch.groupby(["is_swr", "animal", "arm", "segment"])[
+            ["density_per_cm"]
+        ].mean()
+    return _animals_mean(per_epoch, ["arm", "segment"])
 
 
 def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
@@ -322,11 +408,13 @@ def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
     -------
     profiles : pd.DataFrame
         ``density_per_cm``, indexed by ``is_swr``, ``arm_type`` (``"trunk"``,
-        ``"leaf"``) and ``segment``: the mean over the arms of the type.
+        ``"leaf"``) and ``segment``: the mean over the arms of the type; and by
+        ``animal`` after ``is_swr`` when ``density`` is each animal's.
     """
     frame = density.reset_index()
     frame["arm_type"] = np.where(frame["arm"].isin(LEAF_ARMS), "leaf", "trunk")
-    return frame.groupby(["is_swr", "arm_type", "segment"])[["density_per_cm"]].mean()
+    kinds = ["is_swr", "animal"] if "animal" in frame else ["is_swr"]
+    return frame.groupby([*kinds, "arm_type", "segment"])[["density_per_cm"]].mean()
 
 
 def log2_density_against_even(
@@ -413,9 +501,16 @@ def distance_from_animal_shares(
         raise ValueError("a distance from the animal is missing or outside the bins")
     frame = bins.assign(at_well=bins["distance_to_well_cm"] < at_well_cm)
     frames = []
+    frame[WEIGHT] = _weights(bins)
     for (is_swr, animal, epoch), group in frame.groupby(_EPOCH_KEYS):
         here = group["distance_to_animal_cm"].to_numpy()
         well = group["at_well"].to_numpy()
+        time = group[WEIGHT].to_numpy()
+
+        def share(mask, here=here, time=time):
+            counts, _ = np.histogram(here[mask], edges_cm, weights=time[mask])
+            return counts / time.sum()
+
         frames.append(
             pd.DataFrame(
                 {
@@ -423,8 +518,8 @@ def distance_from_animal_shares(
                     "animal": animal,
                     "epoch_id": epoch,
                     "distance_cm": edges_cm[:-1],
-                    "at_well": np.histogram(here[well], edges_cm)[0] / len(group),
-                    "elsewhere": np.histogram(here[~well], edges_cm)[0] / len(group),
+                    "at_well": share(well),
+                    "elsewhere": share(~well),
                 }
             )
         )
@@ -457,6 +552,7 @@ def content_place_shares(bins: pd.DataFrame) -> pd.DataFrame:
         fractions = quadrant_fractions(
             group["distance_to_animal_cm"].to_numpy(),
             group["distance_to_well_cm"].to_numpy(),
+            _weights(group).to_numpy(),
         )
         fractions["at_well"] = fractions["remote_well"] + fractions["own_well"]
         rows.append(

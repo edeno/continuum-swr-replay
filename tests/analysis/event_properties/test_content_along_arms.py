@@ -15,6 +15,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     distance_from_animal_shares,
     distance_to_nearest_well,
     even_content,
+    event_place_mass,
     leaf_and_trunk_profiles,
     log2_density_against_even,
     log2_density_ratio,
@@ -317,3 +318,85 @@ def test_place_shares_go_epoch_then_animal_and_count_animals_at_wells():
     assert statistics["means"].loc[False, "at_well"] == pytest.approx(0.875)
     assert statistics["means"].loc[True, "at_well"] == 0.0
     assert statistics["n_animals_non_swr_more_at_well"] == 2
+
+
+# --- content as posterior mass: one row per place, with its content time -----
+
+
+def test_event_place_mass_sums_each_events_mass_per_place_and_side():
+    """Two events on three places. Event 1 (two time bins): place 0 is near
+    the animal (5 cm) at the first bin and far (30 cm) at the second; place 1
+    is far at both. Event 2 (one bin) is all on place 2, near."""
+    mass = np.array([[0.75, 0.25, 0.0], [0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])
+    distance = np.array([[5.0, 40.0, 60.0], [30.0, 50.0, 60.0], [60.0, 60.0, 10.0]])
+    table = event_place_mass(np.array([1, 1, 2]), mass, distance)
+    by = table.set_index(["event_id", "place", "far"])
+    assert len(by) == 4  # no row where a side holds no mass
+    assert by.loc[(1, 0, False), "weight"] == 0.75
+    assert by.loc[(1, 0, True), "weight"] == 0.5
+    assert by.loc[(1, 1, True), "weight"] == 0.75
+    assert by.loc[(1, 1, True), "distance_to_animal_cm"] == pytest.approx(
+        (0.25 * 40 + 0.5 * 50) / 0.75
+    )
+    assert by.loc[(2, 2, False), "distance_to_animal_cm"] == 10.0
+    # an event's weights sum to its number of time bins
+    assert table.groupby("event_id")["weight"].sum().tolist() == [2.0, 1.0]
+
+
+def test_density_of_weighted_rows_is_the_density_of_as_many_time_bins():
+    """Three time bins on place bin 8 and one on bin 1 are one row of weight 3
+    and one of weight 1; half weights give the same shares."""
+    counted = _bins("a", False, [0, 0, 0, 0], [8, 8, 8, 1])
+    weighted = _bins("a", False, [0, 0], [8, 1]).assign(weight=[3.0, 1.0])
+    expected = content_density_along_arms(counted, n_segments=2)
+    pd.testing.assert_frame_equal(
+        content_density_along_arms(weighted, n_segments=2), expected
+    )
+    halved = weighted.assign(weight=[1.5, 0.5])
+    pd.testing.assert_frame_equal(
+        content_density_along_arms(halved, n_segments=2), expected
+    )
+
+
+def test_density_by_animal_is_each_animals_mean_over_its_epochs():
+    bins = pd.concat(
+        [
+            _bins("a", False, [0, 0, 0], [8, 8, 8], epoch="e1"),
+            _bins("a", False, [0], [1], epoch="e2"),
+            _bins("b", False, [0], [8]),
+        ],
+        ignore_index=True,
+    )
+    each = content_density_along_arms(bins, n_segments=2, by_animal=True)
+    density = each["density_per_cm"]
+    assert density[(False, "a", 0, 0)] == pytest.approx(0.5 / 5)
+    assert density[(False, "b", 0, 1)] == pytest.approx(1 / 5)
+    # the animals' mean is the mean of these
+    mean = content_density_along_arms(bins, n_segments=2)["density_per_cm"]
+    np.testing.assert_allclose(
+        density.groupby(["is_swr", "arm", "segment"]).mean(), mean
+    )
+    profiles = leaf_and_trunk_profiles(each)
+    assert profiles.index.names == ["is_swr", "animal", "arm_type", "segment"]
+    assert profiles.loc[(False, "b", "leaf", 1), "density_per_cm"] == pytest.approx(0.2)
+
+
+def test_place_and_distance_shares_weigh_rows_by_their_content_time():
+    """One row of weight 3 at a remote well and one of weight 1 near the animal
+    off the wells: three quarters and one quarter, as four time bins give."""
+    bins = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": "e1",
+            "is_swr": False,
+            "distance_to_animal_cm": [100.0, 5.0],
+            "distance_to_well_cm": [5.0, 50.0],
+            "weight": [3.0, 1.0],
+        }
+    )
+    shares = content_place_shares(bins).loc[(False, "a")]
+    assert shares["remote_well"] == 0.75 and shares["near_off"] == 0.25
+    assert shares["at_well"] == 0.75
+    by_distance = distance_from_animal_shares(bins, np.array([0.0, 20.0, 200.0]), 20.0)
+    np.testing.assert_allclose(by_distance.loc[False, "at_well"], [0.0, 0.75])
+    np.testing.assert_allclose(by_distance.loc[False, "elsewhere"], [0.25, 0.0])
