@@ -91,6 +91,7 @@ from continuum_swr_replay.analysis.regression.folds import (
     trial_bin_share,
     trial_folds_and_groups,
 )
+from continuum_swr_replay.columns import require_columns
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import sample_step
 
@@ -768,6 +769,19 @@ NULL_DONOR_RULE = (
 run's header records it."""
 
 
+def reference_settings(null_seed: int) -> dict:
+    """The settings of the extra scores, as the run's header files them under
+    ``settings.extra_scores``: the HPD length's coverage
+    (:data:`HPD_COVERAGE`) and the shuffled-event reference's seed and donor
+    rule (:data:`NULL_DONOR_RULE`). The key keeps the name ``extra_scores``
+    because the stored run's manifest has it."""
+    return {
+        "hpd_coverage": HPD_COVERAGE,
+        "null_seed": null_seed,
+        "null_donor_rule": NULL_DONOR_RULE,
+    }
+
+
 def null_donors(windows: pd.DataFrame, folds: NDArray, seed: int) -> NDArray[np.int64]:
     """Each window's donor window for the shuffled-window reference
     (:data:`NULL_DONOR_RULE`).
@@ -1405,20 +1419,21 @@ def require_run_columns(
     table: pd.DataFrame, what: str, columns: Sequence[str] = RUN_COLUMNS
 ) -> None:
     """Refuse a held-out tetrode table without every one of ``columns`` (by
-    default all of :data:`RUN_COLUMNS`; a table made before the run computed
-    the extra scores has not).
+    default all of :data:`RUN_COLUMNS`, the columns the runner writes):
+    ``columns.require_columns``, with the runner named.
 
     Raises
     ------
     ValueError
-        Naming the missing columns and the runner that makes them.
+        Naming ``what``, the missing columns and the runner that makes them.
     """
-    if missing := [c for c in columns if c not in table.columns]:
+    try:
+        require_columns(table, columns, what)
+    except ValueError as error:
         raise ValueError(
-            f"{what} has no columns {missing}: it is not a table of the held-out "
-            "tetrode run. Run scripts/event_evidence/score_tetrode_holdout.py "
-            "again into this folder."
-        )
+            f"{error}: it is not a table of the held-out tetrode run. Run "
+            "scripts/event_evidence/score_tetrode_holdout.py again into this folder."
+        ) from None
 
 
 def window_scores(table: pd.DataFrame) -> pd.DataFrame:
