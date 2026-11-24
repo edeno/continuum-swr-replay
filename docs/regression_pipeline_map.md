@@ -1656,7 +1656,7 @@ Model-free event-start rates on the three visit clocks, and how stops end.
 
 The visit rate model: event starts on the three visit clocks, models A and D.
 
-`CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `declared_contrasts`, `CohortRows`, `model_d_rows`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `calibrate_log_penalty`, `ThirdClockDecision`, `third_clock_decision`
+`CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `declared_contrasts`, `CohortRows`, `model_d_rows`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `AnimalReward`, `AnimalRewardFit`, `fit_animal_rewards`, `calibrate_log_penalty`, `ThirdClockDecision`, `third_clock_decision`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_scenarios.py`
 
@@ -1668,7 +1668,7 @@ Planted scenarios of the visit rate model, as pure functions of the rows.
 
 The estimands of the visit rate model, per session and over sessions.
 
-`session_estimands`, `summarize_estimands`, `lag_curves`, `lag_curve_band`, `ThirdClockQ7a`, `third_clock_q7a`
+`session_estimands`, `summarize_estimands`, `animal_reward_values`, `summarize_animal_rewards`, `lag_curves`, `lag_curve_band`, `ThirdClockQ7a`, `third_clock_q7a`
 
 ### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
 

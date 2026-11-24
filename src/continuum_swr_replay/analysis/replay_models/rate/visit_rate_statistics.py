@@ -13,6 +13,14 @@ session -> recording day -> animal, the animal-balanced estimate with its
 nested bootstrap interval, the animals with its sign and the day-level test.
 The estimates are on the log scale (a log rate ratio).
 
+At ``reward_level="animal"`` (``visit_rate.fit_animal_rewards``) Q2 is one
+coefficient per animal and kind, and the cohort's value is the mean of the
+animals' coefficients with the t interval over the animals
+(:func:`summarize_animal_rewards`); the difference between the kinds is taken
+animal by animal. Taking the animals' mean with a t interval as the
+animal-level value is the plan author's call (2026-11-23 brief), not a
+decision of the lead.
+
 Model D's curve over lags 1 to 10 is described, not tested: per session with
 its simultaneous band (``bands.simultaneous_band``), and the animal-balanced
 curve across sessions with its band (``bands.across_session_band``).
@@ -40,19 +48,25 @@ from continuum_swr_replay.analysis.regression.bands import (
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.record import FitRecord
-from continuum_swr_replay.analysis.shared_statistics import estimand_summary
+from continuum_swr_replay.analysis.shared_statistics import (
+    animal_mean_interval,
+    estimand_summary,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..declared_tests import DIFFERENCE, KINDS
 from .visit_rate import (
     LAGS,
     STRETCH,
+    AnimalRewardFit,
     VisitRateFit,
     declared_contrasts,
     lag_curve_rows,
 )
 
 __all__ = [
+    "animal_reward_values",
+    "summarize_animal_rewards",
     "lag_curve_band",
     "lag_curves",
     "session_estimands",
@@ -167,6 +181,74 @@ def summarize_estimands(
         wide["estimate"] = wide[KINDS[0]] - wide[KINDS[1]]
         summary = _summary(wide, n_draws, seed)
         out.append({"estimand_id": estimand_id, "tested": DIFFERENCE, **summary})
+    return pd.DataFrame(out)
+
+
+def animal_reward_values(fit: AnimalRewardFit) -> pd.DataFrame:
+    """Each animal's reward coefficient of one kind, one row per animal.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``animal``, ``kind``, ``coefficient``, ``se``, ``status``,
+        ``n_iter``, ``n_sessions`` and ``n_events``; a coefficient that did
+        not converge is NaN.
+    """
+    return pd.DataFrame(
+        [
+            {
+                "animal": a.animal,
+                "kind": a.kind,
+                "coefficient": a.coefficient if a.status == CONVERGED else np.nan,
+                "se": a.se if a.status == CONVERGED else np.nan,
+                "status": a.status,
+                "n_iter": a.n_iter,
+                "n_sessions": a.n_sessions,
+                "n_events": a.n_events,
+            }
+            for a in fit.animals
+        ]
+    )
+
+
+def summarize_animal_rewards(values: pd.DataFrame) -> pd.DataFrame:
+    """Q2 at the animal level: the mean of the animals' coefficients with the
+    t interval over the animals, for each kind and for their difference.
+
+    The plan author's call for an animal-level value (module docstring): the
+    estimate is the mean over the animals with a value, its interval
+    ``mean +/- t(0.975, A - 1) SD / sqrt(A)`` over them
+    (``shared_statistics.animal_mean_interval``). The difference SWR minus No
+    SWR is taken animal by animal, over the animals with both.
+
+    Parameters
+    ----------
+    values : pd.DataFrame
+        One row per animal and kind: ``animal``, ``kind`` and
+        ``coefficient`` (:func:`animal_reward_values` of both kinds).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per tested (``SWR``, ``No SWR``, ``SWR minus No SWR``):
+        ``tested`` and the entries of ``animal_mean_interval``.
+
+    Raises
+    ------
+    ValueError
+        If a kind is missing or an animal has two values of a kind.
+    """
+    missing = set(KINDS) - set(values["kind"])
+    if missing:
+        raise ValueError(f"no animal values of {sorted(missing)}")
+    if values.duplicated(["animal", "kind"]).any():
+        raise ValueError("an animal has more than one value of a kind")
+    wide = values.pivot(index="animal", columns="kind", values="coefficient")
+    out = [
+        {"tested": kind, **animal_mean_interval(wide[kind].dropna())} for kind in KINDS
+    ]
+    difference = wide[KINDS[0]] - wide[KINDS[1]]
+    out.append({"tested": DIFFERENCE, **animal_mean_interval(difference.dropna())})
     return pd.DataFrame(out)
 
 
