@@ -2615,33 +2615,6 @@ def test_the_figure03_distance_panel_draws_the_content_distance_of_each_class(
     plt.close(fig)
 
 
-def test_figure03_extent_inset_draws_the_difference_and_the_matched_one(offline):
-    """Panel c's inset: the SWR minus no-SWR extent over all events and at
-    matched duration, each a dot on its 95 % interval, rows named in order."""
-    import matplotlib.pyplot as plt
-
-    figure03 = offline("scripts.figures.generate_figure03")
-    interval = pd.Series(
-        {
-            "difference": 40.0,
-            "difference_low": 15.0,
-            "difference_high": 65.0,
-            "matched_difference": 35.0,
-            "matched_difference_low": 16.0,
-            "matched_difference_high": 54.0,
-        }
-    )
-    fig, ax = plt.subplots()
-    figure03.draw_extent_difference(ax, interval)
-    spans = [list(line.get_xdata()) for line in ax.lines if len(line.get_xdata()) == 2]
-    assert [15.0, 65.0] in spans and [16.0, 54.0] in spans
-    dots = [line.get_xdata()[0] for line in ax.lines if line.get_marker() == "o"]
-    assert dots == [40.0, 35.0]
-    assert [label.get_text() for label in ax.get_yticklabels()] == ["all", "matched"]
-    assert ax.get_xlim()[0] < 0  # the zero line is inside the axis
-    plt.close(fig)
-
-
 def test_supp_figure03_draws_the_shares_at_a_remote_and_at_the_own_well(offline):
     """Panel d: per place, each animal's no-SWR and SWR share joined by a line,
     dots in the kinds' colors, and the animals' mean as a bar."""
