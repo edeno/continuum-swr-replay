@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """The declared-penalty rule for a per-session smooth, in simulation.
 
 Every number this script writes is a simulation number.
@@ -6,10 +5,14 @@ Every number this script writes is a simulation number.
 The rule: a per-session smooth term is the cubic P-spline at one fixed log
 penalty, declared in the model and the same in every session, the value at
 which the median edf of the term over the sessions is a target
-(``regression.calibration.log_penalty_for_edf``). Each session is fitted alone
-(``regression.sessions.fit_sessions``); the scalar estimand is a curve
-contrast of each session's fit (``regression.contrasts``), reduced session ->
-recording day -> animal (``shared_statistics``).
+(``regression.calibration.log_penalty_for_edf``). This module is a scenario
+list of the simulation engine (``regression.simulation``): it builds the
+cohort, the model at each target's declared penalty and the two scenarios,
+and ``scripts/checks/run_simulations.py --model declared_penalty`` runs them.
+The engine draws the counts and runs the real fit
+(``regression.sessions.fit_sessions``), the curve contrast
+(``regression.contrasts``) and the reduction session -> recording day ->
+animal (``shared_statistics.estimand_summary``).
 
 The simulation:
 
@@ -30,7 +33,9 @@ The simulation:
   ``s`` the time since the visit's start and ``b_s`` set so that the expected
   events of the session are its number; :data:`CURVES` gives ``f``: a
   threefold rise over the first 3 s (``rise``) and none (``flat``), the same
-  in every session (no session, day or animal effects);
+  in every session (no session, day or animal effects). Both are scenarios
+  outside the model (``regression.simulation.OutsideScenario``): the rise is
+  not a curve of the smooth's span, so each states its planted contrast;
 - the model: an intercept, ``Smooth(time_since_visit_start_s, 0, 20, 43)`` (the
   planned basis, knots 0.5 s apart) and the exposure's offset, Poisson;
 - the estimand: the Q1 contrast, the curve's mean 2 to 4 s after arrival less
@@ -55,9 +60,8 @@ sufficient and the fit, the edf and the contrast are those of the bins
 
 The declared log penalty of each target edf (:data:`TARGETS`) is found once,
 on one data set of the rise (:data:`CALIBRATION_SEED`), and held for every
-data set of both curves. Each data set is fitted at every target. Written,
-one row per target and curve (``declared_penalty.parquet`` in
-``--output-dir``):
+data set of both curves: one model per target, all fitted to the same data
+sets. The table (:func:`table`), one row per curve and target:
 
 - ``target_edf``, ``log_penalty``, ``calibration_median_edf``;
 - ``median_edf``: the median over every session and data set;
@@ -68,41 +72,39 @@ one row per target and curve (``declared_penalty.parquet`` in
 - the project's inference for a scalar (``estimand_summary``): ``coverage``,
   the share of data sets whose 95 % interval (the nested bootstrap,
   t-corrected) holds ``planted``; ``excludes_zero``, the share whose interval
-  excludes zero; ``reject_day``, the share whose day-level signed-rank p
-  (``day_p``) is below 0.05, a NaN p (fewer than six non-zero day values)
-  counted as no rejection. For the flat curve ``excludes_zero`` and
-  ``reject_day`` are false positives, for the rise power. Each has its
-  binomial standard error (``*_se``);
+  excludes zero; ``reject_day``, the share whose day-level signed-rank p is
+  below 0.05, a NaN p (fewer than six non-zero day values) counted as no
+  rejection. For the flat curve ``excludes_zero`` and ``reject_day`` are
+  false positives, for the rise power. Each has its binomial standard error
+  (``*_se``);
 - ``reject_t_reference``: the share whose t test over the 5 animal values
   (``animal_day_session_values``) against zero has p below 0.05, with
   ``reject_t_reference_se``. It is a reference only, not the project's test:
   no claim rests on a p over five animals;
-- ``share_converged``: the session fits that converged; a row below 1 is
-  printed as a warning. A session without a converged fit leaves that data
-  set's estimate: ``n_sessions_used_min`` and ``n_sessions_used_mean`` are the
-  sessions that entered the estimates over the data sets, ``n_sessions`` the
-  cohort's; ``n_data_sets``, ``n_draws``.
+- ``share_converged``: the session fits that converged. A session without a
+  converged fit leaves that data set's estimate: ``n_sessions_used_min`` and
+  ``n_sessions_used_mean`` are the sessions that entered the estimates over
+  the data sets, ``n_sessions`` the cohort's; ``n_data_sets``, ``n_draws``.
 
-The bootstrap seed of each (curve, data set, target) row is drawn from a
-``SeedSequence`` spawned from the data set's seed.
+Data set ``i`` of curve ``k`` (0 the rise, 1 the flat curve) is drawn from
+``SeedSequence([DATA_SEED, k, i])``; the bootstrap seed of each target's row
+is a child spawned from it (``regression.simulation.bootstrap_seeds``).
 
 ::
 
-    python scripts/checks/simulate_declared_penalty.py --output-dir OUT
-    python scripts/checks/simulate_declared_penalty.py --output-dir OUT --quick
-    python scripts/checks/simulate_declared_penalty.py --output-dir OUT --workers 16
+    python scripts/checks/run_simulations.py --model declared_penalty --output-dir OUT
+    python scripts/checks/run_simulations.py --model declared_penalty --quick
+    python scripts/checks/run_simulations.py --model declared_penalty --workers 6
 
-``--quick`` runs a cohort of 5 animals of 2 days of 2 sessions and 4 data
-sets per curve.
+``--quick`` runs a cohort of 5 animals of 1 day of 2 sessions and 2 data sets
+per curve; its table is the fixed-seed fixture
+``tests/analysis/regression/data/numpy_reference/simulation_declared_penalty.json``.
 """
 
 from __future__ import annotations
 
-import argparse
-import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 
 from continuum_swr_replay.runs.threads import pin_blas_threads, pool_context
 
@@ -116,14 +118,17 @@ from continuum_swr_replay.analysis.regression.calibration import (  # noqa: E402
     log_penalty_for_edf,
 )
 from continuum_swr_replay.analysis.regression.contrasts import (  # noqa: E402
-    evaluate_contrast,
     range_grid,
     range_mean_contrast,
 )
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson  # noqa: E402
 from continuum_swr_replay.analysis.regression.newton import CONVERGED  # noqa: E402
-from continuum_swr_replay.analysis.regression.sessions import (  # noqa: E402
-    fit_sessions,
+from continuum_swr_replay.analysis.regression.simulation import (  # noqa: E402
+    Model,
+    OutsideScenario,
+    Simulation,
+    SimulationResult,
+    draw_data_set,
 )
 from continuum_swr_replay.analysis.regression.terms import (  # noqa: E402
     Design,
@@ -133,10 +138,9 @@ from continuum_swr_replay.analysis.regression.terms import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.shared_statistics import (  # noqa: E402
     animal_day_session_values,
-    estimand_summary,
 )
-from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
-from continuum_swr_replay.tables.io import write_table  # noqa: E402
+
+SessionKey = tuple[str, str, str]
 
 BIN_S = 0.015
 COLUMN = "time_since_visit_start_s"
@@ -145,6 +149,7 @@ TERM_RANGE = (0.0, 20.0)
 N_BASIS = 43
 #: Q1: the mean 2 to 4 s after arrival less the mean in the first second.
 CONTRAST = ((2.0, 4.0), (0.0, 1.0))
+ESTIMAND = "Q1"
 TARGETS = (4.0, 6.0, 8.0)
 
 
@@ -154,7 +159,12 @@ def _rise(s: np.ndarray) -> np.ndarray:
     return np.log(3.0) * u**2 * (3.0 - 2.0 * u)
 
 
-CURVES = {"rise": _rise, "flat": lambda s: np.zeros(np.shape(s))}
+def _flat(s: np.ndarray) -> np.ndarray:
+    """No change over the visit."""
+    return np.zeros(np.shape(s))
+
+
+CURVES = {"rise": _rise, "flat": _flat}
 
 DAYS_PER_ANIMAL = (6, 8, 9, 10, 12)
 SESSIONS_PER_DAY = (4, 7)  # inclusive range
@@ -167,7 +177,6 @@ EVENTS_RANGE = (33.0, 782.0)
 STRUCTURE_SEED = 0
 CALIBRATION_SEED = 1
 DATA_SEED = 20261123
-OUTPUT_NAME = "declared_penalty"
 
 
 @dataclass(frozen=True)
@@ -180,19 +189,9 @@ class Config:
     n_draws: int = 1000
 
 
-QUICK = Config(days_per_animal=(2,) * 5, sessions_per_day=(2, 2), n_data_sets=4)
-
-
-@dataclass(frozen=True)
-class Session:
-    """One session's identity and its summed bins (cells)."""
-
-    key: tuple[str, str, str]
-    animal: str
-    day: str
-    time: np.ndarray  # (n_cells,) the time since the visit's start, s
-    exposure: np.ndarray  # (n_cells,) s
-    n_events: float  # expected
+QUICK = Config(
+    days_per_animal=(1,) * 5, sessions_per_day=(2, 2), n_data_sets=2, n_draws=200
+)
 
 
 def visit_bins(duration: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -236,11 +235,21 @@ def cells(
     return unique, np.bincount(cell, weights=exposure), cell
 
 
-def cohort(config: Config, seed: int = STRUCTURE_SEED) -> list[Session]:
-    """The sessions of the cohort, their bins summed (module docstring)."""
+def cohort(
+    config: Config, seed: int = STRUCTURE_SEED
+) -> dict[SessionKey, pd.DataFrame]:
+    """The sessions of the cohort, their bins summed (module docstring).
+
+    Returns
+    -------
+    dict of (animal, day, epoch) to pd.DataFrame
+        Each session's cells: :data:`COLUMN`, ``exposure`` (s), ``cell`` (the
+        unit) and ``expected_events``, the session's expected number of
+        events, the same on every row.
+    """
     rng = np.random.default_rng(seed)
     lo, hi = config.sessions_per_day
-    out = []
+    out = {}
     for a, n_days in enumerate(config.days_per_animal):
         animal = f"animal{a}"
         for d in range(n_days):
@@ -251,45 +260,56 @@ def cohort(config: Config, seed: int = STRUCTURE_SEED) -> list[Session]:
                 n_events = np.clip(
                     EVENTS_MEDIAN * np.exp(EVENTS_LOG_SD * rng.normal()), *EVENTS_RANGE
                 )
-                out.append(
-                    Session(
-                        (animal, day, f"{2 * e + 2:02d}_r{e + 1}"),
-                        animal,
-                        day,
-                        time,
-                        exposure,
-                        float(n_events),
-                    )
+                out[(animal, day, f"{2 * e + 2:02d}_r{e + 1}")] = pd.DataFrame(
+                    {
+                        COLUMN: time,
+                        "exposure": exposure,
+                        "cell": np.arange(time.size),
+                        "expected_events": float(n_events),
+                    }
                 )
     return out
 
 
-def simulate(
-    sessions: list[Session], curve: str, rng: np.random.Generator
-) -> dict[tuple[str, str, str], pd.DataFrame]:
-    """Each session's cells with a Poisson count at the planted rate.
-
-    A cell's count is drawn as one Poisson of the cell's summed mean: the
-    sum of its bins' independent counts, whose rate is the same.
-
-    Returns
-    -------
-    dict of session key -> pd.DataFrame
-        Columns :data:`COLUMN`, ``exposure``, ``count`` and ``cell``.
-    """
+def expected_counts(
+    sessions: dict[SessionKey, pd.DataFrame],
+    rng: np.random.Generator,
+    *,
+    curve: str,
+) -> dict[SessionKey, np.ndarray]:
+    """Each cell's expected count under ``curve``: ``exposure * exp(f(s))``,
+    scaled so that the session's sum is its ``expected_events``. A cell's
+    count is one Poisson of its bins' summed mean, which is the sum of their
+    independent counts. ``rng`` is not read: the curve is the same in every
+    data set."""
     out = {}
-    for session in sessions:
-        mean = session.exposure * np.exp(CURVES[curve](session.time))
-        mean *= session.n_events / mean.sum()
-        out[session.key] = pd.DataFrame(
-            {
-                COLUMN: session.time,
-                "exposure": session.exposure,
-                "count": rng.poisson(mean).astype(float),
-                "cell": np.arange(session.time.size),
-            }
+    for key, rows in sessions.items():
+        mean = rows["exposure"].to_numpy() * np.exp(
+            CURVES[curve](rows[COLUMN].to_numpy())
         )
+        mean *= rows["expected_events"].iloc[0] / mean.sum()
+        out[key] = mean
     return out
+
+
+def planted_contrast(curve: str) -> float:
+    """:data:`CONTRAST` of the planted curve, on the same grids."""
+    f = CURVES[curve]
+    (a, b), (c, d) = CONTRAST
+    return float(f(range_grid(a, b)).mean() - f(range_grid(c, d)).mean())
+
+
+def scenarios() -> list[OutsideScenario]:
+    """The rise, then the flat curve, each with its planted contrast."""
+    return [
+        OutsideScenario(
+            curve,
+            partial(expected_counts, curve=curve),
+            planted={ESTIMAND: planted_contrast(curve)},
+            columns=("expected_events",),
+        )
+        for curve in CURVES
+    ]
 
 
 def design_at(pooled: pd.DataFrame, log_penalty: float) -> Design:
@@ -314,132 +334,26 @@ def contrast_vector(design: Design) -> np.ndarray:
     return range_mean_contrast(curve_rows, *CONTRAST, term_range=TERM_RANGE)
 
 
-def planted_contrast(curve: str) -> float:
-    """:data:`CONTRAST` of the planted curve, on the same grids."""
-    f = CURVES[curve]
-    (a, b), (c, d) = CONTRAST
-    return float(f(range_grid(a, b)).mean() - f(range_grid(c, d)).mean())
-
-
-def fit_contrasts(
-    design: Design, data: dict[tuple[str, str, str], pd.DataFrame]
-) -> pd.DataFrame:
-    """Each session's contrast, edf and status at the design's penalty.
-
-    Returns
-    -------
-    pd.DataFrame, shape (n_sessions, 3)
-        ``estimate`` (NaN without a converged fit), ``edf`` and
-        ``converged``, indexed by session key.
-    """
-    c = contrast_vector(design)
-    records = fit_sessions(
-        design,
-        data,
-        Poisson(),
-        model="declared_penalty",
-        kind="simulated",
-        response="count",
-        unit="cell",
-        table_sha256={},
-    )
-    rows = []
-    for record in records:
-        converged = record.status == CONVERGED
-        estimate = (
-            evaluate_contrast(c, np.array(record.coef), np.array(record.vcov)).estimate
-            if converged
-            else np.nan
-        )
-        rows.append((estimate, record.edf.get(TERM, np.nan), converged))
-    return pd.DataFrame(
-        rows, columns=["estimate", "edf", "converged"], index=pd.Index(list(data))
+def model_at(name: str, pooled: pd.DataFrame, log_penalty: float) -> Model:
+    """The model at a declared log penalty, with the Q1 estimand."""
+    design = design_at(pooled, log_penalty)
+    return Model(
+        name, design, Poisson(), "count", "cell", {ESTIMAND: contrast_vector(design)}
     )
 
 
-def summarize_data_set(
-    estimates: pd.Series,
-    sessions: list[Session],
-    planted: float,
-    n_draws: int,
-    seed: int,
-) -> dict[str, float]:
-    """One data set's animal-balanced estimate, its interval's coverage of
-    ``planted`` and of zero, its day-level p, the reference t test over
-    animals, and the sessions with a finite estimate."""
-    animal = pd.Series([s.animal for s in sessions], index=estimates.index)
-    day = pd.Series([s.day for s in sessions], index=estimates.index)
-    session = pd.Series([s.key[2] for s in sessions], index=estimates.index)
-    summary = estimand_summary(
-        estimates, animal, day, session, n_draws=n_draws, seed=seed
-    )
-    per_animal = animal_day_session_values(estimates, animal, day, session)
-    return {
-        "estimate": summary["estimate"],
-        "covered": float(summary["low"] <= planted <= summary["high"]),
-        "excludes_zero": float(not summary["low"] <= 0.0 <= summary["high"]),
-        "day_p": float(summary["day_p"]),
-        "t_p": float(scipy.stats.ttest_1samp(per_animal.to_numpy(), 0.0).pvalue),
-        "n_sessions_used": int(summary["n_sessions"]),
-    }
-
-
-def data_seed(curve: str, index: int) -> np.random.SeedSequence:
-    """The seed of data set ``index`` of ``curve``."""
-    return np.random.SeedSequence([DATA_SEED, list(CURVES).index(curve), index])
-
-
-def bootstrap_seeds(curve: str, index: int, n_targets: int) -> tuple[int, ...]:
-    """The bootstrap seed of each target's row of a data set, spawned from
-    the data set's seed."""
-    return tuple(
-        int(child.generate_state(1)[0])
-        for child in data_seed(curve, index).spawn(n_targets)
-    )
-
-
-def run_data_set(
-    task: tuple[str, int],
-    sessions: list[Session],
-    penalties: dict[float, float],
-    n_draws: int,
-) -> list[dict]:
-    """One data set of a curve fitted at every target's declared penalty.
-
-    Returns
-    -------
-    list of dict
-        One per target: :func:`summarize_data_set`'s entries and each
-        session's edf.
-    """
-    curve, index = task
-    data = simulate(sessions, curve, np.random.default_rng(data_seed(curve, index)))
-    pooled = pd.concat(data.values(), ignore_index=True)
-    planted = planted_contrast(curve)
-    out = []
-    seeds = bootstrap_seeds(curve, index, len(penalties))
-    for (target, log_penalty), seed in zip(penalties.items(), seeds, strict=True):
-        fits = fit_contrasts(design_at(pooled, log_penalty), data)
-        row = summarize_data_set(fits["estimate"], sessions, planted, n_draws, seed)
-        out.append(
-            {
-                "target_edf": target,
-                "curve": curve,
-                "data_set": index,
-                **row,
-                "median_edf": float(np.nanmedian(fits["edf"])),
-                "edf": fits["edf"].to_numpy(),
-                "share_converged": float(fits["converged"].mean()),
-            }
-        )
-    return out
-
-
-def calibrate(target: float, sessions: list[Session]) -> tuple[float, float, float]:
+def calibrate(
+    target: float, sessions: dict[SessionKey, pd.DataFrame]
+) -> tuple[float, float]:
     """The declared log penalty of a target edf, found on the calibration
-    data set of the rise: ``(target, log penalty, median edf there)``."""
-    data = simulate(sessions, "rise", np.random.default_rng(CALIBRATION_SEED))
-    pooled = pd.concat(data.values(), ignore_index=True)
+    data set of the rise: ``(log penalty, median edf there)``."""
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    data = draw_data_set(
+        model_at("calibration", pooled, 0.0),
+        sessions,
+        scenarios()[0],
+        np.random.default_rng(CALIBRATION_SEED),
+    )
     found = log_penalty_for_edf(
         design_at(pooled, 0.0),
         data,
@@ -449,134 +363,105 @@ def calibrate(target: float, sessions: list[Session]) -> tuple[float, float, flo
         response="count",
         unit="cell",
     )
-    return target, found.log_penalty, found.median_edf
+    return found.log_penalty, found.median_edf
 
 
-def _share(hits: pd.Series, name: str) -> dict[str, float]:
+def model_name(target: float) -> str:
+    """The name of the model at the declared penalty of ``target``."""
+    return f"target_edf_{target:g}"
+
+
+def simulation(
+    quick: bool, workers: int = 1, config: Config | None = None
+) -> Simulation:
+    """The run: the cohort of ``config`` (by default :data:`QUICK` or the
+    full :class:`Config`), one model per target at its declared penalty, and
+    the two curves. The targets are calibrated in up to ``workers`` ``spawn``
+    processes; each target's calibration is in ``attrs``."""
+    config = config or (QUICK if quick else Config())
+    sessions = cohort(config)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    work = partial(calibrate, sessions=sessions)
+    if workers == 1:
+        found = [work(target) for target in TARGETS]
+    else:
+        with pool_context().Pool(min(workers, len(TARGETS))) as pool:
+            found = pool.map(work, TARGETS, chunksize=1)
+    calibration, models = {}, []
+    for target, (log_penalty, median_edf) in zip(TARGETS, found, strict=True):
+        name = model_name(target)
+        calibration[name] = {
+            "target_edf": target,
+            "log_penalty": log_penalty,
+            "calibration_median_edf": median_edf,
+        }
+        models.append(model_at(name, pooled, log_penalty))
+    return Simulation(
+        models,
+        sessions,
+        scenarios(),
+        config.n_data_sets,
+        config.n_draws,
+        DATA_SEED,
+        {"calibration": calibration},
+    )
+
+
+def _share(hits: np.ndarray, name: str) -> dict[str, float]:
     """The share of data sets in ``hits`` and its binomial standard error."""
-    p = float(hits.mean())
+    p = float(np.mean(hits))
     return {name: p, f"{name}_se": float(np.sqrt(p * (1 - p) / len(hits)))}
 
 
-def summarize(
-    rows: list[dict],
-    calibration: list[tuple[float, float, float]],
-    config: Config,
-    n_sessions: int,
-) -> pd.DataFrame:
-    """One row per target and curve (module docstring)."""
-    frame = pd.DataFrame(rows)
-    declared = {t: (rho, edf) for t, rho, edf in calibration}
+def _t_reference(sessions: pd.DataFrame) -> np.ndarray:
+    """Per data set, whether the t test over the animal values has p below
+    0.05, shape ``(n_data_sets,)``."""
+    hits = []
+    for _, group in sessions.groupby("data_set", sort=False):
+        per_animal = animal_day_session_values(
+            group["estimate"], group["animal"], group["session_date"], group["epoch"]
+        )
+        hits.append(scipy.stats.ttest_1samp(per_animal.to_numpy(), 0.0).pvalue < 0.05)
+    return np.array(hits, dtype=float)
+
+
+def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
+    """One row per curve and target (module docstring), from the engine's
+    tables."""
+    calibration = simulation.attrs["calibration"]
+    sessions = result.sessions.groupby(["scenario", "model"], sort=False)
     out = []
-    for (target, curve), group in frame.groupby(["target_edf", "curve"], sort=False):
-        planted = planted_contrast(curve)
-        n = len(group)
-        estimate = group["estimate"].to_numpy()
-        bias = float(np.mean(estimate) - planted)
+    for row in result.summary.itertuples():
+        fits = sessions.get_group((row.scenario, row.model))
+        declared = calibration[row.model]
         out.append(
             {
-                "target_edf": target,
-                "curve": curve,
-                "log_penalty": declared[target][0],
-                "calibration_median_edf": declared[target][1],
+                "target_edf": declared["target_edf"],
+                "curve": row.scenario,
+                "log_penalty": declared["log_penalty"],
+                "calibration_median_edf": declared["calibration_median_edf"],
                 "median_edf": float(
-                    np.nanmedian(np.concatenate(group["edf"].to_list()))
+                    np.nanmedian([edf.get(TERM, np.nan) for edf in fits["edf"]])
                 ),
-                "planted": planted,
-                "mean_estimate": float(np.mean(estimate)),
-                "bias": bias,
-                "bias_share": bias / planted if planted != 0 else np.nan,
-                "sd": float(np.std(estimate, ddof=1)),
-                "bias_se": float(np.std(estimate, ddof=1) / np.sqrt(n)),
-                **_share(group["covered"], "coverage"),
-                **_share(group["excludes_zero"], "excludes_zero"),
-                **_share(group["day_p"] < 0.05, "reject_day"),
-                **_share(group["t_p"] < 0.05, "reject_t_reference"),
-                "share_converged": float(group["share_converged"].mean()),
-                "n_sessions_used_min": int(group["n_sessions_used"].min()),
-                "n_sessions_used_mean": float(group["n_sessions_used"].mean()),
-                "n_data_sets": n,
-                "n_sessions": n_sessions,
-                "n_draws": config.n_draws,
+                "planted": row.planted,
+                "mean_estimate": row.mean_estimate,
+                "bias": row.bias,
+                "bias_share": row.bias_share,
+                "sd": row.sd,
+                "bias_se": row.bias_se,
+                "coverage": row.coverage,
+                "coverage_se": row.coverage_se,
+                "excludes_zero": row.excludes_zero,
+                "excludes_zero_se": row.excludes_zero_se,
+                "reject_day": row.reject_day,
+                "reject_day_se": row.reject_day_se,
+                **_share(_t_reference(fits), "reject_t_reference"),
+                "share_converged": float(np.mean(fits["status"] == CONVERGED)),
+                "n_sessions_used_min": row.n_sessions_used_min,
+                "n_sessions_used_mean": row.n_sessions_used_mean,
+                "n_data_sets": row.n_data_sets,
+                "n_sessions": row.n_sessions,
+                "n_draws": row.n_draws,
             }
         )
     return pd.DataFrame(out)
-
-
-#: The cohort, set in each worker process once when it starts, so that it is not
-#: sent with every task.
-_COHORT: list[Session] = []
-
-
-def _set_cohort(sessions: list[Session]) -> None:
-    _COHORT[:] = sessions
-
-
-def _calibrate(target: float) -> tuple[float, float, float]:
-    return calibrate(target, _COHORT)
-
-
-def _run_data_set(
-    task: tuple[str, int], penalties: dict[float, float], n_draws: int
-) -> list[dict]:
-    return run_data_set(task, _COHORT, penalties, n_draws)
-
-
-def run(config: Config, workers: int = 1) -> pd.DataFrame:
-    """The table of the module docstring for ``config``, over ``workers``
-    processes."""
-    _COHORT[:] = cohort(config)
-    tasks = [(curve, i) for curve in CURVES for i in range(config.n_data_sets)]
-
-    def compute(map_):
-        calibration = map_(_calibrate, TARGETS)
-        penalties = {target: rho for target, rho, _ in calibration}
-        work = partial(_run_data_set, penalties=penalties, n_draws=config.n_draws)
-        return calibration, [row for chunk in map_(work, tasks) for row in chunk]
-
-    if workers == 1:
-        calibration, rows = compute(lambda f, xs: list(map(f, xs)))
-    else:
-        with pool_context().Pool(
-            workers, initializer=_set_cohort, initargs=(_COHORT,)
-        ) as pool:
-            calibration, rows = compute(partial(pool.map, chunksize=1))
-    return summarize(rows, calibration, config, len(_COHORT))
-
-
-def report(table: pd.DataFrame) -> None:
-    """Print the table, and a warning line for each row in which not every
-    session fit converged."""
-    with pd.option_context("display.width", 200, "display.max_columns", 40):
-        print(table.round(4).to_string(index=False))
-    for row in table.itertuples():
-        if row.share_converged < 1:
-            print(
-                f"warning: target_edf {row.target_edf}, curve {row.curve}: "
-                f"{100 * row.share_converged:.1f} % of session fits converged; "
-                f"an estimate used as few as {row.n_sessions_used_min} of the "
-                f"{row.n_sessions} sessions"
-            )
-
-
-def main(argv: list[str] | None = None) -> None:
-    default_jax_platforms("cpu")
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--quick", action="store_true")
-    parser.add_argument("--workers", type=int, default=1)
-    parser.add_argument("--n-data-sets", type=int, default=None)
-    args = parser.parse_args(argv)
-    config = QUICK if args.quick else Config()
-    if args.n_data_sets is not None:
-        config = replace(config, n_data_sets=args.n_data_sets)
-    started = time.perf_counter()
-    table = run(config, args.workers)
-    table.attrs["seconds"] = time.perf_counter() - started
-    path = write_table(table, args.output_dir / OUTPUT_NAME)
-    report(table)
-    print(f"wrote {path} in {table.attrs['seconds']:.0f} s")
-
-
-if __name__ == "__main__":
-    main()

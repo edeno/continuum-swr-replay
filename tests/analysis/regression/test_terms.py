@@ -575,3 +575,30 @@ def test_a_slope_is_measured_after_its_standardization(rate_sessions) -> None:
             rows,
             intercept=True,
         )
+
+
+def test_the_columns_a_design_reads(rate_sessions, content_sessions) -> None:
+    """``Design.columns`` names every column the build reads, each once:
+    built on those columns alone, the design is the same."""
+    for terms, sessions, intercept, expected in (
+        (
+            _rate_terms(),
+            rate_sessions,
+            True,
+            ("time_since_s", "last_rewarded", "x", *LAG_COLUMNS, "exposure"),
+        ),
+        (
+            _content_terms(),
+            content_sessions,
+            False,
+            ("role", "reward_fraction", "clock_s"),
+        ),
+    ):
+        pooled = pd.concat(sessions.values(), ignore_index=True)
+        design = build_design(terms, pooled, intercept=intercept)
+        assert design.columns == expected
+        full, only = design.build(pooled), design.build(pooled[list(expected)])
+        np.testing.assert_array_equal(full.X, only.X)
+        np.testing.assert_array_equal(full.missing, only.missing)
+        if full.offset is not None:
+            np.testing.assert_array_equal(full.offset, only.offset)

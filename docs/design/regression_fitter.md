@@ -23,6 +23,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
 | `bands.py` | simultaneous bands for a curve |
+| `simulation.py` | the simulation engine: an outcome drawn from a planted truth on a model's own rows, fitted and reduced by the real code |
 | `runtime.py` | how the fitter's JAX runs: float64 for each call, the device guard, the float64 kernel guard and the log of traces (not used by the solver yet) |
 | `padding.py` | rows and groups padded to bucket sizes, with the weight that marks the real rows (not used by the solver yet) |
 
@@ -709,6 +710,74 @@ animal, day or session label is refused. A kind difference is
 the difference of the two kinds' session estimates, reduced the same way. With five
 animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
 alone.
+
+## Simulation
+
+**The rule.** A simulation replaces only the outcome column of a model's own rows. The
+rows, the design, the per-session fit (`fit_sessions`), the estimands (`contrasts`) and
+the reduction session to recording day to animal with the project's interval
+(`shared_statistics.estimand_summary`) are the real functions. The engine,
+`analysis/regression/simulation.py`, builds no model: the caller gives a `Model` (the
+`Design` as the model's own code builds it, the likelihood, the response and unit columns,
+and each estimand's `c`). Every coefficient that an estimand uses must carry a fixed
+penalty (`support.require_tested_penalized`; the engine refuses the model otherwise).
+
+**The draws.** `likelihoods.draw(lik, eta, aux, rng)` draws outcomes at a linear
+predictor: Poisson counts at `exp(eta + offset)`, Bernoulli 0/1, Gaussian with a given
+variance, and under the grouped softmax each row's share of its group (shares sum to
+one, as the content response does). The softmax has three noise models, which a scenario
+chooses (`n_trials`, `concentration`; a number, or a column that holds one per event):
+one categorical choice per event (a share is 0 or 1, variance `p (1 - p)`); a multinomial
+of `n` choices, such as the event's decode bins (variance `p (1 - p) / n`); and a
+Dirichlet-multinomial of `n` choices with concentration `a` (variance
+`p (1 - p) (n + a) / (n (1 + a))`). Each has the model's mean share `p`. The fit treats
+each event as one choice, so the noise model decides what a content simulation shows. The draws use only a NumPy `Generator`, never the fitter, so the same
+seeds give the same data after the solver changes. Data set `i` of the scenario at place
+`s` of the list is drawn from `SeedSequence([seed, s, i])`, the sessions in order; each
+(model, estimand) of the data set has its own bootstrap seed, spawned from it. A run of
+some scenarios only keeps each scenario's place, and so its data.
+
+**Two kinds of scenario.**
+
+1. Inside the model (`InsideScenario`): planted coefficients on the model's design. The
+   planted value of each estimand is `c' beta` at them.
+2. Outside the model (`OutsideScenario`): any expected outcome as a function of the rows
+   (a curve the model cannot hold exactly, an effect drawn anew per animal in each data
+   set). It has no planted coefficients, so it states the planted value of each estimand
+   itself, as a number or a function of the model. An estimand it does not name has the
+   planted value NaN, and the table gives its estimate without a bias or a coverage.
+
+Several models with the same coefficients (for example one model at several declared
+penalties) are fitted to the same data sets of one run.
+
+**The results table** (`simulation.summarize`; one row per scenario, model and
+estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),
+`bias_se`; `coverage` (the share of data sets whose 95 % interval holds the planted
+value), `excludes_zero`, `reject_day` (the day-level signed-rank p below 0.05, a NaN p
+counted as no rejection), each with its binomial standard error; `share_without_value`
+and, for each `record.NoFit` and `support.Removed` code, the share of sessions without a
+value for that cause; `share_not_converged` (of the session fits tried);
+`n_sessions`, `n_sessions_used_min`, `n_sessions_used_mean`, `n_data_sets`,
+`n_data_sets_with_estimate`, `n_draws` and `seed`. The engine also returns one row per
+data set and one per session.
+
+**How a phase adds a list.** A module beside the model, in
+`analysis/replay_models/<family>/`, defines `simulation(quick, workers) -> Simulation` (the
+model's real rows, its models, its scenarios, the data sets and the seed) and, if the
+model needs its own columns, `table(result, simulation)`. The phase adds the module to
+`MODELS` in `scripts/checks/run_simulations.py`, which runs it
+(`--model`, `--scenarios`, `--n-data-sets`, `--seed`, `--workers` in a `spawn` pool,
+`--output-dir`, `--quick`) and writes `<model>.parquet` with the seed, the commit and
+each model's declared penalties in its `attrs`. The first list is the declared-penalty
+check, `scripts/checks/simulate_declared_penalty.py` (a synthetic cohort; one model per
+target edf). Fixed-seed tables are stored in
+`tests/analysis/regression/data/numpy_reference/simulation_*.json`, so that a change of
+the solver is checked on the whole pipeline of bias and coverage.
+
+**Cost.** The fits take almost all the time. What depends only on the rows (each
+session's offset, missing rows and linear predictor under each inside scenario) is
+computed once per run; `fit_sessions` builds each session's design again for every data
+set, since its interface takes rows, not a built design.
 
 ## Precision, devices, threads and padding
 

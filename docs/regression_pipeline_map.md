@@ -578,7 +578,7 @@ Folds of whole trials, balanced by destination well, long stays cut into pieces.
 
 Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`, `draw`
 
 ### `src/continuum_swr_replay/analysis/regression/newton.py`
 
@@ -621,6 +621,12 @@ How the fitter's JAX code runs: float64 for each call, one device, float64 kerne
 The per-session fitting loop: one design, every session fitted alone.
 
 `fit_sessions`
+
+### `src/continuum_swr_replay/analysis/regression/simulation.py`
+
+The simulation engine: a planted truth drawn on a model's own rows, fitted by the real code.
+
+`Model`, `InsideScenario`, `OutsideScenario`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `PreparedDraws`, `prepare_draws`, `draw_data_set`, `run_columns`, `run`, `summarize`
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
@@ -874,6 +880,12 @@ The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track
 
 `ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `set_aside_pairs`, `shuffle_statistics`, `shuffle_p_values`
 
+### `scripts/checks/_regression_reference.py`
+
+Reference cases of the shared regression fitter, and the rule that compares them.
+
+`plain`, `differences`, `run`
+
 ### `scripts/checks/_report.py`
 
 Report helpers shared by the QA and PFC audit scripts: the run's command line, markdown tables.
@@ -921,6 +933,12 @@ Check that the held-out runs' stored folds are the fold rule's folds.
 Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
+
+### `scripts/checks/compare_regression_reference.py`
+
+Fit a real slice with the shared regression fitter, and compare it with a stored fit of the same slice.
+
+`rate_sessions`, `content_sessions`, `rate_records`, `content_records`, `real_slice`, `why_not_a_write_folder`, `main`
 
 ### `scripts/checks/compare_regression_to_current_fitters.py`
 
@@ -976,11 +994,17 @@ Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
 
+### `scripts/checks/run_simulations.py`
+
+Run a model's scenario list through the simulation engine.
+
+`output_dir`, `run`, `warnings`, `main`
+
 ### `scripts/checks/simulate_declared_penalty.py`
 
 The declared-penalty rule for a per-session smooth, in simulation.
 
-`Config`, `Session`, `visit_bins`, `durations`, `cells`, `cohort`, `simulate`, `design_at`, `contrast_vector`, `planted_contrast`, `fit_contrasts`, `summarize_data_set`, `data_seed`, `bootstrap_seeds`, `run_data_set`, `calibrate`, `summarize`, `run`, `report`, `main`
+`Config`, `visit_bins`, `durations`, `cells`, `cohort`, `expected_counts`, `planted_contrast`, `scenarios`, `design_at`, `contrast_vector`, `model_at`, `calibrate`, `model_name`, `simulation`, `table`
 
 ### `scripts/checks/simulate_interval_coverage.py`
 
@@ -1006,6 +1030,12 @@ Regenerate the canonical tables into a scratch root and diff two roots.
 
 `regen`, `frame_problems`, `diff`, `main`
 
+### `scripts/checks/time_regression_fitter.py`
+
+Time the shared regression fitter on fixed synthetic workloads: wall time and peak memory, the first call apart from the calls after it.
+
+`visit_bins`, `rate_inputs`, `content_inputs`, `diagonal_inputs`, `thirty_sessions`, `child`, `time_case`, `table`, `main`
+
 ### `scripts/checks/write_epoch_register_doc.py`
 
 Regenerate the parts of ``docs/epoch_register.md`` that mirror the register.
@@ -1017,6 +1047,12 @@ Regenerate the parts of ``docs/epoch_register.md`` that mirror the register.
 Generate the symbol-anchored regression pipeline code map.
 
 `render`, `main`
+
+### `scripts/checks/write_regression_reference.py`
+
+Write the shared regression fitter's reference outputs, the fixtures its tests compare it with.
+
+`group_text`, `main`
 
 ### `scripts/detection/sweep_memoryless_controls.py`
 
