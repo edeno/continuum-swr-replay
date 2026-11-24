@@ -22,24 +22,22 @@ from .reml import RefitEnd
 __all__ = ["FitRecord", "NoFit"]
 
 
-NoFit = StrEnum(
-    "NoFit",
-    {
-        "NO_ROWS": "no_rows",
-        "NO_EVENTS": "no_events",
-        **{end.name: end.value for end in RefitEnd if end is not RefitEnd.CONVERGED},
-    },
-    module=__name__,
-)
-NoFit.__doc__ = """Why a session has no kept fit (a record's ``no_fit``).
+class NoFit(StrEnum):
+    """Why a session has no kept fit (a record's ``no_fit``).
 
-``NO_ROWS``: no rows left to fit (none given, all missing, or all dropped).
-``NO_EVENTS``: no events of the kind in the rows left to fit. The others are
-the ways :func:`.reml.refit_session` ends without a fit, its
-:class:`.reml.RefitEnd` but ``CONVERGED``, of the same names and values:
-``ALONG_THE_INTERCEPT``, ``ALONG_A_PENALTY``, ``TOO_MANY_ROUNDS`` and
-``OTHER_STATUS``.
-"""
+    ``NO_ROWS`` and ``NO_EVENTS`` are the loop's; the others are the ways
+    :func:`.reml.refit_session` ends without a fit, its :class:`.reml.RefitEnd`
+    but ``CONVERGED``, of the same names and values.
+    """
+
+    #: No rows left to fit: none given, all missing, or all dropped.
+    NO_ROWS = "no_rows"
+    #: No events of the kind in the rows left to fit.
+    NO_EVENTS = "no_events"
+    ALONG_THE_INTERCEPT = RefitEnd.ALONG_THE_INTERCEPT.value
+    ALONG_A_PENALTY = RefitEnd.ALONG_A_PENALTY.value
+    TOO_MANY_ROUNDS = RefitEnd.TOO_MANY_ROUNDS.value
+    OTHER_STATUS = RefitEnd.OTHER_STATUS.value
 
 
 @dataclass(frozen=True)

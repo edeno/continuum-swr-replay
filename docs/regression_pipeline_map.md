@@ -608,7 +608,7 @@ Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
 
 The fit-row record: one row per (model, kind, session) of every stored fit.
 
-`FitRecord`
+`NoFit`, `FitRecord`
 
 ### `src/continuum_swr_replay/analysis/regression/reml.py`
 
