@@ -784,7 +784,7 @@ session to day to animal mean of the sessions' values), and the unit's own targe
 with the weak penalty off, reduced over the units as the estimates are
 (`2026-11-24-unit-of-fit.md`, section 6). The summary gives the bias and the coverage
 against both (`bias`, `coverage`; `bias_unit`, `coverage_unit`). The target is fitted once
-per worker process for an inside scenario and once per data set for an outside one. The
+per run, in the parent before any worker starts, for an inside scenario and once per data set for an outside one. The
 noise-free target never drops a unit for lack of events, and a drawn data set can, so
 `bias_unit` can compare slightly different sets of units. The Bernoulli
 takes only 0/1 outcomes, so its `planted_unit` is NaN. The engine,

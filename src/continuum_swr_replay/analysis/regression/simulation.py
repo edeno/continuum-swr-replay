@@ -58,8 +58,8 @@ Two planted values (``docs/design/2026-11-24-unit-of-fit.md``, section 6):
   at its ``fit_by`` to the expected outcome itself (no noise), with the weak
   penalty off (every simple term's fixed penalty removed; a smooth keeps its
   own), reduced over the units as the estimates are. It is computed once per
-  worker process for an inside scenario and once per data set for an outside
-  one (whose expected outcome may read the generator). The Bernoulli takes
+  run, before the data sets, for an inside scenario and once per data set for
+  an outside one (whose expected outcome may read the generator). The Bernoulli takes
   only 0/1 outcomes, so under it ``planted_unit`` is NaN. The noise-free
   target never drops a unit for lack of events, and a drawn data set can, so
   ``bias_unit`` can compare slightly different sets of units.
@@ -817,26 +817,37 @@ def _unit_targets(
     }
 
 
-def _inside_means(
-    model: Model, prepared: Mapping[SessionKey, _Prepared], place: int
-) -> dict[SessionKey, np.ndarray]:
-    """Each session's expected outcome under the inside scenario at
-    ``place``."""
-    return {
-        key: _inside_mean(model.likelihood, p.inside_eta[place], p)
-        for key, p in prepared.items()
-    }
+def _inside_targets(
+    simulation: Simulation,
+    prepared: Mapping[SessionKey, _Prepared],
+    places: Sequence[int],
+) -> dict[tuple[int, str], dict[str, float]]:
+    """(scenario place, model name) -> its unit targets, for each inside
+    scenario at ``places``: its expected outcome does not change between
+    data sets, so the target is fitted once per run."""
+    out = {}
+    for s in places:
+        if not isinstance(simulation.scenarios[s], InsideScenario):
+            continue
+        for model in simulation.models:
+            means = {
+                key: _inside_mean(model.likelihood, p.inside_eta[s], p)
+                for key, p in prepared.items()
+            }
+            out[s, model.name] = _unit_targets(model, simulation.sessions, means)
+    return out
 
 
 def _run_task(
     simulation: Simulation,
     prepared: Mapping[SessionKey, _Prepared],
     task: tuple[int, int],
-    targets: dict,
+    targets: Mapping[tuple[int, str], dict[str, float]],
 ) -> tuple[list[dict], list[dict]]:
     """One data set of one scenario, fitted by every model: its ``data_sets``
-    and ``sessions`` rows. ``targets`` keeps each (scenario, model)'s unit
-    targets of an inside scenario, computed at its first data set."""
+    and ``sessions`` rows. ``targets`` holds each inside scenario's unit
+    targets (:func:`_inside_targets`); an outside scenario's are fitted here,
+    on the data set's expected outcome."""
     s, i = task
     scenario = simulation.scenarios[s]
     models = simulation.models
@@ -858,14 +869,11 @@ def _run_task(
             table_sha256={},
             fit_by=model.fit_by,
         )
-        if means is not None:
-            target = _unit_targets(model, simulation.sessions, means)
-        else:
-            if (s, model.name) not in targets:
-                targets[s, model.name] = _unit_targets(
-                    model, simulation.sessions, _inside_means(model, prepared, s)
-                )
-            target = targets[s, model.name]
+        target = (
+            targets[s, model.name]
+            if means is None
+            else _unit_targets(model, simulation.sessions, means)
+        )
         base = {"scenario": scenario.name, "model": model.name, "data_set": i}
         rows, estimates = _session_rows(model, records, base)
         session_rows += rows
@@ -887,12 +895,12 @@ def _run_task(
 _WORKER: dict = {}
 
 
-def _init_worker(simulation: Simulation) -> None:
-    _WORKER["simulation"] = simulation
-    _WORKER["prepared"] = _prepare(
-        simulation.models[0], simulation.sessions, simulation.scenarios
-    )
-    _WORKER["targets"] = {}
+def _init_worker(
+    simulation: Simulation,
+    prepared: Mapping[SessionKey, _Prepared],
+    targets: Mapping[tuple[int, str], dict[str, float]],
+) -> None:
+    _WORKER.update(simulation=simulation, prepared=prepared, targets=targets)
 
 
 def _worker_task(task: tuple[int, int]) -> tuple[list[dict], list[dict]]:
@@ -1001,14 +1009,13 @@ def run(
         for i in range(simulation.n_data_sets)
     ]
     simulation = replace(simulation, sessions=_kept_rows(simulation))
+    prepared = _prepare(simulation.models[0], simulation.sessions, simulation.scenarios)
+    targets = _inside_targets(simulation, prepared, sorted({s for s, _ in tasks}))
     if workers == 1:
-        prepared = _prepare(
-            simulation.models[0], simulation.sessions, simulation.scenarios
-        )
-        targets: dict = {}
         parts = [_run_task(simulation, prepared, task, targets) for task in tasks]
     else:
-        with pool_context().Pool(workers, _init_worker, (simulation,)) as pool:
+        context = (simulation, prepared, targets)
+        with pool_context().Pool(workers, _init_worker, context) as pool:
             parts = pool.map(_worker_task, tasks, chunksize=1)
     data_sets = pd.DataFrame([row for part in parts for row in part[0]])
     sessions = pd.DataFrame([row for part in parts for row in part[1]])
