@@ -85,6 +85,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
 from scripts.checks import _regression_reference as reference  # noqa: E402
 
 SESSIONS = (
@@ -92,7 +93,7 @@ SESSIONS = (
     ("j16", 20210706, "02_r1"),
     ("wilbur", 20210326, "03_r1"),
 )
-KEYS = ["animal", "session_date", "epoch"]
+KEYS = list(SESSION_COLUMNS)
 LAG1 = "known_reward_outcome_lag_1"
 RATE_LOG_PENALTIES = (1.77, 3.17)
 WEAK = log_penalty_from_prior_sd(2.0)
