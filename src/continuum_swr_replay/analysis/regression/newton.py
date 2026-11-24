@@ -619,14 +619,17 @@ def _fit(
         for b in np.flatnonzero(members):
             decrement = np.nan if status == NOT_POSITIVE_DEFINITE else r["decrement"][b]
             if status == NO_FINITE_MAXIMUM:
-                fits[b] = _no_finite_maximum(
-                    problem.X,
+                # The last step, and the columns running away along it.
+                step = r["step"][b].copy()
+                fits[b] = NewtonFit(
                     beta[b].copy(),
                     r["A"][b].copy(),
+                    NO_FINITE_MAXIMUM,
                     float(decrement),
                     n_iter,
                     float(loglik[b]),
-                    r["step"][b].copy(),
+                    step,
+                    running_away_columns(problem.X, step),
                 )
             else:
                 fits[b] = NewtonFit(
@@ -646,9 +649,8 @@ def _fit(
         stop(runs_away, r, NO_FINITE_MAXIMUM, n_iter)
         at_maximum = small & ~runs_away
         if at_maximum.any():
-            last = _last_step(problem, beta, r, at_maximum, n_iter, cap)
-            for b in np.flatnonzero(at_maximum):
-                fits[b] = last(b)
+            for b, fit in _last_step(problem, beta, r, at_maximum, n_iter, cap).items():
+                fits[b] = fit
         stepping &= r["ok"] & ~(r["decrement"] < NEWTON_DECREMENT_TOL)
         eta_steps[stepping, n_iter] = r["eta_step"][stepping]
         if n_iter == max_iter or not stepping.any():
@@ -672,29 +674,6 @@ def _fit(
         stop(stepping & away, r, NO_FINITE_MAXIMUM, n_iter)
         stop(stepping & ~away, r, STEP_LIMIT, n_iter)
     return fits
-
-
-def _no_finite_maximum(
-    X: np.ndarray,
-    beta: np.ndarray,
-    A: np.ndarray,
-    decrement: float,
-    n_iter: int,
-    loglik: float,
-    step: np.ndarray,
-) -> NewtonFit:
-    """A fit with no finite maximum, with its last step and the columns
-    running away along it."""
-    return NewtonFit(
-        beta,
-        A,
-        NO_FINITE_MAXIMUM,
-        decrement,
-        n_iter,
-        loglik,
-        step,
-        running_away_columns(X, step),
-    )
 
 
 def _runs_away_at_the_cap(
@@ -750,8 +729,8 @@ def _last_step(
 
     Returns
     -------
-    callable
-        The member's index to its ``NewtonFit``.
+    dict of int to NewtonFit
+        Each member's fit, by its index in the batch.
     """
     F, loglik, _ = problem.evaluate(beta)
     moved = np.where(members[:, None], beta + r["step"], beta)
@@ -762,17 +741,17 @@ def _last_step(
         landed = problem.iterate(moved, eta_moved, F_new, cap)
         take &= landed["ok"] & (landed["decrement"] < NEWTON_DECREMENT_TOL)
 
-    def fit(b: int) -> NewtonFit:
-        if take[b]:
-            return NewtonFit(
-                moved[b].copy(),
-                landed["A"][b].copy(),
-                CONVERGED,
-                float(landed["decrement"][b]),
-                n_iter + 1,
-                float(loglik_new[b]),
-            )
-        return NewtonFit(
+    return {
+        b: NewtonFit(
+            moved[b].copy(),
+            landed["A"][b].copy(),
+            CONVERGED,
+            float(landed["decrement"][b]),
+            n_iter + 1,
+            float(loglik_new[b]),
+        )
+        if take[b]
+        else NewtonFit(
             beta[b].copy(),
             r["A"][b].copy(),
             CONVERGED,
@@ -780,5 +759,5 @@ def _last_step(
             n_iter,
             float(loglik[b]),
         )
-
-    return fit
+        for b in np.flatnonzero(members).tolist()
+    }

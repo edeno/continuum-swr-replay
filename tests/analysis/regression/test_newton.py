@@ -417,7 +417,7 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
         r["step"] = np.array([[to + 0.5]])
         fit = newton._last_step(
             problem, beta, r, np.array([True]), 3, newton.MAX_STEP_LENGTH
-        )(0)
+        )[0]
 
     # The fit stays where it was, with A and the decrement there by hand:
     # g = 1 - exp(-0.5), A = exp(-0.5), decrement g^2 / (2 A).
@@ -889,8 +889,8 @@ def _poisson_probe():
 
 def _last_steps(monkeypatch: pytest.MonkeyPatch) -> list:
     """Record each call of ``newton._last_step`` (of a batch of one): its
-    problem, coefficients, full step and iteration, and, once the fit is
-    read, whether the step was taken."""
+    problem, coefficients, full step and iteration, and whether the step was
+    taken."""
     calls = []
     last_step = newton._last_step
 
@@ -898,14 +898,9 @@ def _last_steps(monkeypatch: pytest.MonkeyPatch) -> list:
         call = {"problem": problem, "beta": beta[0].copy(), "n_iter": n_iter}
         call["step"] = r["step"][0].copy()
         calls.append(call)
-        fit_of = last_step(problem, beta, r, members, n_iter, cap)
-
-        def fit(b):
-            out = fit_of(b)
-            call["taken"] = out.n_iter == n_iter + 1
-            return out
-
-        return fit
+        fits = last_step(problem, beta, r, members, n_iter, cap)
+        call["taken"] = fits[0].n_iter == n_iter + 1
+        return fits
 
     monkeypatch.setattr(newton, "_last_step", recorded)
     return calls

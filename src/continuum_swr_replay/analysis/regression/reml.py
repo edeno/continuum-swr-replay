@@ -1308,15 +1308,14 @@ class _Evaluator:
         blocks: Sequence[PenaltyBlock],
     ) -> None:
         self.lik, self.blocks = lik, blocks
-        self.sessions, self.indices = list(sessions), list(indices)
         self.by_index = dict(zip(indices, sessions, strict=True))
         self.starts: list[np.ndarray | None] = [None] * len(sessions)
 
     def __call__(self, rho: np.ndarray, derivatives: bool) -> PooledScore:
         pooled = _pooled_reml(
             self.lik,
-            self.sessions,
-            self.indices,
+            list(self.by_index.values()),
+            list(self.by_index),
             self.blocks,
             rho,
             self.starts,
