@@ -562,11 +562,7 @@ def _record(
                 data.aux,
                 beta,
                 design.term_columns,
-                intercept=(
-                    design.intercept_column
-                    if design.intercept_column is not None
-                    else (projected or None)
-                ),
+                intercept=projected or None,
             )
             edf = _edf(design, last, block_terms, np.isfinite(beta))
     animal, session_date, epoch = (*identity.key, "", "")[:3]
@@ -649,8 +645,15 @@ def fit_sessions(
         row whose unit id is missing (before any design is built, naming the
         session, the unit column and the rows); if a session's first
         fit finds its design not identified or fails for a numerical reason,
-        naming the unit; if ``fit_by`` is not a unit.
+        naming the unit; if ``fit_by`` is not a unit; if ``fit_by`` is a day
+        or an animal and the design declares no baseline.
     """
+    if fit_by != "session" and not design.baseline:
+        raise ValueError(
+            f"a fit by {fit_by} needs a baseline for each session (one intercept, "
+            "or one set of arm effects, for all its sessions is not the model): "
+            "declare it with build_design(..., baseline=...)"
+        )
     units: dict[tuple, list[SessionKey]] = {}
     for key in sessions:
         units.setdefault(unit_key(key, fit_by), []).append(key)

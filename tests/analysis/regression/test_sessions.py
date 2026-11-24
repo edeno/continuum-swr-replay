@@ -1461,7 +1461,9 @@ def test_visits_of_two_sessions_are_two_units() -> None:
     day unit the units and the support counts are the sums of the two
     sessions' own."""
     sessions = _day_sessions()
-    design = _small_rate_design(pd.concat(sessions.values(), ignore_index=True))
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
     fit = {"response": "count", "unit": "well_visit_id"}
     alone = _fit(design, sessions, Poisson(), **fit)
     (day,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
@@ -1472,28 +1474,21 @@ def test_visits_of_two_sessions_are_two_units() -> None:
         )
 
 
-def test_day_fit_equals_one_concatenated_session() -> None:
-    """Without a baseline, one fit of a day equals the fit of its sessions'
-    rows given as one session (the visit ids made distinct)."""
-    sessions = _day_sessions(3)
+def test_a_larger_unit_needs_a_baseline() -> None:
+    """At a day or an animal unit a design without a baseline would fit one
+    intercept for all the unit's sessions: refused at entry. The equivalence
+    of a unit's fit with a design built by hand is in
+    ``test_unit_fit_equals_a_hand_built_indicator_design`` (Poisson) and
+    ``test_softmax_unit_fit_equals_an_independent_maximization``."""
+    sessions = _day_sessions(2)
     design = _small_rate_design(pd.concat(sessions.values(), ignore_index=True))
     fit = {"response": "count", "unit": "well_visit_id"}
-    (day,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
-    frames = [
-        rows.assign(well_visit_id=rows["well_visit_id"] + 1000 * k)
-        for k, rows in enumerate(sessions.values())
-    ]
-    one = {("sim", "20260101", "all"): pd.concat(frames, ignore_index=True)}
-    (whole,) = _fit(design, one, Poisson(), **fit)
-    np.testing.assert_allclose(day.coef, whole.coef, rtol=1e-10, atol=1e-12)
-    np.testing.assert_allclose(day.vcov, whole.vcov, rtol=1e-9, atol=1e-12)
-    assert (day.n_rows, day.n_units, day.n_events) == (
-        whole.n_rows,
-        whole.n_units,
-        whole.n_events,
-    )
-    assert (day.animal, day.session_date, day.epoch) == ("sim", "20260101", "")
-    assert day.fit_by == "day"
+    for fit_by in ("day", "animal"):
+        with pytest.raises(
+            ValueError, match=r"build_design\(\.\.\., baseline=\.\.\.\)"
+        ):
+            _fit(design, sessions, Poisson(), fit_by=fit_by, **fit)
+    assert len(_fit(design, sessions, Poisson(), **fit)) == 2
 
 
 def test_record_holds_its_sessions() -> None:
@@ -1537,7 +1532,9 @@ def test_units_in_the_order_of_their_first_session() -> None:
         ("a", "20260101", "02_r1"): rate_rows(1),
         ("b", "20260102", "02_r1"): rate_rows(2),
     }
-    design = _small_rate_design(pd.concat(sessions.values(), ignore_index=True))
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
     fit = {"response": "count", "unit": "well_visit_id"}
     records = _fit(design, sessions, Poisson(), fit_by="animal", **fit)
     assert [r.animal for r in records] == ["b", "a"]
@@ -1712,3 +1709,233 @@ def test_a_session_without_the_reference_arm_is_an_error_naming_the_fit() -> Non
             design, sessions, GroupedSoftmax(), response="share", unit="event_id",
             fit_by="day",
         )  # fmt: skip
+
+
+def _weighted_r2(W: np.ndarray, projected: list[int], term: int, others: list[int]):
+    """The R^2 of column ``term`` of ``W`` on ``others`` after the columns
+    ``projected`` are projected out by one QR: the collinearity record's
+    measure, computed directly."""
+    Q = np.linalg.qr(W[:, projected])[0]
+    P = W - Q @ (Q.T @ W)
+    B = np.linalg.qr(P[:, others])[0]
+    a = P[:, term]
+    return float((B.T @ a) @ (B.T @ a) / (a @ a))
+
+
+def test_a_shared_intercept_with_per_session_category_copies() -> None:
+    """Poisson, three sessions: a shared intercept, a category copied for
+    each session, a weakly penalized slope and an unpenalized one. The fit
+    equals the design built by hand, to 1e-8; the edf and the collinearity
+    record hold only the shared slopes, the collinearity with the intercept
+    and every copy projected out; each session lists its two copies."""
+    sessions = {}
+    for key, rows in _day_sessions(3).items():
+        visit = rows["well_visit_id"].to_numpy()
+        sessions[key] = rows.assign(cat=np.array(["A", "B", "C"])[visit % 3])
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    weak = log_penalty_from_prior_sd(2.0)
+    design = build_design(
+        [
+            Category("cat", ("A", "B", "C"), reference="A", penalty="none"),
+            Slope("last_rewarded", weak),
+            Slope("x", "none"),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+        baseline=("cat",),
+    )
+    fit = {"response": "count", "unit": "well_visit_id"}
+    (record,) = _fit(design, sessions, Poisson(), fit_by="day", **fit)
+    assert record.status == "converged"
+    keys = ["/".join(k) for k in sessions]
+    assert record.coef_names == [
+        "(Intercept)",
+        *(f"cat[B]@{k}" for k in keys),
+        *(f"cat[C]@{k}" for k in keys),
+        "last_rewarded",
+        "x",
+    ]
+    session = np.repeat(np.arange(3), [len(r) for r in sessions.values()])
+    cat = pooled["cat"].to_numpy()
+    X = np.column_stack(
+        [
+            np.ones(len(pooled)),
+            *((cat == "B") & (session == s) for s in range(3)),
+            *((cat == "C") & (session == s) for s in range(3)),
+            pooled["last_rewarded"].to_numpy(),
+            pooled["x"].to_numpy() / pooled["x"].std(ddof=0),
+        ]
+    ).astype(float)
+    y, offset = pooled["count"].to_numpy(), np.log(pooled["exposure"].to_numpy())
+    block = design.blocks[0]
+    by_hand = fit_at_penalties(
+        Poisson(),
+        [SessionData(X, y, offset)],
+        [type(block)(np.array([7]), block.S)],
+        design.log_penalties,
+    ).sessions[0]
+    np.testing.assert_allclose(record.coef, by_hand.fit.beta, rtol=0, atol=1e-8)
+    np.testing.assert_allclose(record.vcov, by_hand.covariance, rtol=0, atol=1e-8)
+    assert set(record.edf) == {"last_rewarded", "x"} and record.edf["x"] == 1.0
+    assert set(record.collinearity) == {"last_rewarded", "x"}
+    W = X * np.sqrt(np.exp(X @ np.asarray(record.coef) + offset))[:, None]
+    projected = list(range(7))
+    assert record.collinearity["last_rewarded"]["r2"] == pytest.approx(
+        _weighted_r2(W, projected, 7, [8]), abs=1e-10
+    )
+    assert [e["baseline"] for e in record.sessions] == [
+        [f"cat[B]@{k}", f"cat[C]@{k}"] for k in keys
+    ]
+
+
+def _same_event_ids(n_sessions: int = 3, n_arms: int = 4) -> dict:
+    """Content sessions whose event ids are the same numbers (0, 1, ...) in
+    every session, rows shuffled; per-session arm effects and a 0/1 flag. In
+    the second session one event has no response."""
+    out = {}
+    for s in range(n_sessions):
+        rng = np.random.default_rng(70 + s)
+        n_events = 30 + 10 * s
+        arm = np.tile(np.arange(n_arms), n_events)
+        event = np.repeat(np.arange(n_events), n_arms)
+        flag = (rng.uniform(size=arm.size) < 0.4).astype(float)
+        eta = np.array([0.0, 0.5, -0.3, 0.2])[arm] * (s + 1) + 0.7 * flag
+        w = np.exp(eta).reshape(n_events, n_arms)
+        share = np.concatenate([rng.dirichlet(8 * r / r.sum()) for r in w])
+        if s == 1:
+            share[event == 3] = 0.0
+        key = ("sim", "20260101", f"0{2 * s + 2}_r1")
+        frame = pd.DataFrame(
+            {"event_id": event, "arm": arm, "flag": flag, "share": share}
+        )
+        out[key] = frame.iloc[rng.permutation(arm.size)].reset_index(drop=True)
+    return out
+
+
+def test_softmax_unit_fit_equals_an_independent_maximization() -> None:
+    """The grouped softmax with the same event ids in every session: each
+    session's events are its own groups. The unit's coefficients and
+    covariance equal a direct maximization of the multinomial log-likelihood
+    over per-session groups, to 1e-8; the events count once per session; the
+    per-session event counts sum to the unit's."""
+    from scipy.optimize import minimize
+
+    sessions = _same_event_ids()
+    weak = log_penalty_from_prior_sd(2.0)
+    design = build_design(
+        [
+            Category("arm", (0, 1, 2, 3), reference=0, penalty="none"),
+            Slope("flag", weak),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+        baseline=("arm",),
+    )
+    (record,) = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+        fit_by="day",
+    )  # fmt: skip
+    assert record.status == "converged"
+    Xs, ys, gs, start = [], [], [], 0
+    for s, frame in enumerate(sessions.values()):
+        frame = frame.sort_values("event_id", kind="stable")
+        cols = np.zeros((len(frame), 10))
+        for a in (1, 2, 3):
+            cols[:, (a - 1) * 3 + s] = frame["arm"].to_numpy() == a
+        cols[:, -1] = frame["flag"].to_numpy()
+        Xs.append(cols)
+        ys.append(frame["share"].to_numpy())
+        gs.append(frame["event_id"].to_numpy() + start)
+        start += frame["event_id"].max() + 1
+    X, y, g = np.vstack(Xs), np.concatenate(ys), np.concatenate(gs)
+    lam, n_groups = float(np.exp(weak)), g.max() + 1
+    total = np.bincount(g, weights=y)
+
+    def parts(b):
+        eta = X @ b
+        top = np.full(n_groups, -np.inf)
+        np.maximum.at(top, g, eta)
+        e = np.exp(eta - top[g])
+        sums = np.bincount(g, weights=e)
+        return eta, e / sums[g], np.log(sums) + top
+
+    def objective(b):
+        eta, p, lse = parts(b)
+        value = -(y @ eta - total @ lse - 0.5 * lam * b[-1] ** 2)
+        gradient = -(X.T @ (y - total[g] * p))
+        gradient[-1] += lam * b[-1]
+        return value, gradient
+
+    b = minimize(objective, np.zeros(10), jac=True, method="BFGS",
+                 options={"gtol": 1e-12, "maxiter": 10_000}).x  # fmt: skip
+    for _ in range(20):
+        _, p, _ = parts(b)
+        H = np.zeros((10, 10))
+        for k in range(n_groups):
+            rows = g == k
+            Xg, pg = X[rows], p[rows]
+            H += total[k] * (Xg.T @ (Xg * pg[:, None]) - np.outer(Xg.T @ pg, Xg.T @ pg))
+        H[-1, -1] += lam
+        b = b - np.linalg.solve(H, objective(b)[1])
+    names = [
+        f"arm[{a}]@sim/20260101/0{2 * s + 2}_r1" for a in (1, 2, 3) for s in range(3)
+    ]
+    order = [record.coef_names.index(n) for n in [*names, "flag"]]
+    np.testing.assert_allclose(np.asarray(record.coef)[order], b, rtol=0, atol=1e-8)
+    np.testing.assert_allclose(
+        np.asarray(record.vcov)[np.ix_(order, order)],
+        np.linalg.inv(H),
+        rtol=0,
+        atol=1e-8,
+    )
+    assert record.n_units == 30 + 40 + 50 - 1 == record.n_events
+    for field in ("n_units", "n_events", "events_without_response"):
+        got = [e[field] for e in record.sessions]
+        unit = getattr(record, field, record.cohort_counts.get(field))
+        assert sum(got) == unit, field
+    assert [e["events_without_response"] for e in record.sessions] == [0, 1, 0]
+
+
+@pytest.mark.parametrize("cause", ["no_events", "support"])
+@pytest.mark.parametrize("place", ["first", "last"])
+def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None:
+    """A session dropped from the unit (no event, or three visits) leaves the
+    shared coefficients bit for bit those of the fit without it, whether it
+    is the first or the last of the unit."""
+    sessions = _day_sessions(4)
+    keys = list(sessions)
+    rows = sessions[keys[1]]
+    dropped = (
+        rows.assign(count=0.0)
+        if cause == "no_events"
+        else rows[rows["well_visit_id"] < 3]
+    )
+    others = {k: sessions[k] for k in keys if k != keys[1]}
+    design = build_design(
+        [
+            Slope("last_rewarded", log_penalty_from_prior_sd(2.0)),
+            Slope("x", "none"),
+            Smooth("time_since_s", 0.0, 20.0, 8, 2.0),
+            Offset("exposure"),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    given = (
+        {keys[1]: dropped, **others}
+        if place == "first"
+        else {**others, keys[1]: dropped}
+    )
+    fit = {"response": "count", "unit": "well_visit_id", "fit_by": "day"}
+    (without,) = _fit(design, others, Poisson(), **fit)
+    (with_it,) = _fit(design, given, Poisson(), **fit)
+
+    def shared(record):
+        names = zip(record.coef_names, record.coef, strict=True)
+        return {n: c for n, c in names if "@" not in n}
+
+    assert shared(with_it) == shared(without)
+    copy = f"(Intercept)@{'/'.join(keys[1])}"
+    assert with_it.cohort_counts["rows_dropped"] == {copy: len(dropped)}
