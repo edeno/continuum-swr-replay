@@ -230,7 +230,7 @@ Spike evidence of non-local events: does the prior-excluded spike likelihood fav
 
 Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode left out of the decoder better than local coding does?
 
-`fold_blocks`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `hpd_lengths`, `rate_terms`, `spike_information`, `null_donors`, `null_pairs`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `require_extra_columns`, `window_scores`, `holdout_statistics`
+`fold_blocks`, `fold_settings`, `epoch_folds`, `margin_in_bins`, `fold_training_masks`, `check_no_fold_leakage`, `animal_place_bins`, `place_sampling`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `hpd_lengths`, `rate_terms`, `spike_information`, `null_donors`, `null_pairs`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `require_run_columns`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
