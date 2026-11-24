@@ -898,6 +898,45 @@ class Design:
                 out[term.session] += [self.coef_names[j] for j in term.columns]
         return out
 
+    def baseline_read(self, c: np.ndarray) -> list[str]:
+        """The coefficients of a baseline term on which ``c`` (shape
+        ``(n_coef,)``, over :attr:`coef_names`) is not zero."""
+        return [
+            self.coef_names[j]
+            for j in np.flatnonzero(c)
+            if self.column_terms[j].term in self.baseline
+        ]
+
+    def contrast_on(self, c: np.ndarray, coef_names: Sequence[str]) -> np.ndarray:
+        """``c`` over this design's coefficients as a contrast of a fit whose
+        coefficients are ``coef_names`` (a fit of one unit, whose baseline
+        copies replace the design's baselines), by name.
+
+        Parameters
+        ----------
+        c : np.ndarray, shape (n_coef,)
+        coef_names : sequence of str
+            The fit's coefficient names (a record's ``coef_names``).
+
+        Returns
+        -------
+        np.ndarray, shape (len(coef_names),)
+
+        Raises
+        ------
+        ValueError
+            If ``c`` reads a baseline: a baseline has one copy per session in
+            a fit of several sessions, and no contrast reads it.
+        """
+        read = self.baseline_read(c)
+        if read:
+            raise ValueError(f"a contrast reads the baseline {read}")
+        index = {name: j for j, name in enumerate(coef_names)}
+        out = np.zeros(len(coef_names))
+        for j in np.flatnonzero(c):
+            out[index[self.coef_names[j]]] = c[j]
+        return out
+
     def for_sessions(self, keys: Sequence[SessionKey]) -> Design:
         """The design of one fit of the sessions ``keys``: each baseline term
         copied for each session (module docstring); this design itself for

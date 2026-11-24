@@ -163,8 +163,7 @@ class Model:
         ``(n_coef,)`` (:mod:`.contrasts`). Every coefficient an estimand uses
         must carry a fixed penalty (:func:`.support.require_tested_penalized`)
         and none may be of a baseline term (copied per session in a fit of
-        several sessions; a fit's ``c`` is ``c`` mapped onto its coefficient
-        names by name).
+        several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
     fit_by : {"session", "day", "animal"}
         The unit of the fit.
     """
@@ -192,13 +191,7 @@ class Model:
             estimands[name] = c
         object.__setattr__(self, "estimands", estimands)
         fit_by_columns(self.fit_by)
-        baseline = [
-            n
-            for c in estimands.values()
-            for n in self.used(c)
-            if self.design.column_terms[self.design.coef_names.index(n)].term
-            in self.design.baseline
-        ]
+        baseline = [n for c in estimands.values() for n in self.design.baseline_read(c)]
         if baseline:
             raise ValueError(
                 f"model {self.name!r}: an estimand reads the baseline {baseline}"
@@ -644,17 +637,6 @@ def draw_data_set(
     return dict(_DataSet(sessions, model.response, outcomes))
 
 
-def _unit_c(c: np.ndarray, model: Model, record: FitRecord) -> np.ndarray:
-    """``c`` (over the model's coefficient names) over the fit's coefficient
-    names, by name, shape ``(n_coef_of_the_fit,)``: an estimand reads no
-    baseline, so every name it uses is a coefficient of every fit."""
-    index = {name: j for j, name in enumerate(record.coef_names)}
-    out = np.zeros(len(record.coef_names))
-    for j in np.flatnonzero(c):
-        out[index[model.design.coef_names[j]]] = c[j]
-    return out
-
-
 def _session_rows(
     model: Model, records: Sequence[FitRecord], base: dict
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
@@ -668,7 +650,9 @@ def _session_rows(
             cause = record.no_fit or (left[0] if left else "")
             estimate, se = np.nan, np.nan
             if not cause:
-                contrast = evaluate_contrast(_unit_c(c, model, record), coef, vcov)
+                contrast = evaluate_contrast(
+                    model.design.contrast_on(c, record.coef_names), coef, vcov
+                )
                 estimate, se = contrast.estimate, contrast.se
             estimates[name].append(estimate)
             rows.append(

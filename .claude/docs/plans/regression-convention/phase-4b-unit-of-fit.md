@@ -286,8 +286,7 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
 8. **The rate model reads the setting.** `VisitRateSettings.fit_by` and `clock_curves`; the intercept is
    the baseline; at `clock_curves="per_session"` the clock smooths are baseline terms too (dense; for an
    animal this exceeds memory, see task 12); model D's identifiability is judged on the unit's rows; the
-   statistics module maps each contrast onto a fit's coefficients by name (as `simulation._unit_c`
-   does), reduces with `unit_summary`, and checks `record.fit_by` (it refuses a record of a larger unit
+   statistics module maps each contrast onto a fit's coefficients by name (`terms.Design.contrast_on`, which also refuses a contrast that reads a baseline), reduces with `unit_summary`, and checks `record.fit_by` (it refuses a record of a larger unit
    until then: `visit_rate_statistics._session_records`); the model builder declares its baseline from
    `declared_tests.BASELINES`. Tests (`tests/analysis/replay_models/rate/`):
    `test_visit_rate.py::test_fit_by_from_the_one_setting` (the default is `BEHAVIOR_FIT_BY`),

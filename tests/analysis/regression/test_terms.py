@@ -701,3 +701,21 @@ def test_a_copy_is_named_by_its_session() -> None:
     key = ("an", "d1", "e1")
     assert copy_name("arm[b]", key) == "arm[b]@an/d1/e1"
     assert copy_name(INTERCEPT, key) == "(Intercept)@an/d1/e1"
+
+
+def test_a_contrast_on_a_unit_fit() -> None:
+    """A contrast over the design's coefficients, mapped onto a unit fit's
+    coefficients by name; a contrast that reads a baseline is refused."""
+    rows = pd.DataFrame({"x": [0.5, 1.0, 2.0, -1.0], "z": [1.0, 0.0, 1.0, 0.0]})
+    design = build_design(
+        [Slope("x", 0.0), Slope("z", 0.0)], rows, intercept=True, baseline=(INTERCEPT,)
+    )
+    keys = [("an", "d1", "e1"), ("an", "d1", "e2")]
+    unit = design.for_sessions(keys)
+    c = np.array([0.0, 1.0, -2.0])  # x - 2 z over (Intercept), x, z
+    np.testing.assert_array_equal(design.contrast_on(c, unit.coef_names), [0, 0, 1, -2])
+    np.testing.assert_array_equal(design.contrast_on(c, design.coef_names), c)
+    assert design.baseline_read(c) == []
+    assert design.baseline_read(np.array([1.0, 0.0, 0.0])) == [INTERCEPT]
+    with pytest.raises(ValueError, match="reads the baseline"):
+        design.contrast_on(np.array([1.0, 1.0, 0.0]), unit.coef_names)
