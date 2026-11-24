@@ -283,7 +283,8 @@ def _iteration_one(
     ``F_new`` and ``loglik_new``, and ``halving_ok`` when one was found.
     """
     eta = X @ beta
-    g = X.T @ lik._jax_score(eta, y, aux, weight) - S @ beta
+    # score @ X, not X.T @ score: XLA would copy the transposed design.
+    g = lik._jax_score(eta, y, aux, weight) @ X - S @ beta
     A = lik._jax_information(X, eta, y, aux, weight) + S
     factor = jax.scipy.linalg.cho_factor(A, lower=True)
     ok = jnp.all(jnp.isfinite(A)) & jnp.all(jnp.isfinite(factor[0]))
