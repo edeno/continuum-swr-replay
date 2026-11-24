@@ -639,7 +639,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         events' ``boundary_timing_statistics``; ``mua`` (g):
         :func:`read_mua_counts`; ``split`` (h): by column of
         ``heldout_gain_panels.SPLIT_LABELS``, ``holdout_statistics`` of the
-        events of the canonical held-out tetrode run that start inside a well
+        events of the held-out tetrode run that start inside a well
         visit, indexed by group (a run not held out in folds of whole trials is
         refused, ``reported.events.require_tetrode_holdout_folds``);
         ``outside`` (i): ``outside_swr_statistics``
@@ -657,7 +657,7 @@ def read_inputs(workers: int = NO_SPIKE_WORKERS) -> dict:
         (``reported.events.HELDOUT_RESTRICTION_RERUN`` names what to make again).
     """
     inputs = default_inputs()
-    # panel h: the canonical held-out tetrode run, refused before anything is
+    # panel h: the held-out tetrode run, refused before anything is
     # read when it was not held out in folds of whole trials
     canonical_dir = inputs.tetrode_holdout
     require_tetrode_holdout_folds(

@@ -55,7 +55,6 @@ from continuum_swr_replay.paths import (
     EVENT_RULE_SWEEP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
-    EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     EXPOSURE_IN_VISITS_DIR,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_SIGNAL_DIR,
@@ -302,7 +301,6 @@ class _Run:
             EVENT_PARTICIPATION_DIR,
             EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             EVENT_TETRODE_HOLDOUT_DIR,
-            EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
             EVENT_CONTENT_PLACE_RATE_DIR,
             EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
             EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
@@ -326,8 +324,10 @@ class _Run:
                 "epochs": _restriction_records(),
             }
         # the held-out tetrode run is held out in folds of whole trials
-        for folder in (EVENT_TETRODE_HOLDOUT_DIR, EVENT_TETRODE_HOLDOUT_EXTRA_DIR):
-            self.manifests[folder]["settings"] = {"n_folds": 5, "fold_design": "trials"}
+        self.manifests[EVENT_TETRODE_HOLDOUT_DIR]["settings"] = {
+            "n_folds": 5,
+            "fold_design": "trials",
+        }
         for folder, (key, value) in (changes or {}).items():
             if value is None:
                 self.manifests[folder].pop(key)
@@ -399,7 +399,6 @@ class _Run:
             event_participation=root / EVENT_PARTICIPATION_DIR,
             likelihood_advantage=root / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
             tetrode_holdout=root / EVENT_TETRODE_HOLDOUT_DIR,
-            tetrode_holdout_extra=root / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
             content_place_rate=root / EVENT_CONTENT_PLACE_RATE_DIR,
             nonlocal_restriction=root / EVENT_NONLOCAL_RESTRICTION_DIR,
             nonlocal_restriction_windows=root / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
@@ -531,10 +530,10 @@ class _Run:
             builder.nonlocal_comparison, "nonlocal_event_memberships", memberships
         )
         monkeypatch.setattr(builder.tetrode_holdout, "window_scores", lambda t: t)
-        # the planted run's rows have no extra columns; the check is the
+        # the planted run's rows have not the run's columns; the check is the
         # held-out tetrode module's own (tested there)
         monkeypatch.setattr(
-            builder.tetrode_holdout, "require_extra_columns", lambda table, what: None
+            builder.tetrode_holdout, "require_run_columns", lambda table, what: None
         )
 
     def summarize(self) -> dict:
@@ -565,7 +564,7 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
         "low_rate_values",
     ):
         assert len(seen[name][0]) == 2 * 13, name
-    # the low-rate values: the selected events and the extra run's windows
+    # the low-rate values: the selected events and the held-out tetrode run's windows
     assert len(seen["low_rate_values"][1]) == 13
     assert len(seen["low_rate_values"][2]) == 2 * 13
     # the restriction windows too; the time sums and the time steps are whole
@@ -685,8 +684,9 @@ CONTROL_VALUES = {
     "restriction_window",
     AFTER_VISIT,
 }
-#: The values that read the held-out tetrode run with its extra scores
-EXTRA_VALUES = {
+#: The values that read the held-out tetrode run
+HOLDOUT_VALUES = {
+    "tetrode_holdout",
     "shared_content",
     "tetrode_holdout_extra",
     "low_rate",
@@ -782,21 +782,11 @@ PENDING_CASES = [
         ("event_participation", {"sha256": "old"}),
         {"likelihood_advantage"},
     ),
-    (
-        EVENT_TETRODE_HOLDOUT_DIR,
-        ("event_table", {"sha256": "old"}),
-        {"tetrode_holdout"},
-    ),
+    (EVENT_TETRODE_HOLDOUT_DIR, ("event_table", {"sha256": "old"}), HOLDOUT_VALUES),
     (
         EVENT_TETRODE_HOLDOUT_DIR,
         ("event_participation", {"sha256": "old"}),
-        {"tetrode_holdout"},
-    ),
-    (EVENT_TETRODE_HOLDOUT_EXTRA_DIR, ("event_table", {"sha256": "old"}), EXTRA_VALUES),
-    (
-        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
-        ("event_participation", {"sha256": "old"}),
-        EXTRA_VALUES,
+        HOLDOUT_VALUES,
     ),
     (EVENT_CONTENT_PLACE_RATE_DIR, ("event_table", {"sha256": "old"}), {"low_rate"}),
     ("state_evidence", ("subset", None), {"heldout_by_swr"}),

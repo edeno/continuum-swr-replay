@@ -779,7 +779,7 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
 def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visit(
     monkeypatch,
 ):
-    """The stored held-out tetrode run with its extra scores (held out in
+    """The stored held-out tetrode run (held out in
     folds of whole trials) scores every event; the figure, like the events
     summary, reads the rows (every tetrode's) of the events that start inside a
     well visit (panel h, the events alone), and the held-out event run's
@@ -795,7 +795,7 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     seen = {}
     _patch_reading(monkeypatch, stored, seen)
     inputs = figure.read_inputs()
-    # the canonical run (panel h)
+    # the held-out tetrode run (panel h)
     assert [list(t["event_id"]) for t in seen["tetrode"]] == [[0, 0, *range(1, 8)]]
     assert list(seen["split"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]

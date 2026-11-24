@@ -1320,7 +1320,7 @@ _BIN_AGREEMENT = (0.4, 0.2, 0.1, 0.0, -0.1)
 
 
 def _extra_windows() -> pd.DataFrame:
-    """The held-out tetrode run with its extra scores: animals a, b, c (k = 1,
+    """The held-out tetrode run's windows, with its extra scores: animals a, b, c (k = 1,
     2, 3), one epoch each, for each group one event in each width bin
     (:data:`_WIDTHS`, ids 100 on) and its control. In an event: the gain 0.1k
     (SWR 0.5 more), 0.7 of it from the rate term; the agreement by bin

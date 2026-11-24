@@ -77,12 +77,10 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         supplement splits it into the bins with and without a spike). 2,
         another event's place: the fit to the decoded place minus the fit to
         another event's decoded place of the same group, fold and width bin
-        (``Processed-Data/event_tetrode_holdout_extra``, column
-        ``agreement_minus_null_per_spike``; the events summary's
+        (the same run, column ``agreement_minus_null_per_spike``; the events summary's
         ``*_heldout_agreement_minus_reference_per_spike`` values; by width it
-        is for the text, the ``*_shared_content_*`` values). Both runs are refused when they were not
-        held out in folds of whole trials, the second also when it has no extra
-        scores.
+        is for the text, the ``*_shared_content_*`` values). The run is refused when it was not
+        held out in folds of whole trials or has not every column of the run.
     k — Does the decoder need non-local states outside SWRs? At the left, a
         drawing of the two decoders compared
         (``visualization.evidence_drawings.draw_restriction_test``): the SWR-only
@@ -276,7 +274,6 @@ from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
-    EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
     NONLOCAL_BY_SIGNAL_DIR,
     PARTICIPATION_NAME,
     STATE_BY_SIGNAL_DIR,
@@ -1861,19 +1858,9 @@ def generate_figure(
     check_visit_context_starts(
         table, {identifier: well_visit_times(identifier) for identifier in event_epochs}
     )
-    # the held-out tetrode run with its extra scores, as the events summary
-    # reads it: held out in folds of whole trials, over the selected events
+    # the held-out tetrode run, as the events summary reads it: held out in
+    # folds of whole trials, over the selected events
     holdout = window_scores(
-        read_tetrode_holdout(
-            data_dir / EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
-            event_epochs,
-            events["event_id"],
-            extra=True,
-        )
-    )
-    # the canonical held-out tetrode run, as the events summary reads it: the
-    # gain over local coding of the events
-    canonical = window_scores(
         read_tetrode_holdout(
             data_dir / EVENT_TETRODE_HOLDOUT_DIR, event_epochs, events["event_id"]
         )
@@ -1882,7 +1869,7 @@ def generate_figure(
         data_dir / EVENT_PARTICIPATION_DIR, event_epochs, events["event_id"]
     )
     left_out_fit = {
-        "animal": holdout_statistics(canonical, "event", "gain_per_spike"),
+        "animal": holdout_statistics(holdout, "event", "gain_per_spike"),
         "other": holdout_statistics(holdout, "event", "agreement_minus_null_per_spike"),
     }
     # the events summary's restriction inputs: the same runs, cohorts, time

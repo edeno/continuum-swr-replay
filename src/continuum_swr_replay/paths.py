@@ -191,15 +191,11 @@ EVENT_LIKELIHOOD_ADVANTAGE_DIR = "event_likelihood_advantage"
 non-local events, under the processed-data root
 (``scripts/event_evidence/score_event_likelihood_advantage.py``)."""
 EVENT_TETRODE_HOLDOUT_DIR = "event_tetrode_holdout"
-"""The held-out tetrode score of the canonical non-local events and their
-Local-rest controls, under the processed-data root
-(``scripts/event_evidence/score_tetrode_holdout.py``)."""
-EVENT_TETRODE_HOLDOUT_EXTRA_DIR = "event_tetrode_holdout_extra"
-"""The held-out tetrode run of ``EVENT_TETRODE_HOLDOUT_DIR`` made again with its
-extra scores (``tetrode_holdout.EXTRA_COLUMNS``: the 95 % HPD length, the
-shuffled-event reference, the rate and mark parts, the place information),
-under the processed-data root (``scripts/event_evidence/score_tetrode_holdout.py
---extra-scores --null-seed 0``)."""
+"""The held-out tetrode run, under the processed-data root
+(``scripts/event_evidence/score_tetrode_holdout.py``, null seed 0): each
+canonical non-local event's and its Local-rest control's held-out tetrode
+score, with the 95 % HPD length, the shuffled-event reference, the rate and
+mark parts and the place information (``tetrode_holdout.RUN_COLUMNS``)."""
 EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
 """The per-bin scores of the three non-local restriction models (``none``,
 ``swr``, ``full``) on every analyzed epoch, each fold scored under a decoder

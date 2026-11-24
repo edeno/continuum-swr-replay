@@ -2067,7 +2067,7 @@ def test_figure02_decoder_comparison_draws_the_values_the_events_summary_tags(of
         assert getattr(events, name) is getattr(restriction_totals, name), name
     assert events.TAGS["nonlocal_restriction_figure"].figures == ("2k",)
     # panel j: the gain over local coding (with its split in the supplement)
-    # and the agreement minus the reference of the run with its extra scores
+    # and the agreement minus the reference, of the same run
     assert events.TAGS["tetrode_holdout"].figures == ("2j", "S2h")
     assert events.TAGS["tetrode_holdout_extra_figure"].figures == ("2j",)
     # panel h, participation, and panel i, ripple power
@@ -2193,7 +2193,6 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
         BRAIN_STATE_REFERENCE_DIR,
         EVENT_BIN_FACTS_DIR,
         EVENT_TETRODE_HOLDOUT_DIR,
-        EVENT_TETRODE_HOLDOUT_EXTRA_DIR,
         NONLOCAL_BY_SIGNAL_DIR,
         STATE_BY_SIGNAL_DIR,
         processed_data_dir,
@@ -2226,11 +2225,10 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     entry = prepare_data.behavioral_context_cache_path({"session_id": "e"})
     entry.parent.mkdir(parents=True)
     entry.write_bytes(b"the visits")
-    for folder in (EVENT_TETRODE_HOLDOUT_EXTRA_DIR, EVENT_TETRODE_HOLDOUT_DIR):
-        (tmp_path / folder).mkdir(parents=True)
-        (tmp_path / folder / "manifest.json").write_text(
-            json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
-        )
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR).mkdir(parents=True)
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
+        json.dumps({"settings": {"n_folds": 5, "fold_design": "trials"}})
+    )
     (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
     (tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json").write_text(
         json.dumps(
@@ -2264,7 +2262,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     }.items():
         monkeypatch.setattr(figure02, name, value)
     monkeypatch.setattr(
-        events.tetrode_holdout, "require_extra_columns", lambda table, what: None
+        events.tetrode_holdout, "require_run_columns", lambda table, what: None
     )
     return figure02
 
@@ -2292,10 +2290,10 @@ def test_figure02_refuses_a_held_out_tetrode_run_not_on_trial_folds(
 ):
     """Panel i, as the events summary: a held-out tetrode run whose folds are
     not whole trials is refused before it is read."""
-    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_EXTRA_DIR
+    from continuum_swr_replay.paths import EVENT_TETRODE_HOLDOUT_DIR
 
     figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    (tmp_path / EVENT_TETRODE_HOLDOUT_EXTRA_DIR / "manifest.json").write_text(
+    (tmp_path / EVENT_TETRODE_HOLDOUT_DIR / "manifest.json").write_text(
         json.dumps({"settings": {"n_folds": 5, "fold_design": "blocks"}})
     )
     monkeypatch.setattr(figure02, "holdout_statistics", _refuse_drawing)
