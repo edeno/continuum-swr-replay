@@ -243,6 +243,15 @@ def _statistics() -> dict:
     }
 
 
+def test_the_layout_settles_in_the_font_of_a_machine_without_arial():
+    """The fitted panels settle within the pass limit in DejaVu Sans too, the
+    font matplotlib falls back to (the continuous-integration machine's):
+    wider glyphs put the first pass farther off."""
+    with matplotlib.rc_context({"font.family": "DejaVu Sans"}):
+        fig = figure.generate_figure(_statistics())
+    plt.close(fig)
+
+
 @pytest.fixture(scope="module")
 def drawn():
     """The figure drawn once from :func:`_statistics`, for the tests that only
