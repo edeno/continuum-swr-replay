@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 
 import jax
 import numpy as np
@@ -10,7 +11,7 @@ import pandas as pd
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import newton
+from continuum_swr_replay.analysis.regression import likelihoods, newton
 from continuum_swr_replay.analysis.regression.constants import (
     NEWTON_DECREMENT_TOL,
     NO_MAXIMUM_ETA_STEP,
@@ -538,6 +539,75 @@ def test_sessions_of_ten_sizes_compile_once_per_bucket() -> None:
         assert {sig[1][0] for sig in COMPILE_LOG.signatures(kernel)} == {
             (b, 2) for b in buckets
         }
+
+
+def _transposes_of_rows(compiled_text: str, n_rows: int) -> list[str]:
+    """The ``transpose`` instructions of an optimized HLO program whose shape
+    has ``n_rows`` as a dimension."""
+    found = []
+    for line in compiled_text.splitlines():
+        shape = re.search(r"= \w+\[([\d,]*)\]\S* transpose\(", line)
+        if shape and str(n_rows) in shape.group(1).split(","):
+            found.append(line.strip()[:160])
+    return found
+
+
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
+def test_no_kernel_copies_the_transposed_design(family: str) -> None:
+    """The compiled Newton iteration and information kernels never build the
+    transposed design (padded rows x columns): XLA folds ``X.T @ (w * X)``
+    into the product, but it copied the transpose for ``X.T @ score`` and for
+    ``(X.T * w) @ X``, about half of an iteration at the rate model's size.
+
+    Checked on the optimized program, not the jaxpr: ``X.T @ (w * X)`` has a
+    ``transpose`` in its jaxpr that XLA removes, and
+    ``dot_general(w * X, X)`` has none in its jaxpr but is compiled with a
+    copied transpose."""
+    rng = np.random.default_rng(0)
+    n, p = 5000, 5
+    X = np.column_stack([np.ones(n), rng.normal(size=(n, p - 1))])
+    if family == "softmax":
+        lik, aux = GroupedSoftmax(), np.repeat(np.arange(n // 5), 5)
+        y = np.tile([0.4, 0.3, 0.1, 0.1, 0.1], n // 5)
+    else:
+        lik = {"poisson": Poisson(), "bernoulli": Bernoulli(), "gaussian": Gaussian()}[
+            family
+        ]
+        aux = {"poisson": np.zeros(n), "bernoulli": None, "gaussian": 1.0}[family]
+        y = rng.integers(0, 2, size=n).astype(float)
+    with jax.enable_x64(True):
+        problem = newton._Problem.of(lik, X, y, aux, np.eye(p))
+        r = problem.rows
+        n_bucket = r.X.shape[0]
+        beta, F = np.zeros((1, p)), np.zeros(1)
+        eta = np.zeros(n_bucket)
+        programs = {
+            "_iterate": newton._iterate.lower(
+                lik,
+                r.X,
+                problem.Y,
+                r.aux,
+                r.weight,
+                problem.S_device,
+                beta,
+                F,
+                np.float64(1.0),
+                np.float64(NEWTON_DECREMENT_TOL),
+                np.int64(3),
+            ),
+            "_information_kernel": likelihoods._information_kernel.lower(
+                lik, r.X, eta, problem.Y[0], r.aux, r.weight
+            ),
+            "_dinformation_kernel": likelihoods._dinformation_kernel.lower(
+                lik, r.X, eta, problem.Y[0], r.aux, r.weight, eta
+            ),
+            "_d2information_kernel": likelihoods._d2information_kernel.lower(
+                lik, r.X, eta, problem.Y[0], r.aux, r.weight, eta, eta
+            ),
+        }
+        for name, lowered in programs.items():
+            text = lowered.compile().as_text()
+            assert _transposes_of_rows(text, n_bucket) == [], name
 
 
 def test_a_patched_rule_constant_takes_effect_after_the_kernel_compiled(

@@ -231,8 +231,13 @@ def _weighted_design_kernel(lik, X, eta, y, aux, weight):
 
 
 def _gram(X: Any, weights: Any) -> Any:
-    """``X' diag(weights) X``, shape ``(p, p)``."""
-    return (X.T * weights) @ X
+    """``X' diag(weights) X``, shape ``(p, p)``, for weights of either sign.
+
+    Written ``X.T @ (weights[:, None] * X)``: XLA folds that transpose into
+    the product. ``(X.T * weights) @ X`` made it copy the transposed design,
+    which took about half of a Newton iteration at the rate model's size.
+    """
+    return X.T @ (weights[:, None] * X)
 
 
 class _Family:
@@ -588,7 +593,7 @@ class GroupedSoftmax(_Family):
         for u, v in pairs:
             Xu = self._per_group((weight * u)[:, None] * X, groups)
             Xv = self._per_group((weight * v)[:, None] * X, groups)
-            out = out - (Xu.T * total) @ Xv
+            out = out - Xu.T @ (total[:, None] * Xv)
         return out
 
     def _g_times(self, p, d, groups, weight):
