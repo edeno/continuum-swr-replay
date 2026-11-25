@@ -91,6 +91,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [contains_path_length_confound.md](known_issues/contains_path_length_confound.md) — `contains_path_to_next` depends on trip length.
   - [degenerate_mua_events.md](known_issues/degenerate_mua_events.md) — *open*: a few ContFrag MUA events span seconds.
   - [nonlocal_minimum_duration_rounding.md](known_issues/nonlocal_minimum_duration_rounding.md) — the 15 ms minimum is 7 samples.
+  - [smooth_by_a_thin_level.md](known_issues/smooth_by_a_thin_level.md) — *open*: a smooth by a level has no support count.
 - [history/2026-module-moves.md](history/2026-module-moves.md) — *history*: where moved code and data went in 2026, and the dated audits the docs once cited.
 
 ## Code layout

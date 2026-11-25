@@ -491,6 +491,69 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
     assert 0.0 < entry["size"] < SMALLEST_COLUMN_SIZE
 
 
+def _clock_visits(date: str, rewarded_share: float, seed: int) -> pd.DataFrame:
+    """Rate rows of 60 visits of 10 bins (0.05 s each): a clock of 0 to 4.5 s
+    and a 0/1 ``rewarded`` on a share of the visits."""
+    rng = np.random.default_rng(seed)
+    visit = np.repeat(np.arange(60), 10)
+    clock = np.tile(np.arange(10) * 0.5, 60)
+    rewarded = (rng.uniform(size=60) < rewarded_share).astype(float)[visit]
+    log_rate = np.log(3.0) - 0.1 * clock + 0.4 * rewarded
+    return pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": date,
+            "epoch": "02_r1",
+            "visit": visit,
+            "clock": clock,
+            "rewarded": rewarded,
+            "exposure": 0.05,
+            "count": rng.poisson(np.exp(log_rate) * 0.05).astype(float),
+        }
+    )
+
+
+def test_a_smooth_by_a_level_a_session_lacks_fails_its_support() -> None:
+    """A smooth of the clock by the rewarded level, beside the reward slope: a
+    session with no rewarded rows has that smooth's columns zero, so it fails
+    the support rule there and is inactive, as the slope is; the loop fits
+    both sessions, and the other session's fit is its fit alone."""
+    sessions = {
+        ("sim", "20260101", "02_r1"): _clock_visits("20260101", 0.5, 0),
+        ("sim", "20260102", "02_r1"): _clock_visits("20260102", 0.0, 1),
+    }
+    rewarded = Category("rewarded", (0, 1), 0, "none")
+    design = build_design(
+        [
+            Offset("exposure"),
+            Smooth("clock", 0.0, 4.5, 8, 2.0),
+            Slope("rewarded", log_penalty_from_prior_sd(2.0)),
+            Smooth("clock", 0.0, 4.5, 8, 2.0, by=rewarded, levels=(1,)),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+    )
+    first, second = _fit(design, sessions, Poisson(), response="count", unit="visit")
+    by_level = [n for n in design.coef_names if n.startswith("s(clock):rewarded=1.")]
+    assert len(by_level) == 7
+    assert second.status == "converged"
+    assert second.left_out == {
+        "rewarded": Removed.SUPPORT,
+        **dict.fromkeys(by_level, Removed.SUPPORT),
+    }
+    assert not second.support["s(clock):rewarded=1"]["passes"]
+    assert np.isfinite(second.coef[design.coef_names.index("s(clock).0")])
+    (alone,) = _fit(
+        design,
+        {("sim", "20260101", "02_r1"): sessions["sim", "20260101", "02_r1"]},
+        Poisson(),
+        response="count",
+        unit="visit",
+    )
+    assert first.status == "converged" and first.left_out == {}
+    np.testing.assert_array_equal(first.coef, alone.coef)
+
+
 def test_a_session_without_reference_rows_names_the_session_and_columns(
     rate_sessions,
 ) -> None:

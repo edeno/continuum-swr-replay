@@ -76,8 +76,9 @@ below ``SMALLEST_COLUMN_SIZE`` is the caller's error (a units problem):
 :func:`build_design` raises, naming it. In one session, a term below it on the
 session's rows (:meth:`Design.small_terms`) fails the support rule in that
 session and is made inactive. A term zero on every row of a session (a level
-the session does not have) is not small: the support rule's counts make it
-inactive.
+the session does not have, a term by such a level) is not small: the support
+rule makes it inactive, a level or a slope by its counts, a smooth or a lag
+functional because its columns are zero there.
 
 Each term of a built design is described once, by a :class:`DesignTerm`: its
 kind, columns, level, covariate, penalty block and the terms that leave a

@@ -583,6 +583,14 @@ was removed on 2026-11-24); the constant `MAX_FAILING_SHARE` remains, because th
 search and the rate model's third-clock decision (`visit_rate.third_clock_decision`) read
 it.
 A smooth and a lag functional have no counts; every term is judged by the design check.
+A smooth or a lag functional whose columns are zero on every row of a session (a smooth by
+a level the session has no rows of, as visit-rate model A's time-varying reward smooth in
+a session without a rewarded visit) fails the support rule there and is inactive, as a
+slope by that level is. Before, its columns escaped the design check (which measures only
+sizes above zero) and the first fit found the design not identified, an error that
+stopped the whole loop (`test_sessions.py::test_a_smooth_by_a_level_a_session_lacks_fails_its_support`).
+A smooth by a level the session has rows of, however few, stays in the fit: see
+`docs/known_issues/smooth_by_a_thin_level.md`.
 
 The rule replaced, on 2026-11-23, a rule that counted the units with an event on each
 side. The lead chose a weak penalty on the reward coefficient and on every simple tested

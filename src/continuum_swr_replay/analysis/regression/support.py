@@ -21,7 +21,10 @@ model, an event for a content model).
 A slope passes when both counts are at least ``MIN_UNITS``, a level when its
 own count is. The rule holds for every simple term, penalized or not. A
 smooth and a lag functional have no counts; like every term they are judged
-by the design check (:meth:`.terms.Design.small_terms`).
+by the design check (:meth:`.terms.Design.small_terms`), and one whose
+columns are zero on every row of the session (a smooth by a level the
+session has no rows of, a lag functional whose lags are all zero) fails the
+support rule there: its columns could not be estimated.
 
 Under the grouped softmax every candidate row belongs to an event, so the
 counts are those of the event-based rule this one replaces. Under the Poisson
@@ -77,7 +80,8 @@ MIN_UNITS = 5
 class Removed(StrEnum):
     """Why a term is inactive in a session's fit (a record's ``left_out``)."""
 
-    #: Fewer than ``MIN_UNITS`` units with a row on a side (the support rule).
+    #: Fewer than ``MIN_UNITS`` units with a row on a side, or a smooth's or a
+    #: lag functional's columns zero on every row (the support rule).
     SUPPORT = "support"
     #: Below ``SMALLEST_COLUMN_SIZE`` on the session's rows (the design check).
     TOO_SMALL = "too_small"
@@ -94,8 +98,8 @@ class Support(NamedTuple):
     ----------
     n_low, n_high : int or None
         Units with a row on each side (0 and 1; below and above the median;
-        another level and the level); None for a smooth term that failed the
-        design check.
+        another level and the level); None for a smooth or a lag functional
+        that fails.
     reason : str
         Why it fails: ``Removed.SUPPORT`` or ``Removed.TOO_SMALL``; empty when
         it passes.
@@ -215,9 +219,10 @@ def design_support(
         Term name -> its support, for the terms with a support rule (a level,
         a 0/1 slope, a continuous slope), in column order; then, for a smooth
         or a lag functional that fails the design check in the session
-        (:meth:`.terms.Design.small_terms`), its name -> a failing entry
-        without counts. A slope that fails the design check fails, with that
-        reason.
+        (:meth:`.terms.Design.small_terms`) or whose columns are zero on
+        every row, its name -> a failing entry without counts
+        (``Removed.TOO_SMALL`` or ``Removed.SUPPORT``), in column order. A
+        slope that fails the design check fails, with that reason.
     """
     small = design.small_terms(X)
     out = {}
@@ -236,8 +241,11 @@ def design_support(
                 reason=Removed.TOO_SMALL, size=small.pop(term.name)
             )
         out[term.name] = counted
-    for name, size in small.items():  # the smooths and lag functionals
-        out[name] = Support(None, None, Removed.TOO_SMALL, size)
+    for term in design.terms:  # the smooths and lag functionals
+        if term.name in small:
+            out[term.name] = Support(None, None, Removed.TOO_SMALL, small[term.name])
+        elif term.kind in ("smooth", "lag") and not np.any(X[:, term.columns]):
+            out[term.name] = Support(None, None, Removed.SUPPORT)
     return out
 
 
