@@ -498,6 +498,14 @@ tracks, `uv.lock`) differs from the commit; `--output-dir` elsewhere makes a tri
 records those files, so `make release-check` can say when one has changed since. It also fails when
 `paper/reported_values.tex` is not what the summaries give.
 
+A summary to commit is built with `$CSR_PROCESSED_DATA_DIR` unset, from a checkout whose
+`Processed-Data` is the data folder or a link to it (a side worktree links to the main checkout's; the
+link is never committed). Each value records its input files relative to the repository only when they
+lie under it, so a build with the variable set to another folder records that machine's absolute paths.
+Set the variable for runners, figure renders and trial builds with `--output-dir`. When a merge changes
+a file a summary records, the branch rebuilds that summary and passes `make release-check` before the
+merge: CI does not run the check.
+
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
 tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
