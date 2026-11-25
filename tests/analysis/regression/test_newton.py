@@ -311,6 +311,31 @@ def test_separation_has_no_finite_maximum(name: str, running_away: list[int]) ->
     assert np.max(np.abs(X @ fit.step)) > NO_MAXIMUM_ETA_STEP
 
 
+def _shifted_softmax(shift: float, n_events: int = 100):
+    """Events of two candidates with shares (0.2, 0.8) and a slope of 0 and 2
+    plus ``shift``: the maximum is at ``log(4) / 2`` whatever the shift, which
+    is common to every candidate of an event and cancels in its softmax."""
+    X = (np.tile([0.0, 2.0], n_events) + shift)[:, None]
+    y = np.tile([0.2, 0.8], n_events)
+    return X, y, np.repeat(np.arange(n_events), 2)
+
+
+@pytest.mark.parametrize("shift", [0.0, 1e4, 1e5])
+def test_a_softmax_fit_ignores_a_shift_common_to_every_candidate(
+    shift: float,
+) -> None:
+    """The step's movement of the linear predictor is measured within each
+    event: a shift of 1e4 moved ``X @ step`` by 0.13 at the maximum, all of it
+    common to the event's candidates, while the softmax moved by 1e-5."""
+    X, y, groups = _shifted_softmax(shift)
+    fit = penalized_newton(
+        GroupedSoftmax(), X, y, groups, np.zeros((1, 1)), np.zeros(1)
+    )
+    assert fit.status == CONVERGED
+    assert fit.running_away.size == 0
+    np.testing.assert_allclose(fit.beta, [math.log(4.0) / 2.0], rtol=0, atol=1e-9)
+
+
 def test_a_converged_fit_has_no_running_away_columns() -> None:
     X, y = _logistic_data()
     fit = penalized_newton(Bernoulli(), X, y, None, np.zeros((2, 2)), np.zeros(2))

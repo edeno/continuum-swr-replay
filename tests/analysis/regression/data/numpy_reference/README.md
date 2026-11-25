@@ -24,6 +24,16 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
     uv run --frozen python scripts/checks/write_regression_reference.py
 ```
 
+## Changed since they were written
+
+- `refit.along_a_penalty` (a grouped softmax): the order of the columns running away in
+  its two fits, columns 3 and 8 swapped (`[7, 6, 5, 0, 4, 3, 8, 1, 2, 10, 9]`), when the
+  softmax's columns running away came to be measured on the design less each event's
+  means (`Likelihood.identifying_design`; their parts there are 24.3 and 22.2, on `X`
+  23.2 and 26.1). Only that list was edited, from a trial build of the `refit` group
+  (`--out-dir`) whose every other output matched the stored file; the header still names
+  the commit that wrote the rest.
+
 ## Where they were verified
 
 Only on x86-64 Linux (an Intel Xeon Gold 6342, with AVX-512) with OpenBLAS: NumPy 2.3.4 built

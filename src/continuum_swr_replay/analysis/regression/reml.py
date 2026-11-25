@@ -928,7 +928,11 @@ def reml_and_derivatives(
     if fit.step is not None:
         directions = _directions(rotated, fit.running_away)
         step = _rotate(blocks, fit.step)
-        fit = replace(fit, step=step, running_away=running_away_columns(X, step))
+        fit = replace(
+            fit,
+            step=step,
+            running_away=running_away_columns(lik.identifying_design(X, aux), step),
+        )
     unidentified: tuple[FreeDirection, ...] = ()
     if fit.unidentified is not None:
         named = _named_coordinates(fit.unidentified)

@@ -35,7 +35,10 @@ along ``d1`` and ``d2``), ``_jax_weighted_design`` and
 against a matrix, which REML's derivatives read). Each takes the padded rows
 and their ``weight`` (1 on a real row, 0 on a padded one) and multiplies every
 row's term by it, so a padded row adds exactly 0. A likelihood made for a test
-follows the protocol by overriding these.
+follows the protocol by overriding these. ``_jax_identified_change(d, aux)``
+is ``identifying_design`` applied to a change ``d`` of the padded rows'
+``eta`` (``X @ step``): the change the likelihood sees, which the Newton fit's
+no-finite-maximum rule measures.
 
 The information is the observed information. For the three diagonal families it
 is ``X' diag(w) X`` with weights ``w(eta)`` that do not depend on ``y``; their
@@ -141,6 +144,8 @@ class Likelihood(Protocol):
     def _jax_information_traces(
         self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, M: Any, D: Any, E: Any
     ) -> tuple[Any, Any]: ...
+
+    def _jax_identified_change(self, d: Any, aux: Any) -> Any: ...
 
 
 # The kernel of the public method: one program per family and padded shape.
@@ -296,6 +301,11 @@ class _DiagonalFamily(_Family):
     def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray:
         """The design whose column space the likelihood identifies: ``X``."""
         return X
+
+    def _jax_identified_change(self, d: Any, aux: Any) -> Any:
+        """A change ``d`` of the padded rows' ``eta`` as the likelihood sees
+        it: ``d`` itself."""
+        return d
 
     def _jax_weights(self, eta: Any, aux: Any) -> tuple[Any, Any, Any]:
         """``(w, dw/deta, d2w/deta2)``, each shape ``(n_rows,)``."""
@@ -500,6 +510,15 @@ class GroupedSoftmax(_Family):
         sizes = group_sizes(starts, X.shape[0])
         means = np.add.reduceat(X, starts, axis=0) / sizes[:, None]
         return X - np.repeat(means, sizes, axis=0)
+
+    def _jax_identified_change(self, d: Any, aux: Groups) -> Any:
+        """A change ``d`` of the padded rows' ``eta`` as the likelihood sees
+        it: ``d`` less its group's mean, shape ``(n_rows,)``, since a change
+        common to a group's rows cancels in its softmax. A padded row's ``d``
+        is 0 (its design row is zero), and so is its group's mean."""
+        rows = self._per_group(jnp.ones_like(d), aux)
+        means = self._per_group(d, aux) / jnp.maximum(rows, 1.0)
+        return d - means[aux.index]
 
     def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
         """The rows and groups padded (``padding.pad_groups``)."""

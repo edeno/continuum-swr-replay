@@ -19,7 +19,12 @@ belongs to still moves the linear predictor by more than
 ``NO_MAXIMUM_ETA_STEP`` on some row, the likelihood has no finite maximum
 along that step (a 0/1 column whose rows all have the same outcome, a Poisson
 cell with no events): the decrement shrinks to zero while a coefficient runs
-to infinity. Near a finite maximum the step shrinks with the decrement. A
+to infinity. Near a finite maximum the step shrinks with the decrement. The
+movement is the one the likelihood sees (``Likelihood.identifying_design``):
+for the grouped softmax, within each group, since a movement common to a
+group's rows cancels in its softmax (a column with a large shift common to
+every candidate moves ``X @ step`` by more than the threshold at the
+maximum). A
 quadratic likelihood with ``A`` positive definite always has a finite maximum,
 and its linear predictor is on the outcome's scale, so the rule is not applied
 to it.
@@ -35,15 +40,17 @@ events. After it the error is of the order of the square of that.
 
 A fit with no finite maximum records its last step and the columns running
 away along it (:func:`running_away_columns`): those whose part of the step
-moves the linear predictor by more than ``NO_MAXIMUM_ETA_STEP`` on some row,
-so that a caller can leave them out of the session.
+moves the linear predictor, as the likelihood sees it, by more than
+``NO_MAXIMUM_ETA_STEP`` on some row, so that a caller can leave them out of
+the session.
 
 Every fit ends with one of the statuses below; only ``CONVERGED`` is a fit.
 
 The numerical work runs in JAX, in float64 (``runtime``), on the rows padded
 to a bucket (``Likelihood.pad``): one jitted kernel evaluates ``F`` at given
 coefficients, and one makes a Newton iteration (``A``, its Cholesky factor,
-the step, the decrement, ``max |X step|`` and the step-halving search). The
+the step, the decrement, the step's largest movement of the linear predictor
+and the step-halving search). The
 linear predictor is carried on the device from one iteration to the next,
 ``eta + scale * (X @ step)``, rather than recomputed as ``X @ beta``. The
 rules above, the statuses and the design check are a host loop in Python and
@@ -238,7 +245,8 @@ def _check_inputs(
 
 def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
     """The columns whose part of ``step`` moves the linear predictor by more
-    than ``NO_MAXIMUM_ETA_STEP`` on some row.
+    than ``NO_MAXIMUM_ETA_STEP`` on some row of ``X``, the design the
+    likelihood identifies (``Likelihood.identifying_design``).
 
     Column ``j``'s part is ``max_i |X_ij step_j|``. At a stop with no finite
     maximum the columns along the direction of unbounded increase move the
@@ -250,6 +258,9 @@ def running_away_columns(X: np.ndarray, step: np.ndarray) -> np.ndarray:
     Parameters
     ----------
     X : np.ndarray, shape (n_rows, p)
+        The design the likelihood identifies: the design itself for the
+        Poisson, Bernoulli and Gaussian, the design less each group's column
+        means for the grouped softmax.
     step : np.ndarray, shape (p,)
 
     Returns
@@ -318,7 +329,12 @@ def _iteration_one(
 
     The system: ``g`` the gradient of ``-F``, ``A = H + S``, its Cholesky
     factor (``ok`` when ``A`` and the factor are finite), the step
-    ``A^-1 g``, the decrement ``g' step / 2`` and ``max |X step|``. Then, unless
+    ``A^-1 g``, the decrement ``g' step / 2`` and ``eta_step``, the largest
+    movement of the linear predictor along the step as the likelihood sees it
+    (``max |X step|`` for the diagonal families, the same of ``X step`` less
+    each group's mean for the grouped softmax;
+    ``Likelihood._jax_identified_change``). Then,
+    unless
     the factor failed or the decrement is below ``decrement_tol``, the step
     shortened to ``cap`` (``capped``) and halved, at most ``n_halvings``
     times, until ``F`` is finite and does not rise: the ``candidate``, its
@@ -339,6 +355,7 @@ def _iteration_one(
     # initial=0: a fit with no columns has no step to shorten.
     ratio = cap / jnp.max(jnp.abs(step), initial=0.0)
     eta_step = X @ step
+    identified_step = lik._jax_identified_change(eta_step, aux)
     scale0 = jnp.where(ratio < 1.0, ratio, 1.0)  # Python's min(1.0, ratio)
 
     def untried(state):
@@ -370,7 +387,7 @@ def _iteration_one(
     scalars = {
         "ok": ok,
         "decrement": decrement,
-        "eta_step": jnp.max(jnp.abs(eta_step)),
+        "eta_step": jnp.max(jnp.abs(identified_step)),
         "capped": scale0 < 1.0,
         "F_new": F_new,
         "loglik_new": loglik_new,
@@ -591,9 +608,9 @@ def _fit(
     cap = np.inf if lik.quadratic else max_step
     beta = beta0.copy()
     F, loglik, eta = problem.evaluate(beta)
+    identifying = lik.identifying_design(problem.X, problem.aux)
     unidentified = _unidentified(
-        lik.identifying_design(problem.X, problem.aux),
-        _free_columns(problem.S) if free_basis is None else free_basis,
+        identifying, _free_columns(problem.S) if free_basis is None else free_basis
     )
     if unidentified.shape[1]:
         nan = np.full((p, p), np.nan)
@@ -629,7 +646,7 @@ def _fit(
                     n_iter,
                     float(loglik[b]),
                     step,
-                    running_away_columns(problem.X, step),
+                    running_away_columns(identifying, step),
                 )
             else:
                 fits[b] = NewtonFit(
@@ -684,12 +701,14 @@ def _runs_away_at_the_cap(
 
     ``capped_and_fell`` has shape ``(B, max_iter)``, one entry per step taken;
     ``eta_steps`` has shape ``(B, max_iter + 1)``, the full step's
-    ``max |X step|`` at each iteration, the last one untaken.
+    largest movement of the linear predictor, as the likelihood sees it, at
+    each iteration, the last one untaken.
 
     True when each of the last ``NO_MAXIMUM_CAPPED_STEPS`` steps was shortened
     to ``max_step`` and lowered ``F``, and the full Newton step's movement of
-    the linear predictor (``max |X step|``) did not shrink from one step to the
-    next, through the step left untaken. Along a direction without a finite
+    the linear predictor (``eta_step`` of :func:`_iteration_one`) did not
+    shrink from one step to the next, through the step left untaken. Along a
+    direction without a finite
     maximum the curvature vanishes and the full step grows while the cap keeps
     the progress linear; toward a finite maximum, however far, the full step
     shrinks as the fit approaches it.

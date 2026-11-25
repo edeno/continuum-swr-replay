@@ -21,7 +21,9 @@ MAX_STEP_LENGTH = 10.0
 
 # A decrement below the tolerance is a finite maximum only if its Newton step
 # moves the linear predictor by at most NO_MAXIMUM_ETA_STEP on every row
-# (``max |X @ step|``, on the link scale, whatever the columns' units). Where
+# (``max |X @ step|``, on the link scale, whatever the columns' units; for the
+# grouped softmax, ``X @ step`` less each group's mean, the movement its
+# softmax sees). Where
 # the likelihood has no finite maximum along a direction (a 0/1 column whose
 # rows all have y = 1, a Poisson cell with no events), the decrement goes to
 # zero while each step still moves eta by about one. Not applied to a quadratic

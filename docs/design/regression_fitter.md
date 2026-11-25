@@ -89,11 +89,19 @@ whose rows are all y = 1, a Poisson 0/1 cell with no events, a continuous column
 separates the outcome) the decrement goes to zero while the coefficient runs to
 infinity and each step still moves the linear predictor by about one: such a fit is not
 converged (status "no finite maximum"). The threshold is on the link scale
-and does not depend on a column's units. The largest `max |X step|` at the stop of a
-regular fit was 1.7e-3 over the regression tests and the mgcv fixtures (1,384 stops),
-2.4e-5 over 30 synthetic sessions of 40,000 bins (1,020 stops) and 1.8e-3 over the
-slow simulation's 2,000 data sets (68,127 stops); the smallest at a separated one was
-1.0. The Gaussian is not held to this rule: once `A` is positive definite its maximum
+and does not depend on a column's units. The movement is the one the likelihood sees
+(`Likelihood.identifying_design`, below): for the grouped softmax it is `X step` less
+each event's mean of it, since a movement common to an event's candidates cancels in its
+softmax. Measured on `X step` itself, a slope with a shift of 1e4 common to every
+candidate (100 events of two candidates, shares 0.2 and 0.8) moved it by 0.13 at the
+maximum, all but 1.3e-5 of it common to each event, and the fit stopped as "no finite
+maximum" with its coefficient short of `log(4) / 2` by 1.3e-5. The largest `max |X step|`
+at the stop of a regular fit was 1.7e-3 over the regression tests and the mgcv fixtures
+(1,384 stops), 2.4e-5 over 30 synthetic sessions of 40,000 bins (1,020 stops) and 1.8e-3
+over the slow simulation's 2,000 data sets (68,127 stops); the smallest at a separated
+one was 1.0. Those were measured on `X step` itself, before the softmax's movement was
+taken within events; within an event it is at most the range of `X step` over the event's
+rows, so at most twice `max |X step|`. The Gaussian is not held to this rule: once `A` is positive definite its maximum
 is finite, and its linear predictor is on the outcome's scale, where rounding steps
 exceed 0.1 for an outcome of spread 1e9.
 
@@ -113,8 +121,9 @@ maximum".
 **The columns running away.** A fit that stops as "no finite maximum" keeps its last
 Newton step (`NewtonFit.step`), the direction along which the likelihood rises without
 bound, and the columns running away along it (`NewtonFit.running_away`,
-`running_away_columns`): those whose part of the step, `max_i |X_ij step_j|`, moves the
-linear predictor by more than 0.1 on some row, the threshold of the stop itself, the
+`running_away_columns`): those whose part of the step, `max_i |X_ij step_j|` on the
+design the likelihood identifies (for the grouped softmax, `X` less each event's column
+means), moves the linear predictor by more than 0.1 on some row, the threshold of the stop itself, the
 largest first (the columns of one direction have parts that differ in the last digit only,
 and which is larger depends on the machine: parts whose logarithms agree to 9 decimals are
 a tie, in column order). Along the direction each such column moves the linear predictor by about
@@ -156,7 +165,9 @@ reached" at 40 steps and converges at 400).
 sees (`Likelihood.identifying_design`): `X` for the Poisson, Bernoulli and Gaussian;
 for the grouped softmax, `X` less each group's mean, since a combination of columns
 constant within every group (a session's role columns that together mark every
-candidate) cancels in each group.
+candidate) cancels in each group. The no-finite-maximum rule, the cap rule and the
+columns running away measure the step on the same design (in the iteration kernel,
+`Likelihood._jax_identified_change` takes each group's mean off `X step`).
 
 ## How the penalties are chosen
 
@@ -880,13 +891,14 @@ made for a test overrides the JAX functions. `newton.penalized_newton` pads the 
 once and runs a host loop in Python and NumPy that holds every rule, status and count of
 "The fit and its convergence rule", around two jitted kernels: one evaluates `F` and `l`
 at given coefficients; one makes a Newton iteration (`A`, its Cholesky factor, the step,
-the decrement, `max |X step|`, and the step-halving search as a `lax.while_loop`). A trial
+the decrement, the step's largest movement of the linear predictor as the likelihood
+sees it, and the step-halving search as a `lax.while_loop`). A trial
 of the search takes its linear predictor as `eta + scale * (X @ step)`, and the accepted
 trial's starts the next iteration, kept on the device, so the line search multiplies a
 vector by `X` once (`X @ step`) whatever its halvings, where it did once for `eta`, once
 for the step and once for each trial; the gradient `score @ X` is the iteration's second
 product with `X`, beside the Gram. The iteration returns the seven numbers per fit the loop
-reads at every step (`ok`, the decrement, `max |X step|`, whether the step was capped, the
+reads at every step (`ok`, the decrement, that movement, whether the step was capped, the
 new `F` and `l`, whether a halving was found) stacked in one array, brought to the host in
 one transfer; `A`, the step and the candidate stay on the device until the loop reads them
 (`A` and the step only where a fit stops). The

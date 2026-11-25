@@ -613,6 +613,36 @@ def _empty_reference_rows() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@pytest.mark.parametrize("shift", [0.0, 1e4, 1e5])
+def test_a_shift_common_to_every_candidate_leaves_no_column_out(shift: float) -> None:
+    """Events of two candidates with shares (0.2, 0.8) and a slope of 0 and 2
+    plus ``shift``, which is common to an event's candidates and cancels in
+    its softmax: the session is fitted, nothing left out, at ``log(4) / 2``
+    per SD (the slope's SD is 1)."""
+    n_events = 100
+    rows = pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": "20260101",
+            "epoch": "02_r1",
+            "event_id": np.repeat(np.arange(n_events), 2),
+            "share": np.tile([0.2, 0.8], n_events),
+            "x": np.tile([0.0, 2.0], n_events) + shift,
+        }
+    )
+    design = build_design([Slope("x", "none")], rows, intercept=False)
+    (record,) = _fit(
+        design,
+        by_session([rows]),
+        GroupedSoftmax(),
+        response="share",
+        unit="event_id",
+    )
+    assert record.status == "converged"
+    assert record.left_out == {} and record.no_fit == ""
+    np.testing.assert_allclose(record.coef, [np.log(4.0) / 2.0], rtol=0, atol=1e-9)
+
+
 def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
     """The reference level has 10 visits and no event, two other levels have
     events: the fit has no finite maximum along the intercept. Nothing is
