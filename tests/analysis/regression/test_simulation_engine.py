@@ -746,6 +746,36 @@ def test_refusals(rate_sessions_cohort) -> None:
         )
 
 
+def test_a_gaussian_inside_scenario_has_no_unit_target(rate_sessions_cohort) -> None:
+    """A Gaussian model of the last outcome, inside the model with nothing
+    planted and with the outcome's coefficient planted: the run completes,
+    every data set has an estimate, and ``planted_unit`` is NaN (the
+    expected outcome is noise-free, so its fit has no scale to profile)."""
+    sessions = rate_sessions_cohort
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design([Slope(REWARD, WEAK)], pooled, intercept=True)
+    model = Model(
+        "gaussian",
+        design,
+        Gaussian(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+    )
+    scenarios = [
+        InsideScenario("null", {}, scale=1.0),
+        InsideScenario("planted", {"(Intercept)": 0.3, REWARD: 0.5}, scale=1.0),
+    ]
+    result = engine.run(_simulation(model, sessions, scenarios))
+    table = result.summary.set_index("scenario")
+    assert list(table.index) == ["null", "planted"]
+    assert table["planted"].tolist() == [0.0, 0.5]
+    assert result.data_sets["planted_unit"].isna().all()
+    assert table["planted_unit"].isna().all() and table["bias_unit"].isna().all()
+    assert np.isfinite(result.data_sets["estimate"]).all()
+    assert (table["n_data_sets_with_estimate"] == 2).all()
+
+
 def reference_tables() -> dict[str, list[dict]]:
     """The summary tables of the fixture: the rate model under the inside and
     the outside scenario, and the content model inside, on fixed seeds."""

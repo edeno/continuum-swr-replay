@@ -845,7 +845,9 @@ against both (`bias`, `coverage`; `bias_unit`, `coverage_unit`). The target is f
 per run, in the parent before any worker starts, for an inside scenario and once per data set for an outside one. The
 noise-free target never drops a unit for lack of events, and a drawn data set can, so
 `bias_unit` can compare slightly different sets of units. The Bernoulli
-takes only 0/1 outcomes, so its `planted_unit` is NaN. The engine,
+takes only 0/1 outcomes, and the Gaussian profiles its scale from the residuals, of
+which a noise-free outcome has none when the design holds its mean, so under either
+`planted_unit` is NaN (no target is fitted). The engine,
 `analysis/regression/simulation.py`, builds no model: the caller gives a `Model` (the
 `Design` as the model's own code builds it, the likelihood, the response and unit columns,
 and each estimand's `c`). Every coefficient that an estimand uses must carry a fixed

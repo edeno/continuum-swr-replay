@@ -60,9 +60,11 @@ Two planted values (``docs/design/2026-11-24-unit-of-fit.md``, section 6):
   own), reduced over the units as the estimates are. It is computed once per
   run, before the data sets, for an inside scenario and once per data set for
   an outside one (whose expected outcome may read the generator). The Bernoulli takes
-  only 0/1 outcomes, so under it ``planted_unit`` is NaN. The noise-free
-  target never drops a unit for lack of events, and a drawn data set can, so
-  ``bias_unit`` can compare slightly different sets of units.
+  only 0/1 outcomes, and the Gaussian's scale cannot be profiled on a
+  noise-free outcome (its residuals are zero when the design holds the mean),
+  so under either ``planted_unit`` is NaN. The noise-free target never drops
+  a unit for lack of events, and a drawn data set can, so ``bias_unit`` can
+  compare slightly different sets of units.
 
 The tables of a run (:class:`SimulationResult`):
 
@@ -97,6 +99,7 @@ from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns
 from .contrasts import evaluate_contrast
 from .likelihoods import (
     Bernoulli,
+    Gaussian,
     GroupedSoftmax,
     Likelihood,
     Poisson,
@@ -762,8 +765,8 @@ def _unit_targets(
 ) -> dict[str, float]:
     """Each estimand's unit target (module docstring): the model at its
     ``fit_by`` fitted to the expected outcome ``means`` with the weak penalty
-    off, reduced over the units; NaN under the Bernoulli."""
-    if isinstance(model.likelihood, Bernoulli):
+    off, reduced over the units; NaN under the Bernoulli and the Gaussian."""
+    if isinstance(model.likelihood, (Bernoulli, Gaussian)):
         return dict.fromkeys(model.estimands, np.nan)
     records = fit_sessions(
         _without_weak_penalty(model.design),
