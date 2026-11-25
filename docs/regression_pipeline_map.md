@@ -338,7 +338,7 @@ Ripple power and MUA of confident Local time against confident non-local time.
 
 Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `epoch_labels`, `animal_quartiles`, `animal_balanced_quartiles`, `lag_column`, `frame_event_counts`, `epoch_trigger_windows`, `stored_windows_of`, `stored_triggered_curves`, `stored_animal_window_medians`, `stored_no_spike_trace`, `windows_at`, `kind_triggered_curves`
+`get_signal_windows`, `compute_triggered_average_curves`, `triggered_windows`, `animal_window_medians`, `triggering_events_in`, `epoch_labels`, `animal_quartiles`, `animal_balanced_quartiles`, `lag_column`, `frame_event_counts`, `event_start_windows`, `epoch_trigger_windows`, `stored_windows_of`, `stored_triggered_curves`, `stored_animal_window_medians`, `stored_no_spike_trace`
 
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
@@ -1257,6 +1257,12 @@ Measure how fast each event's content moves along the track, two ways.
 Measure each event's start distance and the theta-like share of duration-matched quiet rest.
 
 `measure_epoch`, `main`
+
+### `scripts/event_properties/measure_gamma_trigger_windows.py`
+
+Store each epoch's slow- and fast-gamma windows around event starts.
+
+`measure`, `main`
 
 ### `scripts/event_properties/measure_nonlocal_by_signal.py`
 

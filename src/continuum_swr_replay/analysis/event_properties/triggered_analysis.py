@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -653,6 +654,47 @@ def _window_rows(
     return rows
 
 
+def event_start_windows(
+    frame: pd.DataFrame,
+    event_types: dict,
+    signals: Sequence[str],
+    window_sec: float = TRIGGERED_WINDOW_S,
+) -> pd.DataFrame:
+    """One epoch's stored windows of ``signals`` around the starts of its
+    immobile non-local events, by SWR overlap (:func:`triggered_windows`: a
+    window that touches excluded time is left out).
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        One epoch's decode frame, read with the SWR source, with ``signals``
+        among its columns.
+    event_types : dict
+        ``nonlocal_events.get_event_types`` of ``frame``.
+    signals : sequence of str
+        The frame's columns to store.
+    window_sec : float, optional
+        The window, in all (s).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per window and signal: :data:`WINDOW_ROW_KEYS` (kind
+        ``"overlap"`` or ``"no_overlap"``, ``non_local_event`` the event's
+        frame label), then one column per lag (:func:`lag_column`).
+    """
+    rows = []
+    for kind, windows in triggered_windows(
+        frame, event_types, list(signals), window_sec=window_sec
+    ).items():
+        labels = windows.indexes["event"].get_level_values("non_local_event")
+        rows += [
+            _window_rows(windows.sel(signal=signal).values, kind, signal, labels)
+            for signal in signals
+        ]
+    return pd.concat(rows, ignore_index=True)
+
+
 def epoch_trigger_windows(
     frame: pd.DataFrame,
     event_types: dict,
@@ -696,15 +738,7 @@ def epoch_trigger_windows(
         periods (``no_spike_periods.level_outside_periods``);
         ``n_no_spike_periods``: the periods.
     """
-    rows = []
-    for kind, windows in triggered_windows(
-        frame, event_types, list(TRIGGERED_SIGNALS), window_sec=window_sec
-    ).items():
-        labels = windows.indexes["event"].get_level_values("non_local_event")
-        rows += [
-            _window_rows(windows.sel(signal=signal).values, kind, signal, labels)
-            for signal in TRIGGERED_SIGNALS
-        ]
+    rows = [event_start_windows(frame, event_types, TRIGGERED_SIGNALS, window_sec)]
     periods = no_spike_periods(frame, arrival_times, departure_times)
     if not periods.empty:
         session = frame[["animal", "day", "epoch"]].iloc[0]
@@ -783,9 +817,11 @@ def stored_windows_of(windows: pd.DataFrame, events: pd.DataFrame) -> pd.DataFra
     return windows.loc[kept]
 
 
-def stored_triggered_curves(windows: pd.DataFrame) -> dict:
-    """Figure 2g's curves from the stored windows: for each of
-    :data:`TRIGGERED_SIGNALS`, ``time`` (s) and, for each SWR-overlap kind,
+def stored_triggered_curves(
+    windows: pd.DataFrame, signals: Sequence[str] = TRIGGERED_SIGNALS
+) -> dict:
+    """Figure 2g's curves from the stored windows: for each of ``signals``
+    (:data:`TRIGGERED_SIGNALS`), ``time`` (s) and, for each SWR-overlap kind,
     its animal-balanced quartiles (:func:`animal_balanced_quartiles`: each
     epoch's quartile, the median over the animal's epochs, the mean over
     animals), as ``"{kind}_q25"``, ``"{kind}_median"`` and ``"{kind}_q75"``.
@@ -796,7 +832,7 @@ def stored_triggered_curves(windows: pd.DataFrame) -> dict:
         :func:`stored_windows_of`' rows.
     """
     curves: dict = {}
-    for signal in TRIGGERED_SIGNALS:
+    for signal in signals:
         curves[signal] = {}
         for kind in ("no_overlap", "overlap"):
             values, animals, epochs, time = _stored(windows, kind, signal)
@@ -857,68 +893,3 @@ def stored_no_spike_trace(windows: pd.DataFrame, epochs: pd.DataFrame) -> dict:
             animal_medians(epochs["no_spike_level"], epochs["animal"]).mean()
         ),
     }
-
-
-def windows_at(
-    time: np.ndarray, signal: np.ndarray, at: np.ndarray, n_each_side: int
-) -> np.ndarray:
-    """A signal's samples around each of some times, on the signal's own grid.
-
-    Parameters
-    ----------
-    time : np.ndarray, shape (n_samples,)
-        The signal's sample times (s), ascending.
-    signal : np.ndarray, shape (n_samples,)
-    at : np.ndarray, shape (n_events,)
-        The times to center on (s); each takes the first sample at or after it.
-    n_each_side : int
-        Samples kept before and after the center.
-
-    Returns
-    -------
-    np.ndarray, shape (n_events, 2 * n_each_side + 1)
-        NaN where a window runs past either end of the signal.
-    """
-    center = np.searchsorted(time, at, side="left")
-    index = center[:, None] + np.arange(-n_each_side, n_each_side + 1)[None, :]
-    inside = (index >= 0) & (index < len(signal))
-    windows = np.asarray(signal, dtype=float)[np.clip(index, 0, len(signal) - 1)]
-    windows[~inside] = np.nan
-    return windows
-
-
-def kind_triggered_curves(
-    windows: np.ndarray,
-    is_swr: np.ndarray,
-    animals: np.ndarray,
-    epochs: np.ndarray,
-    sampling_frequency: float = SAMPLING_FREQUENCY,
-) -> dict:
-    """One signal's curves around event starts, as :func:`stored_triggered_curves`
-    gives them for a signal: ``time`` (s) and, for each SWR-overlap kind of
-    :data:`WINDOW_KINDS`, its animal-balanced quartiles
-    (:func:`animal_balanced_quartiles`) as ``"{kind}_q25"``,
-    ``"{kind}_median"`` and ``"{kind}_q75"``.
-
-    Parameters
-    ----------
-    windows : np.ndarray, shape (n_events, n_lags)
-        The signal around each event's start, an odd number of lags centered
-        on it (:func:`windows_at`).
-    is_swr : np.ndarray of bool, shape (n_events,)
-    animals, epochs : np.ndarray, shape (n_events,)
-        Each event's animal and its epoch within it (:func:`epoch_labels`).
-    sampling_frequency : float
-        The windows' samples per second.
-    """
-    n_each_side = (windows.shape[1] - 1) // 2
-    curves: dict = {
-        "time": np.arange(-n_each_side, n_each_side + 1) / sampling_frequency
-    }
-    for kind, overlaps in WINDOW_KINDS.items():
-        mine = np.asarray(is_swr, dtype=bool) == overlaps
-        for label, quartile in animal_balanced_quartiles(
-            windows[mine], np.asarray(animals)[mine], np.asarray(epochs)[mine]
-        ).items():
-            curves[f"{kind}_{label}"] = quartile
-    return curves

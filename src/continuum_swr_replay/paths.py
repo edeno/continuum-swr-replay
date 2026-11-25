@@ -253,6 +253,10 @@ by MUA and by decoder state class
 EXAMPLE_SESSION_DIR = "example_session"
 """The recording of a session a figure draws whole, beside its decode: one
 folder per epoch, ``<epoch_id>/`` (``scripts/decoding/store_example_session.py``)."""
+EVENT_GAMMA_TRIGGER_WINDOWS_DIR = "event_gamma_trigger_windows"
+"""Slow and fast gamma around event starts, every window
+(``scripts/event_properties/measure_gamma_trigger_windows.py``)."""
+
 EVENT_TRIGGER_WINDOWS_DIR = "event_trigger_windows"
 """Each epoch's windows of the per-time-bin signals around its non-local events'
 starts and its No-Spike periods' starts, Figure 2g's and its supplement's

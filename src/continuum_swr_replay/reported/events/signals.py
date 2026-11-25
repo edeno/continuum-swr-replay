@@ -5,25 +5,18 @@ and gamma during events against quiet rest. The statistics are computed in
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_properties import (
     event_statistics,
-    gamma_power,
-    triggered_analysis,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.events.common import (
     EVENTS_SUBSET,
     TAGS,
     TIME_SUBSET,
     SummaryReads,
-    _epoch_files,
 )
 from continuum_swr_replay.reported.inputs import EventsInputs
 from continuum_swr_replay.reported.values import (
@@ -288,56 +281,6 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
                 ),
             ]
     return values
-
-
-def gamma_triggered_curves(
-    events: pd.DataFrame, folder: Path, n_epochs: int
-) -> tuple[dict[str, dict], list[Path]]:
-    """Slow and fast gamma around the starts of the events of ``events``, by
-    kind (``triggered_analysis.kind_triggered_curves``, keyed by band), from
-    the gamma pass's per-bin z-scored power
-    (``<epoch>_gamma_z.parquet``, on the decode's time grid), over
-    ``triggered_analysis.TRIGGERED_WINDOW_S``; and the files read.
-
-    Raises
-    ------
-    ValueError
-        If ``folder`` does not hold ``n_epochs`` epochs' traces, or an event's
-        epoch has none.
-    """
-    paths = _epoch_files(folder, n_epochs, "*_gamma_z.parquet")
-    n_each_side = int(
-        round(triggered_analysis.TRIGGERED_WINDOW_S / 2 * SAMPLING_FREQUENCY)
-    )
-    epoch_id = swr_source.event_epoch_ids(events)
-    by_path = {path.name.removesuffix("_gamma_z.parquet"): path for path in paths}
-    if not set(epoch_id).issubset(by_path):
-        raise ValueError(f"{folder} has no gamma for an event's epoch")
-    windows: dict[str, list] = {band: [] for band in gamma_power.GAMMA_BANDS}
-    kept = []
-    for epoch, mine in events.groupby(epoch_id.to_numpy()):
-        trace = pd.read_parquet(by_path[epoch])
-        for band in windows:
-            windows[band].append(
-                triggered_analysis.windows_at(
-                    trace["time"].to_numpy(),
-                    trace[f"{band}_z"].to_numpy(),
-                    mine["event_start_s"].to_numpy(),
-                    n_each_side,
-                )
-            )
-        kept.append(mine)
-    kept = pd.concat(kept)
-    labels = triggered_analysis.epoch_labels(kept["session_date"], kept["epoch"])
-    return {
-        band: triggered_analysis.kind_triggered_curves(
-            np.concatenate(windows[band]),
-            kept["is_swr"].to_numpy(dtype=bool),
-            kept["animal"].to_numpy(),
-            labels,
-        )
-        for band in windows
-    }, paths
 
 
 def with_brain_state(

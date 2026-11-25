@@ -49,6 +49,7 @@ from continuum_swr_replay.paths import (
     EVENT_CONTENT_PLACE_RATE_DIR,
     EVENT_FEATURES_RUN,
     EVENT_GAMMA_DIR,
+    EVENT_GAMMA_TRIGGER_WINDOWS_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_NONLOCAL_RESTRICTION_DIR,
     EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
@@ -125,6 +126,7 @@ class EventsInputs:
     bin_facts: Path
     exposure_in_visits: Path
     trigger_windows: Path
+    gamma_trigger_windows: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -165,6 +167,7 @@ def default_inputs() -> EventsInputs:
         bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
         exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
         trigger_windows=processed_data_dir() / EVENT_TRIGGER_WINDOWS_DIR,
+        gamma_trigger_windows=processed_data_dir() / EVENT_GAMMA_TRIGGER_WINDOWS_DIR,
     )
 
 
@@ -634,6 +637,25 @@ def read_trigger_windows(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         n_events=[records[e]["n_events"]["total"] for e in epochs["epoch_id"]],
     )
     return windows, checked_reference(epochs, folder, "trigger windows")
+
+
+def read_gamma_trigger_windows(folder: Path) -> pd.DataFrame:
+    """The stored gamma windows around event starts
+    (``scripts/event_properties/measure_gamma_trigger_windows.py``): one row
+    per window and band (``triggered_analysis.event_start_windows``), with
+    ``epoch_id``, ``animal``, ``session_date`` and ``epoch``.
+
+    Raises
+    ------
+    ValueError
+        As :func:`checked_reference` refuses a per-epoch measurement: not made
+        over the analyses' subset from the current well visits, an analyzed
+        epoch missing or extra, or another decode than the event features run's.
+    """
+    windows = pd.read_parquet(folder / "windows.parquet")
+    epochs = windows.groupby("epoch_id", sort=False)["decode_sha256"].first()
+    checked_reference(epochs.reset_index(), folder, "gamma trigger windows")
+    return windows
 
 
 EXAMPLE_SESSION_RERUN = "scripts/decoding/store_example_session.py"
