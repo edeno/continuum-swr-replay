@@ -1864,8 +1864,8 @@ def test_softmax_unit_fit_equals_an_independent_maximization() -> None:
 @pytest.mark.parametrize("place", ["first", "last"])
 def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None:
     """A session dropped from the unit (no event, or three visits) leaves the
-    shared coefficients bit for bit those of the fit without it, whether it
-    is the first or the last of the unit."""
+    shared coefficients those of the fit without it, to the last digits,
+    whether it is the first or the last of the unit."""
     sessions = _day_sessions(4)
     keys = list(sessions)
     rows = sessions[keys[1]]
@@ -1898,6 +1898,15 @@ def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None
         names = zip(record.coef_names, record.coef, strict=True)
         return {n: c for n, c in names if "@" not in n}
 
-    assert shared(with_it) == shared(without)
+    # Not bit for bit: with the session's rows dropped the fit reads a copy of
+    # the kept rows, and a threaded linear-algebra library (OpenBLAS on four
+    # threads, as on CI) may sum a matrix product over it in another order,
+    # which moves the last digit. A fit that kept the session's rows differs in
+    # the first digits.
+    got, expected = shared(with_it), shared(without)
+    assert list(got) == list(expected)
+    np.testing.assert_allclose(
+        list(got.values()), list(expected.values()), rtol=1e-10, atol=1e-12
+    )
     copy = f"(Intercept)@{'/'.join(keys[1])}"
     assert with_it.cohort_counts["rows_dropped"] == {copy: len(dropped)}
