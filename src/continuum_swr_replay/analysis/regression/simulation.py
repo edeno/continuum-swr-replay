@@ -469,9 +469,12 @@ def _draw_session(
     rng: np.random.Generator,
 ) -> np.ndarray:
     """One session's outcomes at ``eta``, NaN on its rows with a missing
-    value, shape ``(n_rows,)``."""
+    value, shape ``(n_rows,)``; all NaN when no row is kept (the fit records
+    the session as ``no_rows``)."""
     lik = model.likelihood
     y = np.full(eta.size, np.nan)
+    if prepared.missing.all():
+        return y
     rows = np.flatnonzero(~prepared.missing)
     if isinstance(lik, GroupedSoftmax):
         rows = rows[np.argsort(prepared.unit[rows], kind="stable")]
@@ -501,8 +504,11 @@ def _draw_session(
 def _inside_mean(lik: Likelihood, eta: np.ndarray, prepared: _Prepared) -> np.ndarray:
     """The expected outcome at ``eta`` (:func:`.likelihoods.mean`), NaN on the
     rows with a missing value, shape ``(n_rows,)``: under the grouped softmax
-    each event's shares over its rows that are not missing."""
+    each event's shares over its rows that are not missing. All NaN when no
+    row is kept."""
     out = np.full(eta.size, np.nan)
+    if prepared.missing.all():
+        return out
     rows = np.flatnonzero(~prepared.missing)
     if isinstance(lik, GroupedSoftmax):
         rows = rows[np.argsort(prepared.unit[rows], kind="stable")]

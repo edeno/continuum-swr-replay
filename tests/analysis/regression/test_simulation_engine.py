@@ -605,6 +605,31 @@ def test_expected_shares_must_sum_to_one(content_sessions_cohort) -> None:
     assert all(np.isfinite(rows["share"]).all() for rows in drawn.values())
 
 
+@pytest.mark.parametrize("inside", [True, False], ids=["inside", "outside"])
+@pytest.mark.parametrize("empty", ["no_rows", "every_row_missing"])
+def test_a_softmax_session_without_rows_has_no_value(
+    empty: str, inside: bool, content_sessions_cohort
+) -> None:
+    """Under the grouped softmax, one session of 10 with no rows, or with the
+    role missing on every row: its drawn shares are all NaN, and a run inside
+    or outside the model completes, the session without a value for
+    ``no_rows``, as ``fit_sessions`` records it."""
+    sessions = dict(content_sessions_cohort)
+    model = content_model(sessions)
+    key = list(sessions)[1]
+    rows = sessions[key]
+    sessions[key] = rows.iloc[:0] if empty == "no_rows" else rows.assign(role=None)
+    scenario = CONTENT_INSIDE if inside else OutsideScenario("outside", _shares)
+    drawn = draw_data_set(model, sessions, scenario, np.random.default_rng(0))
+    assert len(drawn[key]) == len(sessions[key])
+    assert drawn[key]["share"].isna().all()
+    result = engine.run(_simulation(model, sessions, [scenario]))
+    row = result.summary.iloc[0]
+    assert row["without_value_no_rows"] == pytest.approx(1 / len(sessions))
+    assert row["share_without_value"] == pytest.approx(1 / len(sessions))
+    assert row["n_data_sets_with_estimate"] == 2
+
+
 def _fixed_rate(sessions, rng):
     """Each row's expected count: its exposure times a rate that rises over
     the visit and is 0.5 higher (log) after a reward. ``rng`` is not read."""
