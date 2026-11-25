@@ -259,9 +259,19 @@ PROVISIONAL_USES: tuple[str, ...] = ("test", "simulation")
 #: leaving the cap removes (:func:`cohort_rows`).
 TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 
-#: OPEN (lead): the form of the reward effect. ``"coefficient"`` (the
-#: default, the declared Q2): one coefficient, and one arrival curve for both
-#: outcomes. ``"time_varying"``: the same coefficient and a second arrival
+#: DECIDED (lead, 2026-11-25), NOT YET BUILT: the reward effect is read from
+#: an arrival curve for each outcome, each penalized on its own (``outcome +
+#: s(arrival, by = outcome)``), with the leaving curve shared by both
+#: outcomes; two declared window contrasts (the outcome term plus the mean
+#: over the window of the rewarded arrival curve minus the omitted one): Q2
+#: over 4 to 10 s after arrival, and the onset over 2 to 4 s. The one
+#: coefficient stays as a secondary value. That form replaces
+#: ``"time_varying"`` below (a shared curve plus a difference curve, read
+#: over the rewarded rows) when it is built.
+#:
+#: The forms built today. ``"coefficient"`` (the default, the declared Q2
+#: until the decided form is built): one coefficient, and one arrival curve
+#: for both outcomes. ``"time_varying"``: the same coefficient and a second arrival
 #: curve for the rows after a reward (a smooth ``by`` the last outcome,
 #: sum-to-zero over the rewarded rows of the design), so the effect may change
 #: with time since arrival. The form changes the meaning of Q1 as well as of

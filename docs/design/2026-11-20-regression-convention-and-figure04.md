@@ -1052,6 +1052,58 @@ Open (the design note, section 11.4): whether the rate model's clock curves are 
 are per session; the rate model at the day unit and the declared penalties of its clocks at a larger unit;
 which target the paper states when sessions differ; which unit the headline values come from.
 
+### Twenty-sixth round (lead, 2026-11-25, 14:54 and 15:07 EST): the form of the rate model's reward effect
+
+(The twenty-fifth round, the reward coefficient's weak penalty, 2026-11-23, is recorded on the branch
+`visit-rate-validation`.)
+
+What was shown to the lead: the rate follow-up's later-onset scenario
+(`.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/followup/REPORT.md`, section 3;
+simulation numbers, `mgcv::bam`, the animal unit). With a later onset after an omission and no reward
+ratio planted, the one reward coefficient came out at 0.20 (SWR) and 0.17 (No SWR) and excluded zero in
+every data set; an arrival curve for each outcome read over a window returned the planted shape (4 to
+10 s: -0.057 against a planted -0.053 for SWR; 2 to 4 s: 0.27 / 0.22 against 0.23 / 0.155). Under a
+constant ratio every window recovered it. The windows' costs, with nothing planted: intervals excluding
+zero 2 to 4 s 0 % / 5 %, 4 to 10 s 15 % / 5 %, 1 to 2 s 0 % / 20 % (and biased +0.05 / +0.06); half-widths
+against the one coefficient 15 to 45 % wider at 2 to 4 s, two to three times at 4 to 10 s. The window
+contrast is unusable at the day unit (+0.10 to +0.5 with nothing planted).
+
+The lead's words, 2026-11-25:
+
+- 14:54: "okay so no interaction of outcome of leaving"
+- 15:07: "agree", to the author's recommendation below.
+
+What the lead decided:
+
+- **The leaving curve is shared by both outcomes**: no interaction of the outcome with the time until
+  leaving, in any form of the model.
+- **The reward effect is read from an arrival curve for each outcome** (the author's recommendation,
+  agreed): `outcome + session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)`, Poisson,
+  fitted per animal (and per day, under the twenty-fourth round) and per kind, the two arrival curves
+  penalized each on its own (the form the follow-up simulated, its form O), not the shared curve plus a
+  difference curve of `visit_rate.REWARD_FORMS`' `"time_varying"`.
+- **Two declared tests**, each the outcome term plus the mean over the window of the rewarded arrival
+  curve minus the omitted one (log rate ratio):
+  - Q2, the reward effect on the rate once events are going: the window 4 to 10 s after arrival;
+  - a new question, the reward effect on when events start: the window 2 to 4 s after arrival.
+- **The difference curve** (rewarded minus omitted, over the time since arrival, with its band) is shown,
+  not tested.
+- **The one reward coefficient stays as a secondary value**, for comparison with other studies, described
+  as mixing the timing with the rate.
+
+These windows are declared before any real arrival curve by outcome is looked at; the real curves are a
+check on this choice, not a way to choose it. What follows for the builder (in order): the form and the
+window contrast in `analysis/replay_models/rate/visit_rate.py` at `fit_by="animal"`, with the declared
+tests in `declared_tests.py`; the rate validation through the project's simulation engine, with more data
+sets for the rates of excluding zero (the follow-up's 15 % for SWR at 4 to 10 s rests on few) and with a
+declared penalty for each clock curve (about 15 effective parameters for each arrival curve, 10 or more
+for the leaving curve; not yet run); then the real fits. Under this form Q1 is read from the arrival
+curve after an omission.
+
+This round changes the declared Q2, which was the one coefficient (`declared_tests.py`), and decides the
+open "form of the reward effect" of `visit_rate.REWARD_FORMS` and of item b above (whether the reward
+effect may change with time since arrival: it may, along the arrival clock only).
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions

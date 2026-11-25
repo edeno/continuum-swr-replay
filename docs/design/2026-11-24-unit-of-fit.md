@@ -394,8 +394,10 @@ because it shows what the animal unit hides: the variation between days and a tr
 
 1. Rate: clock curves shared in the unit or per session (the scenario with session-specific curves is
    running, `design_d_trial/rate/followup/`); the rate model at the day unit; the declared penalties of
-   the rate clocks at a larger unit; whether an outcome-specific arrival curve with a window contrast
-   answers the later-onset problem (the same follow-up).
+   the rate clocks at a larger unit. *(Decided 2026-11-25, the twenty-sixth round of
+   `2026-11-20-regression-convention-and-figure04.md`: an arrival curve for each outcome with a window
+   contrast answers the later-onset problem at the animal unit, read over 4 to 10 s (Q2) and 2 to 4 s
+   (the onset); the leaving curve shared.)*
 2. Which target the paper states when sessions differ (section 6): the two differ by about 5 to 10 % at
    the variation simulated.
 3. Which unit the paper's headline values come from, after both are fitted and compared.
