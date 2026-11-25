@@ -1092,7 +1092,21 @@ What the lead decided:
   as mixing the timing with the rate.
 
 These windows are declared before any real arrival curve by outcome is looked at; the real curves are a
-check on this choice, not a way to choose it. What follows for the builder (in order): the form and the
+check on this choice, not a way to choose it.
+
+**What the window tests compare (added 2026-11-25, with the lead's "ok").** A visit after an omission
+is short (median 0.9 s, against 5.4 s after a reward; item b above), so the omission side of each
+window comes only from the omission visits that last into it. Each test is therefore worded as the rate
+after a reward against after an omission, at the same time since arrival and before leaving, among
+visits that last into the window; the visits that linger after an omission may differ from the rest,
+and the paper says so. The support (counts of the input tables, not results; model A's at-risk bins of
+the 242 sessions, by each bin's last outcome; no event counted;
+`.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/omission_support/`): per animal,
+146 to 429 omission visits have bins at 4 to 10 s (208 to 620 at-risk seconds, against 3,321 to 4,669
+rewarded visits), and 375 to 955 at 2 to 4 s; per session a median of 4 at 4 to 10 s (10 % of sessions
+2 or fewer), which is why the window tests are read per animal, not per day. An animal or kind whose
+window lacks support under the support rule is reported as unsupported; the windows are not moved to
+fit the data. What follows for the builder (in order): the form and the
 window contrast in `analysis/replay_models/rate/visit_rate.py` at `fit_by="animal"`, with the declared
 tests in `declared_tests.py`; the rate validation through the project's simulation engine, with more data
 sets for the rates of excluding zero (the follow-up's 15 % for SWR at 4 to 10 s rests on few) and with a
