@@ -66,9 +66,12 @@ class FitRecord:
         row rule; a row shared by levels of two categories that fail in the
         same pass is counted under the first in column order), and under the
         grouped softmax
-        ``events_without_response`` (events given with no response) and
-        ``events_emptied_by_dropped_rows`` (events whose response was all on
-        dropped rows); a caller adds its own cohort counts.
+        ``events_without_response`` (events given with no response: their
+        shares over all the rows given sum to zero, a missing share counted
+        as zero) and ``events_emptied_by_dropped_rows`` (events given with a
+        response, all of it on rows removed before the fit: rows with a
+        missing value or rows of a dropped level); a caller adds its own
+        cohort counts.
     coef_names : list of str
     coef : list of float
         NaN at the columns left out, and everywhere for a session without a

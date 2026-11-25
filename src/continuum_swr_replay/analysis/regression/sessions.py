@@ -34,8 +34,12 @@ design of the kept rows is a slice. For each fit, in order:
    removed: its rows are dropped (not merged into the reference level) and
    the terms fitted for it leave with it (``DesignTerm.dependents``). Under
    the grouped softmax an event with no response on the rows kept is
-   removed: the first time as given (``events_without_response``), after
-   that as emptied by dropped rows (``events_emptied_by_dropped_rows``).
+   removed: as given without a response (``events_without_response``) when
+   its response over all its rows given sums to zero (a missing share counts
+   as zero), else as emptied by the rows removed, for a missing value or a
+   dropped level (``events_emptied_by_dropped_rows``). A response below
+   zero (Poisson, Bernoulli, grouped softmax) is refused on the rows given,
+   before any row is removed.
    At the fixed point, a category without rows of its reference level on the
    rows kept (in the fit; in a session, for a baseline category's copies) is
    an error naming the fit, the category and the level, penalized or not.
@@ -201,13 +205,19 @@ class _Session:
 
     def _remove_empty_events(self) -> None:
         """Under the softmax, remove the events with no response on the rows
-        kept: the first time as given, after that as emptied by dropped rows."""
+        kept: as given without a response when the event's response over all
+        its rows given is not above zero (a missing share counts as zero),
+        else as emptied by the rows removed."""
         kept = self.kept
         response = np.where(np.isnan(self.y), 0.0, self.y)
-        total = np.bincount(self.unit[kept], weights=response[kept])
-        empty = np.zeros(kept.size, dtype=bool)
-        empty[kept] = total[self.unit[kept]] <= 0
-        self.reason[empty] = _EMPTIED if self.events_counted else _NO_RESPONSE
+        given = np.bincount(self.unit, weights=response)
+        total = np.bincount(
+            self.unit[kept], weights=response[kept], minlength=given.size
+        )
+        empty = kept & (total[self.unit] <= 0)
+        self.reason[empty] = np.where(
+            given[self.unit[empty]] <= 0, _NO_RESPONSE, _EMPTIED
+        )
         self.events_counted = True
 
     def _drop_level(self, level: DesignTerm) -> None:
@@ -719,7 +729,10 @@ def fit_sessions(
         If the design has an intercept under the grouped softmax, or an
         offset under another likelihood than the Poisson; if a session has a
         row whose unit id is missing (before any design is built, naming the
-        session, the unit column and the rows); if a category has no rows of
+        session, the unit column and the rows); if a session has a response
+        below zero under the Poisson, the Bernoulli or the grouped softmax
+        (before any design is built, naming the session and the rows); if a
+        category has no rows of
         its reference level on the rows kept of a unit (of a session, for a
         baseline category), naming the unit; if a session's first
         fit finds its design not identified or fails for a numerical reason,
@@ -746,6 +759,13 @@ def fit_sessions(
                 f"session {'/'.join(key)}: {n_missing} rows with a missing {unit} "
                 "(a unit id is never missing in a whole table)"
             )
+        if isinstance(lik, Poisson | Bernoulli | GroupedSoftmax):
+            n_negative = int(np.sum(rows[response].to_numpy(dtype=float) < 0))
+            if n_negative:
+                raise ValueError(
+                    f"session {'/'.join(key)}: {n_negative} rows with {response} "
+                    f"below zero (a {lik.name} response is never negative)"
+                )
     return [
         _fit_unit(
             design,

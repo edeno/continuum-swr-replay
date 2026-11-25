@@ -60,7 +60,17 @@ grouped softmax, group ids that are not finite or not sorted, a negative share, 
 group whose shares sum to zero; for the Gaussian, a scale that is not finite and
 positive. A penalty block whose matrix is not symmetric positive semidefinite (to
 `1e-10` of its largest entry and eigenvalue) is refused when it is built. In a pooled
-fit the message names the session.
+fit the message names the session. The loop over fits (`sessions.fit_sessions`)
+refuses a response below zero under the Poisson, the Bernoulli and the grouped softmax on
+every row given, naming the session, before it removes any row or event: otherwise an
+event whose shares sum to zero or less (`[-1, 1]`), or a session of negative counts only,
+was removed as having no response and the fit went on
+(`test_sessions.py::test_a_negative_share_is_refused_whatever_its_event_sums_to`,
+`::test_a_negative_count_is_refused`). An event the loop removes is counted as given
+without a response when its shares over all the rows given sum to zero (a missing share
+counted as zero, as for the content table's junction-only events), and as emptied when
+its response lay on rows removed for a missing value or a dropped level
+(`::test_an_event_emptied_by_a_missing_value_is_counted_as_emptied`).
 
 ## The fit and its convergence rule
 

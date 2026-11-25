@@ -685,6 +685,84 @@ def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
     assert record.n_units == 150 - 3
 
 
+def _two_candidate_fit(event_rows) -> object:
+    """The record of a content session (conftest, seed 0) whose event 5 has
+    only its current and previous rows, ``event_rows`` (a function of those
+    rows to the rows given), with a penalized role category and clock slope
+    built on the valid rows."""
+    from .conftest import content_rows
+
+    rows = content_rows(0)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, reference="other", penalty=weak)
+    design = build_design([role, Slope("clock_s", weak)], rows, intercept=False)
+    other = rows[(rows["event_id"] != 5) | rows["role"].isin(["current", "previous"])]
+    other = other.reset_index(drop=True)
+    event = other["event_id"] == 5
+    given = pd.concat([other[~event], event_rows(other[event].copy())])
+    (record,) = _fit(
+        design,
+        {("sim", "20260000", "02_r1"): given.reset_index(drop=True)},
+        GroupedSoftmax(),
+        response="share",
+        unit="event_id",
+    )
+    return record
+
+
+def _shares(rows: pd.DataFrame, current: float, previous: float) -> pd.DataFrame:
+    """``rows`` (one event's current and previous rows) with those shares."""
+    rows["share"] = np.where(rows["role"] == "current", current, previous)
+    return rows
+
+
+@pytest.mark.parametrize("shares", [(-1.0, 1.0), (-2.0, 1.0), (-0.5, 1.5)])
+def test_a_negative_share_is_refused_whatever_its_event_sums_to(shares) -> None:
+    """A share below zero is refused, naming the session, before any event is
+    removed: an event whose shares sum to zero or less is not counted as given
+    without a response."""
+    with pytest.raises(
+        ValueError, match=r"session sim/20260000/02_r1: 1 rows with share below zero"
+    ):
+        _two_candidate_fit(lambda rows: _shares(rows, *shares))
+
+
+def test_an_event_emptied_by_a_missing_value_is_counted_as_emptied() -> None:
+    """An event whose only share is on a row with a missing predictor was given
+    a response: it is counted as emptied, not as without response."""
+
+    def missing_where_chosen(rows):
+        rows = _shares(rows, 0.0, 1.0)
+        rows.loc[rows["role"] == "previous", "clock_s"] = np.nan
+        return rows
+
+    record = _two_candidate_fit(missing_where_chosen)
+    assert record.status == "converged"
+    assert record.cohort_counts["rows_missing_values"] == 1
+    assert record.cohort_counts["events_emptied_by_dropped_rows"] == 1
+    assert record.cohort_counts["events_without_response"] == 0
+    assert record.n_units == 149
+
+
+def test_a_negative_count_is_refused(rate_sessions) -> None:
+    """A Poisson count below zero is refused, naming the session, also when no
+    count of the session is above zero (which would otherwise make it a
+    session without events)."""
+    key, rows = next(iter(rate_sessions.items()))
+    design = _rate_design(rows)
+    with pytest.raises(
+        ValueError,
+        match=rf"session {'/'.join(key)}: {len(rows)} rows with count below zero",
+    ):
+        _fit(
+            design,
+            {key: rows.assign(count=-1.0)},
+            Poisson(),
+            response="count",
+            unit="well_visit_id",
+        )
+
+
 def _median_case() -> pd.DataFrame:
     """15 visits of 21 bins, one event each: x per visit and a category, whose
     level C (3 visits, all at x = 2) is too thin. On all rows the median of x
