@@ -564,6 +564,8 @@ def test_summary_arithmetic_by_hand() -> None:
         "coverage_unit": 1 / 3,
         "coverage_unit_se": np.sqrt(2 / 9 / 3),
         "n_units_used_mean": 2.6,
+        # The four sessions, 2.6 of them used on average.
+        "share_sessions_unused": 1 - 2.6 / 4,
     }
     assert row["fit_by"] == "session"
     for column, value in expected.items():
@@ -841,6 +843,7 @@ ADDED_COLUMNS = {
     "coverage_unit",
     "coverage_unit_se",
     "n_units_used_mean",
+    "share_sessions_unused",
 }
 
 
@@ -849,9 +852,10 @@ def test_matches_the_fixed_seed_fixture() -> None:
     """The fixture's tables, to the tolerance of the solver's port
     (``1e-11 + 1e-9 |b|``), with the counts exactly equal. The summary's
     columns added after the fixture was written (:data:`ADDED_COLUMNS`: two
-    counts, and the unit of the fit with the unit's own target) are not
-    stored: every fixture data set with an estimate has an interval, and
-    every fixture model is fitted by session."""
+    counts, the unit of the fit with the unit's own target, and the share of
+    sessions unused) are not stored: every fixture data set with an estimate
+    has an interval, every fixture model is fitted by session, and the share
+    of sessions unused follows from the stored session counts."""
     stored = json.loads(FIXTURE.read_text())["tables"]
     for name, rows in reference_tables().items():
         assert len(rows) == len(stored[name])
@@ -862,6 +866,9 @@ def test_matches_the_fixed_seed_fixture() -> None:
             n = got["n_data_sets_with_estimate"]
             assert got["n_data_sets_with_interval"] == n
             assert 0 <= got["n_data_sets_with_day_p"] <= n
+            assert got["share_sessions_unused"] == pytest.approx(
+                1 - want["n_sessions_used_mean"] / want["n_sessions"]
+            )
             for column, value in want.items():
                 if isinstance(value, float):
                     assert got[column] == pytest.approx(
@@ -1004,6 +1011,32 @@ def test_animal_unit_has_no_day_test(three_units) -> None:
     row = _of(three_units.summary, "animal").iloc[0]
     assert row["n_data_sets_with_day_p"] == 0 and row["reject_day"] == 0.0
     assert row["n_data_sets_with_interval"] == 2
+
+
+def test_a_session_dropped_from_a_day_is_counted() -> None:
+    """5 animals, each with two sessions on its first day and one on its
+    second (15 sessions); one session of animal0's first day has the last
+    outcome missing on every row. At the session unit that session has no
+    value; at the day unit its day keeps a value from the other session, so
+    no unit lacks one (``share_without_value`` is over the units of the fit),
+    and ``share_sessions_unused`` is 1/15 at both units."""
+    sessions, seed = {}, 0
+    for a in range(5):
+        for day, epochs in (("20260001", ("02_r1", "04_r2")), ("20260002", ("02_r1",))):
+            for epoch in epochs:
+                sessions[f"animal{a}", day, epoch] = rate_rows(seed, 40).assign(
+                    animal=f"animal{a}", session_date=day, epoch=epoch
+                )
+                seed += 1
+    models = [unit_rate_model(sessions, fit_by) for fit_by in ("session", "day")]
+    dropped = ("animal0", "20260001", "04_r2")
+    sessions[dropped] = sessions[dropped].assign(**{REWARD: np.nan})
+    result = engine.run(Simulation(models, sessions, [RATE_INSIDE], 2, 50, 5))
+    table = result.summary.set_index("fit_by")
+    assert table.loc["session", "share_without_value"] == pytest.approx(1 / 15)
+    assert table.loc["day", "share_without_value"] == 0.0
+    assert (table["n_sessions_used_min"] == 14).all()
+    np.testing.assert_allclose(table["share_sessions_unused"], 1 / 15)
 
 
 def test_an_estimand_on_a_baseline_is_refused(day_cohort) -> None:

@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import json
 
+import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.simulation import CAUSES
 from continuum_swr_replay.tables.io import read_table
 from scripts.checks import run_simulations
 from scripts.checks import simulate_declared_penalty as sim
@@ -58,3 +60,32 @@ def test_one_scenario_keeps_its_data_sets(monkeypatch) -> None:
     )
     with pytest.raises(ValueError, match="not scenarios of the run"):
         run_simulations.run("declared_penalty", quick=True, scenarios=["none"])
+
+
+def _summary_row(**values) -> dict:
+    """One summary row in which every fit converged and every unit and
+    session has a value, with ``values`` set."""
+    return {
+        "scenario": "s",
+        "model": "m",
+        "estimand": "e",
+        "share_without_value": 0.0,
+        **{f"without_value_{cause}": 0.0 for cause in CAUSES},
+        "share_not_converged": 0.0,
+        "n_sessions": 15,
+        "n_sessions_used_min": 15,
+        "share_sessions_unused": 0.0,
+        **values,
+    }
+
+
+def test_a_session_unused_by_a_day_fit_is_warned() -> None:
+    """A run in which every unit of the fit has a value but an estimate left
+    out one of the 15 sessions (a day fit whose day kept a value without it)
+    is warned; a run that used every session is not."""
+    lost = _summary_row(n_sessions_used_min=14, share_sessions_unused=1 / 15)
+    lines = run_simulations.warnings(pd.DataFrame([_summary_row(), lost]))
+    assert lines == [
+        "warning: scenario s, model m, estimand e: an estimate used as few as 14 "
+        "of the 15 sessions (6.7 % of the sessions unused, mean over the data sets)"
+    ]

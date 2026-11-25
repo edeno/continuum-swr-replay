@@ -888,12 +888,16 @@ penalties) are fitted to the same data sets of one run.
 estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),
 `bias_se`; `coverage` (the share of data sets whose 95 % interval holds the planted
 value), `excludes_zero`, `reject_day` (the day-level signed-rank p below 0.05, a NaN p
-counted as no rejection), each with its binomial standard error; `share_without_value`
-and, for each `record.NoFit` and `support.Removed` code, the share of sessions without a
-value for that cause; `share_not_converged` (of the session fits tried);
-`n_sessions`, `n_sessions_used_min`, `n_sessions_used_mean`, `n_data_sets`,
-`n_data_sets_with_estimate`, `n_draws` and `seed`. The engine also returns one row per
-data set and one per session.
+counted as no rejection), each with its binomial standard error; over the units of the
+fit (sessions, days or animals, at the model's `fit_by`), `share_without_value` and, for
+each `record.NoFit` and `support.Removed` code, the share of units without a value for
+that cause, and `share_not_converged` (of the unit fits tried), so that a session dropped
+from a day that keeps a value is in none of them; over the sessions, `n_sessions`,
+`n_sessions_used_min`, `n_sessions_used_mean` and `share_sessions_unused` (`1 -
+n_sessions_used_mean / n_sessions`); `n_data_sets`, `n_data_sets_with_estimate`,
+`n_draws` and `seed`. The engine also returns one row per data set and one per unit of
+the fit. The runner warns when a unit fit did not converge, a unit has no value, or an
+estimate used fewer than `n_sessions` sessions.
 
 **How a phase adds a list.** A module beside the model, in
 `analysis/replay_models/<family>/`, defines `simulation(quick, workers) -> Simulation` (the

@@ -1034,6 +1034,7 @@ SUMMARY_COLUMNS = (
     "coverage_unit",
     "coverage_unit_se",
     "n_units_used_mean",
+    "share_sessions_unused",
 )
 
 
@@ -1077,12 +1078,17 @@ def summarize(
     ``n_units_used_mean`` the units in the estimates. At the animal unit no
     data set has a day-level p (``n_data_sets_with_day_p`` is 0).
 
-    Over every session of every data set: ``share_without_value`` and, for
-    each code of :data:`CAUSES`, ``without_value_<code>``, the share of
-    sessions without a value for that cause; ``share_not_converged``, the
-    share of the session fits tried (status not ``not fitted``) that did not
-    converge. ``n_sessions`` is the cohort's, ``n_sessions_used_min`` and
-    ``n_sessions_used_mean`` the sessions in the estimates; ``n_data_sets``,
+    Over every unit of the fit of every data set (a session, a day or an
+    animal, at the model's ``fit_by``): ``share_without_value`` and, for each
+    code of :data:`CAUSES`, ``without_value_<code>``, the share of units
+    without a value for that cause; ``share_not_converged``, the share of the
+    unit fits tried (status not ``not fitted``) that did not converge. A
+    session dropped from a day or an animal that keeps a value is in none of
+    them. Over the sessions: ``n_sessions`` is the cohort's,
+    ``n_sessions_used_min`` and ``n_sessions_used_mean`` the sessions in the
+    estimates, and ``share_sessions_unused``, ``1 - n_sessions_used_mean /
+    n_sessions``, the mean share of the cohort's sessions an estimate leaves
+    out; ``n_data_sets``,
     ``n_data_sets_with_estimate``, ``n_data_sets_with_interval`` and
     ``n_data_sets_with_day_p``; ``n_draws`` and ``seed`` the run's.
     """
@@ -1148,6 +1154,8 @@ def summarize(
                 "bias_unit": (float(np.mean(estimate - unit_target)) if n else np.nan),
                 **_share(found["covered_unit"].to_numpy(), "coverage_unit"),
                 "n_units_used_mean": float(group["n_units_used"].mean()),
+                "share_sessions_unused": 1.0
+                - float(group["n_sessions_used"].mean()) / len(simulation.sessions),
             }
         )
     return pd.DataFrame(out, columns=list(SUMMARY_COLUMNS))

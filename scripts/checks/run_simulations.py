@@ -20,7 +20,8 @@ its ``attrs``: ``model``, ``seed``, ``n_data_sets``, ``n_draws``,
 ``log_penalties`` (each model's ``Design.log_penalty_record``: the declared
 penalties), the simulation's own ``attrs`` and ``seconds``. The table is
 printed, with a warning line for each scenario, model and estimand in which
-a session fit did not converge or a session has no value.
+a fit of a unit did not converge, a unit has no value or an estimate left out
+a session.
 ``--reference PATH`` writes the table and its ``attrs`` as JSON as well, the
 form of a fixed-seed test fixture.
 
@@ -107,26 +108,35 @@ def run(
 
 
 def warnings(summary: pd.DataFrame) -> list[str]:
-    """One line for each row of the engine's summary in which a session fit
-    did not converge or a session has no value."""
+    """One line for each row of the engine's summary in which a fit of a
+    unit of the fit (a session, a day or an animal) did not converge, and one
+    for each in which a unit has no value or an estimate left out a session
+    (also a session dropped from a day or an animal that keeps a value)."""
     out = []
     for row in summary.itertuples():
         where = f"scenario {row.scenario}, model {row.model}, estimand {row.estimand}"
         if row.share_not_converged > 0:
             out.append(
                 f"warning: {where}: {100 * row.share_not_converged:.1f} % of the "
-                "session fits tried did not converge"
+                "unit fits tried did not converge"
             )
-        if row.share_without_value > 0:
+        if row.share_without_value > 0 or row.n_sessions_used_min < row.n_sessions:
             causes = ", ".join(
                 f"{column.removeprefix('without_value_')} {100 * share:.1f} %"
                 for column, share in row._asdict().items()
                 if column.startswith("without_value_") and share > 0
             )
+            without = (
+                f"{100 * row.share_without_value:.1f} % of the units of the fit "
+                f"have no value ({causes}); "
+                if row.share_without_value > 0
+                else ""
+            )
             out.append(
-                f"warning: {where}: {100 * row.share_without_value:.1f} % of the "
-                f"sessions have no value ({causes}); an estimate used as few as "
-                f"{row.n_sessions_used_min} of the {row.n_sessions} sessions"
+                f"warning: {where}: {without}an estimate used as few as "
+                f"{row.n_sessions_used_min} of the {row.n_sessions} sessions "
+                f"({100 * row.share_sessions_unused:.1f} % of the sessions unused, "
+                "mean over the data sets)"
             )
     return out
 
