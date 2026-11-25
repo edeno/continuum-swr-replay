@@ -444,10 +444,20 @@ fitted `by` a baseline category; `build_design` refuses both. No declared contra
 (`test_declared_tests.py::test_no_contrast_reads_a_baseline`), and the simulation engine
 refuses an estimand that does. The collinearity record projects the copies out, as it does
 the intercept; the edf and `Design.term_columns` do not hold them. In a fit of one session
-nothing is copied. A category's reference level must have rows in every session of a fit
-that copies it: a session without rows of the reference arm makes the first fit an error
-that names the fit and the copies
+nothing is copied. A category's reference level must have rows, on the rows kept, in every
+fit, and a baseline category's in every session of a fit that copies it: without them the
+intercept (under the grouped softmax, the other levels) and the levels' columns are
+collinear. The loop refuses such a fit before fitting it, penalized or not, with an error
+that names the fit, the category, its reference level (and the session, for a copy) and
+the levels' coefficients
 (`test_sessions.py::test_a_session_without_the_reference_arm_is_an_error_naming_the_fit`).
+A penalized category would otherwise pass: the level's column escapes the identification
+check at the first fit, and the prior alone splits it from the intercept (a Poisson session
+of 12 visits all at the coded level fitted it at exactly 0 with the prior SD as its
+standard error; `::test_a_penalized_category_without_reference_rows_is_refused`). A
+category that is not a baseline is shared by the sessions of a fit, so one session of the
+fit with rows of the reference level identifies it
+(`::test_a_shared_category_needs_its_reference_in_the_fit_only`).
 
 A built design describes each term once, as a `DesignTerm`: its kind (intercept, level,
 0/1 slope, continuous slope, smooth, lag functional), its columns, its level, its

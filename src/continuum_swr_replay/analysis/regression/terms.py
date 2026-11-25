@@ -14,8 +14,10 @@ A model is a list of terms and, for the diagonal families, an intercept:
   missing value (None or NaN) makes its row missing; any other value outside
   the levels is an error. The reference level must have rows in every fit:
   without them the intercept (or, under the grouped softmax, the other
-  levels) and the levels' columns are collinear, and the fit's first fit is
-  an error naming them. For a category that is a baseline (below), each
+  levels) and the levels' columns are collinear, and the loop refuses the
+  fit, naming it, the category and its reference level, whether or not the
+  category is penalized (a penalty would hide the collinearity and split the
+  levels by the prior alone). For a category that is a baseline (below), each
   session of a fit keeps the reference level, so the reference level must
   have rows in every session of the fit.
 - :class:`Slope`: one column, or one for each level of a category.
@@ -862,6 +864,12 @@ class Design:
     def column_terms(self) -> tuple[DesignTerm, ...]:
         """Each design column's :class:`DesignTerm`, in column order."""
         return tuple(term for term in self.terms for _ in term.columns)
+
+    @property
+    def categories(self) -> tuple[Category, ...]:
+        """The :class:`Category` terms, in order (a category that is only the
+        ``by`` of another term is not a term)."""
+        return tuple(b.term for b in self._built if isinstance(b.term, Category))
 
     @property
     def intercept_column(self) -> int | None:

@@ -36,6 +36,9 @@ design of the kept rows is a slice. For each fit, in order:
    the grouped softmax an event with no response on the rows kept is
    removed: the first time as given (``events_without_response``), after
    that as emptied by dropped rows (``events_emptied_by_dropped_rows``).
+   At the fixed point, a category without rows of its reference level on the
+   rows kept (in the fit; in a session, for a baseline category's copies) is
+   an error naming the fit, the category and the level, penalized or not.
 3. Every other term is judged once, on the final rows: one that fails the
    support rule (or the design check in the session) is inactive in the fit.
    The record holds those counts, and for a removed level the counts that
@@ -259,9 +262,51 @@ class _Session:
                 and term.name not in self.levels_dropped
             ]
             if not pending:
+                self._require_reference_rows()
                 return ""
             for term in pending:
                 self._drop_level(term)
+
+    def _require_reference_rows(self) -> None:
+        """Refuse a category without rows of its reference level on the rows
+        kept: in the fit, and, for a baseline category copied for each
+        session, in each session with rows kept (:mod:`.terms`).
+
+        Raises
+        ------
+        ValueError
+            Naming the fit, the category, its reference level (and the
+            session, for a copy) and its levels' active coefficients.
+        """
+        kept_session = self.session[self.kept]
+        for category in self.design.categories:
+            levels = [
+                t
+                for t in self.design.terms
+                if t.kind == "level" and t.term == category.column
+            ]
+            if any(t.is_copy for t in levels):
+                groups = [
+                    (key, kept_session == s)
+                    for s, key in enumerate(self.keys)
+                    if np.any(kept_session == s)
+                ]
+            else:
+                groups = [(None, np.ones(kept_session.size, dtype=bool))]
+            for key, rows in groups:
+                own = [t for t in levels if key is None or t.session == key]
+                columns = [int(j) for t in own for j in t.columns]
+                if np.any(np.all(self.X_kept[np.ix_(rows, columns)] == 0, axis=1)):
+                    continue
+                where = "" if key is None else f" in session {'/'.join(key)}"
+                active = ", ".join(t.name for t in own if t.name not in self.removed)
+                raise ValueError(
+                    f"{self.name}: the category {category.column!r} has no rows of "
+                    f"its reference level {category.reference!r}{where} on the rows "
+                    f"kept, so its levels {active} are not identified (a category's "
+                    "reference level must have rows in every fit, and a baseline "
+                    "category's in every session of the fit)"
+                )
 
     def left_out(self) -> dict[str, str]:
         """Coefficient name -> why it is inactive (a ``Removed`` code): the
@@ -412,8 +457,6 @@ class _Session:
             what = (
                 "its design is not identified, in the coefficients "
                 + _named(self.design, names, refit.refits[0])
-                + " (a category's reference level must have rows in every session of"
-                + " the fit)"
                 if start == NOT_IDENTIFIED
                 else f"its fit ended as {start}, a numerical failure"
             )
@@ -676,7 +719,9 @@ def fit_sessions(
         If the design has an intercept under the grouped softmax, or an
         offset under another likelihood than the Poisson; if a session has a
         row whose unit id is missing (before any design is built, naming the
-        session, the unit column and the rows); if a session's first
+        session, the unit column and the rows); if a category has no rows of
+        its reference level on the rows kept of a unit (of a session, for a
+        baseline category), naming the unit; if a session's first
         fit finds its design not identified or fails for a numerical reason,
         naming the unit; if ``fit_by`` is not a unit; if ``fit_by`` is a day
         or an animal and the design declares no baseline.

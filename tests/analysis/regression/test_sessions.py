@@ -495,9 +495,9 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     rate_sessions,
 ) -> None:
     """A session with no rows of a category's reference level: the intercept
-    and the levels' columns are collinear, and the error names the session and
-    those coefficients (the reference level must have rows in every
-    session)."""
+    and the levels' columns are collinear, and the fit is refused, naming the
+    session, the category, its reference level and those coefficients (the
+    reference level must have rows in every fit)."""
     frames = list(rate_sessions.values())
     keys = list(rate_sessions)
     level = {0: "a", 1: "b", 2: "c"}
@@ -511,11 +511,96 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     grp = Category("grp", ("a", "b", "c"), reference="a", penalty="none")
     design = _rate_design(pooled, grp)
     message = (
-        r"session sim/20260000/02_r1: at its first fit its design is not identified"
-        r".*\(Intercept\), grp\[b\], grp\[c\]"
+        r"session sim/20260000/02_r1: the category 'grp' has no rows of its "
+        r"reference level 'a'.*grp\[b\], grp\[c\]"
     )
     with pytest.raises(ValueError, match=message):
         _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
+
+
+def _visits_at(levels: list[str], date: str = "20260101") -> pd.DataFrame:
+    """Rate rows of one bin per visit with a category ``level``: one visit at
+    each of ``levels``, Poisson counts of mean 2, exposure 1."""
+    rng = np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": date,
+            "epoch": "02_r1",
+            "visit": np.arange(len(levels)),
+            "level": levels,
+            "count": rng.poisson(2.0, len(levels)).astype(float),
+            "exposure": 1.0,
+        }
+    )
+
+
+def test_a_penalized_category_without_reference_rows_is_refused() -> None:
+    """Every visit at level b of a penalized category whose reference is a:
+    the data identify only the intercept plus b, and the penalty alone would
+    split them (b at 0 with the prior SD as its standard error). The fit is
+    refused, naming the session, the category, its reference level and its
+    level's coefficient."""
+    frame = _visits_at(["b"] * 12)
+    level = Category("level", ("a", "b"), "a", log_penalty_from_prior_sd(2.0))
+    design = build_design([level, Offset("exposure")], frame, intercept=True)
+    with pytest.raises(
+        ValueError,
+        match=r"session sim/20260101/02_r1: the category 'level' has no rows of its "
+        r"reference level 'a'.*level\[b\]",
+    ):
+        _fit(
+            design,
+            {("sim", "20260101", "02_r1"): frame},
+            Poisson(),
+            response="count",
+            unit="visit",
+        )
+
+
+def test_a_softmax_session_without_the_reference_role_is_refused() -> None:
+    """Under the grouped softmax, a session whose events have no row of the
+    penalized role category's reference: the levels' columns are collinear
+    with one another, and the fit is refused, naming that session."""
+    from .conftest import content_rows
+
+    second = content_rows(1)
+    frames = [content_rows(0), second[second["role"] != "other"]]
+    sessions = by_session(frames)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, reference="other", penalty=weak)
+    design = build_design(
+        [role, Slope("clock_s", weak)],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"session sim/20260001/02_r1: the category 'role' has no rows of its "
+        r"reference level 'other'.*role\[current\], role\[previous\], role\[trunk\]",
+    ):
+        _fit(design, sessions, GroupedSoftmax(), response="share", unit="event_id")
+
+
+def test_a_shared_category_needs_its_reference_in_the_fit_only() -> None:
+    """A category that is not a baseline is shared by the sessions of a fit:
+    the fit identifies it when one of its sessions has rows of the reference
+    level, so a fit by day whose second session has none is fitted."""
+    sessions = {
+        ("sim", "20260101", "02_r1"): _visits_at(["a", "b"] * 15),
+        ("sim", "20260101", "04_r2"): _visits_at(["b"] * 12),
+    }
+    level = Category("level", ("a", "b"), "a", log_penalty_from_prior_sd(2.0))
+    design = build_design(
+        [level, Offset("exposure")],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    (record,) = _fit(
+        design, sessions, Poisson(), response="count", unit="visit", fit_by="day"
+    )
+    assert record.status == "converged" and record.left_out == {}
 
 
 def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
@@ -1686,18 +1771,18 @@ def test_reference_level_per_session_copy() -> None:
 
 
 def test_a_session_without_the_reference_arm_is_an_error_naming_the_fit() -> None:
-    """One rule, today's: a category's reference level must have rows in every
-    session of the fit; a baseline category's copies of a session without its
-    reference arm are not identified, and the first fit names the fit and
-    those copies."""
+    """A baseline category's reference level must have rows in every session
+    of the fit: the copies of a session without its reference arm are not
+    identified, and the fit is refused, naming the fit, the session and those
+    copies."""
     sessions = _arm_sessions()
     middle = list(sessions)[1]
     sessions[middle] = sessions[middle][sessions[middle]["arm"] != 0]
     design = _arm_design(pd.concat(sessions.values(), ignore_index=True))
     with pytest.raises(
         ValueError,
-        match=r"day sim/20260101: at its first fit its design is not identified.*"
-        r"arm\[1\]@sim/20260101/04_r1.*every session of the fit",
+        match=r"day sim/20260101: the category 'arm' has no rows of its reference "
+        r"level 0 in session sim/20260101/04_r1.*arm\[1\]@sim/20260101/04_r1",
     ):
         _fit(
             design, sessions, GroupedSoftmax(), response="share", unit="event_id",
