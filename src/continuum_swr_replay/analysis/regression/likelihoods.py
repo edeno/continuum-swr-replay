@@ -667,7 +667,9 @@ def draw(
          Variance ``p (1 - p) (n + a) / (n (1 + a))``: that of (1) times
          ``(n + a) / (n (1 + a))``, between ``1 / n`` (large ``a``, no
          overdispersion) and 1 (small ``a``); for large ``n`` it tends to
-         ``1 / (1 + a)``.
+         ``1 / (1 + a)``. The Dirichlet is drawn in log space, so that a
+         small shape ``a p`` does not underflow to zero on every row of a
+         group.
 
       Each choice is the Gumbel-max draw: the row of the largest
       ``log p + Gumbel`` noise.
@@ -696,6 +698,9 @@ def draw(
         softmax, if ``n_trials`` is not a whole number of at least one or a
         concentration is not finite and positive, or either has the wrong
         number of groups, or a group has no finite ``eta``.
+    RuntimeError
+        Under the grouped softmax, if a group's drawn shares do not sum to
+        one.
     """
     eta = np.asarray(eta, dtype=float)
     if lik.name == "poisson":
@@ -743,16 +748,55 @@ def _softmax_draw(
             raise ValueError("a concentration must be finite and positive")
         weight = np.exp(eta - np.repeat(np.maximum.reduceat(eta, starts), sizes))
         p = weight / np.repeat(np.add.reduceat(weight, starts), sizes)
-        gamma = rng.gamma(np.repeat(a, sizes) * p)
-        with np.errstate(divide="ignore"):
-            logits = np.log(gamma / np.repeat(np.add.reduceat(gamma, starts), sizes))
+        logits = _log_dirichlet(np.repeat(a, sizes) * p, starts, sizes, rng)
     chosen = np.zeros(eta.size)
     for trial in range(int(n.max())):
         noisy = logits + rng.gumbel(size=eta.size)
         top = noisy == np.repeat(np.maximum.reduceat(noisy, starts), sizes)
         # One row per group: the first at the maximum (a tie has probability
-        # zero unless every weight of a group underflowed to zero).
+        # zero).
         before = np.cumsum(top) - top
         first = top & (before == np.repeat(before[starts], sizes))
         chosen += first & np.repeat(trial < n, sizes)
+    lost = np.flatnonzero(np.add.reduceat(chosen, starts) != n)
+    if lost.size:
+        raise RuntimeError(
+            f"the drawn shares of {lost.size} groups do not sum to one (the first, "
+            f"group {lost[0]})"
+        )
     return chosen / np.repeat(n, sizes)
+
+
+def _log_dirichlet(
+    shape: np.ndarray,
+    starts: np.ndarray,
+    sizes: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """The log of a Dirichlet draw within each group, shape ``(n_rows,)``.
+
+    Each row's Gamma of shape ``k`` is drawn in log space, ``log G(k) = log
+    G(k + 1) + log(U) / k`` with ``U`` uniform, so that a small shape does not
+    underflow to zero; each group is then normalized by its log-sum-exp. A
+    row of shape zero has log share minus infinity.
+
+    Parameters
+    ----------
+    shape : np.ndarray, shape (n_rows,)
+        Each row's Gamma shape, ``a p``.
+    starts : np.ndarray, shape (n_groups,)
+        Each group's first row.
+    sizes : np.ndarray, shape (n_groups,)
+        Each group's rows.
+    rng : np.random.Generator
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+    """
+    boosted = rng.gamma(shape + 1.0)
+    uniform = rng.random(shape.size)
+    with np.errstate(divide="ignore"):
+        log_gamma = np.log(boosted) + np.log(uniform) / shape
+    shifted = log_gamma - np.repeat(np.maximum.reduceat(log_gamma, starts), sizes)
+    return shifted - np.repeat(np.log(np.add.reduceat(np.exp(shifted), starts)), sizes)

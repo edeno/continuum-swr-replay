@@ -255,6 +255,8 @@ SOFTMAX = {
     "multinomial_per_group": (np.array([2, 4, 7]), None),
     "dirichlet_multinomial": (np.array([2, 4, 7]), 3.0),
     "dirichlet_multinomial_per_group": (6, np.array([0.5, 3.0, 20.0])),
+    # Every Gamma shape a p below 0.001: a Gamma drawn directly underflows.
+    "dirichlet_multinomial_small": (5, 0.001),
 }
 
 
@@ -357,6 +359,27 @@ def test_overdispersion_widens_the_shares() -> None:
     small, large, none = variance(1.0), variance(1e6), variance(None)
     assert small > 2 * none
     assert large == pytest.approx(none, rel=0.15)
+
+
+@pytest.mark.parametrize("n_trials", [1, 5])
+def test_a_small_concentration_loses_no_event(n_trials: int) -> None:
+    """At concentration 0.001, 1,000 events of two equally likely arms: every
+    event's shares sum to one (a Gamma of shape 0.0005 drawn directly is
+    zero on both arms of about half of them), and the mean share of the
+    first arm is 0.5 within 4 standard errors."""
+    groups = np.repeat(np.arange(1000), 2)
+    shares = draw(
+        GroupedSoftmax(),
+        np.zeros(groups.size),
+        groups,
+        np.random.default_rng(1),
+        n_trials=n_trials,
+        concentration=0.001,
+    )
+    np.testing.assert_allclose(np.bincount(groups, weights=shares), 1.0, atol=1e-12)
+    first = shares[::2]
+    se = first.std(ddof=1) / np.sqrt(first.size)
+    assert abs(first.mean() - 0.5) < 4.0 * se
 
 
 def test_softmax_draw_refuses_bad_noise_parameters() -> None:

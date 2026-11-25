@@ -859,7 +859,10 @@ chooses (`n_trials`, `concentration`; a number, or a column that holds one per e
 one categorical choice per event (a share is 0 or 1, variance `p (1 - p)`); a multinomial
 of `n` choices, such as the event's decode bins (variance `p (1 - p) / n`); and a
 Dirichlet-multinomial of `n` choices with concentration `a` (variance
-`p (1 - p) (n + a) / (n (1 + a))`). Each has the model's mean share `p`. The fit treats
+`p (1 - p) (n + a) / (n (1 + a))`). Each has the model's mean share `p`. The Dirichlet
+is drawn in log space (each Gamma of shape `k = a p` as `log G(k + 1) + log(U) / k`, `U`
+uniform, then normalized within the group), so that a small `a p` does not underflow to
+zero on every row of an event; a draw whose shares of a group do not sum to one raises. The fit treats
 each event as one choice, so the noise model decides what a content simulation shows. The draws use only a NumPy `Generator`, never the fitter, so the same
 seeds give the same data after the solver changes. Data set `i` of the scenario at place
 `s` of the list is drawn from `SeedSequence([seed, s, i])`, the sessions in order; each
