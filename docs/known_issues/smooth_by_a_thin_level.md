@@ -27,7 +27,7 @@ on 2 visits (20 rows, 2 events there); terms: a clock smooth, `Slope("rewarded")
 prior SD 2, and the clock smooth by `rewarded = 1` at log penalty 2, the design built
 on this session's rows and those of a session rewarded on half its visits (log rate
 `log 3 - 0.1 clock + 0.4 rewarded`, one `default_rng(0)` drawing the sessions in turn;
-measured 2026-11-25 on master at `e1ccae02` with the empty-level fix applied):
+measured 2026-11-25 with the empty-level fix applied):
 
 | | value |
 | --- | --- |
@@ -39,6 +39,17 @@ measured 2026-11-25 on master at `e1ccae02` with the empty-level fix applied):
 The smooth carries no mean shift, which is the slope's, but it fits a time course of
 the reward effect from two visits with two events, where the slope would not be
 fitted at all.
+
+## The mirror case stops the whole fit
+
+A session whose rows are all of the level (every visit rewarded) is not made inactive
+either. Its reward slope fails the support rule (no unrewarded units), and its smooth
+by `rewarded = 1` then equals the clock smooth on every row, so the two smooths' null
+spaces are collinear and the session's first fit raises "design not identified, in the
+coefficients s(clock) ..., s(clock):rewarded=1 ...", which stops `fit_sessions` for
+every session (the measurement above with the second session rewarded on all 60
+visits; 2026-11-25). It needs every visit of a session (or of a fit by day or animal)
+rewarded, which the task's reward probabilities make unlikely; it is not handled.
 
 ## What is open
 

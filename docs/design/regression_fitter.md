@@ -465,9 +465,12 @@ A penalized category would otherwise pass: the level's column escapes the identi
 check at the first fit, and the prior alone splits it from the intercept (a Poisson session
 of 12 visits all at the coded level fitted it at exactly 0 with the prior SD as its
 standard error; `::test_a_penalized_category_without_reference_rows_is_refused`). A
-category that is not a baseline is shared by the sessions of a fit, so one session of the
-fit with rows of the reference level identifies it
-(`::test_a_shared_category_needs_its_reference_in_the_fit_only`).
+category that is not a baseline is shared by the sessions of a fit, so the check asks for
+rows of the reference level in one session of the fit
+(`::test_a_shared_category_needs_its_reference_in_the_fit_only`). With a baseline
+intercept per session that does not identify a level a session holds alone, and a
+penalized one is then split from that session's intercept by its prior
+(`docs/known_issues/penalized_level_split_by_its_prior.md`).
 
 A built design describes each term once, as a `DesignTerm`: its kind (intercept, level,
 0/1 slope, continuous slope, smooth, lag functional), its columns, its level, its
