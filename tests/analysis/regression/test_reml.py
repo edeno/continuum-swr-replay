@@ -1650,6 +1650,27 @@ def test_a_constant_gaussian_outcome_is_named() -> None:
         pooled_reml(Gaussian(), [constant], blocks, [0.0])
 
 
+@pytest.mark.parametrize(
+    ("X", "y", "reason"),
+    [
+        # Two rows, an intercept and a slope: n - M_p = 0.
+        ([[1.0, 0.0], [1.0, 1.0]], [0.0, 1.0], "0 residual degrees of freedom"),
+        # Three rows on a line: one residual degree of freedom, residual zero.
+        ([[1.0, 0.0], [1.0, 1.0], [1.0, 2.0]], [1.0, 3.0, 5.0], "zero residual"),
+    ],
+)
+def test_a_gaussian_fit_without_a_residual_scale_is_named(
+    X: list, y: list, reason: str
+) -> None:
+    """A Gaussian fit with no residual degrees of freedom, or one that fits
+    the outcome exactly, has no scale to profile: it is refused, naming why
+    and the session, rather than ending converged with a scale, score and
+    covariance that are not finite (or dividing by a zero scale)."""
+    data = SessionData(np.array(X), np.array(y), name="exact")
+    with pytest.raises(ValueError, match=rf"session 0 \(exact\): .*{reason}"):
+        refit_session(Gaussian(), data, [], [])
+
+
 @pytest.mark.parametrize("rho", [15.0, 17.5, 20.0])
 def test_gradient_and_hessian_at_strong_penalties(rho: float) -> None:
     """At log penalties 15 to 20 the analytic gradient and Hessian of the

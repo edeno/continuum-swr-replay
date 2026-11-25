@@ -1055,6 +1055,13 @@ def _gaussian_profiled(
     score, its derivatives (:func:`_profiled_gaussian`) and the rest are
     computed on the fit's padded rows; the derivatives need no product with
     the design beyond the Gram.
+
+    Raises
+    ------
+    ValueError
+        When there is no scale to profile: the outcome is constant, the
+        converged fit has no residual degrees of freedom (``n - M_p <= 0``),
+        or its profiled scale is not finite and positive (a zero residual).
     """
     n_rows, n_columns = X.shape
     working = float(np.var(y))
@@ -1074,6 +1081,16 @@ def _gaussian_profiled(
     )
     if not pls.converged:
         return RemlScore(np.inf, None, None, pls, np.nan)
+    # Checked after the fit: fewer rows than M_p leave the design not
+    # identified, which the fit's status names by its coefficients.
+    null_dimension = _null_dimension(blocks, n_columns)
+    dof = n_rows - null_dimension
+    if dof <= 0:
+        raise ValueError(
+            f"the Gaussian fit has {dof} residual degrees of freedom ({n_rows} rows, "
+            f"{null_dimension} coefficients the penalty leaves free): it has no scale "
+            "to profile"
+        )
     rows = problem.rows
     # The penalties' stack goes to the device only when the derivatives read it.
     extra = (S_j, _ranks(blocks)) if derivatives else ()
@@ -1087,12 +1104,18 @@ def _gaussian_profiled(
             _block_masks(blocks, n_columns),
             np.float64(_log_pdet(blocks, rho)),
             np.int64(n_rows),
-            np.int64(n_rows - _null_dimension(blocks, n_columns)),
+            np.int64(dof),
             *extra,
         )
     )
     gram, D_p, scale, score, covariance, edf, edf_total, loglik = outputs[:8]
     scale = float(scale)
+    if not (np.isfinite(scale) and scale > 0):
+        raise ValueError(
+            f"the Gaussian fit's profiled scale is {scale!r} (D_p = {float(D_p)!r} "
+            f"over {dof} residual degrees of freedom), not finite and positive: a "
+            "zero residual, the outcome fitted exactly, has no scale to profile"
+        )
     fit = replace(
         pls,
         A=np.array(gram) / scale,

@@ -338,7 +338,15 @@ the penalty divided by it, the same minimizer), so its decrement does not depend
 outcome's units: for an outcome scaled by 1, 1e3 and 1e6 the curve is the same up to
 the scale and the selected log strength the same to 3e-15 (and at 1e9 too), with every
 grid point finite. A constant outcome (`var(y) = 0`) has no scale to profile and is
-refused as such ("the Gaussian outcome is constant").
+refused as such ("the Gaussian outcome is constant"). So are, after the fit, a session
+with no residual degrees of freedom (`n - M_p <= 0`: two rows, an intercept and a slope,
+had a scale, score, log-likelihood and covariance of NaN, yet ended "converged") and a
+fit whose scale is not finite and positive (a zero residual: three rows on a line, one
+residual degree of freedom, divided by a zero scale). The test of the scale is `phi > 0`,
+not a threshold relative to the outcome: a noise-free target fitted with a smooth (a
+straight line `1 + 2x` on 400 rows, in the smooth's null space) leaves only rounding,
+`D_p` = 9e-28, and is fitted. Fewer rows than `M_p` leave the design not
+identified, which the fit names first.
 
 ## Agreement with mgcv, neurospatial and the current fitters
 
