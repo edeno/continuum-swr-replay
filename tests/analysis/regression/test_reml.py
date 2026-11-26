@@ -1657,6 +1657,10 @@ def test_a_constant_gaussian_outcome_is_named() -> None:
         ([[1.0, 0.0], [1.0, 1.0]], [0.0, 1.0], "0 residual degrees of freedom"),
         # Three rows on a line: one residual degree of freedom, residual zero.
         ([[1.0, 0.0], [1.0, 1.0], [1.0, 2.0]], [1.0, 3.0, 5.0], "zero residual"),
+        # The same line at values binary floats do not hold exactly: the
+        # residual is zero up to rounding, exactly zero on some machines'
+        # linear-algebra kernels and about 1e-17 on others.
+        ([[1.0, 0.0], [1.0, 1.0], [1.0, 2.0]], [0.1, 0.3, 0.5], "zero residual"),
     ],
 )
 def test_a_gaussian_fit_without_a_residual_scale_is_named(

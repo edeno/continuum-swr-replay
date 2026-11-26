@@ -64,6 +64,7 @@ import numpy as np
 
 from .constants import (
     AT_BOUNDARY_MARGIN,
+    EXACT_FIT_RESIDUAL,
     LOG_PENALTY_BOUNDS,
     MAX_FAILING_SHARE,
     MAX_STEP_HALVINGS,
@@ -1061,7 +1062,8 @@ def _gaussian_profiled(
     ValueError
         When there is no scale to profile: the outcome is constant, the
         converged fit has no residual degrees of freedom (``n - M_p <= 0``),
-        or its profiled scale is not finite and positive (a zero residual).
+        or it reproduces its outcome exactly up to rounding (``D_p`` at most
+        ``EXACT_FIT_RESIDUAL**2 n var(y)``; a zero residual).
     """
     n_rows, n_columns = X.shape
     working = float(np.var(y))
@@ -1110,11 +1112,13 @@ def _gaussian_profiled(
     )
     gram, D_p, scale, score, covariance, edf, edf_total, loglik = outputs[:8]
     scale = float(scale)
-    if not (np.isfinite(scale) and scale > 0):
+    exact = EXACT_FIT_RESIDUAL**2 * n_rows * working
+    if not (np.isfinite(scale) and float(D_p) > exact):
         raise ValueError(
             f"the Gaussian fit's profiled scale is {scale!r} (D_p = {float(D_p)!r} "
-            f"over {dof} residual degrees of freedom), not finite and positive: a "
-            "zero residual, the outcome fitted exactly, has no scale to profile"
+            f"over {dof} residual degrees of freedom, against {exact!r} for an "
+            "exact fit): a zero residual, the outcome fitted exactly up to rounding, "
+            "has no scale to profile"
         )
     fit = replace(
         pls,

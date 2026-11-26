@@ -351,12 +351,16 @@ grid point finite. A constant outcome (`var(y) = 0`) has no scale to profile and
 refused as such ("the Gaussian outcome is constant"). So are, after the fit, a session
 with no residual degrees of freedom (`n - M_p <= 0`: two rows, an intercept and a slope,
 had a scale, score, log-likelihood and covariance of NaN, yet ended "converged") and a
-fit whose scale is not finite and positive (a zero residual: three rows on a line, one
-residual degree of freedom, divided by a zero scale). The test of the scale is `phi > 0`,
-not a threshold relative to the outcome: a noise-free target fitted with a smooth (a
-straight line `1 + 2x` on 400 rows, in the smooth's null space) leaves only rounding,
-`D_p` = 9e-28, and is fitted. Fewer rows than `M_p` leave the design not
-identified, which the fit names first.
+fit that reproduces its outcome exactly (a zero residual: three rows on a line, one
+residual degree of freedom, divided by a zero scale). An exact fit is one whose `D_p` is at
+most `EXACT_FIT_RESIDUAL^2 n var(y)` (`constants.py`, 1e-10: the outcome fitted to ten
+significant digits), not `D_p = 0`: rounding leaves about 1e-32 of it, exactly zero with
+some linear-algebra kernels and not with others (three rows at 0.1, 0.3, 0.5 gave a scale
+of 1.9e-34 with OpenBLAS's AVX-512 kernels and 0.0 with its Haswell ones), so a test of
+`phi > 0` passed on one machine and failed on another. A noise-free fit is refused by the
+same rule (a straight line `1 + 2x` on 400 rows fitted with a smooth leaves `D_p` = 9e-28);
+no Gaussian fit of a noise-free mean is made, since a simulation's Gaussian unit target is
+NaN. Fewer rows than `M_p` leave the design not identified, which the fit names first.
 
 ## Agreement with mgcv, neurospatial and the current fitters
 

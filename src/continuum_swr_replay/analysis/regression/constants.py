@@ -60,6 +60,14 @@ NAMED_SHARE = 0.1
 # times its largest absolute entry and eigenvalue.
 PENALTY_ROUNDING_TOL = 1e-10
 
+# A Gaussian fit reproduces its outcome exactly, and has no scale to profile,
+# when its penalized residual sum of squares ``D_p`` is at most
+# EXACT_FIT_RESIDUAL**2 times the outcome's sum of squares about its mean
+# (``n var(y)``): the outcome fitted to ten significant digits. Rounding leaves
+# about 1e-32 of it, exactly zero on some machines' linear-algebra kernels and
+# not on others, so the test cannot be ``D_p > 0``.
+EXACT_FIT_RESIDUAL = 1e-10
+
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 
