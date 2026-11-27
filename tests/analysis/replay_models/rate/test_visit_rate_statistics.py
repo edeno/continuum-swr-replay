@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -128,6 +130,7 @@ def _values(kind: str, seed: int) -> pd.DataFrame:
                             "variance": 0.01,
                             "se": 0.1,
                             "supported": True,
+                            "settings": "same",
                         }
                     )
     return pd.DataFrame(rows)
@@ -389,3 +392,56 @@ def test_the_difference_curve_and_its_band(cohort) -> None:
     )
     band = difference_curve_band(fitted, n_draws=200, seed=1)
     assert band.estimate.shape == grid.shape and np.all(band.low < band.high)
+
+
+def _animal_values(kind: str, supported: list[bool]) -> pd.DataFrame:
+    """Hand-made Q2 values of five animals at the animal unit."""
+    return pd.DataFrame(
+        {
+            "animal": [f"rat{a}" for a in range(5)],
+            "session_date": "",
+            "epoch": "",
+            "fit_by": "animal",
+            "kind": kind,
+            "estimand_id": "Q2",
+            "estimate": np.linspace(0.1, 0.5, 5),
+            "variance": 0.01,
+            "se": 0.1,
+            "supported": supported,
+            "settings": "same",
+        }
+    )
+
+
+def test_the_kind_difference_counts_the_units_either_kind_lacks() -> None:
+    """The difference SWR minus No SWR leaves out a unit where either kind's
+    value lacks support, and counts it."""
+    swr = _animal_values("SWR", [True, False, True, True, True])
+    no_swr = _animal_values("No SWR", [True, True, False, True, True])
+    summary = summarize_estimands(
+        pd.concat([swr, no_swr]), n_draws=100, seed=0
+    ).set_index(["estimand_id", "tested"])
+    difference = summary.loc[("Q2", DIFFERENCE)]
+    assert difference["n_units_unsupported"] == 2
+    assert difference["n_units"] == 3
+
+
+def test_tables_of_other_settings_are_refused(cohort) -> None:
+    """Each unit table carries its fit's settings; tables of other settings
+    (another prior SD here) are not reduced together."""
+    tables = []
+    for sd in (2.0, 1.0):
+        settings = dataclasses.replace(SETTINGS, weak_prior_sd=sd)
+        fit = vr.fit_visit_rate(
+            cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+        )
+        tables.append(unit_estimands(fit))
+    assert tables[0]["settings"].nunique() == 1
+    assert tables[0]["settings"].iloc[0] != tables[1]["settings"].iloc[0]
+    with pytest.raises(ValueError, match="settings"):
+        summarize_estimands(
+            pd.concat([tables[0], tables[1].assign(kind="No SWR")]), n_draws=10, seed=0
+        )
+    summarize_estimands(
+        pd.concat([tables[0], tables[0].assign(kind="No SWR")]), n_draws=10, seed=0
+    )

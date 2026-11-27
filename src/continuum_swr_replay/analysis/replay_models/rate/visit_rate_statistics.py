@@ -39,6 +39,8 @@ model D's curve over lags 1 to 10.
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 from collections.abc import Sequence
 
 import numpy as np
@@ -65,6 +67,7 @@ from .visit_rate import (
     WINDOW_SUPPORT,
     WINDOW_TESTS,
     VisitRateFit,
+    VisitRateSettings,
     declared_contrasts,
     difference_curve_rows,
     difference_grid,
@@ -77,6 +80,7 @@ __all__ = [
     "difference_curves",
     "lag_curve_band",
     "lag_curves",
+    "settings_id",
     "summarize_estimands",
     "unit_estimands",
 ]
@@ -147,6 +151,7 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
     pd.DataFrame
         One row per unit and estimand: ``animal``, ``session_date``,
         ``epoch`` (``""`` for a part the unit lacks), ``fit_by``, ``kind``,
+        ``settings`` (:func:`settings_id`),
         ``estimand_id``, ``estimate``, ``variance``, ``se`` (NaN where the
         window lacks support); ``supported`` (False for a window contrast
         without support; True otherwise) and
@@ -174,6 +179,7 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
                 {
                     **_key(record),
                     "kind": fit.kind,
+                    "settings": settings_id(fit.settings),
                     "estimand_id": estimand_id,
                     "estimate": estimate,
                     "variance": variance,
@@ -182,6 +188,14 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
+
+
+def settings_id(settings: VisitRateSettings) -> str:
+    """A short fingerprint of a fit's settings (every field, the calibrated
+    penalties' values with their records), carried with each unit table so
+    that tables of other settings are not reduced together."""
+    text = repr(dataclasses.astuple(settings))
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
 def _fit_by(values: pd.DataFrame) -> FitBy:
@@ -255,8 +269,9 @@ def summarize_estimands(
         SWR``): ``estimand_id``, ``tested``, the entries of
         ``unit_summary`` (on the log scale; with ``fit_by`` and ``n_units``)
         and ``n_units_unsupported`` (the units whose value lacks window
-        support, left out). The difference is taken unit by unit, over the
-        units where both kinds have a supported value. The window tests (Q2
+        support, left out; for the difference, the units where either kind
+        lacks it). The difference is taken unit by unit, over the units where
+        both kinds have a supported value. The window tests (Q2
         and the onset test) are declared tests per animal only
         (``visit_rate.is_declared_test``, the twenty-sixth round): at another
         unit they are left out here, and the unit table keeps their values
@@ -265,13 +280,20 @@ def summarize_estimands(
     Raises
     ------
     ValueError
-        If a kind is missing, the values are of more than one unit of the fit,
-        or a unit has more than one value of an estimand and kind.
+        If a kind is missing, the values are of more than one unit of the fit
+        or of more than one setting (:func:`settings_id`), or a unit has more
+        than one value of an estimand and kind.
     """
     missing = set(KINDS) - set(unit_values["kind"])
     if missing:
         raise ValueError(f"no unit values of {sorted(missing)}")
     fit_by = _fit_by(unit_values)
+    settings = sorted(set(unit_values["settings"]))
+    if len(settings) != 1:
+        raise ValueError(
+            f"unit values of {len(settings)} settings: the kinds' fits must share "
+            "every setting (prior SD, penalties, Q1 reference, cap, form, unit)"
+        )
     keys = [*_KEY, "estimand_id", "kind"]
     if unit_values.duplicated(keys).any():
         raise ValueError("a unit has more than one value of an estimand and kind")
@@ -282,13 +304,17 @@ def summarize_estimands(
         for kind in KINDS:
             summary = _summary(values[values["kind"] == kind], fit_by, n_draws, seed)
             out.append({"estimand_id": estimand_id, "tested": kind, **summary})
-        values = values.assign(
-            estimate=values["estimate"].where(values["supported"].astype(bool))
-        )
-        wide = values.pivot(index=list(_KEY), columns="kind", values="estimate")
-        wide = wide.reset_index()
-        wide["estimate"] = wide[KINDS[0]] - wide[KINDS[1]]
-        wide["supported"] = True
+        estimate = values.pivot(index=list(_KEY), columns="kind", values="estimate")
+        supported = values.pivot(index=list(_KEY), columns="kind", values="supported")
+        wide = pd.DataFrame(
+            {
+                "estimate": estimate[KINDS[0]] - estimate[KINDS[1]],
+                "supported": supported[list(KINDS)]
+                .fillna(False)
+                .astype(bool)
+                .all(axis=1),
+            }
+        ).reset_index()
         summary = _summary(wide, fit_by, n_draws, seed)
         out.append({"estimand_id": estimand_id, "tested": DIFFERENCE, **summary})
     return pd.DataFrame(out)
