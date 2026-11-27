@@ -3,9 +3,11 @@
 **Status:** open, recorded (lead, 2026-11-25): not fixed now; giving a smooth by a
 level a support count would be a design change.
 **Affects:** the regression fitter's support rule (`analysis/regression/support.py`),
-for a model with a smooth fitted `by` a level, such as visit-rate model A with
-`reward_form="time_varying"` (`analysis/replay_models/rate/visit_rate.py`, the arrival
-clock smooth by the rewarded outcome).
+for a model with a smooth fitted `by` a level, such as visit-rate model A in its declared
+form, `reward_form="by_outcome"` (`analysis/replay_models/rate/visit_rate.py`: an arrival
+curve for each last outcome, the convention's twenty-sixth round). The form of the
+measurement below, a shared curve plus a curve by the rewarded outcome
+(`"time_varying"`), was removed on 2026-11-26.
 
 ## What
 
@@ -50,6 +52,25 @@ coefficients s(clock) ..., s(clock):rewarded=1 ...", which stops `fit_sessions` 
 every session (the measurement above with the second session rewarded on all 60
 visits; 2026-11-25). It needs every visit of a session (or of a fit by day or animal)
 rewarded, which the task's reward probabilities make unlikely; it is not handled.
+
+## The by-outcome form (2026-11-26)
+
+The declared form of the rate model meets the first case and not the second.
+
+- **A unit with 1 to 4 visits after an omission** (a session, or a day): the outcome
+  coefficient fails the support rule and is left out, so Q2 and the onset test have no
+  value; the arrival curve after an omission stays in the fit, fitted from those visits.
+  Q1 reads that curve, so the rate model's window support rule
+  (`visit_rate.window_support`, the author's rule) marks Q1, Q2 and the onset test
+  unsupported where fewer than `MIN_UNITS` visits of a side reach a window the contrast
+  reads. The values are kept, with the counts beside them, and left out of the reduction
+  over units.
+- **A unit with no visit after an omission**, or every visit rewarded: the curve after an
+  omission has zero columns there and fails the support rule; the outcome coefficient
+  fails it too. The form has no shared arrival curve, so nothing is collinear with the
+  curve after a reward, and the unit is fitted
+  (`test_visit_rate.py::test_a_unit_with_few_omission_visits`). The mirror case above does
+  not stop a fit of this form.
 
 ## What is open
 

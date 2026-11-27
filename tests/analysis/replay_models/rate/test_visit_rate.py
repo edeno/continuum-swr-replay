@@ -34,7 +34,7 @@ from continuum_swr_replay.analysis.replay_models.rate import (
 )
 from continuum_swr_replay.analysis.replay_models.rate.visit_rate_statistics import (
     lag_curves,
-    session_estimands,
+    unit_estimands,
 )
 from continuum_swr_replay.analysis.replay_models.visit_design import (
     REWARD_LAG_COLUMNS as LAG_COLUMNS,
@@ -449,7 +449,7 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
     )
     assert [r.status for r in fit.records] == [CONVERGED] * 4
     assert all(r.edf[vr.REWARD] > 0.99 for r in fit.records)
-    values = session_estimands(fit)
+    values = unit_estimands(fit)
     for estimand_id, group in values.groupby("estimand_id"):
         truth = np.mean([p[estimand_id] for p in planted.values()])
         se = np.sqrt(group["variance"].mean() / len(group))
@@ -492,7 +492,7 @@ def _noiseless_fit(rows, truth, reward_form: str, cohort_of) -> dict[str, float]
         allow_provisional="test",
     )
     assert fit.records[0].status == CONVERGED
-    return session_estimands(fit).set_index("estimand_id")["estimate"].to_dict()
+    return unit_estimands(fit).set_index("estimand_id")["estimate"].to_dict()
 
 
 def test_each_reward_form_converges_to_its_truth(make_visit_rows, cohort_of) -> None:
@@ -622,7 +622,7 @@ def test_each_open_setting_builds_and_fits(
             by_outcome = settings.reward_form == "by_outcome"
             for term in vr.ARRIVAL_BY_OUTCOME.values():
                 assert (term in penalties) == by_outcome
-            values = session_estimands(fit)
+            values = unit_estimands(fit)
             n_estimands = len(vr.RATE_ESTIMANDS) if by_outcome else 1
             assert len(values) == 2 * n_estimands
             assert np.isfinite(values[["estimate", "variance"]]).all().all()
@@ -905,7 +905,7 @@ def test_one_real_session_of_each_kind() -> None:
             assert record.n_events == record.cohort_counts[f"events_{model}"]
             assert record.cohort_counts["bins_selected"] == counts["bins_selected"]
             if model == "A":
-                assert session_estimands(fit).shape[0] == len(vr.RATE_ESTIMANDS)
+                assert unit_estimands(fit).shape[0] == len(vr.RATE_ESTIMANDS)
             else:
                 assert lag_curves(fit, seed=0).shape[0] == len(vr.LAGS)
 
@@ -1136,7 +1136,7 @@ def test_the_by_outcome_form_recovers_a_later_onset(make_visit_rows, cohort_of) 
         - vr.curve_rows(fit.design, vr.OMITTED_ARRIVAL_TERM)(grid) @ beta
     )
     assert np.max(np.abs(difference - planted(grid))) < 0.05
-    values = session_estimands(fit).set_index("estimand_id")["estimate"]
+    values = unit_estimands(fit).set_index("estimand_id")["estimate"]
     for estimand_id, window in (("Q2", (4.0, 10.0)), ("Q2-onset", (2.0, 4.0))):
         assert values[estimand_id] == pytest.approx(
             np.mean(planted(range_grid(*window))), abs=0.02
@@ -1175,7 +1175,7 @@ def test_a_unit_with_few_omission_visits(make_visit_rows, cohort_of, n_omitted) 
     assert thin.status == CONVERGED and not thin.no_fit
     assert thin.left_out[vr.REWARD] == "support"
     assert (vr.OMITTED_ARRIVAL_TERM + ".0" in thin.left_out) == (n_omitted == 0)
-    values = session_estimands(fit)
+    values = unit_estimands(fit)
     values = values[values["session_date"] == "20200101"].set_index("estimand_id")
     assert values.loc[["Q2", "Q2-onset"], "estimate"].isna().all()
     assert np.isfinite(values.loc["Q7a", "estimate"])

@@ -95,7 +95,10 @@ from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.record import FitRecord
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
-from continuum_swr_replay.analysis.regression.support import require_tested_penalized
+from continuum_swr_replay.analysis.regression.support import (
+    MIN_UNITS,
+    require_tested_penalized,
+)
 from continuum_swr_replay.analysis.regression.terms import (
     Category,
     Design,
@@ -163,6 +166,12 @@ __all__ = [
     "require_declared_penalized",
     "tested_terms",
     "window_contrast",
+    "window_reads",
+    "window_support",
+    "WINDOW_SUPPORT",
+    "DIFFERENCE_STEP_S",
+    "difference_curve_rows",
+    "difference_grid",
     "third_clock_decision",
 ]
 
@@ -765,6 +774,119 @@ def declared_contrasts(
     return out
 
 
+# --- The support of a window contrast -------------------------------------------
+
+#: The key of a record's ``cohort_counts`` that holds :func:`window_support`.
+WINDOW_SUPPORT = "window_support"
+
+
+def window_reads(
+    settings: VisitRateSettings,
+) -> dict[str, tuple[tuple[int, tuple[float, float]], ...]]:
+    """What each declared estimand of the by-outcome form reads along the
+    arrival clock: (last outcome, range of time since arrival) pairs.
+
+    Q1 reads the curve after an omission over its two ranges (the second the
+    setting's reference window); Q2 and Q2-onset read both outcomes' curves
+    over their window. Q7a reads the leaving curve, shared by both outcomes,
+    and has no window read.
+    """
+    out = {}
+    for estimand_id in RATE_ESTIMANDS:
+        contrast = estimand(estimand_id).contrast
+        if isinstance(contrast, OutcomeWindowContrast):
+            out[estimand_id] = tuple((level, contrast.window) for level in (1, 0))
+        elif contrast.term in ARRIVAL_BY_OUTCOME.values():
+            level = {t: k for k, t in ARRIVAL_BY_OUTCOME.items()}[contrast.term]
+            second = settings.q1_reference_s if estimand_id == "Q1" else contrast.second
+            out[estimand_id] = ((level, contrast.first), (level, second))
+    return out
+
+
+def window_support(
+    sessions: Sequence[pd.DataFrame], settings: VisitRateSettings
+) -> dict[str, dict]:
+    """The support of each window contrast in one unit of the fit (the
+    author's rule, written for the twenty-sixth round's "under the support
+    rule").
+
+    For each (outcome, range) an estimand reads (:func:`window_reads`), the
+    unit's rows of that last outcome whose time since arrival lies in the
+    range (``lo <= s < hi``) are counted: the visits with such a row (the
+    support rule's unit, a visit; each session's visits apart) and their
+    at-risk seconds. An estimand is supported when every read has at least
+    ``support.MIN_UNITS`` visits: the rule of a 0/1 slope
+    (``support.binary_support``) counted on the rows inside each window, the
+    smallest rule the support machinery states. No response is read.
+
+    Parameters
+    ----------
+    sessions : sequence of pd.DataFrame
+        The rows of each session in the unit's fit (a session dropped from
+        the fit is not given).
+    settings : VisitRateSettings
+
+    Returns
+    -------
+    dict
+        Estimand id -> ``{"supported": bool, "reads": [{"outcome": 0 or 1,
+        "range_s": [lo, hi], "visits": int, "at_risk_s": float}, ...]}``,
+        JSON-ready.
+    """
+    out = {}
+    for estimand_id, reads in window_reads(settings).items():
+        entries = []
+        for level, (lo, hi) in reads:
+            visits, at_risk = 0, 0.0
+            for rows in sessions:
+                s = rows[ARRIVAL].to_numpy(dtype=float)
+                on = (
+                    (rows[REWARD].to_numpy(dtype=float) == level) & (s >= lo) & (s < hi)
+                )
+                visits += int(rows.loc[on, UNIT].nunique())
+                at_risk += float(rows.loc[on, EXPOSURE].sum())
+            entries.append(
+                {
+                    "outcome": level,
+                    "range_s": [float(lo), float(hi)],
+                    "visits": visits,
+                    "at_risk_s": at_risk,
+                }
+            )
+        out[estimand_id] = {
+            "supported": all(e["visits"] >= MIN_UNITS for e in entries),
+            "reads": entries,
+        }
+    return out
+
+
+# --- The difference curve ---------------------------------------------------------
+
+#: The grid of the difference curve (s since arrival): 0.1 s steps over the
+#: arrival clock's basis range. It is shown, not tested.
+DIFFERENCE_STEP_S = 0.1
+
+
+def difference_grid(settings: VisitRateSettings) -> np.ndarray:
+    """The difference curve's grid over the arrival clock's range, shape
+    ``(n_points,)``."""
+    lo, hi = settings.clock_range(ARRIVAL)
+    return np.round(np.arange(lo, hi + 1e-9, DIFFERENCE_STEP_S), 10)
+
+
+def difference_curve_rows(design: Design, grid: np.ndarray) -> np.ndarray:
+    """The rows of the coefficient vector that give the difference curve
+    ``beta + f_1(s) - f_0(s)`` (the log rate ratio after a reward against
+    after an omission at time ``s`` since arrival) at each grid point, shape
+    ``(n_points, n_coef)``."""
+    reward = contrasts.coefficient_contrast(design.coef_names, (REWARD,))
+    return (
+        reward[None, :]
+        + curve_rows(design, REWARDED_ARRIVAL_TERM)(grid)
+        - curve_rows(design, OMITTED_ARRIVAL_TERM)(grid)
+    )
+
+
 # --- The cohort step ----------------------------------------------------------
 
 
@@ -1138,6 +1260,24 @@ def fit_visit_rate(
         replace(r, cohort_counts={**r.cohort_counts, **counts[r.unit_key]})
         for r in records
     ]
+    if model == "A" and settings.reward_form == "by_outcome":
+        records = [
+            replace(
+                r,
+                cohort_counts={
+                    **r.cohort_counts,
+                    WINDOW_SUPPORT: window_support(
+                        [
+                            sessions[(e["animal"], e["session_date"], e["epoch"])]
+                            for e in r.sessions
+                            if e["n_rows"] > 0
+                        ],
+                        settings,
+                    ),
+                },
+            )
+            for r in records
+        ]
     return VisitRateFit(model, kind, settings, design, records)
 
 

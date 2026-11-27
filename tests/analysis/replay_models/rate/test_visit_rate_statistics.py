@@ -6,18 +6,22 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
+from continuum_swr_replay.analysis.regression.units import unit_summary
 from continuum_swr_replay.analysis.replay_models.declared_tests import DIFFERENCE
 from continuum_swr_replay.analysis.replay_models.rate import visit_rate as vr
 from continuum_swr_replay.analysis.replay_models.rate import (
     visit_rate_scenarios as scenarios,
 )
 from continuum_swr_replay.analysis.replay_models.rate.visit_rate_statistics import (
+    difference_curve_band,
+    difference_curves,
     lag_curve_band,
     lag_curves,
-    session_estimands,
     summarize_estimands,
     third_clock_q7a,
+    unit_estimands,
 )
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
 
@@ -70,7 +74,7 @@ def test_estimands_are_linear_functionals(cohort) -> None:
         cohort, model="A", kind="SWR", settings=SETTINGS, allow_provisional="test"
     )
     values = (
-        session_estimands(fit)
+        unit_estimands(fit)
         .set_index(["animal", "session_date", "estimand_id"])
         .sort_index()
     )
@@ -118,11 +122,13 @@ def _values(kind: str, seed: int) -> pd.DataFrame:
                             "animal": f"rat{a}",
                             "session_date": f"2020010{d}",
                             "epoch": f"0{2 * e + 2}_r{e + 1}",
+                            "fit_by": "session",
                             "kind": kind,
                             "estimand_id": estimand_id,
                             "estimate": rng.normal(0.3, 0.2),
                             "variance": 0.01,
                             "se": 0.1,
+                            "supported": True,
                         }
                     )
     return pd.DataFrame(rows)
@@ -174,7 +180,7 @@ def test_lag_curves_and_their_band(cohort) -> None:
     assert band.estimate.shape == (len(vr.LAGS),)
     assert np.all(band.low < band.high)
     with pytest.raises(ValueError, match="model A"):
-        session_estimands(fit)
+        unit_estimands(fit)
 
 
 def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> None:
@@ -204,10 +210,10 @@ def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> Non
         for include in (True, False)
     }
     compared = third_clock_q7a(fits[True], fits[False], n_draws=200, seed=2)
-    sessions = compared.sessions
+    sessions = compared.units
     assert len(sessions) == 3 and (sessions["kind"] == "SWR").all()
     for include, column in ((True, "with_stretch"), (False, "without_stretch")):
-        q7a = session_estimands(fits[include])
+        q7a = unit_estimands(fits[include])
         q7a = q7a[q7a["estimand_id"] == "Q7a"]["estimate"].to_numpy()
         assert sessions[column].to_numpy() == pytest.approx(q7a)
     assert sessions["difference"].to_numpy() == pytest.approx(
@@ -229,20 +235,185 @@ def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> Non
         third_clock_q7a(fits[False], fits[True], n_draws=10, seed=0)
 
 
-def test_a_record_of_a_larger_unit_is_refused(cohort) -> None:
-    """Until the statistics read the unit of the fit, a record of a day or an
-    animal is refused, so that it is never reduced as a session."""
-    for model, read in (
-        ("A", session_estimands),
-        ("D", lambda f: lag_curves(f, seed=0)),
-    ):
+def _two_days(make_visit_rows, cohort_of) -> dict:
+    """Two animals of two days, each day two sessions, counts from a constant
+    ratio of 1.3."""
+    rng = np.random.default_rng(9)
+    out = {}
+    for a in range(2):
+        for d in range(2):
+            for epoch in ("02_r1", "04_r2"):
+                key = (f"rat{a}", f"2020010{d}", epoch)
+                rows = make_visit_rows(
+                    key, n_visits=50, seed=len(out) + 90, length_s=(1.5, 12.0)
+                )
+                truth = scenarios.constant_ratio(
+                    rows, CLOCKS, log_ratio=np.log(1.3), total=400
+                )
+                rows["count"] = rng.poisson(truth.expected).astype(float)
+                out[key] = cohort_of(rows, "SWR")
+    return out
+
+
+@pytest.mark.parametrize(
+    ("fit_by", "n_units"), [("session", 8), ("day", 4), ("animal", 2)]
+)
+def test_unit_estimands_at_each_unit(
+    make_visit_rows, cohort_of, fit_by, n_units
+) -> None:
+    """One row per unit and estimand, keyed by the unit; each value is the
+    declared contrast mapped onto the unit's coefficients by name (the
+    baseline copies are not read), with its window support beside it; the
+    summary is ``unit_summary`` at the unit."""
+    cohort = _two_days(make_visit_rows, cohort_of)
+    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    values = unit_estimands(fit)
+    assert len(values) == n_units * len(vr.RATE_ESTIMANDS)
+    assert (values["fit_by"] == fit_by).all()
+    c = vr.declared_contrasts(fit.design, settings)
+    record = fit.records[-1]
+    got = values[
+        (values["animal"] == record.animal)
+        & (values["session_date"] == record.session_date)
+        & (values["epoch"] == record.epoch)
+    ].set_index("estimand_id")
+    for estimand_id, contrast in c.items():
+        on_fit = fit.design.contrast_on(contrast, record.coef_names)
+        expected = evaluate_contrast(
+            on_fit, np.asarray(record.coef), np.asarray(record.vcov)
+        )
+        assert got.loc[estimand_id, "estimate"] == pytest.approx(
+            expected.estimate, rel=1e-10
+        )
+    support = record.cohort_counts[vr.WINDOW_SUPPORT]
+    assert got.loc["Q2", "supported"] == support["Q2"]["supported"]
+    assert np.isnan(got.loc["Q7a", "visits_omitted"])
+    both = pd.concat(
+        [values, values.assign(kind="No SWR", estimate=values["estimate"] - 0.1)]
+    )
+    summary = summarize_estimands(both, n_draws=100, seed=1).set_index(
+        ["estimand_id", "tested"]
+    )
+    assert (summary["fit_by"] == fit_by).all()
+    q7a = values[values["estimand_id"] == "Q7a"]
+    columns = {"session": [0, 1, 2], "day": [0, 1], "animal": [0]}[fit_by]
+    keys = q7a.iloc[:, columns]
+    index = (
+        pd.Index(keys.iloc[:, 0].to_numpy(), name="animal")
+        if fit_by == "animal"
+        else pd.MultiIndex.from_frame(keys)
+    )
+    expected = unit_summary(
+        pd.Series(q7a["estimate"].to_numpy(), index=index), fit_by, n_draws=100, seed=1
+    )
+    assert summary.loc[("Q7a", "SWR"), "estimate"] == pytest.approx(
+        expected["estimate"]
+    )
+    assert summary.loc[("Q7a", DIFFERENCE), "estimate"] == pytest.approx(0.1)
+
+
+def test_values_of_mixed_units_are_refused(make_visit_rows, cohort_of) -> None:
+    """Records of a day and of an animal are not reduced together; a fit
+    whose records are of another unit than its setting is refused."""
+    cohort = _two_days(make_visit_rows, cohort_of)
+    tables = []
+    for fit_by in ("day", "animal"):
+        settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
         fit = vr.fit_visit_rate(
-            cohort, model=model, kind="SWR", settings=SETTINGS, allow_provisional="test"
+            cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
         )
-        day = fit._replace(
-            records=[
-                r.__class__(**{**r.__dict__, "fit_by": "day"}) for r in fit.records
-            ]
+        tables.append(unit_estimands(fit))
+    mixed = pd.concat(tables)
+    mixed = pd.concat([mixed, mixed.assign(kind="No SWR")])
+    with pytest.raises(ValueError, match="one unit of the fit"):
+        summarize_estimands(mixed, n_draws=10, seed=0)
+    relabeled = fit._replace(
+        records=[r.__class__(**{**r.__dict__, "fit_by": "day"}) for r in fit.records]
+    )
+    with pytest.raises(ValueError, match="fit_by"):
+        unit_estimands(relabeled)
+
+
+def test_an_unsupported_window_is_marked_and_left_out(
+    make_visit_rows, cohort_of
+) -> None:
+    """Visits after an omission all shorter than 4 s: no omission row reaches
+    Q2's window, so Q2 is marked unsupported (its counts beside it: no
+    omitted visit there), kept in the unit table, and left out of the
+    reduction, which counts it; the onset test, whose window they reach,
+    stays supported."""
+    rng = np.random.default_rng(11)
+    cohort = {}
+    for i in range(3):
+        key = (f"rat{i}", "20200101", "02_r1")
+        rows = make_visit_rows(
+            key,
+            n_visits=80,
+            seed=110 + i,
+            length_s=(1.5, 12.0),
+            omission_length_s=(2.5, 3.9),
         )
-        with pytest.raises(ValueError, match="fit_by"):
-            read(day)
+        truth = scenarios.constant_ratio(rows, CLOCKS, log_ratio=0.3, total=500)
+        rows["count"] = rng.poisson(truth.expected).astype(float)
+        cohort[key] = cohort_of(rows, "SWR")
+    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="session")
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    values = unit_estimands(fit).set_index(["animal", "estimand_id"])
+    for animal in ("rat0", "rat1", "rat2"):
+        q2 = values.loc[(animal, "Q2")]
+        assert not q2["supported"] and q2["visits_omitted"] == 0
+        assert q2["at_risk_s_omitted"] == 0.0 and q2["visits_rewarded"] >= 5
+        assert np.isfinite(q2["estimate"])
+        assert values.loc[(animal, "Q2-onset"), "supported"]
+    support = fit.records[0].cohort_counts[vr.WINDOW_SUPPORT]
+    rows = cohort[("rat0", "20200101", "02_r1")].rows["A"]
+    s = rows[vr.ARRIVAL].to_numpy()
+    on = (rows[vr.REWARD] == 1.0).to_numpy() & (s >= 2.0) & (s < 4.0)
+    rewarded = [r for r in support["Q2-onset"]["reads"] if r["outcome"] == 1][0]
+    assert rewarded["visits"] == rows.loc[on, "well_visit_id"].nunique()
+    assert rewarded["at_risk_s"] == pytest.approx(rows.loc[on, "exposure"].sum())
+    table = unit_estimands(fit)
+    both = pd.concat([table, table.assign(kind="No SWR")])
+    summary = summarize_estimands(both, n_draws=100, seed=0).set_index(
+        ["estimand_id", "tested"]
+    )
+    assert summary.loc[("Q2", "SWR"), "n_units_unsupported"] == 3
+    assert summary.loc[("Q2", "SWR"), "n_units"] == 0
+    assert np.isnan(summary.loc[("Q2", "SWR"), "estimate"])
+    assert summary.loc[("Q2-onset", "SWR"), "n_units_unsupported"] == 0
+
+
+def test_the_difference_curve_and_its_band(cohort) -> None:
+    """The difference curve of each unit is the outcome coefficient plus the
+    rewarded arrival curve less the omitted one on the grid, inside its
+    simultaneous band; across units it has a band; at the window's grid its
+    mean is Q2."""
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=SETTINGS, allow_provisional="test"
+    )
+    curves = difference_curves(fit, seed=0)
+    grid = vr.difference_grid(SETTINGS)
+    assert len(curves) == len(fit.records) * grid.size
+    fitted = curves.dropna(subset=["estimate"])
+    assert (fitted["low"] <= fitted["estimate"]).all()
+    assert (fitted["estimate"] <= fitted["high"]).all()
+    record = fit.records[0]
+    C = vr.difference_curve_rows(fit.design, grid)
+    first = curves[
+        (curves["animal"] == record.animal)
+        & (curves["session_date"] == record.session_date)
+    ]["estimate"].to_numpy()
+    assert first == pytest.approx(C @ np.asarray(record.coef), rel=1e-10)
+    q2 = unit_estimands(fit).set_index(["animal", "session_date", "estimand_id"])
+    window = (grid >= 4.0 - 1e-9) & (grid <= 10.0 + 1e-9)
+    # The 0.1 s grid's mean over the window is near the 0.01 s grid's (Q2).
+    assert first[window].mean() == pytest.approx(
+        q2.loc[(record.animal, record.session_date, "Q2"), "estimate"], abs=0.02
+    )
+    band = difference_curve_band(fitted, n_draws=200, seed=1)
+    assert band.estimate.shape == grid.shape and np.all(band.low < band.high)
