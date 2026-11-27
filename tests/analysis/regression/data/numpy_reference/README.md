@@ -173,3 +173,14 @@ are compared by the same rule (`1e-11 + 1e-9 |b|`, counts and codes exactly equa
   model; a grouped-softmax content model inside), 4 data sets each. Made with
   `python -m tests.analysis.regression.test_simulation_engine`. Compared in
   `tests/analysis/regression/test_simulation_engine.py::test_matches_the_fixed_seed_fixture`.
+- `simulation_engine_tables.json`: the `summary`, `data_sets` and `sessions` tables of
+  fixed small runs of the engine with one model or several models of one design (the
+  rate model inside and outside; the content model inside; the day cohort's model at the
+  session, the day and the animal unit with a support hook, inside and outside), 2 data
+  sets each, written before the difference of two models was added to the engine. They
+  are compared exactly, not by the rule above: every float to the bit (by its repr), a
+  float that is not finite by its name, an int not equal to a float. That holds only on
+  the machine that wrote them (the CPU and BLAS above), so the test is skipped on
+  GitHub's runners. Made with
+  `python -m tests.analysis.regression.test_simulation_engine tables`. Compared in
+  `tests/analysis/regression/test_simulation_engine.py::test_tables_unchanged_bit_for_bit`.

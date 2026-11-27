@@ -90,6 +90,35 @@ def test_a_config_file_is_passed_to_the_list(tmp_path) -> None:
     assert set(table["model"]) == {"session_sd2"}
 
 
+def test_the_difference_configuration_runs(tmp_path) -> None:
+    """``--config`` with the kind ``both`` runs the visit rate list's
+    difference run with no change to the runner: one scenario of the quick
+    configuration, with a row for each kind and for their difference."""
+    config = tmp_path / "both_quick.json"
+    config.write_text(json.dumps({"kind": "both"}))
+    run_simulations.main(
+        [
+            "--model",
+            "visit_rate",
+            "--quick",
+            "--scenarios",
+            "swr_ratio",
+            "--config",
+            str(config),
+            "--output-dir",
+            str(tmp_path),
+        ]
+    )
+    table = read_table(tmp_path / "visit_rate_both_quick.parquet")
+    assert table.attrs["scenarios"] == ["swr_ratio"]
+    assert list(dict.fromkeys(table["kind"])) == ["SWR", "No SWR", "SWR minus No SWR"]
+    assert set(table["model"]) == {
+        "SWR/session_sd2",
+        "No SWR/session_sd2",
+        "SWR minus No SWR/session_sd2",
+    }
+
+
 def test_a_config_for_a_list_without_configurations_is_refused(monkeypatch) -> None:
     """``--config`` for a module whose ``simulation`` takes no ``config`` is
     refused with a message that says so, before the list is built."""

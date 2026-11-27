@@ -975,6 +975,41 @@ some scenarios only keeps each scenario's place, and so its data.
 Several models with the same coefficients (for example one model at several declared
 penalties) are fitted to the same data sets of one run.
 
+**Two models' difference.** A model may read some of each session's rows only
+(`Model.rows_where = (column, value)`; None, the default, reads every row): for example
+one kind of event, when each session's rows hold both kinds. Each value is a group of
+rows, drawn on the design of its first model; its models' fits, support hooks and unit
+targets see only its rows, and each model keeps its own penalties (as the real fits of
+the two kinds do). A `Difference(name, first, second)` of two models of two groups at one
+unit is reported beside the models, for every estimand both declare (or those it names):
+unit by unit, the first's estimate less the second's, then `unit_summary` of those unit
+differences, so that its interval is the bootstrap of the differences, as the real
+statistics take it (`rate/visit_rate_statistics.summarize_estimands`). A unit without a
+value in either model has no difference and is counted with its cause (the first's, else
+the second's), never left out unseen. Its two targets:
+
+- `planted`, the first's planted value less the second's (NaN if either is NaN);
+- `planted_unit`, the reduction over the units of the units' differences of the two
+  models' unit targets, over the units where both targets are finite. It is not the
+  difference of the two models' reduced targets: their units can differ (a unit one
+  model lacks for support), and the reduction is not linear across different sets of
+  units.
+
+Each (difference, estimand) has its own bootstrap seed, spawned after every (model,
+estimand)'s, so that adding a difference changes no model's seed; a run without
+`rows_where` is drawn and fitted as before (the bit-for-bit tables,
+`tests/analysis/regression/data/numpy_reference/simulation_engine_tables.json`).
+
+**Independence of the two groups: the coordinator's call (2026-11-27), not the lead's.** The two
+groups' outcomes are drawn independently given each group's expected outcome: under an
+outside scenario `expected` is called once, with every row of every session and the data
+set's generator, and then each group's rows are drawn one group after the other from
+that generator. A dependence between the groups exists only when a scenario plants it
+through the means (for example the same session deviations of an effect in both kinds).
+In the real data the two kinds of event share time bins, and a shared session or animal
+effect would correlate them; independence then validates one case only. It is
+the coordinator's call (2026-11-27), not the lead's, made while the lead had not ruled on it.
+
 **The results table** (`simulation.summarize`; one row per scenario, model and
 estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),
 `bias_se`; `coverage` (the share of data sets whose 95 % interval holds the planted
@@ -1002,7 +1037,8 @@ model needs its own columns, `table(result, simulation)`. The phase adds the mod
 penalties in its `attrs`. The visit rate model's list is
 `analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`): one run
 fits the same draws at the session, the day and the animal (one model per unit and prior
-SD, `<fit_by>_sd<SD>`), in one reward form (the by-outcome form's declared tests, or the
+SD, `<fit_by>_sd<SD>`; with `kind` `"both"`, each kind's models, `<kind>/<fit_by>_sd<SD>`,
+and their difference, SWR less No SWR, under the pair scenarios `PAIR_SCENARIOS`), in one reward form (the by-outcome form's declared tests, or the
 coefficient form's secondary value: the engine fits one design at a time), with each
 curve's penalty calibrated at the day and at the animal to a declared target edf of that
 unit (`CLOCK_TARGETS`, the author's settings, not validated) when `calibrate` is set; the
