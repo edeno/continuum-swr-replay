@@ -350,7 +350,7 @@ def poisson_projection(
         The rate the steps multiply (positive where ``expected`` is).
     by_outcome : bool
         False: one arrival step for both outcomes and ``beta`` (the coefficient
-        form); True: an arrival step for each outcome (the time-varying form).
+        form); True: an arrival step for each outcome (the by-outcome form).
     arrival_cell_s, leaving_cell_s : float
         The cells' widths (s); each splits its clock's basis range.
 
