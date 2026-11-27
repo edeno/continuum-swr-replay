@@ -1062,10 +1062,10 @@ The lead (2026-11-26, 19:15): "no just two". The rate model has two clocks. Path
 
 | Old place | New place | Commit |
 |---|---|---|
-| `visit_rate.STRETCH`, `CLOCK_BASES[STRETCH]`, the stretch entries of `CLOCK_LOG_PENALTIES` (removed) | none: `VisitRateSettings.clocks()` is `(ARRIVAL, LEAVING)` | this section's commit |
-| `visit_rate.VisitRateSettings.include_stretch_clock` (removed) | none | this section's commit |
-| `visit_rate.third_clock_decision`, `ThirdClockDecision` (removed) | none | this section's commit |
-| `visit_rate_statistics.third_clock_q7a`, `ThirdClockQ7a` (removed) | none | this section's commit |
-| `visit_rate_scenarios.PlantedClocks.stretch`, `drop_before_small_movements` (removed) | none | this section's commit |
-| `visit_rate_simulation` scenario `"drop_before_small_movements"`, the stretch targets of `CLOCK_TARGETS`, the stretch column of `synthetic_visit_rows` (removed) | none | this section's commit |
-| `tests/analysis/replay_models/rate/test_visit_rate.py::test_third_clock_rule`, `::test_third_clock_rule_at_its_boundary`, `::test_third_clock_rule_counts_units`; `test_visit_rate_statistics.py::test_q7a_with_and_without_the_third_clock`; `test_visit_rate_scenarios.py::test_a_stretch_curve_enters_the_rate` (removed) | none | this section's commit |
+| `visit_rate.STRETCH`, `CLOCK_BASES[STRETCH]`, the stretch entries of `CLOCK_LOG_PENALTIES` (removed) | none: `VisitRateSettings.clocks()` is `(ARRIVAL, LEAVING)` | e680cffd |
+| `visit_rate.VisitRateSettings.include_stretch_clock` (removed) | none | e680cffd |
+| `visit_rate.third_clock_decision`, `ThirdClockDecision` (removed) | none | e680cffd |
+| `visit_rate_statistics.third_clock_q7a`, `ThirdClockQ7a` (removed) | none | e680cffd |
+| `visit_rate_scenarios.PlantedClocks.stretch`, `drop_before_small_movements` (removed) | none | e680cffd |
+| `visit_rate_simulation` scenario `"drop_before_small_movements"`, the stretch targets of `CLOCK_TARGETS`, the stretch column of `synthetic_visit_rows` (removed) | none | e680cffd |
+| `tests/analysis/replay_models/rate/test_visit_rate.py::test_third_clock_rule`, `::test_third_clock_rule_at_its_boundary`, `::test_third_clock_rule_counts_units`; `test_visit_rate_statistics.py::test_q7a_with_and_without_the_third_clock`; `test_visit_rate_scenarios.py::test_a_stretch_curve_enters_the_rate` (removed) | none | e680cffd |
