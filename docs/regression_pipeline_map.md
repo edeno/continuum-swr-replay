@@ -638,7 +638,7 @@ The fitting loop: one design, one fit for each unit of the fit.
 
 The simulation engine: a planted truth drawn on a model's own rows, fitted by the real code.
 
-`Model`, `InsideScenario`, `OutsideScenario`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `PreparedDraws`, `prepare_draws`, `draw_data_set`, `run_columns`, `run`, `summarize`
+`Model`, `InsideScenario`, `OutsideScenario`, `Difference`, `Simulation`, `SimulationResult`, `data_seed`, `bootstrap_seeds`, `planted_value`, `PreparedDraws`, `prepare_draws`, `draw_data_set`, `run_columns`, `run`, `summarize`
 
 ### `src/continuum_swr_replay/analysis/regression/support.py`
 
@@ -1722,7 +1722,7 @@ Planted scenarios of the visit rate model, as pure functions of the rows.
 
 The visit rate model's scenario list for the simulation engine.
 
-`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `estimand_support`, `model_name`, `calibrate_clocks`, `simulation`, `table`
+`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `estimand_support`, `model_name`, `calibrate_clocks`, `simulation`, `table`, `difference_simulation`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
 
