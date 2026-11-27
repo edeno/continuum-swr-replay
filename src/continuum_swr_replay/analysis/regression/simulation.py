@@ -83,19 +83,16 @@ The tables of a run (:class:`SimulationResult`):
 - ``summary``: one row per (scenario, model, estimand), :data:`SUMMARY_COLUMNS`
   (described in :func:`summarize`).
 
-A model may bring its own fit (:attr:`Model.fit`, :data:`OwnFit`): for a value
-the per-session loop does not give, such as one coefficient shared by an
-animal's sessions. The engine draws the data set as for any model and hands it
-to that fit, which returns one row per unit of inference and estimand
-(:data:`UNIT_COLUMNS`): a session (all three labels) or an animal (the animal
-only), each at most once per estimand. Its rows are the ``sessions`` table's rows of the model. An estimand
-whose units are sessions is reduced session -> recording day -> animal as
-above; one whose units are animals is the mean over the animals with a value,
-with the t interval over them (``shared_statistics.animal_mean_interval``;
-``interval_sd`` is its standard error, and no day-level p). The summary reads
-its units as it reads sessions: ``share_without_value`` and
-``share_not_converged`` are over the units, and ``n_sessions_used`` counts the
-sessions behind the animals with a value (``n_sessions`` of each unit).
+A model may bring its own fit (:attr:`Model.fit`, :data:`OwnFit`), at the
+session unit only: for a value that one model's fit of each session does not
+give, such as the difference of two fits of each session (the visit rate
+model's joint run of its two kinds). The engine draws the data set as for any
+model and hands it to that fit, which returns one row per session and
+estimand (:data:`UNIT_COLUMNS`). Its rows are the ``sessions`` table's rows of
+the model (``fit_by`` ``"session"``; ``n_events`` missing), and each estimand
+is reduced over the sessions by ``unit_summary`` as a model's at
+``fit_by="session"``. An own fit has no unit target: its ``planted_unit`` is
+NaN.
 """
 
 from __future__ import annotations
@@ -162,12 +159,11 @@ SHARE_TOLERANCE = 1e-9
 #: A data set rejects by the day-level test when its p is below this.
 REJECTION_LEVEL = 0.05
 
-#: The columns of an own fit's table (:data:`OwnFit`), one row per unit and
-#: estimand: the estimand's name; the unit's labels (``session_date`` and
-#: ``epoch`` missing for an animal); the fit's ``status`` and ``no_fit``;
-#: ``without_value`` (empty when the unit has a value, else a code of
-#: :data:`CAUSES`); ``estimate`` and ``se``; ``edf``; ``n_sessions``, the
-#: sessions behind the unit's value (1 for a session).
+#: The columns of an own fit's table (:data:`OwnFit`), one row per session and
+#: estimand: the estimand's name; the session's key; the fit's ``status`` and
+#: ``no_fit``; ``without_value`` (empty when the session has a value, else a
+#: code of :data:`CAUSES`); ``estimate`` and ``se``; ``edf``; ``n_sessions``,
+#: 1.
 UNIT_COLUMNS = (
     "estimand",
     "animal",
@@ -206,25 +202,24 @@ class Model:
     estimands : mapping of str to np.ndarray
         Estimand name -> its ``c`` over ``design.coef_names``, shape
         ``(n_coef,)`` (:mod:`.contrasts`). Every coefficient an estimand uses
-        must carry a fixed penalty (:func:`.support.require_tested_penalized`).
+        must carry a fixed penalty (:func:`.support.require_tested_penalized`)
+        and none may be of a baseline term (copied per session in a fit of
+        several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
         Under an inside scenario an estimand's planted value is ``c' beta``.
+    fit_by : {"session", "day", "animal"}
+        The unit of the fit.
     fit : OwnFit or None
-        The model's own fit (module docstring); None fits every session by
-        :func:`.sessions.fit_sessions` and evaluates ``estimands``. With an
-        own fit, ``design`` gives the columns the run keeps and the inside
-        scenarios' coefficients, and the fit gives the value of every
-        estimand of :attr:`estimand_names`.
+        The model's own fit (module docstring), at ``fit_by="session"`` only;
+        None fits each unit by :func:`.sessions.fit_sessions` and evaluates
+        ``estimands``. With an own fit, ``design`` gives the columns the run
+        keeps, and the fit gives the value of every estimand of
+        :attr:`estimand_names`.
     fit_estimands : tuple of str
         The estimands only the own fit gives, with no ``c``: their planted
         value is an outside scenario's (NaN under an inside scenario).
     fit_columns : tuple of str
         The columns the own fit reads beyond the design's and the unit (a run
         keeps them, :func:`run_columns`).
-        must carry a fixed penalty (:func:`.support.require_tested_penalized`)
-        and none may be of a baseline term (copied per session in a fit of
-        several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
-    fit_by : {"session", "day", "animal"}
-        The unit of the fit.
     """
 
     name: str
@@ -248,6 +243,11 @@ class Model:
             raise ValueError(f"model {self.name!r} has no estimand")
         if set(self.estimands) & set(self.fit_estimands):
             raise ValueError(f"model {self.name!r}: an estimand is named twice")
+        if self.fit is not None and self.fit_by != "session":
+            raise ValueError(
+                f"model {self.name!r}: an own fit is at fit_by 'session', not "
+                f"{self.fit_by!r}"
+            )
         estimands = {}
         for name, c in self.estimands.items():
             c = np.asarray(c, dtype=float)
@@ -425,33 +425,26 @@ def planted_value(scenario: Scenario, model: Model, estimand: str) -> float:
     """The planted value of ``estimand`` of ``model`` under ``scenario``:
     ``c' beta`` inside the model, the scenario's own value outside it (NaN
     when it names none). An estimand of an own fit with no ``c`` has the
-    planted value NaN inside the model; for a model with its own fit, the
-    planted coefficients its design lacks (those its own fit holds) are not
-    read."""
+    planted value NaN inside the model."""
     if isinstance(scenario, InsideScenario):
         if estimand not in model.estimands:
             return np.nan
-        beta = _planted_beta(scenario, model.design, model.fit is not None)
-        return float(model.estimands[estimand] @ beta)
+        return float(model.estimands[estimand] @ _planted_beta(scenario, model.design))
     value = scenario.planted.get(estimand, np.nan)
     return float(value(model) if callable(value) else value)
 
 
-def _planted_beta(
-    scenario: InsideScenario, design: Design, absent_allowed: bool = False
-) -> np.ndarray:
-    """The planted coefficients over ``design.coef_names``, shape ``(n_coef,)``;
-    a coefficient the design lacks is refused unless ``absent_allowed``."""
+def _planted_beta(scenario: InsideScenario, design: Design) -> np.ndarray:
+    """The planted coefficients over ``design.coef_names``, shape ``(n_coef,)``."""
     names = list(design.coef_names)
     unknown = [name for name in scenario.coefficients if name not in names]
-    if unknown and not absent_allowed:
+    if unknown:
         raise ValueError(
             f"scenario {scenario.name!r}: {unknown} not coefficients of the design"
         )
     beta = np.zeros(len(names))
     for name, value in scenario.coefficients.items():
-        if name in names:
-            beta[names.index(name)] = value
+        beta[names.index(name)] = value
     return beta
 
 
@@ -782,14 +775,42 @@ def _data_set_row(
     n_draws: int,
     seed: int,
 ) -> dict:
-    """One estimand's reduction over a data set's units (module docstring);
-    NaN when no unit has a value. ``covered``, ``covered_unit`` and
-    ``excludes_zero`` are NaN without a finite interval (none with fewer than
-    two animals), so such a data set counts in none of those rates."""
-    fit_by = records[0].fit_by
+    """One estimand's reduction over a data set's units (module docstring):
+    :func:`_reduced_row` of the records' unit values."""
+    return _reduced_row(
+        unit_values(values, records),
+        records[0].fit_by,
+        int(
+            sum(
+                _n_sessions(r)
+                for r, v in zip(records, values, strict=True)
+                if np.isfinite(v)
+            )
+        ),
+        planted,
+        planted_unit,
+        n_draws,
+        seed,
+    )
+
+
+def _reduced_row(
+    values: pd.Series,
+    fit_by: FitBy,
+    n_sessions_used: int,
+    planted: float,
+    planted_unit: float,
+    n_draws: int,
+    seed: int,
+) -> dict:
+    """One estimand's reduction over the unit values ``values`` (indexed by
+    the unit key, :func:`.units.unit_values`); NaN when no unit has a value.
+    ``covered``, ``covered_unit`` and ``excludes_zero`` are NaN without a
+    finite interval (none with fewer than two animals), so such a data set
+    counts in none of those rates."""
     summary = (
-        unit_summary(unit_values(values, records), fit_by, n_draws=n_draws, seed=seed)
-        if np.isfinite(values).any()
+        unit_summary(values, fit_by, n_draws=n_draws, seed=seed)
+        if np.isfinite(values.to_numpy()).any()
         else dict.fromkeys(("estimate", "low", "high", "sd", "day_p"), np.nan)
         | {"n_units": 0, "n_animals_same_sign": 0}
     )
@@ -810,13 +831,7 @@ def _data_set_row(
         "high": high,
         "interval_sd": summary["sd"],
         "day_p": float(summary["day_p"]),
-        "n_sessions_used": int(
-            sum(
-                _n_sessions(r)
-                for r, v in zip(records, values, strict=True)
-                if np.isfinite(v)
-            )
-        ),
+        "n_sessions_used": n_sessions_used,
         "n_units_used": int(summary["n_units"]),
         "n_animals_same_sign": int(summary["n_animals_same_sign"]),
         "covered": covers(planted),
@@ -826,42 +841,9 @@ def _data_set_row(
     }
 
 
-def _animal_data_set_row(
-    values: np.ndarray,
-    animals: list[str],
-    n_sessions: np.ndarray,
-    planted: float,
-    seed: int,
-) -> dict:
-    """One estimand's reduction over a data set's animals (module docstring):
-    the mean with the t interval over the animals with a value; NaN when none
-    has one, no interval with fewer than two. ``seed`` is recorded as the
-    estimand's bootstrap seed, which this reduction does not draw on."""
-    summary = animal_mean_interval(pd.Series(values, index=animals))
-    low, high = summary["low"], summary["high"]
-    interval = bool(np.isfinite(low) and np.isfinite(high))
-    return {
-        "planted": planted,
-        "estimate": summary["estimate"],
-        "low": low,
-        "high": high,
-        "interval_sd": summary["se"],
-        "day_p": np.nan,
-        "n_sessions_used": int(n_sessions[np.isfinite(values)].sum()),
-        "n_animals_same_sign": summary["n_animals_same_sign"],
-        "covered": (
-            float(low <= planted <= high)
-            if interval and np.isfinite(planted)
-            else np.nan
-        ),
-        "excludes_zero": float(not low <= 0.0 <= high) if interval else np.nan,
-        "bootstrap_seed": seed,
-    }
-
-
 def _own_units(model: Model, data: Mapping[SessionKey, pd.DataFrame]) -> pd.DataFrame:
     """The own fit's table of one data set, checked: its columns, its
-    estimands, and one level of unit for each estimand."""
+    estimands, and one row per session for each estimand."""
     units = model.fit(data)
     missing = sorted(set(UNIT_COLUMNS) - set(units.columns))
     if missing:
@@ -872,14 +854,13 @@ def _own_units(model: Model, data: Mapping[SessionKey, pd.DataFrame]) -> pd.Data
             f"model {model.name!r}: the own fit gives the estimands {given}, not "
             f"{list(model.estimand_names)}"
         )
+    level = ["animal", "session_date", "epoch"]
     for name, part in units.groupby("estimand", sort=False):
-        labeled = part[["session_date", "epoch"]].notna().all(axis=1)
-        if labeled.any() and not labeled.all():
+        if not part[level].notna().all(axis=None):
             raise ValueError(
-                f"model {model.name!r}, estimand {name!r}: units of both levels "
-                "(sessions and animals)"
+                f"model {model.name!r}, estimand {name!r}: an own fit gives "
+                "sessions only (animal, session_date and epoch)"
             )
-        level = ["animal", "session_date", "epoch"] if labeled.all() else ["animal"]
         repeated = part[part.duplicated(level, keep=False)]
         if not repeated.empty:
             first = "/".join(str(v) for v in repeated.iloc[0][level])
@@ -901,28 +882,40 @@ def _own_fit_rows(
     """A model's own fit of one data set: its ``data_sets`` and ``sessions``
     rows (module docstring)."""
     units = _own_units(model, data)
-    session_rows = [{**base, **row} for row in units.to_dict("records")]
+    session_rows = [
+        {
+            **base,
+            "estimand": row["estimand"],
+            "animal": row["animal"],
+            "session_date": row["session_date"],
+            "epoch": row["epoch"],
+            "fit_by": "session",
+            "n_sessions": row["n_sessions"],
+            "n_events": np.nan,
+            **{c: row[c] for c in UNIT_COLUMNS[4:-1]},
+        }
+        for row in units.to_dict("records")
+    ]
     data_set_rows = []
     for name in model.estimand_names:
         part = units[units["estimand"] == name]
-        values = part["estimate"].to_numpy(dtype=float)
-        planted = planted_value(scenario, model, name)
-        seed = next(seeds)
-        if part["session_date"].isna().all():
-            row = _animal_data_set_row(
-                values,
-                part["animal"].tolist(),
-                part["n_sessions"].to_numpy(dtype=int),
-                planted,
-                seed,
-            )
-        else:
-            keys = list(part[["animal", "session_date", "epoch"]].itertuples(False))
-            row = _data_set_row(
-                values, [tuple(k) for k in keys], planted, n_draws, seed
-            )
+        values = pd.Series(
+            part["estimate"].to_numpy(dtype=float),
+            index=pd.MultiIndex.from_frame(part[["animal", "session_date", "epoch"]]),
+        )
+        row = _reduced_row(
+            values,
+            "session",
+            int(np.isfinite(values).sum()),
+            planted_value(scenario, model, name),
+            np.nan,
+            n_draws,
+            next(seeds),
+        )
         data_set_rows.append({**base, "estimand": name, **row})
     return data_set_rows, session_rows
+
+
 def _without_weak_penalty(design: Design) -> Design:
     """``design`` with the fixed penalty of every simple term (a level, a 0/1
     or a continuous slope) removed; a smooth or a lag functional keeps its
@@ -985,6 +978,9 @@ def _inside_targets(
         if not isinstance(simulation.scenarios[s], InsideScenario):
             continue
         for model in simulation.models:
+            if model.fit is not None:
+                out[s, model.name] = {}
+                continue
             means = {
                 key: _inside_mean(model.likelihood, p.inside_eta[s], p)
                 for key, p in prepared.items()
@@ -1009,7 +1005,6 @@ def _run_task(
     rng = np.random.default_rng(data_seed(simulation.seed, s, i))
     outcomes, means = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
     data = _DataSet(simulation.sessions, models[0].response, outcomes)
-    keys = list(data)
     n_estimands = [len(model.estimand_names) for model in models]
     seeds = iter(bootstrap_seeds(simulation.seed, s, i, sum(n_estimands)))
     data_set_rows, session_rows = [], []
@@ -1073,17 +1068,14 @@ def _worker_task(task: tuple[int, int]) -> tuple[list[dict], list[dict]]:
 
 
 def _check(simulation: Simulation) -> None:
-    """Refuse a run whose models cannot share data sets or whose names repeat,
-    and an inside scenario that names a coefficient the first model's design
-    lacks (it is drawn on that design). A model with its own fit need not
-    have the first model's coefficients."""
+    """Refuse a run whose models cannot share data sets or whose names repeat."""
     models = simulation.models
     if not models or not simulation.scenarios:
         raise ValueError("a simulation needs a model and a scenario")
     first = models[0]
     for model in models[1:]:
         if (
-            (model.fit is None and model.design.coef_names != first.design.coef_names)
+            model.design.coef_names != first.design.coef_names
             or model.likelihood.name != first.likelihood.name
             or (model.response, model.unit) != (first.response, first.unit)
         ):
@@ -1091,16 +1083,6 @@ def _check(simulation: Simulation) -> None:
                 f"model {model.name!r} cannot share data sets with {first.name!r}: "
                 "the coefficient names, likelihood, response and unit must agree"
             )
-    known = set(first.design.coef_names)
-    for scenario in simulation.scenarios:
-        if isinstance(scenario, InsideScenario):
-            unknown = sorted(set(scenario.coefficients) - known)
-            if unknown:
-                raise ValueError(
-                    f"scenario {scenario.name!r}: {unknown} not coefficients of the "
-                    f"design of the first model ({first.name!r}), on which the "
-                    "scenario is drawn"
-                )
     for what, names in (
         ("model", [m.name for m in models]),
         ("scenario", [s.name for s in simulation.scenarios]),
@@ -1269,9 +1251,7 @@ def summarize(
     p is below :data:`REJECTION_LEVEL`, over every data set with an
     estimate, a NaN p (fewer than six non-zero day values) counting as no
     rejection; ``n_data_sets_with_day_p`` says how many had a p, so that a
-    rate of zero without any is not read as a test that never rejects. An
-    estimand whose units are animals has no day test: its ``reject_day`` is
-    NaN.
+    rate of zero without any is not read as a test that never rejects.
     Each share has its binomial standard error (``*_se``). Under a planted
     value of zero ``excludes_zero`` and ``reject_day`` are false-positive
     rates, otherwise power.
@@ -1329,13 +1309,9 @@ def summarize(
                     else {"coverage": np.nan, "coverage_se": np.nan}
                 ),
                 **_share(found["excludes_zero"].to_numpy(), "excludes_zero"),
-                **(
-                    {"reject_day": np.nan, "reject_day_se": np.nan}
-                    if "session_date" in fits and fits["session_date"].isna().all()
-                    else _share(
-                        (found["day_p"] < REJECTION_LEVEL).to_numpy(dtype=float),
-                        "reject_day",
-                    )
+                **_share(
+                    (found["day_p"] < REJECTION_LEVEL).to_numpy(dtype=float),
+                    "reject_day",
                 ),
                 "share_without_value": float(np.mean(cause != "")),
                 **{

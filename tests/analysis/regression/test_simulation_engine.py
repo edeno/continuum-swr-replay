@@ -846,42 +846,13 @@ def own_session_fit(data, *, design, estimands) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def own_animal_fit(data, *, without=()) -> pd.DataFrame:
-    """An own fit of one value per animal: the log of the animal's events per
-    second, over its sessions; the animals in ``without`` have no value."""
-    totals: dict[str, list[float]] = {}
-    for (animal, _, _), rows in data.items():
-        count, exposure, n = totals.setdefault(animal, [0.0, 0.0, 0])
-        totals[animal] = [
-            count + rows["count"].sum(),
-            exposure + rows["exposure"].sum(),
-            n + 1,
-        ]
-    return pd.DataFrame(
-        [
-            {
-                "estimand": "log_rate",
-                "animal": animal,
-                "session_date": None,
-                "epoch": None,
-                "status": "converged",
-                "no_fit": "no_events" if animal in without else "",
-                "without_value": "no_events" if animal in without else "",
-                "estimate": np.nan if animal in without else np.log(count / exposure),
-                "se": np.nan,
-                "edf": {},
-                "n_sessions": n,
-            }
-            for animal, (count, exposure, n) in totals.items()
-        ]
-    )
-
-
 def test_an_own_fit_at_the_session_level_gives_the_engine_tables(
     rate_sessions_cohort,
 ) -> None:
     """A model whose own fit does what the engine does gives the plain
-    model's ``data_sets`` and ``sessions`` rows, at the same seed."""
+    model's ``data_sets`` and ``sessions`` rows and summary, at the same
+    seed, except the unit target, which an own fit does not have (NaN), and
+    the sessions' ``n_events``, which it does not give."""
     sessions = rate_sessions_cohort
     plain = rate_model(sessions)
     own = Model(
@@ -897,71 +868,28 @@ def test_an_own_fit_at_the_session_level_gives_the_engine_tables(
     scenario = OutsideScenario("outside", expected_rate, planted={"reward": 0.5})
     a = engine.run(_simulation(plain, sessions, [scenario]))
     b = engine.run(_simulation(own, sessions, [scenario]))
-    pd.testing.assert_frame_equal(a.data_sets, b.data_sets)
-    columns = list(a.sessions.columns)
-    pd.testing.assert_frame_equal(a.sessions, b.sessions[columns])
-    pd.testing.assert_frame_equal(a.summary, b.summary)
-
-
-def test_an_own_fit_at_the_animal_level_is_reduced_over_the_animals(
-    rate_sessions_cohort,
-) -> None:
-    """One value per animal (no session labels): a data set's estimate is
-    the mean over the animals with a value, its interval the t interval over
-    them, its sessions used those of those animals; the share without a value
-    is over the animals. The model's coefficient names need not be the
-    plain model's."""
-    sessions = rate_sessions_cohort
-    plain = rate_model(sessions)
-    pooled = pd.concat(sessions.values(), ignore_index=True)
-    design = build_design([Offset("exposure")], pooled, intercept=True)
-    animal = Model(
-        "animal",
-        design,
-        Poisson(),
-        "count",
-        "well_visit_id",
-        {},
-        fit=partial(own_animal_fit, without=("animal0",)),
-        fit_estimands=("log_rate",),
-        fit_columns=("time_since_s",),
+    target = ["planted_unit", "covered_unit"]
+    assert b.data_sets[target].isna().all(axis=None)
+    pd.testing.assert_frame_equal(
+        a.data_sets.drop(columns=target), b.data_sets.drop(columns=target)
     )
-    scenario = OutsideScenario(
-        "outside", expected_rate, planted={"reward": 0.5, "log_rate": 0.0}
+    columns = [c for c in a.sessions.columns if c != "n_events"]
+    assert b.sessions["n_events"].isna().all()
+    pd.testing.assert_frame_equal(a.sessions[columns], b.sessions[columns])
+    unit = ["planted_unit", "bias_unit", "coverage_unit", "coverage_unit_se"]
+    assert b.summary[unit].isna().all(axis=None)
+    pd.testing.assert_frame_equal(
+        a.summary.drop(columns=unit), b.summary.drop(columns=unit)
     )
-    simulation = Simulation([plain, animal], sessions, [scenario], 3, 200, 5)
-    alone = Simulation([animal], sessions, [scenario], 3, 200, 5)
-    assert engine.run_columns(alone) == ("exposure", "well_visit_id", "time_since_s")
-    result = engine.run(simulation)
-    units = result.sessions.query("model == 'animal'")
-    assert len(units) == 3 * 5 and units["session_date"].isna().all()
-    for i, part in result.data_sets.query("model == 'animal'").groupby("data_set"):
-        (row,) = part.to_dict("records")
-        values = units[units["data_set"] == i].set_index("animal")["estimate"]
-        finite = values.dropna()
-        assert len(finite) == 4
-        se = finite.std(ddof=1) / 2.0
-        half = scipy.stats.t.ppf(0.975, 3) * se
-        assert row["estimate"] == pytest.approx(finite.mean())
-        assert row["low"] == pytest.approx(finite.mean() - half)
-        assert row["high"] == pytest.approx(finite.mean() + half)
-        assert row["interval_sd"] == pytest.approx(se)
-        assert np.isnan(row["day_p"])
-        assert row["n_sessions_used"] == 8
-        assert row["covered"] == float(row["low"] <= 0.0 <= row["high"])
-    summary = result.summary.set_index("model").loc["animal"]
-    assert summary["share_without_value"] == pytest.approx(0.2)
-    assert summary["without_value_no_events"] == pytest.approx(0.2)
-    assert summary["n_sessions_used_min"] == 8
-    assert summary["n_data_sets_with_day_p"] == 0
-    assert np.isnan(summary["reject_day"]) and np.isnan(summary["reject_day_se"])
 
 
 def test_own_fit_refusals(rate_sessions_cohort) -> None:
-    """Values of an own fit without one, an own fit that gives other
-    estimands, and an estimand with units of both levels are refused."""
+    """Values of an own fit without one, an own fit at another unit than the
+    session, an own fit that gives other estimands, and one that gives a row
+    without a session's labels are refused."""
     sessions = rate_sessions_cohort
     plain = rate_model(sessions)
+    fit = partial(own_session_fit, design=plain.design, estimands=plain.estimands)
     with pytest.raises(ValueError, match="own fit"):
         Model(
             "x",
@@ -973,6 +901,8 @@ def test_own_fit_refusals(rate_sessions_cohort) -> None:
             fit_estimands=("log_rate",),
         )
     with pytest.raises(ValueError, match="no estimand"):
+        Model("x", plain.design, Poisson(), "count", "well_visit_id", {}, fit=fit)
+    with pytest.raises(ValueError, match="fit_by 'session'"):
         Model(
             "x",
             plain.design,
@@ -980,7 +910,9 @@ def test_own_fit_refusals(rate_sessions_cohort) -> None:
             "count",
             "well_visit_id",
             {},
-            fit=own_animal_fit,
+            fit=fit,
+            fit_estimands=tuple(plain.estimands),
+            fit_by="animal",
         )
     scenario = OutsideScenario("outside", expected_rate)
     wrong = Model(
@@ -990,34 +922,34 @@ def test_own_fit_refusals(rate_sessions_cohort) -> None:
         "count",
         "well_visit_id",
         {},
-        fit=own_animal_fit,
+        fit=fit,
         fit_estimands=("other",),
     )
     with pytest.raises(ValueError, match="estimands"):
         engine.run(_simulation(wrong, sessions, [scenario]))
 
-    def mixed(data):
-        table = own_animal_fit(data)
-        table.loc[0, ["session_date", "epoch"]] = ["20260001", "02_r1"]
+    def unlabeled(data):
+        table = fit(data)
+        table.loc[0, ["session_date", "epoch"]] = [None, None]
         return table
 
-    both = Model(
+    animal = Model(
         "x",
         plain.design,
         Poisson(),
         "count",
         "well_visit_id",
         {},
-        fit=mixed,
-        fit_estimands=("log_rate",),
+        fit=unlabeled,
+        fit_estimands=tuple(plain.estimands),
     )
-    with pytest.raises(ValueError, match="both"):
-        engine.run(_simulation(both, sessions, [scenario]))
+    with pytest.raises(ValueError, match="sessions only"):
+        engine.run(_simulation(animal, sessions, [scenario]))
 
 
 def test_an_own_fit_that_gives_a_session_twice_is_refused(rate_sessions_cohort) -> None:
     """An own fit whose table holds one session's value of an estimand twice
-    is refused, as one with an animal twice is."""
+    is refused."""
     sessions = rate_sessions_cohort
     plain = rate_model(sessions)
 
@@ -1025,24 +957,19 @@ def test_an_own_fit_that_gives_a_session_twice_is_refused(rate_sessions_cohort) 
         table = own_session_fit(data, design=plain.design, estimands=plain.estimands)
         return pd.concat([table, table.iloc[:1]], ignore_index=True)
 
-    def animal_twice(data):
-        table = own_animal_fit(data)
-        return pd.concat([table, table.iloc[:1]], ignore_index=True)
-
     scenario = OutsideScenario("outside", expected_rate)
-    for fit, names in ((twice, tuple(plain.estimands)), (animal_twice, ("log_rate",))):
-        model = Model(
-            "x",
-            plain.design,
-            Poisson(),
-            "count",
-            "well_visit_id",
-            {},
-            fit=fit,
-            fit_estimands=names,
-        )
-        with pytest.raises(ValueError, match="more than once"):
-            engine.run(_simulation(model, sessions, [scenario]))
+    model = Model(
+        "x",
+        plain.design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {},
+        fit=twice,
+        fit_estimands=tuple(plain.estimands),
+    )
+    with pytest.raises(ValueError, match="more than once"):
+        engine.run(_simulation(model, sessions, [scenario]))
 
 
 def test_an_own_fit_may_be_the_first_model(rate_sessions_cohort) -> None:
@@ -1073,7 +1000,8 @@ def test_an_inside_coefficient_must_be_in_the_first_design(
     rate_sessions_cohort,
 ) -> None:
     """A planted coefficient that the first model's design lacks (a typo) is
-    refused before any draw, with an own-fit model in the run or not."""
+    refused before any draw, whether or not the first model has its own
+    fit."""
     sessions = rate_sessions_cohort
     plain = rate_model(sessions)
     own = Model(
@@ -1088,7 +1016,7 @@ def test_an_inside_coefficient_must_be_in_the_first_design(
     )
     typo = InsideScenario("typo", {"(Intercept)": np.log(0.8), "rewrd": 0.5})
     for models in ([plain, own], [own, plain]):
-        with pytest.raises(ValueError, match="rewrd.*first model"):
+        with pytest.raises(ValueError, match="rewrd.*not coefficients of the design"):
             engine.run(Simulation(models, sessions, [typo], 2, 200, 5))
 
 
