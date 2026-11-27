@@ -688,7 +688,7 @@ a session whose outcomes are all the same cannot identify the lag curve alone, b
 inside a day whose other sessions vary. The model has two clocks, the time since arrival
 and the time until leaving (lead, 2026-11-26: "no just two"), and
 `calibration.log_penalty_for_edf(..., fit_by=)` takes the median edf over the units' fits.
-At `fit_by="session"` every record of the coefficient form and of model D equalled master's
+At `fit_by="session"` every record of the coefficient form and of model D equaled master's
 (70a64c42) field by field, with master's third clock (proved before it left the model).
 
 The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
