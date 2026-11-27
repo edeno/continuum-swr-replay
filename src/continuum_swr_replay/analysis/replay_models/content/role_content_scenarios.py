@@ -59,6 +59,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.regression.contrasts import range_grid
 from continuum_swr_replay.analysis.regression.sessions import SessionKey
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .. import declared_tests as dt
 from . import role_content as rc
@@ -364,12 +365,12 @@ def planted_target(planted: pd.DataFrame) -> pd.Series:
         (``shared_statistics.animal_day_session_values``), what
         ``estimand_summary`` estimates.
     """
-    labels = [planted[c] for c in rc.SESSION_COLUMNS]
+    labels = [planted[c] for c in SESSION_COLUMNS]
     return pd.Series(
         {
             column: float(animal_day_session_values(planted[column], *labels).mean())
             for column in planted.columns
-            if column not in rc.SESSION_COLUMNS
+            if column not in SESSION_COLUMNS
         }
     )
 
@@ -471,7 +472,7 @@ class Scenario:
             values = planted_values(
                 self.truth_for(key), reference, self.variant, settings
             )
-            rows.append(dict(zip(rc.SESSION_COLUMNS, key, strict=True)) | values)
+            rows.append(dict(zip(SESSION_COLUMNS, key, strict=True)) | values)
         return pd.DataFrame(rows)
 
 

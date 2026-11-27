@@ -13,6 +13,7 @@ from continuum_swr_replay.analysis.replay_models.content import (
     role_content_statistics as rs,
 )
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 SESSIONS = [
     ("a1", "20200101", "02_r1"),
@@ -29,7 +30,7 @@ def _per_session(values: dict[str, list[float]], kept=None) -> pd.DataFrame:
     for kind, estimates in values.items():
         for i, (key, estimate) in enumerate(zip(SESSIONS, estimates, strict=True)):
             rows.append(
-                dict(zip(rc.SESSION_COLUMNS, key, strict=True))
+                dict(zip(SESSION_COLUMNS, key, strict=True))
                 | {
                     "model": "role_content",
                     "variant": "unadjusted",

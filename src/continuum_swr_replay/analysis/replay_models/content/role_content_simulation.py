@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.regression import simulation as engine
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
 from continuum_swr_replay.analysis.regression.sessions import SessionKey
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from . import role_content as rc
 from . import role_content_scenarios as sc
@@ -248,15 +249,15 @@ def cohort_from_table(
         sessions in order of day and epoch; None keeps all.
     """
     table = table.assign(
-        **{c: table[c].astype(str) for c in rc.SESSION_COLUMNS}
+        **{c: table[c].astype(str) for c in SESSION_COLUMNS}
     ).reset_index(drop=True)
     if sessions_per_animal is not None:
-        keys = table[list(rc.SESSION_COLUMNS)].drop_duplicates()
+        keys = table[list(SESSION_COLUMNS)].drop_duplicates()
         chosen = []
-        for _, part in keys.sort_values(list(rc.SESSION_COLUMNS)).groupby("animal"):
+        for _, part in keys.sort_values(list(SESSION_COLUMNS)).groupby("animal"):
             index = np.linspace(0, len(part) - 1, min(sessions_per_animal, len(part)))
             chosen.append(part.iloc[np.unique(np.round(index).astype(int))])
-        table = table.merge(pd.concat(chosen), on=list(rc.SESSION_COLUMNS))
+        table = table.merge(pd.concat(chosen), on=list(SESSION_COLUMNS))
     cohort = rc.role_content_cohort(table)
     bins = table.groupby(rc.UNIT)[N_BINS].first()
     rows = cohort.rows.assign(**{N_BINS: cohort.rows[rc.UNIT].map(bins).to_numpy()})
@@ -379,11 +380,9 @@ def _planted(
     for key, truth in truths.items():
         values = sc.planted_values(truth, reference, variant, settings)
         values[Q5A_LOW5] = sc.planted_values(truth, reference, variant, low5)["Q5a"]
-        rows.append(dict(zip(rc.SESSION_COLUMNS, key, strict=True)) | values)
+        rows.append(dict(zip(SESSION_COLUMNS, key, strict=True)) | values)
     frame = pd.DataFrame(rows)
-    undefined = [
-        c for c in frame if c not in rc.SESSION_COLUMNS and frame[c].isna().all()
-    ]
+    undefined = [c for c in frame if c not in SESSION_COLUMNS and frame[c].isna().all()]
     out = sc.planted_target(frame.drop(columns=undefined)).to_dict()
     return out | dict.fromkeys(undefined, np.nan)
 

@@ -14,6 +14,7 @@ from continuum_swr_replay.analysis.replay_models.content import (
     uncertainty_scenarios as us,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .role_tables import draw_shares, synthetic_event_arm_table
 
@@ -182,7 +183,7 @@ def test_spread_truths_target_the_animal_balanced_mean(reference) -> None:
     planted = scenario.planted(keys, reference)
     target = sc.planted_target(planted)
     values = planted["Q3a"]
-    labels = [planted[c] for c in rc.SESSION_COLUMNS]
+    labels = [planted[c] for c in SESSION_COLUMNS]
     expected = animal_day_session_values(values, *labels).mean()
     assert target["Q3a"] == pytest.approx(expected)
     # a1's two sessions share a day: the day's mean, then the animal's.

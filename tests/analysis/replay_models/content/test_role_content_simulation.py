@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.replay_models.content import (
 from continuum_swr_replay.analysis.replay_models.content import (
     role_content_simulation as rsim,
 )
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from scripts.checks import run_simulations
 
 from .role_tables import synthetic_event_arm_table
@@ -316,7 +317,7 @@ def test_sessions_per_animal_keeps_evenly_spaced_sessions() -> None:
         n_nonlocal_bins=10.0
     )
     kept = rsim.cohort_from_table(table, sessions_per_animal=2).rows
-    found = set(map(tuple, kept[list(rc.SESSION_COLUMNS)].drop_duplicates().values))
+    found = set(map(tuple, kept[list(SESSION_COLUMNS)].drop_duplicates().values))
     assert found == {sessions[0], sessions[2], sessions[3]}
     one = rsim.cohort_from_table(table, sessions_per_animal=1).rows
     assert set(one["animal"]) == {"a1", "a2"}

@@ -40,6 +40,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     animal_day_session_values,
     estimand_summary,
 )
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .. import declared_tests as dt
 from . import role_content as rc
@@ -55,7 +56,7 @@ __all__ = [
     "within_arm_slopes",
 ]
 
-_KEYS = list(rc.SESSION_COLUMNS)
+_KEYS = list(SESSION_COLUMNS)
 
 
 def session_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:

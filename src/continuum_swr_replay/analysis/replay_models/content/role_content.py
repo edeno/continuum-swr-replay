@@ -131,6 +131,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRUNK_ARMS,
 )
 from continuum_swr_replay.tables.columns import require_columns
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .. import declared_tests as dt
 
@@ -337,7 +338,6 @@ UNIT = "event_id"
 ARM = "candidate_arm"
 ROLE = "role"
 KIND = "kind"
-SESSION_COLUMNS = ("animal", "session_date", "epoch")
 
 REWARD_FRACTION = "reward_fraction"
 VALUE = "value"
