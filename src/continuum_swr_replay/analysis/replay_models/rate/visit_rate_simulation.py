@@ -40,11 +40,6 @@ The planted values (each scenario's truth for each model):
 - the session level: each session's truth of the coefficient form
   (``Planted.pooled``, the Poisson projection onto that form) reduced as the
   estimates are, session -> recording day -> animal, the animals' mean;
-- the animal level: Q2 is each animal's shared-coefficient projection
-  (``visit_rate_scenarios.shared_ratio_projection``), the mean over the
-  animals; Q1, Q1b and Q7a take the session level's truths (the sessions'
-  curves of the shared form differ from them only by what a session's own
-  ratio would move them; an approximation);
 - beside them (``table``): the omission side's truth of Q2 (the time-varying
   form's), reduced as at the session level.
 
@@ -541,10 +536,6 @@ def shaped_clocks(kind: str, curves: pd.DataFrame) -> sc.PlantedClocks:
 # --- The scenarios -------------------------------------------------------------------
 
 
-def _zero(x: np.ndarray) -> np.ndarray:
-    return np.zeros(np.shape(x))
-
-
 def _scenario_truth(
     name: str,
     rows: pd.DataFrame,
@@ -554,19 +545,17 @@ def _scenario_truth(
     q1_reference_s: tuple[float, float],
     log_ratios: Mapping[SessionKey, float],
     table: sc.RateTable,
-) -> tuple[sc.Planted, np.ndarray]:
-    """One session's planted scenario and the reference rate of its
-    projection (the rate before the reward effect)."""
+) -> sc.Planted:
+    """One session's planted scenario."""
     common = {"total": total, "q1_reference_s": q1_reference_s}
-    exposure = rows[vr.EXPOSURE].to_numpy(dtype=float)
     if name == "rate_table":
-        return sc.rate_table_truth(rows, table, **common), exposure
+        return sc.rate_table_truth(rows, table, **common)
     if name == "no_effect":
-        planted = sc.no_effect(rows, clocks, **common)
-    elif name == "constant_ratio":
-        planted = sc.constant_ratio(rows, clocks, log_ratio=LOG_RATIO[kind], **common)
-    elif name == "fading_ratio":
-        planted = sc.fading_ratio(
+        return sc.no_effect(rows, clocks, **common)
+    if name == "constant_ratio":
+        return sc.constant_ratio(rows, clocks, log_ratio=LOG_RATIO[kind], **common)
+    if name == "fading_ratio":
+        return sc.fading_ratio(
             rows,
             clocks,
             log_ratio=LOG_RATIO[kind],
@@ -574,36 +563,19 @@ def _scenario_truth(
             fade_end_s=FADE_S[1],
             **common,
         )
-    elif name == "differing_ratio":
-        planted = sc.differing_ratio(rows, clocks, log_ratios=log_ratios, **common)
-    elif name == "later_onset":
-        planted = sc.later_onset_after_omission(rows, clocks, delay_s=DELAY_S, **common)
-        delayed = sc.PlantedClocks(
-            lambda s: clocks.arrival(np.maximum(np.asarray(s) - DELAY_S, 0.0)),
-            clocks.leaving,
-        )
-        return planted, exposure * np.exp(delayed.log_rate(rows))
-    elif name == "drop_before_leaving":
-        planted = sc.drop_before_leaving(
+    if name == "differing_ratio":
+        return sc.differing_ratio(rows, clocks, log_ratios=log_ratios, **common)
+    if name == "later_onset":
+        return sc.later_onset_after_omission(rows, clocks, delay_s=DELAY_S, **common)
+    if name == "drop_before_leaving":
+        return sc.drop_before_leaving(
             rows, clocks.arrival, drop=DROP, width_s=DROP_WIDTH_S, **common
         )
-        leaving = sc.PlantedClocks(
-            clocks.arrival, lambda u: np.where(np.asarray(u) < DROP_WIDTH_S, -DROP, 0.0)
-        )
-        return planted, exposure * np.exp(leaving.log_rate(rows))
-    elif name == "drop_before_small_movements":
-        planted = sc.drop_before_small_movements(
+    if name == "drop_before_small_movements":
+        return sc.drop_before_small_movements(
             rows, clocks.arrival, drop=DROP, width_s=DROP_WIDTH_S, **common
         )
-        stretch = sc.PlantedClocks(
-            clocks.arrival,
-            _zero,
-            lambda m: np.where(np.asarray(m) < DROP_WIDTH_S, -DROP, 0.0),
-        )
-        return planted, exposure * np.exp(stretch.log_rate(rows))
-    else:
-        raise ValueError(f"no scenario {name!r}")
-    return planted, exposure * np.exp(clocks.log_rate(rows))
+    raise ValueError(f"no scenario {name!r}")
 
 
 def _session_planted(
@@ -615,19 +587,18 @@ def _session_planted(
     log_ratios: Mapping[SessionKey, float],
     table: sc.RateTable,
 ) -> dict[str, dict]:
-    """Each scenario's expected counts, reference and truths in one session:
+    """Each scenario's expected counts and truths in one session:
     the pooled and omission-side truths with Q1 at both reference windows."""
     out = {}
     for name in names:
-        planted, reference = _scenario_truth(
+        planted = _scenario_truth(
             name, rows, clocks, kind, total, (0.0, 1.0), log_ratios, table
         )
-        later, _ = _scenario_truth(
+        later = _scenario_truth(
             name, rows, clocks, kind, total, (1.0, 2.0), log_ratios, table
         )
         out[name] = {
             "expected": planted.expected,
-            "reference": reference,
             "pooled": {**planted.pooled, "Q1b": later.pooled["Q1"]},
             "omission_side": {
                 **planted.omission_side,
@@ -657,25 +628,6 @@ def _snapped(value: float) -> float:
     as a rounding error (below 1e-12): it is zero, so that its bias has no
     share."""
     return 0.0 if abs(value) < 1e-12 else value
-
-
-def _animal_truth(
-    sessions: Mapping[SessionKey, pd.DataFrame], planted: Mapping[SessionKey, dict]
-) -> float:
-    """The mean over the animals of each animal's shared-coefficient
-    projection (``shared_ratio_projection``)."""
-    values = []
-    for animal in sorted({key[0] for key in sessions}):
-        keys = [key for key in sessions if key[0] == animal]
-        values.append(
-            sc.shared_ratio_projection(
-                pd.concat([sessions[k] for k in keys], ignore_index=True),
-                np.concatenate([planted[k]["expected"] for k in keys]),
-                np.concatenate([planted[k]["reference"] for k in keys]),
-                np.repeat(np.arange(len(keys)), [len(sessions[k]) for k in keys]),
-            )
-        )
-    return _snapped(float(np.mean(values)))
 
 
 def _expected_column(
@@ -969,12 +921,6 @@ def simulation(
                 for e in ("Q1", "Q1b", "Q2", "Q7a")
             },
         }
-        animal_q2 = (
-            np.nan
-            if not np.isfinite(truth["session"]["Q2"])
-            else _animal_truth(sessions, by_session)
-        )
-        truth["animal"] = {**truth["session"], "Q2": animal_q2}
         truths[name] = truth
         planted_values = {
             e: partial(
@@ -1035,8 +981,8 @@ def simulation(
 
 def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     """The engine's summary with the run's kind, target and each model's
-    level and prior SD, and Q2's truths beside the planted value:
-    ``truth_session`` and ``truth_animal`` (each level's pooled truth) and
+    prior SD, and Q2's truths beside the planted value:
+    ``truth_session`` (the pooled truth) and
     ``truth_omission_side`` (the time-varying form's), and
     ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`). A joint run's is
     :func:`joint_table`."""
@@ -1052,7 +998,7 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
         for m in out["model"]
     ]
     out["truth_from_real_counts"] = out["scenario"].isin(TRUTH_FROM_REAL_COUNTS)
-    for name in ("session", "animal", "omission_side"):
+    for name in ("session", "omission_side"):
         out[f"truth_{name}"] = [
             truths[s][name][e]
             for s, e in zip(out["scenario"], out["estimand"], strict=True)

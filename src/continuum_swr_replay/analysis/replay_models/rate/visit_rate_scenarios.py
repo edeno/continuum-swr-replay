@@ -102,7 +102,6 @@ __all__ = [
     "rate_table_from_bins",
     "rate_table_truth",
     "session_log_ratios",
-    "shared_ratio_projection",
 ]
 
 LogCurve = Callable[[np.ndarray], np.ndarray]
@@ -398,57 +397,6 @@ def _proportional_fit(
         if largest < _PROJECTION_TOL:
             return planted, steps
     raise RuntimeError("the projection did not converge")
-
-
-def shared_ratio_projection(
-    rows: pd.DataFrame,
-    expected: np.ndarray,
-    reference: np.ndarray,
-    sessions: np.ndarray,
-    *,
-    arrival_cell_s: float = ARRIVAL_CELL_S,
-    leaving_cell_s: float = LEAVING_CELL_S,
-) -> float:
-    """The reward coefficient of the Poisson projection of several sessions'
-    planted expected counts onto the coefficient form with ONE coefficient
-    shared by the sessions: the truth of ``reward_level="animal"``.
-
-    As :func:`poisson_projection` with ``by_outcome=False`` for one session,
-    with each session's own arrival and leaving steps: ``mu = reference *
-    exp(a_session(arrival cell) + b_session(leaving cell) + beta *
-    rewarded)``, fitted to ``expected`` by maximum likelihood. It is the
-    limit of the animal-level fit on unlimited data, with each session's
-    curves as flexible as the cells.
-
-    Parameters
-    ----------
-    rows : pd.DataFrame
-        The sessions' rows, concatenated: the two clocks and
-        ``last_outcome_rewarded``.
-    expected, reference : np.ndarray, shape (n_rows,)
-        As :func:`poisson_projection` takes them.
-    sessions : np.ndarray of int, shape (n_rows,)
-        Each row's session, coded ``0 .. n_sessions - 1``.
-    arrival_cell_s, leaving_cell_s : float
-
-    Returns
-    -------
-    float
-        ``beta``.
-    """
-    expected = np.asarray(expected, dtype=float)
-    reference = np.asarray(reference, dtype=float)
-    sessions = np.asarray(sessions, dtype=int)
-    n_sessions = int(sessions.max()) + 1
-    groups = []
-    for clock, cell_s in ((ARRIVAL, arrival_cell_s), (LEAVING, leaving_cell_s)):
-        edges = _cell_edges(clock, cell_s)
-        n_cells = edges.size - 1
-        cell = _cell(edges, rows[clock].to_numpy(dtype=float))
-        groups.append((sessions * n_cells + cell, n_sessions * n_cells))
-    groups.append((_rewarded(rows).astype(int), 2))
-    _, steps = _proportional_fit(expected, reference, groups)
-    return float(steps[2][1])
 
 
 def _projected_contrasts(

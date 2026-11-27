@@ -67,10 +67,10 @@ def test_the_same_seed_gives_the_same_table(quick, quick_result) -> None:
 def test_the_planted_values(quick) -> None:
     """A constant ratio is the truth of every level; a later onset has no
     planted ratio; the differing ratios' session truth is the reduction of
-    the sessions' own ratios, and the animal truth lies within their range."""
+    the sessions' own ratios."""
     truths = quick.attrs["truths"]
     log_ratio = vs.LOG_RATIO["SWR"]
-    for level in ("session", "animal", "omission_side"):
+    for level in ("session", "omission_side"):
         assert truths["constant_ratio"][level]["Q2"] == pytest.approx(log_ratio)
         assert truths["no_effect"][level]["Q2"] == 0.0
         assert np.isnan(truths["later_onset"][level]["Q2"])
@@ -83,11 +83,6 @@ def test_the_planted_values(quick) -> None:
     per_animal = pd.Series(ratios).groupby(level=0).mean()
     assert truths["differing_ratio"]["session"]["Q2"] == pytest.approx(
         per_animal.mean()
-    )
-    assert (
-        min(ratios.values())
-        < truths["differing_ratio"]["animal"]["Q2"]
-        < max(ratios.values())
     )
     assert truths["drop_before_leaving"]["session"]["Q7a"] == pytest.approx(-vs.DROP)
 
@@ -195,7 +190,7 @@ def test_the_joint_rows_hold_each_kind_with_its_own_planted_rate(joint) -> None:
                 (0.0, 1.0),
                 {},
                 None,
-            )[0]
+            )
             np.testing.assert_allclose(
                 part["expected_swr_ratio"].to_numpy(), planted.expected, rtol=1e-12
             )
