@@ -480,7 +480,9 @@ def epoch_outside_swr_gains(
         ``no_swr_events_full_minus_swr``, ``share_in_no_swr_events``,
         ``swr_events_outside_swr_full_minus_swr``,
         ``share_in_swr_events_outside_swr``, ``share_outside_events`` (1 minus
-        the two shares), ``outside_events_full_minus_swr``,
+        the two; ``share_in_no_swr_events`` and ``share_outside_events`` are
+        ratios of signed sums and can lie outside 0 to 1),
+        ``outside_events_full_minus_swr``,
         ``outside_events_gain_per_spike`` and ``outside_events_gain_per_s``
         (NaN without spikes, bins or a positive total, as each divides).
 
@@ -645,8 +647,8 @@ def epoch_contrast_gains(
     visit, in nats, per spike and per second, both score families.
 
     It reads any contrast of :data:`.nonlocal_restriction.ALL_CONTRASTS` whose
-    models the time sums hold, the fourth model's (``swr_allowed``) among them
-    when the restriction run scored it, on the same bins as
+    models the time sums hold, the fourth model's (``swr_allowed``) among them,
+    on the same bins as
     :func:`epoch_inside_swr_gains`, :func:`epoch_outside_swr_gains` and
     :func:`epoch_immobile_gains` (their ``full - swr`` is this function's
     ``full_minus_swr``).
@@ -896,7 +898,7 @@ def outside_swr_subset_shares(
     interval.
 
     The share is the same in both score families, and it is a description of
-    the part, not an effect: an animal's value is the median over its epochs
+    the part, not an effect: an animal's value is the mean over its epochs
     (``shared_statistics.animal_session_values``), the estimate the mean over
     animals, and the lowest animal's value is given beside it. (A t interval
     of a share near 1 can pass 1.)
@@ -917,7 +919,7 @@ def outside_swr_subset_shares(
     rows = []
     for subset, threshold, epochs in _subset_epochs(time_sums, bin_s, SUBSETS):
         per_animal = animal_session_values(
-            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "median"
+            epochs["share_of_bins"], epochs["animal"], epochs["epoch_id"], "mean"
         )
         rows.append(
             {
@@ -1147,17 +1149,16 @@ def restriction_figure_statistics(
 # --- the fourth decoder (Figure 2's supplement) --------------------------------
 
 SWR_ALLOWED_TIME_CONTRASTS = {
-    time: (
-        *SWR_ALLOWED_CONTRASTS,
-        *(("swr_minus_none", "full_minus_none") if time == "immobile" else ()),
-    )
-    for time in CONTRAST_TIMES
+    time: tuple(SWR_ALLOWED_CONTRASTS) for time in CONTRAST_TIMES
 }
-"""The contrasts read of a restriction run that scored the fourth model
-(:data:`.nonlocal_restriction.SWR_ALLOWED`), by the time they are read over
-(:data:`CONTRAST_TIMES`): the fourth model's three contrasts over each, and
-over all immobile time also the SWR-only and full decoders' gains over the
-local-only decoder of the same scoring pass."""
+"""The fourth model's contrasts
+(:data:`.nonlocal_restriction.SWR_ALLOWED_CONTRASTS`), by the time they are
+read over (:data:`CONTRAST_TIMES`)."""
+
+IMMOBILE_DECODER_GAINS = ("swr_minus_none", "full_minus_none")
+"""The SWR-only and full decoders' gains over the local-only decoder over all
+immobile time, which the fourth model's panel draws beside its own
+(:func:`immobile_gain_statistics`, the three-decoder values')."""
 SWR_ALLOWED_FIGURE_DECODERS = (
     "swr_minus_none_per_spike",
     "swr_allowed_minus_none_per_spike",
@@ -1183,7 +1184,9 @@ class SwrAllowedStatistics(NamedTuple):
 
     times: pd.DataFrame
     """:func:`contrast_gain_statistics` of :data:`SWR_ALLOWED_TIME_CONTRASTS`
-    over each time, indexed by ``time``, ``family`` and ``measure``."""
+    over each time, and over all immobile time the rows of
+    :data:`IMMOBILE_DECODER_GAINS` of :func:`immobile_gain_statistics`,
+    indexed by ``time``, ``family`` and ``measure``."""
     events: pd.DataFrame
     """``restriction_windows.restriction_window_statistics`` of
     :data:`OUTSIDE_SWR_EVENT_WINDOWS` with the contrast
@@ -1200,8 +1203,8 @@ def swr_allowed_statistics(
     Parameters
     ----------
     windows : pd.DataFrame
-        The held-out events of a run made from a restriction run that scored
-        the fourth model, as :func:`restriction_figure_statistics` takes them.
+        The held-out events, as :func:`restriction_figure_statistics` takes
+        them.
     time_sums : pd.DataFrame
         That run's time sums of every epoch.
     bin_s : pd.Series
@@ -1212,16 +1215,22 @@ def swr_allowed_statistics(
     ValueError
         If the time sums or the windows do not hold the fourth model.
     """
-    times = pd.concat(
-        [
-            contrast_gain_statistics(
-                epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
-                contrasts,
-            ).assign(time=time)
-            for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
-        ],
-        ignore_index=True,
-    ).set_index(["time", "family", "measure"])
+    contrast_rows = [
+        contrast_gain_statistics(
+            epoch_contrast_gains(time_sums, bin_s, time=time, contrasts=contrasts),
+            contrasts,
+        ).assign(time=time)
+        for time, contrasts in SWR_ALLOWED_TIME_CONTRASTS.items()
+    ]
+    immobile = immobile_gain_statistics(epoch_immobile_gains(time_sums, bin_s))
+    decoders = immobile[
+        immobile["measure"].isin(
+            [f"{c}_{u}" for c in IMMOBILE_DECODER_GAINS for u in ("per_spike", "per_s")]
+        )
+    ][list(contrast_rows[0].columns.drop("time"))].assign(time="immobile")
+    times = pd.concat([*contrast_rows, decoders], ignore_index=True).set_index(
+        ["time", "family", "measure"]
+    )
     events = restriction_window_statistics(
         windows,
         **{

@@ -76,6 +76,23 @@ __all__ = [
 ]
 
 
+def _session_records(fit: VisitRateFit) -> list[FitRecord]:
+    """The fit's records, each of one session.
+
+    Raises
+    ------
+    ValueError
+        If a record is of a larger unit (``fit_by`` not ``"session"``): these
+        statistics key a record by its session and reduce it as a session.
+    """
+    larger = sorted({r.fit_by for r in fit.records} - {"session"})
+    if larger:
+        raise ValueError(
+            f"records with fit_by {larger}: these statistics read per-session fits only"
+        )
+    return list(fit.records)
+
+
 def _kept(record: FitRecord) -> bool:
     """A record whose fit is kept (converged, no ``no_fit`` cause)."""
     return record.status == CONVERGED and not record.no_fit
@@ -102,7 +119,7 @@ def session_estimands(fit: VisitRateFit) -> pd.DataFrame:
         raise ValueError(f"the declared estimands are model A's, not {fit.model}'s")
     c = declared_contrasts(fit.design, fit.settings)
     rows = []
-    for record in fit.records:
+    for record in _session_records(fit):
         beta = np.asarray(record.coef, dtype=float)
         vcov = np.asarray(record.vcov, dtype=float)
         for estimand_id, contrast in c.items():
@@ -280,7 +297,7 @@ def lag_curves(fit: VisitRateFit, *, seed: int) -> pd.DataFrame:
         raise ValueError(f"the lag curve is model D's, not {fit.model}'s")
     C = lag_curve_rows(fit.design)
     rows = []
-    for record in fit.records:
+    for record in _session_records(fit):
         beta = np.asarray(record.coef, dtype=float)
         used = np.any(C != 0.0, axis=0)
         if _kept(record) and np.isfinite(beta[used]).all():

@@ -1,13 +1,32 @@
-"""The per-session fitting loop: one design, every session fitted alone.
+"""The fitting loop: one design, one fit for each unit of the fit.
 
 :func:`fit_sessions` takes a :class:`.terms.Design`, each session's rows, a
-likelihood and the names of the response and unit columns, and returns one
-:class:`.record.FitRecord` per session. It knows nothing of the task.
+likelihood, the names of the response and unit columns and the unit of the fit
+(``fit_by``: ``"session"``, ``"day"`` or ``"animal"``,
+:data:`continuum_swr_replay.tables.session_keys.FitBy`), and returns one
+:class:`.record.FitRecord` per unit. It knows nothing of the task.
 
-A session's design is built once, on all its rows (sorted by unit under the
-grouped softmax); from then on one mask over those rows says which are kept,
-with one reason for each row removed, and the design of the kept rows is a
-slice. For each session, in order:
+The sessions given are grouped by their unit
+(:func:`continuum_swr_replay.tables.session_keys.unit_key`), the units in the
+order of each one's first session and each unit's sessions in the order given.
+Each unit is one fit, through the steps below; a unit of one session has no
+baseline copies and is the per-session fit, bit for bit. In a fit of several
+sessions:
+
+- the rows are each session's rows (sorted by unit under the grouped softmax),
+  in turn; each row keeps its session;
+- the support unit is coded within each session and then offset, so that a
+  unit id that starts again in every session (a well visit) is a different
+  unit in each session;
+- each baseline term of the design is copied for each session
+  (:meth:`.terms.Design.for_sessions`). A copy is a level, so the steps below
+  judge and drop it as a level; what that drops is stated once, in
+  :mod:`.terms` ("Baselines"). A copy's dropped rows are counted under
+  ``rows_dropped`` by the copy's name.
+
+The fit's design is built once, on all its rows; from then on one mask over
+those rows says which are kept, with one reason for each row removed, and the
+design of the kept rows is a slice. For each fit, in order:
 
 1. The rows with a missing value the design reads are removed.
 2. The levels of the categories, to a fixed point: the support rule
@@ -15,8 +34,15 @@ slice. For each session, in order:
    removed: its rows are dropped (not merged into the reference level) and
    the terms fitted for it leave with it (``DesignTerm.dependents``). Under
    the grouped softmax an event with no response on the rows kept is
-   removed: the first time as given (``events_without_response``), after
-   that as emptied by dropped rows (``events_emptied_by_dropped_rows``).
+   removed: as given without a response (``events_without_response``) when
+   its response over all its rows given sums to zero (a missing share counts
+   as zero), else as emptied by the rows removed, for a missing value or a
+   dropped level (``events_emptied_by_dropped_rows``). A response below
+   zero (Poisson, Bernoulli, grouped softmax) is refused on the rows given,
+   before any row is removed.
+   At the fixed point, a category without rows of its reference level on the
+   rows kept (in the fit; in a session, for a baseline category's copies) is
+   an error naming the fit, the category and the level, penalized or not.
 3. Every other term is judged once, on the final rows: one that fails the
    support rule (or the design check in the session) is inactive in the fit.
    The record holds those counts, and for a removed level the counts that
@@ -49,8 +75,7 @@ other status, keeps the last fit's status and the true counts, with NaN
 coefficients and its cause. Its ``left_out`` and ``left_out_round`` hold what
 the refit had left out before it ended, as a record of what was tried; no rows
 are dropped for it. Every cause is a code of a closed set
-(:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term;
-:func:`.record.describe` gives their words).
+(:class:`.record.NoFit` for a session, :class:`.support.Removed` for a term).
 
 A session with columns left out keeps its other terms: those columns'
 coefficients and covariance are NaN and ``left_out`` says why (with the
@@ -73,6 +98,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.session_keys import FitBy, unit_fields, unit_key
+
 from .collinearity import term_collinearity
 from .likelihoods import Bernoulli, GroupedSoftmax, Likelihood, Poisson
 from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
@@ -85,11 +112,9 @@ from .reml import (
     refit_session,
 )
 from .support import Removed, Support, design_support
-from .terms import Design, DesignTerm
+from .terms import Design, DesignTerm, SessionKey
 
 __all__ = ["NOT_FITTED", "SessionKey", "fit_sessions"]
-
-SessionKey = tuple[str, str, str]
 
 #: The status of a session for which no fit was tried: no rows, or no events
 #: of the kind, are left.
@@ -113,33 +138,45 @@ class _Removal:
 
 @dataclass(frozen=True)
 class _Identity:
-    key: SessionKey
+    key: tuple  # the unit's key (``unit_key``)
+    fit_by: FitBy
     model: str
     kind: str
     table_sha256: Mapping[str, str]
 
 
 class _Session:
-    """One session's state: its design, built once on all its rows; a reason
-    for each row removed; the terms removed; the last support counts."""
+    """One fit's state: its design, built once on all its rows; a reason for
+    each row removed; the terms removed; the last support counts."""
 
     def __init__(
         self,
         design: Design,
         lik: Likelihood,
-        rows: pd.DataFrame,
+        sessions: Mapping[SessionKey, pd.DataFrame],
         response: str,
         unit: str,
         name: str,
     ) -> None:
-        rows = rows.reset_index(drop=True)
-        if isinstance(lik, GroupedSoftmax):
-            rows = rows.sort_values(unit, kind="stable").reset_index(drop=True)
-        built = design.build(rows)
+        parts, units, offset = [], [], 0
+        read = list(dict.fromkeys([*design.columns, response, unit]))
+        for frame in sessions.values():
+            frame = frame[read].reset_index(drop=True)
+            if isinstance(lik, GroupedSoftmax):
+                frame = frame.sort_values(unit, kind="stable").reset_index(drop=True)
+            codes = pd.factorize(frame[unit].to_numpy(), use_na_sentinel=False)[0]
+            parts.append(frame)
+            units.append(codes + offset)
+            offset += int(codes.max()) + 1 if codes.size else 0
+        rows = pd.concat(parts, ignore_index=True)
+        self.keys = [tuple(key) for key in sessions]
+        self.session = np.repeat(np.arange(len(parts)), [len(p) for p in parts])
+        design = design.for_sessions(self.keys)
+        built = design.build(rows, self.session)
         self.design, self.lik, self.name = design, lik, name
         self.X, self.offset, self.level_rows = built.X, built.offset, built.level_rows
         self.y = rows[response].to_numpy(dtype=float)
-        self.unit = pd.factorize(rows[unit].to_numpy(), use_na_sentinel=False)[0]
+        self.unit = np.concatenate(units)
         self.reason = np.where(built.missing, _MISSING, _KEPT).astype(np.int8)
         self.dropped_by = np.full(len(rows), -1)  # the place in levels_dropped
         self.levels_dropped: list[str] = []
@@ -149,6 +186,7 @@ class _Session:
         self.rounds = 0  # the refit rounds before the current fit
         self.no_fit = ""
         self.fitted_with: tuple[SessionData, list[str]] | None = None
+        self.X_kept: np.ndarray | None = None  # the rows kept, at the last judge
 
     @property
     def kept(self) -> np.ndarray:
@@ -167,13 +205,19 @@ class _Session:
 
     def _remove_empty_events(self) -> None:
         """Under the softmax, remove the events with no response on the rows
-        kept: the first time as given, after that as emptied by dropped rows."""
+        kept: as given without a response when the event's response over all
+        its rows given is not above zero (a missing share counts as zero),
+        else as emptied by the rows removed."""
         kept = self.kept
         response = np.where(np.isnan(self.y), 0.0, self.y)
-        total = np.bincount(self.unit[kept], weights=response[kept])
-        empty = np.zeros(kept.size, dtype=bool)
-        empty[kept] = total[self.unit[kept]] <= 0
-        self.reason[empty] = _EMPTIED if self.events_counted else _NO_RESPONSE
+        given = np.bincount(self.unit, weights=response)
+        total = np.bincount(
+            self.unit[kept], weights=response[kept], minlength=given.size
+        )
+        empty = kept & (total[self.unit] <= 0)
+        self.reason[empty] = np.where(
+            given[self.unit[empty]] <= 0, _NO_RESPONSE, _EMPTIED
+        )
         self.events_counted = True
 
     def _drop_level(self, level: DesignTerm) -> None:
@@ -206,9 +250,10 @@ class _Session:
             if why:
                 return why
             kept = self.kept
+            self.X_kept = self._kept_design(kept)  # the fit of this round reads it
             self.support = design_support(
                 self.design,
-                self.X[kept],
+                self.X_kept,
                 {level: rows[kept] for level, rows in self.level_rows.items()},
                 self.unit[kept],
             )
@@ -227,9 +272,51 @@ class _Session:
                 and term.name not in self.levels_dropped
             ]
             if not pending:
+                self._require_reference_rows()
                 return ""
             for term in pending:
                 self._drop_level(term)
+
+    def _require_reference_rows(self) -> None:
+        """Refuse a category without rows of its reference level on the rows
+        kept: in the fit, and, for a baseline category copied for each
+        session, in each session with rows kept (:mod:`.terms`).
+
+        Raises
+        ------
+        ValueError
+            Naming the fit, the category, its reference level (and the
+            session, for a copy) and its levels' active coefficients.
+        """
+        kept_session = self.session[self.kept]
+        for category in self.design.categories:
+            levels = [
+                t
+                for t in self.design.terms
+                if t.kind == "level" and t.term == category.column
+            ]
+            if any(t.is_copy for t in levels):
+                groups = [
+                    (key, kept_session == s)
+                    for s, key in enumerate(self.keys)
+                    if np.any(kept_session == s)
+                ]
+            else:
+                groups = [(None, np.ones(kept_session.size, dtype=bool))]
+            for key, rows in groups:
+                own = [t for t in levels if key is None or t.session == key]
+                columns = [int(j) for t in own for j in t.columns]
+                if np.any(np.all(self.X_kept[np.ix_(rows, columns)] == 0, axis=1)):
+                    continue
+                where = "" if key is None else f" in session {'/'.join(key)}"
+                active = ", ".join(t.name for t in own if t.name not in self.removed)
+                raise ValueError(
+                    f"{self.name}: the category {category.column!r} has no rows of "
+                    f"its reference level {category.reference!r}{where} on the rows "
+                    f"kept, so its levels {active} are not identified (a category's "
+                    "reference level must have rows in every fit, and a baseline "
+                    "category's in every session of the fit)"
+                )
 
     def left_out(self) -> dict[str, str]:
         """Coefficient name -> why it is inactive (a ``Removed`` code): the
@@ -276,24 +363,70 @@ class _Session:
             for name, counted in self.support.items()
         }
 
-    def cohort_counts(self) -> dict:
-        """The rows and events removed before the fit, by reason."""
+    def counts(self, rows: np.ndarray) -> dict:
+        """The rows, units and events the fit saw of ``rows`` (a mask, shape
+        ``(n_rows,)``)."""
+        mine = rows & self.kept
+        return {
+            "n_rows": int(mine.sum()),
+            "n_units": int(np.unique(self.unit[mine]).size),
+            "n_events": _n_events(self.lik, self.y[mine], self.unit[mine]),
+        }
+
+    def cohort_counts(self, rows: np.ndarray) -> dict:
+        """The rows and events removed before the fit, by reason, on ``rows``
+        (a mask, shape ``(n_rows,)``); every dropped level, with its count."""
+        reason = np.where(rows, self.reason, _KEPT)
         counts = {
-            "rows_missing_values": int(np.sum(self.reason == _MISSING)),
+            "rows_missing_values": int(np.sum(reason == _MISSING)),
             "rows_dropped": {
-                name: int(np.sum((self.reason == _LEVEL) & (self.dropped_by == k)))
+                name: int(np.sum((reason == _LEVEL) & (self.dropped_by == k)))
                 for k, name in enumerate(self.levels_dropped)
             },
         }
         if isinstance(self.lik, GroupedSoftmax):
-            counts["events_emptied_by_dropped_rows"] = self._units(_EMPTIED)
+            counts["events_emptied_by_dropped_rows"] = self._units(_EMPTIED, reason)
             if self.events_counted:
-                counts["events_without_response"] = self._units(_NO_RESPONSE)
+                counts["events_without_response"] = self._units(_NO_RESPONSE, reason)
         return counts
 
-    def _units(self, reason: int) -> int:
-        """The units with a row removed for ``reason``."""
-        return int(np.unique(self.unit[self.reason == reason]).size)
+    def session_entries(self) -> list[dict]:
+        """Each session of the fit: its key, the rows, units and events the fit
+        saw of it, the rows and events removed by reason
+        (:meth:`cohort_counts` on its rows, a dropped level only where it
+        dropped rows of the session) and the names of its baseline copies
+        (the record's ``sessions``)."""
+        baselines = self.design.session_baselines()
+        out = []
+        for s, key in enumerate(self.keys):
+            own = self.session == s
+            removed = self.cohort_counts(own)
+            removed["rows_dropped"] = {
+                name: n for name, n in removed["rows_dropped"].items() if n
+            }
+            animal, session_date, epoch = key
+            out.append(
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": epoch,
+                    **self.counts(own),
+                    **removed,
+                    "baseline": baselines.get(key, []),
+                }
+            )
+        return out
+
+    def _kept_design(self, kept: np.ndarray) -> np.ndarray:
+        """The design's ``kept`` rows: the design itself, not a copy, when
+        every row is kept."""
+        return self.X if kept.all() else self.X[kept]
+
+    def _units(self, reason: int, reasons: np.ndarray | None = None) -> int:
+        """The units with a row removed for ``reason`` (``reasons``: each row's,
+        the fit's when None)."""
+        reasons = self.reason if reasons is None else reasons
+        return int(np.unique(self.unit[reasons == reason]).size)
 
     def data(self) -> tuple[SessionData, list[PenaltyBlock], np.ndarray, list[str]]:
         """The fit's data on the rows kept, every term removed inactive, and
@@ -302,7 +435,7 @@ class _Session:
         kept = self.kept
         left_out = self.left_out()
         inactive = np.array([c in left_out for c in self.design.coef_names])
-        X, y = self.X[kept], self.y[kept]
+        X, y = self.X_kept, self.y[kept]
         if isinstance(self.lik, GroupedSoftmax):
             aux = np.unique(self.unit[kept], return_inverse=True)[1]
         elif isinstance(self.lik, Poisson):
@@ -334,11 +467,10 @@ class _Session:
             what = (
                 "its design is not identified, in the coefficients "
                 + _named(self.design, names, refit.refits[0])
-                + " (a category's reference level must have rows in every session)"
                 if start == NOT_IDENTIFIED
                 else f"its fit ended as {start}, a numerical failure"
             )
-            raise ValueError(f"session {self.name}: at its first fit {what}")
+            raise ValueError(f"{self.name}: at its first fit {what}")
         self.fitted_with = (data, names)
         return refit
 
@@ -380,7 +512,7 @@ class _Session:
                 removal.rounds += [min(removal.rounds)] * len(rest)
                 whole = True
         self.rounds += len(refit.refits) - 1
-        self.no_fit = "" if refit.fitted else NoFit(refit.ended.value)
+        self.no_fit = "" if refit.fitted else NoFit[refit.ended.name]
         return (refit.fitted and level_left) or whole
 
 
@@ -410,16 +542,14 @@ def _edf(
     the category's entry is the sum of those: a total over all entries
     counts the levels twice."""
     penalized = dict(zip(block_terms, fit.edf.tolist(), strict=True))
+    terms = [t for t in design.terms if t.kind != "intercept" and not t.is_copy]
     part = {
-        t.name: penalized.get(t.name, float(active[t.columns].sum()))
-        for t in design.terms
-        if t.kind != "intercept"
+        t.name: penalized.get(t.name, float(active[t.columns].sum())) for t in terms
     }
     out: dict[str, float] = {}
-    for t in design.terms:
-        if t.kind != "intercept":
-            out[t.term] = out.get(t.term, 0.0) + part[t.name]
-    for t in design.terms:
+    for t in terms:
+        out[t.term] = out.get(t.term, 0.0) + part[t.name]
+    for t in terms:
         if t.kind == "level" and t.block is not None:
             out[t.name] = part[t.name]
     return out
@@ -437,16 +567,17 @@ def _named(design: Design, block_terms: list[str], score: RemlScore) -> str:
     return ", ".join(dict.fromkeys(names))
 
 
-def _fit_session(
+def _fit_unit(
     design: Design,
-    rows: pd.DataFrame,
+    sessions: Mapping[SessionKey, pd.DataFrame],
     lik: Likelihood,
     identity: _Identity,
     response: str,
     unit: str,
 ) -> FitRecord:
-    """One session's fit and record (the steps of the module docstring)."""
-    session = _Session(design, lik, rows, response, unit, "/".join(identity.key))
+    """One unit's fit and record (the steps of the module docstring)."""
+    name = f"{identity.fit_by} {'/'.join(identity.key)}"
+    session = _Session(design, lik, sessions, response, unit, name)
     first = True
     while True:
         why = session.judge()
@@ -458,21 +589,44 @@ def _fit_session(
             return _record(session, identity, session.no_fit, refit)
 
 
+def _session_copies(
+    session: _Session, beta: np.ndarray
+) -> list[tuple[slice, list[int]]] | None:
+    """Each session's kept rows (contiguous in the fit's rows) and its active
+    baseline copies, for the collinearity record; None without copies."""
+    design = session.design
+    if not design.sessions:
+        return None
+    codes = session.session[session.kept]
+    bounds = np.searchsorted(codes, np.arange(len(design.sessions) + 1))
+    copies = {key: [] for key in design.sessions}
+    for term in design.terms:
+        if term.is_copy:
+            copies[term.session] += [
+                int(j) for j in term.columns if np.isfinite(beta[j])
+            ]
+    return [
+        (slice(int(bounds[s]), int(bounds[s + 1])), copies[key])
+        for s, key in enumerate(design.sessions)
+    ]
+
+
 def _record(
     session: _Session,
     identity: _Identity,
     no_fit: str,
     refit: SessionRefit | None = None,
 ) -> FitRecord:
-    """The session's :class:`.record.FitRecord`: of its last fit, kept or not,
-    or, with no ``refit``, of a session for which no fit was tried."""
+    """The fit's :class:`.record.FitRecord`: of its last fit, kept or not,
+    or, with no ``refit``, of a fit that was not tried."""
     design = session.design
     kept = session.kept
+    session.X = session.X_kept = None  # the record reads the fit's own design
     p = len(design.coef_names)
     beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)  # no fit tried
     collinearity, edf = {}, {}
     status, decrement, n_iter = NOT_FITTED, float("nan"), 0
-    n_events = _n_events(session.lik, session.y[kept], session.unit[kept])
+    everywhere = np.ones(kept.size, dtype=bool)
     if refit is not None:
         data, block_terms = session.fitted_with
         last = refit.refits[-1]
@@ -482,6 +636,12 @@ def _record(
         decrement, n_iter = float(last.fit.newton_decrement), int(last.fit.n_iter)
         beta, vcov = last.fit.beta, last.covariance
         if refit.fitted:
+            # The intercept always; a baseline copy when it is active.
+            projected = [
+                j
+                for j in design.projected_columns
+                if np.isfinite(beta[j]) or design.column_terms[j].kind == "intercept"
+            ]
             collinearity = term_collinearity(
                 session.lik,
                 data.X,
@@ -489,10 +649,11 @@ def _record(
                 data.aux,
                 beta,
                 design.term_columns,
-                intercept=design.intercept_column,
+                intercept=projected,
+                session_copies=_session_copies(session, beta),
             )
             edf = _edf(design, last, block_terms, np.isfinite(beta))
-    animal, session_date, epoch = identity.key
+    animal, session_date, epoch = unit_fields(identity.key)
     return FitRecord(
         model=identity.model,
         kind=identity.kind,
@@ -500,10 +661,8 @@ def _record(
         session_date=session_date,
         epoch=epoch,
         likelihood=session.lik.name,
-        n_rows=int(kept.sum()),
-        n_units=int(np.unique(session.unit[kept]).size),
-        n_events=n_events,
-        cohort_counts=session.cohort_counts(),
+        **session.counts(everywhere),
+        cohort_counts=session.cohort_counts(everywhere),
         coef_names=list(design.coef_names),
         coef=beta.tolist(),
         vcov=vcov.tolist(),
@@ -520,6 +679,8 @@ def _record(
         standardization=design.standardization_record(),
         table_sha256=dict(identity.table_sha256),
         no_fit=no_fit,
+        fit_by=identity.fit_by,
+        sessions=session.session_entries(),
     )
 
 
@@ -533,8 +694,10 @@ def fit_sessions(
     response: str,
     unit: str,
     table_sha256: Mapping[str, str],
+    fit_by: FitBy = "session",
 ) -> list[FitRecord]:
-    """Every session's fit and record, in the order given (module docstring).
+    """Every unit's fit and record, the units in the order of their first
+    session given (module docstring).
 
     Parameters
     ----------
@@ -551,11 +714,14 @@ def fit_sessions(
         the group id).
     table_sha256 : mapping of str to str
         The tables the rows were read from -> their hashes; recorded.
+    fit_by : {"session", "day", "animal"}
+        The unit of the fit: one fit for each session (the default), for each
+        recording day of an animal, or for each animal.
 
     Returns
     -------
     list of FitRecord
-        One per session.
+        One per unit.
 
     Raises
     ------
@@ -563,10 +729,25 @@ def fit_sessions(
         If the design has an intercept under the grouped softmax, or an
         offset under another likelihood than the Poisson; if a session has a
         row whose unit id is missing (before any design is built, naming the
-        session, the unit column and the rows); if a session's first
+        session, the unit column and the rows); if a session has a response
+        below zero under the Poisson, the Bernoulli or the grouped softmax
+        (before any design is built, naming the session and the rows); if a
+        category has no rows of
+        its reference level on the rows kept of a unit (of a session, for a
+        baseline category), naming the unit; if a session's first
         fit finds its design not identified or fails for a numerical reason,
-        naming the session.
+        naming the unit; if ``fit_by`` is not a unit; if ``fit_by`` is a day
+        or an animal and the design declares no baseline.
     """
+    if fit_by != "session" and not design.baseline:
+        raise ValueError(
+            f"a fit by {fit_by} needs a baseline for each session (one intercept, "
+            "or one set of arm effects, for all its sessions is not the model): "
+            "declare it with build_design(..., baseline=...)"
+        )
+    units: dict[tuple, list[SessionKey]] = {}
+    for key in sessions:
+        units.setdefault(unit_key(key, fit_by), []).append(key)
     if design.intercept_column is not None and isinstance(lik, GroupedSoftmax):
         raise ValueError("the grouped softmax cannot see an intercept")
     if design.offset is not None and not isinstance(lik, Poisson):
@@ -578,9 +759,21 @@ def fit_sessions(
                 f"session {'/'.join(key)}: {n_missing} rows with a missing {unit} "
                 "(a unit id is never missing in a whole table)"
             )
+        if isinstance(lik, Poisson | Bernoulli | GroupedSoftmax):
+            n_negative = int(np.sum(rows[response].to_numpy(dtype=float) < 0))
+            if n_negative:
+                raise ValueError(
+                    f"session {'/'.join(key)}: {n_negative} rows with {response} "
+                    f"below zero (a {lik.name} response is never negative)"
+                )
     return [
-        _fit_session(
-            design, rows, lik, _Identity(key, model, kind, table_sha256), response, unit
+        _fit_unit(
+            design,
+            {key: sessions[key] for key in keys},
+            lik,
+            _Identity(key, fit_by, model, kind, table_sha256),
+            response,
+            unit,
         )
-        for key, rows in sessions.items()
+        for key, keys in units.items()
     ]

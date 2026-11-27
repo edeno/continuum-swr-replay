@@ -234,11 +234,11 @@ def found_again_statistics(events: pd.DataFrame, found: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Indexed by ``group`` (:data:`GROUPS`): ``n_events``, ``n_found``,
-        ``share`` (``n_found`` over ``n_events``, pooled over epochs and
-        animals; NaN without events), ``share_animal_min`` and
-        ``share_animal_max`` (the lowest and highest of the animals' own
-        shares, each the mean over the animal's epochs of the epoch's share,
-        event -> epoch -> animal) and ``n_animals``.
+        ``share`` (event -> epoch -> animal: the mean over animals of each
+        animal's share, the mean over its epochs of the epoch's share; an
+        epoch with no event of the group is not one of its animal's epochs;
+        NaN without events), ``share_animal_min`` and ``share_animal_max``
+        (the lowest and highest of the animals' shares) and ``n_animals``.
     """
     rows = {}
     for group in GROUPS:
@@ -250,7 +250,7 @@ def found_again_statistics(events: pd.DataFrame, found: str) -> pd.DataFrame:
         rows[group] = {
             "n_events": len(mine),
             "n_found": int(hit.sum()),
-            "share": hit.mean() if len(mine) else np.nan,
+            "share": by_animal.mean() if len(mine) else np.nan,
             "share_animal_min": by_animal.min(),
             "share_animal_max": by_animal.max(),
             "n_animals": len(by_animal),

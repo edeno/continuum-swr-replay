@@ -98,3 +98,23 @@ def test_an_sd_change_past_the_terms_range_is_refused() -> None:
 
     with pytest.raises(ValueError, match="outside the term's range"):
         range_mean_contrast(line, curve.first, curve.second, term_range=(0.0, 1.0))
+
+
+def test_no_contrast_reads_a_baseline() -> None:
+    """Every declared model names its per-session baseline terms, and no
+    declared contrast reads one: not a coefficient of a baseline (the
+    intercept, a level of the arm category) and not a baseline as a term."""
+    models = {e.model for e in dt.ESTIMANDS}
+    assert models <= set(dt.BASELINES)
+    for e in dt.ESTIMANDS:
+        baselines = dt.BASELINES[e.model]
+        contrast = e.contrast
+        if isinstance(contrast, dt.CoefficientContrast):
+            names = [*contrast.plus, *contrast.minus]
+        else:
+            names = [contrast.term]
+        for name in names:
+            assert not any(name == b or name.startswith(f"{b}[") for b in baselines), (
+                e.estimand_id,
+                name,
+            )

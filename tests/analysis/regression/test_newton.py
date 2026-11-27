@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import dataclasses
+import math
+import re
+
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
 import scipy.optimize
 
-from continuum_swr_replay.analysis.regression import newton
+from continuum_swr_replay.analysis.regression import newton, reml, runtime
 from continuum_swr_replay.analysis.regression.constants import (
     NEWTON_DECREMENT_TOL,
     NO_MAXIMUM_ETA_STEP,
@@ -28,7 +34,19 @@ from continuum_swr_replay.analysis.regression.newton import (
     NewtonFit,
     penalized_newton,
 )
+from continuum_swr_replay.analysis.regression.padding import (
+    ROW_BUCKET,
+    SMALLEST_ROW_BUCKET,
+    bucket_size,
+)
+from continuum_swr_replay.analysis.regression.reml import (
+    PenaltyBlock,
+    reml_and_derivatives,
+)
+from continuum_swr_replay.analysis.regression.runtime import COMPILE_LOG
 from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+
+from .conftest import family_kernel, jax_family
 
 
 def test_hand_case_poisson_two_parameters() -> None:
@@ -146,8 +164,8 @@ def _logistic_data() -> tuple[np.ndarray, np.ndarray]:
 
 def _decrement(lik, X, y, aux, S, beta) -> float:
     eta = X @ beta
-    g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
-    A = lik.information(X, eta, y, aux) + S
+    g = X.T @ family_kernel(lik, "score", None, eta, y, aux) - S @ beta
+    A = family_kernel(lik, "information", X, eta, y, aux) + S
     return 0.5 * float(g @ np.linalg.solve(A, g))
 
 
@@ -230,10 +248,14 @@ def test_last_step_below_the_objective_rounding_is_taken() -> None:
     optimum = penalized_newton(lik, X, y, offset, S, np.zeros(5)).beta
     for _ in range(3):  # polish by plain Newton steps
         eta = X @ optimum
-        g = X.T @ lik.score_eta(eta, y, offset) - S @ optimum
-        optimum = optimum + np.linalg.solve(lik.information(X, eta, y, offset) + S, g)
-    A = lik.information(X, X @ optimum, y, offset) + S
-    F = -lik.loglik(X @ optimum, y, offset) + 0.5 * optimum @ S @ optimum
+        g = X.T @ family_kernel(lik, "score", None, eta, y, offset) - S @ optimum
+        information = family_kernel(lik, "information", X, eta, y, offset)
+        optimum = optimum + np.linalg.solve(information + S, g)
+    A = family_kernel(lik, "information", X, X @ optimum, y, offset) + S
+    F = (
+        -family_kernel(lik, "loglik", None, X @ optimum, y, offset)
+        + 0.5 * optimum @ S @ optimum
+    )
     # A start off the optimum along A's weakest direction, with a predicted
     # gain delta' A delta / 2 a tenth of the rounding of F.
     gain = 0.1 * abs(F) * np.finfo(float).eps
@@ -287,6 +309,31 @@ def test_separation_has_no_finite_maximum(name: str, running_away: list[int]) ->
     assert fit.status == NO_FINITE_MAXIMUM
     assert fit.running_away.tolist() == running_away
     assert np.max(np.abs(X @ fit.step)) > NO_MAXIMUM_ETA_STEP
+
+
+def _shifted_softmax(shift: float, n_events: int = 100):
+    """Events of two candidates with shares (0.2, 0.8) and a slope of 0 and 2
+    plus ``shift``: the maximum is at ``log(4) / 2`` whatever the shift, which
+    is common to every candidate of an event and cancels in its softmax."""
+    X = (np.tile([0.0, 2.0], n_events) + shift)[:, None]
+    y = np.tile([0.2, 0.8], n_events)
+    return X, y, np.repeat(np.arange(n_events), 2)
+
+
+@pytest.mark.parametrize("shift", [0.0, 1e4, 1e5])
+def test_a_softmax_fit_ignores_a_shift_common_to_every_candidate(
+    shift: float,
+) -> None:
+    """The step's movement of the linear predictor is measured within each
+    event: a shift of 1e4 moved ``X @ step`` by 0.13 at the maximum, all of it
+    common to the event's candidates, while the softmax moved by 1e-5."""
+    X, y, groups = _shifted_softmax(shift)
+    fit = penalized_newton(
+        GroupedSoftmax(), X, y, groups, np.zeros((1, 1)), np.zeros(1)
+    )
+    assert fit.status == CONVERGED
+    assert fit.running_away.size == 0
+    np.testing.assert_allclose(fit.beta, [math.log(4.0) / 2.0], rtol=0, atol=1e-9)
 
 
 def test_a_converged_fit_has_no_running_away_columns() -> None:
@@ -350,10 +397,11 @@ def test_each_status() -> None:
     assert overflow.status == NOT_POSITIVE_DEFINITE
 
     class _Uphill(Bernoulli):
-        """The Bernoulli with the score's sign flipped: no step lowers F."""
+        """The Bernoulli with the score's sign flipped (in the function the
+        kernels call): no step lowers F."""
 
-        def score_eta(self, eta, y, aux):
-            return -super().score_eta(eta, y, aux)
+        def _jax_score(self, eta, y, aux, weight):
+            return -super()._jax_score(eta, y, aux, weight)
 
     uphill = penalized_newton(_Uphill(), X, y, None, S, np.array([0.3, 1.0]))
     assert uphill.status == HALVING_FAILED and not uphill.converged
@@ -385,17 +433,25 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
     a decrement of 0.045, above the tolerance. Neither is taken."""
     X, y, offset, S = np.ones((1, 1)), np.ones(1), np.zeros(1), np.zeros((1, 1))
     lik = Poisson()
-    beta = np.array([-0.5])
-    eta = X @ beta
-    g = X.T @ lik.score_eta(eta, y, offset)
-    A = lik.information(X, eta, y, offset)
-    decrement = 0.5 * float(g @ np.linalg.solve(A, g))
-    fit = NewtonFit(beta, A, CONVERGED, decrement, 3, lik.loglik(eta, y, offset))
+    beta = np.array([[-0.5]])
+    with jax.enable_x64(True):
+        problem = newton._Problem.of(lik, X, y, offset, S)
+        F, loglik, eta = problem.evaluate(beta)
+        r = problem.iterate(beta, eta, F, newton.MAX_STEP_LENGTH)
+        assert r["decrement"][0] == pytest.approx(0.128, abs=1e-3)
+        r["step"] = np.array([[to + 0.5]])
+        fit = newton._last_step(
+            problem, beta, r, np.array([True]), 3, newton.MAX_STEP_LENGTH
+        )[0]
 
-    F = -fit.loglik  # no penalty
-    moved = newton._last_step(lik, X, y, offset, S, fit, F, np.array([to + 0.5]))
-
-    assert moved is fit
+    # The fit stays where it was, with A and the decrement there by hand:
+    # g = 1 - exp(-0.5), A = exp(-0.5), decrement g^2 / (2 A).
+    g, A = 1.0 - np.exp(-0.5), np.exp(-0.5)
+    assert (fit.status, fit.n_iter) == (CONVERGED, 3)
+    np.testing.assert_array_equal(fit.beta, [-0.5])
+    np.testing.assert_allclose(fit.A, [[A]], rtol=1e-15)
+    assert fit.newton_decrement == pytest.approx(0.5 * g**2 / A, rel=1e-14)
+    assert fit.loglik == pytest.approx(-0.5 - np.exp(-0.5), rel=1e-15)
 
 
 def _inputs(family: str) -> tuple:
@@ -493,3 +549,528 @@ def test_a_softmax_design_constant_within_groups_is_not_identified() -> None:
         GroupedSoftmax(), X, y, groups, np.zeros((2, 2)), np.zeros(2)
     )
     assert fit.status == NOT_IDENTIFIED
+
+
+def test_sessions_of_ten_sizes_compile_once_per_bucket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ten fits with ten row counts in four row buckets (512, 2,048, 4,096 and
+    8,192 rows) trace each Newton kernel exactly once per bucket. The family
+    is a class made here, so no earlier test can have traced its kernels."""
+
+    class _Counted(Poisson):
+        pass
+
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 10**9)  # no clear here
+    sizes = [300, 500, 1500, 2500, 3500, 4000, 4100, 5000, 6500, 8190]
+    buckets = {bucket_size(n, ROW_BUCKET, SMALLEST_ROW_BUCKET) for n in sizes}
+    assert buckets == {512, 2048, 4096, 8192}
+    COMPILE_LOG.clear()
+    for n in sizes:
+        rng = np.random.default_rng(n)
+        X = np.column_stack([np.ones(n), rng.normal(size=n)])
+        y = rng.poisson(np.exp(0.2 + 0.3 * X[:, 1])).astype(float)
+        fit = penalized_newton(
+            _Counted(), X, y, np.zeros(n), np.zeros((2, 2)), np.zeros(2)
+        )
+        assert fit.converged
+    for kernel in ("_evaluate", "_iterate"):
+        assert COMPILE_LOG.count(kernel) == len(buckets), kernel
+        assert {sig[1][0] for sig in COMPILE_LOG.signatures(kernel)} == {
+            (b, 2) for b in buckets
+        }
+
+
+def _batch_against_alone(lik, X, responses, aux) -> list[NewtonFit]:
+    """Fit ``responses`` on one design in one batch and each alone, assert
+    each batch fit equals its fit alone (statuses and step counts exactly,
+    coefficients within the references' rule), and return the fits alone."""
+    p = X.shape[1]
+    S, start = np.zeros((p, p)), np.zeros(p)
+    alone = [penalized_newton(lik, X, r, aux, S, start) for r in responses]
+    with jax.enable_x64(True):
+        problems = [newton._Problem.of(lik, X, r, aux, S) for r in responses]
+        Y = jax.device_put(np.concatenate([np.asarray(q.Y) for q in problems]))
+        batch = newton._fit(
+            dataclasses.replace(problems[0], Y=Y),
+            np.zeros((len(responses), p)),
+            None,
+            newton.NEWTON_MAX_STEPS,
+            newton.MAX_STEP_LENGTH,
+        )
+    for got, want in zip(batch, alone, strict=True):
+        assert (got.status, got.n_iter) == (want.status, want.n_iter)
+        np.testing.assert_allclose(got.beta, want.beta, rtol=1e-9, atol=1e-11)
+    return alone
+
+
+def test_a_batch_of_fits_equals_each_fit_alone() -> None:
+    """Two fits on one design in one batch, one converging and one separated
+    (it stops with no finite maximum, later): each ends as it does alone, so
+    the linear predictor carried for the fits still stepping is theirs."""
+    X, y = _logistic_data()
+    separated = (X[:, 1] > 0).astype(float)
+    alone = _batch_against_alone(Bernoulli(), X, [y, separated], None)
+    assert [f.status for f in alone] == [CONVERGED, NO_FINITE_MAXIMUM]
+    assert alone[0].n_iter < alone[1].n_iter
+
+
+class _Fenced(Poisson):
+    """Poisson whose log-likelihood is minus infinity where a real row's
+    linear predictor passes 1: a fit whose optimum lies beyond fails its
+    halving search."""
+
+    def _jax_loglik(self, eta, y, aux, weight):
+        fenced = jnp.any((weight > 0) & (eta > 1.0))
+        return jnp.where(fenced, -jnp.inf, super()._jax_loglik(eta, y, aux, weight))
+
+
+class _Cracked(Poisson):
+    """Poisson whose information is NaN where a real row's linear predictor
+    passes 1: a fit that steps beyond loses a positive definite ``A``."""
+
+    def _jax_information(self, X, eta, y, aux, weight):
+        cracked = jnp.any((weight > 0) & (eta > 1.0))
+        information = super()._jax_information(X, eta, y, aux, weight)
+        return jnp.where(cracked, jnp.nan, information)
+
+
+def _poisson_pair(seed: int) -> tuple:
+    """One design and two responses: rates near 1 (an optimum at eta near 0)
+    and near e^2.5 (beyond 1)."""
+    rng = np.random.default_rng(seed)
+    X = np.column_stack([np.ones(200), 0.1 * rng.normal(size=200)])
+    return X, [rng.poisson(1.0, 200).astype(float), rng.poisson(12.0, 200) * 1.0]
+
+
+def test_a_batch_where_one_fit_fails_its_halving_equals_each_fit_alone(
+    monkeypatch,
+) -> None:
+    """With one halving allowed, the fit whose optimum is beyond the fence
+    fails its search while the other converges, in the batch as alone."""
+    monkeypatch.setattr(newton, "MAX_STEP_HALVINGS", 1)
+    X, responses = _poisson_pair(11)
+    alone = _batch_against_alone(_Fenced(), X, responses, np.zeros(200))
+    assert [f.status for f in alone] == [CONVERGED, HALVING_FAILED]
+
+
+def test_a_batch_where_one_fit_loses_a_positive_definite_a_equals_each_alone() -> None:
+    """The fit that steps past eta = 1 stops with ``A`` not positive definite
+    after a step or more, while the other converges, in the batch as alone."""
+    X, responses = _poisson_pair(12)
+    alone = _batch_against_alone(_Cracked(), X, responses, np.zeros(200))
+    assert [f.status for f in alone] == [CONVERGED, NOT_POSITIVE_DEFINITE]
+    assert alone[1].n_iter >= 1
+
+
+def test_the_carried_linear_predictor_stays_near_x_beta(monkeypatch) -> None:
+    """A slow fit (a far start, steps cut to 0.5, 45 iterations): the linear
+    predictor carried from step to step equals ``X @ beta`` at the last
+    iteration within 8 eps of the largest ``|X @ beta|`` along the path (2.5
+    measured; the rounding of the large early predictors is carried, so it is
+    51 eps of the final ``max |eta|``)."""
+    seen = []
+    iterate = newton._Problem.iterate
+
+    def recorded(self, beta, eta, F, cap):
+        seen.append((beta[0].copy(), np.asarray(eta)[0].copy()))
+        return iterate(self, beta, eta, F, cap)
+
+    monkeypatch.setattr(newton._Problem, "iterate", recorded)
+    rng = np.random.default_rng(3)
+    n, p = 2000, 6
+    X = np.column_stack([np.ones(n), rng.normal(size=(n, p - 1))])
+    rate = np.exp(0.3 + X[:, 1:] @ rng.normal(scale=0.3, size=p - 1))
+    y = rng.poisson(rate).astype(float)
+    start = rng.normal(scale=3.0, size=p)
+    fit = penalized_newton(
+        Poisson(), X, y, np.zeros(n), np.zeros((p, p)), start, max_step=0.5
+    )
+    assert fit.converged and fit.n_iter >= 40
+    # The last call is the last step's landing, from a fresh evaluation; the
+    # one before it is the last iteration on the carried predictor.
+    assert len(seen) == fit.n_iter + 1
+    beta, eta = seen[-2]
+    largest = max(np.max(np.abs(X @ b)) for b, _ in seen)
+    gap = np.max(np.abs(eta[:n] - X @ beta))
+    assert gap <= 8 * np.finfo(float).eps * largest
+
+
+def _transposes_of_rows(compiled_text: str, n_rows: int) -> list[str]:
+    """The ``transpose`` instructions of an optimized HLO program whose shape
+    has ``n_rows`` as a dimension."""
+    found = []
+    for line in compiled_text.splitlines():
+        shape = re.search(r"= \w+\[([\d,]*)\]\S* transpose\(", line)
+        if shape and str(n_rows) in shape.group(1).split(","):
+            found.append(line.strip()[:160])
+    return found
+
+
+@pytest.mark.skipif(
+    jax.default_backend() != "cpu", reason="reads the CPU's compiled program"
+)
+@pytest.mark.parametrize("family", ["poisson", "bernoulli", "gaussian", "softmax"])
+def test_no_kernel_copies_the_transposed_design(family: str) -> None:
+    """A canary for a copy of the transposed design (padded rows x columns)
+    in the compiled Newton iteration, information and REML derivative kernels,
+    on the CPU.
+    ``X.T @ score`` and ``(X.T * w) @ X`` compiled to a ``transpose`` of the
+    design (then a ``copy`` to another layout), about half of an iteration at
+    the rate model's size; XLA folds ``X.T @ (w * X)`` into the product.
+
+    It matches only an instruction named ``transpose`` whose printed shape has
+    the padded row count: XLA could write the same copy as a ``copy`` with
+    another layout, which it would miss, and it is not a test of every form
+    (inside the iteration's program ``dot_general(w * X, X)`` compiled to a
+    ``transpose`` of the weighted design, which it catches, but compiled alone
+    it had none). The jaxpr cannot be read instead: ``X.T @ (w * X)`` has a
+    ``transpose`` there that XLA removes."""
+    rng = np.random.default_rng(0)
+    n, p = 5000, 5
+    X = np.column_stack([np.ones(n), rng.normal(size=(n, p - 1))])
+    if family == "softmax":
+        lik, aux = GroupedSoftmax(), np.repeat(np.arange(n // 5), 5)
+        y = np.tile([0.4, 0.3, 0.1, 0.1, 0.1], n // 5)
+    else:
+        lik = {"poisson": Poisson(), "bernoulli": Bernoulli(), "gaussian": Gaussian()}[
+            family
+        ]
+        aux = {"poisson": np.zeros(n), "bernoulli": None, "gaussian": 1.0}[family]
+        y = rng.integers(0, 2, size=n).astype(float)
+    with jax.enable_x64(True):
+        problem = newton._Problem.of(lik, X, y, aux, np.eye(p))
+        r = problem.rows
+        n_bucket = r.X.shape[0]
+        beta, F = np.zeros((1, p)), np.zeros(1)
+        eta = np.zeros(n_bucket)
+        programs = {
+            "_iterate": newton._iterate.lower(
+                lik,
+                r.X,
+                problem.Y,
+                r.aux,
+                r.weight,
+                problem.S_device,
+                beta,
+                eta[None],
+                F,
+                np.float64(1.0),
+                np.float64(NEWTON_DECREMENT_TOL),
+                np.int64(3),
+            ),
+            "_jax_information": jax_family.lower(
+                lik, "information", r.X, eta, problem.Y[0], r.aux, r.weight
+            ),
+            "_jax_dinformation": jax_family.lower(
+                lik, "dinformation", r.X, eta, problem.Y[0], r.aux, r.weight, eta
+            ),
+            "_jax_d2information": jax_family.lower(
+                lik, "d2information", r.X, eta, problem.Y[0], r.aux, r.weight, eta, eta
+            ),
+        }
+        # REML's kernel of the score and its derivatives in two log penalties.
+        S_j = np.zeros((2, p, p))
+        S_j[0, 1:3, 1:3] = S_j[1, 3:, 3:] = np.eye(2)
+        masks, f = (S_j.diagonal(axis1=1, axis2=2) > 0) * 1.0, np.float64(0.0)
+        b, ranks = np.zeros(p), np.full(2, 2.0)
+        if family == "gaussian":
+            programs["_profiled_gaussian"] = reml._profiled_gaussian.lower(
+                r.X,
+                problem.Y,
+                r.weight,
+                np.eye(p),
+                b,
+                masks,
+                f,
+                np.int64(n),
+                np.int64(n - 1),
+                S_j,
+                ranks,
+            )
+        else:
+            programs["_laplace_derivatives"] = reml._laplace_derivatives.lower(
+                lik,
+                r.X,
+                problem.Y,
+                r.aux,
+                r.weight,
+                S_j,
+                np.eye(p),
+                np.eye(p),
+                b,
+                masks,
+                f,
+                f,
+                f,
+                ranks,
+            )
+        for name, lowered in programs.items():
+            text = lowered.compile().as_text()
+            assert _transposes_of_rows(text, n_bucket) == [], name
+
+
+def test_a_patched_rule_constant_takes_effect_after_the_kernel_compiled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rule constants are arguments of the compiled kernel, read at each
+    call: with no halvings allowed the same fit fails at its first step, and
+    with a loose decrement tolerance (and the step allowed to move the linear
+    predictor) it stops after the one last step, without a new trace."""
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 10**9)  # no clear here
+    X, y = _logistic_data()
+    S = np.zeros((2, 2))
+    start = np.array([0.3, 1.0])
+    fit = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert fit.converged and fit.n_iter > 2
+    COMPILE_LOG.clear()
+
+    monkeypatch.setattr(newton, "MAX_STEP_HALVINGS", 0)
+    halted = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert (halted.status, halted.n_iter) == (HALVING_FAILED, 0)
+
+    monkeypatch.setattr(newton, "MAX_STEP_HALVINGS", 30)
+    monkeypatch.setattr(newton, "NEWTON_DECREMENT_TOL", 1e6)
+    monkeypatch.setattr(newton, "NO_MAXIMUM_ETA_STEP", 1e6)
+    early = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert early.converged and early.n_iter == 1
+    assert COMPILE_LOG.count() == 0
+
+
+# Two fits whose last step the NumPy fitter (before the JAX one) refused: its
+# sum of the log-likelihood moved F by more than the step's allowance,
+# 8 eps |F|, between two points a decrement of about 1e-15 apart. The inputs
+# are those of the review's probes (fixed seeds). The step is checked against
+# an exact sum: math.fsum over each row's term, each term from a linear
+# predictor summed with math.fsum.
+
+
+def _exact_objective(family: str, X, y, aux, S, beta) -> float:
+    """``F = -l + beta' S beta / 2`` with every sum exact (``math.fsum``)."""
+    eta = np.array(
+        [math.fsum(x * b for x, b in zip(row, beta, strict=True)) for row in X]
+    )
+    if family == "poisson":
+        terms = y * (eta + aux) - np.exp(eta + aux)
+    else:
+        terms = y * eta - np.logaddexp(0.0, eta)
+    penalty = math.fsum((0.5 * beta[:, None] * S * beta[None, :]).ravel())
+    return -math.fsum(terms) + penalty
+
+
+def _bernoulli_probe():
+    """The Bernoulli case (n 2,500, p 6, a penalty of 1 on columns 1 to 5)."""
+    rng = np.random.default_rng(1165)
+    p = int(rng.integers(2, 9))
+    n = int(rng.choice([40, 150, 600, 2500, 5000]))
+    X = np.column_stack(
+        [np.ones(n), rng.normal(size=(n, p - 1)) * rng.choice([0.3, 1, 3])]
+    )
+    beta = rng.normal(scale=rng.choice([0.2, 0.8, 1.5]), size=p)
+    lam = rng.choice([0, 0.01, 1.0, 50.0])
+    S = np.zeros((p, p))
+    S[1:, 1:] = lam * np.eye(p - 1)
+    start = np.zeros(p) if rng.random() < 0.7 else rng.normal(scale=0.5, size=p)
+    eta = X @ beta
+    y = (rng.random(n) < 1 / (1 + np.exp(-eta))).astype(float)
+    assert (n, p, lam) == (2500, 6, 1.0)
+    return X, y, S, start
+
+
+def _poisson_probe():
+    """The Poisson REML case (n 4,096, p 6, blocks [1, 2, 3] and [4, 5]),
+    drawn after the probe's three families at 60 rows from the same seed."""
+    rng = np.random.default_rng(5)
+    p = 6
+    for n, family in [
+        (60, "poisson"),
+        (60, "bernoulli"),
+        (60, "gaussian"),
+        (60, "softmax"),
+        (4096, "poisson"),
+    ]:
+        X = np.column_stack([np.ones(n), rng.normal(size=(n, p - 1))])
+        beta = rng.normal(scale=0.4, size=p)
+        eta = X @ beta
+        if family == "poisson":
+            offset = rng.normal(scale=0.3, size=n)
+            y = rng.poisson(np.exp(eta + offset)).astype(float)
+        elif family == "bernoulli":
+            rng.random(n)
+        elif family == "gaussian":
+            rng.normal(size=n)
+        else:
+            sizes = rng.integers(2, 8, size=max(n // 5, 3))
+            X = rng.normal(size=(int(sizes.sum()), p))
+            w = np.exp(X @ beta)
+            for s, z in zip(np.r_[0, np.cumsum(sizes)[:-1]], sizes, strict=True):
+                rng.choice(z, p=w[s : s + z] / w[s : s + z].sum())
+    blocks = [
+        PenaltyBlock(np.array([1, 2, 3]), np.diag([1.0, 2.0, 3.0])),
+        PenaltyBlock(np.array([4, 5]), np.eye(2)),
+    ]
+    return X, y, offset, blocks
+
+
+def _last_steps(monkeypatch: pytest.MonkeyPatch) -> list:
+    """Record each call of ``newton._last_step`` (of a batch of one): its
+    problem, coefficients, full step and iteration, and whether the step was
+    taken."""
+    calls = []
+    last_step = newton._last_step
+
+    def recorded(problem, beta, r, members, n_iter, cap):
+        call = {"problem": problem, "beta": beta[0].copy(), "n_iter": n_iter}
+        call["step"] = r["step"][0].copy()
+        calls.append(call)
+        fits = last_step(problem, beta, r, members, n_iter, cap)
+        call["taken"] = fits[0].n_iter == n_iter + 1
+        return fits
+
+    monkeypatch.setattr(newton, "_last_step", recorded)
+    return calls
+
+
+def _exact_change(family: str, call) -> tuple[float, float]:
+    """The change of the exact F along a recorded last step, and the rule's
+    allowance ``8 eps max(1, |F|)``, both in eps |F|."""
+    problem, beta, step = call["problem"], call["beta"], call["step"]
+    X, n = problem.X, problem.rows.n_real
+    y, aux = np.asarray(problem.Y[0])[:n], problem.aux
+    before = _exact_objective(family, X, y, aux, problem.S, beta)
+    after = _exact_objective(family, X, y, aux, problem.S, beta + step)
+    unit = np.finfo(float).eps * abs(before)
+    return (after - before) / unit, 8.0 * np.finfo(float).eps * max(
+        1.0, abs(before)
+    ) / unit
+
+
+def _assert_the_decision_fits_the_exact_sum(family: str, call) -> None:
+    """A step taken does not raise the exact F by more than the allowance, and
+    a step refused does not lower it by more than the allowance."""
+    change, allowance = _exact_change(family, call)
+    assert not (call["taken"] and change > allowance), change
+    assert not (not call["taken"] and change < -allowance), change
+
+
+def test_a_last_step_the_numpy_sum_refused_is_decided_by_the_exact_sum(
+    monkeypatch,
+) -> None:
+    """Bernoulli: the NumPy fitter refused the last step (its F rose 16.8 eps
+    |F| with it, beyond the allowance of 8); under the exact sum it moves F
+    by -0.99 eps |F|. Whatever the platform's rounding decides, the decision
+    must agree with the exact sum. (On the CPU where this was written the step
+    is taken, 9 steps to 10; that count is not asserted.)"""
+    X, y, S, start = _bernoulli_probe()
+    calls = _last_steps(monkeypatch)
+    fit = penalized_newton(Bernoulli(), X, y, None, S, start)
+    assert fit.status == CONVERGED and "taken" in calls[-1]
+    if calls[-1]["taken"]:
+        np.testing.assert_array_equal(fit.beta, calls[-1]["beta"] + calls[-1]["step"])
+    _assert_the_decision_fits_the_exact_sum("bernoulli", calls[-1])
+
+
+def test_a_reml_fits_last_step_is_decided_by_the_exact_sum(monkeypatch) -> None:
+    """Poisson REML score: the NumPy fitter's inner fit refused its last step,
+    which lowers the exact F by about 4 eps |F|; the decision must agree with
+    the exact sum. (Taken on the CPU where this was written, 4 steps to 5;
+    not asserted.)"""
+    X, y, offset, blocks = _poisson_probe()
+    calls = _last_steps(monkeypatch)
+    score = reml_and_derivatives(Poisson(), X, y, offset, blocks, [0.5, -0.3])
+    assert score.fit.status == CONVERGED and "taken" in calls[-1]
+    _assert_the_decision_fits_the_exact_sum("poisson", calls[-1])
+
+
+@pytest.mark.parametrize(
+    ("lik", "aux"), [(Poisson(), np.empty(0)), (Bernoulli(), None), (Gaussian(), 1.0)]
+)
+def test_no_rows_is_a_design_not_identified(lik, aux) -> None:
+    """No rows identify no coefficient: the status of the NumPy fitter, no
+    step, log-likelihood 0."""
+    fit = penalized_newton(
+        lik, np.empty((0, 2)), np.empty(0), aux, np.zeros((2, 2)), np.zeros(2)
+    )
+    assert (fit.status, fit.n_iter, fit.loglik) == (NOT_IDENTIFIED, 0, 0.0)
+    np.testing.assert_array_equal(fit.beta, [0.0, 0.0])
+
+
+@pytest.mark.parametrize(
+    ("lik", "aux"), [(Poisson(), np.empty(0)), (Bernoulli(), None), (Gaussian(), 1.0)]
+)
+def test_no_rows_with_a_full_penalty_converge_to_the_penaltys_minimum(lik, aux) -> None:
+    """With no rows and a penalty of full rank every coefficient is identified
+    by the penalty alone: the optimum of ``beta' S beta / 2`` is 0, whatever
+    the start, with ``A = S``, a log-likelihood of 0 and a decrement of 0."""
+    S = np.array([[2.0, 0.5], [0.5, 1.0]])
+    fit = penalized_newton(
+        lik, np.empty((0, 2)), np.empty(0), aux, S, np.array([0.7, -1.2])
+    )
+    assert fit.status == CONVERGED
+    np.testing.assert_allclose(fit.beta, [0.0, 0.0], atol=1e-15)
+    np.testing.assert_allclose(fit.A, S, rtol=1e-15)
+    assert fit.loglik == 0.0 and fit.newton_decrement < 1e-30
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"S": np.float32},
+        {"S": int},
+        {"X": np.float32},
+        {"X": int},
+        {"y": np.float32},
+        {"y": int},
+        {"offset": np.float32},
+        {"offset": int},
+        {"start": np.float32},
+        {"start": int},
+    ],
+    ids=lambda change: "-".join(f"{k}_{v.__name__}" for k, v in change.items()),
+)
+def test_inputs_of_other_dtypes_fit_as_float64(change) -> None:
+    """Integer and float32 inputs are fitted in float64: the same fit as the
+    same values given as float64. The float32 inputs hold values float32
+    rounds (0.1, 1/3), so a fit computed in float32 would differ."""
+    rng = np.random.default_rng(4)
+    if change.get(next(iter(change))) is np.float32:
+        inputs = {
+            "X": np.column_stack([np.ones(30), rng.uniform(0.0, 3.0, size=30)]),
+            "y": rng.poisson(2.0, size=30) + 1.0 / 3.0,
+            "offset": 0.1 * rng.integers(-5, 6, size=30) + 1.0 / 3.0,
+            "S": np.diag([0.0, 1.0 / 3.0]),
+            "start": np.array([0.1, 1.0 / 3.0]),
+        }
+    else:
+        inputs = {
+            "X": np.column_stack([np.ones(30), rng.integers(0, 3, size=30)]),
+            "y": rng.poisson(2.0, size=30),
+            "offset": rng.integers(-1, 2, size=30),
+            "S": np.diag([0, 1]),
+            "start": np.zeros(2, dtype=int),
+        }
+    given = {k: np.asarray(v, dtype=change.get(k, float)) for k, v in inputs.items()}
+    as_float64 = {k: np.asarray(v, dtype=float) for k, v in given.items()}
+    for k, kind in change.items():
+        if kind is np.float32:  # float32 changed the values
+            assert not np.array_equal(as_float64[k], inputs[k])
+
+    def fit(a):
+        return penalized_newton(
+            Poisson(), a["X"], a["y"], a["offset"], a["S"], a["start"]
+        )
+
+    expected, got = fit(as_float64), fit(given)
+    assert expected.converged
+    assert (got.status, got.n_iter) == (expected.status, expected.n_iter)
+    np.testing.assert_array_equal(got.beta, expected.beta)
+    np.testing.assert_array_equal(got.A, expected.A)
+
+
+def test_a_fit_owns_its_arrays() -> None:
+    """``A`` and ``step`` are copies, not views of the batch's arrays."""
+    lik, X, y, aux = _separated_cases()["logistic_cell"]
+    p = X.shape[1]
+    fit = penalized_newton(lik, X, y, aux, np.zeros((p, p)), np.zeros(p))
+    assert fit.status == NO_FINITE_MAXIMUM
+    assert fit.A.base is None and fit.step.base is None and fit.beta.base is None

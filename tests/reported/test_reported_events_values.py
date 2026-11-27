@@ -14,11 +14,54 @@ import pytest
 from continuum_swr_replay.analysis.detector_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
+from continuum_swr_replay.analysis.event_evidence import (
+    restriction_totals,
+    restriction_windows,
+)
+from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    RESTRICTION_FIGURE_EVENT_GROUP,
+    RESTRICTION_FIGURE_INSIDE_SWR,
+    RESTRICTION_FIGURE_OUTSIDE_EVENTS,
+    RESTRICTION_FIGURE_OUTSIDE_SWR,
+    SWR_ALLOWED_FIGURE_DECODERS,
+    SWR_ALLOWED_FIGURE_DIFFERENCES,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
+from continuum_swr_replay.analysis.event_properties import low_rate_places
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
-from continuum_swr_replay.reported import events as builder
+from continuum_swr_replay.reported.events import (
+    class_structure,
+    cohort,
+    common,
+    content,
+    decoder,
+    restriction,
+    signals,
+    spike_evidence,
+    tetrode_holdout,
+    validation,
+)
+from continuum_swr_replay.reported.events.detectors import (
+    DETECTORS,
+    TEXT_FOUND_DETECTORS,
+    detections_with_nonlocal_values,
+    left_out_values,
+    nonlocal_found_values,
+    other_detector_values,
+)
+from continuum_swr_replay.reported.events.properties import (
+    _PROPERTIES,
+    content_distance_values,
+    hpd_tight_values,
+    property_interval_values,
+    property_values,
+    rest_theta_values,
+    speed_values,
+    start_distance_values,
+    state_composition_values,
+)
 from continuum_swr_replay.reported.values import Value
 from tests.analysis.detector_comparison.test_inventory_nonlocal_comparison import (
     SELECTED,
@@ -81,15 +124,18 @@ def _events() -> pd.DataFrame:
 
 
 def test_event_cohort_values_name_each_class_and_each_animal_count():
-    numbers = _numbers(builder.event_cohort_values(_events(), "s"))
+    numbers = _numbers(cohort.event_cohort_values(_events(), "s"))
     assert numbers == {
         "nonlocal_events": 13,
         "nonlocal_events_non_swr": 7,
         "nonlocal_events_swr_contained": 2,
         "nonlocal_events_swr_partial": 4,
-        "non_swr_fraction": pytest.approx(7 / 13),
-        "swr_contained_fraction": pytest.approx(2 / 13),
-        "swr_partial_fraction": pytest.approx(4 / 13),
+        # the headline shares are the animal-first shares (pooled over the 13
+        # events they would be 7/13, 2/13 and 4/13): a 3/4, b 2/5, c 1/2
+        # non-SWR; a 1/4, b 0, c 1/4 contained; a 0, b 3/5, c 1/4 partial
+        "non_swr_fraction": pytest.approx(0.55),
+        "swr_contained_fraction": pytest.approx(1 / 6),
+        "swr_partial_fraction": pytest.approx(0.85 / 3),
         # Figure 2d's bars: the mean over animals of each animal's shares
         "non_swr_fraction_animal_mean": pytest.approx(0.55),
         "swr_contained_fraction_animal_mean": pytest.approx(1 / 6),
@@ -105,11 +151,14 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
 
 
 def _quality_sessions() -> pd.DataFrame:
-    """Four sessions: errors 1, 3, 9 and none (median 3, mean 13/3); every state
-    fraction distinct, so a fraction filed under another state or movement
-    fails. Session d has no immobile bin."""
+    """Four sessions, two of animal a (errors 1 and 9) and two of b (3 and
+    none); every state fraction distinct, so a fraction filed under another
+    state or movement fails. b's second session has no immobile bin."""
     return pd.DataFrame(
         {
+            "animal": ["a", "a", "b", "b"],
+            "day": [1, 2, 1, 2],
+            "epoch": "02_r1",
             "median_error_cm": [1.0, 9.0, 3.0, NAN],
             "moving_Local_prob": [0.9, 0.8, 0.7, 0.95],
             "moving_No-Spike_prob": [0.05, 0.1, 0.2, 0.0],
@@ -124,37 +173,41 @@ def _quality_sessions() -> pd.DataFrame:
 
 
 def test_decoding_error_values_are_the_median_over_sessions_with_an_error():
-    numbers = _numbers(builder.decoding_error_values(_quality_sessions(), "s"))
-    assert numbers == {"decoding_error_median_cm": 3.0, "decoding_error_sessions": 3}
+    numbers = _numbers(decoder.decoding_error_values(_quality_sessions(), "s"))
+    # a's median of 1 and 9 is 5, b's only error 3: their mean 4 (the median
+    # over the three pooled sessions would be 3)
+    assert numbers == {"decoding_error_median_cm": 4.0, "decoding_error_sessions": 3}
 
 
 def test_state_fraction_values_name_each_movement_and_state():
     numbers = _numbers(
-        builder.state_fraction_values(_quality_sessions(), "s")
-        + builder.immobile_state_fraction_values(_quality_sessions(), "s")
+        decoder.state_fraction_values(_quality_sessions(), "s")
+        + decoder.immobile_state_fraction_values(_quality_sessions(), "s")
     )
     assert numbers == {
-        # the median over the four sessions: the mean of the middle two
-        "state_fraction_moving_local": pytest.approx(0.85),
-        "state_fraction_moving_no_spike": pytest.approx(0.075),
-        "state_fraction_moving_continuous": pytest.approx(0.045),
-        "state_fraction_moving_fragmented": pytest.approx(0.035),
-        # over the three sessions with an immobile bin
-        "state_fraction_immobile_local": pytest.approx(0.4),
-        "state_fraction_immobile_no_spike": pytest.approx(0.25),
-        "state_fraction_immobile_continuous": pytest.approx(0.22),
-        "state_fraction_immobile_fragmented": pytest.approx(0.12),
+        # each animal's mean over its sessions, then the mean over animals:
+        # moving Local a (0.9, 0.8) 0.85, b (0.7, 0.95) 0.825
+        "state_fraction_moving_local": pytest.approx((0.85 + 0.825) / 2),
+        "state_fraction_moving_no_spike": pytest.approx((0.075 + 0.1) / 2),
+        "state_fraction_moving_continuous": pytest.approx((0.045 + 0.04) / 2),
+        "state_fraction_moving_fragmented": pytest.approx((0.03 + 0.035) / 2),
+        # immobile: b's session without an immobile bin is not one of its
+        # sessions, so b's value is its first session's
+        "state_fraction_immobile_local": pytest.approx((0.4 + 0.4) / 2),
+        "state_fraction_immobile_no_spike": pytest.approx((0.25 + 0.25) / 2),
+        "state_fraction_immobile_continuous": pytest.approx((0.215 + 0.23) / 2),
+        "state_fraction_immobile_fragmented": pytest.approx((0.135 + 0.12) / 2),
     }
     values = _by_key(
-        builder.state_fraction_values(_quality_sessions(), "s")
-        + builder.immobile_state_fraction_values(_quality_sessions(), "s")
+        decoder.state_fraction_values(_quality_sessions(), "s")
+        + decoder.immobile_state_fraction_values(_quality_sessions(), "s")
     )
     for key, value in values.items():
         if "_immobile_" in key:
-            assert value.figures == builder.TAGS["state_fractions_immobile"].figures
+            assert value.figures == common.TAGS["state_fractions_immobile"].figures
             assert "inside a well visit" in value.description
         else:
-            assert value.figures == builder.TAGS["state_fractions"].figures
+            assert value.figures == common.TAGS["state_fractions"].figures
 
 
 def test_calibration_values_are_each_bins_mean_over_animals_of_session_medians():
@@ -176,9 +229,9 @@ def test_calibration_values_are_each_bins_mean_over_animals_of_session_medians()
     ]  # fmt: skip
     calibration = pd.DataFrame(rows).sample(frac=1.0, random_state=0)
 
-    values = _by_key(builder.calibration_values(calibration, "s"))
+    values = _by_key(decoder.calibration_values(calibration, "s"))
 
-    for k, word in enumerate(builder.CALIBRATION_BINS):
+    for k, word in enumerate(decoder.CALIBRATION_BINS):
         key = f"calibration_error_bin_{word}"
         a, b = 20.0 - k, 5.0 - k / 2
         assert values[key].value == pytest.approx((a + b) / 2)
@@ -189,7 +242,7 @@ def test_calibration_values_are_each_bins_mean_over_animals_of_session_medians()
     assert "mean over animals" in description and "calibrat" not in description
     assert {v.figures for v in values.values()} == {("S2d",)}
     with pytest.raises(ValueError, match="has 9 bins, not 10"):
-        builder.calibration_values(
+        decoder.calibration_values(
             calibration[calibration["prob_bin_center"] != centers[3]], "s"
         )
 
@@ -207,7 +260,7 @@ def test_state_by_signal_values_are_the_two_shares_at_each_detection_level():
     }  # fmt: skip
     ripple = _stored(epochs)
     counts = pd.concat([ripple, ripple.assign(signal="mua")], ignore_index=True)
-    values = _by_key(builder.state_by_signal_values(counts, "s"))
+    values = _by_key(class_structure.state_by_signal_values(counts, "s"))
     assert len(values) == 2 * 2 * 3
     for word in ("ripple", "mua"):
         assert values[f"{word}_nonlocal_share_at_detection_level"].value == (
@@ -236,7 +289,7 @@ def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range
             ("b", "1"): {0.5: 1, 0.98: 3},
         }
     ).assign(epoch_id="e")
-    values = _by_key(builder.nonlocal_probability_values(counts, "s"))
+    values = _by_key(validation.nonlocal_probability_values(counts, "s"))
     assert values["nonlocal_probability_low_share"].value == pytest.approx(0.375)
     assert values["nonlocal_probability_middle_share"].value == pytest.approx(0.125)
     assert values["nonlocal_probability_high_share"].value == pytest.approx(0.5)
@@ -248,24 +301,26 @@ def test_nonlocal_probability_values_are_the_three_shares_with_the_animals_range
 
 
 def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
-    values = _by_key(builder.boundary_offset_values(_events(), "s"))
+    values = _by_key(cohort.boundary_offset_values(_events(), "s"))
     assert values["swr_overlapping_events"].value == 6
-    # starts 5, 10, 30, 50, 60, 300 ms; ends -50, -40, -30, -10, -5, 900 ms
-    assert values["start_offset_median_ms"].value == pytest.approx(40.0)
-    assert values["end_offset_median_ms"].value == pytest.approx(-20.0)
+    # one epoch per animal: starts a 10; b 5, 30, 50 (median 30); c 60, 300
+    # (180) ms -> (10 + 30 + 180) / 3 (pooled over the six: 40); ends a -10; b
+    # -5, -30, -40 (-30); c -50, 900 (425) -> 385 / 3 (pooled: -20)
+    assert values["start_offset_median_ms"].value == pytest.approx(220 / 3)
+    assert values["end_offset_median_ms"].value == pytest.approx(385 / 3)
     assert values["start_offset_median_ms"].unit == "ms"
-    # starts beyond 10 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
-    assert values["start_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["start_offset_beyond_fifty_ms_fraction"].value == 2 / 6
-    # ends beyond 10 ms: -50, -40, -30, 900; beyond 50: 900
-    assert values["end_offset_beyond_ten_ms_fraction"].value == 4 / 6
-    assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
+    # starts beyond 10 ms (strictly): a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1
+    assert values["start_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["start_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 3)
+    # ends beyond 10 ms: a 0, b 2/3, c 1; beyond 50: a 0, b 0, c 1/2
+    assert values["end_offset_beyond_ten_ms_fraction"].value == pytest.approx(5 / 9)
+    assert values["end_offset_beyond_fifty_ms_fraction"].value == pytest.approx(1 / 6)
 
 
 def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     """The six SWR-overlapping events: a (together, together); b (together,
     together), (later, earlier) twice; c (later, earlier), (later, later)."""
-    values = _by_key(builder.boundary_timing_values(_events(), "s"))
+    values = _by_key(cohort.boundary_timing_values(_events(), "s"))
     assert len(values) == 9 * 4 + 3
     shares = {k: v.value for k, v in values.items() if k.endswith("_share")}
     assert sum(shares.values()) == pytest.approx(1.0)
@@ -284,9 +339,14 @@ def test_boundary_timing_values_are_the_nine_shares_with_the_animals_range():
     assert values[
         "timing_start_later_end_earlier_share_animal_mean"
     ].value == pytest.approx(7 / 18)
-    assert values["timing_start_together_end_together_share"].value == 2 / 6
-    assert values["timing_start_later_end_earlier_share"].value == 3 / 6
-    assert values["timing_start_later_end_later_share"].value == 1 / 6
+    # the headline shares are the animals' means (pooled over the six events
+    # they would be 2/6, 3/6 and 1/6): together-together a 1, b 1/3, c 0
+    assert values["timing_start_together_end_together_share"].value == pytest.approx(
+        4 / 9
+    )
+    assert values["timing_start_later_end_earlier_share"].value == pytest.approx(7 / 18)
+    # later-later: a 0, b 0, c 1/2
+    assert values["timing_start_later_end_later_share"].value == pytest.approx(1 / 6)
     # later-earlier: a 0, b 2/3, c 1/2
     assert values["timing_start_later_end_earlier_share_animal_min"].value == 0.0
     assert values[
@@ -314,7 +374,7 @@ def _other_detector_events() -> pd.DataFrame:
         ("kay", "b", True, 0.0, 0.1, 0.9, 0.0),
     ]
     others = []
-    for detector in builder.DETECTORS.values():
+    for detector in DETECTORS.values():
         if detector == "kay":
             continue
         others += [
@@ -329,12 +389,13 @@ def _other_detector_events() -> pd.DataFrame:
 
 def test_nonlocal_found_values_are_figure_2es_right_bars():
     """For every detector Figure 2e draws, the share of the selected non-local
-    events its events overlap, pooled over events, with the lowest and highest
-    animal (an animal's share the mean over its epochs), from the function the
+    events its events overlap, the mean over animals (under the headline key
+    too), with the lowest and highest animal (an animal's share the mean over
+    its epochs), from the function the
     figure draws with; tagged with question 2b.3 and panel 2e."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
-    detectors = (*nonlocal_comparison.FIGURE_DETECTORS, *builder.TEXT_FOUND_DETECTORS)
+    detectors = (*nonlocal_comparison.FIGURE_DETECTORS, *TEXT_FOUND_DETECTORS)
     rows = []
     for k, detector in enumerate(detectors):
         # animal a: 1 of 2 events matched in epoch 1, 1 of 1 in epoch 2 (0.75);
@@ -346,12 +407,12 @@ def test_nonlocal_found_values_are_figure_2es_right_bars():
     memberships = pd.DataFrame(
         rows, columns=["animal", "day", "other_detector", "matched"]
     ).assign(epoch="02_r1")
-    values = _by_key(builder.nonlocal_found_values(memberships, "s"))
-    words = {detector: word for word, detector in builder.DETECTORS.items()}
+    values = _by_key(nonlocal_found_values(memberships, "s"))
+    words = {detector: word for word, detector in DETECTORS.items()}
     expected = {}
     for k, detector in enumerate(detectors):
         key = f"nonlocal_events_found_by_{words[detector]}_fraction"
-        expected[key] = (2 + k % 2) / 4
+        expected[key] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_mean"] = (0.75 + k % 2) / 2
         expected[f"{key}_animal_min"] = min(0.75, k % 2)
         expected[f"{key}_animal_max"] = max(0.75, k % 2)
@@ -372,8 +433,8 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
     """The statistic of Figure 2e's left bars: for each detector the panel
     draws, the mean over animals of each animal's share of its events that
     overlap a non-local event and the lowest and highest animal, tagged to
-    the panel; for the criteria-only Widloski inventory, also pooled, for the
-    text."""
+    the panel; for the criteria-only Widloski inventory, also under the
+    headline key, for the text."""
     from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 
     detectors = (*nonlocal_comparison.FIGURE_DETECTORS, "memoryless_criteria")
@@ -386,13 +447,13 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
             "matched": [True, False, True, False] * len(detectors),
         }
     )
-    values = _by_key(builder.detections_with_nonlocal_values(events, "s"))
+    values = _by_key(detections_with_nonlocal_values(events, "s"))
     key = "widloski_criteria_with_nonlocal_fraction"
     # a: the mean of its epochs' 1/2 and 1; b: 0
     assert {k: v.value for k, v in values.items() if k.startswith(key)} == (
         pytest.approx(
             {
-                key: 0.5,
+                key: 0.375,
                 f"{key}_animal_mean": 0.375,
                 f"{key}_animal_min": 0.0,
                 f"{key}_animal_max": 0.75,
@@ -406,7 +467,7 @@ def test_detections_with_nonlocal_values_are_figure_2es_left_statistic():
 
 
 def test_other_detector_values_name_each_detector_and_each_state():
-    values = _by_key(builder.other_detector_values(_other_detector_events(), "s"))
+    values = _by_key(other_detector_values(_other_detector_events(), "s"))
     numbers = {key: value.value for key, value in values.items()}
     kay = {
         key.removeprefix("kay_"): number
@@ -415,12 +476,15 @@ def test_other_detector_values_name_each_detector_and_each_state():
     }
     assert kay == {
         "events": 4,
-        "no_nonlocal_fraction": 0.75,
+        # the headline shares are the animals' means (a 1 and 2/3, b 0; pooled
+        # over the four events: 0.75 and 0.5)
+        "no_nonlocal_fraction": 0.5,
         "no_nonlocal_fraction_animal_min": 0.0,
         "no_nonlocal_fraction_animal_max": 1.0,
         "no_nonlocal_fraction_animal_mean": 0.5,
-        "mostly_local_fraction": 0.5,
+        "mostly_local_fraction": pytest.approx(1 / 3),
         "mostly_local_fraction_animal_mean": pytest.approx(1 / 3),
+        # b has no event overlapping no non-local event: it is left out
         "no_nonlocal_mostly_local_fraction": pytest.approx(2 / 3),
         "no_nonlocal_mostly_no_spike_fraction": pytest.approx(1 / 3),
         "no_nonlocal_mixed_fraction": 0.0,
@@ -442,8 +506,8 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert "yu_no_nonlocal_fraction_animal_min" not in numbers
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
-    # Figure 2c draws the main detector's animal means; its pooled shares no
-    # figure
+    # Figure 2c draws the main detector's animal means; its headline shares
+    # (the same numbers) no figure
     assert values["kay_mostly_local_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_no_nonlocal_fraction_animal_mean"].figures == ("2c",)
     assert values["kay_mostly_local_fraction"].figures == ()
@@ -453,7 +517,7 @@ def test_other_detector_values_name_each_detector_and_each_state():
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
     _write_run(tmp_path / "run", tmp_path / "inventory")
     numbers = _numbers(
-        builder.left_out_values(
+        left_out_values(
             tmp_path / "run", tmp_path / "inventory", SELECTED, VISITS, _exposure(), "s"
         )
     )
@@ -498,7 +562,7 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
         }
     )
     reference = pd.DataFrame({"animal": ["a"], "session_date": "d1", "epoch": "e1"})
-    for k, (signal, column) in enumerate(builder._SIGNAL_EVENT_COLUMNS.items()):
+    for k, (signal, column) in enumerate(signals._SIGNAL_EVENT_COLUMNS.items()):
         events[column] = 10.0 * k + np.array([1.0, 2.0, 3.0, 7.0])
         reference[f"{signal}_running_median"] = 10.0 * k + 4.0
         reference[f"{signal}_rest_median"] = 10.0 * k + 1.8
@@ -511,11 +575,11 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def test_brain_state_values_name_each_signal_class_and_reference():
     values = _by_key(
-        builder.brain_state_values(*_signal_tables(), "s")
-        + builder.gamma_z_values(*_signal_tables(), "s")
+        signals.brain_state_values(*_signal_tables(), "s")
+        + signals.gamma_z_values(*_signal_tables(), "s")
     )
     numbers = {key: value.value for key, value in values.items()}
-    for k, signal in enumerate(builder._SIGNAL_EVENT_COLUMNS):
+    for k, signal in enumerate(signals._SIGNAL_EVENT_COLUMNS):
         own = {
             key.removeprefix(f"{signal}_"): number
             for key, number in numbers.items()
@@ -569,14 +633,19 @@ def test_gamma_db_values_name_each_band_and_class():
             "fast_gamma_db_swr": [0.5, 0.7, -0.2],
         }
     )
-    assert _numbers(builder.gamma_db_values(reference, "s")) == {
-        "slow_gamma_db_median_non_swr": 1.0,
+    assert _numbers(signals.gamma_db_values(reference, "s")) == {
+        # each animal's median over its epochs, then the mean over animals: a
+        # (1, 3) 2, b -1 (the median over the three epochs would be 1)
+        "slow_gamma_db_median_non_swr": pytest.approx(0.5),
         "slow_gamma_db_animals_above_rest_non_swr": 1,
-        "slow_gamma_db_median_swr": 4.0,
+        # a (2, 4) 3, b 6 (over the epochs: 4)
+        "slow_gamma_db_median_swr": pytest.approx(4.5),
         "slow_gamma_db_animals_above_rest_swr": 2,
-        "fast_gamma_db_median_non_swr": -2.0,
+        # a (-3, -1) -2, b -2
+        "fast_gamma_db_median_non_swr": pytest.approx(-2.0),
         "fast_gamma_db_animals_above_rest_non_swr": 0,
-        "fast_gamma_db_median_swr": 0.5,
+        # a (0.5, 0.7) 0.6, b -0.2 (over the epochs: 0.5)
+        "fast_gamma_db_median_swr": pytest.approx(0.2),
         "fast_gamma_db_animals_above_rest_swr": 1,
     }
 
@@ -609,21 +678,23 @@ def _spike_metrics() -> pd.DataFrame:
 
 
 def test_spike_evidence_values_name_each_group_and_each_count():
-    values = _by_key(builder.spike_evidence_values(_spike_metrics(), "s"))
+    values = _by_key(spike_evidence.spike_evidence_values(_spike_metrics(), "s"))
     numbers = {key: value.value for key, value in values.items()}
     assert numbers == {
         "evidence_epochs": 3,
         "evidence_animals": 2,
         "baseline_scored": 3,
-        "baseline_spikes_median": 15.0,
-        "baseline_tetrodes_median": 2.0,
-        "baseline_dll_per_spike_median": 0.2,
-        "baseline_gpi_distance_median_cm": 5.0,
+        # each epoch's median, each animal's median over its epochs, the mean
+        # over animals: a (10, 15) 12.5, b 20 (pooled over the rows: 15)
+        "baseline_spikes_median": pytest.approx(16.25),
+        "baseline_tetrodes_median": pytest.approx(3.0),
+        "baseline_dll_per_spike_median": pytest.approx(0.55),
+        "baseline_gpi_distance_median_cm": pytest.approx(6.0),
         "swr_remote_scored": 3,
-        "swr_remote_spikes_median": 35.0,
-        "swr_remote_tetrodes_median": 6.0,
-        "swr_remote_dll_per_spike_median": 2.2,
-        "swr_remote_gpi_distance_median_cm": 55.0,
+        "swr_remote_spikes_median": pytest.approx(36.25),
+        "swr_remote_tetrodes_median": pytest.approx(7.0),
+        "swr_remote_dll_per_spike_median": pytest.approx(2.55),
+        "swr_remote_gpi_distance_median_cm": pytest.approx(61.25),
         "swr_remote_epochs_above_baseline": 3,
         "swr_remote_epochs_scored": 3,
         "swr_remote_animals_above_baseline": 2,
@@ -677,7 +748,7 @@ def test_heldout_by_swr_values_read_the_immobile_per_spike_rows():
             "animals_pos",
         ],
     )
-    assert _numbers(builder.heldout_by_swr_values(stats, "s")) == {
+    assert _numbers(spike_evidence.heldout_by_swr_values(stats, "s")) == {
         "heldout_swr_per_spike": 0.6,
         "heldout_swr_per_spike_ci_low": 0.4,
         "heldout_swr_per_spike_ci_high": 0.8,
@@ -701,13 +772,13 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
             "main_mode_z": [1.0, 2.0, 0.9, 1.5, 1.2, 9.0, -9.0],
         }
     )
-    assert _numbers(builder.class_distribution_values(distribution, "s")) == {
+    assert _numbers(class_structure.class_distribution_values(distribution, "s")) == {
         "ripple_peak_animals_unimodal": 3,
         "ripple_peak_mode_animal_min": 0.9,
         "ripple_peak_mode_animal_max": 2.0,
     }
     with pytest.raises(ValueError, match="one row for each of 5 animals"):
-        builder.class_distribution_values(distribution.iloc[1:], "s")
+        class_structure.class_distribution_values(distribution.iloc[1:], "s")
 
 
 def _signal_counts() -> pd.DataFrame:
@@ -735,7 +806,7 @@ def _signal_counts() -> pd.DataFrame:
 
 
 def test_nonlocal_power_values_give_the_share_of_nonlocal_time_below_the_threshold():
-    assert _numbers(builder.nonlocal_power_values(_signal_counts(), "s")) == {
+    assert _numbers(class_structure.nonlocal_power_values(_signal_counts(), "s")) == {
         "nonlocal_time_below_swr_threshold_fraction": pytest.approx(0.3),
         "nonlocal_time_below_swr_threshold_fraction_animal_min": pytest.approx(0.1),
         "nonlocal_time_below_swr_threshold_fraction_animal_max": pytest.approx(0.5),
@@ -746,7 +817,7 @@ def test_nonlocal_mua_values_give_the_share_above_the_level_and_below_it():
     """Above 2 z of MUA, (i + 1) / 10 of the bins are non-local; of the
     non-local bins, 2 / (2 + i + 1) have MUA below 2 z. Tagged with the MUA
     panel of Figure 2's supplement."""
-    values = _by_key(builder.nonlocal_mua_values(_signal_counts(), "s"))
+    values = _by_key(class_structure.nonlocal_mua_values(_signal_counts(), "s"))
     below = [2 / (3 + i) for i in range(5)]
     assert {k: v.value for k, v in values.items()} == {
         "nonlocal_share_mua_above_level": pytest.approx(0.3),
@@ -757,9 +828,7 @@ def test_nonlocal_mua_values_give_the_share_above_the_level_and_below_it():
         "nonlocal_time_below_mua_level_fraction_animal_max": pytest.approx(max(below)),
         "mua_level_z": 2.0,
     }
-    assert {v.figures for v in values.values()} == {
-        builder.TAGS["nonlocal_mua"].figures
-    }
+    assert {v.figures for v in values.values()} == {common.TAGS["nonlocal_mua"].figures}
     assert "2 z" in values["nonlocal_share_mua_above_level"].description
 
 
@@ -772,7 +841,7 @@ def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check()
     from continuum_swr_replay.analysis.event_properties import rule_sweep
     from tests.analysis.event_properties.test_rule_sweep import _counts
 
-    values = _by_key(builder.rule_sweep_values(_counts(), "s"))
+    values = _by_key(validation.rule_sweep_values(_counts(), "s"))
     stats = rule_sweep.sweep_statistics(_counts()).set_index(["setting", "value"])
     key = "rule_sweep_probability_threshold_point_nine"
     assert values[f"{key}_no_swr_fraction"].value == pytest.approx(
@@ -798,7 +867,7 @@ def test_rule_sweep_values_name_each_setting_and_value_and_the_criterion_check()
     for key, value in values.items():
         assert value.questions == ("2a.5",)
         pooled = key.endswith("_no_swr_fraction")
-        assert value.figures == (() if pooled else builder.TAGS["rule_sweep"].figures)
+        assert value.figures == (() if pooled else common.TAGS["rule_sweep"].figures)
 
 
 def _state_calibration() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -834,7 +903,7 @@ def _state_calibration() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def test_state_calibration_values_name_each_state_and_state_the_caveats():
     bins, trends = _state_calibration()
-    values = _by_key(builder.state_calibration_values(bins, trends, "s"))
+    values = _by_key(validation.state_calibration_values(bins, trends, "s"))
     numbers = {k: v.value for k, v in values.items()}
     assert numbers["state_calibration_local_top_bin_per_spike"] == 4
     assert numbers[
@@ -852,7 +921,7 @@ def test_state_calibration_values_name_each_state_and_state_the_caveats():
         assert caveat in description
     for value in values.values():
         assert value.questions == ("2a.7",)
-        assert value.figures == builder.TAGS["state_calibration"].figures
+        assert value.figures == common.TAGS["state_calibration"].figures
 
 
 def step_fits() -> pd.DataFrame:
@@ -864,16 +933,16 @@ def step_fits() -> pd.DataFrame:
     with_step = {"duration": 1, "extent": 3, "speed": 3, "evidence": 2}
     evidence_shares = [0.5, -0.1, 0.3, 0.2, 0.9]
     rows = []
-    for prop in [*builder.OTHER_STEP_PROPERTIES, "evidence"]:
+    for prop in [*class_structure.OTHER_STEP_PROPERTIES, "evidence"]:
         for i, animal in enumerate(animals):
             share = evidence_shares[i] if prop == "evidence" else -1.0
             rows.append((prop, animal, i < with_step.get(prop, 0), share))
     return pd.DataFrame(
         rows, columns=["property", "animal", "has_step", "step_share_overall"]
     ).assign(
-        n_knots=builder.STEP_KNOTS,
+        n_knots=class_structure.STEP_KNOTS,
         power="criterion",
-        window_z=builder.STEP_WINDOW_Z,
+        window_z=class_structure.STEP_WINDOW_Z,
         covariate="none",
     )
 
@@ -881,14 +950,14 @@ def step_fits() -> pd.DataFrame:
 def test_class_step_values_name_the_properties_with_the_most_steps():
     animals = list(analyzed_animals())
     steps = step_fits()
-    values = _by_key(builder.class_step_values(steps, "s"))
+    values = _by_key(class_structure.class_step_values(steps, "s"))
     assert {key: value.value for key, value in values.items()} == {
         "step_other_properties_criterion_animals_max": 3,
     }
     description = values["step_other_properties_criterion_animals_max"].description
     assert description.endswith("attained by spatial extent, replay speed")
     # spike evidence's step has its own builder: it alone reads the spike-evidence run
-    evidence = _by_key(builder.class_step_evidence_values(steps, "s"))
+    evidence = _by_key(class_structure.class_step_evidence_values(steps, "s"))
     assert {key: value.value for key, value in evidence.items()} == {
         "step_evidence_criterion_animals": 2,
         "step_evidence_criterion_animals_same_sign": 4,
@@ -897,7 +966,10 @@ def test_class_step_values_name_the_properties_with_the_most_steps():
     assert {value.function for value in evidence.values()} == {
         "class_step_evidence_values"
     }
-    for build in (builder.class_step_values, builder.class_step_evidence_values):
+    for build in (
+        class_structure.class_step_values,
+        class_structure.class_step_evidence_values,
+    ):
         with pytest.raises(ValueError, match="one fit for each of 5 animals"):
             build(steps[steps.animal != animals[0]], "s")
 
@@ -913,18 +985,19 @@ def _property_events() -> pd.DataFrame:
             "is_swr": [False, False, True],
         }
     )
-    for i, (_, column, *_) in enumerate(builder._PROPERTIES):
+    for i, (_, column, *_) in enumerate(_PROPERTIES):
         events[column] = i + np.array([1.0, 3.0, 10.0])
     return events
 
 
 def test_property_values_name_each_property_class_and_direction():
     values = _by_key(
-        builder.property_values(_property_events(), "s")
-        + builder.start_distance_values(_property_events(), "s")
+        property_values(_property_events(), "s")
+        + start_distance_values(_property_events(), "s")
+        + speed_values(_property_events(), "s")
     )
-    assert len(values) == 3 * len(builder._PROPERTIES)
-    for i, (word, _, scale, unit, _, direction, _) in enumerate(builder._PROPERTIES):
+    assert len(values) == 3 * len(_PROPERTIES)
+    for i, (word, _, scale, unit, _, direction, _) in enumerate(_PROPERTIES):
         assert values[f"{word}_median_non_swr"].value == scale * (i + 2.0), word
         assert values[f"{word}_median_swr"].value == scale * (i + 10.0), word
         assert values[f"{word}_median_swr"].unit == unit
@@ -942,18 +1015,17 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     """Per class and band (under 20 cm, 20 to 100 cm, 100 cm or more): the
     share pooled over events with no figure, and the mean over animals of each
     animal's share with the lowest and highest animal, tagged to the
-    supplement's distance panel; and the two cuts."""
+    figure's distance panel (3g); and the two cuts."""
     from tests.analysis.event_properties.test_event_statistics import (
         _distance_events,
     )
 
-    values = _by_key(builder.content_distance_values(_distance_events(), "s"))
-    assert len(values) == 2 * 3 * 4 + 2
+    values = _by_key(content_distance_values(_distance_events(), "s"))
+    assert len(values) == 2 * 3 * 3 + 2
     key = "content_distance_under_non_swr_fraction"
-    assert values[key].value == pytest.approx(1 / 6)
-    assert values[f"{key}_animal_mean"].value == pytest.approx(1 / 12)
+    assert values[key].value == pytest.approx(1 / 12)  # the animals' mean
     assert values[f"{key}_animal_max"].value == pytest.approx(1 / 6)
-    assert values["content_distance_beyond_swr_fraction_animal_mean"].value == (
+    assert values["content_distance_beyond_swr_fraction"].value == (
         pytest.approx(3 / 8)
     )
     assert values["content_distance_between_swr_fraction_animal_min"].value == 0.0
@@ -961,8 +1033,7 @@ def test_content_distance_values_are_each_class_share_by_distance_band():
     assert values["content_distance_remote_cm"].value == 100.0
     for name, value in values.items():
         assert value.questions == ("2d.1",)
-        pooled = name.endswith("_fraction")
-        assert value.figures == (() if pooled else ("S3c",)), name
+        assert value.figures == ("3g",), name
     assert "under 20 cm from the animal" in values[key].description
 
 
@@ -982,7 +1053,7 @@ def test_hpd_tight_values_are_the_share_below_the_cut():
             "hpd_coverage_cm": np.tile([10.0, 300.0, 10.0, 300.0, 400.0, 400.0], 3),
         }
     )
-    values = _by_key(builder.hpd_tight_values(events, "s"))
+    values = _by_key(hpd_tight_values(events, "s"))
     numbers = {k: v.value for k, v in values.items()}
     assert numbers["hpd_tight_share_non_swr"] == pytest.approx(0.5)
     assert numbers["hpd_tight_share_swr"] == pytest.approx(0.25)
@@ -998,14 +1069,14 @@ def test_hpd_tight_values_are_the_share_below_the_cut():
     )
     for value in values.values():
         assert value.questions == ("2d.5",)
-        assert value.figures == builder.TAGS["hpd"].figures
-    (hpd,) = [p for p in builder._PROPERTIES if p[0] == "hpd"]
+        assert value.figures == common.TAGS["hpd"].figures
+    (hpd,) = [p for p in _PROPERTIES if p[0] == "hpd"]
     assert hpd[6].figures == ()
 
 
 def test_property_interval_values_name_each_bound():
     rows = {}
-    for i, (word, *_) in enumerate(builder._PROPERTIES):
+    for i, (word, *_) in enumerate(_PROPERTIES):
         rows[word] = {
             "difference_low": i + 0.1,
             "difference_high": i + 0.2,
@@ -1018,7 +1089,7 @@ def test_property_interval_values_name_each_bound():
             "n_animals": 5,
         }
     intervals = pd.DataFrame.from_dict(rows, orient="index")
-    numbers = _numbers(builder.property_interval_values(intervals, "s"))
+    numbers = _numbers(property_interval_values(intervals, "s"))
     # extent is the second property
     assert {k: v for k, v in numbers.items() if k.startswith("extent_")} == {
         "extent_difference_low": 1.1,
@@ -1047,8 +1118,9 @@ def test_rest_theta_values_name_each_class():
             "rest_theta_like_share": [0.2, 0.4, 0.1, 0.3, 0.9],
         }
     )
-    assert _numbers(builder.rest_theta_values(events, "s")) == {
-        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.7 / 3),
+    assert _numbers(rest_theta_values(events, "s")) == {
+        # a's epoch 0.3 (0.2, 0.4), b's 0.1: their mean (pooled: 0.7 / 3)
+        "theta_like_fraction_rest_matched_non_swr": pytest.approx(0.2),
         # a: half its events against 0.3 of its windows; b: none against 0.1
         "theta_like_animals_above_rest_matched_non_swr": 1,
         "theta_like_fraction_rest_matched_swr": pytest.approx(0.6),
@@ -1061,15 +1133,16 @@ def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
     in no panel. The share of content at a well is quoted on panel f; the
     shares that depend on where the animal is (own and remote wells, remote
     paths, near the animal) are in no panel."""
-    values = _by_key(builder.property_values(_property_events(), "s"))
+    values = _by_key(property_values(_property_events(), "s"))
     assert values["extent_median_swr"].figures == ("3c",)
     assert values["arms_median_swr"].figures == ()
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
-    assert builder.TAGS["content_occupancy"].figures == ("3f",)
-    assert builder.TAGS["content_by_animal"].figures == ()
+    assert common.TAGS["content_occupancy"].figures == ("3f",)
+    assert common.TAGS["content_by_animal"].figures == ()
+    assert common.TAGS["content_well_side"].figures == ("S3c",)
     assert (
-        builder.TAGS["content_by_animal"].questions
-        == builder.TAGS["content_occupancy"].questions
+        common.TAGS["content_by_animal"].questions
+        == common.TAGS["content_occupancy"].questions
     )
 
 
@@ -1105,15 +1178,42 @@ def test_content_occupancy_values_name_each_group_and_place():
         ],
         ignore_index=True,
     )
-    values = builder.content_occupancy_values(bins, "s")
-    shown = {value.key for value in values if value.figures}
-    assert shown == {
-        "occupancy_epochs",
-        "non_swr_content_at_well_fraction",
-        "swr_content_at_well_fraction",
-        "animals_non_swr_more_at_well",
-        "even_content_at_well_fraction",
+    values = content.content_occupancy_values(bins, "s")
+    shown = {
+        value.key: value.figures
+        for value in values
+        if value.figures and "_ci_" not in value.key and "difference" not in value.key
     }
+    assert shown == {
+        "occupancy_epochs": ("3f",),
+        "non_swr_content_at_well_fraction": ("3f",),
+        "swr_content_at_well_fraction": ("3f",),
+        "animals_non_swr_more_at_well": ("3f",),
+        "even_content_at_well_fraction": ("3f",),
+        # the wells by the animal's side: the supplement's panel c
+        "non_swr_content_remote_well_fraction": ("S3c",),
+        "non_swr_content_own_well_fraction": ("S3c",),
+        "swr_content_remote_well_fraction": ("S3c",),
+        "swr_content_own_well_fraction": ("S3c",),
+    }
+    # each of the three shares at a well has its interval and its difference
+    extra = {
+        key: value
+        for key, value in _by_key(values).items()
+        if "_ci_" in key or key.endswith("_difference")
+    }
+    assert len(extra) == 3 * (2 * 2 + 3)
+    # the difference is of an epoch's two shares: only a's e1 has both kinds
+    # (no SWR all at a remote well, SWR none)
+    assert extra["content_remote_well_fraction_difference"].value == pytest.approx(1.0)
+    assert extra["content_at_well_fraction_difference"].figures == ("3f",)
+    assert extra["non_swr_content_remote_well_fraction_ci_low"].figures == ("S3c",)
+    low, high = (
+        extra[f"non_swr_content_remote_well_fraction_ci_{b}"].value
+        for b in ("low", "high")
+    )
+    assert 0.0 <= low <= 0.75 <= high <= 1.0
+    values = [value for value in values if value.key not in extra]
     assert _numbers(values) == {
         "occupancy_epochs": 3,
         # no SWR: a (0.5, 0.25, 0.25, 0), b (1, 0, 0, 0); the animals' mean
@@ -1138,21 +1238,21 @@ def test_the_values_read_from_another_output_have_a_builder_of_their_own():
     """The summary pends the values of a stale output by their builder: the
     gamma pass's are ``gamma_z_values``', the start-distance output's
     ``start_distance_values``'; the event table's are in neither."""
-    gamma = _by_key(builder.gamma_z_values(*_signal_tables(), "s"))
+    gamma = _by_key(signals.gamma_z_values(*_signal_tables(), "s"))
     assert len(gamma) == 20
     assert {key.split("_")[0] for key in gamma} == {"slow", "fast"}
     assert {v.function for v in gamma.values()} == {"gamma_z_values"}
-    brain_state = _by_key(builder.brain_state_values(*_signal_tables(), "s"))
+    brain_state = _by_key(signals.brain_state_values(*_signal_tables(), "s"))
     assert {key.split("_")[0] for key in brain_state} == {"theta", "ripple", "mua"}
 
-    start = _by_key(builder.start_distance_values(_property_events(), "s"))
+    start = _by_key(start_distance_values(_property_events(), "s"))
     assert set(start) == {
         "start_distance_median_non_swr",
         "start_distance_median_swr",
         "start_distance_animals_in_direction",
     }
     assert {v.function for v in start.values()} == {"start_distance_values"}
-    properties = builder.property_values(_property_events(), "s")
+    properties = property_values(_property_events(), "s")
     assert not {v.key for v in properties} & set(start)
 
 
@@ -1162,16 +1262,16 @@ def test_spike_evidence_metrics_read_every_epoch_and_refuse_a_missing_one(tmp_pa
         pd.DataFrame({"epoch_id": [epoch, epoch], "group": group}).to_parquet(
             tmp_path / epoch / SPIKE_EVIDENCE_METRICS
         )
-    metrics = builder.spike_evidence_metrics(tmp_path, n_epochs=2)
+    metrics = spike_evidence.spike_evidence_metrics(tmp_path, n_epochs=2)
     assert list(metrics["epoch_id"]) == ["a1", "a1", "b1", "b1"]
     with pytest.raises(ValueError, match="holds 2 epochs' metrics, not 3"):
-        builder.spike_evidence_metrics(tmp_path, n_epochs=3)
+        spike_evidence.spike_evidence_metrics(tmp_path, n_epochs=3)
     # a table that names another epoch than its folder's
     pd.DataFrame({"epoch_id": ["a1"], "group": "baseline"}).to_parquet(
         tmp_path / "b1" / SPIKE_EVIDENCE_METRICS
     )
     with pytest.raises(ValueError, match="holds epochs \\['a1'\\]"):
-        builder.spike_evidence_metrics(tmp_path, n_epochs=2)
+        spike_evidence.spike_evidence_metrics(tmp_path, n_epochs=2)
 
 
 def _windows(rows) -> pd.DataFrame:
@@ -1196,7 +1296,7 @@ def test_participation_values_name_each_group_window_and_measure():
             ("b", "SWR", "event", 0.6, 700.0),
         ]
     )
-    numbers = _numbers(builder.participation_values(table, "s"))
+    numbers = _numbers(tetrode_holdout.participation_values(table, "s"))
     assert numbers["non_swr_event_participation"] == pytest.approx(0.5)
     assert numbers["non_swr_control_participation"] == pytest.approx(0.4)
     assert numbers["non_swr_participation_animals_above_rest"] == 1
@@ -1215,7 +1315,7 @@ def test_likelihood_advantage_values_are_the_animal_mean_and_its_interval():
             "D_spike": [0.2, 0.4, 0.5, np.nan, 0.9, 1.0, 1.2, 1.4],
         }
     )
-    numbers = _numbers(builder.likelihood_advantage_values(table, "s"))
+    numbers = _numbers(tetrode_holdout.likelihood_advantage_values(table, "s"))
     # no SWR: a 0.3, b 0.5 (its NaN unscored), c 0.9
     assert numbers["non_swr_likelihood_advantage_per_spike"] == pytest.approx(
         (0.3 + 0.5 + 0.9) / 3
@@ -1241,7 +1341,7 @@ def test_state_composition_values_name_each_group_and_state():
             "fragmented_prob_mean": [0.05, 0.3, 0.2, 0.1],
         }
     )
-    values = _by_key(builder.state_composition_values(events, "s"))
+    values = _by_key(state_composition_values(events, "s"))
     assert values["non_swr_continuous_share"].value == pytest.approx(0.8)
     assert values["swr_fragmented_share"].value == pytest.approx(0.2)
     assert values["swr_fragmented_share"].figures == ("3b",)
@@ -1265,7 +1365,7 @@ def test_tetrode_holdout_values_name_each_estimate_and_group():
                         "agreement_per_spike": value / 2,
                     }
                 )
-    values = builder.tetrode_holdout_values(pd.DataFrame(rows), "s")
+    values = tetrode_holdout.tetrode_holdout_values(pd.DataFrame(rows), "s")
     numbers = _numbers(values)
     by_key = _by_key(values)
     # Figure 2i and the supplement's panel S2f draw the events' gain, S2f
@@ -1320,7 +1420,7 @@ _BIN_AGREEMENT = (0.4, 0.2, 0.1, 0.0, -0.1)
 
 
 def _extra_windows() -> pd.DataFrame:
-    """The held-out tetrode run with its extra scores: animals a, b, c (k = 1,
+    """The held-out tetrode run's windows, with its extra scores: animals a, b, c (k = 1,
     2, 3), one epoch each, for each group one event in each width bin
     (:data:`_WIDTHS`, ids 100 on) and its control. In an event: the gain 0.1k
     (SWR 0.5 more), 0.7 of it from the rate term; the agreement by bin
@@ -1359,7 +1459,7 @@ def _extra_windows() -> pd.DataFrame:
 
 
 def test_shared_content_values_are_the_agreement_its_reference_and_shares():
-    values = _by_key(builder.shared_content_values(_extra_windows(), "s"))
+    values = _by_key(tetrode_holdout.shared_content_values(_extra_windows(), "s"))
     numbers = {key: value.value for key, value in values.items()}
     key = "non_swr_shared_content_{}_{}"
     for bin_word, agreement in zip(
@@ -1409,7 +1509,9 @@ def test_shared_content_values_are_the_agreement_its_reference_and_shares():
 
 
 def test_tetrode_holdout_extra_values_split_the_evidence():
-    values = _by_key(builder.tetrode_holdout_extra_values(_extra_windows(), "s"))
+    values = _by_key(
+        tetrode_holdout.tetrode_holdout_extra_values(_extra_windows(), "s")
+    )
     numbers = {key: value.value for key, value in values.items()}
     # no SWR: gains 0.1, 0.2, 0.3; SWR 0.6, 0.7, 0.8
     assert numbers["non_swr_heldout_gain_rate_per_spike"] == pytest.approx(0.14)
@@ -1481,9 +1583,9 @@ def test_low_rate_values_split_the_events_by_their_place_rate():
         ],
         ignore_index=True,
     )
-    values = _by_key(builder.low_rate_values(place_rate, events, windows, "s"))
+    values = _by_key(tetrode_holdout.low_rate_values(place_rate, events, windows, "s"))
     numbers = {key: value.value for key, value in values.items()}
-    shares = builder.low_rate_places.low_rate_share_statistics(place_rate)
+    shares = low_rate_places.low_rate_share_statistics(place_rate)
     assert numbers["non_swr_low_rate_share_animal_mean"] == pytest.approx(
         shares.loc["no SWR", "share_animal_mean"]
     )
@@ -1582,7 +1684,7 @@ def _restriction_windows() -> pd.DataFrame:
 
 def test_restriction_window_values_name_each_window_contrast_and_score():
     windows = _restriction_windows()
-    groups = builder.restriction_window_values(windows, "s")
+    groups = restriction.restriction_window_values(windows, "s")
     # of the window values, only the counts after the visit read the visits
     assert [v.key for v in groups.after_visit] == [
         f"restriction_canonical_{word}_events_outside_swr_after_visit"
@@ -1676,7 +1778,7 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic():
     are for the text."""
     windows = _restriction_windows()
     events = windows[windows["kind"] == "event"]
-    values = _by_key(builder.restriction_heldout_event_values(events, "s"))
+    values = _by_key(restriction.restriction_heldout_event_values(events, "s"))
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_heldout_{}_events_outside_swr_full_minus_swr_per_spike"
     # outside SWRs, per spike: no SWR 1, 2, 3; SWR 0.25, 0.5, 0.75
@@ -1696,7 +1798,7 @@ def test_restriction_heldout_event_values_are_the_canonical_statistic():
     }
     assert {v.figures for v in values.values()} == {(), ("2k",)}
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    canonical = _numbers(builder.restriction_window_values(windows, "s").windows)
+    canonical = _numbers(restriction.restriction_window_values(windows, "s").windows)
     for word in ("non_swr", "swr"):
         assert numbers[key.format(word)] == pytest.approx(
             canonical[
@@ -1725,16 +1827,19 @@ def test_restriction_agreement_values_are_the_shares_found_again():
             "shares_bin_with_canonical": [True, False, True],
         }
     )
-    values = _by_key(builder.restriction_agreement_values(heldout, canonical, "s"))
+    values = _by_key(restriction.restriction_agreement_values(heldout, canonical, "s"))
     numbers = {key: value.value for key, value in values.items()}
-    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(0.75)
+    # each epoch's share, each animal's mean, the mean over animals: a 2/3, b 1
+    # (pooled over the four events: 3/4)
+    assert numbers["restriction_canonical_events_found_again"] == pytest.approx(5 / 6)
     assert numbers["restriction_canonical_non_swr_events_found_again"] == 1.0
     assert numbers["restriction_canonical_swr_events_found_again"] == 0.5
     assert numbers["restriction_canonical_events_found_again_animal_min"] == (
         pytest.approx(2 / 3)
     )
     assert numbers["restriction_canonical_events_found_again_animal_max"] == 1.0
-    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(2 / 3)
+    # a 1/2, b 1 (pooled: 2/3)
+    assert numbers["restriction_heldout_events_with_canonical"] == pytest.approx(0.75)
     assert numbers["restriction_heldout_non_swr_events_with_canonical"] == 0.5
     assert numbers["restriction_heldout_swr_events_with_canonical"] == 1.0
     assert numbers["restriction_heldout_events"] == 3
@@ -1782,8 +1887,8 @@ def _outside_swr_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     )
     columns = dict.fromkeys(
         (
-            *builder.restriction_windows.OUTSIDE_SWR_COLUMNS,
-            *builder.restriction_windows.BIN_FACT_COLUMNS,
+            *restriction_windows.OUTSIDE_SWR_COLUMNS,
+            *restriction_windows.BIN_FACT_COLUMNS,
         ),
         0.0,
     )
@@ -1804,7 +1909,7 @@ def _outside_swr_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
 def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     """The gain outside SWRs and its shares, on :func:`_outside_swr_inputs`."""
     sums, bin_s, selected = _outside_swr_inputs()
-    groups = builder.restriction_outside_swr_values(sums, bin_s, selected, "s")
+    groups = restriction.restriction_outside_swr_values(sums, bin_s, selected, "s")
     values = _by_key([*groups.with_events, *groups.outside_events])
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_outside_swr_full_minus_swr"
@@ -1896,7 +2001,7 @@ def _immobile_time_sums() -> pd.DataFrame:
 def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
     values = _by_key(
-        builder.restriction_immobile_values(_immobile_time_sums(), bin_s, "s")
+        restriction.restriction_immobile_values(_immobile_time_sums(), bin_s, "s")
     )
     numbers = {key: value.value for key, value in values.items()}
     assert numbers["restriction_immobile_swr_minus_none_per_s"] == pytest.approx(
@@ -1930,9 +2035,16 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     # per family: three gains x two units x four, the epochs above, the share
     # and its bounds; and the epochs
     assert len(numbers) == 2 * (3 * 2 * 4 + 1 + 3) + 1
-    # no figure draws them: Figure 2j compares the full and the SWR-only
-    # decoders inside and outside SWRs, not over all immobile time
-    assert {v.figures for v in values.values()} == {()}
+    # no panel of Figure 2 draws them (Figure 2k compares the full and the
+    # SWR-only decoders inside and outside SWRs); Figure 2's supplement, panel
+    # l, draws the SWR-only and full decoders' gains per spike, filter family
+    drawn = {
+        f"restriction_immobile_{contrast}_per_spike{end}"
+        for contrast in ("swr_minus_none", "full_minus_none")
+        for end in ("", "_ci_low", "_ci_high", "_animals_positive")
+    }
+    for name, value in values.items():
+        assert value.figures == (("S2l",) if name in drawn else ()), name
     assert {v.questions for v in values.values()} == {("2c.3",)}
     # the summary says what they are over (``over``), once
     assert not any("inside a well visit" in v.description for v in values.values())
@@ -1941,15 +2053,13 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
 def test_restriction_figure_statistics_are_the_tagged_values():
     """Figure 2j's statistics are the rows the drawn values are made from."""
     sums, bin_s, windows = _outside_swr_inputs()
-    statistics = builder.restriction_totals.restriction_figure_statistics(
-        windows, sums, bin_s
-    )
+    statistics = restriction_totals.restriction_figure_statistics(windows, sums, bin_s)
     outside = statistics.outside
-    groups = builder.restriction_outside_swr_values(sums, bin_s, windows, "s")
+    groups = restriction.restriction_outside_swr_values(sums, bin_s, windows, "s")
     numbers = _numbers(groups.with_events)
     key = "restriction_outside_swr_full_minus_swr"
     for measure, name in (
-        (builder.RESTRICTION_FIGURE_OUTSIDE_SWR, "per_spike"),
+        (RESTRICTION_FIGURE_OUTSIDE_SWR, "per_spike"),
         ("share_in_no_swr_events", "share_in_heldout_non_swr_events"),
         ("share_in_swr_events_outside_swr", "share_in_heldout_swr_events_outside_swr"),
         ("share_outside_events", "share_outside_heldout_events"),
@@ -1959,25 +2069,21 @@ def test_restriction_figure_statistics_are_the_tagged_values():
         )
     numbers = _numbers(groups.outside_events)
     np.testing.assert_allclose(
-        outside.loc[("filter", builder.RESTRICTION_FIGURE_OUTSIDE_EVENTS), "estimate"],
+        outside.loc[("filter", RESTRICTION_FIGURE_OUTSIDE_EVENTS), "estimate"],
         numbers[f"{key}_outside_heldout_events_per_spike"],
     )
-    numbers = _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
+    numbers = _numbers(restriction.restriction_inside_swr_values(sums, bin_s, "s"))
     np.testing.assert_allclose(
-        statistics.inside.loc[
-            ("filter", builder.RESTRICTION_FIGURE_INSIDE_SWR), "estimate"
-        ],
+        statistics.inside.loc[("filter", RESTRICTION_FIGURE_INSIDE_SWR), "estimate"],
         numbers["restriction_inside_swr_full_minus_swr_per_spike"],
     )
     # the events' gain, on windows that carry their spikes outside SWRs
     events = _restriction_windows()
     events = events[events["kind"] == "event"]
-    statistics = builder.restriction_totals.restriction_figure_statistics(
-        events, sums, bin_s
-    )
-    numbers = _numbers(builder.restriction_heldout_event_values(events, "s"))
+    statistics = restriction_totals.restriction_figure_statistics(events, sums, bin_s)
+    numbers = _numbers(restriction.restriction_heldout_event_values(events, "s"))
     np.testing.assert_allclose(
-        statistics.events.loc[builder.RESTRICTION_FIGURE_EVENT_GROUP, "estimate"],
+        statistics.events.loc[RESTRICTION_FIGURE_EVENT_GROUP, "estimate"],
         numbers[
             "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_per_spike"
         ],
@@ -1992,7 +2098,7 @@ def test_restriction_inside_swr_values_are_the_gain_in_swrs_inside_a_visit():
     interval and animals) is drawn on Figure 2j."""
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
     values = _by_key(
-        builder.restriction_inside_swr_values(_immobile_time_sums(), bin_s, "s")
+        restriction.restriction_inside_swr_values(_immobile_time_sums(), bin_s, "s")
     )
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_inside_swr_full_minus_swr"
@@ -2046,13 +2152,14 @@ def _swr_allowed_inputs() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
 def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     """On :func:`_swr_allowed_inputs`: each contrast of the fourth decoder over
     each time, per spike and per second, both families, with the statistic,
-    interval and epoch counts of the gain inside SWRs; the SWR-only and full
-    decoders of the same pass over all immobile time; and the full minus the
+    interval and epoch counts of the gain inside SWRs; and the full minus the
     SWR-allowed decoder in the held-out no-SWR events. Figure 2's supplement
     (S2l) draws the filter family's gains per spike of
-    ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value with its counts."""
+    ``SWR_ALLOWED_FIGURE_*`` and the held-out events' value."""
     sums, bin_s, events = _swr_allowed_inputs()
-    values = _by_key(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
+    values = _by_key(
+        restriction.restriction_swr_allowed_values(events, sums, bin_s, "s")
+    )
     numbers = {key: value.value for key, value in values.items()}
     # inside SWRs: per spike 0.4, 0.2, 0.3 and 0.1; per second twice that
     key = "restriction_inside_swr_{}{}_{}"
@@ -2088,32 +2195,14 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
     assert values["restriction_immobile_full_minus_swr_allowed_per_s"].unit == (
         "nats per s"
     )
-    # the other two decoders of the same pass equal the canonical values on the
-    # same time sums
-    canonical = _numbers(builder.restriction_immobile_values(sums, bin_s, "s"))
-    for contrast in ("swr_minus_none", "full_minus_none"):
-        for family in ("", "_two_sided"):
-            for unit in ("per_spike", "per_s"):
-                assert numbers[
-                    f"restriction_swr_allowed_run_immobile_{contrast}{family}_{unit}"
-                ] == pytest.approx(
-                    canonical[f"restriction_immobile_{contrast}{family}_{unit}"]
-                )
+    canonical = _numbers(restriction.restriction_immobile_values(sums, bin_s, "s"))
     # the held-out no-SWR events outside SWRs: three quarters of 1, 2, 3
     key = "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_allowed"
     assert numbers[f"{key}_per_spike"] == pytest.approx(1.5)
     assert numbers[f"{key}_per_spike_animals_positive"] == 3
-    assert numbers["restriction_heldout_swr_allowed_run_non_swr_events"] == 3
-    assert (
-        numbers[
-            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
-            "_per_spike"
-        ]
-        == 3
-    )
-    # eleven contrasts over a time, two families: per spike four values, per
-    # second six; the held-out events' four and two counts
-    assert len(numbers) == 11 * 2 * (4 + 6) + 4 + 2
+    # nine contrasts over a time, two families: per spike four values, per
+    # second six; the held-out events' four
+    assert len(numbers) == 9 * 2 * (4 + 6) + 4
     ends = ("", "_ci_low", "_ci_high", "_animals_positive")
     drawn = (
         {
@@ -2123,27 +2212,17 @@ def test_restriction_swr_allowed_values_compare_the_fourth_decoder():
             for end in ends
         }
         | {
-            f"restriction{run}_immobile_{contrast}_per_spike{end}"
-            for run, contrast in (
-                ("_swr_allowed_run", "swr_minus_none"),
-                ("", "swr_allowed_minus_none"),
-                ("_swr_allowed_run", "full_minus_none"),
-            )
+            f"restriction_immobile_swr_allowed_minus_none_per_spike{end}"
             for end in ends
         }
         | {f"{key}_per_spike{end}" for end in ends}
-        | {
-            "restriction_heldout_swr_allowed_run_non_swr_events",
-            "restriction_heldout_swr_allowed_run_non_swr_events_outside_swr_scored"
-            "_per_spike",
-        }
     )
     for name, value in values.items():
         assert value.questions == ("2c.3",)
         assert value.figures == (("S2l",) if name in drawn else ()), name
     # no key of the canonical builders is made again
     canonical_keys = set(canonical) | set(
-        _numbers(builder.restriction_inside_swr_values(sums, bin_s, "s"))
+        _numbers(restriction.restriction_inside_swr_values(sums, bin_s, "s"))
     )
     assert not canonical_keys & set(numbers)
     assert "SWR-allowed decoder" in values[f"{key}_per_spike"].description
@@ -2153,20 +2232,23 @@ def test_swr_allowed_statistics_are_the_tagged_values():
     """Figure 2's supplement, panel l, draws the rows the S2l values are made
     from."""
     sums, bin_s, events = _swr_allowed_inputs()
-    statistics = builder.restriction_totals.swr_allowed_statistics(events, sums, bin_s)
-    numbers = _numbers(builder.restriction_swr_allowed_values(events, sums, bin_s, "s"))
+    statistics = restriction_totals.swr_allowed_statistics(events, sums, bin_s)
+    numbers = _numbers(
+        restriction.restriction_swr_allowed_values(events, sums, bin_s, "s")
+    )
     for time in ("inside_swr", "outside_swr", "immobile"):
-        for measure in builder.SWR_ALLOWED_FIGURE_DIFFERENCES:
+        for measure in SWR_ALLOWED_FIGURE_DIFFERENCES:
             assert statistics.times.loc[
                 (time, "filter", measure), "estimate"
             ] == pytest.approx(numbers[f"restriction_{time}_{measure}"])
-    for measure in builder.SWR_ALLOWED_FIGURE_DECODERS:
-        run = "" if measure.startswith("swr_allowed") else "_swr_allowed_run"
+    # the SWR-only and full decoders' gains are the canonical builder's values
+    numbers |= _numbers(restriction.restriction_immobile_values(sums, bin_s, "s"))
+    for measure in SWR_ALLOWED_FIGURE_DECODERS:
         assert statistics.times.loc[
             ("immobile", "filter", measure), "estimate"
-        ] == pytest.approx(numbers[f"restriction{run}_immobile_{measure}"])
+        ] == pytest.approx(numbers[f"restriction_immobile_{measure}"])
     assert statistics.events.loc[
-        builder.RESTRICTION_FIGURE_EVENT_GROUP, "estimate"
+        RESTRICTION_FIGURE_EVENT_GROUP, "estimate"
     ] == pytest.approx(
         numbers[
             "restriction_heldout_non_swr_events_outside_swr_full_minus_swr_allowed"
@@ -2209,7 +2291,7 @@ def _part_time_sums() -> pd.DataFrame:
 def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
     values = _by_key(
-        builder.restriction_outside_swr_part_values(_part_time_sums(), bin_s, "s")
+        restriction.restriction_outside_swr_part_values(_part_time_sums(), bin_s, "s")
     )
     numbers = {key: value.value for key, value in values.items()}
     stem = "restriction_outside_swr"
@@ -2268,7 +2350,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
     assert {
         k
         for k, v in values.items()
-        if v.figures == builder.TAGS["nonlocal_restriction_distance"].figures
+        if v.figures == common.TAGS["nonlocal_restriction_distance"].figures
     } == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
@@ -2277,7 +2359,7 @@ def test_restriction_outside_swr_part_values_are_the_gain_over_each_part():
 def test_the_gain_outside_swrs_leaves_out_the_bins_without_ripple_signal():
     """The headline's bins are those observed: 10 per epoch, 11k nats."""
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
-    groups = builder.restriction_outside_swr_values(
+    groups = restriction.restriction_outside_swr_values(
         _part_time_sums(), bin_s, _restriction_windows().iloc[:0], "s"
     )
     numbers = _numbers(groups.with_events)
@@ -2297,7 +2379,9 @@ def test_resolved_content_values_name_the_share_with_no_swr_by_width():
         _events_and_windows,
     )
 
-    values = _by_key(builder.resolved_content_values(*_events_and_windows(), "s"))
+    values = _by_key(
+        tetrode_holdout.resolved_content_values(*_events_and_windows(), "s")
+    )
     numbers = {key: value.value for key, value in values.items()}
     assert numbers["non_swr_fraction_animal_mean_resolved"] == pytest.approx(5 / 12)
     assert numbers["non_swr_fraction_animal_min_resolved"] == pytest.approx(1 / 3)

@@ -217,3 +217,22 @@ def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> Non
             assert summary.loc[column, name] == pytest.approx(value, nan_ok=True)
     with pytest.raises(ValueError, match="does not"):
         third_clock_q7a(fits[False], fits[True], n_draws=10, seed=0)
+
+
+def test_a_record_of_a_larger_unit_is_refused(cohort) -> None:
+    """Until the statistics read the unit of the fit, a record of a day or an
+    animal is refused, so that it is never reduced as a session."""
+    for model, read in (
+        ("A", session_estimands),
+        ("D", lambda f: lag_curves(f, seed=0)),
+    ):
+        fit = vr.fit_visit_rate(
+            cohort, model=model, kind="SWR", settings=SETTINGS, allow_provisional="test"
+        )
+        day = fit._replace(
+            records=[
+                r.__class__(**{**r.__dict__, "fit_by": "day"}) for r in fit.records
+            ]
+        )
+        with pytest.raises(ValueError, match="fit_by"):
+            read(day)

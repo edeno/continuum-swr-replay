@@ -75,7 +75,7 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   what the animal did: covariates/ (behavioral covariates, qvals_table), design constants, track lookups
 │   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
-│   ├── regression/        #   the shared fitter, arrays in and fits out: likelihoods, penalized Newton, pooled REML penalties, P-splines, terms, support, collinearity, the per-session loop and its record, contrasts, folds, bands
+│   ├── regression/        #   the shared fitter, arrays in and fits out: likelihoods, penalized Newton, pooled REML penalties, P-splines, terms, support, collinearity, the loop over the units of the fit and its record, contrasts, folds, bands
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── event_definition/  #   the rule: analyzed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
 │   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode, Figure 1's simulated run
@@ -90,12 +90,12 @@ src/continuum_swr_replay/
 ├── decoding/              # decode configs and detector classes, transitions, the fit (fit.py), identifiers and file names, the results.nc reader and load_results, a saved decode's encoding model (encoding_model.py)
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
-├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers, simulated_run_panels.py what Figure 1 and its companion share
+├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers, simulated_run_panels.py what Figure 1 and its companion share, publication_style.py the paper figures' style, sizes and checks, panel_layout.py where panels and their letters sit
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── columns.py             # require_columns, the one check that a table carries the columns a step reads
-├── reported/              # reported numbers: the summary builders (survey, detection, events, and behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
+├── reported/              # reported numbers: the summary builders (survey and detection, and events/, behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
-├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
+├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), the pinned runs (*_RUN), canonical table names, table_path()
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
@@ -484,7 +484,7 @@ question in the paper's outline, with the values that answer it, their macros, a
 
 Each value records the builder function that made it (`function`; "Builder function" in `questions.md`),
 so a macro leads to its code in two steps: `\EventsRippleMedianNonSwr` is made in `brain_state_values` of
-`reported/events.py`, which reads it from the `analysis/` function that computes it
+`reported/events/signals.py`, which reads it from the `analysis/` function that computes it
 (`event_statistics.event_signal_statistics`). The last section of `questions.md` takes the second step for
 every builder function: the `analysis/` functions it calls, read from the builders' source
 (`reported/builder_calls.py`). A builder makes its values through
@@ -497,6 +497,14 @@ file of the checkout that the build used (its code, the package's data files, an
 tracks, `uv.lock`) differs from the commit; `--output-dir` elsewhere makes a trial build. Each summary
 records those files, so `make release-check` can say when one has changed since. It also fails when
 `paper/reported_values.tex` is not what the summaries give.
+
+A summary to commit is built with `$CSR_PROCESSED_DATA_DIR` unset, from a checkout whose
+`Processed-Data` is the data folder or a link to it (a side worktree links to the main checkout's; the
+link is never committed). Each value records its input files relative to the repository only when they
+lie under it, so a build with the variable set to another folder records that machine's absolute paths.
+Set the variable for runners, figure renders and trial builds with `--output-dir`. When a merge changes
+a file a summary records, the branch rebuilds that summary and passes `make release-check` before the
+merge: CI does not run the check.
 
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
@@ -566,7 +574,7 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 8. **Data roots**: every root is read at call time from `$CSR_PROCESSED_DATA_DIR` through `paths`. In tests that variable is the one patch point (the `processed_data_root` fixture); the suite starts with a sentinel root that cannot be read or written
 9. **AIC and BIC differences**: the child rung's minus the parent rung's, within session; negative means the child is better (`analysis/replay_models/coefficient_statistics.aic_difference_statistics`, `analysis/replay_models/content/model_comparison.compare_nested_models`). Both compare a session only when its two fits can be compared (`analysis/replay_models/fit_comparability.why_not_comparable`: the same numbers of events, bins and stops, the same clock and stop cohort, likelihoods on the same constants). Likelihood-ratio statistics and held-out gains keep their own signs
-10. **Panel letters**: in a multi-panel figure, the letters of panels that share a row sit at one height (just above the highest of those panels' drawn tops), and the letters of panels that share a column sit at one left edge (the leftmost of those panels' drawn extents); a panel alone in its row or column is placed by itself; a figure may name which part of a panel sets its row's letter height (Figure 2 does for panel a's decode and for the legend above panel g). Figure 2's `place_letters` (`scripts/figures/generate_figure02.py`) does this from a row and column layout of the letters
+10. **Panel letters**: in a multi-panel figure, the letters of panels that share a row sit at one height, their bottom edge 1 pt above the highest of those panels' drawn tops, and the letters of panels that share a column sit at one left edge, 2 pt left of the leftmost of those panels' drawn extents (`panel_layout.LETTER_GAP_PT`, `LETTER_LEFT_PT`, the same in every figure); a letter stays on the page (its top no higher than the figure's top, its left edge no further left than the figure's left edge); a panel alone in its row or column is placed by itself; a figure may name which part of a panel sets its row's letter height (Figure 2 does for panel a's decode and for the legend above panel g). `place_letters` (`visualization/panel_layout.py`) does this from a row and column layout of the letters, for every lettered figure
 11. **Supplementary figures**: each supplementary figure is the supplement of one main figure and is named for it: Figure 2's is drawn by `scripts/figures/generate_supp_figure02.py` into `paper/figures/supp_figure02/`, and its id in `reported/questions.py` is `S2` (a panel `S2b`). A new supplementary result is added as panels to the supplement of the main figure it supports; no supplementary figure stands alone.
 
 ## Notes on Data Quality
@@ -576,4 +584,4 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types or brain areas: the loaders count rows and skip the step when there are none, and an absent area raises `spikes.AreaNotRecordedError`, which `get_spike_data` skips
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
-- Artifacts: one detector (`analysis/detection/artifacts/`, run `analysis/event_definition/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
+- Artifacts: one detector (`analysis/detection/artifacts/`, run `paths.py:ARTIFACT_INTERVALS_RUN`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).

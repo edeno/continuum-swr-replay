@@ -106,14 +106,15 @@ from continuum_swr_replay.visualization.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.visualization.simulated_run_panels import (
+from continuum_swr_replay.visualization.panel_layout import place_letters
+from continuum_swr_replay.visualization.publication_style import (
     LABEL_SIZE,
-    NON_LOCAL_COLOR,
     SMALL_SIZE,
-    axes_added,
     check_journal_limits,
-    drawn_extent,
-    letter_panel,
+)
+from continuum_swr_replay.visualization.simulated_run_panels import (
+    NON_LOCAL_COLOR,
+    axes_added,
     plot_posterior,
     plot_raster,
     posterior_color_limit,
@@ -848,19 +849,21 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
     fig.align_ylabels(axes_examples[:n_axes])
     fig.draw_without_rendering()
 
-    extents = space_rows_evenly(fig, [axes_examples, axes_sweep])
+    space_rows_evenly(fig, [axes_examples, axes_sweep])
 
     # Panel letters: a and b share a left edge; the letters of the sweep's row
     # share its top edge. The two grids are one panel, as are onset and offset.
-    left = min(extent.x0 for extent in extents)
-    _, _, _, ax_onset, _, ax_position = axes_sweep
-    for letter, x, y in (
-        ("a", left, extents[0].y1),
-        ("b", left, extents[1].y1),
-        ("c", drawn_extent(fig, [ax_onset]).x0, extents[1].y1),
-        ("d", drawn_extent(fig, [ax_position]).x0, extents[1].y1),
-    ):
-        letter_panel(fig, letter, x, y)
+    place_letters(
+        fig,
+        {
+            "a": axes_examples,
+            "b": axes_sweep[:3],
+            "c": axes_sweep[3:5],
+            "d": axes_sweep[5:],
+        },
+        rows=["bcd"],
+        columns=["ab"],
+    )
     return fig, decoded
 
 

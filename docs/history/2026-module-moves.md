@@ -841,3 +841,172 @@ own drawing, fitting and reduction code was removed. In `scripts/checks/simulate
 | `summarize` (removed: replaced) | `table`, from the engine's tables |
 | `report` (removed: replaced) | the runner prints the table and its warnings (`run_simulations.warnings`) |
 | `OUTPUT_NAME` (removed: replaced) | the runner writes `<model>.parquet` |
+
+## The held-out tetrode run is one run, 2026-11-23
+
+The stored held-out tetrode run in `Processed-Data/event_tetrode_holdout/` was replaced
+on 2026-11-23 by the run that also holds the extra scores (the HPD length, the
+shuffled-event reference, the rate and mark parts, the place information). That run was
+made with the same settings and null seed 0, and until then it was in
+`Processed-Data/event_tetrode_holdout_extra/`, a folder name that no longer exists. The
+old run was deleted. The two runs had the same rows, and their shared columns differed by
+run-to-run numerical noise of the GPU pass: the largest row difference in `gain` was
+0.044 nats, and the cohort sum of `gain` differed by 0.76 nats in 5.65 million. The two
+windows outputs that record the run's files, `Processed-Data/event_nonlocal_restriction_windows/`
+and `Processed-Data/event_nonlocal_restriction_swr_allowed_windows/`, were made again.
+
+| Old place | New place |
+|---|---|
+| `paths.EVENT_TETRODE_HOLDOUT_EXTRA_DIR` (removed) | `paths.EVENT_TETRODE_HOLDOUT_DIR` |
+| `score_tetrode_holdout.py --extra-scores` (removed) | every run computes the extra scores; `--null-seed` stays |
+| `tetrode_holdout.require_extra_columns`, `EXTRA_COLUMNS` (removed) | `tetrode_holdout.require_run_columns`, `RUN_COLUMNS` |
+| `reported.events.require_trial_folds`, `require_tetrode_holdout_folds`, `read_tetrode_holdout` | `analysis.event_evidence.heldout_runs` |
+
+## The restriction run is one run, 2026-11-24
+
+The restriction run in `Processed-Data/event_nonlocal_restriction/` is, since 2026-11-24,
+the run that scores all four decoders (local-only, SWR-only, full and SWR-allowed). It was
+made with `score_nonlocal_restriction.py --from-stored-fit` from the fold-fit run of the
+three decoders: each fold's decoder rebuilt from that run's records, no EM. Its header
+records `settings.fit_source: stored` and `inputs.stored_fit`, the deleted run's folder name
+and manifest digest, kept as the record of where the fit came from; every fold's fit facts
+(transitions, initial distribution, convergence, the checks) are in this run's own records.
+The run therefore cannot be resumed or gathered again under its own header; a decoder is
+added later with `--from-stored-fit Processed-Data/event_nonlocal_restriction --output-dir
+<new folder>`. The three-decoder run and its two derived outputs
+(`event_nonlocal_restriction_heldout_events/`, `event_nonlocal_restriction_windows/`) were
+deleted; the four-decoder run's derived outputs took their names
+(they were `event_nonlocal_restriction_swr_allowed_heldout_events/` and
+`event_nonlocal_restriction_swr_allowed_windows/`, folder names that no longer exist).
+
+The three decoders' scores in this run differ from the deleted run's by about 3e-5 nats per
+bin (each fold's `stored_score_difference`), which moves the full model's non-local
+probability across 0.8 in a few bins: the held-out events are 88,370 instead of 88,373
+(238 of 242 epochs have the same count). In the events summary 225 values moved, 16 by more
+than 1e-4 relative, the largest by 1.9e-3 (an interval bound); no formatted value changed.
+The 42 values `restriction_swr_allowed_run_*` and `restriction_heldout_swr_allowed_run_*`
+(the second run's copies of three-decoder values and its held-out event counts) were
+removed. `event_bin_facts`' records keep the deleted run's record digest
+(`epoch_inputs.restriction_record`), which nothing checks.
+
+| Old place | New place |
+|---|---|
+| `paths.EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR`, `..._SWR_ALLOWED_HELDOUT_EVENTS_DIR`, `..._SWR_ALLOWED_WINDOWS_DIR` (removed) | `paths.EVENT_NONLOCAL_RESTRICTION_DIR`, `..._HELDOUT_EVENTS_DIR`, `..._WINDOWS_DIR` |
+| `EventsInputs.nonlocal_restriction_swr_allowed`, `nonlocal_restriction_swr_allowed_heldout_events` (removed) | `EventsInputs.nonlocal_restriction`, `nonlocal_restriction_heldout_events` |
+| `REFUSED_FOUR` in `scripts/figures/generate_supp_figure02.py` (removed) | panel l reads panel i's runs |
+
+## Figure 2's code, 2026-11-24
+
+The figure scripts of Figure 2 and its supplement were given one shape (inputs read
+first, then drawn), and what they share moved into shared modules. Paths are under
+`src/continuum_swr_replay/` unless they start with `scripts/` or `tests/`.
+
+| Old place | New place |
+|---|---|
+| `visualization/simulated_run_panels.py`: `LABEL_SIZE`, `SMALL_SIZE`, `PANEL_LETTER_SIZE`, `set_publication_style`, `MAX_FIGURE_SIZE_CM`, `TEXT_SIZE_LIMITS_PT`, `LINE_WIDTH_LIMITS_PT`, `check_journal_limits`, `drawn_extent`, `drawn_texts`, `TEXT_OVERLAP_PT`, `overlapping_texts`, `overlapping_panels`, `check_placement` (removed: moved) | `visualization/publication_style.py` |
+| `tests/visualization/test_simulated_run_panels.py`: the journal-limit and placement tests (removed: moved) | `tests/visualization/test_publication_style.py` |
+| `reported/events.py`: `EventsInputs`, `default_inputs`, `_input_staleness` (now `input_staleness`), `event_table_staleness`, `require_fold_fit`, `run_staleness`, `HeldoutRestriction`, `restriction_inputs_note`, `restriction_input_staleness`, `checked_reference`, `read_checked`, `HELDOUT_EVENTS_RERUN`, `HELDOUT_RESTRICTION_RERUN`, `heldout_restriction_refusal`, `read_heldout_restriction` (removed: moved; `reported.events.default_inputs` is the same function, for `summarize.py`) | `reported/inputs.py`, with `output_staleness`, `participation_staleness`, `read_figure_restriction` and `panel_refusal`, which the figures and the summary share |
+| `scripts/figures/generate_figure02.py`: `generate_figure(nwb_file_name, epoch_name, data_dir, use_cache)` and `--data-dir` (removed) | `read_inputs(nwb_file_name, epoch_name, use_cache)`, then `generate_figure(inputs)`; the data root is `$CSR_PROCESSED_DATA_DIR` |
+| `scripts/figures/generate_figure02.py`: `BOTTOM_LETTERS`, `BOTTOM_PANELS`, `BOTTOM_ROWS`, `BOTTOM_COLUMNS`, `read_participation(folder, ...)`, `restriction_refusal`; the panel names `traces`, `ripple_power` (removed) | `LAYOUT`, `PANELS`, `LETTERS`, `LETTER_ROWS`, `LETTER_COLUMNS`, `read_participation(inputs, ...)`, `reported.inputs.panel_refusal`; `event_traces`, `nonlocal_ripple_power` |
+| `scripts/figures/generate_supp_figure02.py`: `read_inputs()`'s keys `calibration`, `no_spike`, `probability`, `distance`, `sweep`, `timing`, `mua`, `mua_states`, `split`, `outside`, `parts`; `REFUSED` (removed) | one key per panel, its name in `LAYOUT` (`nonlocal_mua` and `outside_distance` hold two tables each); `reported.inputs.panel_refusal` |
+| `tests/scripts/figures/test_figure_script_fixes.py`: Figure 2's tests, its shared helpers and the `offline` fixture (removed: moved) | `tests/scripts/figures/test_generate_figure02.py`, `tests/support/_figure02_tables.py`, `tests/scripts/figures/conftest.py` |
+| `test_the_figure02_panel_e_label_lies_inside_the_figure` (removed) | none: it drew a proxy of a layout the figure no longer has |
+| `scripts/figures/generate_figure02.py`: `CLASS_ORDER`, `CLASS_COLORS`, `CLASS_LABELS`, `C_NO_SWR`, `DECODER_TIMES`, `DECODER_OUTSIDE`; `generate_supp_figure02.py`: `TRACE_CLASSES`, `TRACE_LABELS`, `OUTSIDE_LABEL`, `TRIGGER_WINDOW_S`; `generate_figure03.py` and `generate_supp_figure03.py`: `KINDS`; `visualization/figure_panels.py`: `_EVENT_CLASSES` (removed) | `visualization/palettes.py`: `EVENT_KINDS`, `OVERLAP_CLASSES`, `SIGNAL_LABELS`; `visualization/heldout_gain_panels.py`: `DIFFERENCE_LABELS`, `EVENTS_LABELS`; `analysis/event_properties/triggered_analysis.py`: `WINDOW_KINDS`, `TRIGGERED_WINDOW_S` |
+| `scripts/figures/generate_figure02.py`: its render cache (`_compute_figure_inputs`, `_figure02_cache_path`, the four fingerprint functions, `FIGURE02_CACHE_VERSION`, `Processed-Data/intermediates/*_figure02_*_cache.joblib`), `--force-recompute` and `frame_event_counts` (removed) | `Processed-Data/event_trigger_windows/` (`scripts/event_properties/measure_trigger_windows.py`), read by `reported.inputs.read_trigger_windows`; `triggered_analysis.frame_event_counts`; the example session is loaded at each render (`read_session`) |
+| `scripts/figures/generate_supp_figure02.py`: `read_frame_traces`, `_epoch_keys`, `_frame_epoch`, `--workers`, `NO_SPIKE_WORKERS`, `NO_SPIKE_SIGNAL` (removed) | `read_traces`, from `event_trigger_windows/` (`triggered_analysis.stored_no_spike_trace`, `stored_animal_window_medians`, `NO_SPIKE_SIGNAL`) |
+| `scripts/figures/generate_figure02.py`: `EXAMPLE_NWB_FILE`, `EXAMPLE_EPOCH`; the example session read with `load_data` at each render (removed) | `parameters.EXAMPLE_NWB_FILE`, `EXAMPLE_EPOCH`; `Processed-Data/example_session/<epoch_id>/` (`scripts/decoding/store_example_session.py`), read by `reported.inputs.read_example_session`; the position, SWRs and track graph from the decode frame and the decode's environment |
+
+## The per-animal shares by signal, 2026-11-24
+
+The per-animal table by ripple power and MUA holds shares since the averaging rule
+(each epoch's share, then the animal's mean over its epochs), so its functions were
+renamed. `nonlocal_by_signal.nonlocal_counts` still returns per-epoch counts and keeps
+its name.
+
+| Old place | New place |
+|---|---|
+| `analysis.event_properties.event_statistics.animal_signal_counts` | `event_statistics.animal_signal_shares` |
+| `analysis.event_properties.nonlocal_by_signal.animal_nonlocal_counts` | `nonlocal_by_signal.animal_nonlocal_shares` |
+| `scripts/figures/generate_supp_figure02.py`: `read_mua_counts` | `read_mua_shares` |
+
+## The regression fitter's test-only code, 2026-11-24
+
+Public code of `analysis/regression/` that only the package's own tests used was removed
+(the lead, 2026-11-24: "yes remove"), and the padded rows got one container. No result
+changed: the stored reference outputs (`tests/analysis/regression/data/numpy_reference/`)
+pass unedited. Paths are under `src/continuum_swr_replay/analysis/regression/`.
+
+| Old place | Why it went, and what replaces it | Commit |
+|---|---|---|
+| `Likelihood.loglik`, `score_eta`, `information`, `dinformation`, `d2information` (removed) | only tests called them; the kernels call the families' `_jax_*` functions, which the tests now call through `tests/analysis/regression/conftest.py:family_kernel`; `weighted_design` stays | e6a115fd |
+| `record.write_records`, `read_records`, `records_frame`, `JSON_FIELDS`, `describe` (removed) | only `test_record.py` used the parquet storage and the words of the causes; `FitRecord` and `NoFit` stay | 1bfcb448 |
+| `support.terms_failing_share` (removed) | its 20 % rule was never applied by a fit; `constants.MAX_FAILING_SHARE` stays (the penalty search and `visit_rate.third_clock_decision` read it) | dcd7dbd4 |
+| `terms.prior_sd_from_log_penalty` (removed) | only a test called it; the prior SD of a log penalty `rho` is `exp(-rho / 2)` | c82dd554 |
+| `reml.PenaltySearch.n_grid_not_finite`, `share_without_fit` (removed) | only tests read them; `sum(search.grid_failures.values())`, and the share of `search.set_aside` not `fitted` | c82dd554 |
+| `reml.SetAsideSession.running_away` (removed) | only tests read it; `reference.fit.running_away` | c82dd554 |
+| `runtime.require_device` (removed) | a one-line wrapper; `in_float64` calls `runs.device.require_one_jax_device` | c82dd554 |
+| `SetAsideSession(index, name, reference, refits, left_out, reason)` | `SetAsideSession(index, name, reference, refit)`, with `refits`, `left_out` and `reason` properties of the `SessionRefit` | 8debf964 |
+| `likelihoods.Rows`, `likelihoods.Groups` (removed: moved) | `padding.Rows`, `padding.Groups` (`likelihoods` registers `Groups` as a JAX pytree) | afe5b9d8 |
+| `padding.PaddedRows`, `padding.PaddedGroups` (removed) | `pad_rows` and `pad_groups` return `padding.Rows`: the offset, or the `Groups`, as its `aux` | afe5b9d8 |
+
+## The pinned runs, 2026-11-24
+
+The constants that pin which stored run of each analysis is the canonical one moved to
+one block of `src/continuum_swr_replay/paths.py`, beside the roots they select, with one
+naming, `<WHAT>_RUN`. No value changed. Code that a test patches reads a pin as
+`paths.<PIN>` when called, so a test patches `paths`, not `swr_source`.
+
+| Old place | New place |
+|---|---|
+| `analysis/event_definition/swr_source.py`: `SWR_INVENTORY_RUN_ID` | `paths.SWR_INVENTORY_RUN` |
+| `analysis/event_definition/swr_source.py`: `ARTIFACT_INTERVALS_RUN_ID` | `paths.ARTIFACT_INTERVALS_RUN` |
+| `analysis/detector_comparison/feature_run.py`: `EVENT_FEATURES_RUN` | `paths.EVENT_FEATURES_RUN` |
+| `analysis/detector_comparison/feature_run.py`: `STATE_SPACE_FEATURES_RUN` | `paths.STATE_SPACE_FEATURES_RUN` |
+| `paths.STATE_EVIDENCE_RUN` (among the folder names) | `paths.STATE_EVIDENCE_RUN` (in the pinned-run block) |
+| `reported/detection.py`: `MEMORYLESS_PILOT_RUN` | `paths.MEMORYLESS_PILOT_RUN` |
+
+## The events summary's builder is a package, 2026-11-24
+
+`reported/events.py` (about 5,800 lines) was split into the package `reported/events/`,
+organized as `reported/behavior/` and `reported/mpfc/` are: one module for each part of
+the summary, a `common.py`, and an `__init__.py` with `summarize`, `TAGS` and
+`default_inputs`. Every function, class and constant moved with its text unchanged; only
+the imports changed. `summarize` now reads the event table and the visits and calls one
+function per module, in the order the summary holds its values: the summary's keys,
+values, tags and descriptions, and their order, are unchanged. Each part runs the lines
+of the old `summarize` that made its values, unchanged; the names they read come from
+`common.SummaryReads`. Paths are under `src/continuum_swr_replay/reported/`.
+
+| Old place (`events.py`, removed: split) | New place |
+|---|---|
+| `summarize` | `events/__init__.py`: `summarize`, which calls `add_cohort`, `add_properties`, `add_signals`, `add_detectors`, `add_spike_evidence`, `add_content`, `add_tetrode_holdout`, `add_restriction`, `add_decoder`, `add_class_structure` and `add_validation`, one in each module below |
+| `summarize`'s inner `stale`, `off_subset`, `off_visits`, `off_time_mask`, `add_counts` and the names it read once | `events/common.py`: `SummaryReads` (those five are its methods) |
+| `TAGS`, `EVENTS_SUBSET`, `HELDOUT_EVENTS_SUBSET`, `CONTROL_SUBSET`, `CANONICAL_WINDOWS_SUBSET`, `TIME_SUBSET`, `DETECTOR_SUBSET`, `LEFT_OUT_SUBSET`, `SPIKE_EVIDENCE_SUBSET`, `BOUT_SUBSET`, `_RUN_GROUPS`, `_per_spike_interval`, `_interval_and_animals_positive`, `_animal_range_values`, `_share_interval`, `_epoch_files` | `events/common.py` (`TAGS` is also imported by `events/__init__.py`) |
+| `event_cohort_values`, `visit_context_values`, `boundary_offset_values`, `boundary_timing_values` | `events/cohort.py` |
+| `state_composition_values`, `_PROPERTIES`, `_PROPERTY_NAMES`, `property_values`, `start_distance_values`, `_class_median_values`, `hpd_tight_values`, `_DISTANCE_BANDS`, `content_distance_values`, `property_interval_values`, `rest_theta_values`, `with_start_and_rest_theta`, `_SPEED_PROPERTIES`, `speed_values` | `events/properties.py` |
+| `_SIGNAL_EVENT_COLUMNS`, `_SIGNAL_LABELS`, `brain_state_values`, `gamma_z_values`, `_signal_values`, `gamma_db_values`, `with_brain_state`, `gamma_triggered_curves` | `events/signals.py` |
+| `DETECTORS`, `MAIN_DETECTOR`, `detector_visit_values`, `other_detector_values`, `TEXT_FOUND_DETECTORS`, `nonlocal_found_values`, `detections_with_nonlocal_values`, `left_out_values` | `events/detectors.py` |
+| `_SPIKE_EVIDENCE_GROUPS`, `spike_evidence_metrics`, `spike_evidence_values`, `spike_evidence_visit_values`, `heldout_by_swr_values`, `heldout_bout_values` | `events/spike_evidence.py` |
+| `content_occupancy_values`, `_MASS_PLACE`, `_content_mass_rows`, `_mass_by_place`, `_mass_by_event`, `_mass_by_patch`, `content_mass_along_arms`, `content_mass_tables`, `with_event_start_end`, `content_along_arms_bins` | `events/content.py` |
+| `participation_values`, `likelihood_advantage_values`, `tetrode_holdout_values`, `shared_content_values`, `tetrode_holdout_extra_values`, `low_rate_values`, `resolved_content_values` and their constants (`_TETRODE_HELD_OUT`, `_CONTROL_AGREEMENT`, `_WIDTH_BINS`, `_WIDTH_WORDS`, `_REFERENCE_WORDS`, `_UNMATCHED_DONOR`, `_MATCHED_DONOR`, `_HELDOUT_MEASURES`, `_TENTHS`, `_PLACES`, `_PLACE_RATE_WORDS`) | `events/tetrode_holdout.py`, with `ParticipationReads`, what the restriction values read of the participation run |
+| `window_run_note_staleness`, `WindowValues`, `OutsideSwrValues`, the eight `restriction_*_values` and their constants (`_RESTRICTION_*`, `_OUTSIDE_SWR_*`, `_INSIDE_SWR_BINS`, `_EPOCH_REDUCTION`, `_GROUP_WORDS`, `_FULL_MINUS_SWR`, `_full_minus_swr_values`, `_CONTRAST_TIME_BINS`, `_SWR_ALLOWED_RUN`) | `events/restriction.py` |
+| `CALIBRATION_BINS`, `_STATE_WORDS`, `decoding_error_values`, `calibration_values`, `_state_fraction_values`, `state_fraction_values`, `immobile_state_fraction_values` | `events/decoder.py` |
+| `spike_evidence_staleness`, `OTHER_STEP_PROPERTIES`, `STEP_KNOTS`, `STEP_WINDOW_Z`, `class_distribution_values`, `nonlocal_power_values`, `_STATE_SIGNALS`, `_STATE_MEASURES`, `state_by_signal_values`, `nonlocal_mua_values`, `_step_statistics`, `class_step_values`, `class_step_evidence_values`, `class_step_values_with_staleness` | `events/class_structure.py` |
+| `nonlocal_probability_values`, `_SWEEP_SETTINGS`, `rule_sweep_values`, `_CALIBRATED_STATES`, `_CALIBRATION_CAVEATS`, `state_calibration_values` | `events/validation.py` |
+
+## The unit of the fit, 2026-11-24
+
+`fit_sessions` fits one model for each unit of the fit (a session, a day or an animal:
+`fit_by`), with a baseline for each session of a unit. At `fit_by="session"` every record is
+the one of before, with two new fields (`fit_by`, `sessions`). Paths are under
+`src/continuum_swr_replay/analysis/regression/`.
+
+| Old place | New place | Commit |
+|---|---|---|
+| `sessions._fit_session` (renamed) | `sessions._fit_unit`: one fit of a unit of the fit (a session, a day or an animal; `fit_sessions(..., fit_by=...)`) | fa7a43ac |
+| `sessions.SessionKey` (moved) | `tables.session_keys.SessionKey`; `terms` and `sessions` import it, so `from ...regression.sessions import SessionKey` still works | fa7a43ac, 47942202 |
+| `shared_statistics.unit_summary` (moved) | `units.unit_summary`, beside `units.unit_values` and `units.unit_estimate`; `shared_statistics` keeps `estimand_summary` and `animal_mean_interval` | d109c0ac |
+| `shared_statistics._UNIT_KEY_LEVELS`, `tests/analysis/test_unit_key_levels.py` (removed) | `tables.session_keys.FIT_BY_COLUMNS`, read through `fit_by_columns` | d109c0ac |
+| `simulation._unit_c` (moved) | `terms.Design.contrast_on` (a contrast mapped onto a fit's coefficients by name; it refuses one that reads a baseline) and `terms.Design.baseline_read`, which the engine's `Model` now calls to refuse an estimand on a baseline | 6e95bb1e |
+| `collinearity.concurvity(..., intercept=<int>)`, `term_collinearity(..., intercept=<int>)` | `intercept=<list of columns>` (the intercept's column among them) or `None`; an int is no longer taken | 1b01e198 |
+| `simulation._unit_key`, `simulation._unit_values`, `simulation._reduced_estimate` (removed) | `FitRecord.unit_key`, `units.unit_values`, `units.unit_estimate` | d109c0ac |

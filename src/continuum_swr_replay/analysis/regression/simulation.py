@@ -2,11 +2,12 @@
 by the real code.
 
 A simulation replaces only the outcome column of a model's rows. The rows, the
-design, the per-session fit (:func:`.sessions.fit_sessions`), the estimands
-(:func:`.contrasts.evaluate_contrast`) and the reduction session -> recording
-day -> animal with the project's interval
-(:func:`continuum_swr_replay.analysis.shared_statistics.estimand_summary`) are
-the real functions. Nothing here builds a model: the caller gives the
+design, the fit of each unit (:func:`.sessions.fit_sessions` at the model's
+``fit_by``: a session, a recording day or an animal), the estimands
+(:func:`.contrasts.evaluate_contrast`) and the reduction over the units with
+the project's interval
+(:func:`.units.unit_summary`) are the
+real functions. Nothing here builds a model: the caller gives the
 :class:`Model` as the model's own code builds it, and the engine only draws
 outcomes (:func:`.likelihoods.draw`) and calls those functions.
 
@@ -28,7 +29,8 @@ the same data whatever the solver. Data set ``i`` of the scenario at place
 ``s`` in the scenario list is drawn from ``default_rng(data_seed(seed, s,
 i))``, the sessions in the order given; the seed therefore follows the
 scenario's place in the list. Every model of a run is fitted to the same data
-sets. The bootstrap of each (model, estimand) of a data set has its own seed,
+sets, so models that differ only in their ``fit_by`` fit the same draws: one
+run fits each data set at several units. The bootstrap of each (model, estimand) of a data set has its own seed,
 the child at place ``m * n_estimands + e`` of ``data_seed(seed, s,
 i).spawn(...)`` (:func:`bootstrap_seeds`).
 
@@ -47,19 +49,37 @@ are made one session at a time, as the fit reads them. Each data set is
 fitted by ``fit_sessions``, which builds a session's design again from the
 rows; the fitter's interface has no way to pass a built design in.
 
+Two planted values (``docs/design/2026-11-24-unit-of-fit.md``, section 6):
+
+- ``planted``, the present target: the planted value of the estimand, the
+  session -> day -> animal mean of the sessions' values (``c' beta`` inside
+  the model; the scenario's own value outside it);
+- ``planted_unit``, the unit's own target: the model fitted by the real fitter
+  at its ``fit_by`` to the expected outcome itself (no noise), with the weak
+  penalty off (every simple term's fixed penalty removed; a smooth keeps its
+  own), reduced over the units as the estimates are. It is computed once per
+  run, before the data sets, for an inside scenario and once per data set for
+  an outside one (whose expected outcome may read the generator). The Bernoulli takes
+  only 0/1 outcomes, and the Gaussian's scale cannot be profiled on a
+  noise-free outcome (its residuals are zero when the design holds the mean),
+  so under either ``planted_unit`` is NaN. The noise-free target never drops
+  a unit for lack of events, and a drawn data set can, so ``bias_unit`` can
+  compare slightly different sets of units.
+
 The tables of a run (:class:`SimulationResult`):
 
-- ``sessions``: one row per (scenario, model, data set, estimand, session):
-  the fit's ``status`` and ``no_fit``, the estimate and its standard error,
-  ``without_value`` (empty when the session has a value; otherwise the
-  record's ``no_fit`` code, or the ``left_out`` code of the first
-  coefficient of the estimand that the session left out) and the record's
-  ``edf``;
-- ``data_sets``: one row per (scenario, model, data set, estimand): the
-  planted value, ``estimand_summary``'s estimate, interval, day-level p and
-  sessions used, whether the interval holds the planted value
-  (``covered``) and whether it excludes zero (``excludes_zero``), both NaN
-  without a finite interval;
+- ``sessions``: one row per (scenario, model, data set, estimand, unit of the
+  fit): the unit's key (``""`` for the parts a unit does not have), ``fit_by``,
+  its numbers of sessions and events, the fit's ``status`` and ``no_fit``, the
+  estimate and its standard error, ``without_value`` (empty when the unit has
+  a value; otherwise the record's ``no_fit`` code, or the ``left_out`` code
+  of the first coefficient of the estimand that the fit left out) and the
+  record's ``edf``;
+- ``data_sets``: one row per (scenario, model, data set, estimand): the two
+  planted values, ``unit_summary``'s estimate, interval and day-level p, the
+  units and sessions used, whether the interval holds each planted value
+  (``covered``, ``covered_unit``) and whether it excludes zero
+  (``excludes_zero``), each NaN without a finite interval;
 - ``summary``: one row per (scenario, model, estimand), :data:`SUMMARY_COLUMNS`
   (described in :func:`summarize`).
 
@@ -87,19 +107,26 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.shared_statistics import (
-    animal_mean_interval,
-    estimand_summary,
-)
 from continuum_swr_replay.runs.threads import pool_context
+from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns
 
 from .contrasts import evaluate_contrast
-from .likelihoods import GroupedSoftmax, Likelihood, Poisson, draw, group_starts
+from .likelihoods import (
+    Bernoulli,
+    Gaussian,
+    GroupedSoftmax,
+    Likelihood,
+    Poisson,
+    draw,
+    group_starts,
+    mean,
+)
 from .newton import CONVERGED
 from .record import FitRecord, NoFit
 from .sessions import NOT_FITTED, SessionKey, fit_sessions
 from .support import Removed, require_tested_penalized
 from .terms import Design
+from .units import unit_estimate, unit_summary, unit_values
 
 __all__ = [
     "CAUSES",
@@ -193,6 +220,11 @@ class Model:
     fit_columns : tuple of str
         The columns the own fit reads beyond the design's and the unit (a run
         keeps them, :func:`run_columns`).
+        must carry a fixed penalty (:func:`.support.require_tested_penalized`)
+        and none may be of a baseline term (copied per session in a fit of
+        several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
+    fit_by : {"session", "day", "animal"}
+        The unit of the fit.
     """
 
     name: str
@@ -204,6 +236,7 @@ class Model:
     fit: OwnFit | None = None
     fit_estimands: tuple[str, ...] = ()
     fit_columns: tuple[str, ...] = ()
+    fit_by: FitBy = "session"
 
     def __post_init__(self) -> None:
         n_coef = len(self.design.coef_names)
@@ -225,6 +258,12 @@ class Model:
                 )
             estimands[name] = c
         object.__setattr__(self, "estimands", estimands)
+        fit_by_columns(self.fit_by)
+        baseline = [n for c in estimands.values() for n in self.design.baseline_read(c)]
+        if baseline:
+            raise ValueError(
+                f"model {self.name!r}: an estimand reads the baseline {baseline}"
+            )
         require_tested_penalized(
             self.design,
             dict.fromkeys(name for c in estimands.values() for name in self.used(c)),
@@ -513,9 +552,12 @@ def _draw_session(
     rng: np.random.Generator,
 ) -> np.ndarray:
     """One session's outcomes at ``eta``, NaN on its rows with a missing
-    value, shape ``(n_rows,)``."""
+    value, shape ``(n_rows,)``; all NaN when no row is kept (the fit records
+    the session as ``no_rows``)."""
     lik = model.likelihood
     y = np.full(eta.size, np.nan)
+    if prepared.missing.all():
+        return y
     rows = np.flatnonzero(~prepared.missing)
     if isinstance(lik, GroupedSoftmax):
         rows = rows[np.argsort(prepared.unit[rows], kind="stable")]
@@ -542,6 +584,24 @@ def _draw_session(
     return y
 
 
+def _inside_mean(lik: Likelihood, eta: np.ndarray, prepared: _Prepared) -> np.ndarray:
+    """The expected outcome at ``eta`` (:func:`.likelihoods.mean`), NaN on the
+    rows with a missing value, shape ``(n_rows,)``: under the grouped softmax
+    each event's shares over its rows that are not missing. All NaN when no
+    row is kept."""
+    out = np.full(eta.size, np.nan)
+    if prepared.missing.all():
+        return out
+    rows = np.flatnonzero(~prepared.missing)
+    if isinstance(lik, GroupedSoftmax):
+        rows = rows[np.argsort(prepared.unit[rows], kind="stable")]
+        aux = prepared.unit[rows]
+    else:
+        aux = 0.0 if prepared.offset is None else prepared.offset[rows]
+    out[rows] = mean(lik, eta[rows], aux)
+    return out
+
+
 def _draw(
     model: Model,
     sessions: Mapping[SessionKey, pd.DataFrame],
@@ -549,9 +609,12 @@ def _draw(
     scenario: Scenario,
     place: int,
     rng: np.random.Generator,
-) -> dict[SessionKey, np.ndarray]:
+) -> tuple[dict[SessionKey, np.ndarray], dict[SessionKey, np.ndarray] | None]:
     """The outcomes of one data set of the scenario at ``place`` (module
-    docstring): each session's, shape ``(n_rows,)``."""
+    docstring), each session's, shape ``(n_rows,)``; and, for an outside
+    scenario, each session's expected outcome (None inside the model, whose
+    expected outcome does not change between data sets)."""
+    means = None
     if isinstance(scenario, InsideScenario):
         etas = {key: p.inside_eta[place] for key, p in prepared.items()}
     else:
@@ -570,10 +633,11 @@ def _draw(
             units = sessions[key][model.unit].to_numpy()[~p.missing]
             _check_expected(model.likelihood, mean[~p.missing], units, where)
             etas[key] = _linear_predictor(model.likelihood, mean, p.offset)
-    return {
+    outcomes = {
         key: _draw_session(model, scenario, rows, prepared[key], etas[key], rng)
         for key, rows in sessions.items()
     }
+    return outcomes, means
 
 
 class _DataSet(Mapping):
@@ -661,15 +725,21 @@ def draw_data_set(
         raise ValueError(
             "the prepared draws are of another model, scenario or set of sessions"
         )
-    outcomes = _draw(model, sessions, prepared.sessions, scenario, 0, rng)
+    outcomes, _ = _draw(model, sessions, prepared.sessions, scenario, 0, rng)
     return dict(_DataSet(sessions, model.response, outcomes))
+
+
+def _n_sessions(record: FitRecord) -> int:
+    """The sessions of a fit with rows in it (a session dropped from a unit
+    has none)."""
+    return sum(entry["n_rows"] > 0 for entry in record.sessions)
 
 
 def _session_rows(
     model: Model, records: Sequence[FitRecord], base: dict
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
-    """The ``sessions`` table's rows of one model and data set, and each
-    estimand's session estimates, shape ``(n_sessions,)``."""
+    """The ``sessions`` table's rows of one model and data set, one per unit
+    of the fit, and each estimand's unit estimates, shape ``(n_units,)``."""
     rows, estimates = [], {name: [] for name in model.estimands}
     for record in records:
         coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
@@ -678,7 +748,9 @@ def _session_rows(
             cause = record.no_fit or (left[0] if left else "")
             estimate, se = np.nan, np.nan
             if not cause:
-                contrast = evaluate_contrast(c, coef, vcov)
+                contrast = evaluate_contrast(
+                    model.design.contrast_on(c, record.coef_names), coef, vcov
+                )
                 estimate, se = contrast.estimate, contrast.se
             estimates[name].append(estimate)
             rows.append(
@@ -688,6 +760,9 @@ def _session_rows(
                     "animal": record.animal,
                     "session_date": record.session_date,
                     "epoch": record.epoch,
+                    "fit_by": record.fit_by,
+                    "n_sessions": _n_sessions(record),
+                    "n_events": record.n_events,
                     "status": record.status,
                     "no_fit": record.no_fit,
                     "without_value": cause,
@@ -701,50 +776,51 @@ def _session_rows(
 
 def _data_set_row(
     values: np.ndarray,
-    keys: list[SessionKey],
+    records: Sequence[FitRecord],
     planted: float,
+    planted_unit: float,
     n_draws: int,
     seed: int,
 ) -> dict:
-    """One estimand's reduction over a data set's sessions (module docstring);
-    NaN when no session has a value. ``covered`` and ``excludes_zero`` are
-    NaN without a finite interval (``estimand_summary`` gives none with
-    fewer than two animals), so such a data set counts in neither rate."""
-    index = pd.MultiIndex.from_tuples(keys)
-    if not np.isfinite(values).any():
-        return {
-            "planted": planted,
-            "estimate": np.nan,
-            "low": np.nan,
-            "high": np.nan,
-            "interval_sd": np.nan,
-            "day_p": np.nan,
-            "n_sessions_used": 0,
-            "n_animals_same_sign": 0,
-            "covered": np.nan,
-            "excludes_zero": np.nan,
-            "bootstrap_seed": seed,
-        }
-    labels = [pd.Series([key[k] for key in keys], index=index) for k in range(3)]
-    summary = estimand_summary(
-        pd.Series(values, index=index), *labels, n_draws=n_draws, seed=seed
+    """One estimand's reduction over a data set's units (module docstring);
+    NaN when no unit has a value. ``covered``, ``covered_unit`` and
+    ``excludes_zero`` are NaN without a finite interval (none with fewer than
+    two animals), so such a data set counts in none of those rates."""
+    fit_by = records[0].fit_by
+    summary = (
+        unit_summary(unit_values(values, records), fit_by, n_draws=n_draws, seed=seed)
+        if np.isfinite(values).any()
+        else dict.fromkeys(("estimate", "low", "high", "sd", "day_p"), np.nan)
+        | {"n_units": 0, "n_animals_same_sign": 0}
     )
     low, high = summary["low"], summary["high"]
     interval = bool(np.isfinite(low) and np.isfinite(high))
+
+    def covers(value: float) -> float:
+        return (
+            float(low <= value <= high) if interval and np.isfinite(value) else np.nan
+        )
+
     return {
+        "fit_by": fit_by,
         "planted": planted,
+        "planted_unit": planted_unit,
         "estimate": summary["estimate"],
         "low": low,
         "high": high,
         "interval_sd": summary["sd"],
         "day_p": float(summary["day_p"]),
-        "n_sessions_used": int(summary["n_sessions"]),
-        "n_animals_same_sign": int(summary["n_animals_same_sign"]),
-        "covered": (
-            float(low <= planted <= high)
-            if interval and np.isfinite(planted)
-            else np.nan
+        "n_sessions_used": int(
+            sum(
+                _n_sessions(r)
+                for r, v in zip(records, values, strict=True)
+                if np.isfinite(v)
+            )
         ),
+        "n_units_used": int(summary["n_units"]),
+        "n_animals_same_sign": int(summary["n_animals_same_sign"]),
+        "covered": covers(planted),
+        "covered_unit": covers(planted_unit),
         "excludes_zero": float(not low <= 0.0 <= high) if interval else np.nan,
         "bootstrap_seed": seed,
     }
@@ -847,20 +923,91 @@ def _own_fit_rows(
             )
         data_set_rows.append({**base, "estimand": name, **row})
     return data_set_rows, session_rows
+def _without_weak_penalty(design: Design) -> Design:
+    """``design`` with the fixed penalty of every simple term (a level, a 0/1
+    or a continuous slope) removed; a smooth or a lag functional keeps its
+    own."""
+    simple = ("level", "binary", "slope")
+    terms, blocks, rho = [], [], []
+    for term in design.terms:
+        block = None
+        if term.block is not None and term.kind not in simple:
+            block = len(blocks)
+            blocks.append(design.blocks[term.block])
+            rho.append(design.log_penalties[term.block])
+        terms.append(replace(term, block=block))
+    return replace(
+        design,
+        terms=tuple(terms),
+        blocks=tuple(blocks),
+        log_penalties=np.array(rho, dtype=float),
+    )
+
+
+def _unit_targets(
+    model: Model,
+    sessions: Mapping[SessionKey, pd.DataFrame],
+    means: Mapping[SessionKey, np.ndarray],
+) -> dict[str, float]:
+    """Each estimand's unit target (module docstring): the model at its
+    ``fit_by`` fitted to the expected outcome ``means`` with the weak penalty
+    off, reduced over the units; NaN under the Bernoulli and the Gaussian."""
+    if isinstance(model.likelihood, (Bernoulli, Gaussian)):
+        return dict.fromkeys(model.estimands, np.nan)
+    records = fit_sessions(
+        _without_weak_penalty(model.design),
+        _DataSet(sessions, model.response, means),
+        model.likelihood,
+        model=model.name,
+        kind="target",
+        response=model.response,
+        unit=model.unit,
+        table_sha256={},
+        fit_by=model.fit_by,
+    )
+    _, estimates = _session_rows(model, records, {})
+    return {
+        name: unit_estimate(unit_values(values, records), records[0].fit_by)
+        for name, values in estimates.items()
+    }
+
+
+def _inside_targets(
+    simulation: Simulation,
+    prepared: Mapping[SessionKey, _Prepared],
+    places: Sequence[int],
+) -> dict[tuple[int, str], dict[str, float]]:
+    """(scenario place, model name) -> its unit targets, for each inside
+    scenario at ``places``: its expected outcome does not change between
+    data sets, so the target is fitted once per run."""
+    out = {}
+    for s in places:
+        if not isinstance(simulation.scenarios[s], InsideScenario):
+            continue
+        for model in simulation.models:
+            means = {
+                key: _inside_mean(model.likelihood, p.inside_eta[s], p)
+                for key, p in prepared.items()
+            }
+            out[s, model.name] = _unit_targets(model, simulation.sessions, means)
+    return out
 
 
 def _run_task(
     simulation: Simulation,
     prepared: Mapping[SessionKey, _Prepared],
     task: tuple[int, int],
+    targets: Mapping[tuple[int, str], dict[str, float]],
 ) -> tuple[list[dict], list[dict]]:
     """One data set of one scenario, fitted by every model: its ``data_sets``
-    and ``sessions`` rows."""
+    and ``sessions`` rows. ``targets`` holds each inside scenario's unit
+    targets (:func:`_inside_targets`); an outside scenario's are fitted here,
+    on the data set's expected outcome."""
     s, i = task
     scenario = simulation.scenarios[s]
     models = simulation.models
     rng = np.random.default_rng(data_seed(simulation.seed, s, i))
-    outcomes = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
+    outcomes, means = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
     data = _DataSet(simulation.sessions, models[0].response, outcomes)
     keys = list(data)
     n_estimands = [len(model.estimand_names) for model in models]
@@ -884,12 +1031,25 @@ def _run_task(
             response=model.response,
             unit=model.unit,
             table_sha256={},
+            fit_by=model.fit_by,
+        )
+        target = (
+            targets[s, model.name]
+            if means is None
+            else _unit_targets(model, simulation.sessions, means)
         )
         rows, estimates = _session_rows(model, records, base)
         session_rows += rows
         for name, values in estimates.items():
             planted = planted_value(scenario, model, name)
-            row = _data_set_row(values, keys, planted, simulation.n_draws, next(seeds))
+            row = _data_set_row(
+                values,
+                records,
+                planted,
+                target[name],
+                simulation.n_draws,
+                next(seeds),
+            )
             data_set_rows.append({**base, "estimand": name, **row})
     return data_set_rows, session_rows
 
@@ -898,15 +1058,18 @@ def _run_task(
 _WORKER: dict = {}
 
 
-def _init_worker(simulation: Simulation) -> None:
-    _WORKER["simulation"] = simulation
-    _WORKER["prepared"] = _prepare(
-        simulation.models[0], simulation.sessions, simulation.scenarios
-    )
+def _init_worker(
+    simulation: Simulation,
+    prepared: Mapping[SessionKey, _Prepared],
+    targets: Mapping[tuple[int, str], dict[str, float]],
+) -> None:
+    _WORKER.update(simulation=simulation, prepared=prepared, targets=targets)
 
 
 def _worker_task(task: tuple[int, int]) -> tuple[list[dict], list[dict]]:
-    return _run_task(_WORKER["simulation"], _WORKER["prepared"], task)
+    return _run_task(
+        _WORKER["simulation"], _WORKER["prepared"], task, _WORKER["targets"]
+    )
 
 
 def _check(simulation: Simulation) -> None:
@@ -1024,13 +1187,13 @@ def run(
         for i in range(simulation.n_data_sets)
     ]
     simulation = replace(simulation, sessions=_kept_rows(simulation))
+    prepared = _prepare(simulation.models[0], simulation.sessions, simulation.scenarios)
+    targets = _inside_targets(simulation, prepared, sorted({s for s, _ in tasks}))
     if workers == 1:
-        prepared = _prepare(
-            simulation.models[0], simulation.sessions, simulation.scenarios
-        )
-        parts = [_run_task(simulation, prepared, task) for task in tasks]
+        parts = [_run_task(simulation, prepared, task, targets) for task in tasks]
     else:
-        with pool_context().Pool(workers, _init_worker, (simulation,)) as pool:
+        context = (simulation, prepared, targets)
+        with pool_context().Pool(workers, _init_worker, context) as pool:
             parts = pool.map(_worker_task, tasks, chunksize=1)
     data_sets = pd.DataFrame([row for part in parts for row in part[0]])
     sessions = pd.DataFrame([row for part in parts for row in part[1]])
@@ -1068,6 +1231,13 @@ SUMMARY_COLUMNS = (
     "n_data_sets_with_day_p",
     "n_draws",
     "seed",
+    "fit_by",
+    "planted_unit",
+    "bias_unit",
+    "coverage_unit",
+    "coverage_unit_se",
+    "n_units_used_mean",
+    "share_sessions_unused",
 )
 
 
@@ -1106,12 +1276,24 @@ def summarize(
     value of zero ``excludes_zero`` and ``reject_day`` are false-positive
     rates, otherwise power.
 
-    Over every session of every data set: ``share_without_value`` and, for
-    each code of :data:`CAUSES`, ``without_value_<code>``, the share of
-    sessions without a value for that cause; ``share_not_converged``, the
-    share of the session fits tried (status not ``not fitted``) that did not
-    converge. ``n_sessions`` is the cohort's, ``n_sessions_used_min`` and
-    ``n_sessions_used_mean`` the sessions in the estimates; ``n_data_sets``,
+    Against the unit's own target (module docstring), over the same data
+    sets: ``planted_unit``, its mean; ``bias_unit``, the mean of each data
+    set's estimate less its ``planted_unit``; ``coverage_unit``, the share of
+    intervals that hold it. ``fit_by`` is the model's unit, and
+    ``n_units_used_mean`` the units in the estimates. At the animal unit no
+    data set has a day-level p (``n_data_sets_with_day_p`` is 0).
+
+    Over every unit of the fit of every data set (a session, a day or an
+    animal, at the model's ``fit_by``): ``share_without_value`` and, for each
+    code of :data:`CAUSES`, ``without_value_<code>``, the share of units
+    without a value for that cause; ``share_not_converged``, the share of the
+    unit fits tried (status not ``not fitted``) that did not converge. A
+    session dropped from a day or an animal that keeps a value is in none of
+    them. Over the sessions: ``n_sessions`` is the cohort's,
+    ``n_sessions_used_min`` and ``n_sessions_used_mean`` the sessions in the
+    estimates, and ``share_sessions_unused``, ``1 - n_sessions_used_mean /
+    n_sessions``, the mean share of the cohort's sessions an estimate leaves
+    out; ``n_data_sets``,
     ``n_data_sets_with_estimate``, ``n_data_sets_with_interval`` and
     ``n_data_sets_with_day_p``; ``n_draws`` and ``seed`` the run's.
     """
@@ -1129,6 +1311,7 @@ def summarize(
         bias = mean - planted
         cause = fits["without_value"].to_numpy()
         tried = fits["status"].to_numpy() != NOT_FITTED
+        unit_target = found["planted_unit"].to_numpy(dtype=float)
         out.append(
             {
                 "scenario": scenario,
@@ -1175,6 +1358,13 @@ def summarize(
                 "n_data_sets_with_day_p": int(np.isfinite(found["day_p"]).sum()),
                 "n_draws": simulation.n_draws,
                 "seed": simulation.seed,
+                "fit_by": group["fit_by"].iloc[0],
+                "planted_unit": (float(np.mean(unit_target)) if n else np.nan),
+                "bias_unit": (float(np.mean(estimate - unit_target)) if n else np.nan),
+                **_share(found["covered_unit"].to_numpy(), "coverage_unit"),
+                "n_units_used_mean": float(group["n_units_used"].mean()),
+                "share_sessions_unused": 1.0
+                - float(group["n_sessions_used"].mean()) / len(simulation.sessions),
             }
         )
     return pd.DataFrame(out, columns=list(SUMMARY_COLUMNS))

@@ -156,7 +156,7 @@ LOW_RATE_MEASURES = (
     "mark_information_per_spike",
 )
 """The held-out tetrode scores read by place group
-(``tetrode_holdout.window_scores``' columns of a run with ``--extra-scores``):
+(``tetrode_holdout.window_scores``' columns):
 the gain over local coding, its mark part, and the place information of the
 scored spikes' marks. The agreement minus the shuffled-event reference is not
 split by place group: low-rate events have narrow estimates, so their donors'
@@ -184,8 +184,8 @@ def low_rate_statistics(
     Parameters
     ----------
     windows : pd.DataFrame
-        ``tetrode_holdout.window_scores`` of a run with ``--extra-scores`` (the
-        selected events and their controls).
+        ``tetrode_holdout.window_scores`` (the selected events and their
+        controls).
     place_rate : pd.DataFrame
         The place-rate run's rows of the selected events: ``event_id``,
         ``animal``, ``epoch_id``, ``group`` and ``content_place_rate.RANK_COLUMNS``.

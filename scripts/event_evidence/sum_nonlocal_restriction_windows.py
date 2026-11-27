@@ -22,8 +22,8 @@ The epoch's bins summed by category, well visit and event window, and Figure
 2j's events, come from ``detect_heldout_events.py``, from events detected on
 held-out data.
 
-``--restriction-dir`` reads another restriction run (a second scoring of the
-same bins), ``--bin-facts-dir`` another per-bin facts run, and ``--output-dir``
+``--restriction-dir`` reads another restriction run (a trial, such as a pass
+from a stored fit into its own folder), ``--bin-facts-dir`` another per-bin facts run, and ``--output-dir``
 writes elsewhere; by default the canonical restriction and per-bin facts runs
 and ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``.
 
@@ -57,7 +57,7 @@ held-out tetrode and bin-facts runs' manifests. The participation tables must be
 held-out tetrode run read (its manifest's inputs), or the run stops before any
 epoch: the control windows come from them. The held-out tetrode run must be
 held out in folds of whole trials, as the restriction run is (its manifest's
-settings, ``reported.events.require_tetrode_holdout_folds``), or the run stops
+settings, ``heldout_runs.require_tetrode_holdout_folds``), or the run stops
 before any epoch and does not gather. An event table other than the one
 the held-out tetrode run read does not stop the run: it is logged as a warning
 and the header's settings carry a note with both digests
@@ -89,6 +89,9 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
+from continuum_swr_replay.analysis.event_evidence.heldout_runs import (
+    require_tetrode_holdout_folds,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     epoch_windows,
 )
@@ -108,7 +111,6 @@ from continuum_swr_replay.paths import (
     TETRODE_HOLDOUT_NAME,
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events import require_tetrode_holdout_folds
 from continuum_swr_replay.runs.epoch_records import gather_manifest
 from continuum_swr_replay.runs.io import (
     json_ready,

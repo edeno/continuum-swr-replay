@@ -27,13 +27,16 @@ value, and the inference takes the animal as the unit of replication.
   - For a calibration curve, the epoch's own OLS slope (:func:`epoch_slopes`).
   - For coordinated silence, the epoch's own ratio of sums of silent-run
     counts.
-- **Primary inference, at the animal level.** An animal's summary is the mean
-  of its epochs' values. With A animals:
+- **Primary inference, at the animal level.** An animal's summary is the
+  median of its epochs' values for a metric whose epochs take their median
+  (the log-likelihood ratios and their calibration slopes) and the mean for one
+  whose epochs take their mean (counts, shares, distances; :func:`animal_step`).
+  With A animals:
   - ``{p}animal_estimate`` is the mean of the animal summaries, each animal
     weighted equally;
   - ``{p}animal_ci_lo`` / ``{p}animal_ci_hi`` is its 95 % interval from the
-    nested bootstrap (:func:`nested_mean_intervals`: animals, then epochs
-    within each): the estimate +/- t(0.975, A - 1) sqrt(A / (A - 1)) times the
+    nested bootstrap (:func:`nested_intervals`: animals, then epochs within
+    each, every drawn copy apart, each replicate with the same estimator): the estimate +/- t(0.975, A - 1) sqrt(A / (A - 1)) times the
     replicates' SD
     (:func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`).
     The percentiles of the replicates would under-cover with five animals
@@ -98,8 +101,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
 )
 from continuum_swr_replay.analysis.shared_statistics import (
     bootstrap_interval,
-    nested_bootstrap_draws,
-    nested_codes,
+    session_value_statistics,
 )
 
 ENCODING_LABELS = {
@@ -191,6 +193,15 @@ CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
 
 PROBABILITY_BINS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0000001)
 PROBABILITY_BIN_LABELS = ("0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0")
+
+
+def probability_bin_center(label: str) -> float:
+    """The center of a probability bin named by :data:`PROBABILITY_BIN_LABELS`
+    (``"0.2-0.4"``: 0.3)."""
+    low, high = (float(edge) for edge in label.split("-"))
+    return (low + high) / 2
+
+
 MIN_BIN_WINDOWS = 10
 """Windows a calibration bin needs for a verdict (pooled over epochs) or to
 count toward an epoch's slope (within the epoch)."""
@@ -300,7 +311,7 @@ def stratified_bootstrap_ci(
 
     Window level: the strata keep their sizes but windows are treated as
     independent, so with nested data it ignores the nesting and is not for
-    inference (:func:`nested_mean_intervals` is). Non-finite values are
+    inference (:func:`nested_intervals` is). Non-finite values are
     dropped; NaNs when fewer than two are left.
     """
     x = np.asarray(x, dtype=float)
@@ -515,19 +526,25 @@ def epoch_slopes(
     return out[keep]
 
 
-def nested_mean_intervals(
-    summaries: NDArray, animals: NDArray, *, n_boot: int = 10_000, seed: Seed
+def nested_intervals(
+    summaries: NDArray,
+    animals: NDArray,
+    *,
+    statistic: str,
+    n_boot: int = 10_000,
+    seed: Seed,
 ) -> dict[str, float]:
-    """95 % intervals of the animal-level and epoch-weighted means of per-epoch
-    summaries, from one nested bootstrap.
+    """95 % intervals of the animal-level estimate and the epoch-weighted mean
+    of per-epoch summaries, from one nested bootstrap.
 
-    The replicates are
-    :func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draws`
-    with the epochs as the sessions (each its own row): the animals with
-    replacement, then each drawn animal's epochs with replacement. On it, the
-    animal-level mean is the mean over the drawn animals (each as often as it
-    was drawn) of each one's mean over its drawn epochs, and the epoch-weighted
-    mean the mean over every drawn epoch. Each interval is
+    The animal-level estimate is the mean over animals of each animal's
+    ``statistic`` over its epochs (:func:`_animal_summaries`). The replicates
+    are the nested bootstrap of the animals and their epochs with every drawn
+    copy apart (``shared_statistics.session_value_statistics``): each takes the
+    same estimator as the data, each drawn copy of an animal its ``statistic``
+    over its drawn epochs, then the mean over the drawn animals. The
+    epoch-weighted mean on a replicate is the mean over every drawn epoch.
+    Each interval is
     :func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
     of the statistic on the data and its replicates over the animals: the
     statistic plus or minus t(0.975, A - 1) sqrt(A / (A - 1)) times the
@@ -544,6 +561,8 @@ def nested_mean_intervals(
         One value per epoch; non-finite ones are dropped.
     animals : ndarray, shape (n_epochs,)
         Each epoch's animal.
+    statistic : {"median", "mean"}
+        The animal step (:func:`animal_step`).
     n_boot : int, optional
     seed : int or sequence
         The replicates come from ``keyed_rng(seed, "hierarchical")``.
@@ -559,48 +578,56 @@ def nested_mean_intervals(
     finite = np.isfinite(values)
     values, animals = values[finite], np.asarray(animals)[finite]
     nan = float("nan")
+    keys = [
+        "animal_estimate",
+        "animal_ci_lo",
+        "animal_ci_hi",
+        "epoch_estimate",
+        "epoch_ci_lo",
+        "epoch_ci_hi",
+    ]
     if values.size == 0:
-        return dict.fromkeys(
-            [
-                "animal_estimate",
-                "animal_ci_lo",
-                "animal_ci_hi",
-                "epoch_estimate",
-                "epoch_ci_lo",
-                "epoch_ci_hi",
-            ],
-            nan,
-        )
-    animal_codes, epoch_codes = nested_codes(animals, np.arange(values.size))
-    n_animals = int(animal_codes.max()) + 1
-    animal_estimate = float(_animal_summaries(values, animals).mean())
+        return dict.fromkeys(keys, nan)
+    result = session_value_statistics(
+        values,
+        animals,
+        statistic=statistic,
+        n_boot=n_boot,
+        rng=keyed_rng(seed, "hierarchical"),
+    )
+    n_animals = len(result.per_animal)
     epoch_estimate = float(values.mean())
-    stream = keyed_rng(seed, "hierarchical")
-    draws = nested_bootstrap_draws(animal_codes, epoch_codes, stream, n_boot)
-    epochs_drawn = draws.rows.astype(float)
-    animals_drawn = draws.animals.astype(float)
-    member = np.eye(n_animals)[animal_codes]  # (n_epochs, n_animals)
-    sums = epochs_drawn @ (member * values[:, None])
-    counts = epochs_drawn @ member
-    own_means = np.divide(sums, counts, out=np.zeros_like(sums), where=counts > 0)
-    animal_draws = (animals_drawn * own_means).sum(1) / animals_drawn.sum(1)
-    epoch_draws = (epochs_drawn @ values) / epochs_drawn.sum(1)
-    animal = bootstrap_interval(animal_estimate, animal_draws, n_animals)
+    epoch_draws = np.nanmean(result.copy_values, axis=(1, 2))
     epoch = bootstrap_interval(epoch_estimate, epoch_draws, n_animals)
     return {
-        "animal_estimate": animal_estimate,
-        "animal_ci_lo": animal.low,
-        "animal_ci_hi": animal.high,
+        "animal_estimate": result.estimate,
+        "animal_ci_lo": result.interval.low,
+        "animal_ci_hi": result.interval.high,
         "epoch_estimate": epoch_estimate,
         "epoch_ci_lo": epoch.low,
         "epoch_ci_hi": epoch.high,
     }
 
 
-def _animal_summaries(values: NDArray, animals: NDArray) -> NDArray:
-    """Each animal's mean epoch value, by animal: shape (n_animals,)."""
+def animal_step(metric: str) -> str:
+    """The animal step of a metric's per-epoch values: "median" or "mean".
+
+    The project's rule: the median for a per-event quantity whose epochs are
+    summarized by their median (the heavy-tailed log-likelihood ratios and
+    their calibration slopes, :func:`epoch_summary_kind`), the mean for a
+    quantity summarized by its mean (counts, shares, distances).
+    """
+    return epoch_summary_kind(metric)
+
+
+def _animal_summaries(values: NDArray, animals: NDArray, statistic: str) -> NDArray:
+    """Each animal's ``statistic`` ("median" or "mean") over its epochs'
+    values, by animal: shape (n_animals,)."""
     by_animal: NDArray = (
-        pd.Series(values, dtype=float).groupby(animals, sort=True).mean().to_numpy()
+        pd.Series(values, dtype=float)
+        .groupby(animals, sort=True)
+        .agg(statistic)
+        .to_numpy()
     )
     return by_animal
 
@@ -611,7 +638,7 @@ class AnimalTTest(NamedTuple):
     ``estimate`` is the mean of the A animal summaries; ``p`` the two-sided
     one-sample t-test p against 0, with A - 1 degrees of freedom.
     ``zero_variance``: every animal summary is the same, so there is no test
-    (``p`` is NaN). Its interval is :func:`nested_mean_intervals`'.
+    (``p`` is NaN). Its interval is :func:`nested_intervals`'.
     """
 
     estimate: float
@@ -635,11 +662,13 @@ def _t_inference(by_animal: NDArray) -> AnimalTTest:
     return AnimalTTest(estimate, p, False)
 
 
-def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
+def animal_t_test(
+    summaries: NDArray, animals: NDArray, *, statistic: str
+) -> AnimalTTest:
     """The mean of the animal summaries and its t-test against 0.
 
-    Each animal enters once, as the mean of its epochs' summaries, however
-    many epochs it has (one is enough). With A animals the two-sided test has
+    Each animal enters once, as the ``statistic`` ("median" or "mean") of its
+    epochs' summaries, however many epochs it has (one is enough). With A animals the two-sided test has
     A - 1 degrees of freedom; with balanced data it is the intercept test of a
     random-intercept model of epochs within animals.
 
@@ -658,7 +687,9 @@ def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
     """
     values = np.asarray(summaries, dtype=float)
     finite = np.isfinite(values)
-    return _t_inference(_animal_summaries(values[finite], np.asarray(animals)[finite]))
+    return _t_inference(
+        _animal_summaries(values[finite], np.asarray(animals)[finite], statistic)
+    )
 
 
 def _epoch_statistics(
@@ -668,12 +699,14 @@ def _epoch_statistics(
     n_boot: int,
     n_flips: int,
     seed: Seed,
+    statistic: str,
     signflip: bool = True,
 ) -> dict[str, Any]:
     """The inference on per-epoch values, keyed by column name (module notes).
 
-    Primary: ``animal_estimate`` with its interval ``animal_ci_lo`` /
-    ``animal_ci_hi`` (:func:`nested_mean_intervals`), ``p_animal_t`` and
+    Each animal's value is its ``statistic`` over its epochs
+    (:func:`animal_step`). Primary: ``animal_estimate`` with its interval
+    ``animal_ci_lo`` / ``animal_ci_hi`` (:func:`nested_intervals`), ``p_animal_t`` and
     ``zero_variance`` (:func:`animal_t_test`), and ``animals_pos`` /
     ``epochs_pos`` ("k/A" and "k/N" > 0). Secondary: ``epoch_estimate`` with
     its interval ``epoch_ci_lo`` / ``epoch_ci_hi`` from the same replicates, and
@@ -684,9 +717,11 @@ def _epoch_statistics(
     animal = np.asarray(animals)
     finite = np.isfinite(values)
     values, animal = values[finite], animal[finite]
-    by_animal = _animal_summaries(values, animal)
+    by_animal = _animal_summaries(values, animal, statistic)
     test = _t_inference(by_animal)
-    intervals = nested_mean_intervals(values, animal, n_boot=n_boot, seed=seed)
+    intervals = nested_intervals(
+        values, animal, statistic=statistic, n_boot=n_boot, seed=seed
+    )
     level: dict[str, Any] = {
         "animal_estimate": test.estimate,
         "animal_ci_lo": intervals["animal_ci_lo"],
@@ -780,8 +815,9 @@ def bout_animal_summaries(
 ) -> pd.DataFrame:
     """Each animal's summary of bout metrics and of their paired differences.
 
-    An animal's summary is the mean of its epochs' summaries over windows, the
-    median or the mean by metric (:func:`epoch_summary_kind`): the values whose
+    An animal's summary is its median or mean (:func:`animal_step`) of its
+    epochs' summaries over windows, the median or the mean by metric
+    (:func:`epoch_summary_kind`): the values whose
     mean and interval :func:`bout_statistics` reports as ``animal_*`` and
     ``diff_animal_*``.
 
@@ -813,7 +849,7 @@ def bout_animal_summaries(
                 by_animal = {
                     name: epoch_summaries(values, epochs, animals)
                     .groupby("animal")[kind]
-                    .mean()
+                    .agg(animal_step(metric))
                     for name, values in (("value", x), ("diff", diff))
                 }
                 frame = pd.DataFrame(by_animal).rename_axis("animal").reset_index()
@@ -925,6 +961,7 @@ def bout_statistics(
                             seed=_summary_seed(
                                 _with_keys(seed, *key, *seed_keys), which
                             ),
+                            statistic=animal_step(metric),
                         )
                         row.update(_prefixed(level, f"{role}{quantity}"))
                 if window_level:
@@ -983,9 +1020,10 @@ def calibration_statistics(
 
     - **Primary, animal level:**
       - A bin's ``animal_estimate`` is the mean over animals of each animal's
-        mean epoch summary in the bin (``epoch_summary``,
-        :func:`epoch_summary_kind`), with its interval ``animal_ci_lo`` /
-        ``animal_ci_hi`` (:func:`nested_mean_intervals`).
+        median (or mean, :func:`animal_step`) epoch summary in the bin
+        (``epoch_summary``, :func:`epoch_summary_kind`), with its interval
+        ``animal_ci_lo`` /
+        ``animal_ci_hi`` (:func:`nested_intervals`).
       - A curve's slope is each epoch's own OLS slope (:func:`epoch_slopes`,
         which takes only epochs with two bins of :data:`MIN_BIN_WINDOWS`
         windows), inferred under the prefix ``slope_`` (the module's column
@@ -1086,6 +1124,7 @@ def calibration_statistics(
                             n_boot=n_boot,
                             n_flips=n_flips,
                             seed=_summary_seed(bin_seed, which),
+                            statistic=animal_step(metric),
                             signflip=False,
                         )
                         row.update({f"{role}{c}": level[c] for c in _INTERVALS})
@@ -1098,6 +1137,7 @@ def calibration_statistics(
                     n_boot=n_boot,
                     n_flips=n_flips,
                     seed=_with_keys(seed, regime, state, metric, "epoch"),
+                    statistic=animal_step(metric),
                 )
                 bottom, top = curve[0], curve[-1]
                 enough = bottom["n"] >= MIN_BIN_WINDOWS and top["n"] >= MIN_BIN_WINDOWS
@@ -1211,7 +1251,8 @@ def coordinated_silence(
       - ``obs_animal_estimate`` is the observed ratios' mean over animals, with
         its interval ``obs_animal_ci_lo`` / ``obs_animal_ci_hi``; the
         secondary ``obs_epoch_*`` are their epoch-weighted mean and its
-        interval (:func:`nested_mean_intervals`).
+        interval (:func:`nested_intervals`, the mean at the animal step: a
+        ratio of counts, a share-like quantity).
       - ``pred_{e}_animal_estimate`` is encoding ``e``'s prediction, its mean
         over animals (``pred_{e}_epoch_estimate``, over epochs).
       - Each epoch's observed - predicted is inferred under the prefix
@@ -1302,6 +1343,7 @@ def coordinated_silence(
                 n_boot=n_boot,
                 n_flips=n_flips,
                 seed=_with_keys(seed, regime, kind, state, name, "epoch"),
+                statistic="mean",
                 signflip=False,
             )
             row.update({f"obs_{c}": level[c] for c in _INTERVALS})
@@ -1309,7 +1351,7 @@ def coordinated_silence(
                 predicted = sums[prefix] / sums["silent"]
                 row[f"pred_{prefix}_animal_estimate"] = float(
                     _animal_summaries(
-                        predicted.to_numpy(), sums["animal"].to_numpy()
+                        predicted.to_numpy(), sums["animal"].to_numpy(), "mean"
                     ).mean()
                 )
                 row[f"pred_{prefix}_epoch_estimate"] = float(predicted.mean())
@@ -1319,6 +1361,7 @@ def coordinated_silence(
                     n_boot=n_boot,
                     n_flips=n_flips,
                     seed=_with_keys(seed, regime, kind, state, name, prefix, "excess"),
+                    statistic="mean",
                 )
                 row.update(_prefixed(level, f"excess_{prefix}_"))
         rows.append(row)

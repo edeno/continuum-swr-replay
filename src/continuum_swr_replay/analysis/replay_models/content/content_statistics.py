@@ -16,9 +16,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    class_medians,
-)
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     TRUNK_ARMS,
@@ -211,12 +208,12 @@ def event_length_statistics(events: pd.DataFrame) -> dict[str, float]:
         events; and ``swr_to_non_swr_ratio``, the SWR median over the non-SWR
         median.
     """
-    medians = class_medians(events, "n_nonlocal_bins")
+    medians = events.groupby("is_swr")["n_nonlocal_bins"].median()
     return {
         "median_bins": events["n_nonlocal_bins"].median(),
-        "median_bins_swr": medians["median_swr"],
-        "median_bins_non_swr": medians["median_non_swr"],
-        "swr_to_non_swr_ratio": medians["median_swr"] / medians["median_non_swr"],
+        "median_bins_swr": medians[True],
+        "median_bins_non_swr": medians[False],
+        "swr_to_non_swr_ratio": medians[True] / medians[False],
     }
 
 

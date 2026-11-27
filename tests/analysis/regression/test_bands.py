@@ -166,3 +166,33 @@ def test_the_across_session_band_refuses_a_point_where_the_draws_do_not_vary() -
     curves = curves - curves[:, :1]
     with pytest.raises(ValueError, match="leave that point off the grid"):
         across_session_band(curves, animal, day, n_draws=200, seed=0)
+
+
+def test_band_over_animals() -> None:
+    """At the animal unit each animal gives one curve, passed as one row with
+    the animal as its own day: the estimate is the plain mean of the animals'
+    curves, and at each point the half width is the critical value times the
+    curves' SD over sqrt(A), up to the bootstrap's error (2,000 draws)."""
+    rng = np.random.default_rng(11)
+    grid = np.linspace(0.0, 4.0, 21)
+    curves = np.sin(grid)[None, :] + rng.normal(0.0, 0.5, (5, 1))
+    curves = curves + rng.normal(0.0, 0.2, curves.shape)
+    animal = np.arange(5)
+    band = across_session_band(curves, animal, animal, n_draws=2000, seed=3)
+    np.testing.assert_allclose(band.estimate, curves.mean(axis=0))
+    se = curves.std(axis=0, ddof=1) / np.sqrt(5)
+    np.testing.assert_allclose(band.high - band.estimate, band.critical * se, rtol=0.1)
+    assert band.critical > student_t.ppf(0.975, 4)
+
+
+def test_band_over_days() -> None:
+    """At the day unit each day gives one curve: the estimate is the mean over
+    the animals of each animal's mean over its days."""
+    rng = np.random.default_rng(12)
+    grid = np.linspace(0.0, 4.0, 11)
+    animal = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2])
+    day = np.arange(animal.size)
+    curves = np.cos(grid)[None, :] + rng.normal(0.0, 0.4, (animal.size, grid.size))
+    band = across_session_band(curves, animal, day, n_draws=500, seed=4)
+    by_animal = np.stack([curves[animal == a].mean(axis=0) for a in range(3)])
+    np.testing.assert_allclose(band.estimate, by_animal.mean(axis=0))

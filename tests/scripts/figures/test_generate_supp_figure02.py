@@ -14,18 +14,22 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
+from continuum_swr_replay.analysis.event_evidence import heldout_runs  # noqa: E402
+from continuum_swr_replay.reported import inputs as stored_inputs  # noqa: E402
 from continuum_swr_replay.reported.questions import FIGURES  # noqa: E402
+from continuum_swr_replay.visualization.publication_style import drawn_extent
 from scripts.figures import generate_supp_figure02 as figure  # noqa: E402
-from tests.scripts.figures.test_figure_script_fixes import (  # noqa: E402
+from tests.support._figure02_tables import (  # noqa: E402
     GAIN_SPLIT,
     OUTSIDE,
-    _figure02_events,
-    _gain_statistics,
-    _means_at,
-    _measure_rows,
-    _outside_rows,
     assert_spread_about,
+    figure02_events,
+    gain_statistics,
+    means_at,
+    measure_rows,
+    outside_rows,
 )
+from tests.support._tetrode_holdout_tables import run_table  # noqa: E402
 
 TRIAL_FOLD_SETTINGS = {"n_folds": 5, "fold_design": "trials"}
 MARGINS = {0.1: [0.022, 0.019, 0.026, 0.030, 0.021]}
@@ -38,7 +42,7 @@ def _parts() -> pd.DataFrame:
     threshold, family and measure: each margin's gain per spike."""
     tables = []
     for threshold, values in MARGINS.items():
-        rows = _measure_rows({"gain_per_spike": values}).reset_index()
+        rows = measure_rows({"gain_per_spike": values}).reset_index()
         tables.append(rows.assign(subset="beyond_swr_margin", threshold_s=threshold))
     return pd.concat(tables).set_index(["subset", "threshold_s", "family", "measure"])
 
@@ -55,8 +59,6 @@ def _no_spike_trace() -> dict:
         "median": median,
         "q75": median + 0.5,
         "level": 0.2,
-        "periods": pd.Series({"a": 3, "b": 2}),
-        "median_duration": 0.018,
     }
 
 
@@ -144,18 +146,18 @@ def _decoded_distance() -> tuple[pd.DataFrame, pd.DataFrame]:
     return animal_distance_by_local_probability(pd.DataFrame(rows))
 
 
-def _mua_counts() -> pd.DataFrame:
-    """``animal_signal_counts`` of two animals over the MUA bins: 20 bins in each,
+def _mua_shares() -> pd.DataFrame:
+    """``animal_signal_shares`` of two animals over the MUA bins: 20 bins in each,
     non-local in 2 below 2 z and 10 at or above."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
-        animal_signal_counts,
+        animal_signal_shares,
     )
     from continuum_swr_replay.analysis.event_properties.nonlocal_by_signal import (
         MUA_EDGES,
     )
 
     low, high = MUA_EDGES[:-1], MUA_EDGES[1:]
-    return animal_signal_counts(
+    return animal_signal_shares(
         pd.concat(
             pd.DataFrame(
                 {
@@ -222,23 +224,30 @@ def _four_decoders():
 
 def _statistics() -> dict:
     return {
-        "calibration": _calibration(),
-        "sweep": _sweep(),
-        "mua": _mua_counts(),
-        "mua_states": _mua_states(),
-        "hpd": _hpd(),
-        "timing": _timing(),
-        "probability": _probability(),
-        "distance": _decoded_distance(),
-        "split": {
-            column: _gain_statistics(*groups) for column, groups in GAIN_SPLIT.items()
+        "state_calibration": _calibration(),
+        "no_spike_mua": _no_spike_trace(),
+        "nonlocal_probability": _probability(),
+        "decoded_distance": _decoded_distance(),
+        "rule_sweep": _sweep(),
+        "boundary_timing": _timing(),
+        "nonlocal_mua": (_mua_shares(), _mua_states()),
+        "left_out_split": {
+            column: gain_statistics(*groups) for column, groups in GAIN_SPLIT.items()
         },
-        "outside": _outside_rows(),
-        "parts": _parts(),
-        "no_spike": _no_spike_trace(),
+        "outside_distance": (outside_rows(), _parts()),
         "event_traces": _event_traces(),
+        "hpd": _hpd(),
         "four_decoders": _four_decoders(),
     }
+
+
+def test_the_layout_settles_in_the_font_of_a_machine_without_arial():
+    """The fitted panels settle within the pass limit in DejaVu Sans too, the
+    font matplotlib falls back to (the continuous-integration machine's):
+    wider glyphs put the first pass farther off."""
+    with matplotlib.rc_context({"font.family": "DejaVu Sans"}):
+        fig = figure.generate_figure(_statistics())
+    plt.close(fig)
 
 
 @pytest.fixture(scope="module")
@@ -286,8 +295,7 @@ def test_the_figure_draws_its_panels_in_the_cited_order(drawn):
     by_letter = {figure.LETTERS[panel]: panel for panel in figure.PANELS}
     for column in columns:  # each panel's drawing starts at its column's edge
         starts = [
-            figure.drawn_extent(fig, figure.panel_axes(fig, by_letter[k])).x0
-            for k in column
+            drawn_extent(fig, figure.panel_axes(fig, by_letter[k])).x0 for k in column
         ]
         np.testing.assert_allclose(starts, starts[0], atol=1e-3)
     assert "Immobile, at wells" not in [
@@ -318,7 +326,7 @@ def test_the_split_panel_draws_the_fit_over_the_animals_place_by_bins(drawn):
             (mine,) = [d for d in dots if np.allclose(d.get_offsets()[:, 0], x)]
             np.testing.assert_allclose(mine.get_offsets()[:, 1], groups[k])
             np.testing.assert_allclose(mine.get_facecolor()[0], to_rgba(color))
-            assert np.allclose(_means_at(ax, x), np.mean(groups[k]))
+            assert np.allclose(means_at(ax, x), np.mean(groups[k]))
     labels = [t.get_text() for t in ax.get_xticklabels()]
     assert labels == 2 * list(panels.SPLIT_LABELS.values())
     assert {"No SWR", "SWR", "equal fit"} <= {t.get_text() for t in ax.texts}
@@ -329,7 +337,7 @@ def test_the_split_panel_draws_the_fit_over_the_animals_place_by_bins(drawn):
 def test_each_panels_values_carry_its_letter():
     """The events summary tags each panel's values with the panel's letter, as
     the figure places it."""
-    from continuum_swr_replay.reported import events
+    from continuum_swr_replay.reported.events.common import TAGS
 
     panels = {
         "state_calibration": "state_calibration",
@@ -344,9 +352,9 @@ def test_each_panels_values_carry_its_letter():
         "nonlocal_restriction_swr_allowed": "four_decoders",
     }
     for tag, panel in panels.items():
-        assert events.TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
+        assert TAGS[tag].figures == (f"S2{figure.LETTERS[panel]}",), tag
     # the gain over local coding is Figure 2j's too
-    assert events.TAGS["tetrode_holdout"].figures == (
+    assert TAGS["tetrode_holdout"].figures == (
         "2j",
         f"S2{figure.LETTERS['left_out_split']}",
     )
@@ -484,7 +492,7 @@ def test_the_distance_panel_draws_the_outside_swr_gain_then_away_from_swrs(drawn
         ]
         np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(values))
         assert_spread_about(dots, x)
-        assert np.allclose(_means_at(ax, x), np.mean(values))
+        assert np.allclose(means_at(ax, x), np.mean(values))
     (series,) = [line for line in ax.lines if len(line.get_xdata()) == len(xs)]
     np.testing.assert_allclose(
         series.get_ydata(), [np.mean(v) for v in [OUTSIDE, *MARGINS.values()]]
@@ -640,49 +648,33 @@ def test_the_no_spike_panel_draws_the_mua_around_no_spike_starts(drawn):
     assert ax.get_title() == "No-Spike state"
 
 
-def test_the_no_spike_trace_is_over_every_epochs_periods(monkeypatch):
-    """Each analyzed epoch's frame read once: its periods (the rule, with its
-    well visits) give the windows, and its level outside them; the periods
-    are counted by animal."""
-    import xarray as xr
+def test_the_traces_are_read_from_the_stored_windows(monkeypatch):
+    """The No-Spike trace and the traces panel's lines come from the stored
+    windows (the selected events' windows, every period's); stored windows
+    that are not current are refused, naming the panel and the runner."""
+    from tests.analysis.event_properties.test_triggered_analysis import _stored_rows
 
-    from tests.analysis.event_definition.test_no_spike_periods import _frame
-
-    frame, arrival, departure = _frame()
-    frame = frame.assign(animal="a", day=1, epoch=2)
-    suffix = figure.data_over_time_suffix()
-    paths = [Path(f"a1_02_r1_HPC{suffix}"), Path(f"a2_02_r1_HPC{suffix}")]
-    read, visits = [], []
-    monkeypatch.setattr(figure, "processed_data_dir", lambda: Path("."))
-    monkeypatch.setattr(
-        figure, "analyzed_decode_files", lambda folder, suffix, require_all: paths
+    rows = _stored_rows()
+    epochs = pd.DataFrame({"animal": ["a", "b"], "no_spike_level": [0.0, 2.0]})
+    monkeypatch.setattr(figure, "read_trigger_windows", lambda folder: (rows, epochs))
+    events = pd.DataFrame(
+        {"animal": ["a"], "session_date": 1, "epoch": "02_r1", "non_local_event": [3]}
     )
-    monkeypatch.setattr(
-        figure, "read_dot_with_swr_source", lambda path: read.append(path) or frame
-    )
-    monkeypatch.setattr(
-        figure,
-        "well_visit_times",
-        lambda epoch_id: visits.append(epoch_id) or (arrival, departure),
-    )
+    traces = figure.read_traces(Path("windows"), events)
+    np.testing.assert_allclose(traces["no_spike_mua"]["median"], [3.0, 1.0, -1.0])
+    assert traces["no_spike_mua"]["level"] == pytest.approx(1.0)
+    # only a's SWR event 3 is selected
+    assert list(traces["event_traces"]["overlap"]["MUA_zscore"].columns) == ["a"]
 
-    def windows(data, event_times, signals, window_sec):
-        assert window_sec == figure.TRIGGER_WINDOW_S
-        values = np.tile(np.array([2.0, 0.0]), (len(event_times), 1))[..., None]
-        return xr.DataArray(
-            values,
-            dims=("event", "time", "signal"),
-            coords={"time": [-0.002, 0.0], "signal": signals},
-        )
+    def stale(folder):
+        raise ValueError("the trigger windows were made from other visits")
 
-    monkeypatch.setattr(figure, "get_signal_windows", windows)
-    trace = figure.read_frame_traces(workers=1)["no_spike"]
-    assert read == paths
-    assert visits == ["a1_02_r1_HPC", "a2_02_r1_HPC"]
-    np.testing.assert_allclose(trace["median"], [2.0, 0.0])
-    assert trace["periods"].to_dict() == {"a": 2}  # one period per epoch
-    assert trace["level"] == pytest.approx(1.0)
-    assert trace["median_duration"] == pytest.approx(9 * 0.002)
+    monkeypatch.setattr(figure, "read_trigger_windows", stale)
+    with pytest.raises(
+        ValueError, match="panel b is not drawn: the trigger"
+    ) as refused:
+        figure.read_traces(Path("windows"), events)
+    assert "measure_trigger_windows.py" in str(refused.value)
 
 
 def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
@@ -692,9 +684,15 @@ def test_the_traces_panel_draws_each_animals_median_per_class(drawn):
 
     axes = figure.panel_axes(drawn, "event_traces")
     traces = _event_traces()
-    assert [ax.get_title() for ax in axes] == list(figure.TRACE_LABELS.values())
+    assert [ax.get_title() for ax in axes] == [
+        "Ripple (z)",
+        "MUA (z)",
+        "Theta (z)",
+        "Speed (cm/s)",
+    ]
     for ax, signal in zip(axes, figure.TRIGGERED_SIGNALS, strict=True):
-        for kind, (_, color) in figure.TRACE_CLASSES.items():
+        for kind, is_swr in figure.WINDOW_KINDS.items():
+            color = figure.EVENT_KINDS[is_swr][1]
             mine = [
                 line for line in ax.lines
                 if len(line.get_xdata()) == TRACE_TIME.size
@@ -738,7 +736,6 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         "read_swr_table": lambda path: stored["table"],
         "event_table_epochs": lambda table, analyzed: ["e"],
         "analyzed_epoch_ids": lambda: ["e"],
-        "read_complete_run": lambda folder, name, epochs: stored["scores"],
         "window_scores": lambda table: seen.setdefault("tetrode", []).append(table)
         or table,
         "holdout_statistics": lambda windows, kind, column: seen.setdefault(
@@ -746,18 +743,15 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         ),
         "read_nonlocal_probability": lambda folder: "probability",
         "read_decoded_distance": lambda folder: "distance",
-        "sha256_file": lambda path: "0" * 64,
-        "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),
-        "restriction_inputs_note": lambda folder, epochs: note,
         "outside_swr_statistics": lambda sums, bin_s, events: seen.setdefault(
             "restriction", (sums, bin_s, events)
         ),
-        "read_frame_traces": lambda events, workers: {
-            "no_spike": "trace",
+        "read_traces": lambda folder, events: {
+            "no_spike_mua": "trace",
             "event_traces": "traces",
         },
         "hpd_distribution": lambda events: seen.setdefault("hpd", events),
-        "read_mua_counts": lambda folder: "mua",
+        "read_mua_shares": lambda folder: "mua",
         "read_mua_states": lambda folder: "mua_states",
         "read_rule_sweep": lambda folder, table: "sweep",
         "read_state_calibration": lambda folder: "calibration",
@@ -774,17 +768,39 @@ def _patch_reading(monkeypatch, stored, seen, heldout=None, note=None):
         ),
     }.items():
         monkeypatch.setattr(figure, name, value)
+    # the held-out event run is read by the shared reader
+    for name, value in {
+        "sha256_file": lambda path: "0" * 64,
+        "read_heldout_restriction": lambda *args: heldout or _HeldoutRestriction(),
+        "restriction_inputs_note": lambda folder, epochs: note,
+    }.items():
+        monkeypatch.setattr(stored_inputs, name, value)
+    # the held-out tetrode run is read by its own reader: every column the
+    # runner writes, the stored events' rows
+    monkeypatch.setattr(
+        heldout_runs,
+        "read_output_manifest",
+        lambda folder: {"settings": TRIAL_FOLD_SETTINGS},
+    )
+    monkeypatch.setattr(
+        heldout_runs,
+        "read_complete_run",
+        lambda folder, name, epochs: run_table(
+            event_id=stored["scores"]["event_id"],
+            kind=stored["scores"].get("kind", "event"),
+        ),
+    )
 
 
 def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visit(
     monkeypatch,
 ):
-    """The stored held-out tetrode run with its extra scores (held out in
+    """The stored held-out tetrode run (held out in
     folds of whole trials) scores every event; the figure, like the events
     summary, reads the rows (every tetrode's) of the events that start inside a
     well visit (panel h, the events alone), and the held-out event run's
     events and time sums by the summary's reader."""
-    inside = _figure02_events().assign(event_id=range(8))
+    inside = figure02_events().assign(event_id=range(8))
     outside = inside.iloc[[3]].assign(event_id=99, visit_context="track_leaf_arm")
     stored = {
         "table": pd.concat([inside, outside]),
@@ -795,28 +811,13 @@ def test_the_figure_reads_the_held_out_runs_over_the_events_that_start_in_a_visi
     seen = {}
     _patch_reading(monkeypatch, stored, seen)
     inputs = figure.read_inputs()
-    # the canonical run (panel h)
+    # the held-out tetrode run (panel h)
     assert [list(t["event_id"]) for t in seen["tetrode"]] == [[0, 0, *range(1, 8)]]
     assert list(seen["split"]["event_id"]) == [0, 0, *range(1, 8)]
     sums, bin_s, events = seen["restriction"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
     assert seen["hpd"]["event_id"].tolist() == list(range(8))
-    assert list(inputs) == [
-        "calibration",
-        "probability",
-        "distance",
-        "sweep",
-        "mua",
-        "mua_states",
-        "hpd",
-        "timing",
-        "split",
-        "outside",
-        "parts",
-        "four_decoders",
-        "no_spike",
-        "event_traces",
-    ]
+    assert list(inputs) == list(figure.PANELS)
     events, sums, bin_s = seen["four_decoders"]
     assert len(sums) == 3 and bin_s.to_dict() == {"e": 0.002} and len(events) == 2
 
@@ -838,7 +839,7 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
     the current decodes or SWR source, or a held-out event run not made from
     the current restriction run, per-bin facts run or session cache."""
     stored = {
-        "table": _figure02_events().assign(event_id=range(8)),
+        "table": figure02_events().assign(event_id=range(8)),
         "scores": pd.DataFrame({"event_id": [0]}),
     }
 
@@ -868,41 +869,27 @@ def test_the_figure_refuses_a_held_out_event_run_that_is_not_current(
 def test_the_figure_refuses_a_held_out_run_not_on_trial_folds(
     monkeypatch, settings, message
 ):
-    """A held-out tetrode run of an older fold design is refused before any
-    table is read, as the events summary refuses it."""
-    monkeypatch.setattr(
-        figure, "read_output_manifest", lambda folder: {"settings": settings}
-    )
-
-    def read_swr_table(path):
-        raise AssertionError("read before the refusal")
-
-    monkeypatch.setattr(figure, "read_swr_table", read_swr_table)
-    with pytest.raises(ValueError, match=message):
-        figure.read_inputs()
-
-
-def test_the_figure_refuses_a_fourth_decoder_run_that_is_not_current(monkeypatch):
-    """Panel l is refused on the same grounds as panel i, from its own
-    held-out event run (read by the same reader from its own folders)."""
+    """A held-out tetrode run of an older fold design is refused by the
+    reader, as the events summary refuses it, and panel h is not drawn."""
     stored = {
-        "table": _figure02_events().assign(event_id=range(8)),
+        "table": figure02_events().assign(event_id=range(8)),
         "scores": pd.DataFrame({"event_id": [0]}),
     }
     _patch_reading(monkeypatch, stored, {})
-    current, stale = (
-        _HeldoutRestriction(),
-        _HeldoutRestriction(restriction_run="made from another restriction run"),
-    )
-    four_dir = figure.default_inputs().nonlocal_restriction_swr_allowed_heldout_events
     monkeypatch.setattr(
-        figure,
-        "read_heldout_restriction",
-        lambda heldout_dir, *args: stale if heldout_dir == four_dir else current,
+        heldout_runs, "read_output_manifest", lambda folder: {"settings": settings}
     )
-    with pytest.raises(ValueError, match="panel l is not drawn") as refused:
+
+    def drawn(*args):
+        raise AssertionError("panel h was computed from a run off trial folds")
+
+    monkeypatch.setattr(figure, "window_scores", drawn)
+    monkeypatch.setattr(figure, "holdout_statistics", drawn)
+    with pytest.raises(ValueError, match=message) as refused:
         figure.read_inputs()
-    assert "detect_heldout_events" in str(refused.value)
+    assert "event_tetrode_holdout is not held out in folds of whole trials" in str(
+        refused.value
+    )
 
 
 def test_the_four_decoder_panel_draws_the_decoders_with_the_fourth(drawn):
@@ -953,7 +940,7 @@ def test_the_four_decoder_panel_draws_the_decoders_with_the_fourth(drawn):
             )
             assert (len(dots.get_facecolors()) == 0) == (j == 1)
             assert np.allclose(
-                _means_at(ax_difference, x),
+                means_at(ax_difference, x),
                 statistics.times.loc[(time, "filter", measure), "estimate"],
             )
     assert [t.get_text() for t in ax_difference.get_xticklabels()] == [
@@ -965,7 +952,7 @@ def test_the_four_decoder_panel_draws_the_decoders_with_the_fourth(drawn):
     row = statistics.events.loc["no SWR"]
     dots = dots_at(ax_events, 0.0)
     np.testing.assert_allclose(sorted(dots.get_offsets()[:, 1]), sorted(row["animals"]))
-    assert np.allclose(_means_at(ax_events, 0.0), row["estimate"])
+    assert np.allclose(means_at(ax_events, 0.0), row["estimate"])
     assert ax_events.get_title() == "Outside SWRs,\nheld-out events"
     assert ax_events.get_ylabel() == (
         "Held-out log score,\nfull \u2212 SWR-allowed\n(nats/spike)"

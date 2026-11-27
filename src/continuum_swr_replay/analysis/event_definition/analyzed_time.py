@@ -329,7 +329,7 @@ def excluded_intervals(epoch_id: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         ``start_time`` and ``end_time`` (seconds), closed, disjoint and in time
-        order; no rows while ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` is unset.
+        order; no rows while ``paths.ARTIFACT_INTERVALS_RUN`` is unset.
 
     Raises
     ------

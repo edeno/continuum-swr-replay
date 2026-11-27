@@ -2,7 +2,8 @@
 kernels, and a log of the programs traced.
 
 - :func:`in_float64` goes on each public entry of the fitter that makes a JAX
-  array or runs a kernel. It checks the device (:func:`require_device`) and
+  array or runs a kernel. It checks the device
+  (:func:`continuum_swr_replay.runs.device.require_one_jax_device`) and
   turns JAX's 64-bit types on for that call only, in the calling thread. The
   decoder in the same process computes in float32, so the flag is never set for
   the whole process.
@@ -14,8 +15,18 @@ kernels, and a log of the programs traced.
   arguments, the 64-bit flag) and compiles each trace; a program read from the
   persistent compilation cache is still traced. So the count is the number of
   programs this process needed, whatever the cache holds.
+- :data:`LIVE_PROGRAM_LIMIT` bounds the programs kept compiled. Each compiled
+  XLA CPU program holds 6 to 111 memory mappings, and Linux stops a
+  process at ``vm.max_map_count`` (65,530 by default): a stream of fits over
+  many shapes died at about 735 programs. :func:`in_float64` counts the
+  programs traced since JAX's caches were last cleared and, at the entry of a
+  call when no call of the fitter is running in any thread, clears them with
+  ``jax.clear_caches()`` once the count has reached the limit. That clears
+  every jitted function of the process, another library's too; a cleared
+  program is compiled again on its next use.
 
-This module imports JAX. The fitter's NumPy modules do not import it.
+This module imports JAX, and so does every module of the fitter that imports
+``likelihoods``, whose kernels it runs.
 """
 
 from __future__ import annotations
@@ -33,35 +44,41 @@ from continuum_swr_replay.runs.device import require_one_jax_device
 
 __all__ = [
     "COMPILE_LOG",
+    "LIVE_PROGRAM_LIMIT",
     "CompileLog",
     "float64_kernel",
     "in_float64",
-    "require_device",
+    "live_programs",
 ]
+
+LIVE_PROGRAM_LIMIT = 256
+"""Programs traced since the last clear at which the next outermost call of the
+fitter clears JAX's caches. An iteration kernel took 111 mappings, an
+evaluation kernel 24 and an information kernel 6 (CPU, 2026-11-23): 256 of the
+largest are 28,400 mappings, under half the default ``vm.max_map_count`` with
+the process's own (about 700) and one call's new programs added. Read at each
+call."""
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
-def require_device() -> None:
-    """Refuse to start the fitter's JAX unless it can reach at most one card.
-
-    Raises
-    ------
-    continuum_swr_replay.runs.device.UnconfiguredDeviceError
-        When no device was chosen, with what to set
-        (:func:`continuum_swr_replay.runs.device.require_one_jax_device`).
-    """
-    require_one_jax_device("The regression fitter")
-
-
 def in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
     """Run `function` with JAX's 64-bit types on, for that call only.
 
-    The device is checked first (:func:`require_device`). A fresh
+    The device is checked first: the fitter's JAX refuses to start unless it
+    can reach at most one card
+    (:func:`continuum_swr_replay.runs.device.require_one_jax_device`, which
+    raises ``UnconfiguredDeviceError`` with what to set). A fresh
     ``jax.enable_x64(True)`` is entered on each call. The flag is thread-local:
     other threads, and this one after the call (also when it raises), keep
     the value they had.
+
+    Before the call, when no call so decorated is running in any thread (so
+    never inside a fit, nor while a kernel runs) and the fitter has traced
+    ``LIVE_PROGRAM_LIMIT`` programs or more since the last clear, JAX's caches
+    are cleared (``jax.clear_caches()``): every jitted function of the
+    process, another library's too, compiles again on its next use.
 
     Parameters
     ----------
@@ -76,11 +93,50 @@ def in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
 
     @wraps(function)
     def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        require_device()
-        with jax.enable_x64(True):
-            return function(*args, **kwargs)
+        require_one_jax_device("The regression fitter")
+        _PROGRAMS.enter()
+        try:
+            with jax.enable_x64(True):
+                return function(*args, **kwargs)
+        finally:
+            _PROGRAMS.leave()
 
     return run
+
+
+class _LivePrograms:
+    """The programs traced since JAX's caches were last cleared, and the calls of
+    the fitter running, in every thread."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.live = 0
+        self.running = 0
+
+    def enter(self) -> None:
+        """Start a call; first clear the caches when no call is running and the
+        live programs have reached ``LIVE_PROGRAM_LIMIT``."""
+        with self._lock:
+            if self.running == 0 and self.live >= LIVE_PROGRAM_LIMIT:
+                jax.clear_caches()
+                self.live = 0
+            self.running += 1
+
+    def leave(self) -> None:
+        with self._lock:
+            self.running -= 1
+
+    def traced(self) -> None:
+        with self._lock:
+            self.live += 1
+
+
+_PROGRAMS = _LivePrograms()
+
+
+def live_programs() -> int:
+    """The fitter's programs traced since JAX's caches were last cleared."""
+    return _PROGRAMS.live
 
 
 class CompileLog:
@@ -189,6 +245,7 @@ def float64_kernel(
         leaves = jax.tree_util.tree_leaves((args, kwargs))
         _require_float64(name, leaves)
         COMPILE_LOG.record(name, _signature(leaves))
+        _PROGRAMS.traced()
         return function(*args, **kwargs)
 
     return jax.jit(traced, static_argnames=tuple(static_argnames))

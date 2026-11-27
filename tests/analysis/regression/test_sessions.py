@@ -3,11 +3,13 @@ without a finite maximum, records."""
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import pandas as pd
 import pytest
 from scipy.optimize import brentq
 
+from continuum_swr_replay.analysis.regression import runtime
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.constants import LOG_PENALTY_BOUNDS
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
@@ -33,7 +35,7 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from scripts.checks import simulate_declared_penalty as sim
 
-from .conftest import ROLE, by_session, rate_rows
+from .conftest import ROLE, by_session, cohort, rate_rows
 
 N_ARMS = 6
 
@@ -281,6 +283,29 @@ def test_rate_sessions_are_fitted_and_recorded(rate_sessions) -> None:
         assert record.cohort_counts["rows_missing_values"] == 0
 
 
+def test_the_program_bound_holds_between_the_sessions_of_one_loop(
+    monkeypatch: pytest.MonkeyPatch, rate_sessions
+) -> None:
+    """With the program limit patched to 0, JAX's caches are cleared before
+    every session's fit (each is an outermost call of the fitter), so the
+    live programs stay bounded during a loop over a whole cohort; the records
+    are the ones the loop gives without the bound."""
+    pooled = pd.concat(rate_sessions.values(), ignore_index=True)
+    design = _rate_design(pooled)
+    fit = {"response": "count", "unit": "well_visit_id"}
+    unbounded = _fit(design, rate_sessions, Poisson(), **fit)
+    clears = []
+    clear = jax.clear_caches
+    monkeypatch.setattr(runtime, "LIVE_PROGRAM_LIMIT", 0)
+    monkeypatch.setattr(jax, "clear_caches", lambda: (clears.append(True), clear()))
+    bounded = _fit(design, rate_sessions, Poisson(), **fit)
+    assert len(clears) >= len(rate_sessions)
+    for got, want in zip(bounded, unbounded, strict=True):
+        assert (got.status, got.n_iter) == (want.status, want.n_iter)
+        assert got.coef == want.coef
+        assert got.vcov == want.vcov
+
+
 def test_a_design_not_identified_at_the_first_fit_names_the_session(
     rate_sessions,
 ) -> None:
@@ -466,13 +491,76 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
     assert 0.0 < entry["size"] < SMALLEST_COLUMN_SIZE
 
 
+def _clock_visits(date: str, rewarded_share: float, seed: int) -> pd.DataFrame:
+    """Rate rows of 60 visits of 10 bins (0.05 s each): a clock of 0 to 4.5 s
+    and a 0/1 ``rewarded`` on a share of the visits."""
+    rng = np.random.default_rng(seed)
+    visit = np.repeat(np.arange(60), 10)
+    clock = np.tile(np.arange(10) * 0.5, 60)
+    rewarded = (rng.uniform(size=60) < rewarded_share).astype(float)[visit]
+    log_rate = np.log(3.0) - 0.1 * clock + 0.4 * rewarded
+    return pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": date,
+            "epoch": "02_r1",
+            "visit": visit,
+            "clock": clock,
+            "rewarded": rewarded,
+            "exposure": 0.05,
+            "count": rng.poisson(np.exp(log_rate) * 0.05).astype(float),
+        }
+    )
+
+
+def test_a_smooth_by_a_level_a_session_lacks_fails_its_support() -> None:
+    """A smooth of the clock by the rewarded level, beside the reward slope: a
+    session with no rewarded rows has that smooth's columns zero, so it fails
+    the support rule there and is inactive, as the slope is; the loop fits
+    both sessions, and the other session's fit is its fit alone."""
+    sessions = {
+        ("sim", "20260101", "02_r1"): _clock_visits("20260101", 0.5, 0),
+        ("sim", "20260102", "02_r1"): _clock_visits("20260102", 0.0, 1),
+    }
+    rewarded = Category("rewarded", (0, 1), 0, "none")
+    design = build_design(
+        [
+            Offset("exposure"),
+            Smooth("clock", 0.0, 4.5, 8, 2.0),
+            Slope("rewarded", log_penalty_from_prior_sd(2.0)),
+            Smooth("clock", 0.0, 4.5, 8, 2.0, by=rewarded, levels=(1,)),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+    )
+    first, second = _fit(design, sessions, Poisson(), response="count", unit="visit")
+    by_level = [n for n in design.coef_names if n.startswith("s(clock):rewarded=1.")]
+    assert len(by_level) == 7
+    assert second.status == "converged"
+    assert second.left_out == {
+        "rewarded": Removed.SUPPORT,
+        **dict.fromkeys(by_level, Removed.SUPPORT),
+    }
+    assert not second.support["s(clock):rewarded=1"]["passes"]
+    assert np.isfinite(second.coef[design.coef_names.index("s(clock).0")])
+    (alone,) = _fit(
+        design,
+        {("sim", "20260101", "02_r1"): sessions["sim", "20260101", "02_r1"]},
+        Poisson(),
+        response="count",
+        unit="visit",
+    )
+    assert first.status == "converged" and first.left_out == {}
+    np.testing.assert_array_equal(first.coef, alone.coef)
+
+
 def test_a_session_without_reference_rows_names_the_session_and_columns(
     rate_sessions,
 ) -> None:
     """A session with no rows of a category's reference level: the intercept
-    and the levels' columns are collinear, and the error names the session and
-    those coefficients (the reference level must have rows in every
-    session)."""
+    and the levels' columns are collinear, and the fit is refused, naming the
+    session, the category, its reference level and those coefficients (the
+    reference level must have rows in every fit)."""
     frames = list(rate_sessions.values())
     keys = list(rate_sessions)
     level = {0: "a", 1: "b", 2: "c"}
@@ -486,11 +574,96 @@ def test_a_session_without_reference_rows_names_the_session_and_columns(
     grp = Category("grp", ("a", "b", "c"), reference="a", penalty="none")
     design = _rate_design(pooled, grp)
     message = (
-        r"session sim/20260000/02_r1: at its first fit its design is not identified"
-        r".*\(Intercept\), grp\[b\], grp\[c\]"
+        r"session sim/20260000/02_r1: the category 'grp' has no rows of its "
+        r"reference level 'a'.*grp\[b\], grp\[c\]"
     )
     with pytest.raises(ValueError, match=message):
         _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")
+
+
+def _visits_at(levels: list[str], date: str = "20260101") -> pd.DataFrame:
+    """Rate rows of one bin per visit with a category ``level``: one visit at
+    each of ``levels``, Poisson counts of mean 2, exposure 1."""
+    rng = np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": date,
+            "epoch": "02_r1",
+            "visit": np.arange(len(levels)),
+            "level": levels,
+            "count": rng.poisson(2.0, len(levels)).astype(float),
+            "exposure": 1.0,
+        }
+    )
+
+
+def test_a_penalized_category_without_reference_rows_is_refused() -> None:
+    """Every visit at level b of a penalized category whose reference is a:
+    the data identify only the intercept plus b, and the penalty alone would
+    split them (b at 0 with the prior SD as its standard error). The fit is
+    refused, naming the session, the category, its reference level and its
+    level's coefficient."""
+    frame = _visits_at(["b"] * 12)
+    level = Category("level", ("a", "b"), "a", log_penalty_from_prior_sd(2.0))
+    design = build_design([level, Offset("exposure")], frame, intercept=True)
+    with pytest.raises(
+        ValueError,
+        match=r"session sim/20260101/02_r1: the category 'level' has no rows of its "
+        r"reference level 'a'.*level\[b\]",
+    ):
+        _fit(
+            design,
+            {("sim", "20260101", "02_r1"): frame},
+            Poisson(),
+            response="count",
+            unit="visit",
+        )
+
+
+def test_a_softmax_session_without_the_reference_role_is_refused() -> None:
+    """Under the grouped softmax, a session whose events have no row of the
+    penalized role category's reference: the levels' columns are collinear
+    with one another, and the fit is refused, naming that session."""
+    from .conftest import content_rows
+
+    second = content_rows(1)
+    frames = [content_rows(0), second[second["role"] != "other"]]
+    sessions = by_session(frames)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, reference="other", penalty=weak)
+    design = build_design(
+        [role, Slope("clock_s", weak)],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"session sim/20260001/02_r1: the category 'role' has no rows of its "
+        r"reference level 'other'.*role\[current\], role\[previous\], role\[trunk\]",
+    ):
+        _fit(design, sessions, GroupedSoftmax(), response="share", unit="event_id")
+
+
+def test_a_shared_category_needs_its_reference_in_the_fit_only() -> None:
+    """A category that is not a baseline is shared by the sessions of a fit:
+    the fit identifies it when one of its sessions has rows of the reference
+    level, so a fit by day whose second session has none is fitted."""
+    sessions = {
+        ("sim", "20260101", "02_r1"): _visits_at(["a", "b"] * 15),
+        ("sim", "20260101", "04_r2"): _visits_at(["b"] * 12),
+    }
+    level = Category("level", ("a", "b"), "a", log_penalty_from_prior_sd(2.0))
+    design = build_design(
+        [level, Offset("exposure")],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    (record,) = _fit(
+        design, sessions, Poisson(), response="count", unit="visit", fit_by="day"
+    )
+    assert record.status == "converged" and record.left_out == {}
 
 
 def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
@@ -510,6 +683,84 @@ def test_events_without_response_are_counted_apart_from_those_emptied() -> None:
     assert record.cohort_counts["events_without_response"] == 1
     assert record.cohort_counts["events_emptied_by_dropped_rows"] == 2
     assert record.n_units == 150 - 3
+
+
+def _two_candidate_fit(event_rows) -> object:
+    """The record of a content session (conftest, seed 0) whose event 5 has
+    only its current and previous rows, ``event_rows`` (a function of those
+    rows to the rows given), with a penalized role category and clock slope
+    built on the valid rows."""
+    from .conftest import content_rows
+
+    rows = content_rows(0)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, reference="other", penalty=weak)
+    design = build_design([role, Slope("clock_s", weak)], rows, intercept=False)
+    other = rows[(rows["event_id"] != 5) | rows["role"].isin(["current", "previous"])]
+    other = other.reset_index(drop=True)
+    event = other["event_id"] == 5
+    given = pd.concat([other[~event], event_rows(other[event].copy())])
+    (record,) = _fit(
+        design,
+        {("sim", "20260000", "02_r1"): given.reset_index(drop=True)},
+        GroupedSoftmax(),
+        response="share",
+        unit="event_id",
+    )
+    return record
+
+
+def _shares(rows: pd.DataFrame, current: float, previous: float) -> pd.DataFrame:
+    """``rows`` (one event's current and previous rows) with those shares."""
+    rows["share"] = np.where(rows["role"] == "current", current, previous)
+    return rows
+
+
+@pytest.mark.parametrize("shares", [(-1.0, 1.0), (-2.0, 1.0), (-0.5, 1.5)])
+def test_a_negative_share_is_refused_whatever_its_event_sums_to(shares) -> None:
+    """A share below zero is refused, naming the session, before any event is
+    removed: an event whose shares sum to zero or less is not counted as given
+    without a response."""
+    with pytest.raises(
+        ValueError, match=r"session sim/20260000/02_r1: 1 rows with share below zero"
+    ):
+        _two_candidate_fit(lambda rows: _shares(rows, *shares))
+
+
+def test_an_event_emptied_by_a_missing_value_is_counted_as_emptied() -> None:
+    """An event whose only share is on a row with a missing predictor was given
+    a response: it is counted as emptied, not as without response."""
+
+    def missing_where_chosen(rows):
+        rows = _shares(rows, 0.0, 1.0)
+        rows.loc[rows["role"] == "previous", "clock_s"] = np.nan
+        return rows
+
+    record = _two_candidate_fit(missing_where_chosen)
+    assert record.status == "converged"
+    assert record.cohort_counts["rows_missing_values"] == 1
+    assert record.cohort_counts["events_emptied_by_dropped_rows"] == 1
+    assert record.cohort_counts["events_without_response"] == 0
+    assert record.n_units == 149
+
+
+def test_a_negative_count_is_refused(rate_sessions) -> None:
+    """A Poisson count below zero is refused, naming the session, also when no
+    count of the session is above zero (which would otherwise make it a
+    session without events)."""
+    key, rows = next(iter(rate_sessions.items()))
+    design = _rate_design(rows)
+    with pytest.raises(
+        ValueError,
+        match=rf"session {'/'.join(key)}: {len(rows)} rows with count below zero",
+    ):
+        _fit(
+            design,
+            {key: rows.assign(count=-1.0)},
+            Poisson(),
+            response="count",
+            unit="well_visit_id",
+        )
 
 
 def _median_case() -> pd.DataFrame:
@@ -586,6 +837,36 @@ def _empty_reference_rows() -> pd.DataFrame:
                 {"visit": visit, "cat": level, "x": x, "exposure": 0.1, "count": count}
             )
     return pd.DataFrame(rows)
+
+
+@pytest.mark.parametrize("shift", [0.0, 1e4, 1e5])
+def test_a_shift_common_to_every_candidate_leaves_no_column_out(shift: float) -> None:
+    """Events of two candidates with shares (0.2, 0.8) and a slope of 0 and 2
+    plus ``shift``, which is common to an event's candidates and cancels in
+    its softmax: the session is fitted, nothing left out, at ``log(4) / 2``
+    per SD (the slope's SD is 1)."""
+    n_events = 100
+    rows = pd.DataFrame(
+        {
+            "animal": "sim",
+            "session_date": "20260101",
+            "epoch": "02_r1",
+            "event_id": np.repeat(np.arange(n_events), 2),
+            "share": np.tile([0.2, 0.8], n_events),
+            "x": np.tile([0.0, 2.0], n_events) + shift,
+        }
+    )
+    design = build_design([Slope("x", "none")], rows, intercept=False)
+    (record,) = _fit(
+        design,
+        by_session([rows]),
+        GroupedSoftmax(),
+        response="share",
+        unit="event_id",
+    )
+    assert record.status == "converged"
+    assert record.left_out == {} and record.no_fit == ""
+    np.testing.assert_allclose(record.coef, [np.log(4.0) / 2.0], rtol=0, atol=1e-9)
 
 
 def test_no_finite_maximum_along_the_intercept_keeps_the_fit_tried() -> None:
@@ -1370,3 +1651,518 @@ def test_a_penalized_term_without_rows_on_a_side_fails_its_support() -> None:
     assert record.left_out == {"flag": Removed.SUPPORT}
     assert record.support["flag"]["n_high"] == 3
     assert np.isnan(record.coef[1]) and record.edf["flag"] == 0.0
+
+
+# --- the unit of the fit: grouping, the record, baselines --------------------------
+
+
+def _day_sessions(n: int = 2, day: str = "20260101", animal: str = "sim") -> dict:
+    """``n`` rate sessions of one recording day (seeds 0 to n - 1): every
+    session's visit ids start at 0."""
+    return cohort(
+        rate_rows,
+        animals=[animal],
+        days=[day],
+        epochs=[f"0{2 * s + 2}_r{s + 1}" for s in range(n)],
+        seed=lambda a, d, e: e,
+    )
+
+
+def _rate_fit(design, sessions, **kw):
+    """The records of a rate fit (Poisson; ``count`` of ``well_visit_id``)."""
+    return _fit(
+        design, sessions, Poisson(), response="count", unit="well_visit_id", **kw
+    )
+
+
+def _small_rate_design(pooled, baseline=()):
+    return build_design(
+        [Slope("last_rewarded", log_penalty_from_prior_sd(2.0)), Offset("exposure")],
+        pooled,
+        intercept=True,
+        baseline=baseline,
+    )
+
+
+def test_visits_of_two_sessions_are_two_units() -> None:
+    """Two sessions of one day whose visit ids are the same numbers: at the
+    day unit the units and the support counts are the sums of the two
+    sessions' own."""
+    sessions = _day_sessions()
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
+    alone = _rate_fit(design, sessions)
+    (day,) = _rate_fit(design, sessions, fit_by="day")
+    assert day.n_units == sum(r.n_units for r in alone) == 120
+    for side in ("n_low", "n_high"):
+        assert day.support["last_rewarded"][side] == sum(
+            r.support["last_rewarded"][side] for r in alone
+        )
+
+
+def test_a_larger_unit_needs_a_baseline() -> None:
+    """At a day or an animal unit a design without a baseline would fit one
+    intercept for all the unit's sessions: refused at entry. The equivalence
+    of a unit's fit with a design built by hand is in
+    ``test_unit_fit_equals_a_hand_built_indicator_design`` (Poisson) and
+    ``test_softmax_unit_fit_equals_an_independent_maximization``."""
+    sessions = _day_sessions(2)
+    design = _small_rate_design(pd.concat(sessions.values(), ignore_index=True))
+    for fit_by in ("day", "animal"):
+        with pytest.raises(
+            ValueError, match=r"build_design\(\.\.\., baseline=\.\.\.\)"
+        ):
+            _rate_fit(design, sessions, fit_by=fit_by)
+    assert len(_rate_fit(design, sessions)) == 2
+
+
+def test_record_holds_its_sessions() -> None:
+    """``sessions`` lists each session of the fit, in order, with the rows,
+    units and events the fit saw of it and its rows removed; the counts sum
+    to the record's. At the animal unit the key is the animal alone."""
+    sessions = {
+        **_day_sessions(2, "20260101"),
+        **_day_sessions(1, "20260102"),
+    }
+    first = next(iter(sessions))
+    sessions[first] = sessions[first].assign(
+        last_rewarded=sessions[first]["last_rewarded"].where(sessions[first].index >= 7)
+    )
+    pooled = pd.concat(sessions.values(), ignore_index=True).dropna()
+    design = _small_rate_design(pooled, baseline=("(Intercept)",))
+    (record,) = _rate_fit(design, sessions, fit_by="animal")
+    assert (record.animal, record.session_date, record.epoch) == ("sim", "", "")
+    assert [
+        (e["animal"], e["session_date"], e["epoch"]) for e in record.sessions
+    ] == list(sessions)
+    for entry, rows in zip(record.sessions, sessions.values(), strict=True):
+        missing = 7 if rows is sessions[first] else 0
+        assert entry["rows_missing_values"] == missing
+        assert entry["n_rows"] == len(rows) - missing
+        assert entry["n_events"] == rows["count"].to_numpy()[missing:].sum()
+        assert entry["rows_dropped"] == {}
+    for field in ("n_rows", "n_units", "n_events"):
+        assert sum(e[field] for e in record.sessions) == getattr(record, field)
+    assert record.cohort_counts["rows_missing_values"] == 7
+    # Each session's baseline copies, as data.
+    assert [e["baseline"] for e in record.sessions] == [
+        [f"(Intercept)@{'/'.join(key)}"] for key in sessions
+    ]
+
+
+def test_units_in_the_order_of_their_first_session() -> None:
+    sessions = {
+        ("b", "20260101", "02_r1"): rate_rows(0),
+        ("a", "20260101", "02_r1"): rate_rows(1),
+        ("b", "20260102", "02_r1"): rate_rows(2),
+    }
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
+    records = _rate_fit(design, sessions, fit_by="animal")
+    assert [r.animal for r in records] == ["b", "a"]
+    assert [len(r.sessions) for r in records] == [2, 1]
+    with pytest.raises(ValueError, match="fit_by"):
+        _rate_fit(design, sessions, fit_by="week")
+
+
+def test_rate_baselines_match_separate_intercepts() -> None:
+    """Poisson: k sessions sharing only a slope. Each session's intercept is
+    the root of its own score equation at the shared slope, ``log(sum y /
+    sum exposure exp(b x))`` on its rows, to 1e-8."""
+    sessions = _day_sessions(4)
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
+    (record,) = _rate_fit(design, sessions, fit_by="day")
+    assert record.status == "converged"
+    coef = dict(zip(record.coef_names, record.coef, strict=True))
+    b = coef["last_rewarded"]
+    for key, rows in sessions.items():
+        by_hand = np.log(
+            rows["count"].sum()
+            / (rows["exposure"] * np.exp(b * rows["last_rewarded"])).sum()
+        )
+        assert coef[f"(Intercept)@{'/'.join(key)}"] == pytest.approx(by_hand, abs=1e-8)
+    assert "(Intercept)" not in record.edf and set(record.edf) == {"last_rewarded"}
+    assert set(record.collinearity) == {"last_rewarded"}
+
+
+def test_unit_fit_equals_a_hand_built_indicator_design() -> None:
+    """The baseline copies are the indicator columns built by hand: the fit
+    of one session-indicator column per session and the shared slope, by
+    ``fit_at_penalties``, gives the same coefficients and covariance, to
+    1e-8."""
+    sessions = _day_sessions(3)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = _small_rate_design(pooled, baseline=("(Intercept)",))
+    (record,) = _rate_fit(design, sessions, fit_by="day")
+    sizes = [len(rows) for rows in sessions.values()]
+    session = np.repeat(np.arange(3), sizes)
+    X = np.column_stack(
+        [*(session == s for s in range(3)), pooled["last_rewarded"].to_numpy()]
+    ).astype(float)
+    data = SessionData(
+        X, pooled["count"].to_numpy(), np.log(pooled["exposure"].to_numpy())
+    )
+    block = design.blocks[0]
+    by_hand = fit_at_penalties(
+        Poisson(),
+        [data],
+        [type(block)(np.array([3]), block.S)],
+        design.log_penalties,
+    ).sessions[0]
+    np.testing.assert_allclose(record.coef, by_hand.fit.beta, rtol=0, atol=1e-8)
+    np.testing.assert_allclose(record.vcov, by_hand.covariance, rtol=0, atol=1e-8)
+
+
+def test_session_without_support_dropped_and_counted() -> None:
+    """A session with three visits: its intercept copy fails the support rule
+    (fewer than five units), so its rows leave the unit's fit, counted under
+    the copy's name, and the other sessions are fitted."""
+    sessions = _day_sessions(3)
+    thin = list(sessions)[1]
+    sessions[thin] = sessions[thin][sessions[thin]["well_visit_id"] < 3]
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
+    (record,) = _rate_fit(design, sessions, fit_by="day")
+    copy = f"(Intercept)@{'/'.join(thin)}"
+    assert record.status == "converged"
+    assert record.left_out == {copy: Removed.SUPPORT}
+    assert record.support[copy]["n_high"] == 3
+    assert record.cohort_counts["rows_dropped"] == {copy: len(sessions[thin])}
+    entry = record.sessions[1]
+    assert entry["n_rows"] == 0 and entry["rows_dropped"] == {copy: len(sessions[thin])}
+    assert record.n_rows == sum(len(r) for k, r in sessions.items() if k != thin)
+    assert np.isnan(record.coef[record.coef_names.index(copy)])
+
+
+def test_a_session_without_events_is_dropped_from_the_unit() -> None:
+    """A session with no event: its intercept copy has no finite maximum, the
+    refit leaves it out and its rows are dropped, counted; at the session unit
+    the same session is not fitted."""
+    sessions = _day_sessions(3)
+    empty = list(sessions)[2]
+    sessions[empty] = sessions[empty].assign(count=0.0)
+    design = _small_rate_design(
+        pd.concat(sessions.values(), ignore_index=True), baseline=("(Intercept)",)
+    )
+    (record,) = _rate_fit(design, sessions, fit_by="day")
+    copy = f"(Intercept)@{'/'.join(empty)}"
+    assert record.status == "converged"
+    assert record.left_out[copy] == Removed.NO_FINITE_MAXIMUM
+    assert record.cohort_counts["rows_dropped"][copy] == len(sessions[empty])
+    alone = _rate_fit(design, sessions)
+    assert alone[2].no_fit == NoFit.NO_EVENTS
+
+
+def _arm_sessions(n: int = 3, n_events: int = 60, n_arms: int = 4) -> dict:
+    """Content sessions of one day: each event has a row per arm, a share per
+    row and a 0/1 column ``flag``."""
+    out = {}
+    for s in range(n):
+        rng = np.random.default_rng(50 + s)
+        arm = np.tile(np.arange(n_arms), n_events)
+        event = np.repeat(np.arange(n_events), n_arms) + 1000 * s
+        flag = (rng.uniform(size=arm.size) < 0.3).astype(float)
+        eta = 0.4 * arm * (s - 1) + 0.6 * flag
+        w = np.exp(eta).reshape(n_events, n_arms)
+        share = np.concatenate([rng.dirichlet(10 * r / r.sum()) for r in w])
+        key = ("sim", "20260101", f"0{2 * s + 2}_r1")
+        out[key] = pd.DataFrame(
+            {"event_id": event, "arm": arm, "flag": flag, "share": share}
+        )
+    return out
+
+
+def _arm_design(pooled):
+    return build_design(
+        [
+            Category("arm", (0, 1, 2, 3), reference=0, penalty="none"),
+            Slope("flag", log_penalty_from_prior_sd(2.0)),
+        ],
+        pooled,
+        intercept=False,
+        baseline=("arm",),
+    )
+
+
+def test_reference_level_per_session_copy() -> None:
+    """A session whose rows lack an arm the others have: its copy of that arm
+    fails the support rule with no rows, and the unit fits. Each session keeps
+    the reference arm 0."""
+    sessions = _arm_sessions()
+    last = list(sessions)[2]
+    sessions[last] = sessions[last][sessions[last]["arm"] != 3]
+    design = _arm_design(pd.concat(sessions.values(), ignore_index=True))
+    (record,) = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+        fit_by="day",
+    )  # fmt: skip
+    copy = f"arm[3]@{'/'.join(last)}"
+    assert record.status == "converged"
+    assert record.left_out == {copy: Removed.SUPPORT}
+    assert record.support[copy]["n_high"] == 0
+    assert record.sessions[2]["baseline"] == [
+        f"arm[{a}]@{'/'.join(last)}" for a in (1, 2, 3)
+    ]
+    assert set(record.collinearity) == {"flag"} and set(record.edf) == {"flag"}
+
+
+def test_a_session_without_the_reference_arm_is_an_error_naming_the_fit() -> None:
+    """A baseline category's reference level must have rows in every session
+    of the fit: the copies of a session without its reference arm are not
+    identified, and the fit is refused, naming the fit, the session and those
+    copies."""
+    sessions = _arm_sessions()
+    middle = list(sessions)[1]
+    sessions[middle] = sessions[middle][sessions[middle]["arm"] != 0]
+    design = _arm_design(pd.concat(sessions.values(), ignore_index=True))
+    with pytest.raises(
+        ValueError,
+        match=r"day sim/20260101: the category 'arm' has no rows of its reference "
+        r"level 0 in session sim/20260101/04_r1.*arm\[1\]@sim/20260101/04_r1",
+    ):
+        _fit(
+            design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+            fit_by="day",
+        )  # fmt: skip
+
+
+def _weighted_r2(W: np.ndarray, projected: list[int], term: int, others: list[int]):
+    """The R^2 of column ``term`` of ``W`` on ``others`` after the columns
+    ``projected`` are projected out by one QR: the collinearity record's
+    measure, computed directly."""
+    Q = np.linalg.qr(W[:, projected])[0]
+    P = W - Q @ (Q.T @ W)
+    B = np.linalg.qr(P[:, others])[0]
+    a = P[:, term]
+    return float((B.T @ a) @ (B.T @ a) / (a @ a))
+
+
+def test_a_shared_intercept_with_per_session_category_copies() -> None:
+    """Poisson, three sessions: a shared intercept, a category copied for
+    each session, a weakly penalized slope and an unpenalized one. The fit
+    equals the design built by hand, to 1e-8; the edf and the collinearity
+    record hold only the shared slopes, the collinearity with the intercept
+    and every copy projected out; each session lists its two copies."""
+    sessions = {}
+    for key, rows in _day_sessions(3).items():
+        visit = rows["well_visit_id"].to_numpy()
+        sessions[key] = rows.assign(cat=np.array(["A", "B", "C"])[visit % 3])
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    weak = log_penalty_from_prior_sd(2.0)
+    design = build_design(
+        [
+            Category("cat", ("A", "B", "C"), reference="A", penalty="none"),
+            Slope("last_rewarded", weak),
+            Slope("x", "none"),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+        baseline=("cat",),
+    )
+    (record,) = _rate_fit(design, sessions, fit_by="day")
+    assert record.status == "converged"
+    keys = ["/".join(k) for k in sessions]
+    assert record.coef_names == [
+        "(Intercept)",
+        *(f"cat[B]@{k}" for k in keys),
+        *(f"cat[C]@{k}" for k in keys),
+        "last_rewarded",
+        "x",
+    ]
+    session = np.repeat(np.arange(3), [len(r) for r in sessions.values()])
+    cat = pooled["cat"].to_numpy()
+    X = np.column_stack(
+        [
+            np.ones(len(pooled)),
+            *((cat == "B") & (session == s) for s in range(3)),
+            *((cat == "C") & (session == s) for s in range(3)),
+            pooled["last_rewarded"].to_numpy(),
+            pooled["x"].to_numpy() / pooled["x"].std(ddof=0),
+        ]
+    ).astype(float)
+    y, offset = pooled["count"].to_numpy(), np.log(pooled["exposure"].to_numpy())
+    block = design.blocks[0]
+    by_hand = fit_at_penalties(
+        Poisson(),
+        [SessionData(X, y, offset)],
+        [type(block)(np.array([7]), block.S)],
+        design.log_penalties,
+    ).sessions[0]
+    np.testing.assert_allclose(record.coef, by_hand.fit.beta, rtol=0, atol=1e-8)
+    np.testing.assert_allclose(record.vcov, by_hand.covariance, rtol=0, atol=1e-8)
+    assert set(record.edf) == {"last_rewarded", "x"} and record.edf["x"] == 1.0
+    assert set(record.collinearity) == {"last_rewarded", "x"}
+    W = X * np.sqrt(np.exp(X @ np.asarray(record.coef) + offset))[:, None]
+    projected = list(range(7))
+    assert record.collinearity["last_rewarded"]["r2"] == pytest.approx(
+        _weighted_r2(W, projected, 7, [8]), abs=1e-10
+    )
+    assert [e["baseline"] for e in record.sessions] == [
+        [f"cat[B]@{k}", f"cat[C]@{k}"] for k in keys
+    ]
+
+
+def _same_event_ids(n_sessions: int = 3, n_arms: int = 4) -> dict:
+    """Content sessions whose event ids are the same numbers (0, 1, ...) in
+    every session, rows shuffled; per-session arm effects and a 0/1 flag. In
+    the second session one event has no response."""
+    out = {}
+    for s in range(n_sessions):
+        rng = np.random.default_rng(70 + s)
+        n_events = 30 + 10 * s
+        arm = np.tile(np.arange(n_arms), n_events)
+        event = np.repeat(np.arange(n_events), n_arms)
+        flag = (rng.uniform(size=arm.size) < 0.4).astype(float)
+        eta = np.array([0.0, 0.5, -0.3, 0.2])[arm] * (s + 1) + 0.7 * flag
+        w = np.exp(eta).reshape(n_events, n_arms)
+        share = np.concatenate([rng.dirichlet(8 * r / r.sum()) for r in w])
+        if s == 1:
+            share[event == 3] = 0.0
+        key = ("sim", "20260101", f"0{2 * s + 2}_r1")
+        frame = pd.DataFrame(
+            {"event_id": event, "arm": arm, "flag": flag, "share": share}
+        )
+        out[key] = frame.iloc[rng.permutation(arm.size)].reset_index(drop=True)
+    return out
+
+
+def test_softmax_unit_fit_equals_an_independent_maximization() -> None:
+    """The grouped softmax with the same event ids in every session: each
+    session's events are its own groups. The unit's coefficients and
+    covariance equal a direct maximization of the multinomial log-likelihood
+    over per-session groups, to 1e-8; the events count once per session; the
+    per-session event counts sum to the unit's."""
+    from scipy.optimize import minimize
+
+    sessions = _same_event_ids()
+    weak = log_penalty_from_prior_sd(2.0)
+    design = build_design(
+        [
+            Category("arm", (0, 1, 2, 3), reference=0, penalty="none"),
+            Slope("flag", weak),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+        baseline=("arm",),
+    )
+    (record,) = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+        fit_by="day",
+    )  # fmt: skip
+    assert record.status == "converged"
+    Xs, ys, gs, start = [], [], [], 0
+    for s, frame in enumerate(sessions.values()):
+        frame = frame.sort_values("event_id", kind="stable")
+        cols = np.zeros((len(frame), 10))
+        for a in (1, 2, 3):
+            cols[:, (a - 1) * 3 + s] = frame["arm"].to_numpy() == a
+        cols[:, -1] = frame["flag"].to_numpy()
+        Xs.append(cols)
+        ys.append(frame["share"].to_numpy())
+        gs.append(frame["event_id"].to_numpy() + start)
+        start += frame["event_id"].max() + 1
+    X, y, g = np.vstack(Xs), np.concatenate(ys), np.concatenate(gs)
+    lam, n_groups = float(np.exp(weak)), g.max() + 1
+    total = np.bincount(g, weights=y)
+
+    def parts(b):
+        eta = X @ b
+        top = np.full(n_groups, -np.inf)
+        np.maximum.at(top, g, eta)
+        e = np.exp(eta - top[g])
+        sums = np.bincount(g, weights=e)
+        return eta, e / sums[g], np.log(sums) + top
+
+    def objective(b):
+        eta, p, lse = parts(b)
+        value = -(y @ eta - total @ lse - 0.5 * lam * b[-1] ** 2)
+        gradient = -(X.T @ (y - total[g] * p))
+        gradient[-1] += lam * b[-1]
+        return value, gradient
+
+    b = minimize(objective, np.zeros(10), jac=True, method="BFGS",
+                 options={"gtol": 1e-12, "maxiter": 10_000}).x  # fmt: skip
+    for _ in range(20):
+        _, p, _ = parts(b)
+        H = np.zeros((10, 10))
+        for k in range(n_groups):
+            rows = g == k
+            Xg, pg = X[rows], p[rows]
+            H += total[k] * (Xg.T @ (Xg * pg[:, None]) - np.outer(Xg.T @ pg, Xg.T @ pg))
+        H[-1, -1] += lam
+        b = b - np.linalg.solve(H, objective(b)[1])
+    names = [
+        f"arm[{a}]@sim/20260101/0{2 * s + 2}_r1" for a in (1, 2, 3) for s in range(3)
+    ]
+    order = [record.coef_names.index(n) for n in [*names, "flag"]]
+    np.testing.assert_allclose(np.asarray(record.coef)[order], b, rtol=0, atol=1e-8)
+    np.testing.assert_allclose(
+        np.asarray(record.vcov)[np.ix_(order, order)],
+        np.linalg.inv(H),
+        rtol=0,
+        atol=1e-8,
+    )
+    assert record.n_units == 30 + 40 + 50 - 1 == record.n_events
+    for field in ("n_units", "n_events", "events_without_response"):
+        got = [e[field] for e in record.sessions]
+        unit = getattr(record, field, record.cohort_counts.get(field))
+        assert sum(got) == unit, field
+    assert [e["events_without_response"] for e in record.sessions] == [0, 1, 0]
+
+
+@pytest.mark.parametrize("cause", ["no_events", "support"])
+@pytest.mark.parametrize("place", ["first", "last"])
+def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None:
+    """A session dropped from the unit (no event, or three visits) leaves the
+    shared coefficients those of the fit without it, to the last digits,
+    whether it is the first or the last of the unit."""
+    sessions = _day_sessions(4)
+    keys = list(sessions)
+    rows = sessions[keys[1]]
+    dropped = (
+        rows.assign(count=0.0)
+        if cause == "no_events"
+        else rows[rows["well_visit_id"] < 3]
+    )
+    others = {k: sessions[k] for k in keys if k != keys[1]}
+    design = build_design(
+        [
+            Slope("last_rewarded", log_penalty_from_prior_sd(2.0)),
+            Slope("x", "none"),
+            Smooth("time_since_s", 0.0, 20.0, 8, 2.0),
+            Offset("exposure"),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    given = (
+        {keys[1]: dropped, **others}
+        if place == "first"
+        else {**others, keys[1]: dropped}
+    )
+    (without,) = _rate_fit(design, others, fit_by="day")
+    (with_it,) = _rate_fit(design, given, fit_by="day")
+
+    def shared(record):
+        names = zip(record.coef_names, record.coef, strict=True)
+        return {n: c for n, c in names if "@" not in n}
+
+    # Not bit for bit: with the session's rows dropped the fit reads a copy of
+    # the kept rows, and a threaded linear-algebra library (OpenBLAS on four
+    # threads, as on CI) may sum a matrix product over it in another order,
+    # which moves the last digit. A fit that kept the session's rows differs in
+    # the first digits.
+    got, expected = shared(with_it), shared(without)
+    assert list(got) == list(expected)
+    np.testing.assert_allclose(
+        list(got.values()), list(expected.values()), rtol=1e-10, atol=1e-12
+    )
+    copy = f"(Intercept)@{'/'.join(keys[1])}"
+    assert with_it.cohort_counts["rows_dropped"] == {copy: len(dropped)}

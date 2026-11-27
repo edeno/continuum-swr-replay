@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "760be7f299f5",
+ "commit": "33ff2165f699",
  "code": {
-  "head": "760be7f299f53bb095f46f04a2cb1b09feaafe0d",
+  "head": "33ff2165f69907eedbc75d4acf627dee4e330a75",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -191,27 +191,27 @@
     "code_sha256": "29b8f0bd66291815e2424c396880e7cd07db1d626650c9d72c356c8b6c91c7ec"
    },
    "src/continuum_swr_replay/parameters.py": {
-    "sha256": "835ea24f95b3b52b7f1283e9c3076faa4b98cabd2e140ed0db90a1989386fbac",
-    "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
+    "sha256": "dc25fb70d482fb1f24672a1a2e7eb2ef3dbb533329edca46223b4491e102bb25",
+    "code_sha256": "7ef51ebf420d76aa0e66421990ab89f51f0b93b666c843926a652b8c7ec2de16"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "cbc596c4c05b2969ca2c1c8b7b5c9aeb392f13cab7b735ff57c5ebf8f0cb79be",
-    "code_sha256": "9561aceb2e4f68459e2f3ac3c580c386d1a3583fcd54d6ae2cf488c0a42b8ce9"
+    "sha256": "b26748fd9eec42160424b516fa562563f50d7619e2f6cb92657e65695f432309",
+    "code_sha256": "d70038046c615841958c33c51a5ea686474c5ce4dbb4e97d42acb234beeaa08f"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "2e8599ce25b27a2bbb3b69019f91f16a0d6c5458fbebb36c4a2784ebec8224d6",
-    "code_sha256": "fa051f8c957aeff2a35ab17dd994f0d148db5f76fa3934e87b83981cabc40c19"
+    "sha256": "8baa574fcb7cbab42d3a9211456ef3ffc0f7d0e0d99d8ac2d44803818009f9c2",
+    "code_sha256": "6193bdd24c2d73ed5a0b652b9606b0d8f66c3efc0d35e45919171baec5a247ba"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
     "code_sha256": "d866ba8479cbc8d226b4737d5d51dae5a5cdfa8fb1b34d523c3e89ba9735001a"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "080c01c30eaaa88a8ab66a8545e6e5930b59b390d8606dd452e749a2a2b48183",
+    "sha256": "5700af00f82c996a1e42d449a35c9b21fd75f7999bb2d5fd566d80eb3cbca90e",
     "code_sha256": "169ece09d286064b8dc65a9dec4d16763c4ab3fad9af22bee2030c62898e3f27"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
@@ -247,8 +247,8 @@
     "code_sha256": "9e6eb70d246270d9b19dabc72d897675b01e8a7a8d15035fc999249803900cb6"
    },
    "src/continuum_swr_replay/tables/session_keys.py": {
-    "sha256": "1d7c10e05496fe135530fd947772ff1110f284f2d874c18bc2a4a53eeba6d75d",
-    "code_sha256": "1d49650e8769213d4c95789216c2706be595352f7a3531f63ab7f18d0464f3e0"
+    "sha256": "66107e460466400bd492d3cb0a7aae628b63670bf56150fd10a0a9973d17ce72",
+    "code_sha256": "1a810f520daf639c4b926bb48cec5a3467e31ca2fb5ef1963c320d6388d6f7eb"
    },
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
@@ -275,7 +275,7 @@
  "inputs": [
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
-   "sha256": "9f049948d9c22b2a6907fa7bbec904965518947d7448a7b24806bf2c9ce6098b"
+   "sha256": "b18303308fde58130474bef6afc95941cc51368207c78ab11b146f327debb59e"
   },
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/manifest.json",
@@ -788,7 +788,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero",
+   "description": "animals whose median over their epochs of the held-out evidence of Non-Local Continuous bouts, immobile is above zero",
    "questions": [
     "2a.7"
    ],
@@ -798,7 +798,7 @@
    "pending": null
   },
   "heldout_continuous_immobile_ci_high": {
-   "value": 8.087062107268261,
+   "value": 7.420393837515245,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
@@ -812,11 +812,11 @@
    "pending": null
   },
   "heldout_continuous_immobile_ci_low": {
-   "value": 4.10396610735499,
+   "value": 4.200360828813183,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals)",
    "questions": [
     "2a.7"
    ],
@@ -854,11 +854,11 @@
    "pending": null
   },
   "heldout_continuous_immobile_estimate": {
-   "value": 6.095514107311625,
+   "value": 5.810377333164214,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median",
+   "description": "held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's median over its epochs of each epoch's median over its bouts",
    "questions": [
     "2a.7"
    ],
@@ -872,7 +872,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero",
+   "description": "animals whose median over their epochs of the held-out evidence of Non-Local Continuous bouts, running is above zero",
    "questions": [
     "2a.7"
    ],
@@ -882,7 +882,7 @@
    "pending": null
   },
   "heldout_continuous_running_ci_high": {
-   "value": -0.4666309368514036,
+   "value": -0.5125883573866354,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
@@ -896,11 +896,11 @@
    "pending": null
   },
   "heldout_continuous_running_ci_low": {
-   "value": -1.909909110474895,
+   "value": -1.4767921786927714,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals)",
    "questions": [
     "2a.7"
    ],
@@ -938,11 +938,11 @@
    "pending": null
   },
   "heldout_continuous_running_estimate": {
-   "value": -1.1882700236631494,
+   "value": -0.9946902680397034,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median",
+   "description": "held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's median over its epochs of each epoch's median over its bouts",
    "questions": [
     "2a.7"
    ],
@@ -970,7 +970,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero",
+   "description": "animals whose median over their epochs of the held-out evidence of Non-Local Fragmented bouts, immobile is above zero",
    "questions": [
     "2a.7"
    ],
@@ -980,7 +980,7 @@
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_high": {
-   "value": 0.8283229652639718,
+   "value": 0.6032794210296244,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
@@ -994,11 +994,11 @@
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_low": {
-   "value": -0.5913750167078854,
+   "value": -0.5572470228057482,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals)",
    "questions": [
     "2a.7"
    ],
@@ -1036,11 +1036,11 @@
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_estimate": {
-   "value": 0.1184739742780432,
+   "value": 0.023016199111938,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median",
+   "description": "held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's median over its epochs of each epoch's median over its bouts",
    "questions": [
     "2a.7"
    ],
@@ -1082,7 +1082,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose mean held-out evidence of Local bouts, immobile is above zero",
+   "description": "animals whose median over their epochs of the held-out evidence of Local bouts, immobile is above zero",
    "questions": [
     "2a.7"
    ],
@@ -1092,7 +1092,7 @@
    "pending": null
   },
   "heldout_local_immobile_ci_high": {
-   "value": 4.435332580420715,
+   "value": 4.256545588008989,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
@@ -1106,11 +1106,11 @@
    "pending": null
   },
   "heldout_local_immobile_ci_low": {
-   "value": 1.1452029123754983,
+   "value": 0.9928976807669512,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals)",
    "questions": [
     "2a.7"
    ],
@@ -1148,11 +1148,11 @@
    "pending": null
   },
   "heldout_local_immobile_estimate": {
-   "value": 2.790267746398107,
+   "value": 2.6247216343879702,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median",
+   "description": "held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's median over its epochs of each epoch's median over its bouts",
    "questions": [
     "2a.7"
    ],
@@ -1166,7 +1166,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose mean held-out evidence of No-Spike bouts, immobile is above zero",
+   "description": "animals whose median over their epochs of the held-out evidence of No-Spike bouts, immobile is above zero",
    "questions": [
     "2a.7"
    ],
@@ -1176,7 +1176,7 @@
    "pending": null
   },
   "heldout_no_spike_immobile_ci_high": {
-   "value": 9.71180070946859,
+   "value": 9.813041283825184,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
@@ -1190,11 +1190,11 @@
    "pending": null
   },
   "heldout_no_spike_immobile_ci_low": {
-   "value": 5.68537323976118,
+   "value": 5.766275001325679,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, each replicate with the same estimator, small-sample t correction over the 5 animals)",
    "questions": [
     "2a.7"
    ],
@@ -1232,11 +1232,11 @@
    "pending": null
   },
   "heldout_no_spike_immobile_estimate": {
-   "value": 7.698586974614885,
+   "value": 7.789658142575432,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median",
+   "description": "held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's median over its epochs of each epoch's median over its bouts",
    "questions": [
     "2a.7"
    ],
