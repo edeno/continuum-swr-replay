@@ -350,6 +350,13 @@ def test_an_unsupported_window_is_marked_and_left_out(
     s = rows[vr.ARRIVAL].to_numpy()
     on = (rows[vr.REWARD] == 0.0).to_numpy() & (s >= 4.0) & (s < 6.0)
     assert omitted[(4.0, 6.0)] == rows.loc[on, "well_visit_id"].nunique()
+    seconds = {
+        tuple(r["range_s"]): r["at_risk_s"]
+        for r in support["Q2"]["reads"]
+        if r["outcome"] == 0
+    }
+    assert seconds[(4.0, 6.0)] == pytest.approx(rows.loc[on, "exposure"].sum())
+    assert seconds[(6.0, 8.0)] == 0.0
     # Read as three animals (one session each), where the window tests are
     # declared: Q2 is left out of the reduction and counted.
     table = unit_estimands(fit).assign(fit_by="animal", session_date="", epoch="")
