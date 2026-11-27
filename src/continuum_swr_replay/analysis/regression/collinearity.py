@@ -32,8 +32,12 @@ for a term of several (:func:`separable`).
 
 mgcv computes the measures on the unweighted model matrix, with the intercept
 among the parametric columns ("para"). A smooth whose sum-to-zero constraint
-was computed on the same rows is orthogonal to the intercept, so on unit
-weights its measures are mgcv's.
+was computed on the same rows is orthogonal to the intercept on those rows, so
+on unit weights its measures are mgcv's. A smooth centered on declared points
+(``terms.Smooth.center_on``) is not orthogonal to the intercept on the fit's
+rows: its concurvity, and the VIF of a slope beside it, then depend on where
+its constraint puts the constant (the parametrization), not only on the data;
+the same model centered on its rows gives other values.
 """
 
 from __future__ import annotations

@@ -293,7 +293,7 @@ def summarize_estimands(
         ``unit_summary`` (on the log scale; with ``fit_by`` and ``n_units``)
         and ``n_units_unsupported`` (the units whose value lacks window
         support, left out; for the difference, the units where either kind
-        lacks it). The difference is taken unit by unit, over the units where
+        lacks it, and a unit that one kind lacks altogether). The difference is taken unit by unit, over the units where
         both kinds have a supported value. The window tests (Q2
         and the onset test) are declared tests per animal only
         (``visit_rate.is_declared_test``, the twenty-sixth round): at another
