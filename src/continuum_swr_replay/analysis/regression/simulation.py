@@ -78,8 +78,8 @@ order, each session by session, from that one generator. The groups'
 outcomes are therefore drawn independently given each group's expected
 outcome; a dependence between them exists only when a scenario plants it
 through the means (an outside scenario's ``expected`` sees every row and the
-generator). That independence is the call of the author of the regression
-code (2026-11-27), not the lead's (``docs/design/regression_fitter.md``,
+generator). That independence is the coordinator's call (2026-11-27), not
+the lead's (``docs/design/regression_fitter.md``,
 "Simulation"). Each model's fit, support hook and unit target see only its
 group's rows, and each keeps its own penalties. A run without
 ``rows_where`` is one group of every row, drawn as before.
@@ -92,7 +92,9 @@ less the second. Its rows in the tables carry its name as their ``model``:
   description only: the interval is the bootstrap's); ``without_value``, the
   first's cause, else the second's, so that a unit without a value in either
   model has no difference and is counted with that cause; ``no_fit`` the
-  same; ``status``, the second's when the first converged, else the first's;
+  same; ``status``, that of a fit tried that did not converge in either
+  model (the first's if both), else ``not fitted`` if either was not
+  fitted, else converged;
   ``n_events`` the sum; ``n_sessions``, the unit's sessions with rows in both
   fits; ``edf`` empty;
 - ``data_sets``: ``unit_summary`` of the units' differences (the interval is
@@ -865,7 +867,13 @@ def _session_rows(
     sessions: Mapping[SessionKey, pd.DataFrame],
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
     """The ``sessions`` table's rows of one model and data set, one per unit
-    of the fit, and each estimand's unit estimates, shape ``(n_units,)``."""
+    of the fit, and each estimand's unit estimates, shape ``(n_units,)``.
+
+    A unit has an estimate when its record has no cause; such a record's fit
+    is always converged, as the real statistics require: ``no_fit`` is empty
+    only when the refit ended ``CONVERGED`` (``sessions._Session.apply``),
+    which ``reml.refit_session`` sets only when its last fit converged, and
+    the record's status is that fit's (``sessions._record``)."""
     rows, estimates = [], {name: [] for name in model.estimands}
     for record in records:
         coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
@@ -1179,6 +1187,17 @@ def _difference_rows(
     return data_set_rows, session_rows
 
 
+def _difference_status(a: str, b: str) -> str:
+    """A difference unit's fit status from its two models': a fit tried that
+    did not converge, the first's if both (so that ``share_not_converged``
+    counts it); else ``NOT_FITTED`` if either was not fitted; else
+    converged."""
+    failed = [s for s in (a, b) if s not in (CONVERGED, NOT_FITTED)]
+    if failed:
+        return failed[0]
+    return NOT_FITTED if NOT_FITTED in (a, b) else CONVERGED
+
+
 def _difference_unit(base: dict, a: dict, b: dict, n_both: int) -> dict:
     """One unit's ``sessions`` row of a difference, from its two models' rows
     of the unit, ``a`` less ``b``; ``n_both``, the unit's sessions with rows
@@ -1188,7 +1207,7 @@ def _difference_unit(base: dict, a: dict, b: dict, n_both: int) -> dict:
         **{k: a[k] for k in ("estimand", "animal", "session_date", "epoch", "fit_by")},
         "n_sessions": n_both,
         "n_events": a["n_events"] + b["n_events"],
-        "status": b["status"] if a["status"] == CONVERGED else a["status"],
+        "status": _difference_status(a["status"], b["status"]),
         "no_fit": a["no_fit"] or b["no_fit"],
         "without_value": a["without_value"] or b["without_value"],
         "estimate": a["estimate"] - b["estimate"],

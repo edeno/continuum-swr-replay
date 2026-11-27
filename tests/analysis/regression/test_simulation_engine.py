@@ -1679,6 +1679,49 @@ def test_workers_give_the_same_tables_with_differences(rate_sessions_cohort) -> 
         pd.testing.assert_frame_equal(x, y)
 
 
+@pytest.mark.parametrize(
+    ("a_rows", "b_status", "want"),
+    [
+        (False, "max_iter", "max_iter"),  # A not fitted, B tried and failed
+        (True, "max_iter", "max_iter"),  # A converged, B tried and failed
+        (False, None, "not fitted"),  # A not fitted, B converged
+    ],
+)
+def test_the_status_of_a_difference_unit(
+    monkeypatch, rate_sessions_cohort, a_rows, b_status, want
+) -> None:
+    """A unit of a difference takes the status of a fit that was tried and
+    did not converge, in either model (the first's if both); else "not
+    fitted" if either was not fitted; else converged. So a failed fit of the
+    second model is not hidden by a first model with no rows there, and the
+    summary counts it as not converged."""
+    keys = list(rate_sessions_cohort)
+    gap = keys[3]
+    sessions = _two_kinds(rate_sessions_cohort, drop=None if a_rows else {gap: "A"})
+    real = engine.fit_sessions
+
+    def failing(design, data, *args, **kwargs):
+        records = real(design, data, *args, **kwargs)
+        if kwargs["model"] != "B/rate" or b_status is None:
+            return records
+        return [
+            replace(r, status=b_status) if r.unit_key == gap else r for r in records
+        ]
+
+    monkeypatch.setattr(engine, "fit_sessions", failing)
+    model = rate_model(sessions)
+    scenario = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    result = engine.run(_kinds_simulation(model, sessions, [scenario]))
+    units = _units(result.sessions, "A-B/rate", "reward").set_index(
+        ["animal", "session_date", "epoch"]
+    )
+    assert set(units.loc[[gap], "status"]) == {want}
+    assert (units.drop(index=[gap])["status"] == "converged").all()
+    row = result.summary.set_index(["model", "estimand"]).loc[("A-B/rate", "reward")]
+    tried_failed = want == "max_iter"
+    assert (row["share_not_converged"] > 0) == tried_failed
+
+
 if __name__ == "__main__":
     from continuum_swr_replay.runs.provenance import described_commit
 
