@@ -255,7 +255,7 @@ def test_the_curves_are_calibrated_at_the_unit() -> None:
     median edf over the unit's fits (three animals) reaches the target, and
     the record names the unit."""
     cohort = vs._synthetic_cohort("SWR", SMALL)
-    settings = vr.VisitRateSettings(fit_by="animal", include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="animal")
     targets = {
         vr.OMITTED_ARRIVAL_TERM: 5.0,
         vr.REWARDED_ARRIVAL_TERM: 5.0,

@@ -31,18 +31,11 @@ against after an omission over the time since arrival) is shown, not tested:
 per unit with its simultaneous band (``bands.simultaneous_band``), and across
 units with its band (``bands.across_session_band``, one row per unit). So is
 model D's curve over lags 1 to 10.
-
-Q7a from a fit with the third clock (``f_m``) is the drop before leaving
-conditional on the time until the end of the immobile stretch: in a visit's
-last stretch the two clocks are equal, so part of a drop before leaving can
-move to ``f_m``. :func:`third_clock_q7a` sets Q7a of the fits with and
-without ``f_m`` side by side.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -65,7 +58,6 @@ from continuum_swr_replay.tables.session_keys import (
 from ..declared_tests import DIFFERENCE, KINDS
 from .visit_rate import (
     LAGS,
-    STRETCH,
     WINDOW_SUPPORT,
     VisitRateFit,
     declared_contrasts,
@@ -80,9 +72,7 @@ __all__ = [
     "lag_curve_band",
     "lag_curves",
     "summarize_estimands",
-    "third_clock_q7a",
     "unit_estimands",
-    "ThirdClockQ7a",
 ]
 
 #: The key columns of every unit table: the record's key (``""`` where the
@@ -156,8 +146,7 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
         ``visits_omitted``, ``visits_rewarded``, ``at_risk_s_omitted``,
         ``at_risk_s_rewarded`` (``visit_rate.window_support``; NaN where not
         read). NaN for a unit without a kept fit or with a coefficient the
-        contrast uses left out. With the third clock in the model, Q7a is
-        conditional on it (module docstring).
+        contrast uses left out.
     """
     if fit.model != "A":
         raise ValueError(f"the declared estimands are model A's, not {fit.model}'s")
@@ -427,88 +416,3 @@ def difference_curve_band(curves: pd.DataFrame, *, n_draws: int, seed: int) -> B
     """
     grid = sorted(curves["time_since_arrival_s"].unique())
     return _band(curves, "time_since_arrival_s", grid, n_draws, seed)
-
-
-class ThirdClockQ7a(NamedTuple):
-    """Q7a of model A with and without the third clock (:func:`third_clock_q7a`).
-
-    Attributes
-    ----------
-    units : pd.DataFrame
-        One row per unit: the unit's key, ``fit_by``, ``kind``,
-        ``with_stretch``, ``without_stretch`` (Q7a of each fit) and
-        ``difference`` (with less without); NaN where either fit has no value.
-    summary : pd.DataFrame
-        One row per ``value`` (``with_stretch``, ``without_stretch``,
-        ``difference``): ``unit_summary`` of the unit values.
-    """
-
-    units: pd.DataFrame
-    summary: pd.DataFrame
-
-
-def third_clock_q7a(
-    with_stretch: VisitRateFit,
-    without_stretch: VisitRateFit,
-    *,
-    n_draws: int,
-    seed: int,
-) -> ThirdClockQ7a:
-    """Q7a of model A's fits with and without ``f_m``, per unit and over
-    units, stored beside the third clock's rule.
-
-    The rule (``visit_rate.third_clock_decision``) reads the concurvity only;
-    the difference here shows how much of the drop before leaving moves to
-    ``f_m`` when it is in the model.
-
-    Parameters
-    ----------
-    with_stretch, without_stretch : VisitRateFit
-        Model A's fits of one kind, with and without the stretch clock, on
-        the same sessions and unit of the fit.
-    n_draws, seed : int
-        The bootstrap's (``unit_summary``).
-
-    Returns
-    -------
-    ThirdClockQ7a
-
-    Raises
-    ------
-    ValueError
-        If a fit is not model A's, the fits differ in kind or units, or the
-        stretch clock is not in the first fit alone.
-    """
-    if with_stretch.model != "A" or without_stretch.model != "A":
-        raise ValueError("Q7a is model A's")
-    if with_stretch.kind != without_stretch.kind:
-        raise ValueError("the two fits are of different kinds")
-    if not (
-        with_stretch.settings.include_stretch_clock
-        and not without_stretch.settings.include_stretch_clock
-    ):
-        raise ValueError(f"the first fit holds {STRETCH}, the second does not")
-    keys = list(_KEY)
-    values = {}
-    for name, fit in (
-        ("with_stretch", with_stretch),
-        ("without_stretch", without_stretch),
-    ):
-        q7a = unit_estimands(fit)
-        values[name] = q7a[q7a["estimand_id"] == "Q7a"].set_index(keys)["estimate"]
-    if not values["with_stretch"].index.equals(values["without_stretch"].index):
-        raise ValueError("the two fits are of different units")
-    units = pd.DataFrame(values).reset_index()
-    units["difference"] = units["with_stretch"] - units["without_stretch"]
-    units.insert(len(keys), "kind", with_stretch.kind)
-    fit_by = with_stretch.settings.fit_by
-    summary = [
-        {
-            "value": name,
-            **unit_summary(
-                _indexed(units, fit_by, name), fit_by, n_draws=n_draws, seed=seed
-            ),
-        }
-        for name in ("with_stretch", "without_stretch", "difference")
-    ]
-    return ThirdClockQ7a(units, pd.DataFrame(summary))

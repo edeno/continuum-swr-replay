@@ -273,7 +273,7 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    series is indexed by the unit keys); `visit_rate.calibrate_log_penalty` passes the setting's unit;
    the third clock's rule counts units (its records are units). Tests:
    `test_calibration.py::test_median_over_units` (three animals of two sessions),
-   `test_visit_rate.py::test_calibration_at_the_unit`, `::test_third_clock_rule_counts_units`.
+   `test_visit_rate.py::test_calibration_at_the_unit` (and `::test_third_clock_rule_counts_units`, removed with the third clock). *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)*
 5. **The reduction per unit.** One function, `regression.units.unit_summary(values, fit_by, *, n_draws,
    seed)` (first built in `shared_statistics`, moved into the fitter's package on 2026-11-24 because it
    knows the units): `"session"` is `estimand_summary`; `"day"` is `estimand_summary` with each day as its own

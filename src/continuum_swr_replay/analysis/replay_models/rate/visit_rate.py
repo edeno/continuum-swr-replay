@@ -1,4 +1,4 @@
-"""The visit rate model: event starts on the three visit clocks, models A and D.
+"""The visit rate model: event starts on the two visit clocks, models A and D.
 
 One fit for each unit of the fit (``VisitRateSettings.fit_by``: a recording
 day or an animal, ``fit_by.BEHAVIOR_FIT_BY``, the convention's twenty-fourth
@@ -12,8 +12,9 @@ other term (the clock curves, the reward terms, model D's lag curve) is
 shared.
 
 - Model A: ``f_s(time since the first poke-in) + f_u(time until the final
-  poke-out) [+ f_m(time until the end of the immobile stretch)] + beta *
-  last_outcome_rewarded``.
+  poke-out) + beta * last_outcome_rewarded`` (in the declared by-outcome form,
+  ``f_s`` for each last outcome). Two clocks (DECIDED, lead, 2026-11-26: "no
+  just two"); the time-bin table's ``time_until_stretch_end_s`` is not read.
 - Model D: the same smooths and, in place of the 0/1 term, a smooth curve over
   the last ten known outcomes on the log-lag scale (a lag functional), on the
   bins with ten known outcomes.
@@ -28,9 +29,8 @@ the intercept is not penalized. Every model's design is checked by
 The model's form has open questions. Each is a named setting below, in one
 place, with the values allowed; :class:`VisitRateSettings` holds one choice of
 each, and the model builds and fits for every allowed choice. The defaults
-are the declared form (the coefficient form of the reward effect, Q1's
-declared reference window, all in-visit bins, the third clock in the first
-fit). The log penalties of the module (:data:`CLOCK_LOG_PENALTIES`) are
+are the declared form (the by-outcome form of the reward effect, Q1's
+declared reference window, all in-visit bins). The log penalties of the module (:data:`CLOCK_LOG_PENALTIES`) are
 provisional: :func:`fit_visit_rate` refuses them unless the caller says the
 fit is a test or a simulation; a real fit carries calibrated penalties
 (:class:`CalibratedPenalty`).
@@ -47,23 +47,6 @@ unit) are added to its record's ``cohort_counts``, in model A's and model D's
 records alike. The two clocks that count down reference the future
 (``covariate_timing.FUTURE_REFERENCING``): this model describes; it does not
 predict.
-
-The third clock's rule, written before any fit (:func:`third_clock_decision`):
-fit A with ``f_m``; if the concurvity ``estimate`` of ``f_m`` or of ``f_u`` is
-at least ``collinearity.MAX_EXPLAINED`` (0.8) in more than
-``MAX_FAILING_SHARE`` (20 %) of the units with a fit (each measured on its
-unit's rows), A is refit without
-``f_m``, and the time-until-movement curve is reported only from the
-model-free curves. Both fits are stored.
-
-The rule does not see everything the third clock does to Q7a. In a visit's
-last immobile stretch the stretch clock equals the leaving clock, so with
-``f_m`` in the model part of a drop before leaving can move to ``f_m`` while
-the concurvity stays below 0.8. Q7a read from a fit with ``f_m`` is therefore
-the drop before leaving conditional on the time until the end of the stretch,
-not the whole drop. ``visit_rate_statistics.third_clock_q7a`` compares Q7a of
-the fits with and without ``f_m``, per session and summarized; it is stored
-beside the rule's decision.
 """
 
 from __future__ import annotations
@@ -88,10 +71,7 @@ from continuum_swr_replay.analysis.regression.calibration import (
     EdfCalibration,
     log_penalty_for_edf,
 )
-from continuum_swr_replay.analysis.regression.collinearity import separable
-from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
-from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.record import FitRecord
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
@@ -141,13 +121,11 @@ __all__ = [
     "REWARDED_ARRIVAL_TERM",
     "REWARD",
     "REWARD_FORMS",
-    "STRETCH",
     "TIME_RANGE_CAPS_S",
     "UNIT",
     "WEAK_PRIOR_SD",
     "WEAK_PRIOR_SD_SENSITIVITY",
     "CohortRows",
-    "ThirdClockDecision",
     "VisitRateFit",
     "VisitRateSettings",
     "CalibratedPenalty",
@@ -172,7 +150,6 @@ __all__ = [
     "DIFFERENCE_STEP_S",
     "difference_curve_rows",
     "difference_grid",
-    "third_clock_decision",
 ]
 
 # --- The columns the model reads -------------------------------------------
@@ -181,8 +158,6 @@ __all__ = [
 ARRIVAL = "time_since_visit_start_s"
 #: Time until the final poke-out of the visit (s); counts down.
 LEAVING = "time_until_visit_end_s"
-#: Time until the end of the current immobile stretch (s); counts down.
-STRETCH = "time_until_stretch_end_s"
 #: The last known outcome, 1 rewarded and 0 omitted (lag 1 of the history).
 REWARD = "last_outcome_rewarded"
 #: The bin's at-risk seconds, the Poisson offset's column.
@@ -215,7 +190,6 @@ SECONDARY_ESTIMAND = "reward_coefficient"
 CLOCK_BASES: dict[str, tuple[float, float, float]] = {
     ARRIVAL: (0.0, 20.0, 0.5),
     LEAVING: (0.0, 3.0, 0.1),
-    STRETCH: (0.0, 1.5, 0.1),
 }
 
 #: Model D's lag curve: basis functions over ``[log 1, log 10]``.
@@ -275,20 +249,19 @@ CLOCK_PENALTY_SETTINGS: tuple[str, ...] = ("declared", "stiffer", "looser")
 #: fit takes each curve's penalty from :func:`calibrate_log_penalty`, carried
 #: by ``VisitRateSettings.calibrated_penalties`` with its target and rows;
 #: :func:`fit_visit_rate` refuses these values unless the fit is a test or a
-#: simulation. The stretch clock takes the leaving clock's values (the same
-#: knot spacing); model D's lag curve is 2, with 4 and 0 either side; each
+#: simulation. Model D's lag curve is 2, with 4 and 0 either side; each
 #: arrival curve of the by-outcome reward form takes the arrival clock's
 #: value (:meth:`VisitRateSettings.log_penalty`).
 CLOCK_LOG_PENALTIES: dict[str, dict[str, dict[str, float]]] = {
     "SWR": {
-        "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, STRETCH: 3.0718, LAG_TERM: 2.0},
-        "stiffer": {ARRIVAL: 3.8344, LEAVING: 5.3921, STRETCH: 5.3921, LAG_TERM: 4.0},
-        "looser": {ARRIVAL: -1.7300, LEAVING: 0.7515, STRETCH: 0.7515, LAG_TERM: 0.0},
+        "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, LAG_TERM: 2.0},
+        "stiffer": {ARRIVAL: 3.8344, LEAVING: 5.3921, LAG_TERM: 4.0},
+        "looser": {ARRIVAL: -1.7300, LEAVING: 0.7515, LAG_TERM: 0.0},
     },
     "No SWR": {
-        "declared": {ARRIVAL: 1.8472, LEAVING: 3.2544, STRETCH: 3.2544, LAG_TERM: 2.0},
-        "stiffer": {ARRIVAL: 4.3179, LEAVING: 5.5317, STRETCH: 5.5317, LAG_TERM: 4.0},
-        "looser": {ARRIVAL: -0.6235, LEAVING: 0.9771, STRETCH: 0.9771, LAG_TERM: 0.0},
+        "declared": {ARRIVAL: 1.8472, LEAVING: 3.2544, LAG_TERM: 2.0},
+        "stiffer": {ARRIVAL: 4.3179, LEAVING: 5.5317, LAG_TERM: 4.0},
+        "looser": {ARRIVAL: -0.6235, LEAVING: 0.9771, LAG_TERM: 0.0},
     },
 }
 
@@ -314,7 +287,7 @@ TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 #: arrival curve for each last outcome, each a smooth ``by`` the outcome with
 #: its own sum-to-zero constraint (on the pooled rows of its outcome) and its
 #: own declared penalty, the outcome coefficient (the weak penalty) and the
-#: leaving curve (and the stretch curve) shared by both outcomes: ``outcome +
+#: leaving curve shared by both outcomes: ``outcome +
 #: session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)``.
 #: The outcome coefficient and the two centered curves identify the
 #: difference curve ``beta + f_1(s) - f_0(s)`` (the log rate ratio after a
@@ -382,11 +355,6 @@ class VisitRateSettings:
         outcome) or the secondary one (one coefficient).
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
-    include_stretch_clock : bool
-        Whether model A and D hold ``f_m``; the third clock's rule
-        (:func:`third_clock_decision`) decides it after the first fit, which
-        holds it. With ``f_m``, Q7a is conditional on the third clock (module
-        docstring).
     fit_by : {"day", "animal", "session"}
         The unit of the fit, one for each run (DECIDED, the convention's
         twenty-fourth round): one of ``fit_by.BEHAVIOR_FIT_BY``, the units every
@@ -412,7 +380,6 @@ class VisitRateSettings:
     max_time_since_arrival_s: float | None = None
     reward_form: Literal["by_outcome", "coefficient"] = "by_outcome"
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
-    include_stretch_clock: bool = True
     fit_by: FitBy = BEHAVIOR_FIT_BY[0]
     log_penalties: Mapping[str, float] | None = None
     calibrated_penalties: Mapping[tuple[str, str], CalibratedPenalty] | None = None
@@ -482,7 +449,7 @@ class VisitRateSettings:
 
     def clocks(self) -> tuple[str, ...]:
         """The clock columns the model holds, in order."""
-        return (ARRIVAL, LEAVING, *((STRETCH,) if self.include_stretch_clock else ()))
+        return (ARRIVAL, LEAVING)
 
     def clock_range(self, clock: str) -> tuple[float, float]:
         """A clock's basis range: the arrival clock's ends at the cap."""
@@ -631,7 +598,7 @@ def build_visit_rate_design(
 
 def _probe(design: Design, n: int) -> pd.DataFrame:
     """Rows at which every column the model reads is 0 (exposure 1)."""
-    columns = [ARRIVAL, LEAVING, STRETCH, REWARD, *REWARD_LAG_COLUMNS]
+    columns = [ARRIVAL, LEAVING, REWARD, *REWARD_LAG_COLUMNS]
     frame = pd.DataFrame(0.0, index=np.arange(n), columns=columns)
     frame[EXPOSURE] = 1.0
     return frame
@@ -1347,63 +1314,3 @@ def calibrate_log_penalty(
         unit=UNIT,
         fit_by=settings.fit_by,
     )
-
-
-# --- The third clock's rule ---------------------------------------------------
-
-
-class ThirdClockDecision(NamedTuple):
-    """The third clock's rule on model A's fit with ``f_m``.
-
-    Attributes
-    ----------
-    keep : bool
-        False when ``f_m`` leaves the model.
-    share : float
-        The share of the units of the fit (sessions, days or animals) with a
-        fit in which ``f_m`` or ``f_u`` is not separable (concurvity
-        ``estimate`` at least ``MAX_EXPLAINED``), measured on each unit's
-        rows.
-    n_sessions : int
-        The units with a fit, in which both terms are measured.
-    """
-
-    keep: bool
-    share: float
-    n_sessions: int
-
-
-def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
-    """The third clock's rule (module docstring) on model A's records with
-    ``f_m``, one per unit of the fit: keep ``f_m`` when the share of units in
-    which it or ``f_u`` is not separable is at most ``MAX_FAILING_SHARE`` (a
-    share of exactly 20 % keeps it).
-
-    The rule reads the concurvity only. A drop before leaving can move in
-    part to ``f_m`` while the concurvity stays below the threshold, so the
-    decision is stored with ``visit_rate_statistics.third_clock_q7a``, Q7a
-    with and without ``f_m``.
-
-    Raises
-    ------
-    ValueError
-        If no unit has a fit with both terms measured.
-    """
-    pair = (_smooth_name(STRETCH), _smooth_name(LEAVING))
-    flagged = []
-    for record in records:
-        if record.status != CONVERGED or record.no_fit:
-            continue
-        measured = {
-            name: record.collinearity[name]
-            for name in pair
-            if name in record.collinearity
-            and "not_measured" not in record.collinearity[name]
-        }
-        if len(measured) < len(pair):
-            continue
-        flagged.append(not all(separable(measured).values()))
-    if not flagged:
-        raise ValueError("no unit has a fit with f_m and f_u measured")
-    share = float(np.mean(flagged))
-    return ThirdClockDecision(share <= MAX_FAILING_SHARE, share, len(flagged))

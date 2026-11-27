@@ -1053,3 +1053,19 @@ difference curve, `reward_form="time_varying"`, was decided against and is remov
 | the identification of model D's lag curve per session inside `rate/visit_rate.model_d_rows`, and its counts in `CohortRows.counts` | `visit_rate.lag_curve_counts`, judged on the rows of the unit of the fit at `fit_visit_rate`; the counts are in each record's `cohort_counts` | 7b1811db |
 | `rate/visit_rate._session_rows` | `visit_rate._unit_rows` (the sessions' rows and each unit's counts) | 7b1811db |
 | `rate/visit_rate_simulation` table columns `truth_session`, `truth_omission_side` | `truth_by_outcome`, `truth_pooled` | d464e255 |
+
+## The rate model's third clock removed, 2026-11-26
+
+The lead (2026-11-26, 19:15): "no just two". The rate model has two clocks. Paths are under
+`src/continuum_swr_replay/analysis/replay_models/rate/`. The time-bin table keeps `time_until_stretch_end_s`
+(`replay_models/visit_design.py`); no model reads it.
+
+| Old place | New place | Commit |
+|---|---|---|
+| `visit_rate.STRETCH`, `CLOCK_BASES[STRETCH]`, the stretch entries of `CLOCK_LOG_PENALTIES` (removed) | none: `VisitRateSettings.clocks()` is `(ARRIVAL, LEAVING)` | this section's commit |
+| `visit_rate.VisitRateSettings.include_stretch_clock` (removed) | none | this section's commit |
+| `visit_rate.third_clock_decision`, `ThirdClockDecision` (removed) | none | this section's commit |
+| `visit_rate_statistics.third_clock_q7a`, `ThirdClockQ7a` (removed) | none | this section's commit |
+| `visit_rate_scenarios.PlantedClocks.stretch`, `drop_before_small_movements` (removed) | none | this section's commit |
+| `visit_rate_simulation` scenario `"drop_before_small_movements"`, the stretch targets of `CLOCK_TARGETS`, the stretch column of `synthetic_visit_rows` (removed) | none | this section's commit |
+| `tests/analysis/replay_models/rate/test_visit_rate.py::test_third_clock_rule`, `::test_third_clock_rule_at_its_boundary`, `::test_third_clock_rule_counts_units`; `test_visit_rate_statistics.py::test_q7a_with_and_without_the_third_clock`; `test_visit_rate_scenarios.py::test_a_stretch_curve_enters_the_rate` (removed) | none | this section's commit |

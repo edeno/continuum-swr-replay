@@ -1,5 +1,5 @@
 """The visit rate model (``replay_models/rate/visit_rate.py``): its terms, the
-cohort step, the fit and the third clock's rule.
+cohort step and the fit.
 
 The fits run on synthetic in-visit bins (``conftest.synthetic_visit_rows``)
 whose counts are drawn from a planted rate (``visit_rate_scenarios``); the
@@ -91,34 +91,27 @@ def _planted_cohort(
 def test_model_terms_follow_the_settings() -> None:
     terms_a = vr.model_terms("A", "SWR", DEFAULT)
     smooths = [t for t in terms_a if isinstance(t, Smooth)]
-    assert [t.column for t in smooths] == [
-        vr.ARRIVAL,
-        vr.ARRIVAL,
-        vr.LEAVING,
-        vr.STRETCH,
-    ]
+    assert [t.column for t in smooths] == [vr.ARRIVAL, vr.ARRIVAL, vr.LEAVING]
     assert [(t.lo, t.hi, t.n_basis) for t in smooths] == [
         (0.0, 20.0, 43),
         (0.0, 20.0, 43),
         (0.0, 3.0, 33),
-        (0.0, 1.5, 18),
     ]
     assert [t.penalty for t in smooths] == [
         vr.CLOCK_LOG_PENALTIES["SWR"]["declared"][c]
-        for c in (vr.ARRIVAL, vr.ARRIVAL, vr.LEAVING, vr.STRETCH)
+        for c in (vr.ARRIVAL, vr.ARRIVAL, vr.LEAVING)
+    ]
+    assert DEFAULT.clocks() == (vr.ARRIVAL, vr.LEAVING)
+    assert "time_until_stretch_end_s" not in [
+        getattr(t, "column", None) for t in terms_a
     ]
     (reward,) = [t for t in terms_a if isinstance(t, Slope)]
     assert reward.column == vr.REWARD
     assert reward.penalty == pytest.approx(log_penalty_from_prior_sd(2.0))
 
-    capped = vr.VisitRateSettings(
-        fit_by="session", max_time_since_arrival_s=10.0, include_stretch_clock=False
-    )
+    capped = vr.VisitRateSettings(fit_by="session", max_time_since_arrival_s=10.0)
     for arrival in vr.model_terms("A", "No SWR", capped)[1:3]:
         assert (arrival.column, arrival.hi, arrival.n_basis) == (vr.ARRIVAL, 10.0, 23)
-    assert vr.STRETCH not in [
-        getattr(t, "column", None) for t in vr.model_terms("A", "SWR", capped)
-    ]
 
     terms_d = vr.model_terms("D", "SWR", DEFAULT)
     (lag,) = [t for t in terms_d if isinstance(t, LinearFunctional)]
@@ -428,10 +421,7 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
     the grid, is within a tolerance of the planted one: 0.25 for arrival on
     0.5 to 6 s, 0.5 for leaving on 0 to 2 s (simulation tolerances; the
     planted drop of 1.5 in the last 0.3 s is smoothed by the penalty, most at
-    the poke-out). The model has no stretch clock here: in a visit's last
-    stretch the stretch clock is the leaving clock, so with ``f_m`` in the
-    model a planted drop before leaving is shared between ``f_u`` and ``f_m``
-    (``visit_rate_statistics.third_clock_q7a`` shows how much)."""
+    the poke-out)."""
     cohort, planted = _planted_cohort(
         make_visit_rows,
         cohort_of,
@@ -443,7 +433,7 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
         total=3000.0,
         seed=10,
     )
-    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="session")
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -481,9 +471,7 @@ def _noiseless_fit(rows, truth, reward_form: str, cohort_of) -> dict[str, float]
     counts (a large session without noise), its Q1, Q2 and Q7a."""
     key = tuple(rows[["animal", "session_date", "epoch"]].iloc[0])
     rows = rows.assign(count=truth.expected)
-    settings = vr.VisitRateSettings(
-        fit_by="session", reward_form=reward_form, include_stretch_clock=False
-    )
+    settings = vr.VisitRateSettings(fit_by="session", reward_form=reward_form)
     fit = vr.fit_visit_rate_session(
         key,
         cohort_of(rows, "SWR"),
@@ -565,7 +553,6 @@ SETTINGS = (
         vr.VisitRateSettings(fit_by="session", max_time_since_arrival_s=10.0),
         vr.VisitRateSettings(fit_by="session", reward_form="coefficient"),
         vr.VisitRateSettings(fit_by="session", q1_reference_s=(1.0, 2.0)),
-        vr.VisitRateSettings(fit_by="session", include_stretch_clock=False),
     ]
 )
 
@@ -672,7 +659,7 @@ def test_model_d_skips_a_session_with_constant_outcomes(
         cohort[key] = cohort_of(rows, "SWR")
     constant = cohort[("rat2", "20200101", "02_r1")]
     assert len(constant.rows["D"]) == len(constant.rows["A"])
-    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="session")
     fit = vr.fit_visit_rate(
         cohort, model="D", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -738,73 +725,6 @@ def test_a_real_fit_refuses_provisional_penalties(make_visit_rows, cohort_of) ->
         vr.CalibratedPenalty(1.0, 6.0, {})
 
 
-# --- The third clock's rule ----------------------------------------------------
-
-
-@pytest.mark.parametrize(("two_stretch_share", "keep"), [(0.0, False), (1.0, True)])
-def test_third_clock_rule(make_visit_rows, cohort_of, two_stretch_share, keep) -> None:
-    """With one stretch per visit the stretch clock is the leaving clock in
-    every bin: the rule drops ``f_m``. With two stretches in every visit
-    (about half the at-risk time before a small movement) it keeps it."""
-    cohort, _ = _planted_cohort(
-        make_visit_rows,
-        cohort_of,
-        lambda rows, total: scenarios.no_effect(rows, CLOCKS, total=total),
-        n_sessions=3,
-        n_visits=80,
-        total=600.0,
-        seed=40,
-        two_stretch_share=two_stretch_share,
-    )
-    fit = vr.fit_visit_rate(
-        cohort, model="A", kind="SWR", settings=DEFAULT, allow_provisional="test"
-    )
-    decision = vr.third_clock_decision(fit.records)
-    assert decision.keep is keep
-    assert decision.n_sessions == 3
-    assert decision.share == (0.0 if keep else 1.0)
-
-
-@pytest.mark.parametrize(("n_flagged", "keep"), [(1, True), (2, False)])
-def test_third_clock_rule_at_its_boundary(
-    make_visit_rows, cohort_of, n_flagged, keep
-) -> None:
-    """Five sessions, ``n_flagged`` of them with ``f_m`` not separable: a
-    share of exactly 20 % keeps the clock, 40 % removes it."""
-    cohort, _ = _planted_cohort(
-        make_visit_rows,
-        cohort_of,
-        lambda rows, total: scenarios.no_effect(rows, CLOCKS, total=total),
-        n_sessions=1,
-        n_visits=60,
-        total=400.0,
-        seed=41,
-    )
-    fit = vr.fit_visit_rate(
-        cohort, model="A", kind="SWR", settings=DEFAULT, allow_provisional="test"
-    )
-    (record,) = fit.records
-    stretch, leaving = f"s({vr.STRETCH})", f"s({vr.LEAVING})"
-
-    def measured(name: str, estimate: float) -> dict:
-        return {**record.collinearity[name], "estimate": estimate}
-
-    records = [
-        dataclasses.replace(
-            record,
-            collinearity={
-                **record.collinearity,
-                stretch: measured(stretch, 0.9 if i < n_flagged else 0.1),
-                leaving: measured(leaving, 0.1),
-            },
-        )
-        for i in range(5)
-    ]
-    decision = vr.third_clock_decision(records)
-    assert decision.share == pytest.approx(n_flagged / 5)
-    assert decision.keep is keep and decision.n_sessions == 5
-
-
 # --- Calibration ---------------------------------------------------------------
 
 
@@ -818,7 +738,7 @@ def test_calibration_reaches_its_target(make_visit_rows, cohort_of) -> None:
         total=600.0,
         seed=50,
     )
-    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="session")
     found = vr.calibrate_log_penalty(
         cohort,
         model="A",
@@ -938,7 +858,7 @@ def test_fit_by_from_the_one_setting(make_visit_rows, cohort_of) -> None:
         vr.VisitRateSettings(fit_by="week")
     cohort = _two_session_days(make_visit_rows, cohort_of)
     for fit_by, n_units in (("session", 4), ("day", 2), ("animal", 2)):
-        settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
+        settings = vr.VisitRateSettings(fit_by=fit_by)
         fit = vr.fit_visit_rate(
             cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
         )
@@ -951,7 +871,7 @@ def test_day_fit_has_one_intercept_per_session(make_visit_rows, cohort_of) -> No
     the day, the curves and the reward coefficient shared; the cohort counts
     are the sum of the day's sessions' counts."""
     cohort = _two_session_days(make_visit_rows, cohort_of)
-    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="day")
+    settings = vr.VisitRateSettings(fit_by="day")
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -981,7 +901,7 @@ def test_model_d_identified_on_the_unit(make_visit_rows, cohort_of) -> None:
     cohort = _two_session_days(
         make_visit_rows, cohort_of, p_rewards=(0.6, 1.0, 1.0, 1.0)
     )
-    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="session")
+    settings = vr.VisitRateSettings(fit_by="session")
     by_session = vr.fit_visit_rate(
         cohort, model="D", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -1021,21 +941,10 @@ def test_model_d_identified_on_the_unit(make_visit_rows, cohort_of) -> None:
         assert a.cohort_counts["bins_D"] == d.cohort_counts["bins_D"]
 
 
-def test_third_clock_rule_counts_units(make_visit_rows, cohort_of) -> None:
-    """The third clock's rule is judged on the units' fits: two days, two
-    measured units."""
-    cohort = _two_session_days(make_visit_rows, cohort_of)
-    settings = vr.VisitRateSettings(fit_by="day")
-    fit = vr.fit_visit_rate(
-        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
-    )
-    assert vr.third_clock_decision(fit.records).n_sessions == 2
-
-
 def test_calibration_at_the_unit(make_visit_rows, cohort_of) -> None:
     """The calibration fits at the setting's unit: one edf per day."""
     cohort = _two_session_days(make_visit_rows, cohort_of)
-    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="day")
+    settings = vr.VisitRateSettings(fit_by="day")
     found = vr.calibrate_log_penalty(
         cohort,
         model="A",
@@ -1066,7 +975,6 @@ def test_the_by_outcome_form_is_the_declared_form() -> None:
         vr.OMITTED_ARRIVAL_TERM,
         vr.REWARDED_ARRIVAL_TERM,
         vr.LEAVING,
-        vr.STRETCH,
     )
 
 
@@ -1122,7 +1030,7 @@ def test_the_by_outcome_form_recovers_a_later_onset(make_visit_rows, cohort_of) 
         key,
         cohort_of(rows.assign(count=truth.expected), "SWR"),
         model="A",
-        settings=dataclasses.replace(DEFAULT, include_stretch_clock=False),
+        settings=DEFAULT,
         allow_provisional="test",
     )
     (record,) = fit.records

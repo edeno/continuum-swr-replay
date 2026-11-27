@@ -1028,6 +1028,7 @@ b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled;
    round). Open: the reference window of Q1; the flexibility (penalty) of the leaving clock, and of the
    other clocks; the reward effect as one coefficient or as a contrast of two arrival curves (whether it
    may change with time since arrival); whether the model covers a declared time range.
+   *(The third clock: decided 2026-11-26, the twenty-seventh round: two clocks, no third clock.)*
 c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
 d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
    has an absolute floor.)*
@@ -1187,6 +1188,26 @@ outcome and window a contrast reads, the unit's visits with a row there and thei
 supported when every read has at least `support.MIN_UNITS` (5) visits; the counts are recorded beside
 each value, and a value without support is kept, marked and left out of the reduction. The difference
 curve is `visit_rate_statistics.difference_curves`, with its bands.
+
+### Twenty-seventh round (lead, 2026-11-26, 19:15): the rate model has two clocks
+
+The question, as the coordinator put it to the lead: "The code has a third clock, the time until the end
+of the immobile stretch. It is on by default, with a rule that drops it when it cannot be separated from
+the others. Your decision record's formula has two clocks, and the `bam` simulations left the third one
+out. [...] Do you want the third clock in the model?"
+
+The lead's words: "no just two".
+
+What the lead decided: the rate model's clocks are the time since arrival and the time until leaving. The
+third clock (the time until the end of the immobile stretch, `f_m`) and its drop rule
+(`visit_rate.third_clock_decision`) leave the model, with the scenario that planted a curve on it.
+
+What it changes: the third-clock question of item b of "Open after the twenty-third round" and of the
+plan (`phase-5a-rate-models.md`, the rule for the third clock) is decided. The twenty-sixth round's formula
+already has two clocks. The change moves the rate model's results at every unit against any earlier run
+that had the third clock: the earlier scenario runs on master's default had it; the `bam` trials did not.
+The time-bin table keeps its column `time_until_stretch_end_s`; no model reads it now (the author's note:
+whether the table keeps it is for the lead).
 
 ## 10. Left to the builder
 

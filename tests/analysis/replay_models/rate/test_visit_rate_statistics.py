@@ -20,7 +20,6 @@ from continuum_swr_replay.analysis.replay_models.rate.visit_rate_statistics impo
     lag_curve_band,
     lag_curves,
     summarize_estimands,
-    third_clock_q7a,
     unit_estimands,
 )
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
@@ -29,7 +28,7 @@ CLOCKS = scenarios.PlantedClocks(
     arrival=lambda s: 1.5 * (1.0 - np.exp(-np.asarray(s) / 1.5)),
     leaving=lambda u: -1.0 * np.exp(-np.asarray(u) / 0.3),
 )
-SETTINGS = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
+SETTINGS = vr.VisitRateSettings(fit_by="session")
 
 
 @pytest.fixture
@@ -183,58 +182,6 @@ def test_lag_curves_and_their_band(cohort) -> None:
         unit_estimands(fit)
 
 
-def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> None:
-    """A drop on the leaving clock only, in visits of one or two stretches:
-    Q7a of each fit is its own session value, the difference is with less
-    without, and each summary is ``estimand_summary`` of its column."""
-    rng = np.random.default_rng(8)
-    cohort = {}
-    for i in range(3):
-        key = (f"rat{i}", "20200101", "02_r1")
-        rows = make_visit_rows(key, n_visits=80, seed=80 + i)
-        truth = scenarios.drop_before_leaving(
-            rows, CLOCKS.arrival, drop=1.0, total=800.0
-        )
-        rows["count"] = rng.poisson(truth.expected).astype(float)
-        cohort[key] = cohort_of(rows, "SWR")
-    fits = {
-        include: vr.fit_visit_rate(
-            cohort,
-            model="A",
-            kind="SWR",
-            settings=vr.VisitRateSettings(
-                fit_by="session", include_stretch_clock=include
-            ),
-            allow_provisional="test",
-        )
-        for include in (True, False)
-    }
-    compared = third_clock_q7a(fits[True], fits[False], n_draws=200, seed=2)
-    sessions = compared.units
-    assert len(sessions) == 3 and (sessions["kind"] == "SWR").all()
-    for include, column in ((True, "with_stretch"), (False, "without_stretch")):
-        q7a = unit_estimands(fits[include])
-        q7a = q7a[q7a["estimand_id"] == "Q7a"]["estimate"].to_numpy()
-        assert sessions[column].to_numpy() == pytest.approx(q7a)
-    assert sessions["difference"].to_numpy() == pytest.approx(
-        sessions["with_stretch"] - sessions["without_stretch"]
-    )
-    summary = compared.summary.set_index("value")
-    for column in ("with_stretch", "without_stretch", "difference"):
-        expected = estimand_summary(
-            sessions[column],
-            sessions["animal"],
-            sessions["session_date"],
-            sessions["epoch"],
-            n_draws=200,
-            seed=2,
-        )
-        for name, value in expected.items():
-            assert summary.loc[column, name] == pytest.approx(value, nan_ok=True)
-    with pytest.raises(ValueError, match="does not"):
-        third_clock_q7a(fits[False], fits[True], n_draws=10, seed=0)
-
-
 def _two_days(make_visit_rows, cohort_of) -> dict:
     """Two animals of two days, each day two sessions, counts from a constant
     ratio of 1.3."""
@@ -266,7 +213,7 @@ def test_unit_estimands_at_each_unit(
     baseline copies are not read), with its window support beside it; the
     summary is ``unit_summary`` at the unit."""
     cohort = _two_days(make_visit_rows, cohort_of)
-    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
+    settings = vr.VisitRateSettings(fit_by=fit_by)
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -321,7 +268,7 @@ def test_values_of_mixed_units_are_refused(make_visit_rows, cohort_of) -> None:
     cohort = _two_days(make_visit_rows, cohort_of)
     tables = []
     for fit_by in ("day", "animal"):
-        settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
+        settings = vr.VisitRateSettings(fit_by=fit_by)
         fit = vr.fit_visit_rate(
             cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
         )
@@ -359,7 +306,7 @@ def test_an_unsupported_window_is_marked_and_left_out(
         truth = scenarios.constant_ratio(rows, CLOCKS, log_ratio=0.3, total=500)
         rows["count"] = rng.poisson(truth.expected).astype(float)
         cohort[key] = cohort_of(rows, "SWR")
-    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="session")
+    settings = vr.VisitRateSettings(fit_by="session")
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )

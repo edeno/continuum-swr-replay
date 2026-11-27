@@ -597,8 +597,8 @@ median of its rows and 5 have a row below it; a constant column fails. The units
 rule are in the module docstring. No share of sessions failing the rule drops a term
 from the model (the function that computed it, `terms_failing_share`, was never called and
 was removed on 2026-11-24); the constant `MAX_FAILING_SHARE` remains, because the penalty
-search and the rate model's third-clock decision (`visit_rate.third_clock_decision`) read
-it.
+search reads it (the rate model's third-clock decision read it too until the third clock
+left the model, 2026-11-26).
 A smooth and a lag functional have no counts; every term is judged by the design check.
 A smooth or a lag functional whose columns are zero on every row of a session (a smooth by
 a level the session has no rows of, as visit-rate model A's arrival curve after an
@@ -685,10 +685,11 @@ terms and model D's lag curve. A unit's record holds its sessions' cohort counts
 (a nested count summed by its keys, a flag kept once). Model D's identifiability is
 judged on the unit's rows, with each session's intercept (`visit_rate.lag_curve_counts`):
 a session whose outcomes are all the same cannot identify the lag curve alone, but it can
-inside a day whose other sessions vary. The third clock's rule counts units, and
+inside a day whose other sessions vary. The model has two clocks, the time since arrival
+and the time until leaving (lead, 2026-11-26: "no just two"), and
 `calibration.log_penalty_for_edf(..., fit_by=)` takes the median edf over the units' fits.
-At `fit_by="session"` every record of the coefficient form and of model D equals master's
-(70a64c42), field by field.
+At `fit_by="session"` every record of the coefficient form and of model D equalled master's
+(70a64c42) field by field, with master's third clock (proved before it left the model).
 
 The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
 two smooths of the arrival clock `by` the last outcome (`Smooth(..., by=Category(...),

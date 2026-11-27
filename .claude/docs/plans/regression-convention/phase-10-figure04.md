@@ -31,7 +31,7 @@ colors of the kinds), [C10](shared-contracts.md#c10-rebuilding-reported-values-a
 - **Design pass first** (design 8: "this plan is the starting point for the figure's own design pass"):
   draft the layout from the panel plan, one panel per question, SWR and No SWR drawn separately in every
   panel. Panel c's second half (rate against time until a small movement) is drawn from the model only if
-  Phase 5a kept `f_m`; otherwise from the model-free curves, labeled as such. Show the draft to the lead
+  *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)* Phase 5a kept `f_m`; otherwise from the model-free curves, labeled as such. Show the draft to the lead
   before polishing; the panel list may change.
 - **Script** `scripts/figures/generate_figure04.py` (new), following Figures 2, 3 and 5: read inputs through
   the analysis functions; one `draw_<panel>` function per panel; letters by a `place_letters` of the same

@@ -7,7 +7,7 @@ A scenario draws nothing and fits nothing: a simulation draws the counts from
 the expected ones and runs the real fit.
 
 In every scenario but the rate table, the log rate of a bin is ``b0 +
-f_s(s) + f_u(u) [+ f_m(m)] + g(s) * rewarded``: the omission side's clock
+f_s(s) + f_u(u) + g(s) * rewarded``: the omission side's clock
 curves (:class:`PlantedClocks`), and the effect of a reward ``g``, which may
 change with time since arrival. ``b0`` is set so that the session's expected
 total is ``total`` (when given; else ``b0 = 0``).
@@ -80,7 +80,6 @@ from .visit_rate import (
     RESPONSE,
     REWARD,
     SECONDARY_ESTIMAND,
-    STRETCH,
 )
 
 __all__ = [
@@ -96,7 +95,6 @@ __all__ = [
     "constant_ratio",
     "differing_ratio",
     "drop_before_leaving",
-    "drop_before_small_movements",
     "fading_ratio",
     "interpolated_curve",
     "later_onset_after_omission",
@@ -173,22 +171,16 @@ class PlantedClocks:
         ``f_s``, over time since arrival (s).
     leaving : callable
         ``f_u``, over time until leaving (s).
-    stretch : callable or None
-        ``f_m``, over time until the end of the stretch (s); None is flat.
     """
 
     arrival: LogCurve
     leaving: LogCurve
-    stretch: LogCurve | None = None
 
     def log_rate(self, rows: pd.DataFrame) -> np.ndarray:
-        """``f_s + f_u [+ f_m]`` at each row, shape ``(n_rows,)``."""
-        out = self.arrival(rows[ARRIVAL].to_numpy(dtype=float)) + self.leaving(
+        """``f_s + f_u`` at each row, shape ``(n_rows,)``."""
+        return self.arrival(rows[ARRIVAL].to_numpy(dtype=float)) + self.leaving(
             rows[LEAVING].to_numpy(dtype=float)
         )
-        if self.stretch is not None:
-            out = out + self.stretch(rows[STRETCH].to_numpy(dtype=float))
-        return out
 
     def curve_values(
         self, q1_reference_s: tuple[float, float] = _Q1.second
@@ -456,7 +448,7 @@ def _from_curves(
     q1_reference_s: tuple[float, float],
     planted_ratio: bool = True,
 ) -> Planted:
-    """The scenario ``log mu = b0 + f_s + f_u [+ f_m] + g(s) * rewarded``,
+    """The scenario ``log mu = b0 + f_s + f_u + g(s) * rewarded``,
     ``clocks`` the omission side's curves and ``effect`` ``g``, with both
     truths (module docstring)."""
     rewarded = _rewarded(rows)
@@ -624,7 +616,7 @@ def later_onset_after_omission(
     def effect(s: np.ndarray) -> np.ndarray:
         return clocks.arrival(np.asarray(s, dtype=float)) - delayed(s)
 
-    omission = PlantedClocks(delayed, clocks.leaving, clocks.stretch)
+    omission = PlantedClocks(delayed, clocks.leaving)
     return _from_curves(
         rows,
         omission,
@@ -645,14 +637,12 @@ def drop_before_leaving(
     q1_reference_s: tuple[float, float] = _Q1.second,
 ) -> Planted:
     """A drop of the log rate by ``drop`` in the last ``width_s`` before
-    leaving, on the leaving clock only, with no reward effect and no stretch
-    effect.
+    leaving, on the leaving clock only, with no reward effect.
 
     ``f_u(u) = -drop`` for ``u < width_s``, 0 after; planted Q7a is that
     step's range contrast (``-drop`` when the last window lies inside
     ``width_s`` and the reference window beyond it), Q1 the arrival curve's
-    and Q2 0. A model with the stretch clock may move part of the drop to
-    ``f_m``, since in a visit's last stretch the two clocks are equal.
+    and Q2 0.
     """
 
     def leaving(u: np.ndarray) -> np.ndarray:
@@ -661,37 +651,6 @@ def drop_before_leaving(
     return no_effect(
         rows,
         PlantedClocks(arrival, leaving),
-        total=total,
-        q1_reference_s=q1_reference_s,
-    )
-
-
-def drop_before_small_movements(
-    rows: pd.DataFrame,
-    arrival: LogCurve,
-    *,
-    drop: float,
-    width_s: float = 0.3,
-    total: float | None = None,
-    q1_reference_s: tuple[float, float] = _Q1.second,
-) -> Planted:
-    """A drop of the log rate by ``drop`` in the last ``width_s`` of every
-    immobile stretch, on the stretch clock only, with a flat leaving curve and
-    no reward effect.
-
-    ``f_m(m) = -drop`` for ``m < width_s``; ``f_u`` is flat, so planted Q7a
-    is 0, Q1 the arrival curve's and Q2 0. The visit's last stretch ends at
-    the final poke-out, so the rate drops before leaving too: a model must
-    give the drop to ``f_m``, or the third clock's rule must catch that it
-    cannot.
-    """
-
-    def stretch(m: np.ndarray) -> np.ndarray:
-        return np.where(np.asarray(m) < width_s, -float(drop), 0.0)
-
-    return no_effect(
-        rows,
-        PlantedClocks(arrival, _zero, stretch),
         total=total,
         q1_reference_s=q1_reference_s,
     )

@@ -62,15 +62,6 @@ def test_a_constant_ratio_and_the_session_total(rows) -> None:
     assert ratio[rewarded][0] / ratio[~rewarded][0] == pytest.approx(np.exp(0.5))
 
 
-def test_a_stretch_curve_enters_the_rate(rows) -> None:
-    clocks = scenarios.PlantedClocks(
-        LINEAR.arrival, LINEAR.leaving, stretch=lambda m: -np.asarray(m)
-    )
-    with_m = scenarios.no_effect(rows, clocks).expected
-    without = scenarios.no_effect(rows, LINEAR).expected
-    assert with_m / without == pytest.approx(np.exp(-rows[vr.STRETCH].to_numpy()))
-
-
 def test_a_fading_ratio(rows) -> None:
     """``g`` is the full log ratio before the fade, 0 after it. The window
     truths are the plain means of ``g`` over each window's grid (the fade
@@ -149,30 +140,20 @@ def test_a_later_onset_after_an_omission(rows) -> None:
     assert planted.by_outcome["Q7a"] == pytest.approx(2.75)
 
 
-def test_the_drops_before_leaving_and_before_small_movements(rows) -> None:
+def test_the_drop_before_leaving(rows) -> None:
     """A drop on the leaving clock only: Q7a is the drop (both windows of
-    Q7a on either side of the step); a drop on the stretch clock only: the
-    leaving curve is flat and Q7a is 0. Neither plants a reward effect."""
-    arrival = LINEAR.arrival
-    leaving = scenarios.drop_before_leaving(rows, arrival, drop=1.2, width_s=0.3)
+    Q7a on either side of the step); no reward effect is planted."""
+    leaving = scenarios.drop_before_leaving(rows, LINEAR.arrival, drop=1.2, width_s=0.3)
     u = rows[vr.LEAVING].to_numpy()
     s = rows[vr.ARRIVAL].to_numpy()
-    m = rows[vr.STRETCH].to_numpy()
     exposure = rows[vr.EXPOSURE].to_numpy()
     assert leaving.expected == pytest.approx(
         exposure * np.exp(0.4 * s - 1.2 * (u < 0.3))
     )
-    stretch = scenarios.drop_before_small_movements(
-        rows, arrival, drop=1.2, width_s=0.3
+    assert leaving.by_outcome == pytest.approx(
+        {"Q1": 1.0, "Q7a": -1.2, **_windows(0.0)}, abs=1e-9
     )
-    assert stretch.expected == pytest.approx(
-        exposure * np.exp(0.4 * s - 1.2 * (m < 0.3))
-    )
-    for planted, q7a in ((leaving, -1.2), (stretch, 0.0)):
-        assert planted.by_outcome == pytest.approx(
-            {"Q1": 1.0, "Q7a": q7a, **_windows(0.0)}, abs=1e-9
-        )
-        assert planted.pooled == pytest.approx({COEF: 0.0}, abs=1e-9)
+    assert leaving.pooled == pytest.approx({COEF: 0.0}, abs=1e-9)
 
 
 def _poisson_steps(
