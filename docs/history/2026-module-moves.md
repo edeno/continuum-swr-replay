@@ -1045,11 +1045,11 @@ difference curve, `reward_form="time_varying"`, was decided against and is remov
 
 | Old place | New place | Commit |
 |---|---|---|
-| `rate/visit_rate.REWARD_FORMS` value `"time_varying"` and its branch of `model_terms` and `tested_terms` (removed) | `REWARD_FORMS` value `"by_outcome"`, the default: `OMITTED_ARRIVAL_TERM`, `REWARDED_ARRIVAL_TERM` (now the by-outcome form's curve after a reward), `ARRIVAL_BY_OUTCOME`, each curve at its own penalty | this section's commit |
-| `declared_tests` Q2 as `CoefficientContrast(plus=("last_outcome_rewarded",))` | Q2 as `OutcomeWindowContrast` over `Q2_WINDOW_S` (4 to 10 s); the new `Q2-onset` over `ONSET_WINDOW_S` (2 to 4 s); Q1 reads `s(time_since_visit_start_s):last_outcome_rewarded=0` | this section's commit |
-| the coefficient form's Q1, Q2 and Q7a (`visit_rate.declared_contrasts` of `reward_form="coefficient"`) | the coefficient form gives `visit_rate.SECONDARY_ESTIMAND` (`"reward_coefficient"`) only | this section's commit |
-| `rate/visit_rate_scenarios.Planted.omission_side` (Q2: the mean of the effect over the rewarded rows), `TRUTH_OF_FORM["time_varying"]` (removed) | `Planted.by_outcome` (Q1, Q7a, and Q2 and Q2-onset as the means of the effect over the windows, `window_means`, `WINDOWS`); `TRUTH_OF_FORM["by_outcome"]` | this section's commit |
-| `Planted.pooled`'s Q1, Q2 and Q7a | `Planted.pooled` holds the reward coefficient's projection alone, keyed `SECONDARY_ESTIMAND` | this section's commit |
+| `rate/visit_rate.REWARD_FORMS` value `"time_varying"` and its branch of `model_terms` and `tested_terms` (removed) | `REWARD_FORMS` value `"by_outcome"`, the default: `OMITTED_ARRIVAL_TERM`, `REWARDED_ARRIVAL_TERM` (now the by-outcome form's curve after a reward), `ARRIVAL_BY_OUTCOME`, each curve at its own penalty | d464e255 |
+| `declared_tests` Q2 as `CoefficientContrast(plus=("last_outcome_rewarded",))` | Q2 as `OutcomeWindowContrast` over `Q2_WINDOW_S` (4 to 10 s); the new `Q2-onset` over `ONSET_WINDOW_S` (2 to 4 s); Q1 reads `s(time_since_visit_start_s):last_outcome_rewarded=0` | d464e255 |
+| the coefficient form's Q1, Q2 and Q7a (`visit_rate.declared_contrasts` of `reward_form="coefficient"`) | the coefficient form gives `visit_rate.SECONDARY_ESTIMAND` (`"reward_coefficient"`) only | d464e255 |
+| `rate/visit_rate_scenarios.Planted.omission_side` (Q2: the mean of the effect over the rewarded rows), `TRUTH_OF_FORM["time_varying"]` (removed) | `Planted.by_outcome` (Q1, Q7a, and Q2 and Q2-onset as the means of the effect over the windows, `window_means`, `WINDOWS`); `TRUTH_OF_FORM["by_outcome"]` | d464e255 |
+| `Planted.pooled`'s Q1, Q2 and Q7a | `Planted.pooled` holds the reward coefficient's projection alone, keyed `SECONDARY_ESTIMAND` | d464e255 |
 | the identification of model D's lag curve per session inside `rate/visit_rate.model_d_rows`, and its counts in `CohortRows.counts` | `visit_rate.lag_curve_counts`, judged on the rows of the unit of the fit at `fit_visit_rate`; the counts are in each record's `cohort_counts` | 7b1811db |
 | `rate/visit_rate._session_rows` | `visit_rate._unit_rows` (the sessions' rows and each unit's counts) | 7b1811db |
-| `rate/visit_rate_simulation` table columns `truth_session`, `truth_omission_side` | `truth_by_outcome`, `truth_pooled` | this section's commit |
+| `rate/visit_rate_simulation` table columns `truth_session`, `truth_omission_side` | `truth_by_outcome`, `truth_pooled` | d464e255 |

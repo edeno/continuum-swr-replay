@@ -19,7 +19,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the fitting loop, one fit for each unit of the fit, and the row rule for an inactive level |
-| `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
+| `calibration.py` | the declared log penalty of a smooth: the one at which its median edf over the units of the fit (`fit_by`) is a target |
 | `record.py` | the fit-row record (one per unit of the fit, with its sessions) and the closed set of causes of a fit not kept |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
@@ -601,9 +601,9 @@ search and the rate model's third-clock decision (`visit_rate.third_clock_decisi
 it.
 A smooth and a lag functional have no counts; every term is judged by the design check.
 A smooth or a lag functional whose columns are zero on every row of a session (a smooth by
-a level the session has no rows of, as visit-rate model A's time-varying reward smooth in
-a session without a rewarded visit) fails the support rule there and is inactive, as a
-slope by that level is. Before, its columns escaped the design check (which measures only
+a level the session has no rows of, as visit-rate model A's arrival curve after an
+omission in a unit without an omission visit) fails the support rule there and is
+inactive, as a slope by that level is. Before, its columns escaped the design check (which measures only
 sizes above zero) and the first fit found the design not identified, an error that
 stopped the whole loop (`test_sessions.py::test_a_smooth_by_a_level_a_session_lacks_fails_its_support`).
 A smooth by a level the session has rows of, however few, stays in the fit: see
@@ -674,6 +674,34 @@ A unit of one session is the per-session fit, bit for bit: the stored per-sessio
 references pass unedited (`scripts/checks/_regression_reference.py::_records` checks that
 `fit_by` is `"session"` and that `sessions` repeats the record's own session before it
 leaves the two fields out of the comparison).
+
+**The rate model's use of the loop** (`analysis/replay_models/rate/visit_rate.py`, built
+2026-11-26). `VisitRateSettings.fit_by` holds one unit for each run: a value of
+`fit_by.BEHAVIOR_FIT_BY` (the day, the default, or the animal; the twenty-fourth round),
+or the session, the earlier design, for the validation and comparison. The intercept is
+the baseline of models A and D (`declared_tests.BASELINES`), so each session keeps its
+own intercept and every other term is shared in the unit: the clock curves, the reward
+terms and model D's lag curve. A unit's record holds its sessions' cohort counts, summed
+(a nested count summed by its keys, a flag kept once). Model D's identifiability is
+judged on the unit's rows, with each session's intercept (`visit_rate.lag_curve_counts`):
+a session whose outcomes are all the same cannot identify the lag curve alone, but it can
+inside a day whose other sessions vary. The third clock's rule counts units, and
+`calibration.log_penalty_for_edf(..., fit_by=)` takes the median edf over the units' fits.
+At `fit_by="session"` every record of the coefficient form and of model D equals master's
+(70a64c42), field by field.
+
+The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
+two smooths of the arrival clock `by` the last outcome (`Smooth(..., by=Category(...),
+levels=(0,))` and `levels=(1,)`), each its own term with its own sum-to-zero constraint
+(on the pooled rows of its outcome) and its own penalty block, beside the outcome slope
+(the weak penalty) and the shared leaving curve. The outcome slope and the two centered
+curves identify the difference curve `beta + f_1(s) - f_0(s)`; the declared window
+contrasts read it (`visit_rate.window_contrast`). In a unit with no visit after an
+omission the curve after an omission has zero columns and fails the support rule, the
+outcome slope fails it too, and the unit is fitted (no shared arrival curve is collinear
+with the other). With 1 to 4 such visits the slope fails and the curve stays: the known
+issue `docs/known_issues/smooth_by_a_thin_level.md`, which the rate model's window support
+rule (`visit_rate.window_support`, the author's rule) covers for the values it reports.
 
 A session's design is built once, on all its rows; one mask with one reason code per row
 removed says which rows are kept, and the kept rows' design is a slice. Measured on
@@ -916,7 +944,14 @@ model needs its own columns, `table(result, simulation)`. The phase adds the mod
 `simulation` as `config` for a list of several runs) and writes `<model>.parquet` (or
 `<model>_<config stem>.parquet`) with the seed, the commit and each model's declared
 penalties in its `attrs`. The visit rate model's list is
-`analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`). The first list is the declared-penalty
+`analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`): one run
+fits the same draws at the session, the day and the animal (one model per unit and prior
+SD, `<fit_by>_sd<SD>`), in one reward form (the by-outcome form's declared tests, or the
+coefficient form's secondary value: the engine fits one design at a time), with each
+curve's penalty calibrated at each unit to a declared target edf (`CLOCK_TARGETS`, the
+author's settings, not validated) when `calibrate` is set. Its window truths
+(`visit_rate_scenarios.window_means`) are the plain means of the planted reward effect
+over each window, in closed form; `planted_unit` covers the rest. The first list is the declared-penalty
 check, `scripts/checks/simulate_declared_penalty.py` (a synthetic cohort; one model per
 target edf). Fixed-seed tables are stored in
 `tests/analysis/regression/data/numpy_reference/simulation_*.json`, so that a change of

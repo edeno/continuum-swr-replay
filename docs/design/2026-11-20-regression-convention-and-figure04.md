@@ -1175,6 +1175,19 @@ This round changes the declared Q2, which was the one coefficient (`declared_tes
 open "form of the reward effect" of `visit_rate.REWARD_FORMS` and of item b above (whether the reward
 effect may change with time since arrival: it may, along the arrival clock only).
 
+**Built (2026-11-26, branch `rate-reward-form`; the author's note, not the lead's words).** The form
+is `visit_rate.REWARD_FORMS`' `"by_outcome"`, the default (`OMITTED_ARRIVAL_TERM`,
+`REWARDED_ARRIVAL_TERM`: each a smooth of the arrival clock `by` the last outcome, with its own
+constraint and penalty); `"time_varying"` is removed and `"coefficient"` stays for the secondary value
+(`visit_rate.SECONDARY_ESTIMAND`, `"reward_coefficient"`). The two tests are `declared_tests` Q2
+(`Q2_WINDOW_S`, 4 to 10 s) and `Q2-onset` (`ONSET_WINDOW_S`, 2 to 4 s; the id is the author's, after
+the convention of `Q5b-var`), both `OutcomeWindowContrast`; Q1 reads the arrival curve after an
+omission. The support rule of a window (the author's rule, `visit_rate.window_support`): for each
+outcome and window a contrast reads, the unit's visits with a row there and their at-risk seconds;
+supported when every read has at least `support.MIN_UNITS` (5) visits; the counts are recorded beside
+each value, and a value without support is kept, marked and left out of the reduction. The difference
+curve is `visit_rate_statistics.difference_curves`, with its bands.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
