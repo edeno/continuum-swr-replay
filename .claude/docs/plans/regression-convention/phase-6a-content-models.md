@@ -51,7 +51,7 @@ tested together in one model with the trial number
 well's arm), ASK-1 (lead: "Move them": the ContFrag SWR- and MUA-sourced events are two more event sources of
 this runner), C14.
 
-**Decided at this phase** (design, twenty-fourth round): the lead's words, 2026-11-23, 18:17: "do option
+**Decided at this phase** (design, twenty-eighth round): the lead's words, 2026-11-23, 18:17: "do option
 B". The rest of this paragraph is the author's reading and text, not the lead's words. The recency curve
 and the never-visited indicator cover the other leaf arms only; the role terms carry everything for the
 current and previous arms (every current-arm row has recency 1 trial and every previous-arm row 2); Q5a
@@ -141,7 +141,7 @@ identifiability test" below), since scratch is not kept.
   missing covariate in the cohort step (counted per kind) -> terms:
   `Category(arm)` (arm fixed effects) + `Category(role)` + `Smooth(reward_fraction, 0, 1, 6, by=role)` +
   `Slope(value, by=role)` + `Smooth(log_recency, log 1, log 200)` and the never-visited indicator on the
-  other-leaf rows only (design, twenty-fourth round: the lead, 2026-11-23, 18:17, "do option B") +
+  other-leaf rows only (design, twenty-eighth round: the lead, 2026-11-23, 18:17, "do option B") +
   `Smooth(u, 0, 3)` for the current role (Q7b). The three `Smooth` terms are P-splines at declared
   fixed log penalties (gate item 2); their ranges stay. Two variants per model: length-unadjusted, and
   length-adjusted (every role term and role slope interacting with `log(duration) - L0`, `L0` the pooled

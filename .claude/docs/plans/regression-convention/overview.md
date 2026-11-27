@@ -109,13 +109,13 @@ and after the port); the lead was told it and did not object (design, twenty-fir
     recommend?"; the author recommended the order above; the lead, 13:21: "ok". The open question on the
     port's CPU speed is closed, and the entry condition of Phase 2c is met.
 
-12. **The content models' recency curve covers the other leaf arms only** (twenty-fourth round). After
+12. **The content models' recency curve covers the other leaf arms only** (twenty-eighth round). After
     the explanation of the two options and their simulation, the lead's words, 2026-11-23, 18:17: "do
     option B". The author's reading, not the lead's words: the role terms carry everything for the current
     and previous arms; Q3a and Q3b compare with an average other leaf arm, and "current arm" cannot be
     separated from "most recently visited arm" (the author proposes the paper says so). Shown before the
     decision: under option B the current-arm term cannot tell recency alone from a role effect, and the
-    recency test moves with the settings (design, twenty-fourth round). Phase 6a; its other questions stay
+    recency test moves with the settings (design, twenty-eighth round). Phase 6a; its other questions stay
     open.
 
 **Open** (each with its evidence in the design, "Open after the twenty-third round"; a phase that

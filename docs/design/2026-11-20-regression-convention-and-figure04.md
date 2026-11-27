@@ -956,7 +956,9 @@ The lead: "ok".
   The prototype had one coefficient near zero (about 4e-4) at a relative difference of 5.4e-9. The author
   told the lead, and the lead did not object.
 
-### Twenty-fourth round (lead, 2026-11-23, 18:17): the recency curve covers the other leaf arms only
+### Twenty-eighth round (lead, 2026-11-23, 18:17): the recency curve covers the other leaf arms only
+
+(This round is numbered by when it reached master and placed by its date.)
 
 The author explained the two options for the rows of the content models' recency curve and its
 never-visited indicator: option A, one curve over every leaf arm (current and previous included); option
@@ -997,11 +999,13 @@ words:
   visited arm, so "current arm" cannot be separated from "most recently visited arm".
 
 The other content questions stay open as they are (Phase 6a's list).
+
 ### Twenty-fifth round (lead, 2026-11-23, 19:19 to 19:34): the reward term of the rate model
 
 (Master's twenty-fourth round is the unit of the fit, 2026-11-24, below; this round is placed by its
 date, before it. The content model's recency round, numbered twenty-fourth on the branch
-`role-content-models`, is renumbered when that branch merges.)
+`role-content-models`, became the twenty-eighth when that branch merged; it is above, placed by its
+date.)
 
 What was shown to the lead: the realistic simulation of the weak penalty at prior SD 4, 2 and 1
 (`.claude/research/2026-11-20-regression-prototypes/proto_rate_realistic/REPORT.md`: every session gets

@@ -453,7 +453,7 @@ master.
 - `designs.md`: the fitter's interface (`fit_sessions(..., fit_by)`).
 - `legacy-inventory.md`: rows for the removals of "Order of work", item 4.
 - The design, `docs/design/2026-11-20-regression-convention-and-figure04.md`: a new round (the
-  twenty-sixth; the rate branch adds the twenty-fifth and the content branch the twenty-fourth) with the
+  twenty-sixth; the rate branch adds the twenty-fifth and the content branch's round is the twenty-eighth) with the
   lead's 2026-11-24 words, a note on its fourteenth and seventeenth rounds ("one fit for each session")
   that this round changes them, and the open questions above in "Open after".
 - `docs/README.md`: an index line for `docs/design/2026-11-24-unit-of-fit.md`.
