@@ -25,7 +25,7 @@ CLOCKS = scenarios.PlantedClocks(
     arrival=lambda s: 1.5 * (1.0 - np.exp(-np.asarray(s) / 1.5)),
     leaving=lambda u: -1.0 * np.exp(-np.asarray(u) / 0.3),
 )
-SETTINGS = vr.VisitRateSettings(include_stretch_clock=False)
+SETTINGS = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
 
 
 @pytest.fixture
@@ -188,7 +188,9 @@ def test_q7a_with_and_without_the_third_clock(make_visit_rows, cohort_of) -> Non
             cohort,
             model="A",
             kind="SWR",
-            settings=vr.VisitRateSettings(include_stretch_clock=include),
+            settings=vr.VisitRateSettings(
+                fit_by="session", include_stretch_clock=include
+            ),
             allow_provisional="test",
         )
         for include in (True, False)

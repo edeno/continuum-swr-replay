@@ -1,18 +1,20 @@
 """The declared log penalty of a smooth term: the one that gives a target edf.
 
-A per-session smooth term is fitted at one fixed log penalty, declared in the
-model and the same in every session; no penalty is chosen from the data for a
-per-session fit. :func:`log_penalty_for_edf` finds that value once, on the
-model's sessions: the log penalty at which the median over sessions of the
-term's effective degrees of freedom (edf) equals a target, every other
-penalty held at its declared value. The caller writes the value into the
-model's term as a constant.
+A smooth term is fitted at one fixed log penalty, declared in the model and
+the same in every unit of the fit; no penalty is chosen from the data.
+:func:`log_penalty_for_edf` finds that value once, on the model's sessions
+fitted at the model's unit (``fit_by``: a session, a recording day or an
+animal): the log penalty at which the median over the units of the term's
+effective degrees of freedom (edf) equals a target, every other penalty held
+at its declared value. The caller writes the value into the model's term as a
+constant.
 
-Each session is fitted by :func:`.sessions.fit_sessions`, the loop the model
-itself uses (its support rule, its rows and its refits), and the edf is the
-one its records hold. The median is over the sessions with a kept fit in which
-the term is fitted, so the set of sessions can change with the penalty: a
-session whose fit is not kept at one penalty drops out of the median there.
+Each unit is fitted by :func:`.sessions.fit_sessions` at that ``fit_by``, the
+loop the model itself uses (its support rule, its rows and its refits), and
+the edf is the one its records hold. The median is over the units with a kept
+fit in which the term is fitted, so the set of units can change with the
+penalty: a unit whose fit is not kept at one penalty drops out of the median
+there. At ``fit_by="session"`` each unit is one session, as before.
 It is searched by bisection on the log penalty inside ``LOG_PENALTY_BOUNDS``,
 assuming that the median edf falls as the penalty rises; the search is
 deterministic. A bound is fitted only when the bracket ends there, to tell
@@ -30,6 +32,8 @@ from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.tables.session_keys import FitBy
 
 from .constants import (
     CALIBRATION_EDF_TOL,
@@ -53,15 +57,16 @@ class EdfCalibration(NamedTuple):
         The middle of the bisection's last bracket, narrower than
         ``CALIBRATION_LOG_PENALTY_TOL``.
     median_edf : float
-        The median over sessions of the term's edf at ``log_penalty``, within
-        ``CALIBRATION_EDF_TOL`` of the target.
+        The median over the units of the term's edf at ``log_penalty``,
+        within ``CALIBRATION_EDF_TOL`` of the target.
     n_sessions_used : int
-        The sessions the median is over: those with a kept fit in which the
-        term is fitted at ``log_penalty``.
-    edf : pd.Series, shape (n_sessions,)
-        Each session's edf of the term at ``log_penalty``, indexed by the
-        session keys in the order given; NaN for a session without a kept
-        fit or in which the term is not fitted.
+        The units the median is over (sessions at ``fit_by="session"``):
+        those with a kept fit in which the term is fitted at ``log_penalty``.
+    edf : pd.Series, shape (n_units,)
+        Each unit's edf of the term at ``log_penalty``, indexed by the units'
+        keys (``tables.session_keys.unit_key``) in the order of their first
+        session given; NaN for a unit without a kept fit or in which the term
+        is not fitted.
     """
 
     log_penalty: float
@@ -77,8 +82,9 @@ def _term_edf(
     term: str,
     response: str,
     unit: str,
+    fit_by: FitBy,
 ) -> pd.Series:
-    """Each session's edf of ``term`` at the design's log penalties; NaN where
+    """Each unit's edf of ``term`` at the design's log penalties; NaN where
     the fit is not kept or the term is not fitted."""
     names = [design.coef_names[j] for j in design.by_name[term].columns]
     records = fit_sessions(
@@ -90,6 +96,7 @@ def _term_edf(
         response=response,
         unit=unit,
         table_sha256={},
+        fit_by=fit_by,
     )
     edf = [
         r.edf[term]
@@ -97,7 +104,8 @@ def _term_edf(
         else np.nan
         for r in records
     ]
-    return pd.Series(edf, index=pd.Index(list(sessions)), dtype=float, name=term)
+    index = pd.Index([r.unit_key for r in records])
+    return pd.Series(edf, index=index, dtype=float, name=term)
 
 
 def log_penalty_for_edf(
@@ -109,9 +117,10 @@ def log_penalty_for_edf(
     target_edf: float,
     response: str,
     unit: str,
+    fit_by: FitBy = "session",
 ) -> EdfCalibration:
-    """The log penalty of ``term`` at which its median edf over sessions is
-    ``target_edf`` (module docstring).
+    """The log penalty of ``term`` at which its median edf over the units of
+    the fit is ``target_edf`` (module docstring).
 
     Parameters
     ----------
@@ -131,6 +140,9 @@ def log_penalty_for_edf(
         P-spline, the line).
     response, unit : str
         As :func:`.sessions.fit_sessions` takes them.
+    fit_by : {"session", "day", "animal"}
+        The unit of the fit, as :func:`.sessions.fit_sessions` takes it: the
+        median is over its units.
 
     Returns
     -------
@@ -172,10 +184,11 @@ def log_penalty_for_edf(
             term,
             response,
             unit,
+            fit_by=fit_by,
         )
         if edf.isna().all():
             raise ValueError(
-                f"no session has a kept fit with {term!r} at log penalty {log_penalty}"
+                f"no {fit_by} has a kept fit with {term!r} at log penalty {log_penalty}"
             )
         return edf
 
@@ -206,7 +219,7 @@ def log_penalty_for_edf(
     if abs(median_edf - target_edf) > CALIBRATION_EDF_TOL:
         raise ValueError(
             f"the median edf of {term!r} at log penalty {log_penalty:.6g} is "
-            f"{median_edf:.4g}, over {n_used} of {edf.size} sessions; it differs "
+            f"{median_edf:.4g}, over {n_used} of {edf.size} units ({fit_by}); it differs "
             f"from the target {target_edf} by more than {CALIBRATION_EDF_TOL}: the "
             "median jumps past the target, as when a session's fit is kept on "
             "one side of the penalty and not on the other"

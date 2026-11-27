@@ -160,13 +160,15 @@ class Estimand:
 
 BASELINES: dict[str, tuple[str, ...]] = {
     "visit_rate_A": ("(Intercept)",),
+    "visit_rate_D": ("(Intercept)",),
     "role_content": ("candidate_arm",),
     "role_content_uncertainty": ("candidate_arm",),
     "role_content_next": ("candidate_arm",),
 }
 """Each declared model's baseline terms, copied for each session in a fit of
-several sessions (``regression.terms``, "Baselines"): the rate model's
-intercept, the content models' arm category. No declared contrast reads one."""
+several sessions (``regression.terms``, "Baselines"): the rate models'
+intercept (model D's too, which has no declared test), the content models'
+arm category. No declared contrast reads one."""
 
 _ARRIVAL = "s(time_since_visit_start_s)"
 _LEAVING = "s(time_until_visit_end_s)"

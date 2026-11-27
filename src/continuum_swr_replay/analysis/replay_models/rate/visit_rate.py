@@ -1,9 +1,15 @@
 """The visit rate model: event starts on the three visit clocks, models A and D.
 
-One fit for each session and each kind (SWR, No SWR), by the shared fitter
-(``analysis.regression``): plain penalized maximum likelihood, Poisson with
-the offset ``log(exposure)``, on the in-visit at-risk bins of the visit
-time-bin design (``replay_models.visit_design.visit_timebins``).
+One fit for each unit of the fit (``VisitRateSettings.fit_by``: a recording
+day or an animal, ``fit_by.BEHAVIOR_FIT_BY``, the convention's twenty-fourth
+round; or a session, the earlier design, for the validation and comparison)
+and each kind (SWR, No SWR), by the shared fitter (``analysis.regression``):
+plain penalized maximum likelihood, Poisson with the offset
+``log(exposure)``, on the in-visit at-risk bins of the visit time-bin design
+(``replay_models.visit_design.visit_timebins``). Inside a unit each session
+keeps its own intercept (the baseline, ``declared_tests.BASELINES``) and every
+other term (the clock curves, the reward terms, model D's lag curve) is
+shared.
 
 - Model A: ``f_s(time since the first poke-in) + f_u(time until the final
   poke-out) [+ f_m(time until the end of the immobile stretch)] + beta *
@@ -13,7 +19,7 @@ time-bin design (``replay_models.visit_design.visit_timebins``).
   bins with ten known outcomes.
 
 Each clock curve, and model D's lag curve, is a cubic P-spline at ONE fixed,
-declared log penalty, the same in every session; no penalty is chosen from
+declared log penalty, the same in every unit; no penalty is chosen from
 the data. The reward coefficient, the one simple tested coefficient, carries
 the weak penalty (a Normal prior of mean 0, ``terms.log_penalty_from_prior_sd``);
 the intercept is not penalized. Every model's design is checked by
@@ -33,16 +39,20 @@ The cohort step (:func:`cohort_rows`): ``visit_timebins`` of a session and
 kind -> ``select_visit_context`` (the only filter of the bins) -> the bins
 beyond the time range, if one is set, dropped and counted -> the rows with a
 missing covariate dropped and counted -> model D also drops the bins without
-ten known outcomes, and every bin of a session whose outcomes cannot
-identify the lag curve (:func:`model_d_rows`), counted. The counts are added
-to every record's ``cohort_counts``. The two clocks that count down reference the future
+ten known outcomes (:func:`model_d_rows`), counted. At the fit, model D drops
+every bin of a unit whose outcomes cannot identify the lag curve, judged on
+the unit's rows with each session's intercept (:func:`lag_curve_counts`),
+counted. A unit's counts (its sessions' counts summed, and model D's of the
+unit) are added to its record's ``cohort_counts``, in model A's and model D's
+records alike. The two clocks that count down reference the future
 (``covariate_timing.FUTURE_REFERENCING``): this model describes; it does not
 predict.
 
 The third clock's rule, written before any fit (:func:`third_clock_decision`):
 fit A with ``f_m``; if the concurvity ``estimate`` of ``f_m`` or of ``f_u`` is
 at least ``collinearity.MAX_EXPLAINED`` (0.8) in more than
-``MAX_FAILING_SHARE`` (20 %) of the sessions with a fit, A is refit without
+``MAX_FAILING_SHARE`` (20 %) of the units with a fit (each measured on its
+unit's rows), A is refit without
 ``f_m``, and the time-until-movement curve is reported only from the
 model-free curves. Both fits are stored.
 
@@ -97,8 +107,10 @@ from continuum_swr_replay.analysis.regression.terms import (
     build_design,
     log_penalty_from_prior_sd,
 )
+from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns, unit_key
 
-from ..declared_tests import CoefficientContrast, CurveContrast, estimand
+from ..declared_tests import BASELINES, CoefficientContrast, CurveContrast, estimand
+from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import EVENT_KINDS, REWARD_LAG_COLUMNS, visit_timebins
 
 __all__ = [
@@ -135,6 +147,7 @@ __all__ = [
     "declared_contrasts",
     "fit_visit_rate",
     "fit_visit_rate_session",
+    "lag_curve_counts",
     "lag_curve_rows",
     "model_d_rows",
     "model_terms",
@@ -352,6 +365,14 @@ class VisitRateSettings:
         (:func:`third_clock_decision`) decides it after the first fit, which
         holds it. With ``f_m``, Q7a is conditional on the third clock (module
         docstring).
+    fit_by : {"day", "animal", "session"}
+        The unit of the fit, one for each run (DECIDED, the convention's
+        twenty-fourth round): one of ``fit_by.BEHAVIOR_FIT_BY``, the units every
+        behavior model is fitted at (the first is the default); ``"session"``
+        is the earlier design, kept for the validation and for comparison.
+        Each session keeps its own intercept (the baseline,
+        ``declared_tests.BASELINES``); every other term is shared inside the
+        unit.
     log_penalties : mapping of str to float or None
         Curve column (or :data:`LAG_TERM`) -> a log penalty in place of the
         table's, for the calibration and the tests; None uses the table. A
@@ -370,6 +391,7 @@ class VisitRateSettings:
     reward_form: Literal["coefficient", "time_varying"] = "coefficient"
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
     include_stretch_clock: bool = True
+    fit_by: FitBy = BEHAVIOR_FIT_BY[0]
     log_penalties: Mapping[str, float] | None = None
     calibrated_penalties: Mapping[tuple[str, str], CalibratedPenalty] | None = None
 
@@ -393,6 +415,7 @@ class VisitRateSettings:
                 f"q1_reference_s {self.q1_reference_s} not in {Q1_REFERENCE_WINDOWS}"
             )
         object.__setattr__(self, "q1_reference_s", reference)
+        fit_by_columns(self.fit_by)
 
     @property
     def weak_log_penalty(self) -> float:
@@ -530,8 +553,10 @@ def build_visit_rate_design(
     """Model A's or D's design on the pooled rows of its sessions and kind.
 
     The sum-to-zero constraints are computed on ``pooled_rows``, so every
-    session fitted with this design shares them. The guard
-    (:func:`require_declared_penalized`) is called on the built design.
+    unit fitted with this design shares them. The intercept is the model's
+    baseline (``declared_tests.BASELINES``): in a fit of several sessions
+    each session has its own. The guard (:func:`require_declared_penalized`)
+    is called on the built design.
 
     Parameters
     ----------
@@ -546,7 +571,10 @@ def build_visit_rate_design(
     Design
     """
     design = build_design(
-        model_terms(model, kind, settings), pooled_rows, intercept=True
+        model_terms(model, kind, settings),
+        pooled_rows,
+        intercept=True,
+        baseline=BASELINES[MODEL_NAMES[model]],
     )
     require_declared_penalized(design, model, settings)
     return design
@@ -705,29 +733,36 @@ _Q7A_SPAN_S = max(
 )
 
 
-def _lag_curve_identified(rows: pd.DataFrame) -> bool:
-    """Whether the rows' outcomes identify the lag curve's unpenalized part.
+def _lag_curve_identified(sessions: Sequence[pd.DataFrame]) -> bool:
+    """Whether the unit's rows identify the lag curve's unpenalized part.
 
     The lag curve's penalty leaves a constant and a line in log lag
     unpenalized; on a row they give ``sum_l r_l`` and ``sum_l r_l log l``.
-    With the intercept, these three columns must have full rank. They do not
-    when every outcome of the session is the same (each lag column constant),
-    and then the fitter refuses the session's design.
+    With each session's intercept (the baseline; one intercept for a unit of
+    one session), these columns must have full rank on the unit's rows. They
+    do not when, in every session of the unit, every outcome is the same
+    (each lag column constant in each session), and then the fitter refuses
+    the unit's design. A session of constant outcomes inside a unit whose
+    other sessions vary does not stop it.
     """
-    lags = rows[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float)
+    parts = [rows for rows in sessions if len(rows)]
+    if not parts:
+        return False
+    lags = np.vstack([p[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float) for p in parts])
+    sizes = [len(p) for p in parts]
+    indicators = np.repeat(np.eye(len(parts)), sizes, axis=0)
     columns = np.column_stack(
-        [np.ones(len(lags)), lags.sum(axis=1), lags @ np.log(np.asarray(LAGS))]
+        [indicators, lags.sum(axis=1), lags @ np.log(np.asarray(LAGS))]
     )
-    return len(lags) > 0 and np.linalg.matrix_rank(columns) == columns.shape[1]
+    return np.linalg.matrix_rank(columns) == columns.shape[1]
 
 
 def model_d_rows(rows_a: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Model D's rows of one session, from model A's.
+    """Model D's rows of one session, from model A's: the bins with ten known
+    outcomes.
 
-    Model D keeps the bins with ten known outcomes. When those bins' outcomes
-    cannot identify the lag curve (every outcome the same, for one), the
-    session has no model D rows: its fit is recorded as not fitted, and the
-    other sessions are fitted.
+    Whether the rows identify the lag curve is judged on the rows of the unit
+    of the fit, not here (:func:`lag_curve_counts`).
 
     Parameters
     ----------
@@ -737,22 +772,40 @@ def model_d_rows(rows_a: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
     Returns
     -------
     rows : pd.DataFrame
-        Model D's rows.
+        The bins with ten known outcomes.
     counts : dict of str to int
-        ``bins_``/``events_`` ``without_ten_lags`` (of model A's rows),
-        ``lag_curve_not_identified`` (the rows with ten known outcomes left
-        out for that reason; 0 or all of them) and ``D``.
+        ``bins_``/``events_`` ``without_ten_lags`` (of model A's rows).
     """
     without = ~rows_a[list(REWARD_LAG_COLUMNS)].notna().all(axis=1).to_numpy()
     counts = _counted(rows_a.loc[without], "without_ten_lags")
-    rows_d = rows_a.loc[~without].reset_index(drop=True)
-    not_identified = not rows_d.empty and not _lag_curve_identified(rows_d)
-    counts |= _counted(
-        rows_d if not_identified else rows_d.iloc[:0], "lag_curve_not_identified"
-    )
-    if not_identified:
-        rows_d = rows_d.iloc[:0]
-    return rows_d, counts | _counted(rows_d, "D")
+    return rows_a.loc[~without].reset_index(drop=True), counts
+
+
+def lag_curve_counts(sessions: Sequence[pd.DataFrame]) -> dict[str, int]:
+    """Model D's counts of one unit of the fit, from its sessions' model D
+    rows (:func:`model_d_rows`).
+
+    When the unit's rows cannot identify the lag curve
+    (:func:`_lag_curve_identified`), the unit has no model D rows: its fit is
+    recorded as not fitted, and the other units are fitted.
+
+    Parameters
+    ----------
+    sessions : sequence of pd.DataFrame
+        The model D rows of each session of the unit.
+
+    Returns
+    -------
+    dict of str to int
+        ``bins_``/``events_`` ``lag_curve_not_identified`` (the unit's rows
+        left out for that reason; 0 or all of them) and ``D`` (the rows
+        model D fits).
+    """
+    rows = pd.concat(list(sessions), ignore_index=True)
+    not_identified = not rows.empty and not _lag_curve_identified(sessions)
+    left = rows if not_identified else rows.iloc[:0]
+    kept = rows.iloc[:0] if not_identified else rows
+    return _counted(left, "lag_curve_not_identified") | _counted(kept, "D")
 
 
 def cohort_rows(
@@ -861,6 +914,26 @@ def cohort_rows(
     return CohortRows(kind, {"A": rows_a, "D": rows_d}, counts)
 
 
+def _summed(counts: Sequence[Mapping]) -> dict:
+    """The cohort counts of a unit: its sessions' counts, summed key by key
+    (a count summed, a nested mapping summed by its keys, a flag that must
+    agree kept once). The counts of one session are themselves."""
+    out: dict = {}
+    for name in dict.fromkeys(k for c in counts for k in c):
+        values = [c[name] for c in counts if name in c]
+        if all(isinstance(v, Mapping) for v in values):
+            out[name] = _summed(values)
+        elif all(isinstance(v, bool | np.bool_) for v in values):
+            if len(set(values)) > 1:
+                raise ValueError(f"cohort count {name!r} differs between sessions")
+            out[name] = values[0]
+        elif all(isinstance(v, int | np.integer) for v in values):
+            out[name] = int(sum(values))
+        else:
+            raise ValueError(f"cohort count {name!r} cannot be summed: {values}")
+    return out
+
+
 # --- The fit -------------------------------------------------------------------
 
 
@@ -874,8 +947,10 @@ class VisitRateFit(NamedTuple):
     design : Design
         Built on the pooled rows of the sessions fitted.
     records : list of FitRecord
-        One per session, in the order given; ``cohort_counts`` holds the
-        cohort step's counts too.
+        One per unit of the fit (``settings.fit_by``), in the order of each
+        unit's first session given; ``cohort_counts`` holds the cohort step's
+        counts too, summed over the unit's sessions, and model D's counts of
+        the unit (:func:`lag_curve_counts`).
     """
 
     model: str
@@ -885,17 +960,32 @@ class VisitRateFit(NamedTuple):
     records: list[FitRecord]
 
 
-def _session_rows(
-    cohort: Mapping[SessionKey, CohortRows], model: str, kind: str
-) -> dict[SessionKey, pd.DataFrame]:
-    out = {}
+def _unit_rows(
+    cohort: Mapping[SessionKey, CohortRows], model: str, kind: str, fit_by: FitBy
+) -> tuple[dict[SessionKey, pd.DataFrame], dict[tuple, dict]]:
+    """Each session's rows of the model, and each unit's cohort counts.
+
+    The units are those of ``fit_by`` (``tables.session_keys.unit_key``). A
+    unit's counts are its sessions' counts summed (:func:`_summed`) and model
+    D's counts of the unit (:func:`lag_curve_counts`); model D's rows of a
+    unit that cannot identify the lag curve are emptied.
+    """
+    sessions, units = {}, {}
     for key, rows in cohort.items():
         if rows.kind != kind:
             raise ValueError(
                 f"session {'/'.join(key)}: rows of {rows.kind}, not {kind}"
             )
-        out[key] = rows.rows[model]
-    return out
+        sessions[key] = rows.rows[model]
+        units.setdefault(unit_key(key, fit_by), []).append(key)
+    counts = {}
+    for unit, keys in units.items():
+        counts_d = lag_curve_counts([cohort[key].rows["D"] for key in keys])
+        if model == "D" and counts_d["bins_lag_curve_not_identified"]:
+            for key in keys:
+                sessions[key] = sessions[key].iloc[:0]
+        counts[unit] = _summed([cohort[key].counts for key in keys]) | counts_d
+    return sessions, counts
 
 
 def fit_visit_rate(
@@ -907,12 +997,13 @@ def fit_visit_rate(
     table_sha256: Mapping[str, str] | None = None,
     allow_provisional: Literal["test", "simulation"] | None = None,
 ) -> VisitRateFit:
-    """Fit model A or D of one kind in every session given.
+    """Fit model A or D of one kind in every unit of the sessions given.
 
     The design is built on the pooled rows of the sessions given
-    (:func:`build_visit_rate_design`), then every session is fitted alone at
-    the declared log penalties by ``sessions.fit_sessions``. No penalty is
-    chosen from the data and nothing is selected. A curve whose log penalty
+    (:func:`build_visit_rate_design`), then each unit of ``settings.fit_by``
+    (a recording day, an animal, or a session) is fitted at the declared log
+    penalties by ``sessions.fit_sessions``, each session with its own
+    intercept. No penalty is chosen from the data and nothing is selected. A curve whose log penalty
     has no calibration record (``VisitRateSettings.provisional_curves``) is
     refused unless ``allow_provisional`` says the fit is a test or a
     simulation.
@@ -954,7 +1045,7 @@ def fit_visit_rate(
             "(calibrate_log_penalty, VisitRateSettings.calibrated_penalties) or "
             "pass allow_provisional='test' or 'simulation'"
         )
-    sessions = _session_rows(cohort, model, kind)
+    sessions, counts = _unit_rows(cohort, model, kind, settings.fit_by)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
     records = fit_sessions(
@@ -966,10 +1057,11 @@ def fit_visit_rate(
         response=RESPONSE,
         unit=UNIT,
         table_sha256=dict(table_sha256 or {}),
+        fit_by=settings.fit_by,
     )
     records = [
-        replace(r, cohort_counts={**r.cohort_counts, **cohort[key].counts})
-        for key, r in zip(sessions, records, strict=True)
+        replace(r, cohort_counts={**r.cohort_counts, **counts[r.unit_key]})
+        for r in records
     ]
     return VisitRateFit(model, kind, settings, design, records)
 
@@ -1004,9 +1096,10 @@ def calibrate_log_penalty(
     target_edf: float,
     settings: VisitRateSettings,
 ) -> EdfCalibration:
-    """The log penalty of one curve at which its median edf over the sessions
-    is ``target_edf`` (``calibration.log_penalty_for_edf``), every other
-    penalty at the setting's value.
+    """The log penalty of one curve at which its median edf over the units of
+    the fit (``settings.fit_by``) is ``target_edf``
+    (``calibration.log_penalty_for_edf``), every other penalty at the
+    setting's value.
 
     Parameters
     ----------
@@ -1022,7 +1115,7 @@ def calibrate_log_penalty(
     -------
     EdfCalibration
     """
-    sessions = _session_rows(cohort, _model(model), _kind(kind))
+    sessions, _ = _unit_rows(cohort, _model(model), _kind(kind), settings.fit_by)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
     term = curve if curve == LAG_TERM else _smooth_name(curve)
@@ -1034,6 +1127,7 @@ def calibrate_log_penalty(
         target_edf=target_edf,
         response=RESPONSE,
         unit=UNIT,
+        fit_by=settings.fit_by,
     )
 
 
@@ -1048,10 +1142,12 @@ class ThirdClockDecision(NamedTuple):
     keep : bool
         False when ``f_m`` leaves the model.
     share : float
-        The share of the sessions with a fit in which ``f_m`` or ``f_u`` is
-        not separable (concurvity ``estimate`` at least ``MAX_EXPLAINED``).
+        The share of the units of the fit (sessions, days or animals) with a
+        fit in which ``f_m`` or ``f_u`` is not separable (concurvity
+        ``estimate`` at least ``MAX_EXPLAINED``), measured on each unit's
+        rows.
     n_sessions : int
-        The sessions with a fit, in which both terms are measured.
+        The units with a fit, in which both terms are measured.
     """
 
     keep: bool
@@ -1061,9 +1157,9 @@ class ThirdClockDecision(NamedTuple):
 
 def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
     """The third clock's rule (module docstring) on model A's records with
-    ``f_m``: keep ``f_m`` when the share of sessions in which it or ``f_u`` is
-    not separable is at most ``MAX_FAILING_SHARE`` (a share of exactly 20 %
-    keeps it).
+    ``f_m``, one per unit of the fit: keep ``f_m`` when the share of units in
+    which it or ``f_u`` is not separable is at most ``MAX_FAILING_SHARE`` (a
+    share of exactly 20 % keeps it).
 
     The rule reads the concurvity only. A drop before leaving can move in
     part to ``f_m`` while the concurvity stays below the threshold, so the
@@ -1073,7 +1169,7 @@ def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
     Raises
     ------
     ValueError
-        If no session has a fit with both terms measured.
+        If no unit has a fit with both terms measured.
     """
     pair = (_smooth_name(STRETCH), _smooth_name(LEAVING))
     flagged = []
@@ -1090,6 +1186,6 @@ def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
             continue
         flagged.append(not all(separable(measured).values()))
     if not flagged:
-        raise ValueError("no session has a fit with f_m and f_u measured")
+        raise ValueError("no unit has a fit with f_m and f_u measured")
     share = float(np.mean(flagged))
     return ThirdClockDecision(share <= MAX_FAILING_SHARE, share, len(flagged))

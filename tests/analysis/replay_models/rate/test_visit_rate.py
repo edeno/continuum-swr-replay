@@ -56,7 +56,7 @@ CLOCKS = scenarios.PlantedClocks(
     leaving=lambda u: -1.5 * np.exp(-np.asarray(u) / 0.3),
 )
 LOG_RATIO = float(np.log(1.5))
-DEFAULT = vr.VisitRateSettings()
+DEFAULT = vr.VisitRateSettings(fit_by="session")
 
 
 def _planted_cohort(
@@ -106,7 +106,7 @@ def test_model_terms_follow_the_settings() -> None:
     assert reward.penalty == pytest.approx(log_penalty_from_prior_sd(2.0))
 
     capped = vr.VisitRateSettings(
-        max_time_since_arrival_s=10.0, include_stretch_clock=False
+        fit_by="session", max_time_since_arrival_s=10.0, include_stretch_clock=False
     )
     arrival = vr.model_terms("A", "No SWR", capped)[1]
     assert (arrival.hi, arrival.n_basis) == (10.0, 23)
@@ -142,7 +142,7 @@ def test_the_weak_penalty_is_decided() -> None:
 )
 def test_settings_outside_the_allowed_values_are_refused(bad: dict) -> None:
     with pytest.raises(ValueError):
-        vr.VisitRateSettings(**bad)
+        vr.VisitRateSettings(fit_by="session", **bad)
 
 
 def test_guard_refuses_an_unpenalized_tested_coefficient(make_visit_rows) -> None:
@@ -179,7 +179,7 @@ def test_declared_contrasts_equal_a_hand_calculation(
     reference)`` and Q7a ``mean(u on [0, 0.25]) - mean(u on [1, 2]) = 0.125 -
     1.5``; Q2 reads the reward coefficient alone."""
     rows = make_visit_rows(("rat", "20200101", "02_r1"), n_visits=40, seed=1)
-    settings = vr.VisitRateSettings(q1_reference_s=reference)
+    settings = vr.VisitRateSettings(fit_by="session", q1_reference_s=reference)
     design = vr.build_visit_rate_design("A", "SWR", rows, settings)
     beta = np.zeros(len(design.coef_names))
     for clock, hi in ((vr.ARRIVAL, 20.0), (vr.LEAVING, 3.0)):
@@ -250,7 +250,8 @@ def test_cohort_counts_on_the_hand_built_session() -> None:
         46,
         4,
     )
-    assert (counts["bins_D"], counts["events_D"]) == (0, 0)
+    assert "bins_D" not in counts  # model D's rows are counted at the fit
+    assert vr.lag_curve_counts([swr.rows["D"]])["bins_D"] == 0
     assert len(swr.rows["A"]) == 46 and swr.rows["D"].empty
     assert (swr.rows["A"]["visit_context"] == "in_visit").all()
     assert swr.rows["A"][vr.REWARD].isin([0.0, 1.0]).all()
@@ -285,7 +286,7 @@ def test_cohort_counts_the_bins_beyond_the_time_range() -> None:
     every = _cohort("SWR", stops=stops, events=events, port=port).counts
     capped = _cohort(
         "SWR",
-        vr.VisitRateSettings(max_time_since_arrival_s=10.0),
+        vr.VisitRateSettings(fit_by="session", max_time_since_arrival_s=10.0),
         stops=stops,
         events=events,
         port=port,
@@ -329,7 +330,9 @@ def test_a_missing_arrival_time_is_a_missing_covariate(monkeypatch) -> None:
 
     _patched_bins(monkeypatch, blank)
     every = _cohort("SWR").counts
-    capped = _cohort("SWR", vr.VisitRateSettings(max_time_since_arrival_s=10.0)).counts
+    capped = _cohort(
+        "SWR", vr.VisitRateSettings(fit_by="session", max_time_since_arrival_s=10.0)
+    ).counts
     for counts in (every, capped):
         assert counts["bins_beyond_time_range"] == 0
         assert counts["bins_missing"][vr.ARRIVAL] == 1
@@ -342,9 +345,9 @@ def test_model_d_leaves_a_session_whose_outcomes_cannot_identify_the_lag_curve(
     monkeypatch, constant
 ) -> None:
     """Every bin of the hand-built session given ten known outcomes: all the
-    same (the lag curve is collinear with the intercept), model D has no row
-    and the bins are counted as ``lag_curve_not_identified``; outcomes that
-    vary keep every bin."""
+    same (the lag curve is collinear with the intercept), the session alone
+    (a unit of one session) has no model D row and the bins are counted as
+    ``lag_curve_not_identified``; outcomes that vary keep every bin."""
     rng = np.random.default_rng(0)
 
     def ten_lags(bins: pd.DataFrame) -> None:
@@ -360,15 +363,17 @@ def test_model_d_leaves_a_session_whose_outcomes_cannot_identify_the_lag_curve(
     counts = rows.counts
     assert (counts["bins_A"], counts["events_A"]) == (49, 4)
     assert counts["bins_without_ten_lags"] == 0
+    assert len(rows.rows["D"]) == 49
+    unit = vr.lag_curve_counts([rows.rows["D"]])
     if constant:
         assert (
-            counts["bins_lag_curve_not_identified"],
-            counts["events_lag_curve_not_identified"],
+            unit["bins_lag_curve_not_identified"],
+            unit["events_lag_curve_not_identified"],
         ) == (49, 4)
-        assert counts["bins_D"] == 0 and rows.rows["D"].empty
+        assert unit["bins_D"] == 0
     else:
-        assert counts["bins_lag_curve_not_identified"] == 0
-        assert counts["bins_D"] == 49 and len(rows.rows["D"]) == 49
+        assert unit["bins_lag_curve_not_identified"] == 0
+        assert unit["bins_D"] == 49
 
 
 def test_cohort_records_an_event_on_a_stop_first_sample() -> None:
@@ -416,7 +421,7 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
         total=3000.0,
         seed=10,
     )
-    settings = vr.VisitRateSettings(include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )
@@ -454,7 +459,7 @@ def _noiseless_fit(rows, truth, reward_form: str, cohort_of) -> dict[str, float]
     key = tuple(rows[["animal", "session_date", "epoch"]].iloc[0])
     rows = rows.assign(count=truth.expected)
     settings = vr.VisitRateSettings(
-        reward_form=reward_form, include_stretch_clock=False
+        fit_by="session", reward_form=reward_form, include_stretch_clock=False
     )
     fit = vr.fit_visit_rate_session(
         key,
@@ -557,15 +562,18 @@ def test_model_d_recovers_a_lag_one_effect(make_visit_rows, cohort_of) -> None:
 
 SETTINGS = (
     [
-        vr.VisitRateSettings(weak_prior_sd=sd)
+        vr.VisitRateSettings(fit_by="session", weak_prior_sd=sd)
         for sd in (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
     ]
-    + [vr.VisitRateSettings(clock_penalty=p) for p in vr.CLOCK_PENALTY_SETTINGS]
     + [
-        vr.VisitRateSettings(max_time_since_arrival_s=10.0),
-        vr.VisitRateSettings(reward_form="time_varying"),
-        vr.VisitRateSettings(q1_reference_s=(1.0, 2.0)),
-        vr.VisitRateSettings(include_stretch_clock=False),
+        vr.VisitRateSettings(fit_by="session", clock_penalty=p)
+        for p in vr.CLOCK_PENALTY_SETTINGS
+    ]
+    + [
+        vr.VisitRateSettings(fit_by="session", max_time_since_arrival_s=10.0),
+        vr.VisitRateSettings(fit_by="session", reward_form="time_varying"),
+        vr.VisitRateSettings(fit_by="session", q1_reference_s=(1.0, 2.0)),
+        vr.VisitRateSettings(fit_by="session", include_stretch_clock=False),
     ]
 )
 
@@ -657,9 +665,10 @@ def test_cohort_counts_join_each_record(make_visit_rows) -> None:
 def test_model_d_skips_a_session_with_constant_outcomes(
     make_visit_rows, cohort_of
 ) -> None:
-    """A session rewarded at every visit has no model D rows: its record says
-    it was not fitted, its counts say why, the other sessions are fitted, and
-    the lag curves keep one row per session and lag, NaN for it."""
+    """At ``fit_by="session"`` a session rewarded at every visit has no model
+    D rows: its record says it was not fitted, its counts say why, the other
+    sessions are fitted, and the lag curves keep one row per session and lag,
+    NaN for it."""
     rng = np.random.default_rng(6)
     cohort = {}
     for i, p_reward in enumerate((0.6, 0.6, 1.0)):
@@ -668,15 +677,16 @@ def test_model_d_skips_a_session_with_constant_outcomes(
         rows["count"] = rng.poisson(0.2 * rows["exposure"].to_numpy()).astype(float)
         cohort[key] = cohort_of(rows, "SWR")
     constant = cohort[("rat2", "20200101", "02_r1")]
-    assert constant.rows["D"].empty
-    assert constant.counts["bins_lag_curve_not_identified"] == len(constant.rows["A"])
-    settings = vr.VisitRateSettings(include_stretch_clock=False)
+    assert len(constant.rows["D"]) == len(constant.rows["A"])
+    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
     fit = vr.fit_visit_rate(
         cohort, model="D", kind="SWR", settings=settings, allow_provisional="test"
     )
     assert [r.status for r in fit.records[:2]] == [CONVERGED] * 2
     assert fit.records[2].status != CONVERGED and fit.records[2].no_fit
-    assert fit.records[2].cohort_counts["bins_lag_curve_not_identified"] > 0
+    assert fit.records[2].cohort_counts["bins_lag_curve_not_identified"] == len(
+        constant.rows["D"]
+    )
     curves = lag_curves(fit, seed=0)
     assert len(curves) == 3 * len(vr.LAGS)
     assert curves.loc[curves["animal"] == "rat2", "estimate"].isna().all()
@@ -812,7 +822,7 @@ def test_calibration_reaches_its_target(make_visit_rows, cohort_of) -> None:
         total=600.0,
         seed=50,
     )
-    settings = vr.VisitRateSettings(include_stretch_clock=False)
+    settings = vr.VisitRateSettings(fit_by="session", include_stretch_clock=False)
     found = vr.calibrate_log_penalty(
         cohort,
         model="A",
@@ -872,10 +882,11 @@ def test_one_real_session_of_each_kind() -> None:
                 + counts[f"{unit}_missing_any"]
                 + counts[f"{unit}_A"]
             )
+            unit_d = vr.lag_curve_counts([rows.rows["D"]])
             assert counts[f"{unit}_A"] == (
                 counts[f"{unit}_without_ten_lags"]
-                + counts[f"{unit}_lag_curve_not_identified"]
-                + counts[f"{unit}_D"]
+                + unit_d[f"{unit}_lag_curve_not_identified"]
+                + unit_d[f"{unit}_D"]
             )
         assert counts["bins_selected"] == counts["bins_visit_context"]["in_visit"]["n"]
         default_set = sum(
@@ -886,7 +897,7 @@ def test_one_real_session_of_each_kind() -> None:
         assert default_set == (
             counts["events_selected"] + counts["events_not_at_risk_in_default_set"]
         )
-        assert counts["bins_A"] > 0 and counts["bins_D"] > 0
+        assert counts["bins_A"] > 0 and len(rows.rows["D"]) > 0
         for model in vr.MODELS:
             fit = vr.fit_visit_rate_session(
                 key, rows, model=model, settings=DEFAULT, allow_provisional="test"
@@ -894,10 +905,148 @@ def test_one_real_session_of_each_kind() -> None:
             (record,) = fit.records
             assert record.status == CONVERGED and not record.no_fit
             assert len(record.coef) == len(fit.design.coef_names)
-            assert record.n_rows == counts[f"bins_{model}"]
-            assert record.n_events == counts[f"events_{model}"]
+            assert record.n_rows == record.cohort_counts[f"bins_{model}"]
+            assert record.n_events == record.cohort_counts[f"events_{model}"]
             assert record.cohort_counts["bins_selected"] == counts["bins_selected"]
             if model == "A":
                 assert session_estimands(fit).shape[0] == len(vr.RATE_ESTIMANDS)
             else:
                 assert lag_curves(fit, seed=0).shape[0] == len(vr.LAGS)
+
+
+# --- The unit of the fit ---------------------------------------------------------
+
+
+def _two_session_days(make_visit_rows, cohort_of, *, p_rewards=(0.6, 0.6, 0.6, 0.6)):
+    """Two animals, each one day of two sessions (epochs 02_r1 and 04_r2),
+    counts drawn from a constant ratio of 1.5."""
+    rng = np.random.default_rng(70)
+    cohort = {}
+    for i, p_reward in enumerate(p_rewards):
+        key = (f"rat{i // 2}", "20200101", ("02_r1", "04_r2")[i % 2])
+        rows = make_visit_rows(key, n_visits=60, seed=70 + i, p_reward=p_reward)
+        truth = scenarios.constant_ratio(rows, CLOCKS, log_ratio=LOG_RATIO, total=400.0)
+        rows["count"] = rng.poisson(truth.expected).astype(float)
+        cohort[key] = cohort_of(rows, "SWR")
+    return cohort
+
+
+def test_fit_by_from_the_one_setting(make_visit_rows, cohort_of) -> None:
+    """The setting's units are ``fit_by.BEHAVIOR_FIT_BY`` (the first is the
+    default); "session" stays a value of the mechanism; another is refused.
+    The fit's records are of the setting's unit."""
+    from continuum_swr_replay.analysis.replay_models.fit_by import BEHAVIOR_FIT_BY
+
+    assert vr.VisitRateSettings().fit_by == BEHAVIOR_FIT_BY[0]
+    with pytest.raises(ValueError, match="fit_by"):
+        vr.VisitRateSettings(fit_by="week")
+    cohort = _two_session_days(make_visit_rows, cohort_of)
+    for fit_by, n_units in (("session", 4), ("day", 2), ("animal", 2)):
+        settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by=fit_by)
+        fit = vr.fit_visit_rate(
+            cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+        )
+        assert [r.fit_by for r in fit.records] == [fit_by] * n_units
+        assert all(r.status == CONVERGED for r in fit.records)
+
+
+def test_day_fit_has_one_intercept_per_session(make_visit_rows, cohort_of) -> None:
+    """At ``fit_by="day"`` the intercept is the baseline: one per session of
+    the day, the curves and the reward coefficient shared; the cohort counts
+    are the sum of the day's sessions' counts."""
+    cohort = _two_session_days(make_visit_rows, cohort_of)
+    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="day")
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    assert fit.design.baseline == ("(Intercept)",)
+    first = fit.records[0]
+    intercepts = [n for n in first.coef_names if n.startswith("(Intercept)")]
+    assert intercepts == [
+        "(Intercept)@rat0/20200101/02_r1",
+        "(Intercept)@rat0/20200101/04_r2",
+    ]
+    assert first.coef_names.count(vr.REWARD) == 1
+    assert [s["epoch"] for s in first.sessions] == ["02_r1", "04_r2"]
+    keys = [k for k in cohort if k[0] == "rat0"]
+    assert first.cohort_counts["bins_without_ten_lags"] == sum(
+        cohort[k].counts["bins_without_ten_lags"] for k in keys
+    )
+    assert first.cohort_counts["bins_D"] == sum(len(cohort[k].rows["D"]) for k in keys)
+
+
+def test_model_d_identified_on_the_unit(make_visit_rows, cohort_of) -> None:
+    """A session rewarded at every visit cannot identify the lag curve alone,
+    but can inside a day with a session of mixed outcomes: at
+    ``fit_by="session"`` it is not fitted (its rows counted as
+    ``lag_curve_not_identified``), at ``fit_by="day"`` its rows join the day's
+    fit. A day whose sessions are all rewarded at every visit is not fitted
+    at either unit."""
+    cohort = _two_session_days(
+        make_visit_rows, cohort_of, p_rewards=(0.6, 1.0, 1.0, 1.0)
+    )
+    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="session")
+    by_session = vr.fit_visit_rate(
+        cohort, model="D", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    assert [r.status == CONVERGED for r in by_session.records] == [
+        True,
+        False,
+        False,
+        False,
+    ]
+    constant = by_session.records[1].cohort_counts
+    rows_d = cohort[("rat0", "20200101", "04_r2")].rows["D"]
+    assert len(rows_d) > 0
+    assert constant["bins_lag_curve_not_identified"] == len(rows_d)
+    assert constant["bins_D"] == 0
+    by_day = vr.fit_visit_rate(
+        cohort,
+        model="D",
+        kind="SWR",
+        settings=dataclasses.replace(settings, fit_by="day"),
+        allow_provisional="test",
+    )
+    mixed, constant_day = by_day.records
+    assert mixed.status == CONVERGED
+    assert mixed.cohort_counts["bins_lag_curve_not_identified"] == 0
+    assert [s["n_rows"] > 0 for s in mixed.sessions] == [True, True]
+    assert constant_day.no_fit
+    assert constant_day.cohort_counts["bins_D"] == 0
+    # Model A's records carry the same counts of model D's rows.
+    by_day_a = vr.fit_visit_rate(
+        cohort,
+        model="A",
+        kind="SWR",
+        settings=dataclasses.replace(settings, fit_by="day"),
+        allow_provisional="test",
+    )
+    for a, d in zip(by_day_a.records, by_day.records, strict=True):
+        assert a.cohort_counts["bins_D"] == d.cohort_counts["bins_D"]
+
+
+def test_third_clock_rule_counts_units(make_visit_rows, cohort_of) -> None:
+    """The third clock's rule is judged on the units' fits: two days, two
+    measured units."""
+    cohort = _two_session_days(make_visit_rows, cohort_of)
+    settings = vr.VisitRateSettings(fit_by="day")
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    assert vr.third_clock_decision(fit.records).n_sessions == 2
+
+
+def test_calibration_at_the_unit(make_visit_rows, cohort_of) -> None:
+    """The calibration fits at the setting's unit: one edf per day."""
+    cohort = _two_session_days(make_visit_rows, cohort_of)
+    settings = vr.VisitRateSettings(include_stretch_clock=False, fit_by="day")
+    found = vr.calibrate_log_penalty(
+        cohort,
+        model="A",
+        kind="SWR",
+        curve=vr.LEAVING,
+        target_edf=5.0,
+        settings=settings,
+    )
+    assert list(found.edf.index) == [("rat0", "20200101"), ("rat1", "20200101")]
+    assert found.median_edf == pytest.approx(5.0, abs=0.01)
