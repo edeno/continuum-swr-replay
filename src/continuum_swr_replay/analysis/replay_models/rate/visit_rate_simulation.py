@@ -158,15 +158,19 @@ FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
 #: about 15 effective parameters for each arrival curve and 10 or more for the
 #: leaving curve at the animal unit (``design_d_trial/rate/followup/REPORT.md``,
 #: section 6; the twenty-sixth round), and 10 per curve at the day (the fixed
-#: value that section ran there). On the first validation's synthetic cohort
-#: (:data:`VALIDATION_COHORT`, the curves centered on Q2's window) every target
-#: is reached (measured 2026-11-26). The calibration stops, rather than
-#: leaving a unit out, when a unit's first fit at a trial penalty ends at the
-#: step limit (``sessions.py``, ``_Session.fit``, raises ``ValueError``; the
-#: calibration does not catch it): that happened on the earlier cohort whose
-#: visits after an omission ended by 8 s, at a log penalty of -6.25 for the
-#: curve after an omission. The coefficient form's shared arrival curve takes
-#: the arrival curves' target.
+#: value that section ran there). On :data:`VALIDATION_COHORT` the search
+#: reaches every target (measured 2026-11-26). The calibration still stops
+#: when a unit's first fit fails at a trial penalty
+#: (``docs/known_issues/calibration_stops_at_a_failed_fit.md``). With the
+#: arrival curves centered on Q2's window (``visit_rate.ARRIVAL_CENTER_S``),
+#: in a unit whose rows after an omission do not reach the window about 0.4 to
+#: 0.9 edf moves into the omitted curve's term (the review's simulation
+#: numbers on synthetic rows: 4.70 against 4.09 with the curves centered on
+#: the rows), so a target for that curve at the day unit means a slightly
+#: stiffer penalty than the same number meant with row centering; in units
+#: with support the edfs are equal to 3 decimals. The declared-penalty step on
+#: the real rows must calibrate the day unit with this in view. The
+#: coefficient form's shared arrival curve takes the arrival curves' target.
 CLOCK_TARGETS: dict[str, dict[str, float]] = {
     "day": {
         vr.OMITTED_ARRIVAL_TERM: 10.0,

@@ -705,10 +705,22 @@ over its outcome's pooled rows: so the outcome slope IS Q2, and the weak penalty
 sits on the tested log rate ratio, zero when the two curves are the same curve, as the
 twenty-fifth round puts it on "every simple tested coefficient". Each session's intercept is
 then the session's log rate after an omission at the window's mean of the arrival curve (and
-the leaving curve's pooled mean); it is unpenalized, so the fit is the same model: at a prior
-SD of 100, Q1, Q2, Q2-onset, Q7a and the linear predictor equal those of the row-centered
-curves to 1e-6 (`test_visit_rate.py::test_the_centering_moves_only_where_the_prior_sits`), and a
-unit's Q2 no longer moves when other sessions join the pooled design. The concurvity
+the leaving curve's pooled mean); it is unpenalized, so the fit is the same model up to where
+the weak penalty sits: at a prior SD of 100, where the window has support, Q1, Q2, Q2-onset,
+Q7a and the linear predictor equal those of the row-centered curves to 1e-6
+(`test_visit_rate.py::test_the_centering_moves_only_where_the_prior_sits`); in a unit without
+support Q2 itself agrees only to about 2e-3 (it is not a number there under the support
+rule). A unit's Q2 no longer moves when other sessions join the pooled design. Where a unit's
+rows after an omission do not reach 4 to 10 s, the weak penalty acts on an extrapolated
+quantity: it holds most of the outcome coefficient (its edf about 0.2 to 0.6 instead of 0.99),
+about 0.4 to 0.9 edf moves into the omitted arrival curve's term (4.70 against 4.09 with the
+curves centered on the rows), and the other estimands move a little (at SD 2, Q1 by up to
+0.028 against a standard error of 0.54, the onset test by up to 0.016 against 0.28, Q7a by up
+to 0.018); in units with support nothing changes (edf equal to 3 decimals). These are the
+review's simulation numbers on synthetic rows (2026-11-26). So a calibration target for the
+omitted curve at the day unit means a slightly stiffer penalty than the same number meant
+with row centering; the declared-penalty step on the real rows must calibrate the day unit
+with this in view. The concurvity
 estimates of the arrival curves rose from about 0.01 to 0.02 to about 0.03 to 0.06, and the
 outcome slope's VIF moved from 1.3 to 2.3 (animal) and 3.2 to 2.3 (day), on two animals of the
 validation cohort: far below the thresholds, no check behaved differently. Without

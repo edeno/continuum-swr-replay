@@ -524,7 +524,17 @@ def _clock_smooth(
 #: twenty-fifth round's "every simple tested coefficient". Each session's
 #: intercept is then its log rate after an omission at the window's mean of
 #: the arrival curve, at the leaving curve's pooled mean (unpenalized, so the
-#: fit is the same model as with the curves centered on the rows).
+#: fit is the same model as with the curves centered on the rows, up to where
+#: the weak penalty sits).
+#:
+#: Where a unit's rows after an omission do not reach Q2's window, the weak
+#: penalty then holds most of the outcome coefficient (its edf about 0.2 to
+#: 0.6, not 0.99), about 0.4 to 0.9 edf moves into the omitted curve's term,
+#: and Q1, the onset test and Q7a move a little (at SD 2 by up to 0.028,
+#: 0.016 and 0.018, against standard errors of 0.54, 0.28 and 0.38); with
+#: support nothing changes (edf equal to 3 decimals). The review's simulation
+#: numbers on synthetic rows, 2026-11-26; ``docs/design/regression_fitter.md``,
+#: the ``center_on`` passage.
 ARRIVAL_CENTER_S: tuple[float, ...] = tuple(
     float(x) for x in contrasts.range_grid(*Q2_WINDOW_S)
 )
