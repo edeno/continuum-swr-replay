@@ -15,7 +15,7 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `newton.py` | the penalized Newton fit at fixed penalty strengths: a host loop around a JAX iteration kernel |
 | `reml.py` | the REML score with exact derivatives, pooled over sessions, and the penalty search (the score at a fit, `A^-1` and the edf in JAX) |
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
-| `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
+| `terms.py` | the model terms, the design they build on the pooled rows (a smooth's constraint on those rows or on declared points, `center_on`), the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the fitting loop, one fit for each unit of the fit, and the row rule for an inactive level |
@@ -693,11 +693,24 @@ At `fit_by="session"` every record of the coefficient form and of model D equale
 
 The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
 two smooths of the arrival clock `by` the last outcome (`Smooth(..., by=Category(...),
-levels=(0,))` and `levels=(1,)`), each its own term with its own sum-to-zero constraint
-(on the pooled rows of its outcome) and its own penalty block, beside the outcome slope
-(the weak penalty) and the shared leaving curve. The outcome slope and the two centered
-curves identify the difference curve `beta + f_1(s) - f_0(s)`; the declared window
-contrasts read it (`visit_rate.window_contrast`). In a unit with no visit after an
+levels=(0,))` and `levels=(1,)`), each its own term with its own penalty block, beside the
+outcome slope (the weak penalty) and the shared leaving curve. Each arrival curve sums to
+zero over Q2's window grid (`Smooth(..., center_on=visit_rate.ARRIVAL_CENTER_S)`, the grid
+`OutcomeWindowContrast` averages over for 4 to 10 s; the coordinator's call, 2026-11-26), not
+over its outcome's pooled rows: so the outcome slope IS Q2, and the weak penalty (prior SD 2)
+sits on the tested log rate ratio, zero when the two curves are the same curve, as the
+twenty-fifth round puts it on "every simple tested coefficient". Each session's intercept is
+then the session's log rate after an omission at the window's mean of the arrival curve (and
+the leaving curve's pooled mean); it is unpenalized, so the fit is the same model: at a prior
+SD of 100, Q1, Q2, Q2-onset, Q7a and the linear predictor equal those of the row-centered
+curves to 1e-6 (`test_visit_rate.py::test_the_centering_moves_only_where_the_prior_sits`), and a
+unit's Q2 no longer moves when other sessions join the pooled design. The concurvity
+estimates of the arrival curves rose from about 0.01 to 0.02 to about 0.03 to 0.06, and the
+outcome slope's VIF moved from 1.3 to 2.3 (animal) and 3.2 to 2.3 (day), on two animals of the
+validation cohort: far below the thresholds, no check behaved differently. Without
+`center_on` a smooth is centered on its pooled rows, as before. The outcome slope and the two
+curves identify the difference curve `beta + f_1(s) - f_0(s)`; the declared window contrasts
+read it (`visit_rate.window_contrast`). In a unit with no visit after an
 omission the curve after an omission has zero columns and fails the support rule, the
 outcome slope fails it too, and the unit is fitted (no shared arrival curve is collinear
 with the other). With 1 to 4 such visits the slope fails and the curve stays: the known

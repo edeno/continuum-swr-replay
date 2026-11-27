@@ -4,7 +4,8 @@ A model is a list of terms and, for the diagonal families, an intercept:
 
 - :class:`Smooth`: a cubic P-spline of one column over a fixed range
   (:class:`.pspline.PSplineBasis`, clamped beyond it) with one sum-to-zero
-  constraint; with ``by``, one smooth for each level of a category, zero on the
+  constraint (on the pooled rows, or on declared points, ``center_on``);
+  with ``by``, one smooth for each level of a category, zero on the
   rows of the other levels. Its ``penalty`` is required: ``"none"`` (the same
   basis, unpenalized) or a fixed log penalty.
 - :class:`LinearFunctional`: a smooth curve over lags whose column ``b`` is
@@ -275,6 +276,12 @@ class Smooth:
         rows of the other levels, with its own constraint and penalty.
     levels : tuple or None
         The levels of ``by`` that get a smooth; all when None.
+    center_on : tuple of float or None
+        The points of ``column`` the sum-to-zero constraint is computed on:
+        the curve sums to zero over these points (the same points for every
+        level of ``by``), so its mean over them is zero. None (the default):
+        over the pooled rows (of the level). The points must be finite and
+        inside ``[lo, hi]``.
     """
 
     column: str
@@ -284,6 +291,7 @@ class Smooth:
     penalty: Penalty
     by: Category | None = None
     levels: tuple | None = None
+    center_on: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         _check_penalty(self.penalty)
@@ -291,6 +299,16 @@ class Smooth:
         object.__setattr__(
             self, "levels", _by_levels(self.by, self.levels, f"s({self.column})")
         )
+        if self.center_on is not None:
+            points = tuple(float(x) for x in self.center_on)
+            if not points or not all(
+                np.isfinite(x) and self.lo <= x <= self.hi for x in points
+            ):
+                raise ValueError(
+                    f"s({self.column}): center_on must be finite points inside "
+                    f"[{self.lo}, {self.hi}], not {self.center_on}"
+                )
+            object.__setattr__(self, "center_on", points)
 
 
 @dataclass(frozen=True)
@@ -680,7 +698,8 @@ def _build_smooth(
     term: Smooth, level: object, pooled: pd.DataFrame, levels: _Levels
 ) -> _Built:
     """A smooth, or its piece on one level of its ``by``: the sum-to-zero
-    constraint on the pooled rows (of the level) and the penalty ``Z' P Z``."""
+    constraint on the pooled rows (of the level), or on ``center_on`` when
+    given, and the penalty ``Z' P Z``."""
     base = f"s({term.column})"
     name = base if level is None else _level_name(term, base, level)
     x = pooled[term.column].to_numpy(dtype=float)
@@ -688,7 +707,8 @@ def _build_smooth(
         x = x[levels.rows(term.by, level)]
     x = _finite(x, name)
     basis = PSplineBasis(term.lo, term.hi, term.n_basis)
-    Z = sum_to_zero_constraint(basis.design(x))
+    centered = x if term.center_on is None else np.asarray(term.center_on)
+    Z = sum_to_zero_constraint(basis.design(centered))
     level_key = None if level is None else (term.by.column, level)
     kind = DesignTerm(
         name,

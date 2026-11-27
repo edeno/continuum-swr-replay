@@ -94,6 +94,7 @@ from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns, unit
 
 from ..declared_tests import (
     BASELINES,
+    Q2_WINDOW_S,
     CoefficientContrast,
     CurveContrast,
     OutcomeWindowContrast,
@@ -120,6 +121,7 @@ __all__ = [
     "is_declared_test",
     "OMITTED_ARRIVAL_TERM",
     "ARRIVAL_BY_OUTCOME",
+    "ARRIVAL_CENTER_S",
     "RESPONSE",
     "REWARDED_ARRIVAL_TERM",
     "REWARD",
@@ -309,8 +311,8 @@ TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 #: DECIDED (lead, 2026-11-25, the convention's twenty-sixth round): the form of
 #: the reward effect. ``"by_outcome"`` (the default, the declared form): an
 #: arrival curve for each last outcome, each a smooth ``by`` the outcome with
-#: its own sum-to-zero constraint (on the pooled rows of its outcome) and its
-#: own declared penalty, the outcome coefficient (the weak penalty) and the
+#: its own sum-to-zero constraint (over Q2's window, :data:`ARRIVAL_CENTER_S`,
+#: so that the outcome coefficient is Q2) and its own declared penalty, the outcome coefficient (the weak penalty) and the
 #: leaving curve shared by both outcomes: ``outcome +
 #: session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)``.
 #: The outcome coefficient and the two centered curves identify the
@@ -509,6 +511,20 @@ def _clock_smooth(
     return Smooth(clock, lo, hi, basis.n_basis, penalty, **by)
 
 
+#: The points each arrival curve of the by-outcome form sums to zero over
+#: (``terms.Smooth.center_on``): the grid ``OutcomeWindowContrast`` averages
+#: over for Q2's window (``declared_tests.Q2_WINDOW_S``). Each curve's mean
+#: over Q2's window is then zero, so the outcome coefficient IS Q2, and the
+#: weak penalty (prior SD 2) sits on the tested log rate ratio: zero when the
+#: two curves are the same curve. THE COORDINATOR'S CALL (2026-11-26), for the
+#: twenty-fifth round's "every simple tested coefficient". Each session's
+#: intercept is then its log rate after an omission at the window's mean of
+#: the arrival curve, at the leaving curve's pooled mean (unpenalized, so the
+#: fit is the same model as with the curves centered on the rows).
+ARRIVAL_CENTER_S: tuple[float, ...] = tuple(
+    float(x) for x in contrasts.range_grid(*Q2_WINDOW_S)
+)
+
 #: The last outcome as the ``by`` of the by-outcome form's arrival curves (a
 #: category used only as a ``by``, so not a term: its penalty is not read).
 _OUTCOME = Category(REWARD, (0, 1), 0, "none")
@@ -544,6 +560,7 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
                 term,
                 by=_OUTCOME,
                 levels=(level,),
+                center_on=ARRIVAL_CENTER_S,
             )
             for level, term in ARRIVAL_BY_OUTCOME.items()
         ]

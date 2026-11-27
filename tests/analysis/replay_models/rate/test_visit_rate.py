@@ -20,7 +20,9 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.regression.contrasts import range_grid
+from continuum_swr_replay.analysis.regression.likelihoods import Poisson
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
+from continuum_swr_replay.analysis.regression.sessions import fit_sessions
 from continuum_swr_replay.analysis.regression.terms import (
     LinearFunctional,
     Slope,
@@ -438,7 +440,9 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
         cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
     )
     assert [r.status for r in fit.records] == [CONVERGED] * 4
-    assert all(r.edf[vr.REWARD] > 0.99 for r in fit.records)
+    # The outcome coefficient is Q2 itself (its curves are centered on Q2's
+    # window), and Q2's 8 to 10 s part has no row here: the weak prior holds
+    # part of it, so its edf is not near 1; see the Q2 check below.
     values = unit_estimands(fit)
     # Visits last 1.5 to 8 s: Q2's 8 to 10 s part has no row, so Q2 has no
     # value (the window support rule); the others are read.
@@ -988,7 +992,8 @@ def test_the_by_outcome_form_is_the_declared_form() -> None:
 
 def test_each_arrival_curve_has_its_own_penalty_and_constraint(make_visit_rows) -> None:
     """Two penalty blocks, one per outcome's curve, each at its own declared
-    value; each curve sums to zero over its outcome's pooled rows."""
+    value; each curve sums to zero over Q2's window grid (``ARRIVAL_CENTER_S``)
+    and is zero on the other outcome's rows."""
     rows = make_visit_rows(("rat", "20200101", "02_r1"), n_visits=60, seed=3)
     settings = dataclasses.replace(
         DEFAULT,
@@ -1001,10 +1006,15 @@ def test_each_arrival_curve_has_its_own_penalty_and_constraint(make_visit_rows) 
     blocks = {design.by_name[t].block for t in vr.ARRIVAL_BY_OUTCOME.values()}
     assert len(blocks) == 2 and None not in blocks
     X = design.build(rows).X
+    grid = pd.DataFrame({vr.ARRIVAL: vr.ARRIVAL_CENTER_S}).assign(
+        **{vr.LEAVING: 1.0, vr.EXPOSURE: 1.0}
+    )
     for level, term in vr.ARRIVAL_BY_OUTCOME.items():
         columns = design.by_name[term].columns
         on = rows[vr.REWARD].to_numpy() == level
-        np.testing.assert_allclose(X[on][:, columns].sum(axis=0), 0.0, atol=1e-8)
+        # Each curve sums to zero over Q2's window grid, not over its rows.
+        at = design.build(grid.assign(**{vr.REWARD: float(level)})).X
+        np.testing.assert_allclose(at[:, columns].sum(axis=0), 0.0, atol=1e-8)
         assert not X[~on][:, columns].any()
 
 
@@ -1111,3 +1121,120 @@ def test_the_window_tests_are_declared_per_animal() -> None:
         assert vr.is_declared_test("Q7a", fit_by)
         assert not vr.is_declared_test("Q1b", fit_by)
         assert not vr.is_declared_test(vr.SECONDARY_ESTIMAND, fit_by)
+
+
+# --- The arrival curves centered on Q2's window --------------------------------
+
+
+def _fixture_cohort(make_visit_rows, cohort_of, animals=("rat0",), seed=80):
+    """Two sessions per animal, visits of 1.5 to 12 s, a constant ratio of
+    1.5."""
+    rng = np.random.default_rng(seed)
+    cohort = {}
+    for a, animal in enumerate(animals):
+        for d in range(2):
+            key = (animal, f"2020010{d}", "02_r1")
+            rows = make_visit_rows(
+                key, n_visits=80, seed=seed + 10 * a + d, length_s=(1.5, 12.0)
+            )
+            truth = scenarios.constant_ratio(
+                rows, CLOCKS, log_ratio=LOG_RATIO, total=800.0
+            )
+            rows["count"] = rng.poisson(truth.expected).astype(float)
+            cohort[key] = cohort_of(rows, "SWR")
+    return cohort
+
+
+def test_the_reward_coefficient_is_q2(make_visit_rows, cohort_of) -> None:
+    """The two arrival curves are centered on the grid Q2 averages over, so
+    the outcome coefficient is Q2 itself (the weak penalty sits on the tested
+    log rate ratio): its estimate and standard error equal Q2's."""
+    cohort = _fixture_cohort(make_visit_rows, cohort_of)
+    settings = dataclasses.replace(DEFAULT, fit_by="animal")
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    (record,) = fit.records
+    j = record.coef_names.index(vr.REWARD)
+    q2 = unit_estimands(fit).set_index("estimand_id").loc["Q2"]
+    assert q2["supported"]
+    assert record.coef[j] == pytest.approx(q2["estimate"], abs=1e-10)
+    assert np.sqrt(record.vcov[j][j]) == pytest.approx(q2["se"], abs=1e-10)
+
+
+def _row_centered_fit(cohort, settings):
+    """Model A fitted with each arrival curve centered on its outcome's
+    pooled rows (the form before the change), through the fitter."""
+    sessions = {k: c.rows["A"] for k, c in cohort.items()}
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    terms = [
+        dataclasses.replace(t, center_on=None) if getattr(t, "center_on", None) else t
+        for t in vr.model_terms("A", "SWR", settings)
+    ]
+    design = build_design(terms, pooled, intercept=True, baseline=("(Intercept)",))
+    records = fit_sessions(
+        design,
+        sessions,
+        Poisson(),
+        model="row_centered",
+        kind="SWR",
+        response=vr.RESPONSE,
+        unit=vr.UNIT,
+        table_sha256={},
+        fit_by=settings.fit_by,
+    )
+    return design, records
+
+
+def test_the_centering_moves_only_where_the_prior_sits(
+    make_visit_rows, cohort_of
+) -> None:
+    """At a prior SD of 100 (the weak penalty all but off; 148 is the largest
+    the log penalty bounds allow) the window-centered
+    and the row-centered forms are the same model: Q1, Q2, the onset test,
+    Q7a and the fitted linear predictor agree (tolerance 1e-6)."""
+    cohort = _fixture_cohort(make_visit_rows, cohort_of)
+    settings = dataclasses.replace(DEFAULT, fit_by="animal", weak_prior_sd=100.0)
+    fit = vr.fit_visit_rate(
+        cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+    )
+    design, (record,) = _row_centered_fit(cohort, settings)
+    (new,) = fit.records
+    c_new = vr.declared_contrasts(fit.design, settings)
+    c_old = vr.declared_contrasts(design, settings)
+    for estimand_id in vr.RATE_ESTIMANDS:
+        a = fit.design.contrast_on(c_new[estimand_id], new.coef_names) @ np.asarray(
+            new.coef
+        )
+        b = design.contrast_on(c_old[estimand_id], record.coef_names) @ np.asarray(
+            record.coef
+        )
+        assert a == pytest.approx(b, abs=1e-6), estimand_id
+    sessions = {k: c.rows["A"] for k, c in cohort.items()}
+    for key, rows in sessions.items():
+        eta_new = fit.design.for_sessions(list(sessions)).build(
+            rows, np.full(len(rows), list(sessions).index(key))
+        ).X @ np.asarray(new.coef)
+        eta_old = design.for_sessions(list(sessions)).build(
+            rows, np.full(len(rows), list(sessions).index(key))
+        ).X @ np.asarray(record.coef)
+        np.testing.assert_allclose(eta_new, eta_old, atol=1e-6)
+
+
+def test_a_units_q2_does_not_depend_on_the_other_units(
+    make_visit_rows, cohort_of
+) -> None:
+    """At the decided prior SD of 2, an animal's Q2 is the same whether or
+    not another animal's sessions are in the pooled design (the arrival
+    curves' centering no longer reads the pooled rows)."""
+    both = _fixture_cohort(make_visit_rows, cohort_of, animals=("rat0", "rat1"))
+    alone = {k: v for k, v in both.items() if k[0] == "rat0"}
+    settings = dataclasses.replace(DEFAULT, fit_by="animal")
+    values = []
+    for cohort in (alone, both):
+        fit = vr.fit_visit_rate(
+            cohort, model="A", kind="SWR", settings=settings, allow_provisional="test"
+        )
+        table = unit_estimands(fit).set_index(["animal", "estimand_id"])
+        values.append(table.loc[("rat0", "Q2"), "estimate"])
+    assert values[0] == pytest.approx(values[1], abs=1e-8)
