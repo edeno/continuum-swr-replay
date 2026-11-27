@@ -388,7 +388,11 @@ class VisitRateSettings:
         is the earlier design, kept for the validation and for comparison.
         Each session keeps its own intercept (the baseline,
         ``declared_tests.BASELINES``); every other term is shared inside the
-        unit.
+        unit. That the clock curves are shared is the author's reading, not
+        the lead's words: the formula the lead agreed to (the twenty-sixth
+        round) has the session as an intercept only and no curve by session,
+        and the follow-up simulation supports it (per-session curves were the
+        worst form).
     log_penalties : mapping of str to float or None
         Curve column (or :data:`LAG_TERM`) -> a log penalty in place of the
         table's, for the calibration and the tests; None uses the table. A

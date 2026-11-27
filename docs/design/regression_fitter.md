@@ -681,7 +681,11 @@ leaves the two fields out of the comparison).
 or the session, the earlier design, for the validation and comparison. The intercept is
 the baseline of models A and D (`declared_tests.BASELINES`), so each session keeps its
 own intercept and every other term is shared in the unit: the clock curves, the reward
-terms and model D's lag curve. A unit's record holds its sessions' cohort counts, summed
+terms and model D's lag curve. Whose this is: the formula the lead agreed to in the
+twenty-sixth round has the session as an intercept only and no curve by session; that the
+clock curves are shared in the unit is the author's reading of that formula and of the
+twenty-fourth round, not the lead's words (the follow-up simulation supports it: per-session
+curves were the worst form; `2026-11-24-unit-of-fit.md`, section 11.4). A unit's record holds its sessions' cohort counts, summed
 (a nested count summed by its keys, a flag kept once). Model D's identifiability is
 judged on the unit's rows, with each session's intercept (`visit_rate.lag_curve_counts`):
 a session whose outcomes are all the same cannot identify the lag curve alone, but it can

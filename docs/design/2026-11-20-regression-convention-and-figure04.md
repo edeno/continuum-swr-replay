@@ -1179,15 +1179,20 @@ effect may change with time since arrival: it may, along the arrival clock only)
 **Built (2026-11-26, branch `rate-reward-form`; the author's note, not the lead's words).** The form
 is `visit_rate.REWARD_FORMS`' `"by_outcome"`, the default (`OMITTED_ARRIVAL_TERM`,
 `REWARDED_ARRIVAL_TERM`: each a smooth of the arrival clock `by` the last outcome, with its own
-constraint and penalty); `"time_varying"` is removed and `"coefficient"` stays for the secondary value
+penalty, each summing to zero over Q2's window grid, `ARRIVAL_CENTER_S`, so that the outcome
+coefficient is Q2 itself and the weak penalty sits on it: the coordinator's call); `"time_varying"` is removed and `"coefficient"` stays for the secondary value
 (`visit_rate.SECONDARY_ESTIMAND`, `"reward_coefficient"`). The two tests are `declared_tests` Q2
 (`Q2_WINDOW_S`, 4 to 10 s) and `Q2-onset` (`ONSET_WINDOW_S`, 2 to 4 s; the id is the author's, after
 the convention of `Q5b-var`), both `OutcomeWindowContrast`; Q1 reads the arrival curve after an
-omission. The support rule of a window (the author's rule, `visit_rate.window_support`): for each
-outcome and window a contrast reads, the unit's visits with a row there and their at-risk seconds;
-supported when every read has at least `support.MIN_UNITS` (5) visits; the counts are recorded beside
-each value, and a value without support is kept, marked and left out of the reduction. The difference
-curve is `visit_rate_statistics.difference_curves`, with its bands.
+omission. The support rule of a window (the author's rule, `visit_rate.window_support`, cut into parts
+by the coordinator's call): each range a contrast reads is cut into equal parts of at most
+`SUPPORT_PART_S` = 2 s (Q2: 4 to 6, 6 to 8, 8 to 10); for each part and each outcome the contrast
+reads, the unit's visits with a row there and their at-risk seconds; supported when every part has at
+least `support.MIN_UNITS` (5) visits. The counts are recorded per part; a value without support is
+NaN (its row and counts kept), counted by the reduction, and has no value in the simulation engine.
+The window tests are declared tests at the animal unit only (`visit_rate.WINDOW_TEST_UNIT`,
+`is_declared_test`); the summary leaves them out at another unit. The difference curve is
+`visit_rate_statistics.difference_curves`, with its bands.
 
 ### Twenty-seventh round (lead, 2026-11-26, 19:15): the rate model has two clocks
 

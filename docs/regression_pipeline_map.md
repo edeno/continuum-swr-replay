@@ -1710,25 +1710,25 @@ Model-free event-start rates on the three visit clocks, and how stops end.
 
 The visit rate model: event starts on the two visit clocks, models A and D.
 
-`CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `window_contrast`, `declared_contrasts`, `window_reads`, `window_support`, `difference_grid`, `difference_curve_rows`, `CohortRows`, `model_d_rows`, `lag_curve_counts`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `calibrate_log_penalty`
+`is_declared_test`, `CalibratedPenalty`, `VisitRateSettings`, `model_terms`, `tested_terms`, `require_declared_penalized`, `build_visit_rate_design`, `curve_rows`, `lag_curve_rows`, `window_contrast`, `declared_contrasts`, `window_reads`, `window_parts`, `window_support`, `difference_grid`, `difference_curve_rows`, `CohortRows`, `model_d_rows`, `lag_curve_counts`, `cohort_rows`, `VisitRateFit`, `fit_visit_rate`, `fit_visit_rate_session`, `calibrate_log_penalty`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_scenarios.py`
 
 Planted scenarios of the visit rate model, as pure functions of the rows.
 
-`interpolated_curve`, `PlantedClocks`, `window_means`, `Planted`, `Projection`, `poisson_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
+`interpolated_curve`, `PlantedClocks`, `window_means`, `Planted`, `Projection`, `poisson_projection`, `no_effect`, `constant_ratio`, `fading_ratio`, `session_log_ratios`, `differing_ratio`, `later_onset_after_omission`, `drop_before_leaving`, `drop_before_small_movements`, `RateTable`, `rate_table_from_bins`, `rate_table_truth`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_simulation.py`
 
 The visit rate model's scenario list for the simulation engine.
 
-`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `model_name`, `calibrate_clocks`, `simulation`, `table`
+`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `estimand_support`, `model_name`, `calibrate_clocks`, `simulation`, `table`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
 
 The estimands of the visit rate model, per unit of the fit and over units.
 
-`unit_estimands`, `summarize_estimands`, `lag_curves`, `difference_curves`, `lag_curve_band`, `difference_curve_band`
+`unit_estimands`, `settings_id`, `summarize_estimands`, `lag_curves`, `difference_curves`, `lag_curve_band`, `difference_curve_band`
 
 ### `src/continuum_swr_replay/analysis/replay_models/visit_design.py`
 

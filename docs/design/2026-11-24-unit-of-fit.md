@@ -399,7 +399,12 @@ because it shows what the animal unit hides: the variation between days and a tr
    the rate clocks at a larger unit. *(Decided 2026-11-25, the twenty-sixth round of
    `2026-11-20-regression-convention-and-figure04.md`: an arrival curve for each outcome with a window
    contrast answers the later-onset problem at the animal unit, read over 4 to 10 s (Q2) and 2 to 4 s
-   (the onset); the leaving curve shared.)*
+   (the onset); the leaving curve shared.)* The formula the lead agreed to there, `outcome + session + s(arrival, by =
+   outcome) + s(leaving) + offset(log exposure)`, has the session as an intercept only and no curve by
+   session. That the clock curves are shared in the unit is the author's reading of that formula and of
+   the twenty-fourth round, not words of the lead; the follow-up simulation supports it (per-session
+   curves were the worst form, `design_d_trial/rate/followup/REPORT.md`, section 2). The code builds the
+   shared curves (2026-11-26).
 2. Which target the paper states when sessions differ (section 6): the two differ by about 5 to 10 % at
    the variation simulated.
 3. Which unit the paper's headline values come from, after both are fitted and compared.

@@ -1067,7 +1067,7 @@ The lead (2026-11-26, 19:15): "no just two". The rate model has two clocks. Path
 | `visit_rate.third_clock_decision`, `ThirdClockDecision` (removed) | none | e680cffd |
 | `visit_rate_statistics.third_clock_q7a`, `ThirdClockQ7a` (removed) | none | e680cffd |
 | `visit_rate_scenarios.PlantedClocks.stretch` (removed) | none | e680cffd |
-| `visit_rate_scenarios.drop_before_small_movements` (removed in e680cffd) | restored, with `STRETCH_COLUMN` (the time-bin column it plants on; no model reads it) | the F4 commit, 2026-11-26 |
+| `visit_rate_scenarios.drop_before_small_movements` (removed in e680cffd) | restored, with `STRETCH_COLUMN` (the time-bin column it plants on; no model reads it) | a2982704 |
 | the stretch targets of `CLOCK_TARGETS` (removed) | none | e680cffd |
-| `visit_rate_simulation` scenario `"drop_before_small_movements"` and the stretch column of `synthetic_visit_rows` (removed in e680cffd) | restored, last in both kinds' lists | the F4 commit, 2026-11-26 |
+| `visit_rate_simulation` scenario `"drop_before_small_movements"` and the stretch column of `synthetic_visit_rows` (removed in e680cffd) | restored, last in both kinds' lists | a2982704 |
 | `tests/analysis/replay_models/rate/test_visit_rate.py::test_third_clock_rule`, `::test_third_clock_rule_at_its_boundary`, `::test_third_clock_rule_counts_units`; `test_visit_rate_statistics.py::test_q7a_with_and_without_the_third_clock`; `test_visit_rate_scenarios.py::test_a_stretch_curve_enters_the_rate` (removed) | none | e680cffd |

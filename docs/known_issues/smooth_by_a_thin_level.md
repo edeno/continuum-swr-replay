@@ -58,8 +58,8 @@ rewarded, which the task's reward probabilities make unlikely; it is not handled
 The declared form of the rate model meets the first case and not the second.
 
 - **A unit with 1 to 4 visits after an omission** (a session, or a day): the outcome
-  coefficient fails the support rule and is left out, so Q2 and the onset test have no
-  value; the arrival curve after an omission stays in the fit, fitted from those visits.
+  coefficient (which is Q2 itself since the arrival curves are centered on Q2's window)
+  fails the support rule and is left out, so Q2 and the onset test have no value; the arrival curve after an omission stays in the fit, fitted from those visits.
   Q1 reads that curve, so the rate model's window support rule
   (`visit_rate.window_support`; the author's rule, cut into parts of at most 2 s by the
   coordinator's call) marks Q1, Q2 and the onset test unsupported where fewer than

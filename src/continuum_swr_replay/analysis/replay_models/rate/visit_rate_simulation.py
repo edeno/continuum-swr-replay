@@ -69,10 +69,13 @@ of "no effect" (zero) and of "constant" (:data:`LOG_RATIO`) does not depend
 on the real outcome, nor do the fading, differing, later-onset and drop
 effects. The rate table's does (:data:`TRUTH_FROM_REAL_COUNTS`): its planted
 rate is a tabulation of the rows' REAL counts by outcome and both clocks
-(:func:`_rate_table`), and its "planted" Q1, Q2 and Q7a are an unpenalized
-Poisson projection of the model's coefficient form onto that tabulation
-(``visit_rate_scenarios.rate_table_truth``): in substance the real data's
-pooled model-free values, not a chosen truth. They are not a result and are
+(:func:`_rate_table`), and its "planted" values are unpenalized Poisson
+projections onto that tabulation (``visit_rate_scenarios.rate_table_truth``):
+for the by-outcome form, Q1, Q2, Q2-onset and Q7a from the projection with an
+arrival step for each outcome (the by-outcome projection); for the
+coefficient form, the reward coefficient of the projection with one arrival
+step and the coefficient. In substance they are the real data's pooled
+model-free values, not a chosen truth. They are not a result and are
 not to be quoted; the table carries ``truth_from_real_counts`` on its rows
 and the run's ``attrs`` the same note.
 
@@ -151,29 +154,28 @@ PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
 #: and the session for comparison).
 FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
 #: The target median edf of each curve at each decided unit's calibration:
-#: DECLARED SETTINGS OF THE AUTHOR, NOT validated. The evidence suggests about
-#: 15 effective parameters for each arrival curve and 10 or more for the
+#: DECLARED SETTINGS OF THE AUTHOR, NOT validated: the evidence's suggestion,
+#: about 15 effective parameters for each arrival curve and 10 or more for the
 #: leaving curve at the animal unit (``design_d_trial/rate/followup/REPORT.md``,
-#: section 6; the twenty-sixth round), and ran 10 per curve at the day. The
-#: curve after an omission cannot be calibrated to those targets on the first
-#: validation's synthetic cohort (measured 2026-11-26): the calibration's
-#: bisection tries a log penalty of -6.25 once the target is above the edf at
-#: -2.5 (11.8 for an animal, 9.4 for a day, with visits after an omission of
-#: 0.5 to 8 s), and there the curve, which has no row beyond the longest visit
-#: after an omission, runs away and the unit's first fit ends at the step
-#: limit, which stops the calibration (``calibration.log_penalty_for_edf``
-#: raises). So the curve after an omission takes 10 at the animal and 8 at the
-#: day, below those edfs; the other curves take the evidence's values. The
-#: coefficient form's shared arrival curve takes the rewarded curve's target.
+#: section 6; the twenty-sixth round), and 10 per curve at the day (the fixed
+#: value that section ran there). On the first validation's synthetic cohort
+#: (:data:`VALIDATION_COHORT`, the curves centered on Q2's window) every target
+#: is reached (measured 2026-11-26). The calibration stops, rather than
+#: leaving a unit out, when a unit's first fit at a trial penalty ends at the
+#: step limit (``sessions.py``, ``_Session.fit``, raises ``ValueError``; the
+#: calibration does not catch it): that happened on the earlier cohort whose
+#: visits after an omission ended by 8 s, at a log penalty of -6.25 for the
+#: curve after an omission. The coefficient form's shared arrival curve takes
+#: the arrival curves' target.
 CLOCK_TARGETS: dict[str, dict[str, float]] = {
     "day": {
-        vr.OMITTED_ARRIVAL_TERM: 8.0,
+        vr.OMITTED_ARRIVAL_TERM: 10.0,
         vr.REWARDED_ARRIVAL_TERM: 10.0,
         vr.ARRIVAL: 10.0,
         vr.LEAVING: 10.0,
     },
     "animal": {
-        vr.OMITTED_ARRIVAL_TERM: 10.0,
+        vr.OMITTED_ARRIVAL_TERM: 15.0,
         vr.REWARDED_ARRIVAL_TERM: 15.0,
         vr.ARRIVAL: 15.0,
         vr.LEAVING: 10.0,
