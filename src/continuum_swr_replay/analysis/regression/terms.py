@@ -98,7 +98,7 @@ reference level. A copy is named ``<name>@<animal>/<session_date>/<epoch>``
 (``(Intercept)@a/20260101/02_r1``, ``arm[3]@a/20260101/02_r1``) and is a
 ``level`` term whose level is the base level and the session key
 (``("(Intercept)", key)`` for the intercept, ``(column, value, key)`` for a
-level), with no dependents and its ``session`` set to the key. So the loop
+level), with no dependents and its ``group`` set to the key. So the loop
 judges and drops it as a level, on its session's rows: an intercept copy that
 fails the support rule, or that the refit leaves out, drops its session's rows
 from the fit; a level copy that fails drops that level's rows in its session
@@ -110,11 +110,40 @@ baseline is never tested and never read by a contrast. The collinearity
 record projects the copies out, as it does the intercept, and neither the edf
 nor :attr:`Design.term_columns` holds them. In a fit of one session nothing is
 copied.
+
+Day copies (``docs/design/2026-11-24-unit-of-fit.md``, section 4.1). A model
+may declare tested categories whose coded levels are estimated for each
+recording day inside a fit of several days (``per_day``, checked once, by
+:meth:`Design.with_per_day`): only the column of a penalized :class:`Category`
+term that is not a baseline (the coordinator's call, 2026-11-27, not the
+lead's: no slope is copied until the families' coding of a tested 0/1 term is
+decided). In a fit whose sessions span two days or more
+(:meth:`Design.for_sessions`) each coded level of such a category is replaced
+by one copy for each day (``unit_key(key, "day")``, in the order of the days'
+first sessions), zero on the other days' rows, named
+``<name>@<animal>/<session_date>`` (``role[current]@a/20260101``): a ``level``
+term whose level is ``(column, value, day)``, with no dependents and its
+``group`` set to the day's key. Unlike a baseline copy each day copy keeps the
+base level's penalty, in its own block at the base level's log penalty, and it
+is a column of its category's model term: the edf has an entry for each copy
+and the category's total, and the collinearity record measures the copies
+with the term (only the intercept and the baseline copies are projected out).
+A term ``by`` the category stays shared: it reads the level's rows of every
+day. The loop judges and drops a day copy as any level: one that fails the
+support rule drops that level's rows on that day, counted under the copy's
+name; the terms by the level keep their other rows. The category's reference
+level must have rows on every day of the fit. A declared contrast reads such a
+level as the plain mean of its active copies (:meth:`Design.contrast_on`): the
+weight ``1/n`` on each of the ``n`` copies not left out, so the variance is
+the exact ``c' V c``; with every copy left out it reads them all, and the
+estimand has no value, for their cause (:meth:`Design.copies_of` lets a
+caller count the copies left out). In a fit of one day nothing of the
+category is copied, so the fit is the shared fit.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Literal, NamedTuple
@@ -122,7 +151,7 @@ from typing import Literal, NamedTuple
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.tables.session_keys import SessionKey
+from continuum_swr_replay.tables.session_keys import SessionKey, unit_key
 
 from .constants import LOG_PENALTY_BOUNDS
 from .pspline import PSplineBasis, sum_to_zero_constraint
@@ -161,9 +190,11 @@ SMALLEST_COLUMN_SIZE = 1e-2
 INTERCEPT = "(Intercept)"
 
 
-def copy_name(name: str, key: SessionKey) -> str:
-    """The name of a session's copy of a baseline term or coefficient:
-    ``<name>@<animal>/<session_date>/<epoch>``."""
+def copy_name(name: str, key: tuple) -> str:
+    """The name of a copy of a term or coefficient for a group of a fit's
+    rows: ``<name>@<animal>/<session_date>/<epoch>`` for a session's copy of a
+    baseline, ``<name>@<animal>/<session_date>`` for a day's copy of a per-day
+    level."""
     return f"{name}@{'/'.join(key)}"
 
 
@@ -504,9 +535,10 @@ class DesignTerm:
         For a level, the names of the terms fitted for it: when the level is
         removed from a session, its rows are dropped (not merged into the
         reference level) and these terms leave with it.
-    session : tuple or None
-        For a session's copy of a baseline term (module docstring), the
-        session's key; None otherwise.
+    group : tuple or None
+        For a copy (module docstring), the key of the rows it is the term of:
+        a session's key for a baseline copy, a day's key for a day copy;
+        None otherwise.
     """
 
     name: str
@@ -517,12 +549,13 @@ class DesignTerm:
     covariate: str | None = None
     block: int | None = None
     dependents: tuple[str, ...] = ()
-    session: tuple | None = None
+    group: tuple | None = None
 
     @property
     def is_copy(self) -> bool:
-        """A session's copy of a baseline term (module docstring)."""
-        return self.session is not None
+        """A copy of a term for one group of a fit's rows: a session's copy of
+        a baseline, or a day's copy of a per-day level (module docstring)."""
+        return self.group is not None
 
     @property
     def reads(self) -> tuple | None:
@@ -898,8 +931,11 @@ class Design:
         The baseline terms (module docstring): ``(Intercept)`` or a category's
         column.
     sessions : tuple of SessionKey
-        The sessions of a fit whose baselines are copied
-        (:meth:`for_sessions`); empty for the design of the pooled rows.
+        The sessions of a fit whose terms are copied (:meth:`for_sessions`);
+        empty for the design of the pooled rows.
+    per_day : tuple of str
+        The categories whose coded levels are copied for each day in a fit of
+        several days (module docstring, "Day copies"; :meth:`with_per_day`).
     """
 
     terms: tuple[DesignTerm, ...]
@@ -910,6 +946,7 @@ class Design:
     _built: tuple[_Built, ...] = field(repr=False)
     baseline: tuple[str, ...] = ()
     sessions: tuple[SessionKey, ...] = ()
+    per_day: tuple[str, ...] = ()
     # A design with copies: the design of the pooled rows, and for each column
     # the base column it copies.
     _base: Design | None = field(default=None, repr=False)
@@ -936,13 +973,18 @@ class Design:
         """The intercept's column (0); None without one."""
         return 0 if self.terms and self.terms[0].kind == "intercept" else None
 
+    def is_baseline_copy(self, term: DesignTerm) -> bool:
+        """``term`` is a session's copy of a baseline (a day copy is not)."""
+        return term.is_copy and term.term in self.baseline
+
     @property
     def term_columns(self) -> dict[str, np.ndarray]:
         """Model term name -> its column indices, in column order (the
-        intercept and the baseline copies are not terms)."""
+        intercept and the baseline copies are not terms; a day copy is a
+        column of its category's term)."""
         out: dict[str, list[np.ndarray]] = {}
         for term in self.terms:
-            if term.kind != "intercept" and not term.is_copy:
+            if term.kind != "intercept" and not self.is_baseline_copy(term):
                 out.setdefault(term.term, []).append(term.columns)
         return {name: np.concatenate(parts) for name, parts in out.items()}
 
@@ -953,7 +995,7 @@ class Design:
         return [
             int(j)
             for term in self.terms
-            if term.kind == "intercept" or term.is_copy
+            if term.kind == "intercept" or self.is_baseline_copy(term)
             for j in term.columns
         ]
 
@@ -962,8 +1004,8 @@ class Design:
         column order; empty without copies."""
         out: dict[tuple, list[str]] = {key: [] for key in self.sessions}
         for term in self.terms:
-            if term.is_copy:
-                out[term.session] += [self.coef_names[j] for j in term.columns]
+            if self.is_baseline_copy(term):
+                out[term.group] += [self.coef_names[j] for j in term.columns]
         return out
 
     def baseline_read(self, c: np.ndarray) -> list[str]:
@@ -975,16 +1017,38 @@ class Design:
             if self.column_terms[j].term in self.baseline
         ]
 
-    def contrast_on(self, c: np.ndarray, coef_names: Sequence[str]) -> np.ndarray:
+    @staticmethod
+    def copies_of(name: str, coef_names: Sequence[str]) -> list[str]:
+        """The copies of the coefficient ``name`` among a fit's
+        ``coef_names`` (those named ``<name>@...``), in their order."""
+        prefix = f"{name}@"
+        return [n for n in coef_names if n.startswith(prefix)]
+
+    def contrast_on(
+        self,
+        c: np.ndarray,
+        coef_names: Sequence[str],
+        left_out: Mapping[str, str] | Sequence[str] = (),
+    ) -> np.ndarray:
         """``c`` over this design's coefficients as a contrast of a fit whose
-        coefficients are ``coef_names`` (a fit of one unit, whose baseline
-        copies replace the design's baselines), by name.
+        coefficients are ``coef_names`` (a fit of one unit, whose copies
+        replace the design's baselines and per-day levels), by name.
+
+        An entry on a coefficient of the fit maps to it. An entry on a
+        per-day level copied in the fit reads the plain mean of its active
+        copies (module docstring, "Day copies"): ``c_j / n`` on each of the
+        ``n`` copies not in ``left_out``; when every copy is left out,
+        ``c_j / n`` on all of them, so that the contrast reads the coefficients
+        left out and has no value, for their cause. Without ``left_out`` a
+        copy left out is read, and the estimate is NaN, never a wrong number.
 
         Parameters
         ----------
         c : np.ndarray, shape (n_coef,)
         coef_names : sequence of str
             The fit's coefficient names (a record's ``coef_names``).
+        left_out : mapping or sequence of str
+            The fit's coefficients left out (a record's ``left_out``).
 
         Returns
         -------
@@ -993,8 +1057,9 @@ class Design:
         Raises
         ------
         ValueError
-            If ``c`` reads a baseline: a baseline has one copy per session in
-            a fit of several sessions, and no contrast reads it.
+            If ``c`` reads a baseline (a baseline has one copy per session in
+            a fit of several sessions, and no contrast reads it), or a
+            coefficient that is neither in the fit nor copied there.
         """
         read = self.baseline_read(c)
         if read:
@@ -1002,13 +1067,79 @@ class Design:
         index = {name: j for j, name in enumerate(coef_names)}
         out = np.zeros(len(coef_names))
         for j in np.flatnonzero(c):
-            out[index[self.coef_names[j]]] = c[j]
+            name = self.coef_names[j]
+            if name in index:
+                out[index[name]] = c[j]
+                continue
+            copies = self.copies_of(name, coef_names)
+            if not copies:
+                raise ValueError(
+                    f"{name!r} is neither a coefficient of the fit nor copied in it"
+                )
+            active = [n for n in copies if n not in left_out] or copies
+            for n in active:
+                out[index[n]] = c[j] / len(active)
         return out
+
+    def with_per_day(self, per_day: Sequence[str]) -> Design:
+        """This design with ``per_day`` the categories whose coded levels are
+        copied for each day in a fit of several days (module docstring, "Day
+        copies"); the one check of what may be declared.
+
+        Parameters
+        ----------
+        per_day : sequence of str
+            Columns of penalized :class:`Category` terms of the design that
+            are not baselines, each once.
+
+        Returns
+        -------
+        Design
+
+        Raises
+        ------
+        ValueError
+            If a name is not the column of a penalized category term (a slope,
+            a smooth, a lag functional, the intercept, an unpenalized category
+            or an unknown name: only a category's coded levels are copied; no
+            slope is), is a baseline, or repeats; if a coefficient name of a
+            design that declares one holds ``'@'`` (the copies' separator); or
+            if the design is a fit's (:meth:`for_sessions`).
+        """
+        per_day = tuple(per_day)
+        if self._base is not None:
+            raise ValueError("per_day is declared on the design of the pooled rows")
+        penalized = {
+            b.term.column
+            for b in self._built
+            if isinstance(b.term, Category) and b.log_penalty is not None
+        }
+        baseline = [name for name in per_day if name in self.baseline]
+        if baseline:
+            raise ValueError(f"per_day: {baseline} is a baseline, copied per session")
+        wrong = [name for name in per_day if name not in penalized]
+        if wrong:
+            raise ValueError(
+                f"per_day copies only the coded levels of a penalized Category "
+                f"term that is not a baseline, not {wrong} (the design's: "
+                f"{sorted(penalized)}); no slope is copied: how a tested 0/1 term "
+                "enters the per-day rule is not decided"
+            )
+        if len(set(per_day)) != len(per_day):
+            raise ValueError(f"per_day names repeat: {list(per_day)}")
+        marked = [n for n in self.coef_names if "@" in n]
+        if per_day and marked:
+            raise ValueError(
+                f"per_day: coefficient names with '@', the copies' separator: {marked}"
+            )
+        return replace(self, per_day=per_day)
 
     def for_sessions(self, keys: Sequence[SessionKey]) -> Design:
         """The design of one fit of the sessions ``keys``: each baseline term
-        copied for each session (module docstring); this design itself for
-        one session or without a baseline.
+        copied for each session when there are two sessions or more, and each
+        coded level of a per-day category for each day when they span two
+        days or more (module docstring); this design itself when nothing is
+        copied.
 
         Parameters
         ----------
@@ -1020,24 +1151,32 @@ class Design:
         Design
             Its :meth:`build` takes each row's place in ``keys``.
         """
-        if len(keys) < 2 or not self.baseline:
+        keys = [tuple(key) for key in keys]
+        days = list(dict.fromkeys(unit_key(key, "day") for key in keys))
+        groups = {
+            **dict.fromkeys(self.baseline if len(keys) > 1 else (), keys),
+            **dict.fromkeys(self.per_day if len(days) > 1 else (), days),
+        }
+        if not groups:
             return self
-        terms, source, blocks, names = [], [], [], []
+        terms, source, blocks, rho, names = [], [], [], [], []
         for term in self.terms:
-            copied = term.term in self.baseline
-            for key in keys if copied else [None]:
+            for group in groups.get(term.term, [None]):
                 columns = np.arange(len(source), len(source) + term.columns.size)
                 source.extend(term.columns.tolist())
-                if not copied:  # a baseline has no penalty (build_design)
-                    block = None
-                    if term.block is not None:
-                        block = len(blocks)
-                        blocks.append(PenaltyBlock(columns, self.blocks[term.block].S))
+                block = None
+                if term.block is not None:  # never a baseline's (build_design)
+                    block = len(blocks)
+                    blocks.append(PenaltyBlock(columns, self.blocks[term.block].S))
+                    rho.append(self.log_penalties[term.block])
+                if group is None:
                     names.extend(self.coef_names[j] for j in term.columns)
                     terms.append(replace(term, columns=columns, block=block))
                     continue
-                level = (INTERCEPT, key) if term.level is None else (*term.level, key)
-                names.append(copy_name(term.name, key))
+                level = (
+                    (INTERCEPT, group) if term.level is None else (*term.level, group)
+                )
+                names.append(copy_name(term.name, group))
                 terms.append(
                     DesignTerm(
                         names[-1],
@@ -1045,7 +1184,8 @@ class Design:
                         "level",
                         columns,
                         level=level,
-                        session=tuple(key),
+                        block=block,
+                        group=group,
                     )
                 )
         return replace(
@@ -1053,7 +1193,8 @@ class Design:
             terms=tuple(terms),
             coef_names=tuple(names),
             blocks=tuple(blocks),
-            sessions=tuple(tuple(key) for key in keys),
+            log_penalties=np.array(rho, dtype=float),
+            sessions=tuple(keys),
             _base=self,
             _source=np.array(source, dtype=int),
         )
@@ -1160,24 +1301,22 @@ class Design:
         self, rows: pd.DataFrame, session: np.ndarray | None
     ) -> SessionDesign:
         """:meth:`build` of a design with copies: the base design's columns,
-        each copy zero outside its session's rows (which lie together)."""
+        each copy zero outside its group's rows (the rows of the sessions
+        whose key starts with the group's key)."""
         if session is None or len(session) != len(rows):
-            raise ValueError("a design with baseline copies needs each row's session")
+            raise ValueError("a design with copies needs each row's session")
         base = self._base.build(rows)
         X = np.zeros((len(rows), len(self.coef_names)))
-        place = {key: s for s, key in enumerate(self.sessions)}
-        bounds = np.searchsorted(session, np.arange(len(self.sessions) + 1))
         level_rows = dict(base.level_rows)
         for term in self.terms:
             source = self._source[term.columns]
             if not term.is_copy:
                 X[:, term.columns] = base.X[:, source]
                 continue
-            s = place[term.session]
-            own = slice(bounds[s], bounds[s + 1])
-            X[own, term.columns] = base.X[own, source]
-            rows_of = np.zeros(len(rows), dtype=bool)
-            rows_of[own] = True
+            group = term.group
+            mine = np.array([key[: len(group)] == group for key in self.sessions])
+            rows_of = mine[session]
+            X[np.ix_(rows_of, term.columns)] = base.X[np.ix_(rows_of, source)]
             level_rows[term.level] = (
                 rows_of
                 if term.level[0] == INTERCEPT
@@ -1282,6 +1421,7 @@ def build_design(
     *,
     intercept: bool,
     baseline: Sequence[str] = (),
+    per_day: Sequence[str] = (),
 ) -> Design:
     """Build a model's terms on its pooled rows.
 
@@ -1300,6 +1440,10 @@ def build_design(
         The model's baseline terms, copied for each session in a fit of
         several sessions (module docstring): ``(Intercept)`` (with
         ``intercept``) or the column of a :class:`Category` term.
+    per_day : sequence of str
+        The columns of penalized :class:`Category` terms, not baselines,
+        whose coded levels are copied for each day in a fit of several days
+        (module docstring, "Day copies"; :meth:`Design.with_per_day`).
 
     Returns
     -------
@@ -1310,7 +1454,8 @@ def build_design(
     ValueError
         If a term fails the design check on the pooled rows that are not
         missing (a units problem), naming it; if a baseline is not the
-        intercept or a category term of the design.
+        intercept or a category term of the design; if ``per_day`` is not
+        what :meth:`Design.with_per_day` takes.
     """
     offsets = [term for term in terms if isinstance(term, Offset)]
     if len(offsets) > 1:
@@ -1398,4 +1543,4 @@ def build_design(
         )
     design = replace(design, baseline=tuple(baseline))
     design._check_pooled(pooled_rows, levels)
-    return design
+    return design.with_per_day(per_day)

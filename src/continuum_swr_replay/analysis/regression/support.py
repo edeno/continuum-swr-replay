@@ -49,7 +49,12 @@ variance's false positives in simulation, to 20 % in one case), and every term
 by that level leaves the session with them (the level's
 ``DesignTerm.dependents``; :mod:`.sessions` applies the rule). The
 same row rule holds for a level made inactive because the session has no
-finite maximum along it.
+finite maximum along it. A copy of a level for a group of a unit's rows (a
+session's copy of a baseline, a day's copy of a per-day level;
+:mod:`.terms`) is a level of that group: it is counted on every row of the
+fit (it is zero outside its group), and when it fails, the rows of its level
+in its group are dropped and counted under its name. A copy has no
+dependents: a term by a per-day level is shared and keeps its other rows.
 """
 
 from __future__ import annotations

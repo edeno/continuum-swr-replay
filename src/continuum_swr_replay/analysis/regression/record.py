@@ -89,7 +89,9 @@ class FitRecord:
         without a fit. For a penalized category, the category's entry is the
         sum of its levels' entries, so a total over all entries counts those
         levels twice: sum the model terms only (the entries that are not a
-        level's coefficient name).
+        level's coefficient name). A day copy of a per-day level
+        (:mod:`.terms`, "Day copies") is such a level: it has its own entry,
+        by its copy's name, and the category's entry sums the copies.
     status : str
         The last fit's ``NewtonFit.status``; only "converged" is a kept fit.
         "not fitted" when no fit was tried: no rows, or no events, left to
@@ -126,11 +128,14 @@ class FitRecord:
         One entry per session in the fit, in the order of its rows:
         ``animal``, ``session_date``, ``epoch``; ``n_rows``, ``n_units`` and
         ``n_events`` the fit saw of it; ``rows_missing_values``,
-        ``rows_dropped`` (a dropped level or baseline copy -> its rows in
-        the session, where above zero) and, under the grouped softmax,
-        ``events_emptied_by_dropped_rows`` and ``events_without_response``;
-        and ``baseline``, the coefficient names of the session's baseline
-        copies (empty in a fit of one session, where nothing is copied).
+        ``rows_dropped`` (a dropped level, baseline copy or day copy -> its
+        rows in the session, where above zero) and, under the grouped
+        softmax, ``events_emptied_by_dropped_rows`` and
+        ``events_without_response``; and ``baseline``, the coefficient names
+        of the session's baseline copies (empty in a fit of one session,
+        where nothing is copied; a day copy is not a baseline and is not
+        listed: its name carries its day). A copy left out, its support and
+        its edf are in ``left_out``, ``support`` and ``edf`` by its name.
     """
 
     model: str

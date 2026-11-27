@@ -11,9 +11,11 @@ the information ``H`` (:func:`weighted_design`):
 
 When the design has an intercept it is projected out of every other column
 first (in a fit of several sessions, the baseline copies of each session,
-``terms.py``, in its place), so a term's measures are about the variation the intercept does not
-explain (else a 0/1 column whose mean is 0.85 would count as 85 % explained by
-the intercept alone). Then, for each term ``i`` with columns ``Xi`` and the
+``terms.py``, in its place; a day copy of a per-day level is not projected
+out: it is an ordinary column of its category's term, one of the shared
+columns of each session's block), so a term's measures are about the
+variation the intercept does not explain (else a 0/1 column whose mean is
+0.85 would count as 85 % explained by the intercept alone). Then, for each term ``i`` with columns ``Xi`` and the
 other terms' columns ``X0``, QR of ``[X0, Xi]`` gives
 ``R = [[R00, R0i], [0, Rii]]`` and mgcv's three concurvity measures
 (``concurvity(fit, full = TRUE)``; :func:`concurvity`):
@@ -243,8 +245,10 @@ def term_collinearity(
         none. Each must be active.
     session_copies : sequence of (slice, sequence of int), or None
         In a fit of several sessions with baseline copies, each session's
-        rows (contiguous) and its active copy columns. Then each session's
-        copies are projected out of its own rows (a copy is zero on the
+        rows (contiguous) and its active baseline copy columns (a day copy
+        of a per-day level is a column of its term, among the shared ones).
+        Then each session's copies are projected out of its own rows (a copy
+        is zero on the
         other sessions' rows, also once weighted, so the copies of different
         sessions are orthogonal): for each session, the weighted rows of its
         copies and of the other active columns, the copies' range (their

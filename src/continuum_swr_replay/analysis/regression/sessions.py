@@ -18,11 +18,12 @@ sessions:
 - the support unit is coded within each session and then offset, so that a
   unit id that starts again in every session (a well visit) is a different
   unit in each session;
-- each baseline term of the design is copied for each session
-  (:meth:`.terms.Design.for_sessions`). A copy is a level, so the steps below
-  judge and drop it as a level; what that drops is stated once, in
-  :mod:`.terms` ("Baselines"). A copy's dropped rows are counted under
-  ``rows_dropped`` by the copy's name.
+- each baseline term of the design is copied for each session, and each
+  coded level of a per-day category for each day when the sessions span two
+  days or more (:meth:`.terms.Design.for_sessions`). A copy is a level, so the
+  steps below judge and drop it as a level; what that drops is stated once, in
+  :mod:`.terms` ("Baselines", "Day copies"). A copy's dropped rows are counted
+  under ``rows_dropped`` by the copy's name.
 
 The fit's design is built once, on all its rows; from then on one mask over
 those rows says which are kept, with one reason for each row removed, and the
@@ -41,8 +42,9 @@ design of the kept rows is a slice. For each fit, in order:
    zero (Poisson, Bernoulli, grouped softmax) is refused on the rows given,
    before any row is removed.
    At the fixed point, a category without rows of its reference level on the
-   rows kept (in the fit; in a session, for a baseline category's copies) is
-   an error naming the fit, the category and the level, penalized or not.
+   rows kept (in the fit; in a session, for a baseline category's copies; on
+   a day, for a per-day category's copies) is an error naming the fit, the
+   category and the level, penalized or not.
 3. Every other term is judged once, on the final rows: one that fails the
    support rule (or the design check in the session) is inactive in the fit.
    The record holds those counts, and for a removed level the counts that
@@ -279,14 +281,16 @@ class _Session:
 
     def _require_reference_rows(self) -> None:
         """Refuse a category without rows of its reference level on the rows
-        kept: in the fit, and, for a baseline category copied for each
-        session, in each session with rows kept (:mod:`.terms`).
+        kept: in the fit, and, for a category whose levels are copied, in
+        each group of its copies with rows kept (each session for a baseline
+        category, each day for a per-day category; :mod:`.terms`).
 
         Raises
         ------
         ValueError
             Naming the fit, the category, its reference level (and the
-            session, for a copy) and its levels' active coefficients.
+            session or the day, for a copy) and its levels' active
+            coefficients.
         """
         kept_session = self.session[self.kept]
         for category in self.design.categories:
@@ -295,33 +299,36 @@ class _Session:
                 for t in self.design.terms
                 if t.kind == "level" and t.term == category.column
             ]
-            if any(t.is_copy for t in levels):
-                groups = [
-                    (key, kept_session == s)
-                    for s, key in enumerate(self.keys)
-                    if np.any(kept_session == s)
-                ]
-            else:
-                groups = [(None, np.ones(kept_session.size, dtype=bool))]
+            groups = list(dict.fromkeys(t.group for t in levels))
             # An uncoded level's rows are zero in the columns too, but they are
             # not the reference's rows.
             uncoded = np.zeros(kept_session.size, dtype=bool)
             for level in category.uncoded:
                 uncoded |= self.level_rows[category.column, level][self.kept]
-            for key, rows in groups:
-                own = [t for t in levels if key is None or t.session == key]
+            for group in groups:
+                mine = [group is None or k[: len(group)] == group for k in self.keys]
+                rows = np.array(mine, dtype=bool)[kept_session]
+                if not rows.any():
+                    continue
+                own = [t for t in levels if t.group == group]
                 columns = [int(j) for t in own for j in t.columns]
                 at_zero = np.all(self.X_kept[np.ix_(rows, columns)] == 0, axis=1)
                 if np.any(at_zero & ~uncoded[rows]):
                     continue
-                where = "" if key is None else f" in session {'/'.join(key)}"
+                where = (
+                    ""
+                    if group is None
+                    else f" {'in session' if len(group) == 3 else 'on day'} "
+                    f"{'/'.join(group)}"
+                )
                 active = ", ".join(t.name for t in own if t.name not in self.removed)
                 raise ValueError(
                     f"{self.name}: the category {category.column!r} has no rows of "
                     f"its reference level {category.reference!r}{where} on the rows "
                     f"kept, so its levels {active} are not identified (a category's "
-                    "reference level must have rows in every fit, and a baseline "
-                    "category's in every session of the fit)"
+                    "reference level must have rows in every fit, a baseline "
+                    "category's in every session of the fit and a per-day "
+                    "category's on every day of it)"
                 )
 
     def left_out(self) -> dict[str, str]:
@@ -399,9 +406,9 @@ class _Session:
     def session_entries(self) -> list[dict]:
         """Each session of the fit: its key, the rows, units and events the fit
         saw of it, the rows and events removed by reason
-        (:meth:`cohort_counts` on its rows, a dropped level only where it
-        dropped rows of the session) and the names of its baseline copies
-        (the record's ``sessions``)."""
+        (:meth:`cohort_counts` on its rows, a dropped level or copy only
+        where it dropped rows of the session) and the names of its baseline
+        copies, not its day copies (the record's ``sessions``)."""
         baselines = self.design.session_baselines()
         out = []
         for s, key in enumerate(self.keys):
@@ -546,9 +553,13 @@ def _edf(
     edf from the fit and an unpenalized one's active columns. A level of a
     penalized category has its own entry too, by its coefficient name, and
     the category's entry is the sum of those: a total over all entries
-    counts the levels twice."""
+    counts the levels twice. A day copy of a level is such a level."""
     penalized = dict(zip(block_terms, fit.edf.tolist(), strict=True))
-    terms = [t for t in design.terms if t.kind != "intercept" and not t.is_copy]
+    terms = [
+        t
+        for t in design.terms
+        if t.kind != "intercept" and not design.is_baseline_copy(t)
+    ]
     part = {
         t.name: penalized.get(t.name, float(active[t.columns].sum())) for t in terms
     }
@@ -599,7 +610,8 @@ def _session_copies(
     session: _Session, beta: np.ndarray
 ) -> list[tuple[slice, list[int]]] | None:
     """Each session's kept rows (contiguous in the fit's rows) and its active
-    baseline copies, for the collinearity record; None without copies."""
+    baseline copies, for the collinearity record (a day copy is a column of
+    its term, not projected out); None without copies."""
     design = session.design
     if not design.sessions:
         return None
@@ -607,10 +619,8 @@ def _session_copies(
     bounds = np.searchsorted(codes, np.arange(len(design.sessions) + 1))
     copies = {key: [] for key in design.sessions}
     for term in design.terms:
-        if term.is_copy:
-            copies[term.session] += [
-                int(j) for j in term.columns if np.isfinite(beta[j])
-            ]
+        if design.is_baseline_copy(term):
+            copies[term.group] += [int(j) for j in term.columns if np.isfinite(beta[j])]
     return [
         (slice(int(bounds[s]), int(bounds[s + 1])), copies[key])
         for s, key in enumerate(design.sessions)

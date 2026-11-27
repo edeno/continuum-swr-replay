@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
     GroupedSoftmax,
@@ -693,7 +694,7 @@ def test_baseline_copies_per_session() -> None:
         ]
     ).astype(float)
     np.testing.assert_array_equal(built.X, expected)
-    copies = [t for t in unit.terms if t.session is not None]
+    copies = [t for t in unit.terms if t.group is not None]
     assert [t.kind for t in copies] == ["level"] * 6
     assert all(t.dependents == () for t in copies)
     np.testing.assert_array_equal(
@@ -800,3 +801,222 @@ def test_a_smooth_centered_on_declared_points() -> None:
     np.testing.assert_array_equal(plain.build(rows).X, again.build(rows).X)
     with pytest.raises(ValueError, match="center_on"):
         Smooth("t", 0.0, 20.0, 12, 1.0, center_on=(25.0,))
+
+
+# --- per-day copies of a tested category's levels ----------------------------------
+
+DAY_KEYS = [
+    ("an", "d1", "e1"),
+    ("an", "d1", "e2"),
+    ("an", "d2", "e1"),
+    ("an", "d2", "e2"),
+]
+
+
+def _per_day_rows() -> pd.DataFrame:
+    """Twelve rows, three per session of :data:`DAY_KEYS`: an arm (a baseline),
+    a role (tested, weak) and a covariate ``x``."""
+    return pd.DataFrame(
+        {
+            "arm": ["a", "b", "c"] * 4,
+            "role": ["oth", "cur", "prev", "cur", "oth", "prev"] * 2,
+            "x": np.linspace(-1.0, 2.0, 12),
+        }
+    )
+
+
+WEAK_ROLE = Category(
+    "role", ("cur", "prev", "oth"), "oth", log_penalty_from_prior_sd(8.0)
+)
+
+
+def _per_day_design(rows: pd.DataFrame, per_day=("role",)):
+    return build_design(
+        [
+            Category("arm", ("a", "b", "c"), reference="a", penalty="none"),
+            WEAK_ROLE,
+            Slope("x", log_penalty_from_prior_sd(2.0), by=WEAK_ROLE, levels=("cur",)),
+        ],
+        rows,
+        intercept=False,
+        baseline=("arm",),
+        per_day=per_day,
+    )
+
+
+def test_per_day_copies_named_and_penalized() -> None:
+    """In a fit of two days, each coded level of a per-day category has one
+    copy per day, named by the day, zero on the other day's rows, each in its
+    own penalty block at the base level's log penalty; the copies are columns
+    of the category's term, not projected out and not baselines. A term by the
+    category stays shared. Within one day nothing of the category is
+    copied."""
+    rows = _per_day_rows()
+    design = _per_day_design(rows)
+    assert design.per_day == ("role",)
+    unit = design.for_sessions(DAY_KEYS)
+    sessions = ["/".join(k) for k in DAY_KEYS]
+    assert unit.coef_names == (
+        *(f"arm[b]@{s}" for s in sessions),
+        *(f"arm[c]@{s}" for s in sessions),
+        "role[cur]@an/d1",
+        "role[cur]@an/d2",
+        "role[prev]@an/d1",
+        "role[prev]@an/d2",
+        "x:role=cur",
+    )
+    copies = [t for t in unit.terms if t.term == "role"]
+    assert [t.group for t in copies] == [("an", "d1"), ("an", "d2")] * 2
+    assert all(t.kind == "level" and t.dependents == () for t in copies)
+    assert [t.group for t in unit.terms if t.term == "arm"] == DAY_KEYS * 2
+    rho_role = log_penalty_from_prior_sd(8.0)
+    np.testing.assert_array_equal(
+        unit.log_penalties, [rho_role] * 4 + [log_penalty_from_prior_sd(2.0)]
+    )
+    assert [b.columns.tolist() for b in unit.blocks] == [[8], [9], [10], [11], [12]]
+    assert all(np.array_equal(b.S, np.eye(1)) for b in unit.blocks)
+    assert [t.block for t in copies] == [0, 1, 2, 3]
+    assert {k: v.tolist() for k, v in unit.term_columns.items()} == {
+        "role": [8, 9, 10, 11],
+        "x:role=cur": [12],
+    }
+    assert unit.projected_columns == list(range(8))
+    assert unit.session_baselines() == {
+        key: [f"arm[b]@{s}", f"arm[c]@{s}"]
+        for key, s in zip(DAY_KEYS, sessions, strict=True)
+    }
+    session = np.repeat(np.arange(4), 3)
+    built = unit.build(rows, session)
+    base = design.build(rows)
+    day1 = session < 2
+    cur, prev = (
+        design.coef_names.index("role[cur]"),
+        design.coef_names.index("role[prev]"),
+    )
+    np.testing.assert_array_equal(built.X[:, 8], base.X[:, cur] * day1)
+    np.testing.assert_array_equal(built.X[:, 9], base.X[:, cur] * ~day1)
+    np.testing.assert_array_equal(built.X[:, 11], base.X[:, prev] * ~day1)
+    np.testing.assert_array_equal(built.X[:, 12], base.X[:, -1])
+    np.testing.assert_array_equal(
+        built.level_rows[("role", "cur", ("an", "d2"))],
+        (rows["role"] == "cur").to_numpy() & ~day1,
+    )
+    # One day: the arms are copied, the role is not.
+    one_day = design.for_sessions(DAY_KEYS[:2])
+    assert [n for n in one_day.coef_names if "@" not in n] == [
+        "role[cur]",
+        "role[prev]",
+        "x:role=cur",
+    ]
+    np.testing.assert_array_equal(one_day.log_penalties, design.log_penalties)
+    assert design.for_sessions(DAY_KEYS[:1]) is design
+    # Without per_day the role is never copied.
+    shared = _per_day_design(rows, per_day=()).for_sessions(DAY_KEYS)
+    assert shared.per_day == () and "role[cur]" in shared.coef_names
+
+
+def test_contrast_on_mean_of_active_copies() -> None:
+    """A contrast's entry on a per-day level reads the plain mean of the fit's
+    active copies of it: weight 1/n on each of the n copies not left out; with
+    every copy left out, 1/n on all of them, so the estimate is NaN; the
+    variance is the exact c'Vc. A baseline is still refused, a name neither in
+    the fit nor copied there is an error, and a fit without copies maps by
+    name as before."""
+    keys = [("an", d, "e1") for d in ("d1", "d2", "d3")]
+    rows = pd.concat([_per_day_rows().iloc[:6]] * 2, ignore_index=True)
+    design = _per_day_design(rows)
+    unit = design.for_sessions(keys)
+    copies = ["role[cur]@an/d1", "role[cur]@an/d2", "role[cur]@an/d3"]
+    assert design.copies_of("role[cur]", unit.coef_names) == copies
+    assert design.copies_of("x:role=cur", unit.coef_names) == []
+    c = np.zeros(len(design.coef_names))
+    c[design.coef_names.index("role[cur]")] = 1.0
+    names = list(unit.coef_names)
+
+    def weights(mapped):
+        return {n: w for n, w in zip(names, mapped, strict=True) if w}
+
+    assert weights(design.contrast_on(c, names)) == dict.fromkeys(copies, 1 / 3)
+    assert weights(design.contrast_on(c, names, {copies[1]: "support"})) == {
+        copies[0]: 0.5,
+        copies[2]: 0.5,
+    }
+    every = dict.fromkeys(copies, "support")
+    assert weights(design.contrast_on(c, names, every)) == dict.fromkeys(copies, 1 / 3)
+    rng = np.random.default_rng(3)
+    A = rng.normal(size=(len(names), len(names)))
+    vcov = A @ A.T
+    coef = rng.normal(size=len(names))
+    got = evaluate_contrast(design.contrast_on(c, names), coef, vcov)
+    j = [names.index(n) for n in copies]
+    assert got.estimate == pytest.approx(coef[j].mean(), abs=1e-14)
+    assert got.se**2 == pytest.approx(vcov[np.ix_(j, j)].sum() / 9, rel=1e-12)
+    coef[j] = np.nan
+    assert np.isnan(
+        evaluate_contrast(design.contrast_on(c, names, every), coef, vcov).estimate
+    )
+    # A shared entry beside it maps by name.
+    c2 = c.copy()
+    c2[design.coef_names.index("x:role=cur")] = -2.0
+    assert weights(design.contrast_on(c2, names)) == {
+        **dict.fromkeys(copies, 1 / 3),
+        "x:role=cur": -2.0,
+    }
+    arm = np.zeros(len(design.coef_names))
+    arm[design.coef_names.index("arm[b]")] = 1.0
+    with pytest.raises(ValueError, match="reads the baseline"):
+        design.contrast_on(arm, names)
+    with pytest.raises(ValueError, match=r"'x:role=cur' is neither a coefficient"):
+        design.contrast_on(c2, [n for n in names if n != "x:role=cur"])
+    np.testing.assert_array_equal(design.contrast_on(c2, design.coef_names), c2)
+
+
+def test_build_design_refuses_bad_per_day() -> None:
+    """``per_day`` names only the column of a penalized category term that is
+    not a baseline, once, in a design without '@' in its names; anything else
+    (a slope, a smooth, the intercept, an unpenalized category, a baseline, an
+    unknown name, a repeat) is refused, naming it. ``with_per_day`` is the one
+    check: the same design declares it either way."""
+    rows = _per_day_rows()
+    for per_day, match in (
+        (("x:role=cur",), "only the coded levels of a penalized Category"),
+        (("x",), "only the coded levels of a penalized Category"),
+        (("arm",), "a baseline"),
+        (("role", "role"), "repeat"),
+        (("nothing",), "only the coded levels of a penalized Category"),
+    ):
+        with pytest.raises(ValueError, match=match):
+            _per_day_design(rows, per_day=per_day)
+    unpenalized = Category("role", ("cur", "prev", "oth"), "oth", "none")
+    with pytest.raises(
+        ValueError, match="only the coded levels of a penalized Category"
+    ):
+        build_design([unpenalized], rows, intercept=True, per_day=("role",))
+    with pytest.raises(
+        ValueError, match="only the coded levels of a penalized Category"
+    ):
+        build_design(
+            [WEAK_ROLE, Smooth("x", -1.0, 2.0, 5, 1.0)],
+            rows,
+            intercept=True,
+            per_day=("s(x)",),
+        )
+    with pytest.raises(
+        ValueError, match="only the coded levels of a penalized Category"
+    ):
+        build_design([WEAK_ROLE], rows, intercept=True, per_day=(INTERCEPT,))
+    at = rows.assign(role=rows["role"].replace({"cur": "c@1"}))
+    weak_at = Category("role", ("c@1", "prev", "oth"), "oth", 0.0)
+    with pytest.raises(ValueError, match="'@'"):
+        build_design([weak_at], at, intercept=True, per_day=("role",))
+    plain = _per_day_design(rows, per_day=())
+    later = plain.with_per_day(("role",))
+    assert later.per_day == ("role",) and plain.per_day == ()
+    assert later.coef_names == plain.coef_names
+    assert later.for_sessions(DAY_KEYS).coef_names == (
+        _per_day_design(rows).for_sessions(DAY_KEYS).coef_names
+    )
+    with pytest.raises(ValueError, match="a baseline"):
+        plain.with_per_day(("arm",))
+    with pytest.raises(ValueError, match="design of the pooled rows"):
+        later.for_sessions(DAY_KEYS).with_per_day(("role",))
