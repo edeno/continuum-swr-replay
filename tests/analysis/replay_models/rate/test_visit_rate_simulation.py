@@ -353,6 +353,7 @@ def test_the_difference_run_has_both_kinds_and_their_difference(both) -> None:
         "same_ratio",
         "swr_ratio",
         "shared_session_deviations",
+        "same_clocks",
     ]
     rows = next(iter(both.sessions.values()))
     swr, no_swr = (rows[rows[vs.KIND_COLUMN] == k] for k in ("SWR", "No SWR"))
@@ -360,32 +361,77 @@ def test_the_difference_run_has_both_kinds_and_their_difference(both) -> None:
     np.testing.assert_array_equal(swr[columns].to_numpy(), no_swr[columns].to_numpy())
 
 
-def test_the_pair_scenarios_planted_values(both) -> None:
-    """Each pair's planted values by kind: nothing in either kind; SWR's
-    constant ratio in both (a difference of exactly 0); in SWR only (the
-    difference is SWR's truth); the differing ratios with the same session
-    deviations in both kinds (a difference of exactly 0)."""
-    log_ratio = vs.LOG_RATIO["SWR"]
-    swr, no_swr = both.models
-    by_name = {s.name: s for s in both.scenarios}
+#: Other planted clocks for the No SWR kind, so that the kinds' clocks differ
+#: as ``shaped_clocks(kind, ...)`` makes them on the real cohort.
+OTHER_CLOCKS = sc.PlantedClocks(
+    arrival=sc.interpolated_curve(
+        np.array([0.0, 1.0, 3.0]), np.array([-1.0, 0.0, 0.2])
+    ),
+    leaving=sc.interpolated_curve(
+        np.array([0.0, 0.5, 1.0]), np.array([-0.4, -0.1, 0.0])
+    ),
+)
 
-    def planted(pair, model, estimand="Q2"):
-        return engine.planted_value(by_name[pair], model, estimand)
 
-    assert planted("no_effect", swr) == 0.0 and planted("no_effect", no_swr) == 0.0
-    assert planted("same_ratio", swr) == pytest.approx(log_ratio)
-    assert planted("same_ratio", no_swr) == planted("same_ratio", swr)
-    assert planted("swr_ratio", swr) == pytest.approx(log_ratio)
-    assert planted("swr_ratio", no_swr) == 0.0
-    shared = planted("shared_session_deviations", swr)
-    assert shared != pytest.approx(log_ratio)
-    assert planted("shared_session_deviations", no_swr) == shared
-    truths = both.attrs["truths"]
-    assert truths["swr_ratio"][DIFFERENCE]["by_outcome"]["Q2"] == pytest.approx(
-        log_ratio
-    )
+@pytest.fixture(scope="module")
+def both_other_clocks() -> Simulation:
+    """The quick difference run with the No SWR kind on :data:`OTHER_CLOCKS`."""
+    real = vs._kind_cohort
+
+    def kind_cohort(kind, config, workers):
+        cohort, record, clocks = real(kind, config, workers)
+        return cohort, record, OTHER_CLOCKS if kind == "No SWR" else clocks
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(vs, "_kind_cohort", kind_cohort)
+        return vs.simulation(True, 1, {"kind": vs.BOTH})
+
+
+#: The window tests, whose truth is a reward effect; the clock tests, whose
+#: truth is a contrast of the planted clocks.
+WINDOWS = ("Q2", "Q2-onset")
+CLOCK_TESTS = ("Q1", "Q1b", "Q7a")
+
+
+def test_the_pair_scenarios_planted_values(both_other_clocks) -> None:
+    """With the kinds' planted clocks different, each pair's planted
+    difference of every estimand, as the engine gives it (first's planted
+    less second's) and as the run's truths state it: for Q2 and Q2-onset, 0
+    in the null pairs and SWR's ratio in ``swr_ratio``; for the clock tests,
+    the difference of the kinds' clock contrasts (not 0) in every pair but
+    ``same_clocks``; in ``same_clocks`` (both kinds on SWR's clocks, no reward
+    effect), exactly 0 for every estimand."""
+    run = both_other_clocks
+    swr, no_swr = run.models[0], run.models[1]
+    assert (swr.name, no_swr.name) == ("SWR/session_sd2", "No SWR/session_sd2")
+    by_name = {s.name: s for s in run.scenarios}
+    truths = run.attrs["truths"]
+
+    def difference(pair, estimand):
+        scenario = by_name[pair]
+        planted = engine.planted_value(scenario, swr, estimand) - engine.planted_value(
+            scenario, no_swr, estimand
+        )
+        assert planted == truths[pair][DIFFERENCE]["by_outcome"][estimand]
+        return planted
+
+    clocks = {
+        e: truths["no_effect"]["SWR"]["by_outcome"][e]
+        - truths["no_effect"]["No SWR"]["by_outcome"][e]
+        for e in CLOCK_TESTS
+    }
+    assert all(abs(v) > 0.01 for v in clocks.values()), clocks
+    for pair in ("no_effect", "same_ratio", "swr_ratio", "shared_session_deviations"):
+        for e in CLOCK_TESTS:
+            assert difference(pair, e) == pytest.approx(clocks[e], abs=1e-9), (pair, e)
     for pair in ("no_effect", "same_ratio", "shared_session_deviations"):
-        assert truths[pair][DIFFERENCE]["by_outcome"]["Q2"] == 0.0
+        for e in WINDOWS:
+            assert difference(pair, e) == 0.0, (pair, e)
+    for e in WINDOWS:
+        assert difference("swr_ratio", e) == pytest.approx(vs.LOG_RATIO["SWR"])
+    for e in (*WINDOWS, *CLOCK_TESTS):
+        assert difference("same_clocks", e) == 0.0, e
+    assert engine.planted_value(by_name["same_clocks"], swr, "Q1") != 0.0
 
 
 def test_the_quick_difference_run(both, both_result) -> None:

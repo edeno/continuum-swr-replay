@@ -250,30 +250,48 @@ BOTH = "both"
 #: The column of the difference run's rows that names each row's kind.
 KIND_COLUMN = "event_kind"
 #: The difference run's scenarios, in the list's order (the order fixes the
-#: seeds): each kind's single-kind scenario and the kind whose planted
-#: constants it takes (:data:`LOG_RATIO`; for ``differing_ratio`` the mean
-#: of the session log ratios, whose deviations come from
-#: :data:`DIFFERING_SEED` in both kinds):
+#: seeds): each kind's single-kind scenario, the kind whose planted constants
+#: it takes (:data:`LOG_RATIO`; for ``differing_ratio`` the mean of the
+#: session log ratios, whose deviations come from :data:`DIFFERING_SEED` in
+#: both kinds) and the kind whose planted clock curves it takes (each kind
+#: keeps its own rows and expected totals). The planted difference of each
+#: estimand:
 #:
-#: - ``no_effect``: no reward effect in either kind (planted difference 0);
+#: - ``no_effect``: no reward effect in either kind; Q2 and Q2-onset 0;
 #: - ``same_ratio``: SWR's constant ratio (log 2.5) in both kinds, an effect
-#:   in each and a planted difference of exactly 0;
-#: - ``swr_ratio``: SWR's constant ratio in SWR only (the planted difference
-#:   is the SWR truth);
+#:   in each; Q2 and Q2-onset exactly 0;
+#: - ``swr_ratio``: SWR's constant ratio in SWR only; Q2 and Q2-onset the SWR
+#:   truth;
 #: - ``shared_session_deviations``: the differing ratios about SWR's mean,
-#:   the same session deviations in both kinds (a planted difference of 0,
-#:   with a positive dependence between the kinds through the means).
-PAIR_SCENARIOS: dict[str, dict[str, tuple[str, str]]] = {
-    "no_effect": {"SWR": ("no_effect", "SWR"), "No SWR": ("no_effect", "No SWR")},
+#:   the same session deviations in both kinds; Q2 and Q2-onset 0, with a
+#:   positive dependence between the kinds through the means;
+#: - ``same_clocks``: no reward effect, and both kinds on the first kind's
+#:   clocks; every estimand's planted difference exactly 0.
+#:
+#: In the first four each kind keeps its own clocks, so the clock tests' (Q1,
+#: Q1b and Q7a) planted difference is the difference of the two kinds' clock
+#: contrasts, not 0 on the real cohort (where ``shaped_clocks(kind, ...)``
+#: shapes each kind's own): they give the false-positive rate of the
+#: difference for Q2 and Q2-onset only; ``same_clocks`` gives it for every
+#: estimand, the clock tests among them.
+PAIR_SCENARIOS: dict[str, dict[str, tuple[str, str, str]]] = {
+    "no_effect": {
+        "SWR": ("no_effect", "SWR", "SWR"),
+        "No SWR": ("no_effect", "No SWR", "No SWR"),
+    },
     "same_ratio": {
-        "SWR": ("constant_ratio", "SWR"),
-        "No SWR": ("constant_ratio", "SWR"),
+        "SWR": ("constant_ratio", "SWR", "SWR"),
+        "No SWR": ("constant_ratio", "SWR", "No SWR"),
     },
-    "swr_ratio": {"SWR": ("constant_ratio", "SWR"), "No SWR": ("no_effect", "No SWR")},
+    "swr_ratio": {
+        "SWR": ("constant_ratio", "SWR", "SWR"),
+        "No SWR": ("no_effect", "No SWR", "No SWR"),
+    },
     "shared_session_deviations": {
-        "SWR": ("differing_ratio", "SWR"),
-        "No SWR": ("differing_ratio", "SWR"),
+        "SWR": ("differing_ratio", "SWR", "SWR"),
+        "No SWR": ("differing_ratio", "SWR", "No SWR"),
     },
+    "same_clocks": {kind: ("no_effect", kind, KINDS[0]) for kind in KINDS},
 }
 
 #: The quick configuration's synthetic cohort: animals, days per animal,
@@ -1263,19 +1281,26 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
 def _pair_planted(
     rows: pd.DataFrame,
     kind: str,
-    clocks: sc.PlantedClocks,
+    clocks: Mapping[str, sc.PlantedClocks],
     total: float,
     log_ratios: Mapping[str, Mapping[SessionKey, float]],
     table: sc.RateTable,
 ) -> dict[str, dict]:
     """One session's planted values of a kind under each pair scenario
     (:data:`PAIR_SCENARIOS`), as :func:`_session_planted` gives them;
-    ``log_ratios``, the differing ratios about each kind's mean."""
+    ``clocks``, each kind's planted clocks; ``log_ratios``, the differing
+    ratios about each kind's mean."""
     out = {}
     for pair, spec in PAIR_SCENARIOS.items():
-        name, constants = spec[kind]
+        name, constants, clocks_of = spec[kind]
         out[pair] = _session_planted(
-            rows, [name], clocks, constants, total, log_ratios[constants], table
+            rows,
+            [name],
+            clocks[clocks_of],
+            constants,
+            total,
+            log_ratios[constants],
+            table,
         )[name]
     return out
 
@@ -1321,6 +1346,7 @@ def difference_simulation(config: Config, workers: int) -> Simulation:
     if keys[0] != keys[1]:
         raise ValueError("the two kinds' cohorts do not have the same sessions")
     kind_rows, planted, calibration, models, differences = {}, {}, {}, [], []
+    all_clocks = {kind: inputs[kind][2] for kind in KINDS}
     for kind in KINDS:
         cohort, record, clocks = inputs[kind]
         sessions = {key: rows.rows["A"] for key, rows in cohort.items()}
@@ -1342,7 +1368,7 @@ def difference_simulation(config: Config, workers: int) -> Simulation:
             (
                 rows,
                 kind,
-                clocks,
+                all_clocks,
                 float(rows[vr.RESPONSE].sum()),
                 log_ratios,
                 table_rates,
@@ -1442,7 +1468,8 @@ def difference_simulation(config: Config, workers: int) -> Simulation:
         "pair_scenarios": {pair: dict(spec) for pair, spec in PAIR_SCENARIOS.items()},
         "draws": (
             "each kind's counts drawn independently given its expected counts "
-            "(the engine's rule, the coordinator's call); a dependence only "
+            "(the engine's rule, the coordinator's call (2026-11-27), not the "
+            "lead's); a dependence only "
             "where a scenario plants it through the means"
         ),
         "truth_from_real_counts": {"scenarios": [], "note": "no pair scenario"},
