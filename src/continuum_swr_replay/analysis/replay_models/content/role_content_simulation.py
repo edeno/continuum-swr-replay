@@ -70,7 +70,6 @@ __all__ = [
     "CALIBRATED_CLUSTERING",
     "CALIBRATED_NOISE",
     "CENTRAL_NOISE",
-    "CENTRAL_PRIOR_SD",
     "CONCENTRATIONS",
     "NOISES",
     "NOISE_CONCENTRATION",
@@ -147,8 +146,10 @@ is a
 calibration of the noise to a description of the real response; no
 coefficient of the model is estimated by it."""
 
-PRIOR_SDS: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0)
-CENTRAL_PRIOR_SD = 8.0
+#: The prior SDs of the weak penalty, one model each: the declared SD first,
+#: then the sensitivity pair (``role_content.WEAK_PRIOR_SD``,
+#: ``WEAK_PRIOR_SD_SENSITIVITY``), that is (8, 4, 16).
+PRIOR_SDS: tuple[float, ...] = (rc.WEAK_PRIOR_SD, *rc.WEAK_PRIOR_SD_SENSITIVITY)
 
 TARGET_EDF: Mapping[str, float] = {
     rc.RECENCY: 5.0,
@@ -570,7 +571,7 @@ def calibrate_smooth_penalties(
     decode bins (the edf reads the fitted shares, not the real ones). The
     recency smooth is calibrated in the uncertainty model, the two others in
     the plain model, every other penalty at :data:`CALIBRATED_LOG_PENALTIES`
-    and the weak penalty at :data:`CENTRAL_PRIOR_SD`.
+    and the weak penalty at ``role_content.WEAK_PRIOR_SD``.
 
     Returns
     -------
@@ -586,7 +587,7 @@ def calibrate_smooth_penalties(
             cohort,
             model=model,
             kind=kind,
-            prior_sds=(CENTRAL_PRIOR_SD,),
+            prior_sds=(rc.WEAK_PRIOR_SD,),
             scenarios=[f"null_{model}"],
             n_data_sets=2,
             seed=seed,
@@ -642,7 +643,7 @@ def simulation(quick: bool, workers: int) -> engine.Simulation:
         cohort,
         model="role_content",
         kind="No SWR",
-        prior_sds=(CENTRAL_PRIOR_SD,),
+        prior_sds=(rc.WEAK_PRIOR_SD,),
         scenarios=_QUICK["scenarios"],
         n_data_sets=_QUICK["n_data_sets"],
         n_draws=_QUICK["n_draws"],

@@ -50,6 +50,11 @@ def test_the_cohort_holds_no_response_and_every_events_bins(cohort) -> None:
     assert set(cohort.data_truths) == {"SWR", "No SWR"}
 
 
+def test_the_prior_sds_are_the_declared_sd_then_its_pair() -> None:
+    assert rsim.PRIOR_SDS == (rc.WEAK_PRIOR_SD, *rc.WEAK_PRIOR_SD_SENSITIVITY)
+    assert rsim.PRIOR_SDS == (8.0, 4.0, 16.0)
+
+
 def test_the_quick_run_goes_through_the_runner(monkeypatch) -> None:
     monkeypatch.setattr(rsim, "load_table", _table)
     table = run_simulations.run("role_content", quick=True)

@@ -369,10 +369,22 @@ def test_the_guard_refuses_an_unpenalized_tested_coefficient(cohort) -> None:
         require_tested_penalized(unpenalized, tested)
 
 
+def test_the_weak_penalty_is_declared_at_sd_8_with_4_and_16_beside_it(cohort) -> None:
+    """The content model's declared prior SD (design, twenty-fifth round, the
+    author's call) and its sensitivity pair; the default settings take the
+    declared SD, and it reaches the fit's penalty of the role levels."""
+    assert rc.WEAK_PRIOR_SD == 8.0
+    assert rc.WEAK_PRIOR_SD_SENSITIVITY == (4.0, 16.0)
+    assert rc.RoleContentSettings().prior_sd == rc.WEAK_PRIOR_SD
+    design, _, _ = _design(cohort, "role_content", "unadjusted")
+    penalty = design.log_penalty_record()["role"]
+    assert penalty == {"set": "fixed", "log_penalty": pytest.approx(np.log(1 / 64))}
+
+
 def test_arm_effects_are_baselines_and_role_slopes_penalized(cohort) -> None:
     design, _, _ = _design(cohort, "role_content_uncertainty", "length_adjusted")
     penalties = design.log_penalty_record()
-    weak = -2.0 * np.log(rc.DEFAULT_PRIOR_SD)
+    weak = -2.0 * np.log(rc.WEAK_PRIOR_SD)
     assert penalties[rc.ARM]["set"] == "none"
     assert penalties[rc.NEVER_VISITED]["set"] == "none"
     assert penalties["log_duration_rel:role=trunk"]["set"] == "none"
@@ -703,7 +715,7 @@ def test_trunk_level_is_fitted_at_zero_and_changes_no_tested_coefficient(
     assert abs(record.coef[names.index(rc.TRUNK_LEVEL)]) < 1e-6
     # The same model with no trunk level: the trunk rows join the reference
     # level of the role category only (every term by role still reads role).
-    weak = log_penalty_from_prior_sd(rc.DEFAULT_PRIOR_SD)
+    weak = log_penalty_from_prior_sd(rc.WEAK_PRIOR_SD)
     terms = [
         Category("role_no_trunk", rc.LEAF_ROLES[::-1], reference=rc.REFERENCE_ROLE,
                  penalty=weak)
@@ -1004,7 +1016,8 @@ def _recency_fixed_case():
 
 def test_the_recency_curve_is_on_the_other_leaf_rows_only() -> None:
     # The estimates of this fixed case from the fit on the other-leaf rows
-    # (commit 66f49d00), to 1e-8; no setting chooses the rows any more.
+    # (commit 66f49d00), to 1e-8; no setting chooses the rows any more. They
+    # were made at prior SD 2, the default then, so the fit here states it.
     pinned = {
         ("role_content", "20200101", "Q3a"): 1.0046419949810848,
         ("role_content", "20200101", "Q3b"): -0.538315217883582,
@@ -1025,8 +1038,9 @@ def test_the_recency_curve_is_on_the_other_leaf_rows_only() -> None:
         key: draw_shares(part, sc.expected_shares(part, truth, reference), 40, 5)
         for key, part in rc.session_rows(rows).items()
     }
+    settings = rc.RoleContentSettings(prior_sd=2.0)
     for model in rc.MODELS:
-        fit = _fit(cohort, sessions, model)
+        fit = _fit(cohort, sessions, model, settings=settings)
         recency = [t.name for t in fit.design.terms if t.covariate == rc.RECENCY]
         assert recency == [dt.estimand("Q5a").contrast.term]
         per = rs.session_estimands(fit).set_index(["session_date", "estimand_id"])[

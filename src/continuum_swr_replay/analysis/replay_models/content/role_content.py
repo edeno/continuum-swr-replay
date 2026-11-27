@@ -137,7 +137,6 @@ from .. import declared_tests as dt
 
 __all__ = [
     "COHORT_COLUMNS",
-    "DEFAULT_PRIOR_SD",
     "DEFAULT_SMOOTH_LOG_PENALTIES",
     "EVENT_WEIGHTS",
     "LEAF_ROLES",
@@ -151,6 +150,8 @@ __all__ = [
     "TRIAL_NUMBER_COLUMNS",
     "TRUNK_LEVEL",
     "VARIANTS",
+    "WEAK_PRIOR_SD",
+    "WEAK_PRIOR_SD_SENSITIVITY",
     "ContrastReference",
     "RoleContentCohort",
     "RoleContentFit",
@@ -170,24 +171,32 @@ __all__ = [
 ]
 
 # ---------------------------------------------------------------------------
-# The open settings, in one place. Each is a question for the lead; the
-# default is a placeholder that lets the module build and fit, and no real fit
-# is made with it before the lead answers.
+# The open settings, in one place. Each is a question for the lead, except
+# where it is marked DECIDED; the default is a placeholder that lets the module
+# build and fit, and no real fit is made with it before the lead answers.
 # ---------------------------------------------------------------------------
 
-PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 16.0)
-"""OPEN (lead): penalty width. The Normal prior SD of every simple tested
-coefficient (each role level, each role slope), in the reported unit (a 0/1
-step; one pooled SD of a continuous covariate): the log penalty is
-``log(1 / SD**2)``. One declared number for all models; these are the widths
-the simulations compare. A weak prior is not weak on this likelihood's scale:
-with one unit of weight per event (:data:`EVENT_WEIGHTS`) the information is
-small, and the penalty shrinks a rare role level or a slope in a small
-session toward 0 (:func:`.role_content_statistics.penalized_edf` reports by
-how much)."""
+#: DECIDED (lead, 2026-11-23, twenty-fifth round): the weak penalty stays on
+#: every simple tested coefficient of the content models (each role level,
+#: each role slope). The penalty is a Normal prior of mean 0 on the
+#: coefficient in the reported unit (a 0/1 step; one pooled SD of a
+#: continuous covariate); its SD is this value, the author's call from the
+#: content validation under the lead's "pick a penalty that's reasonable",
+#: not a number the lead chose. The log penalty is ``log(1 / SD^2)``
+#: (``terms.log_penalty_from_prior_sd``). A weak prior is not weak on this
+#: likelihood's scale: with one unit of weight per event
+#: (:data:`EVENT_WEIGHTS`) the information is small, and the penalty shrinks a
+#: rare role level or a slope in a small session toward 0
+#: (:func:`.role_content_statistics.penalized_edf` reports by how much).
+WEAK_PRIOR_SD = 8.0
 
-DEFAULT_PRIOR_SD = 2.0
-"""The width used until the lead chooses one: a placeholder."""
+#: The stiffer and looser prior SDs reported beside :data:`WEAK_PRIOR_SD`
+#: (the convention's sensitivity pair).
+WEAK_PRIOR_SD_SENSITIVITY: tuple[float, float] = (4.0, 16.0)
+
+PRIOR_SD_CANDIDATES: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 16.0)
+"""The prior SDs a fit may take: :data:`WEAK_PRIOR_SD`, its sensitivity pair
+and the stiffer widths the earlier simulations compared."""
 
 DEFAULT_SMOOTH_LOG_PENALTIES: Mapping[str, float] = {
     "reward_fraction": 0.0,
@@ -257,7 +266,8 @@ class RoleContentSettings:
     Attributes
     ----------
     prior_sd : float
-        The weak penalty's prior SD, one of :data:`PRIOR_SD_CANDIDATES`.
+        The weak penalty's prior SD: the declared :data:`WEAK_PRIOR_SD`, or
+        another of :data:`PRIOR_SD_CANDIDATES` (its sensitivity pair first).
     smooth_log_penalties : mapping of str to float
         Each smooth's covariate -> its declared log penalty.
     trial_number : str
@@ -272,7 +282,7 @@ class RoleContentSettings:
         One of :data:`EVENT_WEIGHTS`.
     """
 
-    prior_sd: float = DEFAULT_PRIOR_SD
+    prior_sd: float = WEAK_PRIOR_SD
     smooth_log_penalties: Mapping[str, float] = field(
         default_factory=lambda: dict(DEFAULT_SMOOTH_LOG_PENALTIES)
     )
