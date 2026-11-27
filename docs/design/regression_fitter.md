@@ -452,15 +452,18 @@ levels for a `by`, so a smooth or a slope can still be fitted for one. It is for
 that is an exact function of other terms, whose coefficient is not a parameter of the
 model: the content models' trunk role, which holds exactly on the trunk arms, whose arm
 effects each have a free column. Fixing such a coefficient at 0 by declaration is exact;
-fixing it by a prior is what the reference-level rule below refuses. The caller is
-responsible for the level being carried by another term (or meant to equal the
-reference); nothing checks it. An uncoded level has no level term, so the support rule
+fixing it by a prior is what the reference-level rule below refuses. It is not a way to
+merge a level into the reference, which the support rule refuses. The fitter does not
+check that the level is such a function: the caller must check it on its rows (the
+content models do, in `role_content.design_rows`). An uncoded level has no level term, so the support rule
 never removes it and its rows are never dropped as a level's. Its rows are not the
 reference's rows: the reference-level check below does not count them
 (`test_terms.py::test_an_uncoded_level_has_no_column_and_stays_a_level_for_a_by`,
 `::test_uncoded_levels_are_checked`;
 `test_sessions.py::test_a_by_term_of_an_uncoded_level_is_fitted`,
-`::test_the_rows_of_an_uncoded_level_are_not_reference_rows`).
+`::test_the_rows_of_an_uncoded_level_are_not_reference_rows`; with baseline copies,
+`::test_copies_carry_an_uncoded_levels_rows_and_its_by_term_is_fitted`,
+`::test_a_copy_whose_only_zero_rows_are_uncoded_is_refused`).
 
 **Baselines.** A model declares its baseline terms to `build_design` (`baseline`): the
 intercept or a category (the rate models' intercept, the content models' arm category;

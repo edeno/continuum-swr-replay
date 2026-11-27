@@ -226,11 +226,12 @@ class Category:
         category's term: there their rows are at the reference. They stay
         levels for a ``by`` (a smooth or a slope can be fitted for one), and
         their rows are not the reference's rows when the loop asks for those.
-        Use it for a level that is an exact function of other terms (its
-        coefficient is not a parameter of the model) or that is meant to
-        equal the reference; the caller is responsible for that being true,
-        nothing here checks it. Empty by default: every level but the
-        reference has a column.
+        Use it only for a level that is an exact function of other terms
+        (its coefficient is not a parameter of the model). It is not a way to
+        merge a level into the reference, which the support rule refuses
+        (:mod:`.support`). The fitter does not check that the level is such a
+        function: the caller must check it on its rows. Empty by default:
+        every level but the reference has a column.
     """
 
     column: str
