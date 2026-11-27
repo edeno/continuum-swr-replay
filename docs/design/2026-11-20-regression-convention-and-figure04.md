@@ -958,7 +958,9 @@ The lead: "ok".
 
 ### Twenty-fifth round (lead, 2026-11-23, 19:19 to 19:34): the reward term of the rate model
 
-(The twenty-fourth round, the content model's recency decision, is recorded on another branch.)
+(When this round was written, the number twenty-four was kept for the content model's recency decision,
+recorded on the branch `role-content-models`. On master the twenty-fourth round is the unit of the fit,
+2026-11-24, below; this round is placed by its date, before it.)
 
 What was shown to the lead: the realistic simulation of the weak penalty at prior SD 4, 2 and 1
 (`.claude/research/2026-11-20-regression-prototypes/proto_rate_realistic/REPORT.md`: every session gets
@@ -993,6 +995,14 @@ So:
   beside it); it does not veto a term.
 - The per-animal fit built for the comparison (`visit_rate.fit_animal_rewards`, `reward_level="animal"`)
   is a check, not the paper's method; whether it stays in the code is a question for the lead.
+
+Later rounds change this one. The twenty-fourth round (2026-11-24) fits the behavior models for each
+recording day and for each animal (design C), so the reward coefficient is no longer fitted in each
+session alone; the weak penalty stays on it. The twenty-sixth round (2026-11-25) reads the reward effect
+from an arrival curve for each outcome over two windows and keeps the one coefficient as a secondary value.
+The per-animal check was removed on 2026-11-26, when the branch took master, by task 12 of
+`.claude/docs/plans/regression-convention/phase-4b-unit-of-fit.md`: a fit at `fit_by="animal"` with the
+shared curves replaces it. The lead was not asked the question of the bullet above again.
 
 ### Open after the twenty-third round
 
@@ -1094,8 +1104,8 @@ which target the paper states when sessions differ; which unit the headline valu
 
 ### Twenty-sixth round (lead, 2026-11-25, 14:54 and 15:07 EST): the form of the rate model's reward effect
 
-(The twenty-fifth round, the reward coefficient's weak penalty, 2026-11-23, is recorded on the branch
-`visit-rate-validation`.)
+(The twenty-fifth round, the reward coefficient's weak penalty, 2026-11-23, is above, before the
+twenty-fourth by its date.)
 
 What was shown to the lead: the rate follow-up's later-onset scenario
 (`.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/followup/REPORT.md`, section 3;
