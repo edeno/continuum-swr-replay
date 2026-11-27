@@ -891,18 +891,6 @@ some scenarios only keeps each scenario's place, and so its data.
 Several models with the same coefficients (for example one model at several declared
 penalties) are fitted to the same data sets of one run.
 
-**A model's own fit.** A model may bring its own fit (`Model.fit`), at the session unit
-only, for a value that one model's fit of each session does not give, such as the
-difference of two fits of each session (the visit rate model's joint run of its two
-kinds, `visit_rate_simulation.joint_fit`). The engine draws the data set as for any model
-and hands it to that fit, which returns one row per session and estimand
-(`simulation.UNIT_COLUMNS`); each estimand is reduced over the sessions by `unit_summary`
-as a model's at `fit_by="session"`. An own fit has no unit target (`planted_unit` NaN).
-The estimands only the own fit gives (`Model.fit_estimands`) have no `c`, so their
-planted value is an outside scenario's. The coefficient names, likelihood, response and
-unit must agree with the other models', as for any model. A fit at a day or an animal is
-`fit_by`, not an own fit.
-
 **The results table** (`simulation.summarize`; one row per scenario, model and
 estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),
 `bias_se`; `coverage` (the share of data sets whose 95 % interval holds the planted

@@ -82,17 +82,6 @@ The tables of a run (:class:`SimulationResult`):
   (``excludes_zero``), each NaN without a finite interval;
 - ``summary``: one row per (scenario, model, estimand), :data:`SUMMARY_COLUMNS`
   (described in :func:`summarize`).
-
-A model may bring its own fit (:attr:`Model.fit`, :data:`OwnFit`), at the
-session unit only: for a value that one model's fit of each session does not
-give, such as the difference of two fits of each session (the visit rate
-model's joint run of its two kinds). The engine draws the data set as for any
-model and hands it to that fit, which returns one row per session and
-estimand (:data:`UNIT_COLUMNS`). Its rows are the ``sessions`` table's rows of
-the model (``fit_by`` ``"session"``; ``n_events`` missing), and each estimand
-is reduced over the sessions by ``unit_summary`` as a model's at
-``fit_by="session"``. An own fit has no unit target: its ``planted_unit`` is
-NaN.
 """
 
 from __future__ import annotations
@@ -129,11 +118,9 @@ __all__ = [
     "CAUSES",
     "SHARE_TOLERANCE",
     "SUMMARY_COLUMNS",
-    "UNIT_COLUMNS",
     "InsideScenario",
     "Model",
     "OutsideScenario",
-    "OwnFit",
     "PreparedDraws",
     "Scenario",
     "Simulation",
@@ -159,31 +146,6 @@ SHARE_TOLERANCE = 1e-9
 #: A data set rejects by the day-level test when its p is below this.
 REJECTION_LEVEL = 0.05
 
-#: The columns of an own fit's table (:data:`OwnFit`), one row per session and
-#: estimand: the estimand's name; the session's key; the fit's ``status`` and
-#: ``no_fit``; ``without_value`` (empty when the session has a value, else a
-#: code of :data:`CAUSES`); ``estimate`` and ``se``; ``edf``; ``n_sessions``,
-#: 1.
-UNIT_COLUMNS = (
-    "estimand",
-    "animal",
-    "session_date",
-    "epoch",
-    "status",
-    "no_fit",
-    "without_value",
-    "estimate",
-    "se",
-    "edf",
-    "n_sessions",
-)
-
-#: A model's own fit: one data set (each session's rows with the drawn
-#: outcome) -> a table of :data:`UNIT_COLUMNS`. It must be a module-level
-#: function (or a ``functools.partial`` of one) so that a process pool can
-#: send it.
-OwnFit = Callable[[Mapping[tuple[str, str, str], pd.DataFrame]], pd.DataFrame]
-
 
 @dataclass(frozen=True)
 class Model:
@@ -205,21 +167,8 @@ class Model:
         must carry a fixed penalty (:func:`.support.require_tested_penalized`)
         and none may be of a baseline term (copied per session in a fit of
         several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
-        Under an inside scenario an estimand's planted value is ``c' beta``.
     fit_by : {"session", "day", "animal"}
         The unit of the fit.
-    fit : OwnFit or None
-        The model's own fit (module docstring), at ``fit_by="session"`` only;
-        None fits each unit by :func:`.sessions.fit_sessions` and evaluates
-        ``estimands``. With an own fit, ``design`` gives the columns the run
-        keeps, and the fit gives the value of every estimand of
-        :attr:`estimand_names`.
-    fit_estimands : tuple of str
-        The estimands only the own fit gives, with no ``c``: their planted
-        value is an outside scenario's (NaN under an inside scenario).
-    fit_columns : tuple of str
-        The columns the own fit reads beyond the design's and the unit (a run
-        keeps them, :func:`run_columns`).
     """
 
     name: str
@@ -228,26 +177,12 @@ class Model:
     response: str
     unit: str
     estimands: Mapping[str, np.ndarray]
-    fit: OwnFit | None = None
-    fit_estimands: tuple[str, ...] = ()
-    fit_columns: tuple[str, ...] = ()
     fit_by: FitBy = "session"
 
     def __post_init__(self) -> None:
         n_coef = len(self.design.coef_names)
-        if (self.fit_estimands or self.fit_columns) and self.fit is None:
-            raise ValueError(
-                f"model {self.name!r}: estimands of an own fit without an own fit"
-            )
-        if not self.estimands and not self.fit_estimands:
+        if not self.estimands:
             raise ValueError(f"model {self.name!r} has no estimand")
-        if set(self.estimands) & set(self.fit_estimands):
-            raise ValueError(f"model {self.name!r}: an estimand is named twice")
-        if self.fit is not None and self.fit_by != "session":
-            raise ValueError(
-                f"model {self.name!r}: an own fit is at fit_by 'session', not "
-                f"{self.fit_by!r}"
-            )
         estimands = {}
         for name, c in self.estimands.items():
             c = np.asarray(c, dtype=float)
@@ -268,12 +203,6 @@ class Model:
             self.design,
             dict.fromkeys(name for c in estimands.values() for name in self.used(c)),
         )
-
-    @property
-    def estimand_names(self) -> tuple[str, ...]:
-        """Every estimand of the model: those of ``estimands``, then
-        ``fit_estimands``."""
-        return (*self.estimands, *self.fit_estimands)
 
     def used(self, c: np.ndarray) -> list[str]:
         """The coefficient names on which ``c`` is not zero, in column order."""
@@ -372,9 +301,7 @@ class Simulation:
     models : sequence of Model
         Fitted to the same data sets: the same coefficient names, likelihood,
         response and unit (they may differ in their penalties or estimands).
-        Every data set is drawn on the first model's design (its offset, its
-        rows with a missing value and, under an :class:`InsideScenario`, its
-        coefficients), whether or not that model has its own fit.
+        An :class:`InsideScenario` is drawn on the first model's design.
     sessions : mapping of (animal, session_date, epoch) to pd.DataFrame
         The model's real rows of each session; a missing response column is
         added.
@@ -424,11 +351,8 @@ def bootstrap_seeds(seed: int, scenario: int, data_set: int, n: int) -> list[int
 def planted_value(scenario: Scenario, model: Model, estimand: str) -> float:
     """The planted value of ``estimand`` of ``model`` under ``scenario``:
     ``c' beta`` inside the model, the scenario's own value outside it (NaN
-    when it names none). An estimand of an own fit with no ``c`` has the
-    planted value NaN inside the model."""
+    when it names none)."""
     if isinstance(scenario, InsideScenario):
-        if estimand not in model.estimands:
-            return np.nan
         return float(model.estimands[estimand] @ _planted_beta(scenario, model.design))
     value = scenario.planted.get(estimand, np.nan)
     return float(value(model) if callable(value) else value)
@@ -775,42 +699,14 @@ def _data_set_row(
     n_draws: int,
     seed: int,
 ) -> dict:
-    """One estimand's reduction over a data set's units (module docstring):
-    :func:`_reduced_row` of the records' unit values."""
-    return _reduced_row(
-        unit_values(values, records),
-        records[0].fit_by,
-        int(
-            sum(
-                _n_sessions(r)
-                for r, v in zip(records, values, strict=True)
-                if np.isfinite(v)
-            )
-        ),
-        planted,
-        planted_unit,
-        n_draws,
-        seed,
-    )
-
-
-def _reduced_row(
-    values: pd.Series,
-    fit_by: FitBy,
-    n_sessions_used: int,
-    planted: float,
-    planted_unit: float,
-    n_draws: int,
-    seed: int,
-) -> dict:
-    """One estimand's reduction over the unit values ``values`` (indexed by
-    the unit key, :func:`.units.unit_values`); NaN when no unit has a value.
-    ``covered``, ``covered_unit`` and ``excludes_zero`` are NaN without a
-    finite interval (none with fewer than two animals), so such a data set
-    counts in none of those rates."""
+    """One estimand's reduction over a data set's units (module docstring);
+    NaN when no unit has a value. ``covered``, ``covered_unit`` and
+    ``excludes_zero`` are NaN without a finite interval (none with fewer than
+    two animals), so such a data set counts in none of those rates."""
+    fit_by = records[0].fit_by
     summary = (
-        unit_summary(values, fit_by, n_draws=n_draws, seed=seed)
-        if np.isfinite(values.to_numpy()).any()
+        unit_summary(unit_values(values, records), fit_by, n_draws=n_draws, seed=seed)
+        if np.isfinite(values).any()
         else dict.fromkeys(("estimate", "low", "high", "sd", "day_p"), np.nan)
         | {"n_units": 0, "n_animals_same_sign": 0}
     )
@@ -831,7 +727,13 @@ def _reduced_row(
         "high": high,
         "interval_sd": summary["sd"],
         "day_p": float(summary["day_p"]),
-        "n_sessions_used": n_sessions_used,
+        "n_sessions_used": int(
+            sum(
+                _n_sessions(r)
+                for r, v in zip(records, values, strict=True)
+                if np.isfinite(v)
+            )
+        ),
         "n_units_used": int(summary["n_units"]),
         "n_animals_same_sign": int(summary["n_animals_same_sign"]),
         "covered": covers(planted),
@@ -839,81 +741,6 @@ def _reduced_row(
         "excludes_zero": float(not low <= 0.0 <= high) if interval else np.nan,
         "bootstrap_seed": seed,
     }
-
-
-def _own_units(model: Model, data: Mapping[SessionKey, pd.DataFrame]) -> pd.DataFrame:
-    """The own fit's table of one data set, checked: its columns, its
-    estimands, and one row per session for each estimand."""
-    units = model.fit(data)
-    missing = sorted(set(UNIT_COLUMNS) - set(units.columns))
-    if missing:
-        raise ValueError(f"model {model.name!r}: the own fit gives no {missing}")
-    given = list(dict.fromkeys(units["estimand"]))
-    if sorted(given) != sorted(model.estimand_names):
-        raise ValueError(
-            f"model {model.name!r}: the own fit gives the estimands {given}, not "
-            f"{list(model.estimand_names)}"
-        )
-    level = ["animal", "session_date", "epoch"]
-    for name, part in units.groupby("estimand", sort=False):
-        if not part[level].notna().all(axis=None):
-            raise ValueError(
-                f"model {model.name!r}, estimand {name!r}: an own fit gives "
-                "sessions only (animal, session_date and epoch)"
-            )
-        repeated = part[part.duplicated(level, keep=False)]
-        if not repeated.empty:
-            first = "/".join(str(v) for v in repeated.iloc[0][level])
-            raise ValueError(
-                f"model {model.name!r}, estimand {name!r}: the own fit gives the "
-                f"unit {first} more than once"
-            )
-    return units
-
-
-def _own_fit_rows(
-    model: Model,
-    data: Mapping[SessionKey, pd.DataFrame],
-    scenario: Scenario,
-    base: dict,
-    n_draws: int,
-    seeds,
-) -> tuple[list[dict], list[dict]]:
-    """A model's own fit of one data set: its ``data_sets`` and ``sessions``
-    rows (module docstring)."""
-    units = _own_units(model, data)
-    session_rows = [
-        {
-            **base,
-            "estimand": row["estimand"],
-            "animal": row["animal"],
-            "session_date": row["session_date"],
-            "epoch": row["epoch"],
-            "fit_by": "session",
-            "n_sessions": row["n_sessions"],
-            "n_events": np.nan,
-            **{c: row[c] for c in UNIT_COLUMNS[4:-1]},
-        }
-        for row in units.to_dict("records")
-    ]
-    data_set_rows = []
-    for name in model.estimand_names:
-        part = units[units["estimand"] == name]
-        values = pd.Series(
-            part["estimate"].to_numpy(dtype=float),
-            index=pd.MultiIndex.from_frame(part[["animal", "session_date", "epoch"]]),
-        )
-        row = _reduced_row(
-            values,
-            "session",
-            int(np.isfinite(values).sum()),
-            planted_value(scenario, model, name),
-            np.nan,
-            n_draws,
-            next(seeds),
-        )
-        data_set_rows.append({**base, "estimand": name, **row})
-    return data_set_rows, session_rows
 
 
 def _without_weak_penalty(design: Design) -> Design:
@@ -978,9 +805,6 @@ def _inside_targets(
         if not isinstance(simulation.scenarios[s], InsideScenario):
             continue
         for model in simulation.models:
-            if model.fit is not None:
-                out[s, model.name] = {}
-                continue
             means = {
                 key: _inside_mean(model.likelihood, p.inside_eta[s], p)
                 for key, p in prepared.items()
@@ -1005,18 +829,10 @@ def _run_task(
     rng = np.random.default_rng(data_seed(simulation.seed, s, i))
     outcomes, means = _draw(models[0], simulation.sessions, prepared, scenario, s, rng)
     data = _DataSet(simulation.sessions, models[0].response, outcomes)
-    n_estimands = [len(model.estimand_names) for model in models]
+    n_estimands = [len(model.estimands) for model in models]
     seeds = iter(bootstrap_seeds(simulation.seed, s, i, sum(n_estimands)))
     data_set_rows, session_rows = [], []
     for model in models:
-        base = {"scenario": scenario.name, "model": model.name, "data_set": i}
-        if model.fit is not None:
-            sets, rows = _own_fit_rows(
-                model, data, scenario, base, simulation.n_draws, seeds
-            )
-            data_set_rows += sets
-            session_rows += rows
-            continue
         records = fit_sessions(
             model.design,
             data,
@@ -1033,6 +849,7 @@ def _run_task(
             if means is None
             else _unit_targets(model, simulation.sessions, means)
         )
+        base = {"scenario": scenario.name, "model": model.name, "data_set": i}
         rows, estimates = _session_rows(model, records, base)
         session_rows += rows
         for name, values in estimates.items():
@@ -1095,13 +912,11 @@ def _check(simulation: Simulation) -> None:
 
 def run_columns(simulation: Simulation) -> tuple[str, ...]:
     """The columns of the rows a run keeps, each once: every model's design
-    columns (:attr:`.terms.Design.columns`), unit and own fit's
-    ``fit_columns``, the columns a scenario
+    columns (:attr:`.terms.Design.columns`) and unit, the columns a scenario
     names for the softmax's noise, and an outside scenario's ``columns``. The
     response is not kept: it is drawn."""
     out = [c for model in simulation.models for c in model.design.columns]
     out += [model.unit for model in simulation.models]
-    out += [c for model in simulation.models for c in model.fit_columns]
     for scenario in simulation.scenarios:
         out += [
             value
