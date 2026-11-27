@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.regression.terms import (
     build_design,
     log_penalty_from_prior_sd,
 )
+from continuum_swr_replay.analysis.regression.units import unit_estimate, unit_summary
 from continuum_swr_replay.analysis.shared_statistics import (
     estimand_summary,
     signed_rank_p,
@@ -1228,6 +1229,454 @@ def test_tables_unchanged_bit_for_bit() -> None:
             for k, (a, b) in enumerate(zip(rows, want, strict=True)):
                 assert list(a) == list(b), (run, table, k)
                 assert json.dumps(a) == json.dumps(b), (run, table, k)
+
+
+# --- The difference of two models: two kinds of rows in each session ----------------
+
+KIND = "kind"
+
+
+def _two_kinds(sessions: dict, drop: dict | None = None) -> dict:
+    """Each session's rows twice, as kind A and kind B (identical rows);
+    ``drop`` maps a session to the kind it has no rows of."""
+    drop = drop or {}
+    out = {}
+    for key, rows in sessions.items():
+        parts = [rows.assign(**{KIND: k}) for k in ("A", "B") if drop.get(key) != k]
+        out[key] = pd.concat(parts, ignore_index=True)
+    return out
+
+
+def _of_kind(model: Model, kind: str, **changes) -> Model:
+    """``model`` on the rows of one kind, named ``<kind>/<name>``."""
+    return replace(
+        model, name=f"{kind}/{model.name}", rows_where=(KIND, kind), **changes
+    )
+
+
+def _kinds_simulation(
+    model, sessions, scenarios, n_data_sets=2, n_draws=50, seed=5, b_changes=None
+) -> Simulation:
+    """Kind A's and kind B's ``model`` and their difference, ``A-B/<name>``."""
+    a = _of_kind(model, "A")
+    b = _of_kind(model, "B", **(b_changes or {}))
+    return Simulation(
+        [a, b],
+        sessions,
+        scenarios,
+        n_data_sets,
+        n_draws,
+        seed,
+        differences=[engine.Difference(f"A-B/{model.name}", a.name, b.name)],
+    )
+
+
+def _kind_rate(sessions, rng, *, log_ratio=(("A", 0.5), ("B", 0.0))):
+    """Each row's expected count: :func:`_fixed_rate`'s curve with a reward
+    effect of its kind's log ratio. ``rng`` is not read."""
+    ratios = dict(log_ratio)
+    out = {}
+    for key, rows in sessions.items():
+        effect = rows[KIND].map(ratios).to_numpy(dtype=float)
+        t = rows["time_since_s"].to_numpy()
+        log_rate = (
+            np.log(0.8)
+            + np.log(2.0) * (1.0 - np.exp(-t / 0.3))
+            + effect * rows[REWARD].to_numpy()
+        )
+        out[key] = rows["exposure"].to_numpy() * np.exp(log_rate)
+    return out
+
+
+def _reward_of_kind(model: Model) -> float:
+    """The planted reward effect of :func:`_kind_rate` for a model's kind."""
+    return {"A": 0.5, "B": 0.0}[model.rows_where[1]]
+
+
+def _kind_hook(record, sessions, *, kind, unsupported=None) -> dict[str, bool]:
+    """A support hook that checks it sees only its kind's rows; ``reward``
+    lacks support in the unit holding the session ``unsupported``."""
+    for rows in sessions.values():
+        assert set(rows[KIND]) == {kind}
+    return {"reward": unsupported not in sessions}
+
+
+def _units(table: pd.DataFrame, model: str, estimand: str) -> pd.DataFrame:
+    """A model's rows of one estimand in a ``sessions`` table."""
+    return table[(table["model"] == model) & (table["estimand"] == estimand)]
+
+
+def test_bootstrap_seeds_are_a_prefix() -> None:
+    """Seeds spawned for more pairs begin with those spawned for fewer: the
+    difference's seeds, appended after the models', change none of theirs."""
+    assert bootstrap_seeds(5, 1, 2, 6)[:3] == bootstrap_seeds(5, 1, 2, 3)
+
+
+def test_one_group_draws_as_today(rate_sessions_cohort) -> None:
+    """Every row of kind A and every model on kind A: the tables are those of
+    the run without the row filter, bit for bit."""
+    sessions = {k: r.assign(**{KIND: "A"}) for k, r in rate_sessions_cohort.items()}
+    model = rate_model(sessions)
+    outside = OutsideScenario("outside", expected_rate, planted={"reward": 0.5})
+    plain = engine.run(_simulation(model, sessions, [RATE_INSIDE, outside]))
+    filtered = engine.run(
+        _simulation(
+            replace(model, rows_where=(KIND, "A")), sessions, [RATE_INSIDE, outside]
+        )
+    )
+    for a, b in zip(plain, filtered, strict=True):
+        assert json.dumps(_encoded(a)) == json.dumps(_encoded(b))
+
+
+def test_a_model_reads_only_its_rows(monkeypatch, rate_sessions_cohort) -> None:
+    """Each session holds the rate rows twice, as kinds A and B: each model's
+    data holds only its kind's rows, equal to them but for the outcome; the
+    two kinds' outcomes on identical rows differ (drawn apart); the support
+    hook of each model sees only its kind's rows."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    model = rate_model(sessions)
+    simulation = replace(
+        _kinds_simulation(model, sessions, [RATE_INSIDE]),
+        models=[_of_kind(model, k, support=partial(_kind_hook, kind=k)) for k in "AB"],
+    )
+    seen = _capture(monkeypatch)
+    engine.run(simulation)
+    assert len(seen) == 4  # two data sets, two models
+    kept = engine.run_columns(simulation)
+    for i in range(2):
+        a, b = seen[2 * i], seen[2 * i + 1]
+        for key, rows in sessions.items():
+            for data, kind in ((a, "A"), (b, "B")):
+                assert set(data[key][KIND]) == {kind}
+                mine = rows[rows[KIND] == kind][[c for c in rows.columns if c in kept]]
+                pd.testing.assert_frame_equal(data[key].drop(columns="count"), mine)
+            assert not np.array_equal(a[key]["count"], b[key]["count"])
+
+
+@pytest.mark.slow
+def test_identical_kinds_difference_is_null(rate_sessions_cohort) -> None:
+    """Identical rows and models, the same planted coefficients in both
+    kinds, 40 data sets: both planted values of the difference are exactly 0,
+    each unit's difference is the kinds' estimates subtracted, its mean is
+    within 3 simulation SEs of 0, and its SD about sqrt(2) times a kind's
+    (between 1.1 and 1.8: the kinds are drawn independently)."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    model = rate_model(sessions)
+    result = engine.run(_kinds_simulation(model, sessions, [RATE_INSIDE], 40))
+    diff = f"A-B/{model.name}"
+    summary = result.summary.set_index(["model", "estimand"])
+    data_sets = result.data_sets[result.data_sets["model"] == diff]
+    assert (data_sets["planted"] == 0.0).all()
+    assert (data_sets["planted_unit"] == 0.0).all()
+    for estimand in ("reward", "rise"):
+        a = _units(result.sessions, "A/rate", estimand)
+        b = _units(result.sessions, "B/rate", estimand)
+        d = _units(result.sessions, diff, estimand)
+        np.testing.assert_array_equal(
+            d["estimate"].to_numpy(),
+            a["estimate"].to_numpy() - b["estimate"].to_numpy(),
+        )
+        row = summary.loc[(diff, estimand)]
+        assert abs(row["mean_estimate"]) < 3 * row["bias_se"], estimand
+        ratio = row["sd"] / summary.loc[("A/rate", estimand), "sd"]
+        assert 1.1 <= ratio <= 1.8, (estimand, ratio)
+
+
+def test_planted_difference_recovered(rate_sessions_cohort) -> None:
+    """A reward effect of 0.5 on kind A's rows and none on kind B's, an
+    outside scenario: the difference's planted value is 0.5 and its bias
+    within 3 simulation SEs and the weak penalty's shrinkage."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    model = rate_model(sessions)
+    scenario = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    result = engine.run(_kinds_simulation(model, sessions, [scenario], 10))
+    summary = result.summary.set_index(["model", "estimand"])
+    row = summary.loc[(f"A-B/{model.name}", "reward")]
+    assert row["planted"] == 0.5
+    assert summary.loc[("A/rate", "reward"), "planted"] == 0.5
+    assert summary.loc[("B/rate", "reward"), "planted"] == 0.0
+    assert abs(row["bias"]) < 3 * row["bias_se"] + 0.02
+    # The rise has no planted value in either kind, so none in the difference.
+    assert np.isnan(summary.loc[(f"A-B/{model.name}", "rise"), "planted"])
+
+
+def test_difference_interval_is_of_unit_differences(rate_sessions_cohort) -> None:
+    """The difference's estimate, interval and day-level p are
+    ``unit_summary``'s on the units' differences of the ``sessions`` table at
+    the difference's own bootstrap seed, which follows the models' seeds (each
+    model keeps its own); the interval is not one made from the two kinds'
+    intervals."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    model = rate_model(sessions)
+    scenario = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    simulation = _kinds_simulation(model, sessions, [scenario], n_draws=200)
+    result = engine.run(simulation)
+    diff = f"A-B/{model.name}"
+    by_model = result.data_sets.set_index(["data_set", "model", "estimand"])
+    for i in range(2):
+        seeds = bootstrap_seeds(5, 0, i, 6)
+        for m, name in enumerate(("A/rate", "B/rate", diff)):
+            for e, estimand in enumerate(("reward", "rise")):
+                row = by_model.loc[(i, name, estimand)]
+                assert row["bootstrap_seed"] == seeds[2 * m + e]
+        for estimand in ("reward", "rise"):
+            units = [
+                _units(
+                    result.sessions[result.sessions["data_set"] == i], name, estimand
+                )
+                for name in ("A/rate", "B/rate")
+            ]
+            index = pd.MultiIndex.from_frame(
+                units[0][["animal", "session_date", "epoch"]]
+            )
+            values = pd.Series(
+                units[0]["estimate"].to_numpy() - units[1]["estimate"].to_numpy(),
+                index=index,
+            )
+            row = by_model.loc[(i, diff, estimand)]
+            direct = unit_summary(
+                values, "session", n_draws=200, seed=row["bootstrap_seed"]
+            )
+            assert (row["estimate"], row["low"], row["high"], row["day_p"]) == (
+                direct["estimate"],
+                direct["low"],
+                direct["high"],
+                direct["day_p"],
+            )
+            a, b = (
+                by_model.loc[(i, "A/rate", estimand)],
+                by_model.loc[(i, "B/rate", estimand)],
+            )
+            assert row["low"] != a["low"] - b["high"]
+            assert row["low"] != a["low"] - b["low"]
+
+
+@pytest.mark.parametrize("cause", ["support", "no_rows"])
+def test_a_unit_without_a_value_in_one_kind_is_counted(
+    cause: str, rate_sessions_cohort
+) -> None:
+    """Kind B lacks a value in one session of 10, by its support hook or for
+    want of rows of its kind there: the difference has no value in that unit
+    (NaN, for B's cause), it is counted in the summary (a share of 0.1, kind A
+    none) and 9 units are used."""
+    keys = list(rate_sessions_cohort)
+    gap = keys[3]
+    sessions = _two_kinds(
+        rate_sessions_cohort, drop={gap: "B"} if cause == "no_rows" else None
+    )
+    model = rate_model(sessions)
+    b_changes = (
+        {"support": partial(_kind_hook, kind="B", unsupported=gap)}
+        if cause == "support"
+        else None
+    )
+    scenario = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    result = engine.run(
+        _kinds_simulation(model, sessions, [scenario], b_changes=b_changes)
+    )
+    diff = f"A-B/{model.name}"
+    units = _units(result.sessions, diff, "reward").set_index(
+        ["animal", "session_date", "epoch"]
+    )
+    assert set(units.loc[[gap], "without_value"]) == {cause}
+    assert units.loc[[gap], "estimate"].isna().all()
+    assert (units.drop(index=[gap])["without_value"] == "").all()
+    summary = result.summary.set_index(["model", "estimand"])
+    assert summary.loc[(diff, "reward"), "share_without_value"] == pytest.approx(0.1)
+    assert summary.loc[(diff, "reward"), f"without_value_{cause}"] == pytest.approx(0.1)
+    assert summary.loc[("A/rate", "reward"), "share_without_value"] == 0.0
+    data_sets = result.data_sets[
+        (result.data_sets["model"] == diff) & (result.data_sets["estimand"] == "reward")
+    ]
+    assert (data_sets["n_units_used"] == 9).all()
+    assert (data_sets["n_sessions_used"] == 9).all()
+
+
+#: Each kind's reward effect in each of the ten sessions of the hand case.
+_HAND_EFFECTS = {"A": np.linspace(-0.4, 1.4, 10), "B": np.full(10, 0.3)}
+
+
+def _session_kind_effects(sessions, rng):
+    """The reward effect of a row's kind in its session (:data:`_HAND_EFFECTS`),
+    on a flat rate: a model of an intercept and the reward slope holds it."""
+    out = {}
+    for k, (key, rows) in enumerate(sessions.items()):
+        effect = np.where(
+            rows[KIND].to_numpy() == "A", _HAND_EFFECTS["A"][k], _HAND_EFFECTS["B"][k]
+        )
+        log_rate = np.log(0.8) + effect * rows[REWARD].to_numpy()
+        out[key] = rows["exposure"].to_numpy() * np.exp(log_rate)
+    return out
+
+
+def test_difference_planted_unit_over_shared_units(rate_sessions_cohort) -> None:
+    """Each session's own reward effect in each kind, held by the model (so
+    each unit's target is that effect), and kind B without support in one
+    session: the difference's ``planted_unit`` is the reduction of the units'
+    differences over the nine units with both targets, which differs from the
+    difference of the kinds' reductions (A's over ten units, B's over nine)."""
+    keys = list(rate_sessions_cohort)
+    gap = keys[3]
+    sessions = _two_kinds(rate_sessions_cohort)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [Slope(REWARD, WEAK), Offset("exposure")], pooled, intercept=True
+    )
+    model = Model(
+        "slope",
+        design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+    )
+    scenario = OutsideScenario("hand", _session_kind_effects)
+    result = engine.run(
+        _kinds_simulation(
+            model,
+            sessions,
+            [scenario],
+            b_changes={"support": partial(_kind_hook, kind="B", unsupported=gap)},
+        )
+    )
+    index = pd.MultiIndex.from_tuples(keys, names=["animal", "session_date", "epoch"])
+    a = pd.Series(_HAND_EFFECTS["A"], index=index)
+    b = pd.Series(_HAND_EFFECTS["B"], index=index).drop(index=[gap])
+    shared = unit_estimate(a - b, "session")
+    summary = result.summary.set_index("model")
+    np.testing.assert_allclose(
+        summary.loc["A/slope", "planted_unit"], unit_estimate(a, "session"), atol=1e-6
+    )
+    np.testing.assert_allclose(summary.loc["B/slope", "planted_unit"], 0.3, atol=1e-6)
+    np.testing.assert_allclose(
+        summary.loc["A-B/slope", "planted_unit"], shared, atol=1e-6
+    )
+    gap_of_reductions = (
+        summary.loc["A/slope", "planted_unit"] - summary.loc["B/slope", "planted_unit"]
+    )
+    assert abs(shared - gap_of_reductions) > 0.01
+
+
+def test_difference_at_day_and_animal() -> None:
+    """3 animals of 2 days of 2 sessions, the model at the day and the animal
+    unit in each kind; kind B has no rows in one session of animal0's first
+    day and none on animal1's second day. The difference's units are the
+    kinds' units; at the day unit animal0's first day keeps a difference from
+    its one session with both kinds, animal1's second day has none
+    (``no_rows``), and 5 of the 6 days are used; at the animal unit every
+    animal has a difference, from the sessions with both kinds (9 of 12),
+    and no data set has a day-level p."""
+    days = _day_cohort()
+    keys = list(days)
+    drop = {keys[0]: "B", keys[6]: "B", keys[7]: "B"}
+    assert keys[0][:2] == ("animal0", "20260001")
+    assert {k[:2] for k in (keys[6], keys[7])} == {("animal1", "20260002")}
+    sessions = _two_kinds(days, drop)
+    models, differences = [], []
+    for fit_by in ("day", "animal"):
+        base = unit_rate_model(sessions, fit_by)
+        a, b = _of_kind(base, "A"), _of_kind(base, "B")
+        models += [a, b]
+        differences.append(engine.Difference(f"A-B/{base.name}", a.name, b.name))
+    outside = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    result = engine.run(
+        Simulation(models, sessions, [outside], 2, 50, 5, differences=differences)
+    )
+    table = result.sessions
+    for fit_by in ("day", "animal"):
+        diff = _units(table, f"A-B/rate_{fit_by}", "reward")
+        a = _units(table, f"A/rate_{fit_by}", "reward")
+        columns = ["data_set", "animal", "session_date", "epoch"]
+        assert diff[columns].to_numpy().tolist() == a[columns].to_numpy().tolist()
+        assert (diff["fit_by"] == fit_by).all()
+    day = _units(table, "A-B/rate_day", "reward").set_index(["animal", "session_date"])
+    first = day.loc[[("animal0", "20260001")]]
+    assert (first["without_value"] == "").all() and (first["n_sessions"] == 1).all()
+    second = day.loc[[("animal1", "20260002")]]
+    assert set(second["without_value"]) == {"no_rows"}
+    assert second["estimate"].isna().all()
+    data_sets = result.data_sets.set_index("model")
+    assert (data_sets.loc["A-B/rate_day", "n_units_used"] == 5).all()
+    assert (data_sets.loc["A/rate_day", "n_units_used"] == 6).all()
+    assert (data_sets.loc["A-B/rate_day", "n_sessions_used"] == 9).all()
+    animal = data_sets.loc["A-B/rate_animal"]
+    assert (animal["n_units_used"] == 3).all()
+    assert (animal["n_sessions_used"] == 9).all()
+    assert animal["day_p"].isna().all()
+    assert np.isfinite(animal["low"]).all()
+    assert (animal["planted"] == 0.5).all()
+
+
+def test_refusals_of_differences(rate_sessions_cohort) -> None:
+    """Each rule of a run with row filters and differences is refused with
+    its reason."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    model = rate_model(sessions)
+    a, b = _of_kind(model, "A"), _of_kind(model, "B")
+    Difference = engine.Difference
+
+    def refused(match, models=(a, b), differences=(), rows=sessions):
+        simulation = Simulation(
+            list(models), rows, [RATE_INSIDE], 2, 50, 5, differences=list(differences)
+        )
+        with pytest.raises(ValueError, match=match):
+            engine.run(simulation)
+
+    with pytest.raises(ValueError, match="rows_where"):
+        replace(model, rows_where="kind")
+    with pytest.raises(ValueError, match="rows_where"):
+        replace(model, rows_where=(1, "A"))
+    refused("on every model or on none", models=(a, model))
+    refused("one column", models=(a, replace(b, rows_where=("other", "B"))))
+    refused("the response", models=(replace(a, rows_where=("count", 1.0)),))
+    refused("names repeat", differences=[Difference("d", a.name, b.name)] * 2)
+    refused("a model's name", differences=[Difference(a.name, a.name, b.name)])
+    refused("not a model", differences=[Difference("d", a.name, "C/rate")])
+    refused("itself", differences=[Difference("d", a.name, a.name)])
+    same_rows = replace(b, name="A2/rate", rows_where=(KIND, "A"))
+    refused(
+        "rows of different",
+        models=(a, b, same_rows),
+        differences=[Difference("d", a.name, same_rows.name)],
+    )
+    plain = (replace(model, name="p1"), replace(model, name="p2"))
+    refused("rows_where", models=plain, differences=[Difference("d", "p1", "p2")])
+    day_b = replace(b, fit_by="day")
+    refused("fit_by", models=(a, day_b), differences=[Difference("d", a.name, b.name)])
+    refused(
+        "does not declare", differences=[Difference("d", a.name, b.name, ("nothing",))]
+    )
+    only_rise = replace(b, estimands={"rise": b.estimands["rise"]})
+    only_reward = replace(a, estimands={"reward": a.estimands["reward"]})
+    refused(
+        "no estimand both",
+        models=(only_reward, only_rise),
+        differences=[Difference("d", a.name, b.name)],
+    )
+    stray = {**sessions}
+    key = next(iter(stray))
+    stray[key] = stray[key].assign(
+        **{KIND: np.where(stray[key].index < 5, "C", stray[key][KIND])}
+    )
+    refused(r"5 rows .* match no model", rows=stray)
+    with pytest.raises(ValueError, match="rows_where"):
+        draw_data_set(a, sessions, RATE_INSIDE, np.random.default_rng(0))
+    with pytest.raises(ValueError, match="rows_where"):
+        engine.prepare_draws(a, sessions, RATE_INSIDE)
+
+
+def test_workers_give_the_same_tables_with_differences(rate_sessions_cohort) -> None:
+    """A spawn pool of two workers gives the tables of one process with a
+    difference."""
+    sessions = _two_kinds(rate_sessions_cohort)
+    scenario = OutsideScenario("kinds", _kind_rate, planted={"reward": _reward_of_kind})
+    simulation = _kinds_simulation(
+        rate_model(sessions), sessions, [RATE_INSIDE, scenario]
+    )
+    for x, y in zip(
+        engine.run(simulation), engine.run(simulation, workers=2), strict=True
+    ):
+        pd.testing.assert_frame_equal(x, y)
 
 
 if __name__ == "__main__":
