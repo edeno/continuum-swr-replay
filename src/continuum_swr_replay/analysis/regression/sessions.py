@@ -303,10 +303,16 @@ class _Session:
                 ]
             else:
                 groups = [(None, np.ones(kept_session.size, dtype=bool))]
+            # An uncoded level's rows are zero in the columns too, but they are
+            # not the reference's rows.
+            uncoded = np.zeros(kept_session.size, dtype=bool)
+            for level in category.uncoded:
+                uncoded |= self.level_rows[category.column, level][self.kept]
             for key, rows in groups:
                 own = [t for t in levels if key is None or t.session == key]
                 columns = [int(j) for t in own for j in t.columns]
-                if np.any(np.all(self.X_kept[np.ix_(rows, columns)] == 0, axis=1)):
+                at_zero = np.all(self.X_kept[np.ix_(rows, columns)] == 0, axis=1)
+                if np.any(at_zero & ~uncoded[rows]):
                     continue
                 where = "" if key is None else f" in session {'/'.join(key)}"
                 active = ", ".join(t.name for t in own if t.name not in self.removed)

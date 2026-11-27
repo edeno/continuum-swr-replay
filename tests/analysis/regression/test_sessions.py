@@ -645,6 +645,52 @@ def test_a_softmax_session_without_the_reference_role_is_refused() -> None:
         _fit(design, sessions, GroupedSoftmax(), response="share", unit="event_id")
 
 
+def test_a_by_term_of_an_uncoded_level_is_fitted() -> None:
+    """A role category whose trunk level is uncoded, with a slope fitted for
+    the trunk rows only: the fit converges, has no trunk level and fits the
+    slope."""
+    from .conftest import content_rows
+
+    sessions = by_session([content_rows(0)])
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, "other", weak, uncoded=("trunk",))
+    design = build_design(
+        [role, Slope("clock_s", "none", by=role, levels=("trunk",))],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    (record,) = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )
+    assert record.status == "converged"
+    assert "role[trunk]" not in record.coef_names
+    assert np.isfinite(record.coef[record.coef_names.index("clock_s:role=trunk")])
+
+
+def test_the_rows_of_an_uncoded_level_are_not_reference_rows() -> None:
+    """The rows of an uncoded level are zero in the category's columns, as the
+    reference's are, but they are not the reference: a session whose events
+    have trunk rows and no row of the reference is refused."""
+    from .conftest import content_rows
+
+    second = content_rows(1)
+    frames = [content_rows(0), second[second["role"] != "other"]]
+    sessions = by_session(frames)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ROLE.levels, "other", weak, uncoded=("trunk",))
+    design = build_design(
+        [role, Slope("clock_s", weak)],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"session sim/20260001/02_r1: the category 'role' has no rows of its "
+        r"reference level 'other'.*role\[current\], role\[previous\] are",
+    ):
+        _fit(design, sessions, GroupedSoftmax(), response="share", unit="event_id")
+
+
 def test_a_shared_category_needs_its_reference_in_the_fit_only() -> None:
     """A category that is not a baseline is shared by the sessions of a fit:
     the fit identifies it when one of its sessions has rows of the reference

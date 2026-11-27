@@ -445,6 +445,23 @@ A smooth or a slope fitted for one level of a category appends `:<by column>=<le
 to its term name, for example `s(clock_s):role=current`. The declared estimands name
 their terms by this rule.
 
+**Uncoded levels** (the regression code author's call, 2026-11-26). A `Category` may
+declare levels beside the reference that get no column in the category's own term
+(`uncoded`, empty by default). In that term their rows are at the reference; they stay
+levels for a `by`, so a smooth or a slope can still be fitted for one. It is for a level
+that is an exact function of other terms, whose coefficient is not a parameter of the
+model: the content models' trunk role, which holds exactly on the trunk arms, whose arm
+effects each have a free column. Fixing such a coefficient at 0 by declaration is exact;
+fixing it by a prior is what the reference-level rule below refuses. The caller is
+responsible for the level being carried by another term (or meant to equal the
+reference); nothing checks it. An uncoded level has no level term, so the support rule
+never removes it and its rows are never dropped as a level's. Its rows are not the
+reference's rows: the reference-level check below does not count them
+(`test_terms.py::test_an_uncoded_level_has_no_column_and_stays_a_level_for_a_by`,
+`::test_uncoded_levels_are_checked`;
+`test_sessions.py::test_a_by_term_of_an_uncoded_level_is_fitted`,
+`::test_the_rows_of_an_uncoded_level_are_not_reference_rows`).
+
 **Baselines.** A model declares its baseline terms to `build_design` (`baseline`): the
 intercept or a category (the rate models' intercept, the content models' arm category;
 `declared_tests.BASELINES`). In a fit of several sessions

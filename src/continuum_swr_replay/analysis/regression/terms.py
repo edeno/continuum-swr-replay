@@ -10,7 +10,9 @@ A model is a list of terms and, for the diagonal families, an intercept:
 - :class:`LinearFunctional`: a smooth curve over lags whose column ``b`` is
   ``sum_l B_b(log l) r_l`` (``r_l`` the value at lag ``l``), with no constraint
   and the same required ``penalty``.
-- :class:`Category`: one 0/1 column for each level but the reference. A
+- :class:`Category`: one 0/1 column for each level but the reference and
+  the levels declared ``uncoded``, whose rows are at the reference in the
+  category's term and which stay levels for a ``by``. A
   missing value (None or NaN) makes its row missing; any other value outside
   the levels is an error. The reference level must have rows in every fit:
   without them the intercept (or, under the grouped softmax, the other
@@ -219,22 +221,52 @@ class Category:
         ``"none"`` for no penalty, else the fixed log penalty of the identity
         on each coded level's column (module docstring); not read when the
         category is only a ``by``.
+    uncoded : tuple
+        Levels, beside the reference, with no column of their own in the
+        category's term: there their rows are at the reference. They stay
+        levels for a ``by`` (a smooth or a slope can be fitted for one), and
+        their rows are not the reference's rows when the loop asks for those.
+        Use it for a level that is an exact function of other terms (its
+        coefficient is not a parameter of the model) or that is meant to
+        equal the reference; the caller is responsible for that being true,
+        nothing here checks it. Empty by default: every level but the
+        reference has a column.
     """
 
     column: str
     levels: tuple
     reference: object
     penalty: Penalty
+    uncoded: tuple = ()
 
     def __post_init__(self) -> None:
         _check_penalty(self.penalty)
         object.__setattr__(self, "levels", tuple(self.levels))
+        object.__setattr__(self, "uncoded", tuple(self.uncoded))
         if len(set(self.levels)) != len(self.levels):
             raise ValueError(f"{self.column}: levels repeat: {self.levels}")
         if self.reference not in self.levels:
             raise ValueError(
                 f"{self.column}: reference {self.reference!r} not among the levels "
                 f"{self.levels}"
+            )
+        if len(set(self.uncoded)) != len(self.uncoded):
+            raise ValueError(f"{self.column}: uncoded levels repeat: {self.uncoded}")
+        unknown = [level for level in self.uncoded if level not in self.levels]
+        if unknown:
+            raise ValueError(
+                f"{self.column}: uncoded levels {unknown} not among the levels "
+                f"{self.levels}"
+            )
+        if self.reference in self.uncoded:
+            raise ValueError(
+                f"{self.column}: the reference {self.reference!r} has no column "
+                "already; it cannot be uncoded"
+            )
+        if not _coded(self):
+            raise ValueError(
+                f"{self.column}: no coded level: every level is the reference or "
+                f"uncoded ({self.uncoded})"
             )
 
 
@@ -585,8 +617,13 @@ class _Built:
 
 
 def _coded(category: Category) -> list:
-    """The levels with a column: every level but the reference."""
-    return [level for level in category.levels if level != category.reference]
+    """The levels with a column: every level but the reference and the
+    uncoded levels."""
+    return [
+        level
+        for level in category.levels
+        if level != category.reference and level not in category.uncoded
+    ]
 
 
 class _Levels:
@@ -808,7 +845,8 @@ class SessionDesign(NamedTuple):
         True for a row with a missing value the design reads.
     level_rows : dict of tuple to np.ndarray of bool
         ``(column, value)`` -> the rows of that level, for every level a
-        design term codes or is fitted for.
+        design term codes or is fitted for, and every uncoded level of a
+        category term.
     """
 
     X: np.ndarray
@@ -1088,6 +1126,9 @@ class Design:
             for t in b.design_terms
             if t.level is not None
         }
+        for category in self.categories:
+            for level in category.uncoded:
+                level_rows[category.column, level] = levels.rows(category, level)
         missing = ~np.isfinite(X).all(axis=1)
         offset = self._offset(rows)
         if offset is not None:

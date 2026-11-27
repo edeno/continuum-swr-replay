@@ -333,6 +333,51 @@ def test_one_scale_per_covariate_across_its_terms(content_sessions) -> None:
     )
 
 
+def test_an_uncoded_level_has_no_column_and_stays_a_level_for_a_by(
+    content_sessions,
+) -> None:
+    """A level declared ``uncoded`` has no column in its category's term (its
+    rows are at the reference there); the other names are as before, and a
+    term by the category can still be fitted for it."""
+    pooled = pd.concat(content_sessions.values(), ignore_index=True)
+    role = Category(
+        "role", ROLES, reference="other", penalty="none", uncoded=("trunk",)
+    )
+    trunk_slope = Slope("clock_s", "none", by=role, levels=("trunk",))
+    coded = build_design([ROLE, Slope("clock_s", "none", by=ROLE, levels=("trunk",))],
+                         pooled, intercept=False)  # fmt: skip
+    design = build_design([role, trunk_slope], pooled, intercept=False)
+    assert design.coef_names == tuple(n for n in coded.coef_names if n != "role[trunk]")
+    assert design.coef_names == (
+        "role[current]",
+        "role[previous]",
+        "clock_s:role=trunk",
+    )
+    assert design.categories == (role,)
+    X, _ = design.session(pooled)
+    trunk = (pooled["role"] == "trunk").to_numpy()
+    assert np.all(X[trunk][:, :2] == 0.0)
+    slope = X[:, design.coef_names.index("clock_s:role=trunk")]
+    assert np.all(slope[~trunk] == 0.0) and np.any(slope[trunk] != 0.0)
+    assert design.by_name["clock_s:role=trunk"].level == ("role", "trunk")
+    # With the default, nothing is uncoded.
+    assert ROLE.uncoded == ()
+
+
+@pytest.mark.parametrize(
+    ("uncoded", "message"),
+    [
+        (("next",), "not among the levels"),
+        (("other",), "the reference"),
+        (("trunk", "trunk"), "repeat"),
+        (("current", "previous", "trunk"), "no coded level"),
+    ],
+)
+def test_uncoded_levels_are_checked(uncoded, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        Category("role", ROLES, reference="other", penalty="none", uncoded=uncoded)
+
+
 def test_category_and_by_terms(content_sessions) -> None:
     """A category has one column per level but the reference; a term by a
     category is zero off its levels, whose values it does not read (the
