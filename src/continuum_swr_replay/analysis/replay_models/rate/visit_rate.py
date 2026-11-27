@@ -784,7 +784,12 @@ def window_support(
     at-risk seconds. An estimand is supported when every read has at least
     ``support.MIN_UNITS`` visits: the rule of a 0/1 slope
     (``support.binary_support``) counted on the rows inside each window, the
-    smallest rule the support machinery states. No response is read.
+    smallest rule the support machinery states. No response is read. The
+    rule asks for visits with a row anywhere in the window, not for rows over
+    its whole range: where no visit after an omission lasts to the window's
+    end, the curve there is the penalty's extrapolation and the rule does not
+    see it (a synthetic cohort whose visits after an omission all ended by 8
+    s gave Q2 biased by +0.14 to +0.47 with nothing planted, 2026-11-26).
 
     Parameters
     ----------
