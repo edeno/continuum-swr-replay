@@ -231,8 +231,9 @@ unit's model (the fit on unlimited data).
   estimates are. The fitter accepts a response that is not a whole number (`likelihoods.py:420` checks
   only that it is not negative), so the expected counts or shares can be fitted as they are.
 - **Call**: in that target fit the weak penalty is off. The target is a property of the truth, not of
-  the estimator. (The rate branch computes this target by hand, `shared_ratio_projection`; the engine
-  replaces it with the real fit.)
+  the estimator. (The rate branch computed this target by hand, `shared_ratio_projection`; that
+  projection was removed when the branch merged master, 2026-11-26, and the engine's real fit replaces
+  it.)
 - **OPEN**: which target the paper states. Evidence awaited: how far apart the two are under the
   scenarios that plant session differences (effects, arm effects, curves).
 
@@ -244,8 +245,8 @@ unit's model (the fit on unlimited data).
 | `"day"` | one per day | day -> animal, mean of means | nested bootstrap (animals, days), t over animals: `estimand_summary` with the day as its own session | animals with the sign; the day-level test |
 | `"animal"` | one per animal | the mean over the animals | mean +/- t(0.975, 4) SD / sqrt(5) | animals with the sign; no day-level test |
 
-- For the animal unit the function exists on the rate branch: `shared_statistics.animal_mean_interval`
-  (branch `visit-rate-validation`). It is the interval `bootstrap_interval` gives a mean of animal values,
+- For the animal unit the function is on master: `shared_statistics.animal_mean_interval` (first built on
+  the branch `visit-rate-validation`, whose copy went when it merged master). It is the interval `bootstrap_interval` gives a mean of animal values,
   without resampling. **Call**: it becomes the one animal-level reduction. As built: the rule of this
   table is one function, `analysis/regression/units.py:unit_summary` (in the fitter's package, as it knows
   the units), which calls `shared_statistics.estimand_summary` or `shared_statistics.animal_mean_interval`.

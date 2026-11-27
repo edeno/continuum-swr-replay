@@ -156,6 +156,17 @@ d758a17e; both branches start from master 7959aca7, before the JAX fitter.
 
 ### Rate branch (`visit-rate-validation`, not on master)
 
+**Done on 2026-11-26.** The rate branch merged master (908f05af, then cf68fb2a). Removed:
+`reward_level="animal"` with `REWARD_LEVELS`, `fit_animal_rewards` and the profile fit,
+`animal_reward_values`, `summarize_animal_rewards`, `animal_level_fit`, `_animal_truth`,
+`shared_ratio_projection`, the engine's own-fit path (with `OwnFit`, `UNIT_COLUMNS` and the animal-unit
+branch; `regression/simulation.py` is master's again) and the joint run of both kinds (`joint_fit`,
+`joint_simulation`). The own-fit path and the joint run are not merged to master; they are reachable at
+the tag `rate-validation-with-joint-run-ae44dce8` (the code of the earlier reports at
+`rate-validation-frozen-5d97fd98`). Kept: the scenario list (`visit_rate_simulation.py`,
+`visit_rate_scenarios.py`), `WEAK_PRIOR_SD` and its pair, `--config` (`docs/history/2026-module-moves.md`,
+"The rate branch takes master"). The table below is the inventory as it was.
+
 | Place | What it does | What changes |
 |---|---|---|
 | `visit_rate.py:320` `REWARD_LEVELS`; `:1092` `AnimalReward`; `:1134` `AnimalRewardFit`; `:1167` `_profile_terms`; `:1196`, `:1208` the side checks; `:1218` `_fit_animal`; `:1273` `fit_animal_rewards` | one unpenalized reward coefficient per animal, each session's baseline and curves its own, by Newton steps on the summed profile score | question 7, task 12 |
@@ -186,7 +197,10 @@ built one design per unit to dodge the reference-level rule; task 3 makes that u
 1. **The rate branch takes master** (it holds the JAX fitter, 2e0ea0d0) and merges after its own
    phase-boundary review. It brings `animal_mean_interval`, the engine's own-fit path and the animal
    check (`reward_level="animal"`) as they are. Its simulations are running: it merges master only after
-   they finish (C11).
+   they finish (C11). *(Done 2026-11-26: master merged; the animal check, `shared_ratio_projection`, the
+   own-fit path and the joint run removed, the last two reachable at the tag
+   `rate-validation-with-joint-run-ae44dce8`; the scenario list kept. See the note under the rate
+   branch's inventory.)*
 2. **The content branch the same**, after its simulations finish.
 3. **This phase branches from master after both.** If one has not merged, tasks 1 to 7 (task-free) go
    ahead, and the model tasks (8 to 12) wait for it. Nothing here is built on an unmerged branch.
@@ -195,6 +209,7 @@ built one design per unit to dodge the reference-level rule; task 3 makes that u
      (task 7);
    - `shared_ratio_projection` and `_animal_truth` (task 7);
    - `summarize_animal_rewards`, `animal_reward_values`, `animal_level_fit` (task 12);
+   - *(Items for the rate branch above: done 2026-11-26, with the shared curves of the decided form.)*
    - `REWARD_LEVELS`, `fit_animal_rewards` and its helpers: removed if question 1 gives shared curves;
      moved into `analysis/regression/` and generalized if it gives per-session curves (task 12). Until the
      answer they stay, as the check, because they are the only per-session-curve fit that fits in memory
@@ -309,6 +324,13 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
     `test_visit_rate_scenarios.py::test_differing_curves_differ_by_session`,
     `test_role_content_scenarios.py::test_arm_deviations_per_session`, each also checking the seed fixes
     the draw.
+    **NOTE (the 2026-11-26 review's proposal, not a decision): the kind difference at larger units.** A
+    `Model` with an optional row filter by event kind (so that one data set holds both kinds' rows and
+    each model fits its own), and a `Simulation` with declared differences of two models' unit values
+    (for example SWR minus No SWR of Q2), aligned by unit key and reduced as the estimates are
+    (`unit_summary`), with `planted` and `planted_unit` taken as the differences of the two models'.
+    It would replace the joint run removed from the rate branch (tag
+    `rate-validation-with-joint-run-ae44dce8`), which worked at the session unit only.
 11. **The leave-one-session-out report.** A task-free function in `analysis/regression/` (new module
     `influence.py`, `leave_one_session_out(design, sessions, lik, *, fit_by, ...)`) refits each unit once
     per session left out, with the same design and penalties. A model's statistics module turns it into
