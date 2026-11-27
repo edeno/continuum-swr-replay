@@ -61,10 +61,11 @@ The declared form of the rate model meets the first case and not the second.
   coefficient fails the support rule and is left out, so Q2 and the onset test have no
   value; the arrival curve after an omission stays in the fit, fitted from those visits.
   Q1 reads that curve, so the rate model's window support rule
-  (`visit_rate.window_support`, the author's rule) marks Q1, Q2 and the onset test
-  unsupported where fewer than `MIN_UNITS` visits of a side reach a window the contrast
-  reads. The values are kept, with the counts beside them, and left out of the reduction
-  over units.
+  (`visit_rate.window_support`; the author's rule, cut into parts of at most 2 s by the
+  coordinator's call) marks Q1, Q2 and the onset test unsupported where fewer than
+  `MIN_UNITS` visits of an outcome the contrast reads have a row in some part of a range it
+  reads. An unsupported value is NaN (its row and counts kept) and the reduction over units
+  counts it; the simulation engine gives it no value either (cause `support`).
 - **A unit with no visit after an omission**, or every visit rewarded: the curve after an
   omission has zero columns there and fails the support rule; the outcome coefficient
   fails it too. The form has no shared arrival curve, so nothing is collinear with the

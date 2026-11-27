@@ -440,6 +440,11 @@ def test_planted_clocks_and_reward_ratio_recovered(make_visit_rows, cohort_of) -
     assert [r.status for r in fit.records] == [CONVERGED] * 4
     assert all(r.edf[vr.REWARD] > 0.99 for r in fit.records)
     values = unit_estimands(fit)
+    # Visits last 1.5 to 8 s: Q2's 8 to 10 s part has no row, so Q2 has no
+    # value (the window support rule); the others are read.
+    q2 = values[values["estimand_id"] == "Q2"]
+    assert q2["estimate"].isna().all() and not q2["supported"].any()
+    values = values[values["estimand_id"] != "Q2"]
     for estimand_id, group in values.groupby("estimand_id"):
         truth = np.mean([p[estimand_id] for p in planted.values()])
         se = np.sqrt(group["variance"].mean() / len(group))
@@ -489,7 +494,8 @@ def test_each_reward_form_converges_to_its_truth(make_visit_rows, cohort_of) -> 
     reward (2 to 14 s), on one large session without noise. The coefficient
     form's reward coefficient converges to the pooled truth; the by-outcome
     form's Q1 (the arrival curve after an omission) and Q7a converge to the
-    omission side's, which the pooled curves miss. Tolerance 0.01, a
+    omission side's, which the pooled curves miss, and its Q2 has no value:
+    no visit after an omission reaches 4 s, so Q2's window lacks support. Tolerance 0.01, a
     simulation tolerance for the declared penalties and the projection's
     cells."""
     rows = make_visit_rows(
@@ -508,6 +514,8 @@ def test_each_reward_form_converges_to_its_truth(make_visit_rows, cohort_of) -> 
         truth.pooled[vr.SECONDARY_ESTIMAND], abs=0.01
     )
     by_outcome = _noiseless_fit(rows, truth, "by_outcome", cohort_of)
+    # No visit after an omission lasts past 4 s: Q2's window lacks support.
+    assert np.isnan(by_outcome["Q2"])
     for estimand_id in ("Q1", "Q7a"):
         assert by_outcome[estimand_id] == pytest.approx(
             truth.by_outcome[estimand_id], abs=0.01
@@ -1087,3 +1095,19 @@ def test_a_unit_with_few_omission_visits(make_visit_rows, cohort_of, n_omitted) 
     values = values[values["session_date"] == "20200101"].set_index("estimand_id")
     assert values.loc[["Q2", "Q2-onset"], "estimate"].isna().all()
     assert np.isfinite(values.loc["Q7a", "estimate"])
+
+
+def test_the_window_tests_are_declared_per_animal() -> None:
+    """One rule in one place: Q2 and the onset test are declared tests at the
+    animal unit only (the twenty-sixth round: "the window tests are read per
+    animal, not per day"); Q1 and Q7a at every unit; Q1b and the secondary
+    reward coefficient at none."""
+    assert vr.WINDOW_TEST_UNIT == "animal"
+    assert vr.WINDOW_TESTS == ("Q2", "Q2-onset")
+    for fit_by in ("session", "day", "animal"):
+        for estimand_id in ("Q2", "Q2-onset"):
+            assert vr.is_declared_test(estimand_id, fit_by) == (fit_by == "animal")
+        assert vr.is_declared_test("Q1", fit_by)
+        assert vr.is_declared_test("Q7a", fit_by)
+        assert not vr.is_declared_test("Q1b", fit_by)
+        assert not vr.is_declared_test(vr.SECONDARY_ESTIMAND, fit_by)

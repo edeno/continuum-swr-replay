@@ -137,6 +137,7 @@ __all__ = [
     "shaped_clocks",
     "simulation",
     "smoothed_log_rate",
+    "estimand_support",
     "model_name",
     "spread_sessions",
     "table",
@@ -232,7 +233,7 @@ SCENARIOS: dict[str, tuple[str, ...]] = {
 #: The quick configuration's synthetic cohort: animals, days per animal,
 #: sessions per day, visits per session, events per session, the range of a
 #: visit's length (s) and that after an omission (None: the same).
-QUICK_COHORT = (5, 2, 1, 40, 150.0, (1.5, 8.0), None)
+QUICK_COHORT = (5, 2, 1, 40, 150.0, (1.5, 12.0), None)
 #: The first validation's synthetic cohort (the author's sizes): five
 #: animals of four days of two sessions, 100 visits and 200 expected events
 #: a session; visits after an omission shorter (0.5 to 12 s against 1 to
@@ -740,6 +741,19 @@ def _estimands(design, settings: vr.VisitRateSettings) -> dict[str, np.ndarray]:
     return {**c, "Q1b": later["Q1"]}
 
 
+def estimand_support(
+    record, sessions: Mapping[SessionKey, pd.DataFrame], *, settings
+) -> dict[str, bool]:
+    """The window support rule (``visit_rate.window_support``) of the
+    by-outcome form's estimands in one unit, Q1b with Q1's reads at the 1 to
+    2 s reference: the engine's ``Model.support``, so that the simulation
+    gives no value where the statistics give none."""
+    reads = dict(vr.window_reads(settings))
+    reads["Q1b"] = vr.window_reads(replace(settings, q1_reference_s=(1.0, 2.0)))["Q1"]
+    found = vr.window_support(list(sessions.values()), settings, reads)
+    return {name: entry["supported"] for name, entry in found.items()}
+
+
 def _settings(
     config: Config,
     fit_by: str,
@@ -785,6 +799,11 @@ def _models(
                     vr.UNIT,
                     _estimands(design, settings),
                     fit_by=fit_by,
+                    support=(
+                        partial(estimand_support, settings=settings)
+                        if config.reward_form == "by_outcome"
+                        else None
+                    ),
                 )
             )
     return models
@@ -1132,8 +1151,11 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     """The engine's summary with the run's kind, reward form and calibration,
     each model's prior SD (its unit is the engine's ``fit_by``), the truths of
     both forms beside the planted value (``truth_by_outcome``,
-    ``truth_pooled``; NaN where a form has no such estimand), and
-    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`)."""
+    ``truth_pooled``; NaN where a form has no such estimand),
+    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`) and
+    ``declared_test`` (``visit_rate.is_declared_test``: the window tests are
+    declared at the animal unit only; their session and day rows are kept as
+    a check)."""
     config = simulation.attrs["config"]
     truths = simulation.attrs["truths"]
     out = result.summary.copy()
@@ -1142,6 +1164,10 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     out.insert(2, "calibrate", config["calibrate"])
     out["prior_sd"] = [float(m.rpartition("_sd")[2]) for m in out["model"]]
     out["truth_from_real_counts"] = out["scenario"].isin(TRUTH_FROM_REAL_COUNTS)
+    out["declared_test"] = [
+        vr.is_declared_test(e, f)
+        for e, f in zip(out["estimand"], out["fit_by"], strict=True)
+    ]
     for name in ("by_outcome", "pooled"):
         out[f"truth_{name}"] = [
             truths[s][name].get(e, np.nan)

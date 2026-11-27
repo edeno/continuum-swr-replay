@@ -44,7 +44,9 @@ def test_the_quick_list_runs_through_the_engine(quick, quick_result) -> None:
     assert set(summary["model"]) == {"session_sd2"}
     assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q2-onset", "Q7a"}
     assert (summary["share_not_converged"] == 0.0).all()
-    assert (summary["share_without_value"] == 0.0).all()
+    # A unit without a value lacks only the window support of a window read.
+    assert (summary["share_without_value"] == summary["without_value_support"]).all()
+    assert (summary.query("estimand == 'Q7a'")["share_without_value"] == 0.0).all()
     assert (summary["n_data_sets_with_estimate"] == 2).all()
     table = vs.table(quick_result, quick)
     assert {"kind", "reward_form", "calibrate", "prior_sd", "truth_by_outcome"} <= set(
@@ -98,7 +100,9 @@ def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
     for a in range(5):
         for e in range(2):
             key = (f"animal{a}", f"2026{e + 1:04d}", "02_r1")
-            rows = vs.synthetic_visit_rows(key, n_visits=80, seed=100 + 2 * a + e)
+            rows = vs.synthetic_visit_rows(
+                key, n_visits=80, seed=100 + 2 * a + e, length_s=(1.5, 12.0)
+            )
             sessions[key] = rows
     pooled = pd.concat(sessions.values(), ignore_index=True)
     config = vs.Config(prior_sds=(2.0,), fit_by=("session",))
@@ -172,7 +176,7 @@ def test_the_rate_table_truth_is_flagged_as_read_from_the_real_counts(
 
 
 #: A small cohort of two sessions a day, for the units.
-SMALL = (3, 2, 2, 30, 120.0, (1.0, 12.0), (0.5, 8.0))
+SMALL = (3, 2, 2, 30, 120.0, (1.0, 12.0), (0.5, 12.0))
 
 
 @pytest.fixture(scope="module")
@@ -203,6 +207,12 @@ def test_models_at_each_unit_on_the_same_draws(at_every_unit) -> None:
         vs.LOG_RATIO["SWR"]
     )
     assert np.isfinite(summary.loc[("animal_sd2", "Q2"), "planted_unit"])
+    table = vs.table(result, at_every_unit).set_index(["model", "estimand"])
+    assert table.loc[("animal_sd2", "Q2"), "declared_test"]
+    assert not table.loc[("day_sd2", "Q2"), "declared_test"]
+    assert not table.loc[("session_sd2", "Q2-onset"), "declared_test"]
+    assert table.loc[("day_sd2", "Q7a"), "declared_test"]
+    assert not table.loc[("animal_sd2", "Q1b"), "declared_test"]
 
 
 def test_the_window_truths_of_a_later_onset(at_every_unit) -> None:
@@ -271,3 +281,29 @@ def test_the_curves_are_calibrated_at_the_unit() -> None:
         assert last["median_edf"] == pytest.approx(targets[curve], abs=0.01)
         assert last["n_units_used"] == 3
         assert penalty.rows["fit_by"] == "animal"
+
+
+def test_the_engine_reads_the_window_support_rule() -> None:
+    """Visits after an omission of 2.5 to 5.9 s: Q2's 6 to 8 s part has no
+    row after an omission in any unit, so the engine reports every unit
+    without a value of Q2 for the cause ``support`` (the rule of
+    ``visit_rate.window_support``, the one the statistics read); the onset
+    test keeps a value in every unit."""
+    run = vs.simulation(
+        False,
+        1,
+        {
+            "synthetic": (3, 2, 2, 30, 120.0, (1.0, 12.0), (2.5, 5.9)),
+            "fit_by": ("day",),
+            "n_data_sets": 2,
+            "n_draws": 50,
+            "prior_sds": (2.0,),
+        },
+    )
+    assert all(m.support is not None for m in run.models)
+    summary = engine.run(run, scenarios=["constant_ratio"]).summary.set_index(
+        "estimand"
+    )
+    assert summary.loc["Q2", "without_value_support"] == 1.0
+    assert summary.loc["Q2", "share_without_value"] == 1.0
+    assert summary.loc["Q2-onset", "share_without_value"] == 0.0

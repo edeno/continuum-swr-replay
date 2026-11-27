@@ -13,12 +13,16 @@ a kept fit, or with a coefficient the contrast uses left out, has no value
 (NaN).
 
 The support of a window contrast (Q1, Q2, Q2-onset; ``visit_rate.window_support``,
-the author's rule) is recorded beside each value: the visits and at-risk
-seconds of each outcome in the windows it reads, and ``supported``. A value
-whose window lacks support is kept in the unit table, marked, and left out of
-the reduction over units, which counts it (``n_units_unsupported``).
+read in parts of at most 2 s) is recorded beside each value: the fewest
+visits and at-risk seconds of each outcome over the parts it reads, and
+``supported``. A value whose window lacks support is not a number (the
+twenty-sixth round: "reported as unsupported"): its estimate, standard error
+and band are NaN, its row and counts are kept, and the reduction over units
+counts it (``n_units_unsupported``).
 
 Over units, each estimand is summarized for each kind and for the difference
+(the window tests Q2 and Q2-onset only at the animal unit, where they are
+declared tests: ``visit_rate.is_declared_test``)
 between the kinds (the SWR unit value less the No SWR one, unit by unit, over
 the units where both kinds have a supported value) by
 ``regression.units.unit_summary`` at the records' ``fit_by`` (design note
@@ -59,10 +63,12 @@ from ..declared_tests import DIFFERENCE, KINDS
 from .visit_rate import (
     LAGS,
     WINDOW_SUPPORT,
+    WINDOW_TESTS,
     VisitRateFit,
     declared_contrasts,
     difference_curve_rows,
     difference_grid,
+    is_declared_test,
     lag_curve_rows,
 )
 
@@ -141,8 +147,9 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
     pd.DataFrame
         One row per unit and estimand: ``animal``, ``session_date``,
         ``epoch`` (``""`` for a part the unit lacks), ``fit_by``, ``kind``,
-        ``estimand_id``, ``estimate``, ``variance``, ``se``; ``supported``
-        (False for a window contrast without support; True otherwise) and
+        ``estimand_id``, ``estimate``, ``variance``, ``se`` (NaN where the
+        window lacks support); ``supported`` (False for a window contrast
+        without support; True otherwise) and
         ``visits_omitted``, ``visits_rewarded``, ``at_risk_s_omitted``,
         ``at_risk_s_rewarded`` (``visit_rate.window_support``; NaN where not
         read). NaN for a unit without a kept fit or with a coefficient the
@@ -156,8 +163,9 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
         beta = np.asarray(record.coef, dtype=float)
         vcov = np.asarray(record.vcov, dtype=float)
         for estimand_id, contrast in c.items():
+            support = _support_columns(record, estimand_id)
             value = None
-            if _kept(record):
+            if _kept(record) and support["supported"]:
                 on_fit = fit.design.contrast_on(contrast, record.coef_names)
                 value = evaluate_contrast(on_fit, beta, vcov)
             estimate = np.nan if value is None else value.estimate
@@ -170,7 +178,7 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
                     "estimate": estimate,
                     "variance": variance,
                     "se": float(np.sqrt(variance)),
-                    **_support_columns(record, estimand_id),
+                    **support,
                 }
             )
     return pd.DataFrame(rows)
@@ -248,7 +256,11 @@ def summarize_estimands(
         ``unit_summary`` (on the log scale; with ``fit_by`` and ``n_units``)
         and ``n_units_unsupported`` (the units whose value lacks window
         support, left out). The difference is taken unit by unit, over the
-        units where both kinds have a supported value.
+        units where both kinds have a supported value. The window tests (Q2
+        and the onset test) are declared tests per animal only
+        (``visit_rate.is_declared_test``, the twenty-sixth round): at another
+        unit they are left out here, and the unit table keeps their values
+        and support marks as a description.
 
     Raises
     ------
@@ -265,6 +277,8 @@ def summarize_estimands(
         raise ValueError("a unit has more than one value of an estimand and kind")
     out = []
     for estimand_id, values in unit_values.groupby("estimand_id", sort=False):
+        if estimand_id in WINDOW_TESTS and not is_declared_test(estimand_id, fit_by):
+            continue
         for kind in KINDS:
             summary = _summary(values[values["kind"] == kind], fit_by, n_draws, seed)
             out.append({"estimand_id": estimand_id, "tested": kind, **summary})

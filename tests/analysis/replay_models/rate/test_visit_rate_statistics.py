@@ -39,7 +39,7 @@ def cohort(make_visit_rows, cohort_of):
     out = {}
     for i in range(3):
         key = (f"rat{i}", "20200101", "02_r1")
-        rows = make_visit_rows(key, n_visits=60, seed=60 + i)
+        rows = make_visit_rows(key, n_visits=60, seed=60 + i, length_s=(1.5, 12.0))
         truth = scenarios.constant_ratio(rows, CLOCKS, log_ratio=np.log(1.3), total=500)
         rows["count"] = rng.poisson(truth.expected).astype(float)
         out[key] = cohort_of(rows, "SWR")
@@ -142,9 +142,10 @@ def test_difference_between_kinds() -> None:
     summary = summarize_estimands(
         pd.concat([swr, no_swr], ignore_index=True), n_draws=200, seed=3
     ).set_index(["estimand_id", "tested"])
-    assert len(summary) == 3 * len(vr.RATE_ESTIMANDS)
+    declared = [e for e in vr.RATE_ESTIMANDS if vr.is_declared_test(e, "session")]
+    assert len(summary) == 3 * len(declared)
     keys = ["animal", "session_date", "epoch"]
-    for estimand_id in vr.RATE_ESTIMANDS:
+    for estimand_id in declared:
         a = swr[swr["estimand_id"] == estimand_id].set_index(keys)["estimate"]
         b = no_swr[no_swr["estimand_id"] == estimand_id].set_index(keys)["estimate"]
         for tested, values in (("SWR", a), ("No SWR", b), (DIFFERENCE, a - b)):
@@ -260,6 +261,13 @@ def test_unit_estimands_at_each_unit(
         expected["estimate"]
     )
     assert summary.loc[("Q7a", DIFFERENCE), "estimate"] == pytest.approx(0.1)
+    # The window tests are declared per animal (the twenty-sixth round): at
+    # another unit the summary leaves them out; the unit table keeps them.
+    windows = {"Q2", "Q2-onset"}
+    summarized = set(summary.index.get_level_values("estimand_id"))
+    assert (windows <= summarized) == (fit_by == "animal")
+    assert not (windows & summarized) or fit_by == "animal"
+    assert windows <= set(values["estimand_id"])
 
 
 def test_values_of_mixed_units_are_refused(make_visit_rows, cohort_of) -> None:
@@ -287,11 +295,12 @@ def test_values_of_mixed_units_are_refused(make_visit_rows, cohort_of) -> None:
 def test_an_unsupported_window_is_marked_and_left_out(
     make_visit_rows, cohort_of
 ) -> None:
-    """Visits after an omission all shorter than 4 s: no omission row reaches
-    Q2's window, so Q2 is marked unsupported (its counts beside it: no
-    omitted visit there), kept in the unit table, and left out of the
-    reduction, which counts it; the onset test, whose window they reach,
-    stays supported."""
+    """Visits after an omission of 2.5 to 5.9 s: many reach Q2's window, none
+    lasts past 6 s. Q2's window is read in parts of at most 2 s (4 to 6, 6 to
+    8, 8 to 10), and its 6 to 8 s part has no visit after an omission: Q2 is
+    unsupported, its estimate and standard error NaN, its counts kept per
+    part; it is left out of the reduction, which counts it. The onset test
+    (2 to 4 s) stays supported."""
     rng = np.random.default_rng(11)
     cohort = {}
     for i in range(3):
@@ -301,7 +310,7 @@ def test_an_unsupported_window_is_marked_and_left_out(
             n_visits=80,
             seed=110 + i,
             length_s=(1.5, 12.0),
-            omission_length_s=(2.5, 3.9),
+            omission_length_s=(2.5, 5.9),
         )
         truth = scenarios.constant_ratio(rows, CLOCKS, log_ratio=0.3, total=500)
         rows["count"] = rng.poisson(truth.expected).astype(float)
@@ -315,24 +324,40 @@ def test_an_unsupported_window_is_marked_and_left_out(
         q2 = values.loc[(animal, "Q2")]
         assert not q2["supported"] and q2["visits_omitted"] == 0
         assert q2["at_risk_s_omitted"] == 0.0 and q2["visits_rewarded"] >= 5
-        assert np.isfinite(q2["estimate"])
-        assert values.loc[(animal, "Q2-onset"), "supported"]
+        assert np.isnan(q2["estimate"]) and np.isnan(q2["se"])
+        onset = values.loc[(animal, "Q2-onset")]
+        assert onset["supported"] and np.isfinite(onset["estimate"])
     support = fit.records[0].cohort_counts[vr.WINDOW_SUPPORT]
+    parts = [(r["outcome"], tuple(r["range_s"])) for r in support["Q2"]["reads"]]
+    assert parts == [
+        (1, (4.0, 6.0)),
+        (1, (6.0, 8.0)),
+        (1, (8.0, 10.0)),
+        (0, (4.0, 6.0)),
+        (0, (6.0, 8.0)),
+        (0, (8.0, 10.0)),
+    ]
+    omitted = {
+        tuple(r["range_s"]): r["visits"]
+        for r in support["Q2"]["reads"]
+        if r["outcome"] == 0
+    }
+    assert omitted[(4.0, 6.0)] >= 5 and omitted[(6.0, 8.0)] == 0
     rows = cohort[("rat0", "20200101", "02_r1")].rows["A"]
     s = rows[vr.ARRIVAL].to_numpy()
-    on = (rows[vr.REWARD] == 1.0).to_numpy() & (s >= 2.0) & (s < 4.0)
-    rewarded = [r for r in support["Q2-onset"]["reads"] if r["outcome"] == 1][0]
-    assert rewarded["visits"] == rows.loc[on, "well_visit_id"].nunique()
-    assert rewarded["at_risk_s"] == pytest.approx(rows.loc[on, "exposure"].sum())
-    table = unit_estimands(fit)
+    on = (rows[vr.REWARD] == 0.0).to_numpy() & (s >= 4.0) & (s < 6.0)
+    assert omitted[(4.0, 6.0)] == rows.loc[on, "well_visit_id"].nunique()
+    # Read as three animals (one session each), where the window tests are
+    # declared: Q2 is left out of the reduction and counted.
+    table = unit_estimands(fit).assign(fit_by="animal", session_date="", epoch="")
     both = pd.concat([table, table.assign(kind="No SWR")])
     summary = summarize_estimands(both, n_draws=100, seed=0).set_index(
         ["estimand_id", "tested"]
     )
+    assert summary.loc[("Q2-onset", "SWR"), "n_units_unsupported"] == 0
     assert summary.loc[("Q2", "SWR"), "n_units_unsupported"] == 3
     assert summary.loc[("Q2", "SWR"), "n_units"] == 0
     assert np.isnan(summary.loc[("Q2", "SWR"), "estimate"])
-    assert summary.loc[("Q2-onset", "SWR"), "n_units_unsupported"] == 0
 
 
 def test_the_difference_curve_and_its_band(cohort) -> None:

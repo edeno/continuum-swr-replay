@@ -169,6 +169,17 @@ class Model:
         several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
     fit_by : {"session", "day", "animal"}
         The unit of the fit.
+    support : callable or None
+        The model's own support of its estimands in a unit, beyond the
+        fitter's: ``support(record, sessions)``, the unit's
+        :class:`.record.FitRecord` and its sessions' rows (those with rows in
+        the fit, keyed by session) -> estimand name -> whether it has support
+        there; an estimand it does not name has support. A unit without
+        support has no value for that estimand, for the cause ``support``
+        (``Removed.SUPPORT``), as the model's own statistics report it. It
+        reads no outcome, so the unit target leaves out the same units. A
+        module-level function (or a ``functools.partial`` of one), so that a
+        process pool can send it. None: only the fitter's.
     """
 
     name: str
@@ -178,6 +189,10 @@ class Model:
     unit: str
     estimands: Mapping[str, np.ndarray]
     fit_by: FitBy = "session"
+    support: (
+        Callable[[FitRecord, Mapping[SessionKey, pd.DataFrame]], Mapping[str, bool]]
+        | None
+    ) = None
 
     def __post_init__(self) -> None:
         n_coef = len(self.design.coef_names)
@@ -652,17 +667,38 @@ def _n_sessions(record: FitRecord) -> int:
     return sum(entry["n_rows"] > 0 for entry in record.sessions)
 
 
+def _model_support(
+    model: Model, record: FitRecord, sessions: Mapping[SessionKey, pd.DataFrame]
+) -> Mapping[str, bool]:
+    """The model's own support of its estimands in one unit (``Model.support``);
+    every estimand has it without a hook."""
+    if model.support is None:
+        return {}
+    keys = [
+        (e["animal"], e["session_date"], e["epoch"])
+        for e in record.sessions
+        if e["n_rows"] > 0
+    ]
+    return model.support(record, {key: sessions[key] for key in keys})
+
+
 def _session_rows(
-    model: Model, records: Sequence[FitRecord], base: dict
+    model: Model,
+    records: Sequence[FitRecord],
+    base: dict,
+    sessions: Mapping[SessionKey, pd.DataFrame],
 ) -> tuple[list[dict], dict[str, np.ndarray]]:
     """The ``sessions`` table's rows of one model and data set, one per unit
     of the fit, and each estimand's unit estimates, shape ``(n_units,)``."""
     rows, estimates = [], {name: [] for name in model.estimands}
     for record in records:
         coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
+        supported = _model_support(model, record, sessions)
         for name, c in model.estimands.items():
             left = [record.left_out[n] for n in model.used(c) if n in record.left_out]
             cause = record.no_fit or (left[0] if left else "")
+            if not cause and not supported.get(name, True):
+                cause = Removed.SUPPORT.value
             estimate, se = np.nan, np.nan
             if not cause:
                 contrast = evaluate_contrast(
@@ -785,7 +821,7 @@ def _unit_targets(
         table_sha256={},
         fit_by=model.fit_by,
     )
-    _, estimates = _session_rows(model, records, {})
+    _, estimates = _session_rows(model, records, {}, sessions)
     return {
         name: unit_estimate(unit_values(values, records), records[0].fit_by)
         for name, values in estimates.items()
@@ -850,7 +886,7 @@ def _run_task(
             else _unit_targets(model, simulation.sessions, means)
         )
         base = {"scenario": scenario.name, "model": model.name, "data_set": i}
-        rows, estimates = _session_rows(model, records, base)
+        rows, estimates = _session_rows(model, records, base, simulation.sessions)
         session_rows += rows
         for name, values in estimates.items():
             planted = planted_value(scenario, model, name)

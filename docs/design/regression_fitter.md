@@ -701,8 +701,14 @@ contrasts read it (`visit_rate.window_contrast`). In a unit with no visit after 
 omission the curve after an omission has zero columns and fails the support rule, the
 outcome slope fails it too, and the unit is fitted (no shared arrival curve is collinear
 with the other). With 1 to 4 such visits the slope fails and the curve stays: the known
-issue `docs/known_issues/smooth_by_a_thin_level.md`, which the rate model's window support
-rule (`visit_rate.window_support`, the author's rule) covers for the values it reports.
+issue `docs/known_issues/smooth_by_a_thin_level.md`. The fitter keeps that curve; the rate
+model's window support rule (`visit_rate.window_support`; the author's rule, cut into parts of
+at most `SUPPORT_PART_S` = 2 s by the coordinator's call) asks for 5 visits of each outcome a
+contrast reads in every part of every range it reads, and a value without that support is NaN
+in the statistics (`visit_rate_statistics.unit_estimands`) and has no value in the simulation
+engine (`Model.support`, the cause `support`). So Q1, Q2 and the onset test have no value from
+a curve fitted on few visits or extrapolated over a part of a window that no visit reaches; the
+curve itself, and the difference curve that is shown, are not changed.
 
 A session's design is built once, on all its rows; one mask with one reason code per row
 removed says which rows are kept, and the kept rows' design is a slice. Measured on

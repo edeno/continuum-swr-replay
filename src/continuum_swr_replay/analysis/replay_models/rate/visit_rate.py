@@ -115,6 +115,9 @@ __all__ = [
     "Q1_REFERENCE_WINDOWS",
     "RATE_ESTIMANDS",
     "SECONDARY_ESTIMAND",
+    "WINDOW_TESTS",
+    "WINDOW_TEST_UNIT",
+    "is_declared_test",
     "OMITTED_ARRIVAL_TERM",
     "ARRIVAL_BY_OUTCOME",
     "RESPONSE",
@@ -146,6 +149,8 @@ __all__ = [
     "window_contrast",
     "window_reads",
     "window_support",
+    "window_parts",
+    "SUPPORT_PART_S",
     "WINDOW_SUPPORT",
     "DIFFERENCE_STEP_S",
     "difference_curve_rows",
@@ -176,6 +181,25 @@ MODEL_NAMES: dict[str, str] = {"A": "visit_rate_A", "D": "visit_rate_D"}
 #: The declared estimands this model answers (``declared_tests``), all read
 #: from model A's by-outcome form.
 RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q2-onset", "Q7a")
+
+#: The window tests of the by-outcome form (``declared_tests``: Q2 and the
+#: onset test), and the one unit at which they are declared tests: DECIDED
+#: (the twenty-sixth round, added with the lead's "ok"): "which is why the
+#: window tests are read per animal, not per day". At another unit their
+#: values are a description (:func:`is_declared_test`).
+WINDOW_TESTS: tuple[str, ...] = ("Q2", "Q2-onset")
+WINDOW_TEST_UNIT = "animal"
+
+
+def is_declared_test(estimand_id: str, fit_by: str) -> bool:
+    """Whether an estimand is a declared test of the rate model at a unit of
+    the fit: the declared estimands (:data:`RATE_ESTIMANDS`) at every unit,
+    but the window tests (:data:`WINDOW_TESTS`) at :data:`WINDOW_TEST_UNIT`
+    only."""
+    if estimand_id not in RATE_ESTIMANDS:
+        return False
+    return estimand_id not in WINDOW_TESTS or fit_by == WINDOW_TEST_UNIT
+
 
 #: The secondary value, read from model A's coefficient form: the one reward
 #: coefficient (the twenty-sixth round: kept for comparison with other
@@ -513,7 +537,14 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
     terms: list[Term] = [Offset(EXPOSURE)]
     if model == "A" and settings.reward_form == "by_outcome":
         terms += [
-            _clock_smooth(ARRIVAL, kind, settings, term, by=_OUTCOME, levels=(level,))
+            _clock_smooth(
+                ARRIVAL,
+                kind,
+                settings,
+                term,
+                by=_OUTCOME,
+                levels=(level,),
+            )
             for level, term in ARRIVAL_BY_OUTCOME.items()
         ]
     else:
@@ -770,26 +801,46 @@ def window_reads(
     return out
 
 
+#: The longest part of a range a window contrast reads that the window
+#: support rule counts on its own (s): THE COORDINATOR'S CALL (2026-11-26), not
+#: the lead's. A window's mean weighs every part of the window equally, so
+#: every part needs rows; 2 s is about what a curve of 10 to 15 effective
+#: parameters over 20 s can resolve.
+SUPPORT_PART_S = 2.0
+
+
+def window_parts(lo: float, hi: float) -> list[tuple[float, float]]:
+    """A range cut into equal parts no longer than :data:`SUPPORT_PART_S`
+    (one part for a range of 2 s or less)."""
+    n = max(1, int(np.ceil((hi - lo) / SUPPORT_PART_S - 1e-9)))
+    edges = np.linspace(lo, hi, n + 1)
+    return [(float(a), float(b)) for a, b in zip(edges[:-1], edges[1:], strict=True)]
+
+
 def window_support(
-    sessions: Sequence[pd.DataFrame], settings: VisitRateSettings
+    sessions: Sequence[pd.DataFrame],
+    settings: VisitRateSettings,
+    reads: Mapping[str, Sequence[tuple[int, tuple[float, float]]]] | None = None,
 ) -> dict[str, dict]:
     """The support of each window contrast in one unit of the fit (the
-    author's rule, written for the twenty-sixth round's "under the support
-    rule").
+    window support rule; the author's rule, written for the twenty-sixth
+    round's "under the support rule", cut into parts by the coordinator's call).
 
-    For each (outcome, range) an estimand reads (:func:`window_reads`), the
-    unit's rows of that last outcome whose time since arrival lies in the
-    range (``lo <= s < hi``) are counted: the visits with such a row (the
-    support rule's unit, a visit; each session's visits apart) and their
-    at-risk seconds. An estimand is supported when every read has at least
-    ``support.MIN_UNITS`` visits: the rule of a 0/1 slope
-    (``support.binary_support``) counted on the rows inside each window, the
-    smallest rule the support machinery states. No response is read. The
-    rule asks for visits with a row anywhere in the window, not for rows over
-    its whole range: where no visit after an omission lasts to the window's
-    end, the curve there is the penalty's extrapolation and the rule does not
-    see it (a synthetic cohort whose visits after an omission all ended by 8
-    s gave Q2 biased by +0.14 to +0.47 with nothing planted, 2026-11-26).
+    Each range an estimand reads (:func:`window_reads`) is cut into parts no
+    longer than :data:`SUPPORT_PART_S` (:func:`window_parts`: Q2's 4 to 10 s
+    into 4 to 6, 6 to 8 and 8 to 10; the onset test's 2 to 4 s and Q1's
+    ranges are one part each). For each part and each outcome the estimand
+    reads, the unit's rows of that last outcome whose time since arrival lies
+    in the part (``lo <= s < hi``) are counted: the visits with such a row
+    (the support rule's unit, a visit; each session's visits apart) and their
+    at-risk seconds. An estimand is supported when every part of every read
+    has at least ``support.MIN_UNITS`` visits: the rule of a 0/1 slope
+    (``support.binary_support``) counted on the rows of each part. So a part
+    of a window that no visit after an omission reaches, where the curve
+    would be the penalty's extrapolation, makes the estimand unsupported. No
+    response is read. An unsupported value is not a number:
+    ``visit_rate_statistics.unit_estimands`` and the simulation engine
+    (``Model.support``) give it none.
 
     Parameters
     ----------
@@ -797,34 +848,40 @@ def window_support(
         The rows of each session in the unit's fit (a session dropped from
         the fit is not given).
     settings : VisitRateSettings
+    reads : mapping, optional
+        Estimand id -> its (outcome, range) reads; :func:`window_reads` of
+        the settings by default.
 
     Returns
     -------
     dict
         Estimand id -> ``{"supported": bool, "reads": [{"outcome": 0 or 1,
-        "range_s": [lo, hi], "visits": int, "at_risk_s": float}, ...]}``,
-        JSON-ready.
+        "range_s": [lo, hi], "visits": int, "at_risk_s": float}, ...]}``, one
+        entry per part, JSON-ready.
     """
     out = {}
-    for estimand_id, reads in window_reads(settings).items():
+    for estimand_id, estimand_reads in (reads or window_reads(settings)).items():
         entries = []
-        for level, (lo, hi) in reads:
-            visits, at_risk = 0, 0.0
-            for rows in sessions:
-                s = rows[ARRIVAL].to_numpy(dtype=float)
-                on = (
-                    (rows[REWARD].to_numpy(dtype=float) == level) & (s >= lo) & (s < hi)
+        for level, (lo, hi) in estimand_reads:
+            for part_lo, part_hi in window_parts(lo, hi):
+                visits, at_risk = 0, 0.0
+                for rows in sessions:
+                    s = rows[ARRIVAL].to_numpy(dtype=float)
+                    on = (
+                        (rows[REWARD].to_numpy(dtype=float) == level)
+                        & (s >= part_lo)
+                        & (s < part_hi)
+                    )
+                    visits += int(rows.loc[on, UNIT].nunique())
+                    at_risk += float(rows.loc[on, EXPOSURE].sum())
+                entries.append(
+                    {
+                        "outcome": level,
+                        "range_s": [part_lo, part_hi],
+                        "visits": visits,
+                        "at_risk_s": at_risk,
+                    }
                 )
-                visits += int(rows.loc[on, UNIT].nunique())
-                at_risk += float(rows.loc[on, EXPOSURE].sum())
-            entries.append(
-                {
-                    "outcome": level,
-                    "range_s": [float(lo), float(hi)],
-                    "visits": visits,
-                    "at_risk_s": at_risk,
-                }
-            )
         out[estimand_id] = {
             "supported": all(e["visits"] >= MIN_UNITS for e in entries),
             "reads": entries,
