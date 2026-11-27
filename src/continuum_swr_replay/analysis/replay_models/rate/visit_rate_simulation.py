@@ -150,25 +150,28 @@ PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
 #: and the session for comparison).
 FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
 #: The target median edf of each curve at each decided unit's calibration:
-#: DECLARED SETTINGS OF THE AUTHOR, NOT validated. At the animal unit, the
-#: evidence's suggestion (about 15 effective parameters for each arrival
-#: curve and 10 or more for the leaving curve,
-#: ``design_d_trial/rate/followup/REPORT.md``, section 6; the twenty-sixth
-#: round). At the day unit, 10 for each curve: the fixed value that section
-#: ran at the day (the 15 of the animal unit needs a log penalty near -6 for
-#: the curve after an omission on a day of the first validation's synthetic
-#: cohort, where a unit's first fit can end at the step limit and stop the
-#: calibration; measured 2026-11-26). The coefficient form's shared arrival
-#: curve takes the arrival curves' target.
+#: DECLARED SETTINGS OF THE AUTHOR, NOT validated. The evidence suggests about
+#: 15 effective parameters for each arrival curve and 10 or more for the
+#: leaving curve at the animal unit (``design_d_trial/rate/followup/REPORT.md``,
+#: section 6; the twenty-sixth round), and ran 10 per curve at the day. The
+#: curve after an omission cannot be calibrated to those targets on the first
+#: validation's synthetic cohort (measured 2026-11-26): the calibration's
+#: bisection tries a log penalty of -6.25 once the target is above the edf at
+#: -2.5 (11.8 for an animal, 9.4 for a day), and there the curve, which has
+#: no row beyond 8 s since arrival, runs away and the unit's first fit ends at
+#: the step limit, which stops the calibration (``calibration.log_penalty_for_edf``
+#: raises). So the curve after an omission takes 10 at the animal and 8 at the
+#: day, below those edfs; the other curves take the evidence's values. The
+#: coefficient form's shared arrival curve takes the rewarded curve's target.
 CLOCK_TARGETS: dict[str, dict[str, float]] = {
     "day": {
-        vr.OMITTED_ARRIVAL_TERM: 10.0,
+        vr.OMITTED_ARRIVAL_TERM: 8.0,
         vr.REWARDED_ARRIVAL_TERM: 10.0,
         vr.ARRIVAL: 10.0,
         vr.LEAVING: 10.0,
     },
     "animal": {
-        vr.OMITTED_ARRIVAL_TERM: 15.0,
+        vr.OMITTED_ARRIVAL_TERM: 10.0,
         vr.REWARDED_ARRIVAL_TERM: 15.0,
         vr.ARRIVAL: 15.0,
         vr.LEAVING: 10.0,
