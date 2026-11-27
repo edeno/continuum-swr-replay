@@ -123,13 +123,11 @@ def test_model_terms_follow_the_settings() -> None:
 
 def test_the_weak_penalty_is_decided() -> None:
     """The reward coefficient's prior SD is the decided 2 (log penalty
-    log(1/4)), with 1 and 4 beside it; the default reward level is the
-    session."""
+    log(1/4)), with 1 and 4 beside it."""
     assert vr.WEAK_PRIOR_SD == 2.0
     assert vr.WEAK_PRIOR_SD_SENSITIVITY == (1.0, 4.0)
     assert DEFAULT.weak_prior_sd == vr.WEAK_PRIOR_SD
     assert DEFAULT.weak_log_penalty == pytest.approx(np.log(1.0 / 4.0))
-    assert DEFAULT.reward_level == "session"
 
 
 @pytest.mark.parametrize(

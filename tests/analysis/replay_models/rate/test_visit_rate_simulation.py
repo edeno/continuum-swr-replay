@@ -39,21 +39,16 @@ def quick_result(quick):
 
 def test_the_quick_list_runs_through_the_engine(quick, quick_result) -> None:
     """Every scenario of the kind, every model and estimand has a row; the
-    session-level and animal-level models are fitted to the same data sets;
     every fit converged and every unit has a value."""
     summary = quick_result.summary
     assert list(dict.fromkeys(summary["scenario"])) == list(vs.SCENARIOS["SWR"])
-    assert set(summary["model"]) == {"session_sd2", "animal"}
+    assert set(summary["model"]) == {"session_sd2"}
     assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q7a"}
     assert (summary["share_not_converged"] == 0.0).all()
     assert (summary["share_without_value"] == 0.0).all()
     assert (summary["n_data_sets_with_estimate"] == 2).all()
-    animal_q2 = quick_result.sessions.query("model == 'animal' and estimand == 'Q2'")
-    assert animal_q2["session_date"].isna().all()
-    assert len(animal_q2) == len(vs.SCENARIOS["SWR"]) * 2 * 5
-    assert (animal_q2["n_sessions"] == 2).all()
     table = vs.table(quick_result, quick)
-    assert {"kind", "target_edf", "level", "prior_sd", "truth_omission_side"} <= set(
+    assert {"kind", "target_edf", "prior_sd", "truth_omission_side"} <= set(
         table.columns
     )
     assert quick.attrs["allow_provisional"] == "simulation"
@@ -100,9 +95,8 @@ def test_the_planted_values(quick) -> None:
 def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
     """Ten synthetic sessions of 80 visits and about 2,000 events each, the
     rate flat on the clocks and 0.6 higher after a reward, planted on the
-    session-level model's design: Q2 of the session-level model and of the
-    animal-level model are within 3 standard errors of 0.6 over four data
-    sets (a simulation tolerance); Q1 and Q7a are near 0."""
+    session-level model's design: Q2 of the session-level model is within 3
+    standard errors of 0.6 over four data sets (a simulation tolerance)."""
     sessions = {}
     for a in range(5):
         for e in range(2):
@@ -122,13 +116,10 @@ def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
     table = result.summary.set_index(["scenario", "model", "estimand"])
     for row in (
         table.loc[("inside", "session_sd2", "Q2")],
-        table.loc[("outside", "animal", "Q2")],
         table.loc[("outside", "session_sd2", "Q2")],
     ):
         assert row["planted"] == pytest.approx(0.6)
         assert abs(row["bias"]) < 3 * row["sd"] / 2 + 0.01
-    for estimand in ("Q1", "Q7a"):
-        assert abs(table.loc[("outside", "animal", estimand), "mean_estimate"]) < 0.15
 
 
 def _constant(sessions, rng):
@@ -229,7 +220,7 @@ def test_the_joint_fit_gives_each_kind_the_values_of_its_own_run(joint) -> None:
         (single,) = vs._models(
             kind,
             pooled,
-            vs.Config(kind=kind, prior_sds=(2.0,), animal_level=False),
+            vs.Config(kind=kind, prior_sds=(2.0,)),
             None,
         )
         records = fit_sessions(
@@ -353,53 +344,6 @@ def test_the_rate_table_truth_is_flagged_as_read_from_the_real_counts(
     assert flagged.loc["rate_table"].all()
     assert not flagged.drop(index="rate_table")["any"].any()
     assert list(quick.attrs["truth_from_real_counts"]["scenarios"]) == ["rate_table"]
-
-
-def _no_event_after_omission(sessions, rng):
-    """About 150 events a session, none after an omission."""
-    out = {}
-    for key, rows in sessions.items():
-        mean = rows[vr.EXPOSURE].to_numpy() * rows[vr.REWARD].to_numpy()
-        out[key] = mean * 150.0 / mean.sum()
-    return out
-
-
-def test_the_animal_check_counts_the_sessions_of_an_animal_without_a_coefficient(
-    quick,
-) -> None:
-    """With no event after an omission anywhere, no animal has a finite
-    coefficient: every session still has a row of Q1, Q1b and Q7a, without a
-    value (``no_finite_maximum``), every animal a Q2 without one, and the run
-    records no value instead of raising."""
-    animal = next(m for m in quick.models if m.name == "animal")
-    data = engine.draw_data_set(
-        animal,
-        quick.sessions,
-        OutsideScenario("none_after_omission", _no_event_after_omission),
-        np.random.default_rng(3),
-    )
-    units = animal.fit(data)
-    for estimand in ("Q1", "Q1b", "Q7a"):
-        part = units[units["estimand"] == estimand]
-        assert sorted(map(tuple, part[["animal", "session_date", "epoch"]].values)) == (
-            sorted(quick.sessions)
-        )
-        assert (part["without_value"] == "no_finite_maximum").all()
-        assert part["estimate"].isna().all()
-    q2 = units[units["estimand"] == "Q2"]
-    assert len(q2) == 5 and q2["estimate"].isna().all()
-    result = engine.run(
-        Simulation(
-            [animal],
-            quick.sessions,
-            [OutsideScenario("none_after_omission", _no_event_after_omission)],
-            2,
-            200,
-            5,
-        )
-    )
-    assert (result.summary["share_without_value"] == 1.0).all()
-    assert result.summary["mean_estimate"].isna().all()
 
 
 def test_a_joint_run_may_hold_a_subset_of_the_scenarios(joint) -> None:

@@ -54,16 +54,6 @@ the drop before leaving conditional on the time until the end of the stretch,
 not the whole drop. ``visit_rate_statistics.third_clock_q7a`` compares Q7a of
 the fits with and without ``f_m``, per session and summarized; it is stored
 beside the rule's decision.
-
-The level of the reward coefficient (:data:`REWARD_LEVELS`): at ``"session"``
-(the default, and the paper's method, decided on 2026-11-23) the coefficient
-is in each session's fit, with the weak penalty at the decided prior SD
-(:data:`WEAK_PRIOR_SD`). ``"animal"`` is a CHECK, not the paper's method: ONE
-coefficient for each animal and
-kind, shared by that animal's sessions and unpenalized, while each session keeps
-its own baseline and its own clock curves (:func:`fit_animal_rewards`): it is
-the joint penalized fit of the animal's sessions with one shared reward column,
-found through the per-session fits.
 """
 
 from __future__ import annotations
@@ -91,10 +81,7 @@ from continuum_swr_replay.analysis.regression.calibration import (
 from continuum_swr_replay.analysis.regression.collinearity import separable
 from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
-from continuum_swr_replay.analysis.regression.newton import (
-    CONVERGED,
-    NO_FINITE_MAXIMUM,
-)
+from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.record import FitRecord
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
@@ -130,12 +117,6 @@ __all__ = [
     "REWARDED_ARRIVAL_TERM",
     "REWARD",
     "REWARD_FORMS",
-    "REWARD_LEVELS",
-    "ANIMAL_REWARD_MAX_ITER",
-    "ANIMAL_REWARD_MAX_STEP",
-    "ANIMAL_REWARD_TOL",
-    "AnimalReward",
-    "AnimalRewardFit",
     "STRETCH",
     "TIME_RANGE_CAPS_S",
     "UNIT",
@@ -152,7 +133,6 @@ __all__ = [
     "cohort_rows",
     "curve_rows",
     "declared_contrasts",
-    "fit_animal_rewards",
     "fit_visit_rate",
     "fit_visit_rate_session",
     "lag_curve_rows",
@@ -314,21 +294,6 @@ TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 #: option to build and test, not the declared test.
 REWARD_FORMS: tuple[str, ...] = ("coefficient", "time_varying")
 
-#: The level of the reward coefficient. ``"session"`` (the default and the
-#: paper's method, decided by the lead on 2026-11-23): the coefficient is in
-#: each session's fit, with the weak penalty, and Q2 is reduced session -> day
-#: -> animal. ``"animal"`` is a CHECK, NOT the paper's method, kept for the
-#: simulation that compares the two (whether it stays is a question for the
-#: lead):
-#: one coefficient for each animal and kind, shared by the animal's sessions
-#: and unpenalized, each session keeping its own baseline and clock curves
-#: (:func:`fit_animal_rewards`); Q2 over the cohort is the mean of the animals'
-#: coefficients with the t interval over the animals
-#: (``visit_rate_statistics.summarize_animal_rewards``). Only with the
-#: coefficient form of the reward effect. An option to build and compare in
-#: simulation, not the declared test, and not a method of the paper.
-REWARD_LEVELS: tuple[str, ...] = ("session", "animal")
-
 #: OPEN (lead): the reference window of Q1 (s since arrival). ``(0, 1)`` is
 #: the declared one (``declared_tests``, the default); ``(1, 2)`` the
 #: alternative, for a kind whose events rarely start in the first second.
@@ -381,11 +346,6 @@ class VisitRateSettings:
         arrival curve becomes the curve after an omission) as well as Q2.
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
-    reward_level : {"session", "animal"}
-        :data:`REWARD_LEVELS`; ``"session"`` is the paper's method,
-        ``"animal"`` a CHECK only. At ``"animal"`` a session's design has no
-        reward column (the coefficient enters its offset); only with the
-        coefficient form.
     include_stretch_clock : bool
         Whether model A and D hold ``f_m``; the third clock's rule
         (:func:`third_clock_decision`) decides it after the first fit, which
@@ -408,7 +368,6 @@ class VisitRateSettings:
     max_time_since_arrival_s: float | None = None
     reward_form: Literal["coefficient", "time_varying"] = "coefficient"
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
-    reward_level: Literal["session", "animal"] = "session"
     include_stretch_clock: bool = True
     log_penalties: Mapping[str, float] | None = None
     calibrated_penalties: Mapping[tuple[str, str], CalibratedPenalty] | None = None
@@ -427,15 +386,6 @@ class VisitRateSettings:
             )
         if self.reward_form not in REWARD_FORMS:
             raise ValueError(f"reward_form {self.reward_form!r} not in {REWARD_FORMS}")
-        if self.reward_level not in REWARD_LEVELS:
-            raise ValueError(
-                f"reward_level {self.reward_level!r} not in {REWARD_LEVELS}"
-            )
-        if self.reward_level == "animal" and self.reward_form != "coefficient":
-            raise ValueError(
-                "reward_level 'animal' takes the coefficient form only, not "
-                f"reward_form {self.reward_form!r} (time_varying)"
-            )
         reference = tuple(float(x) for x in self.q1_reference_s)
         if reference not in Q1_REFERENCE_WINDOWS:
             raise ValueError(
@@ -509,9 +459,7 @@ def _clock_smooth(
 
 
 def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term]:
-    """The terms of model A or D for one kind (module docstring). At
-    ``reward_level="animal"`` model A has no reward term: the animal's
-    coefficient enters each session's offset (:func:`fit_animal_rewards`).
+    """The terms of model A or D for one kind (module docstring).
 
     Parameters
     ----------
@@ -531,8 +479,7 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
     terms: list[Term] = [Offset(EXPOSURE)]
     terms += [_clock_smooth(clock, kind, settings) for clock in settings.clocks()]
     if model == "A":
-        if settings.reward_level == "session":
-            terms.append(Slope(REWARD, settings.weak_log_penalty))
+        terms.append(Slope(REWARD, settings.weak_log_penalty))
         if settings.reward_form == "time_varying":
             outcome = Category(REWARD, (0, 1), 0, "none")
             terms.append(
@@ -556,13 +503,10 @@ def tested_terms(model: str, settings: VisitRateSettings) -> tuple[str, ...]:
     """The terms and coefficients the model's estimands read: model A's
     declared tests (Q1, Q7a: the clock smooths; Q2: the reward coefficient,
     and the rewarded arrival curve in the time-varying form); model D's lag
-    curve (described, not tested). At ``reward_level="animal"`` the reward
-    coefficient is not a term of a session's design."""
+    curve (described, not tested)."""
     if _model(model) == "D":
         return (LAG_TERM,)
-    out = [_smooth_name(ARRIVAL), _smooth_name(LEAVING)]
-    if settings.reward_level == "session":
-        out.append(REWARD)
+    out = [_smooth_name(ARRIVAL), _smooth_name(LEAVING), REWARD]
     if settings.reward_form == "time_varying":
         out.append(REWARDED_ARRIVAL_TERM)
     return tuple(out)
@@ -680,9 +624,7 @@ def declared_contrasts(
     Returns
     -------
     dict of str to np.ndarray
-        Estimand id -> ``c``, shape ``(n_coef,)``. At
-        ``reward_level="animal"`` Q2 is not among them: it is the animal's
-        coefficient (:func:`fit_animal_rewards`), not a session's.
+        Estimand id -> ``c``, shape ``(n_coef,)``.
 
     Raises
     ------
@@ -693,8 +635,6 @@ def declared_contrasts(
     out = {}
     basis = design.basis_record()
     for estimand_id in RATE_ESTIMANDS:
-        if estimand_id == "Q2" and settings.reward_level == "animal":
-            continue
         declared = estimand(estimand_id)
         if declared.model != MODEL_NAMES["A"]:
             raise ValueError(f"{estimand_id} is an estimand of {declared.model}")
@@ -998,31 +938,9 @@ def fit_visit_rate(
     ------
     ValueError
         If a curve's log penalty is provisional and ``allow_provisional`` is
-        None, or ``allow_provisional`` is not one of :data:`PROVISIONAL_USES`;
-        if the settings put the reward coefficient at the animal level (fit
-        those with :func:`fit_animal_rewards`).
+        None, or ``allow_provisional`` is not one of :data:`PROVISIONAL_USES`.
     """
     _model(model)
-    if model == "A" and settings.reward_level != "session":
-        raise ValueError(
-            f"reward_level {settings.reward_level!r}: model A's reward coefficient "
-            "is the animal's; fit it with fit_animal_rewards"
-        )
-    _check_provisional(model, kind, settings, allow_provisional)
-    sessions = _session_rows(cohort, model, kind)
-    pooled = pd.concat(list(sessions.values()), ignore_index=True)
-    design = build_visit_rate_design(model, kind, pooled, settings)
-    records = _fit_records(design, sessions, cohort, model, kind, table_sha256)
-    return VisitRateFit(model, kind, settings, design, records)
-
-
-def _check_provisional(
-    model: str,
-    kind: str,
-    settings: VisitRateSettings,
-    allow_provisional: str | None,
-) -> None:
-    """Refuse provisional log penalties in a real fit (:func:`fit_visit_rate`)."""
     if allow_provisional is not None and allow_provisional not in PROVISIONAL_USES:
         raise ValueError(
             f"allow_provisional {allow_provisional!r} not in {PROVISIONAL_USES}"
@@ -1035,18 +953,9 @@ def _check_provisional(
             "(calibrate_log_penalty, VisitRateSettings.calibrated_penalties) or "
             "pass allow_provisional='test' or 'simulation'"
         )
-
-
-def _fit_records(
-    design: Design,
-    sessions: Mapping[SessionKey, pd.DataFrame],
-    cohort: Mapping[SessionKey, CohortRows],
-    model: str,
-    kind: str,
-    table_sha256: Mapping[str, str] | None,
-) -> list[FitRecord]:
-    """Every session fitted alone with ``design`` (``sessions.fit_sessions``),
-    each record with its session's cohort counts."""
+    sessions = _session_rows(cohort, model, kind)
+    pooled = pd.concat(list(sessions.values()), ignore_index=True)
+    design = build_visit_rate_design(model, kind, pooled, settings)
     records = fit_sessions(
         design,
         sessions,
@@ -1057,10 +966,11 @@ def _fit_records(
         unit=UNIT,
         table_sha256=dict(table_sha256 or {}),
     )
-    return [
+    records = [
         replace(r, cohort_counts={**r.cohort_counts, **cohort[key].counts})
         for key, r in zip(sessions, records, strict=True)
     ]
+    return VisitRateFit(model, kind, settings, design, records)
 
 
 def fit_visit_rate_session(
@@ -1082,286 +992,6 @@ def fit_visit_rate_session(
         table_sha256=table_sha256,
         allow_provisional=allow_provisional,
     )
-
-
-# --- One reward coefficient for each animal ------------------------------------
-
-#: The animal's coefficient is found by Newton steps on the pooled profile
-#: score of its sessions; it stops when a step is below this (log rate ratio),
-#: the coefficient then being the one its sessions were last fitted at.
-ANIMAL_REWARD_TOL = 1e-7
-#: The most Newton steps; a coefficient still moving after them has the
-#: status :data:`ANIMAL_REWARD_NOT_CONVERGED`.
-ANIMAL_REWARD_MAX_ITER = 50
-#: The largest Newton step (log rate ratio): a longer step is cut to it.
-ANIMAL_REWARD_MAX_STEP = 2.0
-#: The status of an animal whose coefficient did not converge.
-ANIMAL_REWARD_NOT_CONVERGED = "max_iter"
-
-
-class AnimalReward(NamedTuple):
-    """One animal's reward coefficient of one kind (:func:`fit_animal_rewards`).
-
-    Attributes
-    ----------
-    animal, kind : str
-    coefficient : float
-        The log rate ratio after a reward, shared by the animal's sessions;
-        NaN when no session has a kept fit.
-    se : float
-        Its standard error, from the profile information (the inverse of the
-        pooled profile information at ``coefficient``).
-    status : str
-        ``newton.CONVERGED``; :data:`ANIMAL_REWARD_NOT_CONVERGED`;
-        ``newton.NO_FINITE_MAXIMUM`` for an animal with no event on one side
-        in all its sessions (not fitted); or ``"no_kept_fit"`` when no
-        session has a kept fit.
-    n_iter : int
-        The fits of the animal's sessions it took.
-    n_sessions, n_events : int
-        The sessions whose kept fit enters the coefficient, and their events.
-    records : list of FitRecord
-        Each session's fit at ``coefficient``, with the reward column in its
-        offset (``exposure * exp(coefficient * rewarded)``).
-    used_sessions : tuple of (animal, session_date, epoch)
-        The sessions whose kept fit enters the coefficient at the last fit
-        (``n_sessions`` of them); a session whose fit is not kept there is
-        not part of the coefficient. Empty when the animal was not fitted.
-    """
-
-    animal: str
-    kind: str
-    coefficient: float
-    se: float
-    status: str
-    n_iter: int
-    n_sessions: int
-    n_events: int
-    records: list[FitRecord]
-    used_sessions: tuple[SessionKey, ...] = ()
-
-
-class AnimalRewardFit(NamedTuple):
-    """Model A at ``reward_level="animal"``, one kind, every animal given.
-
-    Attributes
-    ----------
-    kind : str
-    settings : VisitRateSettings
-    design : Design
-        A session's design (no reward column), built on the pooled rows of
-        every session given.
-    animals : list of AnimalReward
-        In the order of the animals' first sessions.
-    """
-
-    kind: str
-    settings: VisitRateSettings
-    design: Design
-    animals: list[AnimalReward]
-
-    def session_fit(self) -> VisitRateFit:
-        """Every session's record as a model A fit, for the session values
-        of Q1 and Q7a (``visit_rate_statistics.session_estimands``)."""
-        records = [r for animal in self.animals for r in animal.records]
-        return VisitRateFit("A", self.kind, self.settings, self.design, records)
-
-
-def _with_reward_offset(rows: pd.DataFrame, coefficient: float) -> pd.DataFrame:
-    """The rows with the reward in the offset: ``exposure`` times
-    ``exp(coefficient * rewarded)``."""
-    scale = np.exp(coefficient * rows[REWARD].to_numpy(dtype=float))
-    return rows.assign(**{EXPOSURE: rows[EXPOSURE].to_numpy(dtype=float) * scale})
-
-
-def _profile_terms(
-    design: Design, rows: pd.DataFrame, record: FitRecord
-) -> tuple[float, float]:
-    """One session's profile score and information of the reward coefficient
-    at its fit.
-
-    With ``r`` the reward column, ``mu`` the fitted means, ``X`` the session's
-    design (its fitted columns) and ``V`` the fit's covariance (the inverse of
-    the penalized Hessian): the score is ``sum r (y - mu)`` and the
-    information ``sum r mu - g' V g``, ``g = X' (r mu)``.
-    """
-    built = design.build(rows)
-    kept = ~built.missing
-    if record.n_rows != int(kept.sum()):
-        raise ValueError(
-            f"session {record.animal}/{record.session_date}/{record.epoch}: the fit "
-            f"kept {record.n_rows} of its {int(kept.sum())} rows with values"
-        )
-    coef = np.asarray(record.coef, dtype=float)
-    fitted = np.isfinite(coef)
-    X = built.X[kept][:, fitted]
-    mu = np.exp(X @ coef[fitted] + built.offset[kept])
-    r = rows[REWARD].to_numpy(dtype=float)[kept]
-    y = rows[RESPONSE].to_numpy(dtype=float)[kept]
-    g = X.T @ (r * mu)
-    V = np.asarray(record.vcov, dtype=float)[np.ix_(fitted, fitted)]
-    return float(r @ (y - mu)), float(r @ mu - g @ V @ g)
-
-
-def _require_both_sides(animal: str, rows: Sequence[pd.DataFrame]) -> None:
-    """Refuse an animal whose sessions have no rows after an omission, or
-    none after a reward: its coefficient is not identified."""
-    reward = np.concatenate([r[REWARD].to_numpy(dtype=float) for r in rows])
-    for value, side in ((0.0, "an omission"), (1.0, "a reward")):
-        if not np.any(reward == value):
-            raise ValueError(
-                f"animal {animal}: no session has a row after {side}; its reward "
-                "coefficient is not identified"
-            )
-
-
-def _events_on_both_sides(rows: Sequence[pd.DataFrame]) -> bool:
-    """Whether the animal's sessions hold an event after an omission and one
-    after a reward. Without one on a side, the joint likelihood rises without
-    bound as the coefficient runs to that side (each session's baseline
-    follows it), so the coefficient has no finite maximum."""
-    reward = np.concatenate([r[REWARD].to_numpy(dtype=float) for r in rows])
-    count = np.concatenate([r[RESPONSE].to_numpy(dtype=float) for r in rows])
-    return bool(count[reward == 0.0].sum() > 0 and count[reward == 1.0].sum() > 0)
-
-
-def _fit_animal(
-    animal: str,
-    keys: list[SessionKey],
-    design: Design,
-    sessions: Mapping[SessionKey, pd.DataFrame],
-    cohort: Mapping[SessionKey, CohortRows],
-    kind: str,
-    table_sha256: Mapping[str, str] | None,
-) -> AnimalReward:
-    """One animal's coefficient (:func:`fit_animal_rewards`)."""
-    _require_both_sides(animal, [sessions[key] for key in keys])
-    if not _events_on_both_sides([sessions[key] for key in keys]):
-        return AnimalReward(
-            animal, kind, np.nan, np.nan, NO_FINITE_MAXIMUM, 0, 0, 0, []
-        )
-    coefficient = 0.0
-    for n_iter in range(1, ANIMAL_REWARD_MAX_ITER + 1):
-        rows = {key: _with_reward_offset(sessions[key], coefficient) for key in keys}
-        records = _fit_records(design, rows, cohort, "A", kind, table_sha256)
-        kept = [(key, r) for key, r in zip(keys, records, strict=True) if _kept_fit(r)]
-        if not kept:
-            return AnimalReward(
-                animal, kind, np.nan, np.nan, "no_kept_fit", n_iter, 0, 0, records
-            )
-        score, information = np.sum(
-            [_profile_terms(design, rows[key], r) for key, r in kept], axis=0
-        )
-        step = score / information
-        if abs(step) < ANIMAL_REWARD_TOL:
-            status = CONVERGED
-            break
-        coefficient += float(
-            np.clip(step, -ANIMAL_REWARD_MAX_STEP, ANIMAL_REWARD_MAX_STEP)
-        )
-    else:
-        status = ANIMAL_REWARD_NOT_CONVERGED
-    return AnimalReward(
-        animal,
-        kind,
-        coefficient,
-        float(1.0 / np.sqrt(information)),
-        status,
-        n_iter,
-        len(kept),
-        int(sum(r.n_events for _, r in kept)),
-        records,
-        tuple(key for key, _ in kept),
-    )
-
-
-def _kept_fit(record: FitRecord) -> bool:
-    """A record whose fit is kept (converged, no ``no_fit`` cause)."""
-    return record.status == CONVERGED and not record.no_fit
-
-
-def fit_animal_rewards(
-    cohort: Mapping[SessionKey, CohortRows],
-    *,
-    kind: str,
-    settings: VisitRateSettings,
-    table_sha256: Mapping[str, str] | None = None,
-    allow_provisional: Literal["test", "simulation"] | None = None,
-) -> AnimalRewardFit:
-    """Model A with one reward coefficient for each animal, of one kind.
-
-    A CHECK, not the paper's method: the paper fits the reward coefficient in
-    each session with the weak penalty (:data:`WEAK_PRIOR_SD`; the lead,
-    2026-11-23). This fit is kept for the simulation that compares the two.
-
-    Each animal's coefficient is shared by its sessions and unpenalized; each
-    session keeps its own baseline and clock curves at the declared log
-    penalties. It is the maximum of the joint penalized likelihood of the
-    animal's sessions in which they share one reward column, found through the
-    per-session fits, with no new solver: at a fixed coefficient every session
-    is fitted alone by the module's fit path (``sessions.fit_sessions``, the
-    design without a reward column, the reward column times the coefficient in
-    the offset); the sessions' profile scores and informations of the
-    coefficient (``_profile_terms``) are summed, and the coefficient takes the
-    Newton step (cut to :data:`ANIMAL_REWARD_MAX_STEP`). It starts at 0 and
-    stops when a step is below :data:`ANIMAL_REWARD_TOL`, at the coefficient
-    the sessions were last fitted at, or after :data:`ANIMAL_REWARD_MAX_ITER`
-    fits. Its standard error is the inverse square root of the summed profile
-    information there.
-
-    A session with no event on one side takes part like any other: no rule
-    reads its events (one with no event at all is not fitted, as in
-    ``fit_sessions``, and so has no part). A session whose fit is not kept is
-    left out of that step's score, so the objective may change between steps;
-    the sessions that take part at the last fit are recorded
-    (``AnimalReward.used_sessions``). An animal with no event on one side in
-    all its sessions has no finite coefficient (``_events_on_both_sides``):
-    it is not fitted, and its status is ``newton.NO_FINITE_MAXIMUM``. That
-    existence rule reads the outcome: with a large true effect, the animals
-    left out are the most extreme ones (no event after an omission), so the
-    mean over the animals can be biased toward zero. It did not occur in any
-    cell of the validation runs.
-
-    Parameters
-    ----------
-    cohort : mapping of (animal, session_date, epoch) to CohortRows
-        Each session's rows of the kind (:func:`cohort_rows`).
-    kind : {"SWR", "No SWR"}
-    settings : VisitRateSettings
-        With ``reward_level="animal"``.
-    table_sha256 : mapping of str to str, optional
-    allow_provisional : {"test", "simulation"} or None
-        As :func:`fit_visit_rate`.
-
-    Returns
-    -------
-    AnimalRewardFit
-
-    Raises
-    ------
-    ValueError
-        If ``reward_level`` is not ``"animal"``; if a log penalty is
-        provisional in a real fit; if an animal's sessions have no row after
-        an omission or none after a reward (its coefficient is not
-        identified).
-    """
-    if settings.reward_level != "animal":
-        raise ValueError(
-            f"fit_animal_rewards needs reward_level 'animal', not "
-            f"{settings.reward_level!r}"
-        )
-    _check_provisional("A", kind, settings, allow_provisional)
-    sessions = _session_rows(cohort, "A", kind)
-    pooled = pd.concat(list(sessions.values()), ignore_index=True)
-    design = build_visit_rate_design("A", kind, pooled, settings)
-    by_animal: dict[str, list[SessionKey]] = {}
-    for key in sessions:
-        by_animal.setdefault(key[0], []).append(key)
-    animals = [
-        _fit_animal(animal, keys, design, sessions, cohort, kind, table_sha256)
-        for animal, keys in by_animal.items()
-    ]
-    return AnimalRewardFit(kind, settings, design, animals)
 
 
 def calibrate_log_penalty(

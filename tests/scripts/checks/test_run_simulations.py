@@ -87,7 +87,7 @@ def test_a_config_file_is_passed_to_the_list(tmp_path) -> None:
     assert table.attrs["config"]["kind"] == "No SWR"
     assert table.attrs["scenarios"] == ["no_effect"]
     assert set(table["kind"]) == {"No SWR"}
-    assert set(table["model"]) == {"session_sd2", "animal"}
+    assert set(table["model"]) == {"session_sd2"}
 
 
 def test_a_config_for_a_list_without_configurations_is_refused(monkeypatch) -> None:
@@ -114,6 +114,8 @@ def test_the_declared_penalty_list_reads_a_config_mapping(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="stop"):
         sim.simulation(True, 1, {"n_data_sets": 3})
     assert seen == [sim.Config(n_data_sets=3)]
+
+
 def _summary_row(**values) -> dict:
     """One summary row in which every fit converged and every unit and
     session has a value, with ``values`` set."""

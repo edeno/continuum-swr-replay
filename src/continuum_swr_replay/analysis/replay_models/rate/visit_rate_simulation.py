@@ -23,10 +23,8 @@ penalty target:
   (the only use of the real counts but the rate table);
 - the scenarios (:data:`SCENARIOS`, from ``visit_rate_scenarios``), each an
   outside scenario of the engine: its expected counts and its planted values;
-- the models: model A at ``reward_level="session"`` with the weak penalty at
-  each prior SD of :data:`PRIOR_SDS`, and at ``reward_level="animal"``
-  (an own fit of the engine, ``visit_rate.fit_animal_rewards``), all fitted
-  to the same data sets. The estimands are Q1 with the declared reference
+- the models: model A with the weak penalty at each prior SD of
+  :data:`PRIOR_SDS`, all fitted to the same data sets. The estimands are Q1 with the declared reference
   window (0 to 1 s), Q1b (the same with 1 to 2 s), Q2 and Q7a;
 - the clocks' log penalties: each clock calibrated on the run's rows by
   ``visit_rate.calibrate_log_penalty`` to the target median edf, on one data
@@ -88,10 +86,8 @@ from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
 from continuum_swr_replay.analysis.regression.newton import (
     CONVERGED,
-    NO_FINITE_MAXIMUM,
 )
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
-from continuum_swr_replay.analysis.regression.record import NoFit
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
 from continuum_swr_replay.analysis.regression.simulation import (
     Model,
@@ -99,7 +95,6 @@ from continuum_swr_replay.analysis.regression.simulation import (
     Simulation,
     SimulationResult,
 )
-from continuum_swr_replay.analysis.regression.support import Removed
 from continuum_swr_replay.analysis.regression.terms import (
     Offset,
     Smooth,
@@ -225,8 +220,6 @@ class Config:
     n_data_sets, n_draws : int
     prior_sds : tuple of float
         The weak penalty's prior SDs of the session-level models.
-    animal_level : bool
-        Whether the animal-level model is fitted too.
     calibration_path : str or None
         Where the calibrated log penalties are kept (read when it exists).
     quick : bool
@@ -239,7 +232,6 @@ class Config:
     n_data_sets: int = 20
     n_draws: int = 1000
     prior_sds: tuple[float, ...] = PRIOR_SDS
-    animal_level: bool = True
     calibration_path: str | None = None
     quick: bool = False
 
@@ -715,116 +707,13 @@ def _estimands(design, settings: vr.VisitRateSettings) -> dict[str, np.ndarray]:
     return out
 
 
-def animal_level_fit(
-    data: Mapping[SessionKey, pd.DataFrame],
-    *,
-    kind: str,
-    settings: vr.VisitRateSettings,
-    allow_provisional: str | None,
-) -> pd.DataFrame:
-    """The animal-level model's own fit of one data set (the engine's
-    :data:`OwnFit`): ``visit_rate.fit_animal_rewards``; Q1, Q1b and Q7a per
-    session from its records, Q2 per animal.
-
-    An animal with no finite coefficient (no event on one side in all its
-    sessions) has no Q2 (``without_value`` ``no_finite_maximum``), and its
-    sessions have a row of Q1, Q1b and Q7a without a value for that cause
-    (it was not fitted); one whose coefficient did not converge, or with no
-    session with a kept fit, has no Q2 either (``other_status``).
-    """
-    cohort = {
-        key: vr.CohortRows(kind, {"A": rows, "D": rows.iloc[:0]}, {})
-        for key, rows in data.items()
-    }
-    fit = vr.fit_animal_rewards(
-        cohort, kind=kind, settings=settings, allow_provisional=allow_provisional
-    )
-    contrasts = _estimands(fit.design, settings)
-    rows = []
-    for animal in fit.animals:
-        if not animal.records:
-            cause = (
-                Removed.NO_FINITE_MAXIMUM.value
-                if animal.status == NO_FINITE_MAXIMUM
-                else NoFit.OTHER_STATUS.value
-            )
-            rows += [
-                {
-                    "estimand": name,
-                    "animal": key[0],
-                    "session_date": key[1],
-                    "epoch": key[2],
-                    "status": animal.status,
-                    "no_fit": cause,
-                    "without_value": cause,
-                    "estimate": np.nan,
-                    "se": np.nan,
-                    "edf": {},
-                    "n_sessions": 1,
-                }
-                for key in data
-                if key[0] == animal.animal
-                for name in contrasts
-            ]
-        for record in animal.records:
-            kept = record.status == CONVERGED and not record.no_fit
-            coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
-            for name, c in contrasts.items():
-                used = np.flatnonzero(c)
-                cause = record.no_fit or (
-                    "" if np.isfinite(coef[used]).all() else NoFit.OTHER_STATUS.value
-                )
-                value = evaluate_contrast(c, coef, vcov) if kept and not cause else None
-                rows.append(
-                    {
-                        "estimand": name,
-                        "animal": record.animal,
-                        "session_date": record.session_date,
-                        "epoch": record.epoch,
-                        "status": record.status,
-                        "no_fit": record.no_fit,
-                        "without_value": cause
-                        or ("" if value is not None else NoFit.OTHER_STATUS.value),
-                        "estimate": np.nan if value is None else value.estimate,
-                        "se": np.nan if value is None else value.se,
-                        "edf": record.edf,
-                        "n_sessions": 1,
-                    }
-                )
-        converged = animal.status == CONVERGED
-        cause = (
-            ""
-            if converged
-            else Removed.NO_FINITE_MAXIMUM.value
-            if animal.status == NO_FINITE_MAXIMUM
-            else NoFit.OTHER_STATUS.value
-        )
-        rows.append(
-            {
-                "estimand": "Q2",
-                "animal": animal.animal,
-                "session_date": None,
-                "epoch": None,
-                "status": animal.status,
-                "no_fit": cause,
-                "without_value": cause,
-                "estimate": animal.coefficient if converged else np.nan,
-                "se": animal.se if converged else np.nan,
-                "edf": {"n_iter": animal.n_iter, "n_events": animal.n_events},
-                "n_sessions": animal.n_sessions,
-            }
-        )
-    return pd.DataFrame(rows)
-
-
 def _models(
     kind: str,
     pooled: pd.DataFrame,
     config: Config,
     calibrated: Mapping[tuple[str, str], vr.CalibratedPenalty] | None,
 ) -> list[Model]:
-    """The session-level models (one per prior SD) and the animal-level one."""
-    allow = None if calibrated else "simulation"
+    """The session-level models, one per prior SD."""
     base = vr.VisitRateSettings(calibrated_penalties=calibrated)
     models = []
     for sd in config.prior_sds:
@@ -838,27 +727,6 @@ def _models(
                 vr.RESPONSE,
                 vr.UNIT,
                 _estimands(design, settings),
-            )
-        )
-    if config.animal_level:
-        settings = replace(base, reward_level="animal")
-        design = vr.build_visit_rate_design("A", kind, pooled, settings)
-        models.append(
-            Model(
-                "animal",
-                design,
-                Poisson(),
-                vr.RESPONSE,
-                vr.UNIT,
-                _estimands(design, settings),
-                fit=partial(
-                    animal_level_fit,
-                    kind=kind,
-                    settings=settings,
-                    allow_provisional=allow,
-                ),
-                fit_estimands=("Q2",),
-                fit_columns=(vr.REWARD,),
             )
         )
     return models
@@ -1111,10 +979,7 @@ def simulation(
         planted_values = {
             e: partial(
                 _planted_of,
-                values={
-                    m.name: truth["animal" if m.fit is not None else "session"][e]
-                    for m in models
-                },
+                values={m.name: truth["session"][e] for m in models},
             )
             for e in ("Q1", "Q1b", "Q2", "Q7a")
         }
@@ -1182,7 +1047,6 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     out = result.summary.copy()
     out.insert(0, "kind", config["kind"])
     out.insert(1, "target_edf", config["target_edf"])
-    out["level"] = np.where(out["model"] == "animal", "animal", "session")
     out["prior_sd"] = [
         float(m.removeprefix("session_sd")) if m.startswith("session_sd") else np.nan
         for m in out["model"]
