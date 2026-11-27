@@ -1264,6 +1264,78 @@ that had the third clock: the earlier scenario runs on master's default had it; 
 The time-bin table keeps its column `time_until_stretch_end_s`; no model reads it now (the author's note:
 whether the table keeps it is for the lead).
 
+### Twenty-ninth round (lead, 2026-11-27, 02:19 and 02:27 PST): role levels per recording day, one rule for every family
+
+The question: the remedy study of the content model's animal fit
+(`.claude/research/2026-11-20-regression-prototypes/content_validation/unit_of_fit_remedy/REPORT.md`) put
+three remedies to the lead for a leak it had found; R1 was to estimate the role levels for each recording
+day inside the animal fit.
+
+The lead's words: "Agree on r1." (02:19 PST), and then "Remember that we want to have consistency between
+the rate, contract, etc models" (02:27 PST; "contract" is the content model).
+
+What R1 is: in the content model's animal-unit fit, the role levels are estimated per recording day, the
+curves and slopes stay shared in the animal, and the animal's value of a level is the mean of its per-day
+levels. What the lead decided is R1 for the content model, and that the mechanism be consistent across the
+model families. So it is a rule of the shared convention, not of one family: declared once, beside the
+baselines (`declared_tests.PER_DAY`), implemented once in the fitter (`build_design(..., per_day=...)`;
+`regression_fitter.md`, "Day copies of a tested category"), and read through the one contrast mapping
+(`Design.contrast_on`); no family carries its own copy logic or its own mean over days. The rule as the
+convention states it is in `2026-11-24-unit-of-fit.md`, section 4.1.
+
+What the evidence showed (simulation numbers, the remedy study's `tables/B1_summary.csv`; "nf" is a form's
+noise-free fit minus the planted value):
+
+- The leak comes from role levels that change over days. With only the levels trending, the animal fit
+  with one level per animal moved the shared curves: Q5a nf -0.086 / -0.047 (No SWR / SWR) under an upward
+  trend and +0.100 / +0.064 under a downward one; with day-to-day variation and no trend, a spurious
+  belief-variance slope (Q5b-var) of about 0.09 where none was planted on two of four seeds.
+- R1 removed it in every levels-only scenario: Q5a nf +0.003 / +0.004 under both trends and 0.018 or less on
+  all four day-variation seeds; Q5b-var nf 0.014 or less; Q7b 0.013 or less. A linear trend per level (R2)
+  did not handle day-to-day variation (Q5a -0.120 / -0.100 on one seed). Per-session levels (R1s) removed
+  it too, with role-level intervals about 1.18 times as wide, and no advantage.
+- Where nothing varied, R1 cost nothing measured: nf 0.009 or less on every estimand, coverage and
+  intervals as the shared form (median half-width ratios 0.89 for Q5a, 0.78 for Q5b-var, 0.98 to 1.04
+  elsewhere), and no day copy dropped by the support rule.
+
+What it did not show: R1 does not fix curves whose strength changes over days. When the curves trend over
+days, R1 returns what the shared form returns (SWR Q5a nf -0.084 up / +0.082 down, Q7b -0.034 / +0.062), and
+the animal value is no named average (under the upward curve trend, SWR, its noise-free Q5a was 0.376
+against 0.461 plain, 0.439 event-weighted and 0.416 inverse-variance weighted). In the combined scenarios R1
+removes the levels' part and leaves the curves' part (SWR Q5a trend_up -0.129 to -0.096). The day fits, fitted
+beside the animal fits, are where that variation shows.
+
+The coordinator's calls (2026-11-27), not the lead's, made to build the mechanism:
+
+1. Scope: only the coded levels of a penalized `Category` term can be copied per day; no slope is copied.
+   How a simple 0/1 tested term of the rate model (the last outcome) enters the same rule, as a category
+   level or as a slope copy with its own dropping rule, is not decided and waits for a consistency audit
+   of the model families. `build_design` refuses anything else, naming it.
+2. The animal's value of a declared contrast that reads a per-day level is the plain mean of its active
+   day copies (weight 1/n over the n days whose copy is active), with the exact variance from the fit's
+   covariance.
+3. A day copy without support is treated as any level without support: its level's rows that day are
+   dropped and counted under the copy's name, it is left out of the mean, and the number of copies left
+   out is reported beside the value (`Design.copies_of`; the simulation engine's `copies_left_out`). If
+   every copy is left out, the estimand has no value, for their cause.
+4. Each day copy carries the level's declared weak penalty (its own block at the level's log penalty).
+5. The reference level must have rows per group of the copies: on every day for day copies, in every
+   session for baseline copies.
+
+What it changes: the fitter has the mechanism and every model's entry in `declared_tests.PER_DAY` is empty,
+so no fit's numbers move (at `per_day=()` the records of the rate-like and content-like synthetic designs at
+the session, day and animal units were equal to the earlier code's by exact repr). The content models adopt
+`("role",)` in a later change.
+
+Open:
+
+- The rate model's adoption, after its own simulation: the shared and the per-day forms fitted to the same
+  drawn data sets (two models whose designs differ only in `per_day` share them).
+- One coding and one support rule for a tested level in every family: the content model's level is a
+  `Category` level judged by its own rows (`level_support`), the rate model's a 0/1 `Slope` judged on both
+  sides (`binary_support`); under per-day copies the difference becomes "5 events with a row of the level
+  that day" against "5 visits on each side that day".
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions

@@ -141,3 +141,12 @@ def test_no_contrast_reads_a_baseline() -> None:
                 e.estimand_id,
                 name,
             )
+
+
+def test_per_day_is_declared_beside_the_baselines() -> None:
+    """Every model with baselines declares its per-day terms (empty for now),
+    and none of them is a baseline."""
+    assert set(dt.PER_DAY) == set(dt.BASELINES)
+    for model, names in dt.PER_DAY.items():
+        assert names == ()
+        assert not set(names) & set(dt.BASELINES[model])

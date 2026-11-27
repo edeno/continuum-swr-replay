@@ -59,6 +59,7 @@ import numpy as np
 __all__ = [
     "DECLARED_TESTS",
     "BASELINES",
+    "PER_DAY",
     "DIFFERENCE",
     "ESTIMANDS",
     "KINDS",
@@ -208,6 +209,41 @@ BASELINES: dict[str, tuple[str, ...]] = {
 several sessions (``regression.terms``, "Baselines"): the rate models'
 intercept (model D's too, which has no declared test), the content models'
 arm category. No declared contrast reads one."""
+
+PER_DAY: dict[str, tuple[str, ...]] = {
+    "visit_rate_A": (),
+    "visit_rate_D": (),
+    "role_content": (),
+    "role_content_uncertainty": (),
+    "role_content_next": (),
+}
+"""Each declared model's tested categories whose levels are estimated for each
+recording day in a fit of several days (``regression.terms``, "Day copies";
+passed to ``build_design(..., per_day=...)``), beside :data:`BASELINES`. The
+rule is the convention's, the same for every family: in a fit of several
+recording days, each tested category that this declaration names for the model
+has one copy of each coded level per day, each with the level's declared weak
+penalty; every other tested term and every curve is shared, and the baselines
+stay per session. A declared contrast reads such a level as the plain mean of
+its active day copies (``Design.contrast_on``); a copy without support drops
+that level's rows that day and is left out of the mean, and the copies left
+out are counted. In a fit of one day the level is the level itself. No family
+has copy logic or a mean over days of its own.
+
+Why: the lead decided R1 for the content model's animal fit ("Agree on r1.",
+2026-11-27 02:19 PST: the role levels estimated per recording day, the curves
+and slopes shared in the animal, the animal's value the mean of the per-day
+levels), after a simulation showed that a level that changes from day to day,
+forced to one value per animal, leaks into the shared curves; and added
+"Remember that we want to have consistency between the rate, contract, etc
+models" (2026-11-27 02:27 PST; "contract" is the content model), so the rule
+is declared here for every model and implemented once in the fitter.
+
+Every entry is empty for now: the content models adopt ``("role",)`` in a
+later change, and the rate models wait for their own simulation. Only the
+coded levels of a penalized category can be named, not a slope: how a tested
+0/1 term (the rate model's last outcome) enters the rule is not decided (the
+coordinator's call, 2026-11-27, not the lead's)."""
 
 _OMITTED_ARRIVAL = "s(time_since_visit_start_s):last_outcome_rewarded=0"
 _REWARDED_ARRIVAL = "s(time_since_visit_start_s):last_outcome_rewarded=1"

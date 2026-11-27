@@ -496,6 +496,69 @@ intercept per session that does not identify a level a session holds alone, and 
 penalized one is then split from that session's intercept by its prior
 (`docs/known_issues/penalized_level_split_by_its_prior.md`).
 
+**Day copies of a tested category** (the lead's R1, 2026-11-27; the rule in
+[2026-11-24-unit-of-fit.md](2026-11-24-unit-of-fit.md), section 4.1). A model may declare
+tested categories whose coded levels are estimated for each recording day inside a fit of
+several days: `build_design(..., per_day=(...))`, the model's entry of
+`declared_tests.PER_DAY`, beside `BASELINES`. `Design.with_per_day` is the one check of what
+may be declared: only the column of a penalized `Category` term that is not a baseline, once,
+in a design without `'@'` in a coefficient name; a slope, a smooth, a lag functional, the
+intercept, an unpenalized category or a baseline is refused, naming it. That only a
+category's coded levels are copied, and no slope, is the coordinator's call (2026-11-27), not
+the lead's: how a tested 0/1 term (the rate model's last outcome) enters the rule, as a level
+or as a slope copy with its own dropping rule, waits for a consistency audit of the model
+families. `with_per_day` also lets a simulation fit the same design with a level shared and
+per day (below).
+
+- *Copies.* In a fit whose sessions span two days or more (`Design.for_sessions`), each coded
+  level of a per-day category is replaced by one copy for each day (`unit_key(key, "day")`,
+  the days in the order of their first sessions), zero on the other days' rows. A copy is
+  named `<name>@<animal>/<session_date>` (`role[current]@a/20260101`), so a name holds one
+  `@` and a day key has two parts where a session key has three. It is a `level` term
+  whose level is `(column, value, day)`, with no dependents and its `group` set to the day's
+  key (`DesignTerm.group` is a session key for a baseline copy, a day key for a day copy; it
+  replaced `DesignTerm.session`). A fit of one day (at `fit_by="day"`, or an animal recorded
+  on one day) copies nothing of the category: the record is the shared fit's, bit for bit
+  (`test_sessions.py::test_per_day_within_one_day_is_the_shared_fit`), so a model passes its
+  declaration at every unit and has no second code path.
+- *Penalty.* Each day copy keeps the base level's declared weak penalty, in its own block at
+  the base log penalty (the coordinator's call, 2026-11-27, not the lead's). With independent
+  copies that is a prior SD of `SD / sqrt(n_days)` on their mean.
+- *A copy is a column of its term.* The edf has an entry for each copy, by its name, and the
+  category's total; the collinearity record measures the copies with the category's term
+  (only the intercept and the baseline copies are projected out); `Design.term_columns` holds
+  them; `sessions[i]["baseline"]` lists baseline copies only
+  (`::test_edf_and_collinearity_hold_day_copies`). A term `by` the category (a smooth or a
+  slope fitted for the level) stays shared: it reads the level's rows of every day. The fit
+  equals a design built by hand with one column per role level and day, to 1e-8
+  (`::test_animal_fit_equals_hand_built_day_columns`, with per-session arm baselines and an
+  uncoded trunk level beside the copies).
+- *Support and dropping.* A day copy is judged and dropped as any level: one without support
+  drops its level's rows on its day, counted under the copy's name in `rows_dropped` (the
+  fit's and its sessions'), and is left out (`::test_day_copy_without_support_left_out_and_counted`).
+  The terms by the level keep their other rows; if every copy fails, those terms fail the
+  support rule themselves.
+- *Reference rows.* The category's reference level must have rows on every day of the fit
+  (per group of the copies: per day for day copies, per session for baseline copies; the
+  coordinator's call, 2026-11-27): an error names the fit, the day ("on day a/d") and the
+  day's copies (`::test_reference_rows_required_per_day`).
+- *Contrasts.* `Design.contrast_on(c, coef_names, left_out)` maps an entry on a per-day level
+  to the plain mean of its active copies: `c_j / n` on each of the `n` copies not left out
+  (the coordinator's call, 2026-11-27: the plain mean, not a weighted one), so the variance is
+  the exact `c' V c` over the mapped `c`, the covariances between copies through the shared
+  curves included. A copy without support is left out of the mean; when every copy is left
+  out the mapped `c` reads them all and the estimand has no value, for their cause. Without
+  `left_out` a copy left out is read and the estimate is NaN, never a wrong number. A name
+  neither in the fit nor copied there is an error; the baseline refusal is unchanged.
+  `Design.copies_of(name, coef_names)` lets a caller count the copies left out, so that no
+  family has a mean over days of its own (`test_terms.py::test_contrast_on_mean_of_active_copies`).
+- *What it removes.* On noise-free shares of one animal over four days, with the current
+  arm's level changing over days (-0.5, 0, 0.5, 1) and its value rising with the day, a
+  shared level moved a planted-zero slope by the current arm's value to 0.365; with per-day
+  copies each day's level and the slope were recovered to 1e-5 or better
+  (`::test_day_level_does_not_leak_into_shared_slope`; synthetic rows, the role at the
+  weakest log penalty, -10).
+
 A built design describes each term once, as a `DesignTerm`: its kind (intercept, level,
 0/1 slope, continuous slope, smooth, lag functional), its columns, its level, its
 covariate, its penalty block and, for a level, the terms that leave a session with it.
@@ -1021,7 +1084,19 @@ that cause, and `share_not_converged` (of the unit fits tried), so that a sessio
 from a day that keeps a value is in none of them; over the sessions, `n_sessions`,
 `n_sessions_used_min`, `n_sessions_used_mean` and `share_sessions_unused` (`1 -
 n_sessions_used_mean / n_sessions`); `n_data_sets`, `n_data_sets_with_estimate`,
-`n_draws` and `seed`. The engine also returns one row per data set and one per unit of
+`n_draws` and `seed`. **Per-day levels in the engine.** An estimand, a planted value and an
+inside scenario name a per-day level by its base name (an inside scenario plants one value
+for every day, and a day copy's name is refused; a truth that differs by day is an outside
+scenario). A unit's value is `evaluate_contrast` of `Design.contrast_on(c, record.coef_names,
+record.left_out)`, and its cause without a value is that of the first name the mapped
+contrast reads that the fit left out, so a unit with one day copy left out keeps a value and
+one with every copy left out has none (`test_simulation_engine.py::test_without_value_reads_copies`);
+the `sessions` table counts the copies left out (`copies_left_out`; a difference's row, the
+sum of its two models'). The unit target drops the copies' weak penalty with the base
+level's (`test_unit_target_per_day_model`). Two models whose designs differ only in `per_day`
+have the same coefficient names and share the data sets of a run: on a level that rises over
+the days, the per-day model's unit target is the mean of the day levels and the shared
+model's the pooled level (`test_same_data_sets_shared_and_per_day`). The engine also returns one row per data set and one per unit of
 the fit. The runner warns when a unit fit did not converge, a unit has no value, or an
 estimate used fewer than `n_sessions` sessions.
 

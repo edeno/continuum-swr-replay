@@ -158,7 +158,7 @@ is design C of the 03:13 answer. A baseline is never tested and is never read by
 | model | per session inside the unit | shared inside the unit |
 |---|---|---|
 | rate (`visit_rate_A`, `visit_rate_D`) | the intercept (the session's level of rate) | the reward coefficient (A); the lag curve (D; described, not tested: **call**); the clock curves: **OPEN (a)** |
-| content (`role_content`, `role_content_uncertainty`) | the arm effects: **OPEN (b)** | the role levels, the role slopes, the smooths |
+| content (`role_content`, `role_content_uncertainty`) | the arm effects: **OPEN (b)** | the role levels (per recording day once the content models adopt R1, below), the role slopes, the smooths |
 | choice, stay or leave, ripple power (Phase 7, not built) | the model's baseline, declared with the model | its tested terms |
 
 **OPEN (a), rate: are the clock curves shared inside the unit?** The model has two clocks that Q1 and
@@ -190,6 +190,34 @@ animal, with arm effects that differ between sessions (a Normal deviation of SD 
 counted, as a level that fails is dropped today (`support.py:42-49`: merging into another level inflated
 false positives in simulation). The scratch driver instead shared one set of arm effects among such
 sessions. The plan builds the drop and reports how many sessions it removes.
+
+**A tested level per recording day (R1; decided, lead, 2026-11-27 02:19 PST: "Agree on r1.").** In the
+content model's animal fit the role levels are estimated for each recording day, the curves and slopes
+are shared in the animal, and the animal's value is the mean of the per-day levels: in simulation a level
+that changes from day to day, forced to one value per animal, leaked into the shared curves (the remedy
+study, `.claude/research/2026-11-20-regression-prototypes/content_validation/unit_of_fit_remedy/REPORT.md`;
+the convention's twenty-ninth round). The lead added (02:27 PST): "Remember that we want to have
+consistency between the rate, contract, etc models" ("contract" is the content model). So the rule is the
+shared convention's, stated once for every family:
+
+> In a fit of several recording days, each tested category that `declared_tests.PER_DAY` names for the
+> model has one copy of each coded level per day, each with the level's declared weak penalty. Every
+> other tested term and every curve is shared, and the baselines stay per session. A declared contrast
+> reads such a level as the plain mean of its active day copies; a copy without support drops that
+> level's rows that day and is left out of the mean, and the copies left out are counted. In a fit of one
+> day the level is the level itself.
+
+It is declared beside the baselines (`declared_tests.PER_DAY`), implemented once in the fitter
+(`build_design(..., per_day=...)`, `Design.for_sessions`; `regression_fitter.md`, "Day copies of a
+tested category") and read through the one contrast mapping (`Design.contrast_on`); no family has copy
+logic or a mean over days of its own. Every model's entry is empty today: the content models adopt
+`("role",)` in a later change, and the rate models wait for their own simulation. These choices are the
+coordinator's calls (2026-11-27), not the lead's: only the coded levels of a penalized category can be
+copied, no slope (how a tested 0/1 term such as the rate model's last outcome enters the rule is not
+decided); the animal's value is the plain mean over the active days; a day copy without support is left
+out of the mean and counted (if every copy is left out the estimand has no value); each copy carries the
+level's own weak penalty; and the reference level must have rows on every day of the fit, as a baseline
+category's must in every session.
 
 ## 5. Penalties under a larger unit
 
