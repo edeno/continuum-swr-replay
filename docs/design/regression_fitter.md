@@ -980,16 +980,15 @@ estimand)'s, so that adding a difference changes no model's seed; a run without
 `rows_where` is drawn and fitted as before (the bit-for-bit tables,
 `tests/analysis/regression/data/numpy_reference/simulation_engine_tables.json`).
 
-**Independence of the two groups (the coordinator's call, not the lead's).** The two
+**Independence of the two groups: the coordinator's call (2026-11-27), not the lead's.** The two
 groups' outcomes are drawn independently given each group's expected outcome: under an
 outside scenario `expected` is called once, with every row of every session and the data
 set's generator, and then each group's rows are drawn one group after the other from
 that generator. A dependence between the groups exists only when a scenario plants it
 through the means (for example the same session deviations of an effect in both kinds).
 In the real data the two kinds of event share time bins, and a shared session or animal
-effect would correlate them; independence then validates one case only. The decision is
-the author of the regression code's (2026-11-27), made while the lead had not ruled on
-it.
+effect would correlate them; independence then validates one case only. It is
+the coordinator's call (2026-11-27), not the lead's, made while the lead had not ruled on it.
 
 **The results table** (`simulation.summarize`; one row per scenario, model and
 estimand): `planted`; `mean_estimate`, `bias`, `bias_share`, `sd` (over data sets),

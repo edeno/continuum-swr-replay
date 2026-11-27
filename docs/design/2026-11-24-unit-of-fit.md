@@ -242,8 +242,7 @@ unit's model (the fit on unlimited data).
   own target is the reduction of the units' differences of the two kinds' unit targets, over the units
   where both have one, not the difference of the two reduced targets (their units can differ). The
   two kinds are drawn independently given their expected counts, a dependence only where a scenario
-  plants it (`docs/design/regression_fitter.md`, "Simulation"; the coordinator's call, not the
-  lead's).
+  plants it (`docs/design/regression_fitter.md`, "Simulation"; the coordinator's call (2026-11-27), not the lead's).
 
 ## 7. The reduction and the inference for each unit
 
