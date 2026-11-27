@@ -157,9 +157,10 @@ FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
 #: curve after an omission cannot be calibrated to those targets on the first
 #: validation's synthetic cohort (measured 2026-11-26): the calibration's
 #: bisection tries a log penalty of -6.25 once the target is above the edf at
-#: -2.5 (11.8 for an animal, 9.4 for a day), and there the curve, which has
-#: no row beyond 8 s since arrival, runs away and the unit's first fit ends at
-#: the step limit, which stops the calibration (``calibration.log_penalty_for_edf``
+#: -2.5 (11.8 for an animal, 9.4 for a day, with visits after an omission of
+#: 0.5 to 8 s), and there the curve, which has no row beyond the longest visit
+#: after an omission, runs away and the unit's first fit ends at the step
+#: limit, which stops the calibration (``calibration.log_penalty_for_edf``
 #: raises). So the curve after an omission takes 10 at the animal and 8 at the
 #: day, below those edfs; the other curves take the evidence's values. The
 #: coefficient form's shared arrival curve takes the rewarded curve's target.
@@ -234,10 +235,13 @@ SCENARIOS: dict[str, tuple[str, ...]] = {
 QUICK_COHORT = (5, 2, 1, 40, 150.0, (1.5, 8.0), None)
 #: The first validation's synthetic cohort (the author's sizes): five
 #: animals of four days of two sessions, 100 visits and 200 expected events
-#: a session; visits after an omission shorter (0.5 to 8 s against 1 to
+#: a session; visits after an omission shorter (0.5 to 12 s against 1 to
 #: 14 s), so that the windows' omission side comes from the visits that last
-#: into them.
-VALIDATION_COHORT = (5, 4, 2, 100, 200.0, (1.0, 14.0), (0.5, 8.0))
+#: into them: about 220 visits after an omission reach 4 s in an animal (the
+#: real animals have 146 to 429 in 4 to 10 s; the twenty-sixth round) and
+#: about 55 reach 10 s, so that no part of Q2's window lies beyond every
+#: visit after an omission.
+VALIDATION_COHORT = (5, 4, 2, 100, 200.0, (1.0, 14.0), (0.5, 12.0))
 #: The quick configuration's planted curves: a rise after arrival and a drop
 #: before leaving.
 QUICK_CLOCKS = sc.PlantedClocks(
