@@ -709,11 +709,8 @@ def test_the_design_has_no_trunk_column_and_is_identified_without_the_weak_penal
     model is identified with the weak penalty off."""
     from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
     from continuum_swr_replay.analysis.regression.sessions import fit_sessions
-    from continuum_swr_replay.analysis.regression.simulation import (
-        _without_weak_penalty,
-    )
 
-    _, sessions, fit = trunk_session
+    cohort, sessions, fit = trunk_session
     names = fit.design.coef_names
     assert "role[trunk]" not in names
     assert [n for n in names if n.startswith("role[")] == [
@@ -722,9 +719,20 @@ def test_the_design_has_no_trunk_column_and_is_identified_without_the_weak_penal
     ]
     (role,) = [c for c in fit.design.categories if c.column == rc.ROLE]
     assert role.uncoded == ("trunk",)
+    # The weak penalty off: every simple term unpenalized, the smooths kept.
+    terms = [
+        replace(t, penalty="none")
+        if isinstance(t, Category | Slope) and t.penalty != "none"
+        else t
+        for t in rc.role_terms("role_content", "unadjusted")
+    ]
+    design = build_design(terms, cohort.model_rows("role_content"), intercept=False)
+    assert design.coef_names == names and not any(
+        t.block is not None for t in design.terms if t.kind in ("level", "slope")
+    )
     ((key, rows),) = sessions.items()
     (record,) = fit_sessions(
-        _without_weak_penalty(fit.design), {key: rows}, GroupedSoftmax(),
+        design, {key: rows}, GroupedSoftmax(),
         model="no_weak_penalty", kind=KIND, response=rc.RESPONSE, unit=rc.UNIT,
         table_sha256={},
     )  # fmt: skip
