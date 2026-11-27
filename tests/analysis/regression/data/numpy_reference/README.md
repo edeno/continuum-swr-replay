@@ -177,7 +177,10 @@ are compared by the same rule (`1e-11 + 1e-9 |b|`, counts and codes exactly equa
   fixed small runs of the engine with one model or several models of one design (the
   rate model inside and outside; the content model inside; the day cohort's model at the
   session, the day and the animal unit with a support hook, inside and outside), 2 data
-  sets each, written before the difference of two models was added to the engine. They
+  sets each, written before the difference of two models was added to the engine, and
+  written again at ae41bfa3 for one column the per-day copies added to the `sessions`
+  table, `copies_left_out` (0 on every row): every earlier column of every row was
+  unchanged, bit for bit. They
   are compared exactly, not by the rule above: every float to the bit (by its repr), a
   float that is not finite by its name, an int not equal to a float. That holds only on
   the machine that wrote them (the CPU and BLAS above), so the test is skipped on
