@@ -739,6 +739,83 @@ def test_the_design_has_no_trunk_column_and_is_identified_without_the_weak_penal
     assert record.status == "converged"
 
 
+def _trunk_coded_terms(model, variant, settings=None) -> list:
+    """The model's terms with the trunk role coded (``uncoded=()``), in the
+    role category and in every term by it: the design before the trunk
+    level had no column."""
+    terms = _ROLE_TERMS(model, variant, settings)
+    (role,) = [t for t in terms if isinstance(t, Category) and t.column == rc.ROLE]
+    coded = replace(role, uncoded=())
+    return [
+        coded
+        if t is role
+        else replace(t, by=coded)
+        if getattr(t, "by", None) is role
+        else t
+        for t in terms
+    ]
+
+
+_ROLE_TERMS = rc.role_terms
+
+
+@pytest.mark.parametrize("variant", rc.VARIANTS)
+@pytest.mark.parametrize("model", rc.MODELS)
+def test_the_uncoded_trunk_gives_the_fit_with_the_trunk_coded(
+    cohort, monkeypatch, model, variant
+) -> None:
+    """The trunk role is an exact function of the arm, so leaving its level
+    out changes nothing the model reads: with the trunk coded (held by the
+    weak prior at the declared SD) every shared coefficient, every declared
+    estimand and its variance, and the linear predictor centered within
+    event are the same, the coded trunk level is 0, and no estimand's
+    contrast reads it."""
+    truth = sc.Truth(
+        arm=sc.arm_effects(),
+        role={"current": 0.6, "previous": -0.4, "trunk": 0.7},
+        length={"trunk": 0.5, "current": 0.2},
+    )
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
+    rows = cohort.model_rows(model)
+    sessions = _drawn(rows[rows[rc.KIND] == KIND], truth, reference, seed=2)
+    uncoded = _fit(cohort, sessions, model, variant)
+    monkeypatch.setattr(rc, "role_terms", _trunk_coded_terms)
+    coded = _fit(cohort, sessions, model, variant)
+    assert "role[trunk]" in coded.design.coef_names
+    assert "role[trunk]" not in uncoded.design.coef_names
+    trunk = coded.design.coef_names.index("role[trunk]")
+    tol = 1e-9
+    for a, b, (_key, part) in zip(
+        uncoded.records, coded.records, sessions.items(), strict=True
+    ):
+        assert a.status == b.status == "converged"
+        index = [list(b.coef_names).index(n) for n in a.coef_names]
+        ca, cb = np.asarray(a.coef), np.asarray(b.coef)
+        va, vb = np.asarray(a.vcov), np.asarray(b.vcov)
+        np.testing.assert_allclose(ca, cb[index], rtol=0, atol=tol)
+        assert abs(cb[list(b.coef_names).index("role[trunk]")]) < tol
+        for estimand, c in uncoded.contrasts.items():
+            d = coded.contrasts[estimand]
+            assert d[trunk] == 0.0
+            assert c @ ca == pytest.approx(d @ cb, abs=tol)
+            assert c @ va @ c == pytest.approx(d @ vb @ d, abs=tol)
+        prepared = rc.design_rows(part, model, variant, uncoded.reference)
+        events = prepared[rc.UNIT].to_numpy()
+        etas = []
+        for fit, coef, names in (
+            (uncoded, ca, a.coef_names),
+            (coded, cb, b.coef_names),
+        ):
+            X, _ = fit.design.session(prepared)
+            full = np.zeros(len(fit.design.coef_names))
+            full[[fit.design.coef_names.index(n) for n in names]] = coef
+            eta = np.nan_to_num(X) @ full
+            etas.append(
+                eta - pd.Series(eta).groupby(events).transform("mean").to_numpy()
+            )
+        np.testing.assert_allclose(etas[0], etas[1], rtol=0, atol=tol)
+
+
 def test_a_trunk_role_off_the_trunk_arms_is_refused(cohort) -> None:
     rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
     reference = rc.ContrastReference.from_rows(
