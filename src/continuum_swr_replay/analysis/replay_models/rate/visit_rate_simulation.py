@@ -37,10 +37,12 @@ it. :func:`simulation` builds one run for one kind of event:
   1 s), Q2, Q2-onset and Q7a, and Q1b (Q1 against 1 to 2 s); the coefficient
   form's is the secondary reward coefficient (``visit_rate.SECONDARY_ESTIMAND``);
 - the curves' log penalties: with ``Config.calibrate``, each curve of the
-  form (``VisitRateSettings.curves``) calibrated at each unit, by
+  form (``VisitRateSettings.curves``) calibrated at each decided unit (a day
+  and an animal; the session, kept for comparison, stays at the provisional
+  per-session values), by
   ``visit_rate.calibrate_log_penalty`` (the median edf over that unit's
-  fits) to its declared target (:data:`CLOCK_TARGETS`, the author's settings:
-  the evidence's suggestion, not validated), on one data set of the
+  fits) to its declared target at that unit (:data:`CLOCK_TARGETS`, the
+  author's settings from the evidence, not validated), on one data set of the
   calibration scenario (:data:`CALIBRATION_SEED`: the constant ratio on the
   planted curves, each session's expected total its number of events of the
   kind; the counts of the bins are not used), in two rounds (each curve with
@@ -115,6 +117,7 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from continuum_swr_replay.runs.threads import pool_context
 
+from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import REWARD_LAG_COLUMNS
 from . import visit_rate as vr
 from . import visit_rate_scenarios as sc
@@ -146,19 +149,33 @@ PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
 #: The units each run fits the same data sets at (the decided day and animal,
 #: and the session for comparison).
 FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
-#: The target median edf of each curve at a unit's calibration: DECLARED
-#: SETTINGS OF THE AUTHOR, the evidence's suggestion (about 15 effective
-#: parameters for each arrival curve and 10 or more for the leaving curve,
+#: The target median edf of each curve at each decided unit's calibration:
+#: DECLARED SETTINGS OF THE AUTHOR, NOT validated. At the animal unit, the
+#: evidence's suggestion (about 15 effective parameters for each arrival
+#: curve and 10 or more for the leaving curve,
 #: ``design_d_trial/rate/followup/REPORT.md``, section 6; the twenty-sixth
-#: round), NOT validated. The coefficient form's shared arrival curve takes
-#: the arrival curves' target; the stretch clock takes 6, the earlier
-#: per-session target (the evidence fitted no third clock).
-CLOCK_TARGETS: dict[str, float] = {
-    vr.OMITTED_ARRIVAL_TERM: 15.0,
-    vr.REWARDED_ARRIVAL_TERM: 15.0,
-    vr.ARRIVAL: 15.0,
-    vr.LEAVING: 10.0,
-    vr.STRETCH: 6.0,
+#: round). At the day unit, 10 for each curve: the fixed value that section
+#: ran at the day (the 15 of the animal unit needs a log penalty near -6 for
+#: the curve after an omission on a day of the first validation's synthetic
+#: cohort, where a unit's first fit can end at the step limit and stop the
+#: calibration; measured 2026-11-26). The coefficient form's shared arrival
+#: curve takes the arrival curves' target; the stretch clock takes 6, the
+#: earlier per-session target (the evidence fitted no third clock).
+CLOCK_TARGETS: dict[str, dict[str, float]] = {
+    "day": {
+        vr.OMITTED_ARRIVAL_TERM: 10.0,
+        vr.REWARDED_ARRIVAL_TERM: 10.0,
+        vr.ARRIVAL: 10.0,
+        vr.LEAVING: 10.0,
+        vr.STRETCH: 6.0,
+    },
+    "animal": {
+        vr.OMITTED_ARRIVAL_TERM: 15.0,
+        vr.REWARDED_ARRIVAL_TERM: 15.0,
+        vr.ARRIVAL: 15.0,
+        vr.LEAVING: 10.0,
+        vr.STRETCH: 6.0,
+    },
 }
 #: The run's seed (``regression.simulation.data_seed``).
 DATA_SEED = 20261124
@@ -247,8 +264,9 @@ class Config:
     fit_by : tuple of str
         The units of the fit, one model each (:data:`FIT_BYS`).
     calibrate : bool
-        Calibrate each curve at each unit to :data:`CLOCK_TARGETS`; False
-        fits at the provisional values.
+        Calibrate each curve at each decided unit (a day, an animal) to
+        :data:`CLOCK_TARGETS`; False fits at the provisional values. The
+        session always fits at them.
     sessions_per_animal : int or None
         Sessions of each animal (:func:`spread_sessions`); None takes all.
     n_data_sets, n_draws : int
@@ -805,7 +823,7 @@ def calibrate_clocks(
     clocks: sc.PlantedClocks,
     record: Mapping[str, object],
     workers: int = 1,
-    targets: Mapping[str, float] = CLOCK_TARGETS,
+    targets: Mapping[str, float] | None = None,
 ) -> dict[tuple[str, str], vr.CalibratedPenalty]:
     """Each curve's log penalty at its target median edf over the units of
     ``settings.fit_by``, on one data set of the calibration scenario (the
@@ -817,8 +835,9 @@ def calibrate_clocks(
     settings : VisitRateSettings
         The form and unit of the fit; each curve of
         ``settings.curves("A")`` is calibrated.
-    targets : mapping of str to float
-        Curve -> its target median edf (:data:`CLOCK_TARGETS`).
+    targets : mapping of str to float, optional
+        Curve -> its target median edf; None reads the unit's
+        :data:`CLOCK_TARGETS`.
 
     Returns
     -------
@@ -827,6 +846,7 @@ def calibrate_clocks(
         calibration scenario and seed, and the log penalty, median edf and
         units used of each round.
     """
+    targets = CLOCK_TARGETS[settings.fit_by] if targets is None else targets
     rng = np.random.default_rng(CALIBRATION_SEED)
     drawn = {}
     for key, rows in cohort.items():
@@ -881,28 +901,36 @@ def calibrate_clocks(
 def _calibrated(
     cohort, kind: str, config: Config, clocks, record, workers: int
 ) -> dict[str, dict[tuple[str, str], vr.CalibratedPenalty] | None]:
-    """The calibrated penalties of the run at each unit of ``config.fit_by``:
-    read from ``calibration_path`` when it exists, else calibrated and
-    written there; None at every unit without ``config.calibrate``."""
+    """The calibrated penalties of the run at each unit of ``config.fit_by``
+    that is a unit of ``fit_by.BEHAVIOR_FIT_BY`` (a day, an animal): read from
+    ``calibration_path`` when it exists, else calibrated and written there.
+    None (the provisional values) at the session, the earlier design kept for
+    comparison, and at every unit without ``config.calibrate``: the targets
+    are a unit's, and a session's fit at a smooth of about 15 effective
+    parameters ends at the step limit on a thin session (the first
+    validation's synthetic cohort, 2026-11-26), which stops the
+    calibration."""
     if not config.calibrate:
         return dict.fromkeys(config.fit_by)
+    calibrated_units = [u for u in config.fit_by if u in BEHAVIOR_FIT_BY]
     path = Path(config.calibration_path) if config.calibration_path else None
     if path is not None and path.exists():
         stored = json.loads(path.read_text())
-        return {
+        found = {
             fit_by: {
                 (kind, c): vr.CalibratedPenalty(
                     v["log_penalty"], v["target_edf"], v["rows"]
                 )
                 for c, v in stored[fit_by].items()
             }
-            for fit_by in config.fit_by
+            for fit_by in calibrated_units
         }
+        return dict.fromkeys(config.fit_by) | found
     found = {
         fit_by: calibrate_clocks(
             cohort, kind, _settings(config, fit_by), clocks, record, workers
         )
-        for fit_by in config.fit_by
+        for fit_by in calibrated_units
     }
     if path is not None:
         from continuum_swr_replay.runs.io import json_ready
@@ -924,7 +952,7 @@ def _calibrated(
         )
         path.parent.mkdir(parents=True, exist_ok=True)
         write_atomically(path, lambda tmp: Path(tmp).write_text(text))
-    return found
+    return dict.fromkeys(config.fit_by) | found
 
 
 # --- The run ---------------------------------------------------------------------

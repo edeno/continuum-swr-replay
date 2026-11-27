@@ -948,8 +948,9 @@ penalties in its `attrs`. The visit rate model's list is
 fits the same draws at the session, the day and the animal (one model per unit and prior
 SD, `<fit_by>_sd<SD>`), in one reward form (the by-outcome form's declared tests, or the
 coefficient form's secondary value: the engine fits one design at a time), with each
-curve's penalty calibrated at each unit to a declared target edf (`CLOCK_TARGETS`, the
-author's settings, not validated) when `calibrate` is set. Its window truths
+curve's penalty calibrated at the day and at the animal to a declared target edf of that
+unit (`CLOCK_TARGETS`, the author's settings, not validated) when `calibrate` is set; the
+session, kept for comparison, fits at the provisional per-session values. Its window truths
 (`visit_rate_scenarios.window_means`) are the plain means of the planted reward effect
 over each window, in closed form; `planted_unit` covers the rest. The first list is the declared-penalty
 check, `scripts/checks/simulate_declared_penalty.py` (a synthetic cohort; one model per
