@@ -10,12 +10,15 @@ Two synthetic models of the engine's own, on rows from ``conftest``:
   decode bins), its shares drawn by each of the softmax's noise models.
 
 ``python -m tests.analysis.regression.test_simulation_engine`` writes the
-fixed-seed fixture ``data/numpy_reference/simulation_engine.json``.
+fixed-seed fixture ``data/numpy_reference/simulation_engine.json``; with the
+argument ``tables``, the bit-for-bit tables
+``data/numpy_reference/simulation_engine_tables.json``.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import replace
 from functools import partial
@@ -1094,24 +1097,6 @@ def test_the_unit_target_is_the_unpenalized_fit_by_hand() -> None:
     assert abs(slope(np.exp(WEAK)) - slope(0.0)) > 1e-4
 
 
-if __name__ == "__main__":
-    from continuum_swr_replay.runs.provenance import described_commit
-
-    FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-    FIXTURE.write_text(
-        json.dumps(
-            {
-                "commit": described_commit(),
-                "command": "python -m tests.analysis.regression.test_simulation_engine",
-                "tables": reference_tables(),
-            },
-            indent=1,
-        )
-        + "\n"
-    )
-    print(f"wrote {FIXTURE}", file=sys.stderr)
-
-
 #: The unit in which the hook below says ``rise`` lacks support.
 _UNSUPPORTED = ("animal0", "20260001", "02_r1")
 
@@ -1152,3 +1137,118 @@ def test_a_model_support_hook_marks_units_without_a_value(rate_sessions_cohort) 
         plain.summary.query("estimand == 'reward'").reset_index(drop=True),
         hooked.summary.query("estimand == 'reward'").reset_index(drop=True),
     )
+
+
+# --- The tables of single-model runs, bit for bit ---------------------------------
+
+TABLES_FIXTURE = FIXTURE.with_name("simulation_engine_tables.json")
+
+bit_for_bit = pytest.mark.skipif(
+    os.environ.get("GITHUB_ACTIONS") == "true",
+    reason=(
+        "the stored tables are exact on the machine that wrote them; another "
+        "CPU's BLAS kernels round the fits differently "
+        "(data/numpy_reference/README.md), and a job cannot choose its machine"
+    ),
+)
+
+
+def _reward_unsupported_on_a_day(record, sessions) -> dict[str, bool]:
+    """A support hook of :func:`unit_rate_model`: ``reward`` lacks support in
+    every unit holding a session of animal1's second day."""
+    return {"reward": ("animal1", "20260002") not in {k[:2] for k in sessions}}
+
+
+def _encoded(table: pd.DataFrame) -> list[dict]:
+    """A table's rows as JSON values: a float by its exact repr (JSON's), a
+    float that is not finite by its name (``"NaN"``, ``"Infinity"``,
+    ``"-Infinity"``), so that NaN equals NaN."""
+
+    def value(x):
+        if isinstance(x, float) and not np.isfinite(x):
+            return "NaN" if np.isnan(x) else ("Infinity" if x > 0 else "-Infinity")
+        return x
+
+    return [{k: value(v) for k, v in row.items()} for row in table.to_dict("records")]
+
+
+def bit_for_bit_tables() -> dict[str, dict[str, list[dict]]]:
+    """The three tables of fixed small runs, each table's rows
+    :func:`_encoded`: the rate model under the inside and the outside
+    scenario; the content model inside; on the day cohort, the model at the
+    session, the day and the animal unit with a support hook, inside and
+    outside the model. Two data sets each."""
+    rate_sessions = _cohort(rate_rows)
+    content_sessions = _cohort(_content_rows)
+    days = _day_cohort()
+    outside = OutsideScenario("outside", expected_rate, planted={"reward": 0.5})
+    runs = {
+        "rate": _simulation(
+            rate_model(rate_sessions), rate_sessions, [RATE_INSIDE, outside]
+        ),
+        "content": _simulation(
+            content_model(content_sessions), content_sessions, [CONTENT_INSIDE]
+        ),
+        "units": Simulation(
+            [
+                replace(unit_rate_model(days, f), support=_reward_unsupported_on_a_day)
+                for f in ("session", "day", "animal")
+            ],
+            days,
+            [RATE_INSIDE, outside],
+            2,
+            50,
+            5,
+        ),
+    }
+    out = {}
+    for name, simulation in runs.items():
+        result = engine.run(simulation)
+        out[name] = {
+            table: _encoded(getattr(result, table))
+            for table in ("summary", "data_sets", "sessions")
+        }
+    return out
+
+
+@bit_for_bit
+def test_tables_unchanged_bit_for_bit() -> None:
+    """The ``summary``, ``data_sets`` and ``sessions`` tables of
+    :func:`bit_for_bit_tables` equal the stored ones exactly: every float to
+    the bit (its repr), NaN equal to NaN, an int not equal to a float, and the
+    columns in the same order. Written before the difference of two models
+    was added to the engine, they show that a run without one is unchanged."""
+    stored = json.loads(TABLES_FIXTURE.read_text())["tables"]
+    got = bit_for_bit_tables()
+    assert list(got) == list(stored)
+    for run, tables in got.items():
+        for table, rows in tables.items():
+            want = stored[run][table]
+            assert len(rows) == len(want), (run, table)
+            for k, (a, b) in enumerate(zip(rows, want, strict=True)):
+                assert list(a) == list(b), (run, table, k)
+                assert json.dumps(a) == json.dumps(b), (run, table, k)
+
+
+if __name__ == "__main__":
+    from continuum_swr_replay.runs.provenance import described_commit
+
+    # ``tables`` writes the bit-for-bit tables; no argument, the summary fixture.
+    which = sys.argv[1:] == ["tables"]
+    path, make = (
+        (TABLES_FIXTURE, bit_for_bit_tables) if which else (FIXTURE, reference_tables)
+    )
+    command = "python -m tests.analysis.regression.test_simulation_engine"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "commit": described_commit(),
+                "command": command + (" tables" if which else ""),
+                "tables": make(),
+            },
+            indent=1,
+        )
+        + "\n"
+    )
+    print(f"wrote {path}", file=sys.stderr)
