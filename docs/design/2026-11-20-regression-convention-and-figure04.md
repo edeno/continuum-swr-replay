@@ -958,9 +958,9 @@ The lead: "ok".
 
 ### Twenty-fifth round (lead, 2026-11-23, 19:19 to 19:34): the reward term of the rate model
 
-(When this round was written, the number twenty-four was kept for the content model's recency decision,
-recorded on the branch `role-content-models`. On master the twenty-fourth round is the unit of the fit,
-2026-11-24, below; this round is placed by its date, before it.)
+(Master's twenty-fourth round is the unit of the fit, 2026-11-24, below; this round is placed by its
+date, before it. The content model's recency round, numbered twenty-fourth on the branch
+`role-content-models`, is renumbered when that branch merges.)
 
 What was shown to the lead: the realistic simulation of the weak penalty at prior SD 4, 2 and 1
 (`.claude/research/2026-11-20-regression-prototypes/proto_rate_realistic/REPORT.md`: every session gets
@@ -981,8 +981,12 @@ The lead's words, in order:
 So:
 
 - Decided by the lead: the reward coefficient keeps the weak penalty in each session, as every simple
-  tested coefficient does, at a reasonable declared value. There is no per-animal coefficient as the
-  method and no unpenalized fit.
+  tested coefficient does, at a reasonable declared value. There is no unpenalized fit.
+- (The author's reading at the time, not the lead's decision; superseded by the twenty-fourth round)
+  There is no per-animal coefficient as the method. The lead's words at 19:19 ("I just feel like once we
+  start this, then we have to do it for every type of model") are a hesitation, not a refusal, and the
+  twenty-fourth round did exactly that for every behavior model: one fit for each recording day and for
+  each animal.
 - (**call**, the author's, not values the lead chose) The values are declared per model, because the unit
   of the coefficient differs: prior SD 2 on the rate model's log rate ratio (a rate ratio between about
   1/50 and 50 is plausible, `exp(1.96 x 2)` is about 50), with SD 1 and 4 reported beside it
@@ -1036,6 +1040,9 @@ g. *(Decided in the twenty-fifth round: the reward coefficient per session with 
    values are the author's, per model: SD 2 on the rate model's log rate ratio, with 1 and 4 beside it;
    SD 8 on the content model's coefficients, with 4 and 16 beside it.)* Each family reports
    a sensitivity analysis over the strength (Greenland and Mansournia 2015).
+   (Superseded in part: the twenty-fourth round fits per day and per animal, not per session, with the
+   weak penalty kept; the twenty-sixth round reads the reward effect from an arrival curve for each
+   outcome over two windows, the one coefficient kept as a secondary value.)
 
 ### Twenty-fourth round (lead, 2026-11-24, 02:09 to 09:55): the unit of the fit
 

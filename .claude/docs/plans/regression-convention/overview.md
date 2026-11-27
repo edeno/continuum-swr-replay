@@ -126,6 +126,9 @@ depends on one names it with `OPEN (lead): <name>`):
   No per-animal coefficient, no unpenalized fit. (The author's text:) each family's
   simulation measures the error the paper states beside the number; it does not veto a term. Every phase
   with a penalized simple term (5a, 5b, 6a, 7, 8, 11) reads it.
+  (Superseded in part: "fitted per session" and "no per-animal coefficient" by the twenty-fourth round,
+  one fit per recording day and per animal with the weak penalty kept; the one coefficient as Q2 by the
+  twenty-sixth round, an arrival curve for each outcome read over two windows.)
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
 on a stop's first sample, which the rate design does not count (about 0.2 % of the No SWR events, none of

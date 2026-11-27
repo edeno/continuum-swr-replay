@@ -67,7 +67,9 @@ solver, this phase's fits are rerun once to confirm equality. CPU only.
   19:19, about one coefficient per animal: "I just feel like once we start this, then we have to do it
   for every type of model"; 19:27, about an unpenalized fit: "it's not consistent to have no penalty";
   19:34: "lets just pick a penalty that's reasonable". So the reward coefficient is fitted per session
-  with the weak penalty; the prior SD is 2 on the log rate ratio (the author's call, not the lead's
+  with the weak penalty (superseded: the twenty-fourth round fits per recording day and per animal, the
+  weak penalty kept; the twenty-sixth round reads the reward effect from an arrival curve for each
+  outcome over two windows); the prior SD is 2 on the log rate ratio (the author's call, not the lead's
   number: a rate ratio within a factor of about 50 either way is plausible), with SD 1 and 4 reported
   beside it (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`); the log penalty is `log(1 / SD^2)`.
   The values are the author's, per model (rate SD 2, content SD 8 with 4 and 16 beside it); no single SD
