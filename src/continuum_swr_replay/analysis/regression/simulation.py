@@ -116,8 +116,13 @@ The tables of a run (:class:`SimulationResult`):
   its numbers of sessions and events, the fit's ``status`` and ``no_fit``, the
   estimate and its standard error, ``without_value`` (empty when the unit has
   a value; otherwise the record's ``no_fit`` code, or the ``left_out`` code
-  of the first coefficient of the estimand that the fit left out) and the
-  record's ``edf``;
+  of the first coefficient that the estimand's contrast on the unit's fit
+  reads and the fit left out: :meth:`.terms.Design.contrast_on` with the
+  record's ``left_out``, so that a per-day level reads its active day copies
+  and has no value only when every copy is left out), ``copies_left_out``
+  (the day copies of the levels the estimand reads that the fit left out of
+  their mean; 0 for a design without per-day terms; a difference's row
+  holds the sum of its two models') and the record's ``edf``;
 - ``data_sets``: one row per (scenario, model, data set, estimand): the two
   planted values, ``unit_summary``'s estimate, interval and day-level p, the
   units and sessions used, whether the interval holds each planted value
@@ -211,6 +216,11 @@ class Model:
         must carry a fixed penalty (:func:`.support.require_tested_penalized`)
         and none may be of a baseline term (copied per session in a fit of
         several sessions; a fit's ``c`` is :meth:`.terms.Design.contrast_on`).
+        An estimand names a per-day level by its base name: in a fit of
+        several days it reads the mean of the level's active day copies. Two
+        models whose designs differ only in ``per_day``
+        (:meth:`.terms.Design.with_per_day`) have the same coefficient names
+        and so share the data sets of a run.
     fit_by : {"session", "day", "animal"}
         The unit of the fit.
     support : callable or None
@@ -292,7 +302,10 @@ class InsideScenario:
     name : str
     coefficients : mapping of str to float
         Coefficient name (of ``design.coef_names``) -> planted value; a
-        coefficient not named is zero.
+        coefficient not named is zero. A per-day level is planted by its base
+        name, the same value on every day; a day copy's name is not a
+        coefficient of the design and is refused (a truth that differs by day
+        is an :class:`OutsideScenario`).
     scale : float or None
         The Gaussian's variance; required under the Gaussian, not read
         otherwise.
@@ -879,15 +892,15 @@ def _session_rows(
         coef, vcov = np.asarray(record.coef), np.asarray(record.vcov)
         supported = _model_support(model, record, sessions)
         for name, c in model.estimands.items():
-            left = [record.left_out[n] for n in model.used(c) if n in record.left_out]
+            mapped = model.design.contrast_on(c, record.coef_names, record.left_out)
+            read = [record.coef_names[j] for j in np.flatnonzero(mapped)]
+            left = [record.left_out[n] for n in read if n in record.left_out]
             cause = record.no_fit or (left[0] if left else "")
             if not cause and not supported.get(name, True):
                 cause = Removed.SUPPORT.value
             estimate, se = np.nan, np.nan
             if not cause:
-                contrast = evaluate_contrast(
-                    model.design.contrast_on(c, record.coef_names), coef, vcov
-                )
+                contrast = evaluate_contrast(mapped, coef, vcov)
                 estimate, se = contrast.estimate, contrast.se
             estimates[name].append(estimate)
             rows.append(
@@ -903,12 +916,23 @@ def _session_rows(
                     "status": record.status,
                     "no_fit": record.no_fit,
                     "without_value": cause,
+                    "copies_left_out": _copies_left_out(model, c, record),
                     "estimate": estimate,
                     "se": se,
                     "edf": record.edf,
                 }
             )
     return rows, {name: np.array(v) for name, v in estimates.items()}
+
+
+def _copies_left_out(model: Model, c: np.ndarray, record: FitRecord) -> int:
+    """The day copies of the levels ``c`` reads that the unit's fit left out
+    of their mean (:meth:`.terms.Design.contrast_on`); 0 without copies."""
+    return sum(
+        n in record.left_out
+        for base in model.used(c)
+        for n in model.design.copies_of(base, record.coef_names)
+    )
 
 
 def _data_set_row(
@@ -1210,6 +1234,7 @@ def _difference_unit(base: dict, a: dict, b: dict, n_both: int) -> dict:
         "status": _difference_status(a["status"], b["status"]),
         "no_fit": a["no_fit"] or b["no_fit"],
         "without_value": a["without_value"] or b["without_value"],
+        "copies_left_out": a["copies_left_out"] + b["copies_left_out"],
         "estimate": a["estimate"] - b["estimate"],
         "se": float(np.hypot(a["se"], b["se"])),
         "edf": {},

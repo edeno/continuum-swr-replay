@@ -37,7 +37,16 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from scripts.checks import simulate_declared_penalty as sim
 
-from .conftest import ROLE, by_session, cohort, rate_rows
+from .conftest import (
+    DAY_ROLE,
+    N_DAY_ARMS,
+    ROLE,
+    by_session,
+    cohort,
+    rate_rows,
+    role_day_design,
+    role_day_sessions,
+)
 
 N_ARMS = 6
 
@@ -2287,96 +2296,6 @@ def test_a_dropped_session_leaves_the_shared_fit_unchanged(cause, place) -> None
 
 # --- per-day copies of a tested category's levels -----------------------------------
 
-#: The role of a candidate arm, the trunk (arm 6) an exact function of the arm.
-DAY_ROLE = Category(
-    "role",
-    ("current", "previous", "other", "trunk"),
-    "other",
-    log_penalty_from_prior_sd(8.0),
-    uncoded=("trunk",),
-)
-N_DAY_ARMS = 7  # six leaf arms (0 to 5) and the trunk
-
-
-def _role_day_sessions(
-    days=("20260101", "20260102"),
-    n_epochs: int = 2,
-    n_events: int = 60,
-    current=(1.0, 0.2),
-    previous: float = 0.3,
-    slope: float = 0.0,
-    trend: float = 0.0,
-    concentration: float | None = 20.0,
-    seed: int = 0,
-) -> dict:
-    """Content sessions of one animal over ``days``: each event has a row for
-    each of seven arms; its current and its previous arm are two of the six
-    leaf arms, the other leaf arms are ``other`` and arm 6 is the trunk. The
-    log share of a row: the day's ``current`` level on the current arm,
-    ``previous`` on the previous arm, and ``slope`` times ``value`` on the
-    current arm, whose value is N(0, 1) plus ``trend`` times the day's place.
-    Shares are a Dirichlet draw of ``concentration`` around the softmax, or
-    the softmax itself (None, noise-free). Event ids are unique in the
-    animal, each session's rows in event order."""
-    rng = np.random.default_rng(seed)
-    out = {}
-    for d, day in enumerate(days):
-        for e in range(n_epochs):
-            arm = np.tile(np.arange(N_DAY_ARMS), n_events)
-            role = np.full(arm.size, "other", dtype=object)
-            role[arm == 6] = "trunk"
-            first = np.arange(n_events) * N_DAY_ARMS
-            for k in range(n_events):
-                cur, prev = rng.choice(6, 2, replace=False)
-                role[first[k] + cur] = "current"
-                role[first[k] + prev] = "previous"
-            value = rng.normal(size=arm.size) + trend * d * (role == "current")
-            eta = (
-                current[d] * (role == "current")
-                + previous * (role == "previous")
-                + slope * value * (role == "current")
-            )
-            w = np.exp(eta).reshape(n_events, N_DAY_ARMS)
-            p = w / w.sum(axis=1, keepdims=True)
-            share = (
-                p.ravel()
-                if concentration is None
-                else np.concatenate([rng.dirichlet(concentration * r) for r in p])
-            )
-            key = ("sim", day, f"0{2 * e + 2}_r{e + 1}")
-            start = 10_000 * (d * n_epochs + e)
-            out[key] = pd.DataFrame(
-                {
-                    "event_id": start + np.repeat(np.arange(n_events), N_DAY_ARMS),
-                    "arm": arm,
-                    "role": role,
-                    "value": value,
-                    "share": share,
-                }
-            )
-    return out
-
-
-def _role_day_design(pooled, per_day=("role",), role=DAY_ROLE, slope_penalty=None):
-    return build_design(
-        [
-            Category("arm", tuple(range(N_DAY_ARMS)), reference=0, penalty="none"),
-            role,
-            Slope(
-                "value",
-                log_penalty_from_prior_sd(2.0)
-                if slope_penalty is None
-                else slope_penalty,
-                by=role,
-                levels=("current",),
-            ),
-        ],
-        pooled,
-        intercept=False,
-        baseline=("arm",),
-        per_day=per_day,
-    )
-
 
 def _content_fit(design, sessions, **kw):
     return _fit(
@@ -2387,7 +2306,7 @@ def _content_fit(design, sessions, **kw):
 def test_an_empty_per_day_changes_no_record() -> None:
     """A design built with ``per_day=()`` fits, at the animal unit, the same
     record as the design built without the argument, field by field."""
-    sessions = _role_day_sessions()
+    sessions = role_day_sessions()
     pooled = pd.concat(sessions.values(), ignore_index=True)
     without = build_design(
         [
@@ -2405,7 +2324,7 @@ def test_an_empty_per_day_changes_no_record() -> None:
         baseline=("arm",),
     )
     (a,) = _content_fit(without, sessions, fit_by="animal")
-    (b,) = _content_fit(_role_day_design(pooled, per_day=()), sessions, fit_by="animal")
+    (b,) = _content_fit(role_day_design(pooled, per_day=()), sessions, fit_by="animal")
     assert a.status == "converged"
     assert repr(a) == repr(b)
 
@@ -2414,9 +2333,9 @@ def test_per_day_within_one_day_is_the_shared_fit() -> None:
     """Within one day nothing of a per-day category is copied: a fit by day,
     and the animal fit of an animal recorded on one day, equal the fits of the
     design without ``per_day``, record by record."""
-    sessions = _role_day_sessions()
+    sessions = role_day_sessions()
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    per_day, shared = _role_day_design(pooled), _role_day_design(pooled, per_day=())
+    per_day, shared = role_day_design(pooled), role_day_design(pooled, per_day=())
     days = _content_fit(per_day, sessions, fit_by="day")
     assert [r.status for r in days] == ["converged"] * 2
     assert [repr(r) for r in days] == [
@@ -2435,9 +2354,9 @@ def test_animal_fit_equals_hand_built_day_columns() -> None:
     column and the slope in its own block at the design's log penalties,
     fitted by ``fit_at_penalties``: the same coefficients and covariance, to
     1e-8."""
-    sessions = _role_day_sessions()
+    sessions = role_day_sessions()
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    design = _role_day_design(pooled)
+    design = role_day_design(pooled)
     (record,) = _content_fit(design, sessions, fit_by="animal")
     assert record.status == "converged" and record.left_out == {}
     keys = list(sessions)
@@ -2476,9 +2395,9 @@ def test_edf_and_collinearity_hold_day_copies() -> None:
     each copy and the role's total, their sum; the collinearity record
     measures the role as one term and the slope beside it, with only the arm
     copies projected out; each session lists its arm copies only."""
-    sessions = _role_day_sessions()
+    sessions = role_day_sessions()
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    (record,) = _content_fit(_role_day_design(pooled), sessions, fit_by="animal")
+    (record,) = _content_fit(role_day_design(pooled), sessions, fit_by="animal")
     copies = [n for n in record.coef_names if n.startswith("role[")]
     assert set(record.edf) == {"role", "value:role=current", *copies}
     assert record.edf["role"] == pytest.approx(sum(record.edf[n] for n in copies))
@@ -2499,7 +2418,7 @@ def test_day_copy_without_support_left_out_and_counted() -> None:
     other days' rows, and a contrast of the level reads the mean of the two
     other days' copies, with one copy left out."""
     days = ("20260101", "20260102", "20260103")
-    sessions = _role_day_sessions(days=days, current=(1.0, 0.2, 0.5))
+    sessions = role_day_sessions(days=days, current=(1.0, 0.2, 0.5))
     thin = [k for k in sessions if k[1] == days[2]]
     for k, key in enumerate(thin):
         rows = sessions[key]
@@ -2508,7 +2427,7 @@ def test_day_copy_without_support_left_out_and_counted() -> None:
             role=rows["role"].where(~(late & (rows["role"] == "current")), "other")
         )
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    design = _role_day_design(pooled)
+    design = role_day_design(pooled)
     (record,) = _content_fit(design, sessions, fit_by="animal")
     copy = "role[current]@sim/20260103"
     assert record.status == "converged"
@@ -2535,11 +2454,11 @@ def test_reference_rows_required_per_day() -> None:
     """A per-day category's reference level must have rows on every day of
     the fit: a day whose events hold no ``other`` arm cannot identify its
     copies, and the fit is refused, naming the fit, the day and the copies."""
-    sessions = _role_day_sessions()
+    sessions = role_day_sessions()
     for key in [k for k in sessions if k[1] == "20260102"]:
         rows = sessions[key]
         sessions[key] = rows[rows["role"] != "other"].reset_index(drop=True)
-    design = _role_day_design(pd.concat(sessions.values(), ignore_index=True))
+    design = role_day_design(pd.concat(sessions.values(), ignore_index=True))
     with pytest.raises(
         ValueError,
         match=r"animal sim: the category 'role' has no rows of its reference level "
@@ -2559,13 +2478,13 @@ def test_day_level_does_not_leak_into_shared_slope() -> None:
     0.05."""
     days = ("20260101", "20260102", "20260103", "20260104")
     planted = (-0.5, 0.0, 0.5, 1.0)
-    sessions = _role_day_sessions(
+    sessions = role_day_sessions(
         days=days, current=planted, trend=0.8, concentration=None, n_events=80
     )
     pooled = pd.concat(sessions.values(), ignore_index=True)
     loosest = replace(DAY_ROLE, penalty=LOG_PENALTY_BOUNDS[0])
-    per_day = _role_day_design(pooled, role=loosest, slope_penalty="none")
-    shared = _role_day_design(pooled, per_day=(), role=loosest, slope_penalty="none")
+    per_day = role_day_design(pooled, role=loosest, slope_penalty="none")
+    shared = role_day_design(pooled, per_day=(), role=loosest, slope_penalty="none")
     (fit,) = _content_fit(per_day, sessions, fit_by="animal")
     assert fit.status == "converged" and fit.left_out == {}
     coef = dict(zip(fit.coef_names, fit.coef, strict=True))

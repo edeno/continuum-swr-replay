@@ -39,6 +39,7 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     GroupedSoftmax,
     Poisson,
 )
+from continuum_swr_replay.analysis.regression.sessions import fit_sessions
 from continuum_swr_replay.analysis.regression.simulation import (
     CAUSES,
     SUMMARY_COLUMNS,
@@ -50,6 +51,7 @@ from continuum_swr_replay.analysis.regression.simulation import (
     data_seed,
     draw_data_set,
 )
+from continuum_swr_replay.analysis.regression.support import Removed
 from continuum_swr_replay.analysis.regression.terms import (
     Category,
     Offset,
@@ -64,7 +66,16 @@ from continuum_swr_replay.analysis.shared_statistics import (
     signed_rank_p,
 )
 
-from .conftest import ROLES, cohort, content_rows, rate_rows
+from .conftest import (
+    DAY_ROLE,
+    N_DAY_ARMS,
+    ROLES,
+    cohort,
+    content_rows,
+    rate_rows,
+    role_day_design,
+    role_day_sessions,
+)
 
 #: The weak penalty of the tests: a prior SD of 2 on each simple coefficient.
 WEAK = log_penalty_from_prior_sd(2.0)
@@ -1720,6 +1731,180 @@ def test_the_status_of_a_difference_unit(
     row = result.summary.set_index(["model", "estimand"]).loc[("A-B/rate", "reward")]
     tried_failed = want == "max_iter"
     assert (row["share_not_converged"] > 0) == tried_failed
+
+
+# --- per-day copies of a tested category's levels ---------------------------------
+
+PER_DAY_DAYS = ("20260001", "20260002", "20260003")
+
+
+def _per_day_cohort(n_animals: int = 2, n_events: int = 40) -> dict:
+    """Content sessions of ``n_animals`` animals over three days of two
+    sessions each (:func:`.conftest.role_day_sessions`)."""
+    out = {}
+    for a in range(n_animals):
+        out |= role_day_sessions(
+            days=PER_DAY_DAYS,
+            n_events=n_events,
+            current=(1.0, 1.0, 1.0),
+            seed=a,
+            animal=f"animal{a}",
+        )
+    return out
+
+
+def per_day_model(sessions: dict, per_day=("role",), name="per_day") -> Model:
+    """The content-like model of :func:`.conftest.role_day_design` at the
+    animal unit: the arm a baseline, the role per day (or shared, with
+    ``per_day=()``); its estimand, the current role's level (``current``)."""
+    design = role_day_design(pd.concat(sessions.values(), ignore_index=True), per_day)
+    return Model(
+        name,
+        design,
+        GroupedSoftmax(),
+        "share",
+        "event_id",
+        {"current": coefficient_contrast(design.coef_names, ["role[current]"])},
+        fit_by="animal",
+    )
+
+
+PER_DAY_INSIDE = InsideScenario(
+    "planted", {"role[current]": 1.0, "role[previous]": 0.3}, n_trials=5
+)
+
+
+def _thin_current(sessions: dict, days: dict) -> dict:
+    """``sessions`` with the current arm kept in the first ``n`` events of
+    each session of a day of ``days`` (day -> n) and made ``other`` in the
+    rest, so that the day's copy of ``role[current]`` lacks support when
+    ``2 n`` is below five."""
+    out = {}
+    for key, rows in sessions.items():
+        if key[:2] in days:
+            late = rows["event_id"] >= rows["event_id"].min() + days[key[:2]]
+            current = rows["role"] == "current"
+            rows = rows.assign(role=rows["role"].where(~(late & current), "other"))
+        out[key] = rows
+    return out
+
+
+def test_unit_target_per_day_model() -> None:
+    """Inside the model a level is planted once, so every day's copy has the
+    same truth: the planted value is the level, the unit's own target (the
+    noise-free fit, the weak penalty off on every copy) is the mean of its
+    copies, the level, and no copy is left out."""
+    sessions = _per_day_cohort()
+    model = per_day_model(sessions)
+    result = engine.run(Simulation([model], sessions, [PER_DAY_INSIDE], 2, 50, 5))
+    for _, row in result.data_sets.iterrows():
+        assert row["planted"] == 1.0
+        assert row["planted_unit"] == pytest.approx(1.0, abs=1e-6)
+    units = result.sessions
+    assert len(units) == 2 * 2 and set(units["copies_left_out"]) == {0}
+    assert (units["without_value"] == "").all()
+    assert np.isfinite(units["estimate"]).all()
+
+
+def test_inside_scenario_refuses_copy_names() -> None:
+    """An inside scenario plants the model's own coefficients: a day copy's
+    name is not one of them (a truth that differs by day is an outside
+    scenario)."""
+    sessions = _per_day_cohort(n_animals=1)
+    model = per_day_model(sessions)
+    scenario = InsideScenario(
+        "by_day", {f"role[current]@animal0/{PER_DAY_DAYS[0]}": 1.0}
+    )
+    with pytest.raises(ValueError, match="not coefficients of the design"):
+        engine.run(Simulation([model], sessions, [scenario], 2, 50, 5))
+
+
+def test_without_value_reads_copies() -> None:
+    """A unit's value of an estimand on a per-day level is the mean of its
+    active copies: one copy without support leaves the unit a value and is
+    counted in ``copies_left_out``; with every copy left out the unit has no
+    value, for their cause (``support``)."""
+    sessions = _per_day_cohort()
+    days = {("animal0", PER_DAY_DAYS[2]): 1}
+    days |= {("animal1", day): 1 for day in PER_DAY_DAYS}
+    sessions = _thin_current(sessions, days)
+    model = per_day_model(sessions)
+    result = engine.run(Simulation([model], sessions, [PER_DAY_INSIDE], 2, 50, 5))
+    units = result.sessions.set_index(["data_set", "animal"])
+    for i in range(2):
+        first, second = units.loc[(i, "animal0")], units.loc[(i, "animal1")]
+        assert first["without_value"] == "" and np.isfinite(first["estimate"])
+        assert first["copies_left_out"] == 1
+        assert second["without_value"] == Removed.SUPPORT
+        assert np.isnan(second["estimate"]) and second["copies_left_out"] == 3
+
+
+def _day_trend(sessions, rng):
+    """Shares whose current level rises over the days (0, 0.5, 1.0), the
+    previous arm's 0.3: a level that changes from day to day."""
+    out = {}
+    for key, rows in sessions.items():
+        level = (0.0, 0.5, 1.0)[PER_DAY_DAYS.index(key[1])]
+        role = rows["role"].to_numpy()
+        eta = level * (role == "current") + 0.3 * (role == "previous")
+        w = pd.Series(np.exp(eta))
+        out[key] = (
+            w / w.groupby(rows["event_id"].to_numpy()).transform("sum")
+        ).to_numpy()
+    return out
+
+
+def test_same_data_sets_shared_and_per_day(monkeypatch) -> None:
+    """Two models whose designs differ only in ``per_day``
+    (:meth:`.terms.Design.with_per_day`) share the data sets of a run. On a
+    level planted to rise over the days, the per-day model's unit target is
+    the mean of the day levels and the shared model's is the pooled level
+    (the noise-free fit of one level for the animal, the weak penalty off)."""
+    sessions = _per_day_cohort(n_animals=1)
+    shared = per_day_model(sessions, per_day=(), name="shared")
+    per_day = replace(
+        shared, name="per_day", design=shared.design.with_per_day(("role",))
+    )
+    scenario = OutsideScenario("trend", _day_trend, planted={"current": 0.5})
+    seen = _capture(monkeypatch)
+    result = engine.run(Simulation([shared, per_day], sessions, [scenario], 2, 50, 5))
+    assert len(seen) == 4
+    for i in range(2):
+        for key in sessions:
+            a, b = seen[2 * i][key]["share"], seen[2 * i + 1][key]["share"]
+            assert a.to_numpy().tobytes() == b.to_numpy().tobytes()
+    targets = result.data_sets.groupby("model")["planted_unit"]
+    assert targets.nunique().to_dict() == {"per_day": 1, "shared": 1}
+    day_mean = result.data_sets.loc[result.data_sets["model"] == "per_day"]
+    assert day_mean["planted_unit"].iloc[0] == pytest.approx(0.5, abs=1e-6)
+    pooled_rows = pd.concat(sessions.values(), ignore_index=True)
+    free = replace(DAY_ROLE, penalty="none")
+    by_hand = build_design(
+        [
+            Category("arm", tuple(range(N_DAY_ARMS)), reference=0, penalty="none"),
+            free,
+            Slope("value", "none", by=free, levels=("current",)),
+        ],
+        pooled_rows,
+        intercept=False,
+        baseline=("arm",),
+    )
+    expected = _day_trend(sessions, None)
+    (fit,) = fit_sessions(
+        by_hand,
+        {k: rows.assign(share=expected[k]) for k, rows in sessions.items()},
+        GroupedSoftmax(),
+        model="by_hand",
+        kind="target",
+        response="share",
+        unit="event_id",
+        table_sha256={},
+        fit_by="animal",
+    )
+    pooled = fit.coef[fit.coef_names.index("role[current]")]
+    got = result.data_sets.loc[result.data_sets["model"] == "shared", "planted_unit"]
+    assert got.iloc[0] == pytest.approx(pooled, abs=1e-8)
+    assert result.data_sets["planted"].tolist() == [0.5] * 4
 
 
 if __name__ == "__main__":

@@ -22,7 +22,12 @@ import pytest
 from continuum_swr_replay.analysis.regression.padding import pad_values
 from continuum_swr_replay.analysis.regression.reml import PenaltyBlock
 from continuum_swr_replay.analysis.regression.runtime import float64_kernel, in_float64
-from continuum_swr_replay.analysis.regression.terms import Category
+from continuum_swr_replay.analysis.regression.terms import (
+    Category,
+    Slope,
+    build_design,
+    log_penalty_from_prior_sd,
+)
 from scripts.checks.compare_regression_to_mgcv import bins_of
 
 N_LAGS = 10
@@ -309,3 +314,105 @@ def rate_sessions() -> dict[tuple[str, str, str], pd.DataFrame]:
 def content_sessions() -> dict[tuple[str, str, str], pd.DataFrame]:
     """Six content sessions (seeds 0 to 5)."""
     return by_session([content_rows(seed) for seed in range(6)])
+
+
+#: The role of a candidate arm, the trunk (arm 6) an exact function of the arm.
+DAY_ROLE = Category(
+    "role",
+    ("current", "previous", "other", "trunk"),
+    "other",
+    log_penalty_from_prior_sd(8.0),
+    uncoded=("trunk",),
+)
+N_DAY_ARMS = 7  # six leaf arms (0 to 5) and the trunk
+
+
+def role_day_sessions(
+    days=("20260101", "20260102"),
+    n_epochs: int = 2,
+    n_events: int = 60,
+    current=(1.0, 0.2),
+    previous: float = 0.3,
+    slope: float = 0.0,
+    trend: float = 0.0,
+    concentration: float | None = 20.0,
+    seed: int = 0,
+    animal: str = "sim",
+) -> dict:
+    """Content sessions of one animal over ``days``: each event has a row for
+    each of seven arms; its current and its previous arm are two of the six
+    leaf arms, the other leaf arms are ``other`` and arm 6 is the trunk. The
+    log share of a row: the day's ``current`` level on the current arm,
+    ``previous`` on the previous arm, and ``slope`` times ``value`` on the
+    current arm, whose value is N(0, 1) plus ``trend`` times the day's place.
+    Shares are a Dirichlet draw of ``concentration`` around the softmax, or
+    the softmax itself (None, noise-free). Event ids are unique in the
+    animal, each session's rows in event order.
+
+    Returns
+    -------
+    dict of (animal, session_date, epoch) to pd.DataFrame
+        Each session's rows: ``event_id``, ``arm``, ``role``, ``value`` and
+        ``share``.
+    """
+    rng = np.random.default_rng(seed)
+    out = {}
+    for d, day in enumerate(days):
+        for e in range(n_epochs):
+            arm = np.tile(np.arange(N_DAY_ARMS), n_events)
+            role = np.full(arm.size, "other", dtype=object)
+            role[arm == 6] = "trunk"
+            first = np.arange(n_events) * N_DAY_ARMS
+            for k in range(n_events):
+                cur, prev = rng.choice(6, 2, replace=False)
+                role[first[k] + cur] = "current"
+                role[first[k] + prev] = "previous"
+            value = rng.normal(size=arm.size) + trend * d * (role == "current")
+            eta = (
+                current[d] * (role == "current")
+                + previous * (role == "previous")
+                + slope * value * (role == "current")
+            )
+            w = np.exp(eta).reshape(n_events, N_DAY_ARMS)
+            p = w / w.sum(axis=1, keepdims=True)
+            share = (
+                p.ravel()
+                if concentration is None
+                else np.concatenate([rng.dirichlet(concentration * r) for r in p])
+            )
+            key = (animal, day, f"0{2 * e + 2}_r{e + 1}")
+            start = 10_000 * (d * n_epochs + e)
+            out[key] = pd.DataFrame(
+                {
+                    "event_id": start + np.repeat(np.arange(n_events), N_DAY_ARMS),
+                    "arm": arm,
+                    "role": role,
+                    "value": value,
+                    "share": share,
+                }
+            )
+    return out
+
+
+def role_day_design(pooled, per_day=("role",), role=DAY_ROLE, slope_penalty=None):
+    """The content-like design of :func:`role_day_sessions`: the arm a
+    baseline (copied per session), the role (per day by default, the trunk
+    uncoded) and a slope of ``value`` on the current arm (weak by default)."""
+    return build_design(
+        [
+            Category("arm", tuple(range(N_DAY_ARMS)), reference=0, penalty="none"),
+            role,
+            Slope(
+                "value",
+                log_penalty_from_prior_sd(2.0)
+                if slope_penalty is None
+                else slope_penalty,
+                by=role,
+                levels=("current",),
+            ),
+        ],
+        pooled,
+        intercept=False,
+        baseline=("arm",),
+        per_day=per_day,
+    )
