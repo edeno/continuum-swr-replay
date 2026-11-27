@@ -59,6 +59,15 @@ Poisson projection of the model's coefficient form onto that tabulation
 pooled model-free values, not a chosen truth. They are not a result and are
 not to be quoted; the table carries ``truth_from_real_counts`` on its rows
 and the run's ``attrs`` the same note.
+
+Reproducing the earlier reports. The research reports of 2026-11-23 and
+2026-11-24 ran the frozen copy of this list at the tag
+``rate-validation-frozen-5d97fd98``, with the prior SDs (1, 2, 4, 8) in that
+order and an animal-level model beside them. Here :data:`PRIOR_SDS` is (2, 1,
+4): the model order sets each model's bootstrap stream
+(``regression.simulation.bootstrap_seeds``), so the same data sets give the
+same estimates of the SD 2 model but other interval ends. To reproduce those
+reports, run that tag.
 """
 
 from __future__ import annotations
@@ -113,8 +122,10 @@ __all__ = [
     "table",
 ]
 
-#: The prior SDs of the weak penalty at the session level.
-PRIOR_SDS: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0)
+#: The prior SDs of the weak penalty, one model each: the decided SD first,
+#: then the sensitivity pair (``visit_rate.WEAK_PRIOR_SD``,
+#: ``WEAK_PRIOR_SD_SENSITIVITY``), that is (2, 1, 4).
+PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
 #: The clocks' target median edfs.
 TARGETS: tuple[float, ...] = (6.0, 10.0)
 #: The run's seed (``regression.simulation.data_seed``).
