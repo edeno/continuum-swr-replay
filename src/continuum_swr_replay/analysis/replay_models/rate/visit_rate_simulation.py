@@ -4,6 +4,11 @@ Every number a run of this list writes is a simulation number: the counts are
 drawn from a planted rate on the model's real rows (``regression.simulation``);
 the model's real outcome is never fitted.
 
+This list fits each session alone (the engine's models at ``fit_by="session"``,
+named ``session_sd<SD>``). The decided design fits the behavior models per
+recording day and per animal (the convention's twenty-fourth round); the next
+step (plan phase 4b, task 8) gives the list its ``fit_by``.
+
 ``scripts/checks/run_simulations.py --model visit_rate --config CONFIG`` runs
 it. :func:`simulation` builds one run for one kind of event and one clock
 penalty target:
@@ -28,8 +33,10 @@ penalty target:
   window (0 to 1 s), Q1b (the same with 1 to 2 s), Q2 and Q7a;
 - the clocks' log penalties: each clock calibrated on the run's rows by
   ``visit_rate.calibrate_log_penalty`` to the target median edf, on one data
-  set of the calibration scenario (:data:`CALIBRATION_SEED`; the rows' real
-  counts are not used), in two rounds (each clock with the others at the
+  set of the calibration scenario (:data:`CALIBRATION_SEED`: the constant
+  ratio on the planted curves, each session's expected total its real number
+  of events of the kind; the real counts of the bins are not used), in two
+  rounds (each clock with the others at the
   previous round's values; the first round starts from the module's
   provisional values). The values are kept in ``calibration_path`` so that a
   rerun reads them. A run with no target (the quick configuration) fits at
@@ -43,7 +50,13 @@ The planted values (each scenario's truth for each model):
 - beside them (``table``): the omission side's truth of Q2 (the time-varying
   form's), reduced as at the session level.
 
-A scenario with no planted ratio (the later onset) has Q2 NaN in every truth.
+The later-onset scenario has Q2 NaN in every truth because Q2 here is
+the single reward coefficient and this scenario plants no constant ratio
+(only the arrival curve after an omission is delayed). Under the decided window
+form (the convention's twenty-sixth round: an arrival curve for each outcome,
+read over a window) this scenario has a real, nonzero window truth, the
+difference of the two arrival curves over the window; the next step computes
+it, this list does not.
 
 Which truths depend on the real outcome. On the real cohort, every scenario's
 planted clock curves are shaped by the stored model-free curves of the real
@@ -973,7 +986,13 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     prior SD, and Q2's truths beside the planted value:
     ``truth_session`` (the pooled truth) and
     ``truth_omission_side`` (the time-varying form's), and
-    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`)."""
+    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`).
+
+    The later-onset scenario's Q2 truths are NaN: Q2 here is the single reward
+    coefficient and that scenario plants no constant ratio. Under the decided
+    window form (twenty-sixth round) it has a real, nonzero window truth, the
+    difference of the two arrival curves over the window, which the next step
+    computes (module docstring)."""
     config = simulation.attrs["config"]
     truths = simulation.attrs["truths"]
     out = result.summary.copy()
