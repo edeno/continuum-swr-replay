@@ -445,3 +445,61 @@ def test_tables_of_other_settings_are_refused(cohort) -> None:
     summarize_estimands(
         pd.concat([tables[0], tables[0].assign(kind="No SWR")]), n_draws=10, seed=0
     )
+
+
+def test_equal_settings_have_one_id() -> None:
+    """``settings_id`` is canonical: a prior SD of 2.0, np.float64(2.0) or 2,
+    a mapping in another key order, a cap of 10 or 10.0 give one id; a
+    setting that differs in any field gives another."""
+    from continuum_swr_replay.analysis.replay_models.rate.visit_rate_statistics import (
+        settings_id,
+    )
+
+    base = vr.VisitRateSettings(max_time_since_arrival_s=10.0)
+    record = {"tables": {"a": "x", "b": "y"}, "n": 1}
+    calibrated = {
+        ("SWR", vr.LEAVING): vr.CalibratedPenalty(1.5, 10.0, record),
+        ("SWR", vr.OMITTED_ARRIVAL_TERM): vr.CalibratedPenalty(0.5, 15.0, record),
+    }
+    reordered = {k: calibrated[k] for k in reversed(list(calibrated))}
+    reordered_record = {"n": 1, "tables": {"b": "y", "a": "x"}}
+    pairs = [
+        (
+            dataclasses.replace(base, weak_prior_sd=2.0),
+            dataclasses.replace(base, weak_prior_sd=np.float64(2.0)),
+        ),
+        (
+            dataclasses.replace(base, weak_prior_sd=2.0),
+            dataclasses.replace(base, weak_prior_sd=2),
+        ),
+        (
+            dataclasses.replace(base, calibrated_penalties=calibrated),
+            dataclasses.replace(
+                base,
+                calibrated_penalties={
+                    k: vr.CalibratedPenalty(
+                        p.log_penalty, p.target_edf, reordered_record
+                    )
+                    for k, p in reordered.items()
+                },
+            ),
+        ),
+        (
+            vr.VisitRateSettings(max_time_since_arrival_s=10.0),
+            vr.VisitRateSettings(max_time_since_arrival_s=10),
+        ),
+    ]
+    for a, b in pairs:
+        assert settings_id(a) == settings_id(b)
+        assert len(settings_id(a)) == 16
+    others = [
+        dataclasses.replace(base, weak_prior_sd=1.0),
+        dataclasses.replace(base, fit_by="animal"),
+        dataclasses.replace(base, reward_form="coefficient"),
+        dataclasses.replace(base, q1_reference_s=(1.0, 2.0)),
+        dataclasses.replace(base, max_time_since_arrival_s=None),
+        dataclasses.replace(base, log_penalties={vr.LEAVING: 2.0}),
+        dataclasses.replace(base, calibrated_penalties=calibrated),
+    ]
+    ids = {settings_id(s) for s in [base, *others]}
+    assert len(ids) == len(others) + 1

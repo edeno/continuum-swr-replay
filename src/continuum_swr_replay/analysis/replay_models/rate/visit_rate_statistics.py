@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -190,11 +190,34 @@ def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _canonical(value: object) -> object:
+    """A value in one form for each meaning: a number as a float, a mapping
+    as a tuple of its items sorted by key, a sequence as a tuple, a dataclass
+    as its fields by name; recursively."""
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return tuple(
+            (f.name, _canonical(getattr(value, f.name)))
+            for f in dataclasses.fields(value)
+        )
+    if isinstance(value, Mapping):
+        items = [(_canonical(k), _canonical(v)) for k, v in value.items()]
+        return ("mapping", tuple(sorted(items, key=repr)))
+    if isinstance(value, list | tuple):
+        return tuple(_canonical(v) for v in value)
+    if isinstance(value, bool | np.bool_):
+        return bool(value)
+    if isinstance(value, int | float | np.integer | np.floating):
+        return float(value)
+    return value
+
+
 def settings_id(settings: VisitRateSettings) -> str:
-    """A short fingerprint of a fit's settings (every field, the calibrated
-    penalties' values with their records), carried with each unit table so
-    that tables of other settings are not reduced together."""
-    text = repr(dataclasses.astuple(settings))
+    """A short fingerprint of a fit's settings, carried with each unit table
+    so that tables of other settings are not reduced together. It is
+    canonical (:func:`_canonical`): equal settings give one id however their
+    numbers are typed and their mappings ordered (the calibrated penalties
+    and their records included); settings that differ in any field differ."""
+    text = repr(_canonical(settings))
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
