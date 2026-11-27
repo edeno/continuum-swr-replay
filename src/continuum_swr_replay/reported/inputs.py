@@ -662,6 +662,11 @@ EXAMPLE_SESSION_RERUN = "scripts/decoding/store_example_session.py"
 """The runner that stores an example session's recording."""
 
 
+class ExampleSessionNotCurrent(ValueError):
+    """A stored example session that is missing or not current
+    (:func:`read_example_session`)."""
+
+
 def read_example_session(
     folder: Path, epoch_id: str, decode_sha256: str
 ) -> tuple[pd.Series, list[np.ndarray]]:
@@ -687,12 +692,12 @@ def read_example_session(
 
     Raises
     ------
-    ValueError
+    ExampleSessionNotCurrent
         If the folder holds no stored session, or it records another epoch,
         another decode frame or another SWR source than the current one.
     """
     if not (folder / "manifest.json").exists():
-        raise ValueError(f"{rel(folder)} holds no stored session")
+        raise ExampleSessionNotCurrent(f"{rel(folder)} holds no stored session")
     manifest = read_output_manifest(folder)
     what = rel(folder)
     notes = [
@@ -710,7 +715,7 @@ def read_example_session(
     ]
     notes = [note for note in notes if note is not None]
     if notes:
-        raise ValueError(f"{what} is not current: {'; '.join(notes)}")
+        raise ExampleSessionNotCurrent(f"{what} is not current: {'; '.join(notes)}")
     ripple = pd.read_parquet(folder / "ripple.parquet")
     spikes = pd.read_parquet(folder / "spikes.parquet")
     trace = pd.Series(ripple["zscore"].to_numpy(), index=ripple["time"].to_numpy())
@@ -740,12 +745,12 @@ def read_example_decode(nwb_file_name: str, epoch_name: str) -> dict:
     trace of the SWR source and the HPC tetrodes' spikes stored by
     ``scripts/decoding/store_example_session.py``
     (:func:`read_example_session`). ``results``, ``detector`` and ``env``: the
-    decode's (``load_results``). Figure 2's ``read_session`` reads the same
-    things, with its own refusal.
+    decode's (``load_results``). Figure 2's panels a and b read it too
+    (``read_session`` there gives its own refusal).
 
     Raises
     ------
-    ValueError
+    ExampleSessionNotCurrent
         If the stored session is not current (:func:`read_example_session`).
     """
     identifier = format_epoch_identifier(nwb_file_name, epoch_name, "HPC")

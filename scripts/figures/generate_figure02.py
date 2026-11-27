@@ -59,16 +59,13 @@ from matplotlib.ticker import NullLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.detector_comparison import (
-    inventory_run,
     nonlocal_comparison,
 )
 from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
     SWR_DEFINITIONS,
 )
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    read_dot_with_swr_source,
     read_swr_table,
-    swr_intervals,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     check_visit_context_starts,
@@ -129,10 +126,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_epoch_ids,
 )
 from continuum_swr_replay.decoding.identifiers import (
-    format_epoch_identifier,
     parse_nwb_filename,
 )
-from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -142,21 +137,20 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     EVENT_FEATURES_RUN,
-    EXAMPLE_SESSION_DIR,
     PARTICIPATION_NAME,
     event_features_root,
-    processed_data_dir,
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.inputs import (
     EXAMPLE_SESSION_RERUN,
     EventsInputs,
+    ExampleSessionNotCurrent,
     default_inputs,
     event_table_staleness,
     panel_refusal,
     participation_staleness,
     read_checked,
-    read_example_session,
+    read_example_decode,
     read_figure_restriction,
     read_trigger_windows,
 )
@@ -656,60 +650,24 @@ def read_windows(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         ) from error
 
 
-POSITION_COLUMNS = (
-    "head_position_x",
-    "head_position_y",
-    "head_speed",
-    "linear_position",
-)
-"""The position the example session's panels draw, from its decode frame."""
-
-
 def read_session(nwb_file_name: str, epoch_name: str) -> dict:
-    """The example session of panels a and b, from stored outputs alone.
-
-    ``data``: the position (:data:`POSITION_COLUMNS`) and the SWR source's SWRs
-    (``ripple_times``, the ones the event table's classes are computed
-    against) from the epoch's decode frame; the track graph, its edge order and
-    spacing from the decode's environment; the ripple trace of the SWR source
-    and the HPC tetrodes' spikes stored by
-    ``scripts/decoding/store_example_session.py``
-    (``reported.inputs.read_example_session``). ``results``, ``detector`` and
-    ``env``: the decode's (``load_results``).
+    """The example session of panels a and b, from stored outputs alone
+    (``reported.inputs.read_example_decode``): its ``ripple_times`` are the SWR
+    source's SWRs, the ones the event table's classes are computed against.
 
     Raises
     ------
     ValueError
         If the stored session is not current: refused as panel a.
     """
-    identifier = format_epoch_identifier(nwb_file_name, epoch_name, "HPC")
-    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     try:
-        trace, spikes = read_example_session(
-            processed_data_dir() / EXAMPLE_SESSION_DIR / identifier,
-            identifier,
-            features["epochs"][identifier]["decode"]["sha256"],
-        )
-    except ValueError as error:
+        return read_example_decode(nwb_file_name, epoch_name)
+    except ExampleSessionNotCurrent as error:
         raise ValueError(
             panel_refusal(
                 FIGURE, LETTERS["overview"], str(error), EXAMPLE_SESSION_RERUN
             )
         ) from error
-    frame = read_dot_with_swr_source(inventory_run.decode_path(identifier))
-    results, detector, env = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC", root=processed_data_dir()
-    )
-    data = {
-        "position_info": frame[list(POSITION_COLUMNS)],
-        "track_graph": env.track_graph,
-        "linear_edge_order": env.edge_order,
-        "linear_edge_spacing": env.edge_spacing,
-        "zscored_ripple_consensus_trace": trace,
-        "ripple_times": swr_intervals(frame),
-        "spike_times": {"HPC": spikes},
-    }
-    return {"data": data, "results": results, "detector": detector, "env": env}
 
 
 def detector_comparison(events: pd.DataFrame) -> dict:

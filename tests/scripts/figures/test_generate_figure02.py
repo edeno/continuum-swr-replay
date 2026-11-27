@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1151,21 +1152,34 @@ def test_a_participation_run_the_summary_marks_pending_is_refused(
 def test_a_stored_session_that_is_not_current_refuses_panel_a(figure02, monkeypatch):
     """Panels a and b read the stored example session; one that is not current
     is refused as panel a, naming the runner."""
+    inputs = sys.modules[figure02.read_example_decode.__module__]
     epoch = "wilbur20210329_02_r1_HPC"
     monkeypatch.setattr(
-        figure02,
+        inputs,
         "read_manifest",
         lambda run: {"epochs": {epoch: {"decode": {"sha256": "d" * 64}}}},
     )
 
     def stale(folder, epoch_id, decode_sha256):
         assert (folder.name, epoch_id, decode_sha256) == (epoch, epoch, "d" * 64)
-        raise ValueError("it was made from another decode frame")
+        raise inputs.ExampleSessionNotCurrent("it was made from another decode frame")
 
-    monkeypatch.setattr(figure02, "read_example_session", stale)
+    monkeypatch.setattr(inputs, "read_example_session", stale)
     with pytest.raises(ValueError) as refused:
         figure02.read_session("wilbur20210329_.nwb", "02_r1")
     assert str(refused.value) == (
         f"Figure 2: panel {figure02.LETTERS['overview']} is not drawn: it was made "
         "from another decode frame. Rerun scripts/decoding/store_example_session.py."
     )
+
+
+def test_an_error_of_the_decode_read_is_not_refused_as_panel_a(figure02, monkeypatch):
+    """Only the stored-session check is refused as panel a; another ValueError
+    of the reader keeps its own message."""
+
+    def bad_decode(nwb_file_name, epoch_name):
+        raise ValueError("the decode frame is off contract")
+
+    monkeypatch.setattr(figure02, "read_example_decode", bad_decode)
+    with pytest.raises(ValueError, match="^the decode frame is off contract$"):
+        figure02.read_session("wilbur20210329_.nwb", "02_r1")

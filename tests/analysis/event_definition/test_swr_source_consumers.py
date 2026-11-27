@@ -652,28 +652,42 @@ def test_the_event_gallery_catalogs_against_the_source(source, tmp_path, offline
     }
 
 
+#: Each figure script, the file that builds its ``data``, and the call there.
 FIGURE_SCRIPTS = (
-    "scripts/figures/generate_figure02.py",
-    "scripts/figures/generate_event_gallery.py",
+    (
+        "scripts/figures/generate_figure02.py",
+        "src/continuum_swr_replay/reported/inputs.py",
+        "read_example_decode(",
+    ),
+    (
+        "scripts/figures/generate_event_gallery.py",
+        "scripts/figures/generate_event_gallery.py",
+        None,
+    ),
 )
 
 
-@pytest.mark.parametrize("script", FIGURE_SCRIPTS)
-def test_the_figures_draw_the_sources_intervals(script):
+@pytest.mark.parametrize(("script", "builder", "call"), FIGURE_SCRIPTS)
+def test_the_figures_draw_the_sources_intervals(script, builder, call):
     text = (REPO / script).read_text()
+    built = (REPO / builder).read_text()
 
     # The plotted ``data["ripple_times"]`` is the session's source intervals from
     # the source-read frame, before anything draws or gates it: the gallery
     # replaces ``load_data``'s entry, and Figure 2, which reads stored outputs
-    # alone, builds its ``data`` with it ...
+    # alone, takes its ``data`` from ``reported.inputs.read_example_decode``,
+    # which builds it with them ...
+    if call is not None:
+        assert call in text
     assert re.search(
-        r'(data\["ripple_times"\] = |"ripple_times": )swr_intervals\(', text
+        r'(data\["ripple_times"\] = |"ripple_times": )swr_intervals\(', built
     )
     # ... and load_data's stored ripples are never re-gated or unpickled around it.
-    assert not re.search(
-        r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', text
-    )
-    assert "pd.read_pickle(" not in text
+    for source in (text, built):
+        assert not re.search(
+            r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', source
+        )
+        assert "pd.read_pickle(" not in source
 
 
 # --------------------------------------------------------------------------
