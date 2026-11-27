@@ -1010,3 +1010,23 @@ the one of before, with two new fields (`fit_by`, `sessions`). Paths are under
 | `simulation._unit_c` (moved) | `terms.Design.contrast_on` (a contrast mapped onto a fit's coefficients by name; it refuses one that reads a baseline) and `terms.Design.baseline_read`, which the engine's `Model` now calls to refuse an estimand on a baseline | 6e95bb1e |
 | `collinearity.concurvity(..., intercept=<int>)`, `term_collinearity(..., intercept=<int>)` | `intercept=<list of columns>` (the intercept's column among them) or `None`; an int is no longer taken | 1b01e198 |
 | `simulation._unit_key`, `simulation._unit_values`, `simulation._reduced_estimate` (removed) | `FitRecord.unit_key`, `units.unit_values`, `units.unit_estimate` | d109c0ac |
+
+## The rate branch takes master, 2026-11-26
+
+The branch `visit-rate-validation` merged master (908f05af) in 45565605. Its per-animal check of the
+rate model's reward coefficient and the target computed for it are removed: a fit at
+`fit_by="animal"` (with the shared curves of design C) and the engine's unit target `planted_unit`
+replace them. The engine's own fit stays at the session unit only, for the joint run of both kinds.
+Paths are under `src/continuum_swr_replay/analysis/`.
+
+| Old place | New place | Commit |
+|---|---|---|
+| `replay_models/rate/visit_rate.REWARD_LEVELS`, `VisitRateSettings.reward_level`, `AnimalReward`, `AnimalRewardFit`, `ANIMAL_REWARD_MAX_ITER`, `ANIMAL_REWARD_MAX_STEP`, `ANIMAL_REWARD_TOL`, `_profile_terms`, `_fit_animal`, `fit_animal_rewards`, `_check_provisional`, `_fit_records` (removed) | `regression.sessions.fit_sessions(..., fit_by="animal")`, a baseline for each session (`terms.build_design(..., baseline=)`) | bbc13322 |
+| `replay_models/rate/visit_rate_statistics.animal_reward_values`, `summarize_animal_rewards` (removed) | `regression.units.unit_summary` at `fit_by="animal"` | bbc13322 |
+| `replay_models/rate/visit_rate_simulation.animal_level_fit`, the `"animal"` model of `_models`, `Config.animal_level`, the table's `level` column (removed) | a model at `fit_by="animal"` in the engine | bbc13322 |
+| `tests/analysis/replay_models/rate/test_visit_rate_animal_reward.py` (removed) | `tests/analysis/regression/test_sessions.py`, `test_units.py` (the fit and the reduction at the animal unit) | bbc13322 |
+| `replay_models/rate/visit_rate_scenarios.shared_ratio_projection` (removed) | `regression.simulation`'s unit target `planted_unit` | 6d05d866 |
+| `replay_models/rate/visit_rate_simulation._animal_truth`, the scenarios' `"animal"` truths, the table's `truth_animal`, the reference rate of `_scenario_truth` and `_zero` (removed) | `planted_unit` | 6d05d866 |
+| `regression/simulation._animal_data_set_row`, the animal units of `_own_units`, `_planted_beta(..., absent_allowed)`, the own-fit exemption and the inside-coefficient guard of `_check`, the animal-unit `reject_day` of `summarize` (removed) | `fit_by="animal"` and `units.unit_summary`; master's `_planted_beta` and `_check` | 67763447 |
+| `regression/simulation._data_set_row` (split) | `_data_set_row` and `_reduced_row`, which the session-level own fit (`_own_fit_rows`) calls too | 67763447 |
+| `shared_statistics.animal_mean_interval` (the branch's copy) | master's `shared_statistics.animal_mean_interval` (the same arithmetic, with an `sd` key) | 45565605 |
