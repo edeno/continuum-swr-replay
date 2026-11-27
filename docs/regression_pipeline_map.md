@@ -1644,13 +1644,13 @@ Planted truths for the role content models, as functions of a session's rows.
 
 The role content models in simulation: their scenario list for the engine.
 
-`load_table`, `SimulationCohort`, `cohort_from_table`, `clustering_columns`, `model_settings`, `engine_model`, `scenario_list`, `build_simulation`, `calibrate_smooth_penalties`, `simulation`
+`load_table`, `SimulationCohort`, `cohort_from_table`, `clustering_columns`, `model_settings`, `model_name`, `engine_model`, `scenario_list`, `build_simulation`, `calibrate_smooth_penalties`, `simulation`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/role_content_statistics.py`
 
-The declared content estimands of the role models, per session and summarized.
+The declared content estimands of the role models, per unit of the fit and summarized.
 
-`session_estimands`, `penalized_edf`, `penalized_edf_summary`, `estimand_summaries`, `role_shares`, `within_arm_slopes`, `current_share_by_time_until_leaving`
+`unit_estimands`, `penalized_edf`, `penalized_edf_summary`, `estimand_summaries`, `role_shares`, `within_arm_slopes`, `current_share_by_time_until_leaving`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/session_fits.py`
 

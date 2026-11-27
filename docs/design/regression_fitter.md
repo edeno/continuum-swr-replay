@@ -715,6 +715,24 @@ and the time until leaving (lead, 2026-11-26: "no just two"), and
 At `fit_by="session"` every record of the coefficient form and of model D equaled master's
 (70a64c42) field by field, with master's third clock (proved before it left the model).
 
+**The content model's use of the loop** (`analysis/replay_models/content/role_content.py`,
+built 2026-11-27, task 9 of the unit-of-fit plan). `RoleContentSettings.fit_by` holds one
+unit for each run, as the rate model's does (the day is the default). The arm category is
+the baseline of both content models (`declared_tests.BASELINES`): at a day or an animal
+each session has its own arm effects (question 2 of the plan, answered 2026-11-24) and
+every tested term (the role levels, the slopes, the curves) is shared in the unit, at the
+declared penalties of the session fit (question 3, answered the same day). The role
+category keeps its uncoded trunk level. A session with fewer than `MIN_UNITS` events in a
+unit loses its arm copies to the support rule, so its rows of arms 1 to 8 are dropped and
+its events leave nothing to the fit; a session without rows of the reference arm stops the
+unit's fit (the plan's questions 8 and 10). The tested coefficients' collinearity is
+measured on each unit's fit with its arm copies projected out. In the animal unit the role
+levels are one per animal here; the lead decided on 2026-11-27 (02:19 PST, "Agree on r1.")
+that they are estimated per recording day, with Q3a and Q3b the mean of the day levels: a
+term copied per day, built in the step after this one. At `fit_by="session"` every record,
+the collinearity and every table of the statistics module equal those before the change, by
+`repr` (a scratch capture of the content fixtures, both models, both variants, both kinds).
+
 The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
 two smooths of the arrival clock `by` the last outcome (`Smooth(..., by=Category(...),
 levels=(0,))` and `levels=(1,)`), each its own term with its own penalty block, beside the

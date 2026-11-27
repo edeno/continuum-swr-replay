@@ -23,7 +23,8 @@ from continuum_swr_replay.analysis.replay_models.content import (
 from continuum_swr_replay.analysis.replay_models.content import (
     role_content_statistics as rs,
 )
-from continuum_swr_replay.data_loaders.constants import TRUNK_ARMS
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS, TRUNK_ARMS
+from continuum_swr_replay.tables.session_keys import unit_key
 
 from .role_tables import draw_shares, synthetic_event_arm_table
 
@@ -68,7 +69,14 @@ def _simulate(cohort, truth, seed, n_bins=60):
     return sessions, reference
 
 
+#: The settings of a fit by session: the tests that read a session's record
+#: or value by its key fit each session alone (the unit-of-fit tests set
+#: their own unit).
+BY_SESSION = rc.RoleContentSettings(fit_by="session")
+
+
 def _fit(cohort, sessions, model, variant="unadjusted", settings=None, kind=KIND):
+    settings = BY_SESSION if settings is None else settings
     return rc.fit_role_content(
         sessions,
         model=model,
@@ -82,7 +90,7 @@ def _fit(cohort, sessions, model, variant="unadjusted", settings=None, kind=KIND
 
 def _pooled(fit) -> pd.DataFrame:
     """Each estimand's mean over sessions and the SE of that mean."""
-    per = rs.session_estimands(fit)
+    per = rs.unit_estimands(fit)
     assert per["kept"].all()
     grouped = per.groupby("estimand_id")
     return pd.DataFrame(
@@ -454,7 +462,7 @@ def test_pooled_slope_hides_opposite_roles(big_cohort) -> None:
     # of the model recover both signs.
     assert abs(beta) < 0.15
     fit = _fit(big_cohort, sessions, "role_content")
-    estimates = rs.session_estimands(fit)
+    estimates = rs.unit_estimands(fit)
     assert (estimates.loc[estimates.estimand_id == "Q4b", "estimate"] > 0.15).all()
     assert se > 0
 
@@ -551,7 +559,7 @@ def test_a_thin_previous_level_is_dropped_with_its_rows(table) -> None:
     assert thin_record.left_out["value:role=previous"] == "with_level"
     assert thin_record.cohort_counts["rows_dropped"] == {"role[previous]": 3}
     assert thin_record.support["role[previous]"]["n_high"] == 3
-    estimates = rs.session_estimands(fit).set_index(["session_date", "estimand_id"])
+    estimates = rs.unit_estimands(fit).set_index(["session_date", "estimand_id"])
     assert not estimates.loc[("20200101", "Q3b"), "kept"]
     assert estimates.loc[("20200101", "Q3a"), "kept"]
     other = by_key[("a1", "20200102", "02_r1")]
@@ -593,7 +601,7 @@ def test_each_open_setting_builds_and_fits(table, settings) -> None:
     for model in rc.MODELS:
         fit = _fit(cohort, sessions, model, "length_adjusted", settings)
         assert all(r.status == "converged" for r in fit.records)
-        estimates = rs.session_estimands(fit)
+        estimates = rs.unit_estimands(fit)
         assert estimates["kept"].all() and np.isfinite(estimates["estimate"]).all()
         assert set(estimates["estimand_id"]) == {
             e.estimand_id for e in rc.model_estimands(model)
@@ -816,6 +824,98 @@ def test_the_uncoded_trunk_gives_the_fit_with_the_trunk_coded(
         np.testing.assert_allclose(etas[0], etas[1], rtol=0, atol=tol)
 
 
+UNIT_SESSIONS = (
+    ("a1", "20200101", "02_r1"),
+    ("a1", "20200101", "04_r2"),
+    ("a1", "20200102", "02_r1"),
+    ("a2", "20200103", "04_r2"),
+)
+"""Four sessions: a day of two sessions, a day of one, a second animal."""
+
+
+@pytest.fixture(scope="module")
+def unit_sessions():
+    """The No SWR rows of :data:`UNIT_SESSIONS`, shares drawn around role
+    levels and arm effects."""
+    table = synthetic_event_arm_table(
+        UNIT_SESSIONS, n_visits=150, swr_share=0.3, seed=3
+    )
+    cohort = rc.role_content_cohort(table)
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 0.6, "previous": -0.4})
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
+    rows = cohort.model_rows("role_content_uncertainty")
+    return cohort, _drawn(rows[rows[rc.KIND] == KIND], truth, reference, seed=4)
+
+
+def test_fit_by_from_the_one_setting(unit_sessions) -> None:
+    """The setting's units are ``fit_by.BEHAVIOR_FIT_BY`` (the first is the
+    default); "session" stays a value; another is refused. The design
+    declares the arm category as its baseline, and the fit's records are of
+    the setting's unit."""
+    from continuum_swr_replay.analysis.replay_models.fit_by import BEHAVIOR_FIT_BY
+
+    assert rc.RoleContentSettings().fit_by == BEHAVIOR_FIT_BY[0]
+    with pytest.raises(ValueError, match="fit_by"):
+        rc.RoleContentSettings(fit_by="week")
+    cohort, sessions = unit_sessions
+    for model in rc.MODELS:
+        for fit_by, n_units in (("session", 4), ("day", 3), ("animal", 2)):
+            settings = rc.RoleContentSettings(fit_by=fit_by)
+            fit = _fit(cohort, sessions, model, "length_adjusted", settings)
+            assert fit.design.baseline == dt.BASELINES[model]
+            assert [r.fit_by for r in fit.records] == [fit_by] * n_units
+            assert all(r.status == "converged" for r in fit.records)
+
+
+def test_a_unit_fit_has_arm_effects_per_session_and_shared_tested_terms(
+    unit_sessions,
+) -> None:
+    """At a day or an animal each session has its own arm effects (the
+    baseline's copies) and every tested coefficient is one, shared; the trunk
+    level has no column in any session."""
+    cohort, sessions = unit_sessions
+    for fit_by in ("day", "animal"):
+        settings = rc.RoleContentSettings(fit_by=fit_by)
+        fit = _fit(cohort, sessions, "role_content", "length_adjusted", settings)
+        first = fit.records[0]
+        keys = [k for k in sessions if unit_key(k, fit_by) == first.unit_key]
+        assert len(keys) == {"day": 2, "animal": 3}[fit_by]
+        arms = [n for n in first.coef_names if n.startswith(f"{rc.ARM}[")]
+        assert arms == [
+            f"{rc.ARM}[{a}]@{'/'.join(k)}" for a in ALL_ARMS[1:] for k in keys
+        ]
+        for name in rc.tested_coefficients(fit.design, fit.contrasts):
+            assert first.coef_names.count(name) == 1
+        assert not any(n.startswith("role[trunk]") for n in first.coef_names)
+        assert "log_duration_rel:role=trunk" in first.coef_names
+        assert [
+            (e["animal"], e["session_date"], e["epoch"]) for e in first.sessions
+        ] == keys
+
+
+def test_collinearity_per_unit(unit_sessions) -> None:
+    """The tested coefficients' collinearity is judged on each unit's fit,
+    keyed by the unit: a day of one session gives what that session's own
+    fit gives; a day of two is measured on its two sessions' rows with their
+    arm effects projected out."""
+    cohort, sessions = unit_sessions
+    by = {}
+    for fit_by in ("session", "day"):
+        settings = rc.RoleContentSettings(fit_by=fit_by)
+        by[fit_by] = _fit(cohort, sessions, "role_content", "unadjusted", settings)
+    day = by["day"]
+    assert list(day.tested_collinearity) == [r.unit_key for r in day.records]
+    alone = day.tested_collinearity[("a1", "20200102")]
+    session = by["session"].tested_collinearity[("a1", "20200102", "02_r1")]
+    assert alone.keys() == session.keys() and alone
+    for name in alone:
+        assert alone[name]["r2"] == pytest.approx(session[name]["r2"], abs=1e-10)
+    two = day.tested_collinearity[("a1", "20200101")]
+    assert set(two) == {"role[current]", "role[previous]", "value:role=other_leaf"}
+    assert all(0.0 <= m["r2"] < 1.0 for m in two.values())
+    assert set(day.separable[("a1", "20200101")]) == set(two)
+
+
 def test_a_trunk_role_off_the_trunk_arms_is_refused(cohort) -> None:
     rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
     reference = rc.ContrastReference.from_rows(
@@ -862,6 +962,7 @@ def _one_session_fit(table, model="role_content", seed=0):
     fit = rc.fit_role_content_session(
         key, rows, model=model, variant="unadjusted", kind=KIND,
         reference_log_duration=cohort.reference_log_duration, scale_rows=scale,
+        settings=BY_SESSION,
     )  # fmt: skip
     return key, rows, fit
 
@@ -878,8 +979,7 @@ def _likelihood_r2(fit, key, rows, name):
     prepared = rc.design_rows(rows, fit.model, fit.variant, fit.reference).assign(
         **{rc.WEIGHTED_RESPONSE: rows[rc.RESPONSE]}
     )
-    used = rc._fitted_rows(fit.design, prepared, record)
-    X, _ = fit.design.session(used)
+    _, used, X, _ = rc._fitted_rows(fit.design, {key: prepared}, record)
     j = fit.design.coef_names.index(name)
     others = np.setdiff1d(np.arange(X.shape[1]), [j])
     measured = term_collinearity(
@@ -1022,7 +1122,7 @@ def test_penalized_edf_reports_the_shrinkage(cohort) -> None:
     per = {
         sd: rs.penalized_edf(
             _fit(cohort, sessions, "role_content",
-                 settings=rc.RoleContentSettings(prior_sd=sd))
+                 settings=rc.RoleContentSettings(prior_sd=sd, fit_by="session"))
         )
         for sd in (1.0, 8.0)
     }  # fmt: skip
@@ -1044,7 +1144,7 @@ def test_penalized_edf_reports_the_shrinkage(cohort) -> None:
         assert row.n_events == n_events[(row.animal, row.session_date, row.epoch)]
     summary = rs.penalized_edf_summary(pd.concat([narrow, wide]))
     assert len(summary) == 2 * narrow["coefficient"].nunique()
-    assert (summary["n_sessions"] == len(sessions)).all()
+    assert (summary["n_units"] == len(sessions)).all()
     assert (summary["edf_min"] <= summary["edf_median"]).all()
 
 
@@ -1119,7 +1219,7 @@ def test_the_recency_curve_is_on_the_other_leaf_rows_only() -> None:
         fit = _fit(cohort, sessions, model, settings=settings)
         recency = [t.name for t in fit.design.terms if t.covariate == rc.RECENCY]
         assert recency == [dt.estimand("Q5a").contrast.term]
-        per = rs.session_estimands(fit).set_index(["session_date", "estimand_id"])[
+        per = rs.unit_estimands(fit).set_index(["session_date", "estimand_id"])[
             "estimate"
         ]
         for (m, date, eid), value in pinned.items():
@@ -1225,5 +1325,5 @@ def test_one_real_session_of_each_kind_end_to_end() -> None:
                     "events_kept"
                 ] - record.cohort_counts.get("events_without_response", 0)
                 assert np.asarray(record.vcov).shape == (len(record.coef),) * 2
-                estimates = rs.session_estimands(fit)
+                estimates = rs.unit_estimands(fit)
                 assert len(estimates) == len(rc.model_estimands(model))

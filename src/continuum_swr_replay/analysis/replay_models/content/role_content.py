@@ -2,7 +2,11 @@
 
 The response is each event's share over its nine candidate arms (the event-arm
 table's ``arm_fraction``), fitted by the grouped softmax, one event per group,
-one fit for each session and each kind (``SWR``, ``No SWR``).
+one fit for each unit of the fit (``RoleContentSettings.fit_by``: a recording
+day or an animal; a session for the validation and comparison) and each kind
+(``SWR``, ``No SWR``). In a unit of several sessions each session keeps its own
+arm effects (the baseline, copied for each session) and every tested term is
+shared.
 
 Roles, exclusive, per (event, arm): ``current`` (the arm of the well being
 visited; for an event that crosses the final poke-out, the visit's well's arm,
@@ -125,9 +129,15 @@ from continuum_swr_replay.data_loaders.constants import (
     TRUNK_ARMS,
 )
 from continuum_swr_replay.tables.columns import require_columns
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    FitBy,
+    fit_by_columns,
+    unit_key,
+)
 
 from .. import declared_tests as dt
+from ..fit_by import BEHAVIOR_FIT_BY
 
 __all__ = [
     "COHORT_COLUMNS",
@@ -273,6 +283,22 @@ class RoleContentSettings:
         One of :data:`SCALE_POOLINGS`.
     event_weight : str
         One of :data:`EVENT_WEIGHTS`.
+    fit_by : {"day", "animal", "session"}
+        The unit of the fit, one for each run (DECIDED, the convention's
+        twenty-fourth round): one of ``fit_by.BEHAVIOR_FIT_BY``, the units every
+        behavior model is fitted at (the first is the default); ``"session"``
+        is the earlier design, kept for the validation and for comparison.
+        Each session keeps its own arm effects (the baseline,
+        ``declared_tests.BASELINES``: question 2 of the unit-of-fit plan,
+        answered 2026-11-24); every tested term (the role levels, the slopes,
+        the curves) is shared inside the unit. The penalties are the declared
+        ones at every unit (question 3, answered the same day). At the animal
+        unit the role levels are one per animal here. The lead decided remedy
+        R1 on 2026-11-27 (02:19 PST, "Agree on r1."): in the animal unit the
+        role levels are estimated per recording day, the curves and slopes
+        stay shared, and Q3a and Q3b are the mean of the day levels. It needs
+        a tested term copied per day in the fitter and is built in the step
+        after this one.
     """
 
     prior_sd: float = WEAK_PRIOR_SD
@@ -284,6 +310,7 @@ class RoleContentSettings:
     q5a_trials: tuple[float, float] = DEFAULT_Q5A_TRIALS
     scale_pooling: str = SCALE_POOLINGS[0]
     event_weight: str = EVENT_WEIGHTS[0]
+    fit_by: FitBy = BEHAVIOR_FIT_BY[0]
 
     def __post_init__(self) -> None:
         if self.scale_pooling not in SCALE_POOLINGS:
@@ -316,6 +343,7 @@ class RoleContentSettings:
             raise ValueError(
                 f"q5a_trials {self.q5a_trials} outside [{lo}, {hi}] trials"
             )
+        fit_by_columns(self.fit_by)
 
 
 # ---------------------------------------------------------------------------
@@ -824,7 +852,12 @@ def role_design(
         Of the same rows (:meth:`ContrastReference.from_rows`).
     """
     rows = design_rows(pooled_rows, model, variant, reference)
-    return build_design(role_terms(model, variant, settings), rows, intercept=False)
+    return build_design(
+        role_terms(model, variant, settings),
+        rows,
+        intercept=False,
+        baseline=dt.BASELINES[model],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1018,12 +1051,13 @@ class RoleContentFit:
     contrasts : dict of str to np.ndarray
         :func:`estimand_contrasts`.
     records : list of FitRecord
-        One per session, in sorted session order.
+        One per unit of the fit (``settings.fit_by``), in the order of each
+        unit's first session given.
     tested_collinearity : dict
-        Session key -> :func:`tested_coefficient_collinearity` of the simple
-        tested coefficients (a role level, a slope; a smooth's is the
-        record's concurvity of the term); empty for a session without a kept
-        fit.
+        Unit key (``FitRecord.unit_key``) -> :func:`tested_coefficient_collinearity`
+        of the simple tested coefficients (a role level, a slope; a smooth's is
+        the record's concurvity of the term), on the unit's fit; empty for a
+        unit without a kept fit.
     settings : RoleContentSettings
     """
 
@@ -1039,7 +1073,7 @@ class RoleContentFit:
 
     @property
     def separable(self) -> dict[SessionKey, dict[str, bool]]:
-        """The collinearity rule of these models: session key -> tested
+        """The collinearity rule of these models: unit key -> tested
         coefficient -> True when the other columns explain less than
         ``collinearity.MAX_EXPLAINED`` of it (``collinearity.separable`` of
         :attr:`tested_collinearity`, measured on the penalized problem)."""
@@ -1058,7 +1092,8 @@ def fit_role_content(
     table_sha256: Mapping[str, str] | None = None,
     cohort_counts: Mapping | None = None,
 ) -> RoleContentFit:
-    """Fit every session of one kind (``sessions.fit_sessions``, grouped softmax).
+    """Fit every unit of one kind (``sessions.fit_sessions`` at
+    ``settings.fit_by``, grouped softmax).
 
     Parameters
     ----------
@@ -1137,6 +1172,7 @@ def fit_role_content(
         response=WEIGHTED_RESPONSE,
         unit=UNIT,
         table_sha256=dict(table_sha256 or {}),
+        fit_by=settings.fit_by,
     )
     if cohort_counts is not None:
         records = [_with_cohort(r, cohort_counts) for r in records]
@@ -1145,9 +1181,14 @@ def fit_role_content(
         for name in tested_coefficients(design, contrasts)
         if design.column_terms[design.coef_names.index(name)].kind != "smooth"
     ]
+    units: dict[tuple, dict[SessionKey, pd.DataFrame]] = {}
+    for key, rows in prepared.items():
+        units.setdefault(unit_key(key, settings.fit_by), {})[key] = rows
     collinearity = {
-        key: tested_coefficient_collinearity(design, prepared[key], record, simple)
-        for key, record in zip(prepared, records, strict=True)
+        record.unit_key: tested_coefficient_collinearity(
+            design, units[record.unit_key], record, simple
+        )
+        for record in records
     }
     return RoleContentFit(
         model,
@@ -1194,26 +1235,43 @@ def _with_cohort(record: FitRecord, cohort_counts: Mapping) -> FitRecord:
     )
 
 
-def _fitted_rows(design: Design, rows: pd.DataFrame, record: FitRecord) -> pd.DataFrame:
-    """The rows a session's kept fit used: sorted by event as the fitting loop
-    sorts them, less the rows of each dropped level and the events left with
-    no response."""
-    rows = rows.sort_values(UNIT, kind="stable").reset_index(drop=True)
-    built = design.build(rows)
+def _fitted_rows(
+    design: Design, sessions: Mapping[SessionKey, pd.DataFrame], record: FitRecord
+) -> tuple[Design, pd.DataFrame, np.ndarray, np.ndarray]:
+    """The unit's design (each baseline copied for each session in a unit of
+    several, ``Design.for_sessions``), the rows its kept fit used, their
+    design matrix and each row's event as an integer code, as the fitting
+    loop builds them: each session's rows sorted by event, the sessions in
+    order, less the rows of each dropped level and the events left with no
+    response."""
+    keys = list(sessions)
+    unit = design.for_sessions(keys)
+    parts = [
+        sessions[key].sort_values(UNIT, kind="stable").reset_index(drop=True)
+        for key in keys
+    ]
+    rows = pd.concat(parts, ignore_index=True)
+    session = np.repeat(np.arange(len(parts)), [len(p) for p in parts])
+    built = unit.build(rows, session)
     keep = ~built.missing
     for name in record.cohort_counts.get("rows_dropped", {}):
-        keep &= ~built.level_rows[design.by_name[name].level]
+        keep &= ~built.level_rows[unit.by_name[name].level]
+    event = pd.Series(session).astype(str) + ":" + rows[UNIT].astype(str)
     total = (
         pd.Series(np.where(keep, rows[WEIGHTED_RESPONSE], 0.0))
-        .groupby(rows[UNIT])
+        .groupby(event.to_numpy())
         .transform("sum")
     )
     keep &= total.to_numpy() > 0
-    return rows.loc[keep].reset_index(drop=True)
+    events = pd.factorize(event.to_numpy()[keep])[0]
+    return unit, rows.loc[keep].reset_index(drop=True), built.X[keep], events
 
 
 def tested_coefficient_collinearity(
-    design: Design, rows: pd.DataFrame, record: FitRecord, tested: Sequence[str]
+    design: Design,
+    sessions: Mapping[SessionKey, pd.DataFrame],
+    record: FitRecord,
+    tested: Sequence[str],
 ) -> dict[str, dict[str, float]]:
     """Each tested coefficient's collinearity with every other column, alone,
     on the information of the fit's penalized problem.
@@ -1249,16 +1307,20 @@ def tested_coefficient_collinearity(
     response.
 
     Each tested coefficient is a term of its own and each model term's other
-    columns are one term. Empty for a session without a kept fit.
+    columns are one term. In a unit of several sessions (a day or an animal)
+    the measure is on the unit's fit: its rows, and each session's arm
+    effects (the baseline's copies) projected out first, as the fit's record
+    projects them. Empty for a unit without a kept fit.
 
     Parameters
     ----------
     design : Design
-    rows : pd.DataFrame
-        The session's rows as given to the fit (:func:`design_rows`, with
-        the weighted response).
+        The model's design (:func:`role_design`).
+    sessions : mapping of (animal, session_date, epoch) to pd.DataFrame
+        The unit's sessions, in the order of the fit, each with its rows as
+        given to the fit (:func:`design_rows`, with the weighted response).
     record : FitRecord
-        The session's record.
+        The unit's record.
     tested : sequence of str
         Coefficient names.
 
@@ -1269,12 +1331,11 @@ def tested_coefficient_collinearity(
     """
     if record.status != CONVERGED or record.no_fit:
         return {}
-    used = _fitted_rows(design, rows, record)
+    design, used, X, events = _fitted_rows(design, sessions, record)
     if len(used) != record.n_rows:
         raise ValueError(
             f"rebuilt {len(used)} rows for the fit, the record has {record.n_rows}"
         )
-    X, _ = design.session(used)
     beta = np.asarray(record.coef, dtype=float)
     active = np.isfinite(beta)
     index = np.cumsum(active) - 1  # a column's place among the active ones
@@ -1282,7 +1343,7 @@ def tested_coefficient_collinearity(
         GroupedSoftmax(),
         X[:, active],
         used[WEIGHTED_RESPONSE].to_numpy(dtype=float),
-        pd.factorize(used[UNIT])[0],
+        events,
         X[:, active] @ beta[active],
     )
     augmented = np.vstack([weighted, _smooth_penalty_root(design, active, index)])
@@ -1296,7 +1357,8 @@ def tested_coefficient_collinearity(
             terms[names[j]] = index[[j]]
         if rest:
             terms[term] = index[rest]
-    measured = concurvity(augmented, terms, beta[active], intercept=None)
+    copies = [int(index[j]) for j in design.projected_columns if active[j]]
+    measured = concurvity(augmented, terms, beta[active], intercept=copies or None)
     out = {}
     for name in tested:
         if name not in measured:

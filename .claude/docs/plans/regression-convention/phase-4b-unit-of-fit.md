@@ -334,6 +334,20 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    tasks 8 and 9; that is expected. Tests (`tests/analysis/replay_models/content/`):
    `test_role_content.py::test_fit_by_from_the_one_setting`, `::test_arm_effects_per_session_and_shared`,
    `::test_collinearity_per_unit`, `test_role_content_statistics.py::test_unit_estimands_at_each_unit`.
+   **Built 2026-11-27 (branch `content-unit-of-fit`, from the trial merge with the rate branch):**
+   `RoleContentSettings.fit_by` (default `BEHAVIOR_FIT_BY[0]`, the day; `"session"` kept); the arm
+   category is the baseline (`BASELINES`), per session (question 2; `arm_effects` not built); the
+   declared penalties at every unit (question 3); the collinearity of the tested coefficients on each
+   unit's fit, the arm copies projected out; `role_content_statistics.unit_estimands` (replaces
+   `session_estimands`), `estimand_summaries` by `unit_summary`, mixed units refused; the simulation's
+   models at every unit of `FIT_BYS` (`<fit_by>_sd<SD>`); the smooths' calibration stays per session.
+   The plan's `test_arm_effects_per_session_and_shared` is
+   `test_a_unit_fit_has_arm_effects_per_session_and_shared_tested_terms` (per session only). At
+   `fit_by="session"` every record, the collinearity and the statistics tables equal the earlier
+   code's by `repr` (a scratch capture). Remedy R1 is decided (lead, 2026-11-27, 02:19 PST: "Agree on
+   r1."): in the animal unit the role levels go per recording day, Q3a and Q3b the mean of the day
+   levels; it needs a tested term copied per day in the fitter and is built in the step after this
+   task (branch `fitter-term-by-day`).
 10. **Scenarios that plant session-to-session differences.** Rate: clock curves that differ by session (a
     shift and a scale of the arrival and leaving curves per session, drawn once with a fixed seed), with
     the share of rewarded visits left as the rows give it; the existing `differing_ratio` kept. Content:

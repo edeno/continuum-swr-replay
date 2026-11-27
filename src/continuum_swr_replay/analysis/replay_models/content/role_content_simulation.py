@@ -5,9 +5,9 @@ response (the event-arm table's ``arm_fraction``) is never fitted: the cohort
 rows are kept for their covariates, roles, events and decode bins, and the
 engine (``regression.simulation``) draws the shares each scenario expects and
 fits the real model (``role_content.role_design``, the grouped softmax,
-``regression.sessions.fit_sessions``), reads its estimands
-(``role_content.estimand_contrasts``) and reduces them over sessions, days
-and animals (``shared_statistics.estimand_summary``). The one place the real
+``regression.sessions.fit_sessions`` at the model's unit), reads its
+estimands (``role_content.estimand_contrasts``) and reduces them over the
+units (``regression.units.unit_summary``). The one place the real
 shares are read is the truth from the data (``role_content_scenarios
 .truth_from_data``), whose band means are its planted curves; that truth is
 then drawn and fitted like every other.
@@ -15,7 +15,10 @@ then drawn and fitted like every other.
 A run (:func:`build_simulation`) is one model, one variant and one kind
 (``SWR`` or ``No SWR``): the engine fits each session of one kind, and the
 two models have different coefficients. Its models are the same design at
-each weak-penalty width (:data:`PRIOR_SDS`), fitted to the same data sets.
+each unit of the fit (:data:`FIT_BYS`: a session, a recording day, an
+animal; each session with its own arm effects at a day or an animal) and
+each weak-penalty width (:data:`PRIOR_SDS`), named ``<fit_by>_sd<SD>`` and
+fitted to the same data sets.
 The noise of the shares (:data:`NOISES`) is the run's: one categorical
 choice per event; a multinomial over the event's decode bins
 (``n_nonlocal_bins``); or a Dirichlet-multinomial over them at a stated
@@ -59,8 +62,9 @@ from continuum_swr_replay.analysis.regression import simulation as engine
 from continuum_swr_replay.analysis.regression.calibration import log_penalty_for_edf
 from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
 from continuum_swr_replay.analysis.regression.sessions import SessionKey
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, FitBy
 
+from ..fit_by import BEHAVIOR_FIT_BY
 from . import role_content as rc
 from . import role_content_scenarios as sc
 from . import uncertainty_scenarios as uc
@@ -71,6 +75,7 @@ __all__ = [
     "CALIBRATED_NOISE",
     "CENTRAL_NOISE",
     "CONCENTRATIONS",
+    "FIT_BYS",
     "NOISES",
     "NOISE_CONCENTRATION",
     "NOISE_TRIALS",
@@ -88,6 +93,7 @@ __all__ = [
     "cohort_from_table",
     "engine_model",
     "load_table",
+    "model_name",
     "model_settings",
     "scenario_list",
     "simulation",
@@ -150,6 +156,10 @@ coefficient of the model is estimated by it."""
 #: then the sensitivity pair (``role_content.WEAK_PRIOR_SD``,
 #: ``WEAK_PRIOR_SD_SENSITIVITY``), that is (8, 4, 16).
 PRIOR_SDS: tuple[float, ...] = (rc.WEAK_PRIOR_SD, *rc.WEAK_PRIOR_SD_SENSITIVITY)
+
+#: The units of the fit a run fits the same data sets at: the session (the
+#: earlier design, for comparison) and ``fit_by.BEHAVIOR_FIT_BY``.
+FIT_BYS: tuple[FitBy, ...] = ("session", *BEHAVIOR_FIT_BY)
 
 TARGET_EDF: Mapping[str, float] = {
     rc.RECENCY: 5.0,
@@ -318,12 +328,21 @@ def clustering_columns(
 
 
 def model_settings(
-    prior_sd: float, smooth_log_penalties: Mapping[str, float] | None = None
+    prior_sd: float,
+    smooth_log_penalties: Mapping[str, float] | None = None,
+    fit_by: FitBy = "session",
 ) -> rc.RoleContentSettings:
-    """The settings of a run's model at one width; the smooths at their
-    calibrated penalties unless given."""
+    """The settings of a run's model at one width and unit; the smooths at
+    their calibrated penalties unless given."""
     penalties = dict(smooth_log_penalties or CALIBRATED_LOG_PENALTIES)
-    return rc.RoleContentSettings(prior_sd=prior_sd, smooth_log_penalties=penalties)
+    return rc.RoleContentSettings(
+        prior_sd=prior_sd, smooth_log_penalties=penalties, fit_by=fit_by
+    )
+
+
+def model_name(fit_by: str, prior_sd: float) -> str:
+    """A run's model at one unit and width: ``<fit_by>_sd<SD>``."""
+    return f"{fit_by}_sd{prior_sd:g}"
 
 
 def engine_model(
@@ -336,7 +355,7 @@ def engine_model(
 ) -> engine.Model:
     """The role model as its own code builds it, for the engine: its design on
     the scale rows, its estimands and, for the uncertainty model,
-    :data:`Q5A_LOW5`."""
+    :data:`Q5A_LOW5`, fitted at the settings' unit."""
     reference = rc.ContrastReference.from_rows(
         scale_rows, reference_log_duration, model
     )
@@ -347,7 +366,15 @@ def engine_model(
         estimands[Q5A_LOW5] = rc.estimand_contrasts(
             design, model, variant, reference, low5
         )["Q5a"]
-    return engine.Model(name, design, GroupedSoftmax(), rc.RESPONSE, rc.UNIT, estimands)
+    return engine.Model(
+        name,
+        design,
+        GroupedSoftmax(),
+        rc.RESPONSE,
+        rc.UNIT,
+        estimands,
+        fit_by=settings.fit_by,
+    )
 
 
 def _fixed_shares(
@@ -452,6 +479,7 @@ def build_simulation(
     variant: str = "unadjusted",
     noise: str = CENTRAL_NOISE,
     prior_sds: Sequence[float] = PRIOR_SDS,
+    fit_by: Sequence[FitBy] = FIT_BYS,
     smooth_log_penalties: Mapping[str, float] | None = None,
     scenarios: Sequence[str] | None = None,
     thin: int | None = None,
@@ -469,7 +497,10 @@ def build_simulation(
     noise : str
         One of :data:`NOISES`.
     prior_sds : sequence of float
-        One model per width, named ``sd<width>``.
+        The weak penalty's widths.
+    fit_by : sequence of str
+        The units of the fit (:data:`FIT_BYS`). One model per unit and width,
+        named ``<fit_by>_sd<width>`` (:func:`model_name`), in that order.
     smooth_log_penalties : mapping or None
         The smooths' declared log penalties; :data:`CALIBRATED_LOG_PENALTIES`
         when None.
@@ -492,13 +523,14 @@ def build_simulation(
     l0 = cohort.reference_log_duration
     models = [
         engine_model(
-            f"sd{sd:g}",
+            model_name(unit, sd),
             model,
             variant,
-            model_settings(sd, smooth_log_penalties),
+            model_settings(sd, smooth_log_penalties, unit),
             scale,
             l0,
         )
+        for unit in fit_by
         for sd in prior_sds
     ]
     reference = rc.ContrastReference.from_rows(scale, l0, model)
@@ -571,7 +603,10 @@ def calibrate_smooth_penalties(
     decode bins (the edf reads the fitted shares, not the real ones). The
     recency smooth is calibrated in the uncertainty model, the two others in
     the plain model, every other penalty at :data:`CALIBRATED_LOG_PENALTIES`
-    and the weak penalty at ``role_content.WEAK_PRIOR_SD``.
+    and the weak penalty at ``role_content.WEAK_PRIOR_SD``. The fits are per
+    session, as the declared values were set; those values are used at every
+    unit of the fit (question 3 of the unit-of-fit plan, answered 2026-11-24:
+    no recalibration on the unit).
 
     Returns
     -------
@@ -588,6 +623,7 @@ def calibrate_smooth_penalties(
             model=model,
             kind=kind,
             prior_sds=(rc.WEAK_PRIOR_SD,),
+            fit_by=("session",),
             scenarios=[f"null_{model}"],
             n_data_sets=2,
             seed=seed,

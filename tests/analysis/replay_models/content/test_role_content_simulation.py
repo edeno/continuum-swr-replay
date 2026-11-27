@@ -62,9 +62,12 @@ def test_the_quick_run_goes_through_the_runner(monkeypatch) -> None:
     assert table.attrs["content_model"] == "role_content"
     assert table.attrs["kind"] == "No SWR"
     assert set(table["estimand"]) == {"Q3a", "Q3b", "Q4a", "Q4b", "Q7b"}
-    planted = table.set_index(["scenario", "estimand"])["planted"]
-    assert planted[("role_current_large", "Q3a")] == pytest.approx(1.0)
-    assert planted[("null_role_content", "Q3a")] == 0.0
+    names = [rsim.model_name(u, rc.WEAK_PRIOR_SD) for u in rsim.FIT_BYS]
+    assert sorted(set(table["model"])) == sorted(names)
+    planted = table.set_index(["model", "scenario", "estimand"])["planted"]
+    for name in names:
+        assert planted[(name, "role_current_large", "Q3a")] == pytest.approx(1.0)
+        assert planted[(name, "null_role_content", "Q3a")] == 0.0
     assert (table["share_not_converged"] == 0).all()
 
 
@@ -88,7 +91,12 @@ def test_shares_and_planted_values_are_the_scenarios(cohort) -> None:
         cohort, model="role_content_uncertainty", kind="SWR", prior_sds=(4.0, 8.0),
         scenarios=["recency_curve_large"], n_data_sets=2, n_draws=50,
     )  # fmt: skip
-    assert [m.name for m in run.models] == ["sd4", "sd8"]
+    assert [m.name for m in run.models] == [
+        f"{u}_sd{sd}" for u in ("session", "day", "animal") for sd in (4, 8)
+    ]
+    assert [m.fit_by for m in run.models] == [
+        u for u in ("session", "day", "animal") for _ in (4, 8)
+    ]
     scenario = next(s for s in run.scenarios if s.name == "recency_curve_large")
     shares = scenario.expected(run.sessions, np.random.default_rng(0))
     for key, rows in run.sessions.items():
@@ -267,17 +275,18 @@ def test_the_planted_values_are_what_the_engine_recovers(
     model, variant, scenario, estimand
 ) -> None:
     """On large sessions with loose penalties the fit's estimate of each
-    planted estimand is its planted value."""
+    planted estimand is its planted value, at every unit of the fit."""
     penalties = {rc.REWARD_FRACTION: -8.0, rc.RECENCY: -8.0, rc.LEAVING: -6.0}
     run = rsim.build_simulation(
         _big_cohort(), model=model, kind="No SWR", variant=variant,
         prior_sds=(16.0,), smooth_log_penalties=penalties, scenarios=[scenario],
         n_data_sets=2, n_draws=50,
     )  # fmt: skip
-    summary = engine.run(run, 1, [scenario]).summary.set_index("estimand")
-    planted = summary.loc[estimand, "planted"]
-    assert abs(planted) > 0.1
-    assert summary.loc[estimand, "mean_estimate"] == pytest.approx(planted, rel=0.1)
+    summary = engine.run(run, 1, [scenario]).summary.set_index(["model", "estimand"])
+    for unit in rsim.FIT_BYS:
+        row = summary.loc[(rsim.model_name(unit, 16.0), estimand)]
+        assert abs(row["planted"]) > 0.1
+        assert row["mean_estimate"] == pytest.approx(row["planted"], rel=0.1)
 
 
 def test_truth_from_data_gives_the_known_levels_and_band_curves() -> None:

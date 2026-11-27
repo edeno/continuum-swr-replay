@@ -1,25 +1,30 @@
-"""The declared content estimands of the role models, per session and summarized.
+"""The declared content estimands of the role models, per unit of the fit and summarized.
 
-:func:`session_estimands` reads each declared estimand of a fit
-(:func:`.role_content.fit_role_content`) in every session, with its exact
-variance ``c' V c`` (``regression.contrasts.evaluate_contrast``, ``V`` the
-fit's Bayesian covariance), and says whether the session's value is kept: a
+A fit (:func:`.role_content.fit_role_content`) gives one record per unit of
+the fit (``RoleContentSettings.fit_by``: a recording day or an animal, or a
+session for the validation and comparison). :func:`unit_estimands` reads each
+declared estimand in every unit, the contrast mapped onto the unit's
+coefficients by name (``terms.Design.contrast_on``, which refuses a contrast
+that reads a baseline: the arm effects, copied for each session), with its
+exact variance ``c' V c`` (``regression.contrasts.evaluate_contrast``, ``V``
+the fit's Bayesian covariance), and says whether the unit's value is kept: a
 converged fit, kept (no ``no_fit`` cause), with every coefficient the contrast
 reads fitted. :func:`estimand_summaries` reduces them with
-``shared_statistics.estimand_summary`` for each kind and for the difference
-of the two kinds' session values (SWR minus No SWR, a session with both).
+``regression.units.unit_summary`` at the values' unit (session -> day ->
+animal; at the animal unit no day-level test) for each kind and for the
+difference of the two kinds' unit values (SWR minus No SWR, unit by unit,
+over the units with both kinds). Values of two units are refused.
 
 A record's ``variance`` and ``se`` are on the model's scale: the fit's
 Bayesian covariance, with each event one categorical draw (or its weight,
 ``role_content.EVENT_WEIGHTS``). They are not sampling errors of the estimate
 across data sets (under the share response they can be several times its
 spread), and no interval is built from them: an estimand's interval is the
-project's, over sessions, recording days and animals
-(``shared_statistics.estimand_summary``).
+project's, over the units of the fit (``regression.units.unit_summary``).
 
 :func:`penalized_edf` reports how much the weak penalty decides: each
-penalized simple coefficient's effective degrees of freedom in each session,
-beside the session's number of events, and :func:`penalized_edf_summary`
+penalized simple coefficient's effective degrees of freedom in each unit,
+beside the unit's number of events, and :func:`penalized_edf_summary`
 summarizes it by kind.
 
 The model-free references (:func:`role_shares`, :func:`within_arm_slopes`,
@@ -36,11 +41,16 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
+from continuum_swr_replay.analysis.regression.record import FitRecord
+from continuum_swr_replay.analysis.regression.units import unit_summary
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_day_session_values,
-    estimand_summary,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    FitBy,
+    fit_by_columns,
+)
 
 from .. import declared_tests as dt
 from . import role_content as rc
@@ -52,42 +62,69 @@ __all__ = [
     "penalized_edf",
     "penalized_edf_summary",
     "role_shares",
-    "session_estimands",
+    "unit_estimands",
     "within_arm_slopes",
 ]
 
 _KEYS = list(SESSION_COLUMNS)
 
 
-def session_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:
-    """Each declared estimand of the fit in each session.
+def _records(fit: rc.RoleContentFit) -> list[FitRecord]:
+    """The fit's records, each of the settings' unit.
+
+    Raises
+    ------
+    ValueError
+        If a record is of another unit than ``fit.settings.fit_by``.
+    """
+    other = sorted({r.fit_by for r in fit.records} - {fit.settings.fit_by})
+    if other:
+        raise ValueError(
+            f"records with fit_by {other} in a fit by {fit.settings.fit_by!r}"
+        )
+    return list(fit.records)
+
+
+def _key(record: FitRecord) -> dict[str, str]:
+    """A record's unit: its key columns (``""`` for a part the unit lacks)
+    and ``fit_by``."""
+    return {
+        "animal": record.animal,
+        "session_date": record.session_date,
+        "epoch": record.epoch,
+        "fit_by": record.fit_by,
+    }
+
+
+def unit_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:
+    """Each declared estimand of the fit in each unit of the fit.
 
     Returns
     -------
     pd.DataFrame
-        One row per (session, estimand): ``animal``, ``session_date``,
-        ``epoch``, ``model``, ``variant``, ``kind``, ``estimand_id``,
+        One row per (unit, estimand): ``animal``, ``session_date``,
+        ``epoch`` (``""`` for a part the unit lacks), ``fit_by``, ``model``,
+        ``variant``, ``kind``, ``estimand_id``,
         ``estimate``, ``variance`` and ``se`` (on the model's scale, not
         sampling errors: module docstring), ``status``, ``no_fit``, ``kept``
         (the value may enter a summary) and ``left_out`` (the coefficients the
-        contrast reads that the session left out, comma-separated).
+        contrast reads that the unit left out, comma-separated).
     """
     rows = []
     names = fit.design.coef_names
-    for record in fit.records:
+    for record in _records(fit):
         beta = np.asarray(record.coef, dtype=float)
         vcov = np.asarray(record.vcov, dtype=float)
         fitted = record.status == CONVERGED and not record.no_fit
         for eid, c in fit.contrasts.items():
             reads = [names[j] for j in np.flatnonzero(c)]
             missing = [n for n in reads if n in record.left_out]
-            value = evaluate_contrast(c, beta, vcov)
+            on_fit = fit.design.contrast_on(c, record.coef_names)
+            value = evaluate_contrast(on_fit, beta, vcov)
             kept = fitted and not missing and np.isfinite(value.estimate)
             rows.append(
                 {
-                    "animal": record.animal,
-                    "session_date": record.session_date,
-                    "epoch": record.epoch,
+                    **_key(record),
                     "model": fit.model,
                     "variant": fit.variant,
                     "kind": fit.kind,
@@ -105,7 +142,7 @@ def session_estimands(fit: rc.RoleContentFit) -> pd.DataFrame:
 
 
 def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
-    """Each penalized simple coefficient's edf in each session of a fit.
+    """Each penalized simple coefficient's edf in each unit of a fit.
 
     A penalized simple coefficient is a role level or a role slope with a
     fixed penalty. Its edf (the record's ``edf`` by coefficient name) is near 1
@@ -116,12 +153,12 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        One row per (session, coefficient): ``animal``, ``session_date``,
-        ``epoch``, ``model``, ``variant``, ``kind``, ``prior_sd`` (the
-        fit's), ``coefficient``,
+        One row per (unit, coefficient): ``animal``, ``session_date``,
+        ``epoch`` (``""`` for a part the unit lacks), ``fit_by``, ``model``,
+        ``variant``, ``kind``, ``prior_sd`` (the fit's), ``coefficient``,
         ``tested`` (a declared estimand reads it), ``edf`` (NaN where the
-        session left it out or has no kept fit), ``n_events`` (the events in
-        the session's fit).
+        unit left it out or has no kept fit), ``n_events`` (the events in
+        the unit's fit).
     """
     design = fit.design
     tested = set(rc.tested_coefficients(design, fit.contrasts))
@@ -131,7 +168,7 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
         if t.kind in ("level", "slope", "binary") and t.block is not None
     ]
     rows = []
-    for record in fit.records:
+    for record in _records(fit):
         fitted = record.status == CONVERGED and not record.no_fit
         for name in names:
             edf = record.edf.get(name, np.nan) if fitted else np.nan
@@ -139,9 +176,7 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
                 edf = np.nan
             rows.append(
                 {
-                    "animal": record.animal,
-                    "session_date": record.session_date,
-                    "epoch": record.epoch,
+                    **_key(record),
                     "model": fit.model,
                     "variant": fit.variant,
                     "kind": fit.kind,
@@ -155,29 +190,29 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def penalized_edf_summary(per_session: pd.DataFrame) -> pd.DataFrame:
-    """The edf of each penalized coefficient over sessions, by kind.
+def penalized_edf_summary(per_unit: pd.DataFrame) -> pd.DataFrame:
+    """The edf of each penalized coefficient over units, by kind.
 
     Parameters
     ----------
-    per_session : pd.DataFrame
+    per_unit : pd.DataFrame
         :func:`penalized_edf` of any fits.
 
     Returns
     -------
     pd.DataFrame
-        One row per (model, variant, kind, prior SD, coefficient): ``tested``,
-        ``n_sessions`` (with an edf), the ``edf`` quantiles ``edf_min``,
-        ``edf_q10``, ``edf_median``, ``edf_max``, and the median, smallest
-        and largest ``n_events`` of those sessions.
+        One row per (fit_by, model, variant, kind, prior SD, coefficient):
+        ``tested``, ``n_units`` (with an edf), the ``edf`` quantiles
+        ``edf_min``, ``edf_q10``, ``edf_median``, ``edf_max``, and the median,
+        smallest and largest ``n_events`` of those units.
     """
-    kept = per_session.loc[np.isfinite(per_session["edf"])]
+    kept = per_unit.loc[np.isfinite(per_unit["edf"])]
     grouped = kept.groupby(
-        ["model", "variant", "kind", "prior_sd", "coefficient"], sort=False
+        ["fit_by", "model", "variant", "kind", "prior_sd", "coefficient"], sort=False
     )
     return grouped.agg(
         tested=("tested", "first"),
-        n_sessions=("edf", "size"),
+        n_units=("edf", "size"),
         edf_min=("edf", "min"),
         edf_q10=("edf", lambda e: float(np.quantile(e, 0.1))),
         edf_median=("edf", "median"),
@@ -188,48 +223,86 @@ def penalized_edf_summary(per_session: pd.DataFrame) -> pd.DataFrame:
     ).reset_index()
 
 
+def _fit_by(values: pd.DataFrame) -> FitBy:
+    """The one unit of a table's values.
+
+    Raises
+    ------
+    ValueError
+        If the values are of more than one unit of the fit.
+    """
+    units = sorted(set(values["fit_by"]))
+    if len(units) != 1:
+        raise ValueError(f"values of fit_by {units}: one unit of the fit at a time")
+    return units[0]
+
+
+def _indexed(values: pd.DataFrame, fit_by: FitBy) -> pd.Series:
+    """The estimates, one per unit, indexed by the unit's key columns
+    (``unit_summary``)."""
+    columns = list(fit_by_columns(fit_by))
+    index = (
+        pd.Index(values[columns[0]].to_numpy(), name=columns[0])
+        if len(columns) == 1
+        else pd.MultiIndex.from_frame(values[columns])
+    )
+    return pd.Series(values["estimate"].to_numpy(dtype=float), index=index)
+
+
 def estimand_summaries(
-    per_session: pd.DataFrame, *, n_draws: int, seed: int
+    per_unit: pd.DataFrame, *, n_draws: int, seed: int
 ) -> pd.DataFrame:
     """Each estimand summarized for each kind and for the kind difference.
 
     Parameters
     ----------
-    per_session : pd.DataFrame
-        :func:`session_estimands` of the fits of both kinds (any models and
-        variants); only the kept values are read.
+    per_unit : pd.DataFrame
+        :func:`unit_estimands` of the fits of both kinds (any models and
+        variants), of one unit of the fit; only the kept values are read.
     n_draws, seed : int
-        The nested bootstrap's (``estimand_summary``).
+        The bootstrap's (``units.unit_summary``).
 
     Returns
     -------
     pd.DataFrame
         One row per (model, variant, estimand, tested), ``tested`` one of
-        ``declared_tests.TESTED``: ``estimand_summary``'s entries, and
-        ``n_sessions_left_out`` (sessions with a value that was not kept, for
-        a kind; for the difference, sessions with a kept value of one kind
-        only). A tested quantity with no kept session has NaN entries.
+        ``declared_tests.TESTED``: ``unit_summary``'s entries (with
+        ``fit_by`` and ``n_units``), and ``n_units_left_out`` (units with a
+        value that was not kept, for a kind; for the difference, units with a
+        kept value of one kind only). A tested quantity with no kept unit has
+        NaN entries.
+
+    Raises
+    ------
+    ValueError
+        If the values are of more than one unit of the fit.
     """
-    kept = per_session.loc[per_session["kept"]]
+    fit_by = _fit_by(per_unit)
+    keys = list(fit_by_columns(fit_by))
+    kept = per_unit.loc[per_unit["kept"]]
     out = []
-    for (model, variant, eid), group in per_session.groupby(
+    for (model, variant, eid), group in per_unit.groupby(
         ["model", "variant", "estimand_id"], sort=False
     ):
         values = {}
         for kind in dt.KINDS:
-            of_kind = kept[
+            values[kind] = kept[
                 (kept["model"] == model)
                 & (kept["variant"] == variant)
                 & (kept["estimand_id"] == eid)
                 & (kept["kind"] == kind)
-            ]
-            values[kind] = of_kind.set_index(_KEYS)["estimate"]
+            ].set_index(keys)
         both = values[dt.KINDS[0]].index.intersection(values[dt.KINDS[1]].index)
         values[dt.DIFFERENCE] = (
-            values[dt.KINDS[0]].loc[both] - values[dt.KINDS[1]].loc[both]
+            values[dt.KINDS[0]]
+            .loc[both]
+            .assign(
+                estimate=values[dt.KINDS[0]].loc[both, "estimate"]
+                - values[dt.KINDS[1]].loc[both, "estimate"]
+            )
         )
         for tested in dt.TESTED:
-            series = values[tested]
+            frame = values[tested]
             if tested == dt.DIFFERENCE:
                 left_out = len(
                     values[dt.KINDS[0]].index.symmetric_difference(
@@ -243,13 +316,14 @@ def estimand_summaries(
                 "variant": variant,
                 "estimand_id": eid,
                 "tested": tested,
-                "n_sessions_left_out": left_out,
+                "n_units_left_out": left_out,
             }
-            if len(series):
-                index = series.index.to_frame(index=False)
-                labels = [pd.Series(index[c].to_numpy()) for c in _KEYS]
-                entry |= estimand_summary(
-                    pd.Series(series.to_numpy()), *labels, n_draws=n_draws, seed=seed
+            if len(frame):
+                entry |= unit_summary(
+                    _indexed(frame.reset_index(), fit_by),
+                    fit_by,
+                    n_draws=n_draws,
+                    seed=seed,
                 )
             out.append(entry)
     return pd.DataFrame(out)

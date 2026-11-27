@@ -138,8 +138,8 @@ One setting, three values (**call**, on the lead's 03:33 words):
   fitted are declared once, in `analysis/replay_models/fit_by.py`: `BEHAVIOR_FIT_BY = ("day",
   "animal")`, both units, in that order (decided, 09:55; section 11.1). The rate and content models
   read it ("rate, content, etc", decided, 02:10), and so do the choice, stay-or-leave and ripple-power
-  models (the author's reading of "etc", 11.1). The mPFC models do not (decided, 02:14). Nothing reads it
-  yet: the models read it from tasks 8 and 9 of the plan on. `"session"`
+  models (the author's reading of "etc", 11.1). The mPFC models do not (decided, 02:14). The rate model
+  reads it since task 8 of the plan (2026-11-26), the content model since task 9 (2026-11-27). `"session"`
   stays a value of `FitBy` and of the mechanism, with today's behavior exactly: it is the earlier design,
   kept for the validation and for comparison, and it is the default of `fit_sessions`.
 - **One code path.** `fit_sessions` takes `fit_by` and groups the sessions it is given into units. Each
@@ -158,7 +158,7 @@ is design C of the 03:13 answer. A baseline is never tested and is never read by
 | model | per session inside the unit | shared inside the unit |
 |---|---|---|
 | rate (`visit_rate_A`, `visit_rate_D`) | the intercept (the session's level of rate) | the reward coefficient (A); the lag curve (D; described, not tested: **call**); the clock curves: **OPEN (a)** |
-| content (`role_content`, `role_content_uncertainty`) | the arm effects: **OPEN (b)** | the role levels, the role slopes, the smooths |
+| content (`role_content`, `role_content_uncertainty`) | the arm effects (OPEN (b) below; decided 2026-11-24, per session; built 2026-11-27) | the role levels, the role slopes, the smooths (at the animal unit the role levels go per day: R1, decided 2026-11-27, built after task 9) |
 | choice, stay or leave, ripple power (Phase 7, not built) | the model's baseline, declared with the model | its tested terms |
 
 **OPEN (a), rate: are the clock curves shared inside the unit?** The model has two clocks that Q1 and

@@ -7,13 +7,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
+from continuum_swr_replay.analysis.regression.units import unit_summary
 from continuum_swr_replay.analysis.replay_models import declared_tests as dt
 from continuum_swr_replay.analysis.replay_models.content import role_content as rc
+from continuum_swr_replay.analysis.replay_models.content import (
+    role_content_scenarios as sc,
+)
 from continuum_swr_replay.analysis.replay_models.content import (
     role_content_statistics as rs,
 )
 from continuum_swr_replay.analysis.shared_statistics import estimand_summary
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, fit_by_columns
+
+from .role_tables import draw_shares, synthetic_event_arm_table
 
 SESSIONS = [
     ("a1", "20200101", "02_r1"),
@@ -39,6 +46,7 @@ def _per_session(values: dict[str, list[float]], kept=None) -> pd.DataFrame:
                     "estimate": estimate,
                     "variance": 0.01,
                     "kept": True if kept is None else kept[kind][i],
+                    "fit_by": "session",
                 }
             )
     return pd.DataFrame(rows)
@@ -62,8 +70,8 @@ def test_summaries_for_each_kind_and_the_difference() -> None:
     )
     assert out.loc[dt.DIFFERENCE, "estimate"] == pytest.approx(expected["estimate"])
     assert out.loc[dt.DIFFERENCE, "n_sessions"] == 5
-    assert out.loc[dt.DIFFERENCE, "n_sessions_left_out"] == 1
-    assert out.loc["No SWR", "n_sessions_left_out"] == 1
+    assert out.loc[dt.DIFFERENCE, "n_units_left_out"] == 1
+    assert out.loc["No SWR", "n_units_left_out"] == 1
     assert out.loc["No SWR", "n_sessions"] == 5
 
 
@@ -141,3 +149,86 @@ def test_current_share_by_time_until_leaving_by_hand() -> None:
     out = rs.current_share_by_time_until_leaving(rows).set_index("bin")["share"]
     assert out["[0.0, 0.25)"] == pytest.approx(0.7)
     assert out["[1.0, 2.0)"] == pytest.approx(0.2)
+
+
+@pytest.fixture(scope="module")
+def unit_rows():
+    """The No SWR rows of four sessions (a day of two, a day of one, a second
+    animal), shares drawn around role levels and arm effects."""
+    keys = (
+        ("a1", "20200101", "02_r1"),
+        ("a1", "20200101", "04_r2"),
+        ("a1", "20200102", "02_r1"),
+        ("a2", "20200103", "04_r2"),
+    )
+    cohort = rc.role_content_cohort(
+        synthetic_event_arm_table(keys, n_visits=150, swr_share=0.3, seed=3)
+    )
+    truth = sc.Truth(arm=sc.arm_effects(), role={"current": 0.6, "previous": -0.4})
+    reference = sc.ScenarioReference(cohort.rows, cohort.reference_log_duration)
+    rows = cohort.model_rows("role_content")
+    rows = rows[rows[rc.KIND] == "No SWR"]
+    sessions = {
+        key: draw_shares(part, sc.expected_shares(part, truth, reference), 40, i)
+        for i, (key, part) in enumerate(rc.session_rows(rows).items())
+    }
+    return cohort, sessions
+
+
+@pytest.mark.parametrize(
+    ("fit_by", "n_units"), [("session", 4), ("day", 3), ("animal", 2)]
+)
+def test_unit_estimands_at_each_unit(unit_rows, fit_by, n_units) -> None:
+    """One row per unit and estimand, keyed by the unit; each value is the
+    declared contrast mapped onto the unit's coefficients by name (the arm
+    copies are not read); the summary is ``unit_summary`` at the unit, the
+    kind difference taken unit by unit; values of two units are refused."""
+    cohort, sessions = unit_rows
+    settings = rc.RoleContentSettings(fit_by=fit_by)
+    fit = rc.fit_role_content(
+        sessions, model="role_content", variant="unadjusted", kind="No SWR",
+        reference_log_duration=cohort.reference_log_duration, settings=settings,
+        scale_rows=cohort.model_rows("role_content"),
+    )  # fmt: skip
+    values = rs.unit_estimands(fit)
+    assert len(values) == n_units * len(fit.contrasts)
+    assert (values["fit_by"] == fit_by).all() and values["kept"].all()
+    record = fit.records[-1]
+    got = values[
+        (values["animal"] == record.animal)
+        & (values["session_date"] == record.session_date)
+        & (values["epoch"] == record.epoch)
+    ].set_index("estimand_id")
+    for estimand_id, contrast in fit.contrasts.items():
+        on_fit = fit.design.contrast_on(contrast, record.coef_names)
+        expected = evaluate_contrast(
+            on_fit, np.asarray(record.coef), np.asarray(record.vcov)
+        )
+        assert got.loc[estimand_id, "estimate"] == pytest.approx(
+            expected.estimate, rel=1e-12
+        )
+    shift = values.assign(kind="SWR", estimate=values["estimate"] + 0.2)
+    summary = rs.estimand_summaries(
+        pd.concat([values, shift]), n_draws=100, seed=1
+    ).set_index(["estimand_id", "tested"])
+    assert (summary["fit_by"] == fit_by).all()
+    q3a = values[values["estimand_id"] == "Q3a"]
+    columns = list(fit_by_columns(fit_by))
+    index = (
+        pd.Index(q3a[columns[0]].to_numpy(), name=columns[0])
+        if len(columns) == 1
+        else pd.MultiIndex.from_frame(q3a[columns])
+    )
+    expected = unit_summary(
+        pd.Series(q3a["estimate"].to_numpy(), index=index), fit_by, n_draws=100, seed=1
+    )
+    assert summary.loc[("Q3a", "No SWR"), "estimate"] == pytest.approx(
+        expected["estimate"]
+    )
+    assert summary.loc[("Q3a", dt.DIFFERENCE), "estimate"] == pytest.approx(0.2)
+    assert summary.loc[("Q3a", "No SWR"), "n_units"] == n_units
+    other = "animal" if fit_by != "animal" else "day"
+    with pytest.raises(ValueError, match="fit_by"):
+        rs.estimand_summaries(
+            pd.concat([values, shift.assign(fit_by=other)]), n_draws=100, seed=1
+        )
