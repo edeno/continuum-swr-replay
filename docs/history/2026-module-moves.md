@@ -1016,8 +1016,10 @@ the one of before, with two new fields (`fit_by`, `sessions`). Paths are under
 The branch `visit-rate-validation` merged master (908f05af) in 45565605. Its per-animal check of the
 rate model's reward coefficient and the target computed for it are removed: a fit at
 `fit_by="animal"` (with the shared curves of design C) and the engine's unit target `planted_unit`
-replace them. The engine's own fit stays at the session unit only, for the joint run of both kinds.
-Paths are under `src/continuum_swr_replay/analysis/`.
+replace them. The engine's own fit and the joint run of both kinds were then removed too
+(2026-11-26): `regression/simulation.py` and its tests are master's. Neither is merged to master; both
+are reachable at the tag `rate-validation-with-joint-run-ae44dce8`, and the code of the earlier
+reports at `rate-validation-frozen-5d97fd98`. Paths are under `src/continuum_swr_replay/analysis/`.
 
 | Old place | New place | Commit |
 |---|---|---|
@@ -1028,5 +1030,8 @@ Paths are under `src/continuum_swr_replay/analysis/`.
 | `replay_models/rate/visit_rate_scenarios.shared_ratio_projection` (removed) | `regression.simulation`'s unit target `planted_unit` | 6d05d866 |
 | `replay_models/rate/visit_rate_simulation._animal_truth`, the scenarios' `"animal"` truths, the table's `truth_animal`, the reference rate of `_scenario_truth` and `_zero` (removed) | `planted_unit` | 6d05d866 |
 | `regression/simulation._animal_data_set_row`, the animal units of `_own_units`, `_planted_beta(..., absent_allowed)`, the own-fit exemption and the inside-coefficient guard of `_check`, the animal-unit `reject_day` of `summarize` (removed) | `fit_by="animal"` and `units.unit_summary`; master's `_planted_beta` and `_check` | 67763447 |
-| `regression/simulation._data_set_row` (split) | `_data_set_row` and `_reduced_row`, which the session-level own fit (`_own_fit_rows`) calls too | 67763447 |
+| `regression/simulation._data_set_row` (split into `_data_set_row` and `_reduced_row`) | undone: master's `_data_set_row` | 67763447, 0f33f726 |
+| `replay_models/rate/visit_rate_simulation.joint_fit`, `joint_simulation`, `JointConfig`, `JOINT_QUICK`, `_kind_units`, `_KindRows`, `_joint_truths`, `joint_table`, `joint_estimand`, `KIND_COLUMN`, `DIFFERENCE`, `JOINT_ESTIMANDS`, `JOINT_SCENARIOS`, `JOINT_PRIOR_SDS`, the `kind="both"` dispatch, and their tests (removed) | not merged to master; reachable at the tag `rate-validation-with-joint-run-ae44dce8`. The kind difference at a day or an animal is to be an extension of master's engine | 61188272 |
+| `regression/simulation.Model.fit`, `fit_estimands`, `fit_columns`, `estimand_names`, `OwnFit`, `UNIT_COLUMNS`, `_own_units`, `_own_fit_rows`, and the own-fit tests of `tests/analysis/regression/test_simulation_engine.py` (removed) | not merged to master; reachable at the tag `rate-validation-with-joint-run-ae44dce8`. Master's engine at `fit_by` | 0f33f726 |
+| `replay_models/rate/visit_rate_simulation.PRIOR_SDS` `(1, 2, 4, 8)` | `(visit_rate.WEAK_PRIOR_SD, *visit_rate.WEAK_PRIOR_SD_SENSITIVITY)`, that is (2, 1, 4) | 817fa1b4 |
 | `shared_statistics.animal_mean_interval` (the branch's copy) | master's `shared_statistics.animal_mean_interval` (the same arithmetic, with an `sd` key) | 45565605 |
