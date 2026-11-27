@@ -50,22 +50,16 @@ A visited other-leaf arm is at least 3 trials since its last visit; one never
 visited carries the censored count, which can be 2, and the never-visited
 indicator. Q5a reads the other-leaf curve at its two points.
 
+The trunk role holds exactly on the trunk arms, each of which has a free arm
+effect, so a trunk level would be an exact function of the arm and not a
+parameter of the model. The role category therefore declares it uncoded
+(``regression.terms.Category.uncoded``; the regression code author's call): it
+has no column and stays a role for every term by role, and
+:func:`design_rows` refuses rows on which the trunk role and the trunk arms
+disagree.
+
 A call of this module, made where the plan does not fix it:
 
-- The trunk level of the role category is a function of the arm, so it is not
-  identified beside the arm effects. It is kept as a level (so that the trunk
-  rows are a role of their own for every term by role and for the support
-  rule) and the weak penalty of the role category sets its coefficient to 0;
-  the likelihood is flat along that one direction, so every other coefficient
-  and its variance are those of the model without it. The record's
-  collinearity of the term ``role`` therefore counts that column, which is
-  exactly collinear with the arm effects (its ``worst`` is 1) while its
-  ``estimate`` can be far below the rule's limit. The collinearity rule of
-  these models reads the collinearity of each tested coefficient alone
-  (:func:`tested_coefficient_collinearity`, :attr:`RoleContentFit.separable`),
-  never the record's term ``role``; the trunk level is not a tested
-  coefficient and is left out of it, because its collinearity is a property of
-  the design (a function of the arm, fitted at 0), not of the data.
 - The collinearity of a tested coefficient is measured on the information of
   the penalized problem with the smooths' declared penalties in and the weak
   penalties out (:func:`tested_coefficient_collinearity` says why). On the
@@ -148,7 +142,6 @@ __all__ = [
     "ROLES",
     "SCALE_POOLINGS",
     "TRIAL_NUMBER_COLUMNS",
-    "TRUNK_LEVEL",
     "VARIANTS",
     "WEAK_PRIOR_SD",
     "WEAK_PRIOR_SD_SENSITIVITY",
@@ -339,8 +332,6 @@ Variant = Literal["unadjusted", "length_adjusted"]
 
 ROLES: tuple[str, ...] = ("other_leaf", "current", "previous", "trunk")
 REFERENCE_ROLE = "other_leaf"
-TRUNK_LEVEL = "role[trunk]"
-"""The trunk level's coefficient: a function of the arm, fitted at 0."""
 LEAF_ROLES: tuple[str, ...] = ("current", "previous", "other_leaf")
 
 RESPONSE = "arm_fraction"
@@ -736,6 +727,7 @@ def design_rows(
     unadjusted variant adds nothing.
     """
     _check_model(model, variant)
+    _require_trunk_role_on_trunk_arms(rows)
     if variant == "unadjusted":
         return rows
     out = rows.copy()
@@ -744,6 +736,21 @@ def design_rows(
         centered = out[covariate] - reference.covariate_means[covariate]
         out[_product(covariate)] = centered * out[LOG_DURATION_REL]
     return out
+
+
+def _require_trunk_role_on_trunk_arms(rows: pd.DataFrame) -> None:
+    """Refuse rows whose role is trunk off the trunk arms, or not trunk on
+    one: the trunk level has no column because the two are the same
+    (module docstring)."""
+    trunk_role = (rows[ROLE] == "trunk").to_numpy()
+    trunk_arm = rows[ARM].isin(TRUNK_ARMS).to_numpy()
+    wrong = trunk_role != trunk_arm
+    if wrong.any():
+        raise ValueError(
+            f"{int(wrong.sum())} rows break the trunk role exactly on the trunk "
+            f"arms {TRUNK_ARMS}: the trunk level has no column only because the "
+            "two are the same"
+        )
 
 
 def _check_model(model: str, variant: str) -> None:
@@ -766,7 +773,9 @@ def role_terms(
     _check_model(model, variant)
     settings = settings or RoleContentSettings()
     weak = log_penalty_from_prior_sd(settings.prior_sd)
-    role = Category(ROLE, ROLES, reference=REFERENCE_ROLE, penalty=weak)
+    role = Category(
+        ROLE, ROLES, reference=REFERENCE_ROLE, penalty=weak, uncoded=("trunk",)
+    )
     terms: list = [
         Category(ARM, ALL_ARMS, reference=ALL_ARMS[0], penalty="none"),
         role,
@@ -1014,7 +1023,7 @@ class RoleContentFit:
         Session key -> :func:`tested_coefficient_collinearity` of the simple
         tested coefficients (a role level, a slope; a smooth's is the
         record's concurvity of the term); empty for a session without a kept
-        fit. The trunk level is never among them (module docstring).
+        fit.
     settings : RoleContentSettings
     """
 
@@ -1033,9 +1042,7 @@ class RoleContentFit:
         """The collinearity rule of these models: session key -> tested
         coefficient -> True when the other columns explain less than
         ``collinearity.MAX_EXPLAINED`` of it (``collinearity.separable`` of
-        :attr:`tested_collinearity`, measured on the penalized problem). The
-        record's collinearity of the term ``role`` is not read: it counts the
-        trunk level, exactly collinear with the arm effects by construction."""
+        :attr:`tested_collinearity`, measured on the penalized problem)."""
         return {key: separable(m) for key, m in self.tested_collinearity.items()}
 
 
@@ -1137,7 +1144,6 @@ def fit_role_content(
         name
         for name in tested_coefficients(design, contrasts)
         if design.column_terms[design.coef_names.index(name)].kind != "smooth"
-        and name != TRUNK_LEVEL
     ]
     collinearity = {
         key: tested_coefficient_collinearity(design, prepared[key], record, simple)

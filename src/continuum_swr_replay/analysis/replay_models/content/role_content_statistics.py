@@ -111,8 +111,7 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
     fixed penalty. Its edf (the record's ``edf`` by coefficient name) is near 1
     when the data decide its value and lower as the penalty shrinks it; for
     one coefficient alone it is the shrinkage factor of its estimate, on the
-    model's scale. The trunk level is left out: it is a function of the arm,
-    fitted at 0 by construction, so its edf of 0 says nothing of the data.
+    model's scale.
 
     Returns
     -------
@@ -129,9 +128,7 @@ def penalized_edf(fit: rc.RoleContentFit) -> pd.DataFrame:
     names = [
         t.name
         for t in design.terms
-        if t.kind in ("level", "slope", "binary")
-        and t.block is not None
-        and t.name != rc.TRUNK_LEVEL
+        if t.kind in ("level", "slope", "binary") and t.block is not None
     ]
     rows = []
     for record in fit.records:

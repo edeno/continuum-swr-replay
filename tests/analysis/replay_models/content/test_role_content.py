@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.replay_models.content import (
 from continuum_swr_replay.analysis.replay_models.content import (
     role_content_statistics as rs,
 )
+from continuum_swr_replay.data_loaders.constants import TRUNK_ARMS
 
 from .role_tables import draw_shares, synthetic_event_arm_table
 
@@ -699,74 +700,64 @@ def trunk_session():
     return cohort, sessions, _fit(cohort, sessions, "role_content")
 
 
-def test_trunk_level_is_fitted_at_zero_and_changes_no_tested_coefficient(
+def test_the_design_has_no_trunk_column_and_is_identified_without_the_weak_penalty(
     trunk_session,
 ) -> None:
+    """The trunk role holds exactly on the trunk arms, whose arm effects have
+    a column each, so the role category declares it uncoded: the design has
+    no trunk column, the trunk is still a role for the terms by role, and the
+    model is identified with the weak penalty off."""
     from continuum_swr_replay.analysis.regression.likelihoods import GroupedSoftmax
     from continuum_swr_replay.analysis.regression.sessions import fit_sessions
-    from continuum_swr_replay.analysis.regression.terms import (
-        log_penalty_from_prior_sd,
+    from continuum_swr_replay.analysis.regression.simulation import (
+        _without_weak_penalty,
     )
 
-    cohort, sessions, fit = trunk_session
-    (record,) = fit.records
-    names = list(fit.design.coef_names)
-    assert record.status == "converged"
-    assert abs(record.coef[names.index(rc.TRUNK_LEVEL)]) < 1e-6
-    # The same model with no trunk level: the trunk rows join the reference
-    # level of the role category only (every term by role still reads role).
-    weak = log_penalty_from_prior_sd(rc.WEAK_PRIOR_SD)
-    terms = [
-        Category("role_no_trunk", rc.LEAF_ROLES[::-1], reference=rc.REFERENCE_ROLE,
-                 penalty=weak)
-        if isinstance(t, Category) and t.column == rc.ROLE
-        else t
-        for t in rc.role_terms("role_content", "unadjusted")
-    ]  # fmt: skip
+    _, sessions, fit = trunk_session
+    names = fit.design.coef_names
+    assert "role[trunk]" not in names
+    assert [n for n in names if n.startswith("role[")] == [
+        "role[current]",
+        "role[previous]",
+    ]
+    (role,) = [c for c in fit.design.categories if c.column == rc.ROLE]
+    assert role.uncoded == ("trunk",)
     ((key, rows),) = sessions.items()
-    rows = rows.assign(role_no_trunk=rows[rc.ROLE].replace("trunk", rc.REFERENCE_ROLE))
-    scale = cohort.rows.assign(
-        role_no_trunk=cohort.rows[rc.ROLE].replace("trunk", rc.REFERENCE_ROLE)
+    (record,) = fit_sessions(
+        _without_weak_penalty(fit.design), {key: rows}, GroupedSoftmax(),
+        model="no_weak_penalty", kind=KIND, response=rc.RESPONSE, unit=rc.UNIT,
+        table_sha256={},
+    )  # fmt: skip
+    assert record.status == "converged"
+
+
+def test_a_trunk_role_off_the_trunk_arms_is_refused(cohort) -> None:
+    rows = cohort.rows[cohort.rows[rc.KIND] == KIND]
+    reference = rc.ContrastReference.from_rows(
+        rows, cohort.reference_log_duration, "role_content"
     )
-    design = build_design(terms, scale, intercept=False)
-    (without,) = fit_sessions(
-        design, {key: rows}, GroupedSoftmax(), model="no_trunk", kind=KIND,
-        response=rc.RESPONSE, unit=rc.UNIT, table_sha256={},
-    )  # fmt: skip
-    other = list(design.coef_names)
-    tested = rc.tested_coefficients(fit.design, fit.contrasts)
-    assert tested
-    index = [names.index(n) for n in tested]
-    index_without = [other.index(n.replace("role[", "role_no_trunk[")) for n in tested]
-    np.testing.assert_allclose(
-        np.asarray(record.coef)[index],
-        np.asarray(without.coef)[index_without],
-        rtol=1e-6, atol=1e-8,
-    )  # fmt: skip
-    vcov = np.asarray(record.vcov)[np.ix_(index, index)]
-    vcov_without = np.asarray(without.vcov)[np.ix_(index_without, index_without)]
-    np.testing.assert_allclose(vcov, vcov_without, rtol=1e-6, atol=1e-12)
+    leaf = rows.index[~rows[rc.ARM].isin(TRUNK_ARMS)][0]
+    trunk = rows.index[rows[rc.ARM].isin(TRUNK_ARMS)][0]
+    for index, role in ((leaf, "trunk"), (trunk, rc.REFERENCE_ROLE)):
+        bad = rows.copy()
+        bad.loc[index, rc.ROLE] = role
+        for variant in rc.VARIANTS:
+            with pytest.raises(
+                ValueError, match="trunk role exactly on the trunk arms"
+            ):
+                rc.design_rows(bad, "role_content", variant, reference)
 
 
 def test_the_collinearity_rule_reads_the_tested_coefficients(trunk_session) -> None:
-    from continuum_swr_replay.analysis.regression.collinearity import (
-        MAX_EXPLAINED,
-        separable,
-    )
+    from continuum_swr_replay.analysis.regression.collinearity import MAX_EXPLAINED
 
     _, _, fit = trunk_session
     (record,) = fit.records
     key = (record.animal, record.session_date, record.epoch)
-    # The record reports the trunk level's exact collinearity with the arm
-    # effects in the term's worst case, while the term's rule reads its
-    # estimate, which passes: the record's term ``role`` is not the rule here.
-    assert record.collinearity["role"]["worst"] > 1 - 1e-6
-    assert separable(record.collinearity)["role"]
     tested = fit.tested_collinearity[key]
     assert set(fit.separable[key]) == set(tested) == {
         "role[current]", "role[previous]", "value:role=other_leaf"
     }  # fmt: skip
-    assert rc.TRUNK_LEVEL not in fit.separable[key]
     assert fit.separable[key] == {n: m["r2"] < MAX_EXPLAINED for n, m in tested.items()}
     # The role levels are separable; on these synthetic rows the value slope
     # is not (the reward fraction and the belief mean share their outcomes).
@@ -1072,7 +1063,7 @@ def _identified(c, null):
 def test_the_role_levels_are_identified_beside_the_recency_curve(table) -> None:
     """On events whose other-leaf arms are all at least 3 trials since their
     last visit, the current and previous levels are identified by the
-    unpenalized likelihood and Q5a is too; the trunk level is not."""
+    unpenalized likelihood and Q5a is too."""
     model = "role_content"
     cohort = rc.role_content_cohort(table)
     rows = cohort.model_rows(model)
@@ -1087,7 +1078,6 @@ def test_the_role_levels_are_identified_beside_the_recency_curve(table) -> None:
     null = _within_event_null_space(design, rows)
     names = design.coef_names
     unit = np.eye(len(names))
-    assert not _identified(unit[names.index(rc.TRUNK_LEVEL)], null)
     for role in ("current", "previous"):
         assert _identified(unit[names.index(f"role[{role}]")], null)
     term = dt.estimand("Q5a").contrast.term
