@@ -1977,6 +1977,75 @@ def test_a_session_without_the_reference_arm_is_an_error_naming_the_fit() -> Non
         )  # fmt: skip
 
 
+def test_copies_carry_an_uncoded_levels_rows_and_its_by_term_is_fitted() -> None:
+    """A fit by day of three sessions with the arm category a baseline (copied
+    for each session) and a role category whose trunk level, a function of
+    the arm, is uncoded: the copies' design holds the trunk rows, and a slope
+    fitted for the trunk rows only is fitted."""
+    roles = np.array(["other", "current", "other", "trunk"], dtype=object)
+    sessions = {
+        key: rows.assign(role=roles[rows["arm"].to_numpy()])
+        for key, rows in _arm_sessions().items()
+    }
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    weak = log_penalty_from_prior_sd(2.0)
+    role = Category("role", ("other", "current", "trunk"), "other", weak,
+                    uncoded=("trunk",))  # fmt: skip
+    design = build_design(
+        [
+            Category("arm", (0, 1, 2, 3), reference=0, penalty="none"),
+            role,
+            Slope("flag", weak, by=role, levels=("trunk",)),
+        ],
+        pooled,
+        intercept=False,
+        baseline=("arm",),
+    )
+    keys = list(sessions)
+    copies = design.for_sessions(keys)
+    built = copies.build(
+        pooled, np.repeat(np.arange(len(keys)), [len(f) for f in sessions.values()])
+    )
+    np.testing.assert_array_equal(
+        built.level_rows[("role", "trunk")], (pooled["role"] == "trunk").to_numpy()
+    )
+    (record,) = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+        fit_by="day",
+    )  # fmt: skip
+    assert record.status == "converged"
+    assert "role[trunk]" not in record.coef_names
+    assert np.isfinite(record.coef[record.coef_names.index("flag:role=trunk")])
+
+
+def test_a_copy_whose_only_zero_rows_are_uncoded_is_refused() -> None:
+    """A baseline category with an uncoded level: in a session without its
+    reference rows, the copy's columns are zero only on the uncoded rows,
+    which are not the reference's, and the fit is refused, naming that
+    session."""
+    sessions = _arm_sessions()
+    middle = list(sessions)[1]
+    sessions[middle] = sessions[middle][sessions[middle]["arm"] != 0]
+    design = build_design(
+        [
+            Category("arm", (0, 1, 2, 3), reference=0, penalty="none", uncoded=(3,)),
+            Slope("flag", log_penalty_from_prior_sd(2.0)),
+        ],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+        baseline=("arm",),
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"day sim/20260101: the category 'arm' has no rows of its reference "
+        r"level 0 in session sim/20260101/04_r1.*arm\[1\]@sim/20260101/04_r1",
+    ):
+        _fit(
+            design, sessions, GroupedSoftmax(), response="share", unit="event_id",
+            fit_by="day",
+        )  # fmt: skip
+
+
 def _weighted_r2(W: np.ndarray, projected: list[int], term: int, others: list[int]):
     """The R^2 of column ``term`` of ``W`` on ``others`` after the columns
     ``projected`` are projected out by one QR: the collinearity record's
