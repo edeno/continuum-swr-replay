@@ -1722,7 +1722,7 @@ Planted scenarios of the visit rate model, as pure functions of the rows.
 
 The visit rate model's scenario list for the simulation engine.
 
-`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `calibrate_clocks`, `simulation`, `table`, `joint_estimand`, `JointConfig`, `joint_fit`, `joint_simulation`, `joint_table`
+`Config`, `synthetic_visit_rows`, `spread_sessions`, `real_cohort`, `smoothed_log_rate`, `shaped_clocks`, `calibrate_clocks`, `simulation`, `table`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/visit_rate_statistics.py`
 
