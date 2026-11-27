@@ -59,7 +59,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     signed_rank_p,
 )
 
-from .conftest import ROLES, content_rows, rate_rows
+from .conftest import ROLES, cohort, content_rows, rate_rows
 
 #: The weak penalty of the tests: a prior SD of 2 on each simple coefficient.
 WEAK = log_penalty_from_prior_sd(2.0)
@@ -71,13 +71,13 @@ FIXTURE = Path(__file__).parent / "data" / "numpy_reference" / "simulation_engin
 def _cohort(make, n_animals: int = 5, n_sessions: int = 2) -> dict:
     """``n_animals`` animals of ``n_sessions`` sessions, each on its own day,
     their rows from ``make(seed)``."""
-    out = {}
-    for a in range(n_animals):
-        for e in range(n_sessions):
-            key = (f"animal{a}", f"2026{e + 1:04d}", "02_r1")
-            rows = make(n_sessions * a + e)
-            out[key] = rows.assign(animal=key[0], session_date=key[1], epoch=key[2])
-    return out
+    return cohort(
+        make,
+        animals=[f"animal{a}" for a in range(n_animals)],
+        days=[f"2026{e + 1:04d}" for e in range(n_sessions)],
+        epochs=["02_r1"],
+        seed=lambda a, d, e: n_sessions * a + d,
+    )
 
 
 def rate_model(sessions: dict) -> Model:
@@ -235,12 +235,14 @@ def _simulation(model, sessions, scenarios, n_data_sets=2, seed=5) -> Simulation
 
 
 def _capture(monkeypatch) -> list[dict]:
-    """The data sets given to ``fit_sessions``, recorded as the engine runs."""
+    """The drawn data sets given to ``fit_sessions``, recorded as the engine
+    runs (not the fits of the expected outcome behind the unit's target)."""
     seen = []
     real = engine.fit_sessions
 
     def recording(design, sessions, *args, **kwargs):
-        seen.append({key: rows.copy() for key, rows in sessions.items()})
+        if kwargs["kind"] != "target":
+            seen.append({key: rows.copy() for key, rows in sessions.items()})
         return real(design, sessions, *args, **kwargs)
 
     monkeypatch.setattr(engine, "fit_sessions", recording)
@@ -493,13 +495,17 @@ def _hand_tables() -> tuple[pd.DataFrame, pd.DataFrame, Simulation]:
             "model": "m",
             "data_set": range(5),
             "estimand": "e",
+            "fit_by": "session",
             "planted": 1.0,
+            "planted_unit": 1.1,
             "estimate": [1.0, 2.0, 0.4, 1.2, nan],
             "low": [0.5, 1.8, -0.1, nan, nan],
             "high": [1.5, 2.2, 0.9, nan, nan],
             "day_p": [0.01, 0.2, nan, nan, nan],
             "n_sessions_used": [4, 4, 3, 2, 0],
             "covered": [1.0, 0.0, 1.0, nan, nan],
+            "covered_unit": [1.0, 0.0, 0.0, nan, nan],
+            "n_units_used": [4, 4, 3, 2, 0],
             "excludes_zero": [1.0, 1.0, 0.0, nan, nan],
         }
     )
@@ -552,7 +558,16 @@ def test_summary_arithmetic_by_hand() -> None:
         "n_data_sets_with_day_p": 2,
         "n_draws": 100,
         "seed": 7,
+        # Against the unit's target, 1.1 in every data set.
+        "planted_unit": 1.1,
+        "bias_unit": 0.05,
+        "coverage_unit": 1 / 3,
+        "coverage_unit_se": np.sqrt(2 / 9 / 3),
+        "n_units_used_mean": 2.6,
+        # The four sessions, 2.6 of them used on average.
+        "share_sessions_unused": 1 - 2.6 / 4,
     }
+    assert row["fit_by"] == "session"
     for column, value in expected.items():
         assert row[column] == pytest.approx(value), column
     others = [c for c in CAUSES if c not in ("no_events", "support")]
@@ -590,6 +605,31 @@ def test_expected_shares_must_sum_to_one(content_sessions_cohort) -> None:
     scenario = OutsideScenario("near", partial(_shares, scale_first=near))
     drawn = draw_data_set(model, sessions, scenario, rng)
     assert all(np.isfinite(rows["share"]).all() for rows in drawn.values())
+
+
+@pytest.mark.parametrize("inside", [True, False], ids=["inside", "outside"])
+@pytest.mark.parametrize("empty", ["no_rows", "every_row_missing"])
+def test_a_softmax_session_without_rows_has_no_value(
+    empty: str, inside: bool, content_sessions_cohort
+) -> None:
+    """Under the grouped softmax, one session of 10 with no rows, or with the
+    role missing on every row: its drawn shares are all NaN, and a run inside
+    or outside the model completes, the session without a value for
+    ``no_rows``, as ``fit_sessions`` records it."""
+    sessions = dict(content_sessions_cohort)
+    model = content_model(sessions)
+    key = list(sessions)[1]
+    rows = sessions[key]
+    sessions[key] = rows.iloc[:0] if empty == "no_rows" else rows.assign(role=None)
+    scenario = CONTENT_INSIDE if inside else OutsideScenario("outside", _shares)
+    drawn = draw_data_set(model, sessions, scenario, np.random.default_rng(0))
+    assert len(drawn[key]) == len(sessions[key])
+    assert drawn[key]["share"].isna().all()
+    result = engine.run(_simulation(model, sessions, [scenario]))
+    row = result.summary.iloc[0]
+    assert row["without_value_no_rows"] == pytest.approx(1 / len(sessions))
+    assert row["share_without_value"] == pytest.approx(1 / len(sessions))
+    assert row["n_data_sets_with_estimate"] == 2
 
 
 def _fixed_rate(sessions, rng):
@@ -733,6 +773,36 @@ def test_refusals(rate_sessions_cohort) -> None:
         )
 
 
+def test_a_gaussian_inside_scenario_has_no_unit_target(rate_sessions_cohort) -> None:
+    """A Gaussian model of the last outcome, inside the model with nothing
+    planted and with the outcome's coefficient planted: the run completes,
+    every data set has an estimate, and ``planted_unit`` is NaN (the
+    expected outcome is noise-free, so its fit has no scale to profile)."""
+    sessions = rate_sessions_cohort
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design([Slope(REWARD, WEAK)], pooled, intercept=True)
+    model = Model(
+        "gaussian",
+        design,
+        Gaussian(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+    )
+    scenarios = [
+        InsideScenario("null", {}, scale=1.0),
+        InsideScenario("planted", {"(Intercept)": 0.3, REWARD: 0.5}, scale=1.0),
+    ]
+    result = engine.run(_simulation(model, sessions, scenarios))
+    table = result.summary.set_index("scenario")
+    assert list(table.index) == ["null", "planted"]
+    assert table["planted"].tolist() == [0.0, 0.5]
+    assert result.data_sets["planted_unit"].isna().all()
+    assert table["planted_unit"].isna().all() and table["bias_unit"].isna().all()
+    assert np.isfinite(result.data_sets["estimate"]).all()
+    assert (table["n_data_sets_with_estimate"] == 2).all()
+
+
 def reference_tables() -> dict[str, list[dict]]:
     """The summary tables of the fixture: the rate model under the inside and
     the outside scenario, and the content model inside, on fixed seeds."""
@@ -764,24 +834,41 @@ def reference_tables() -> dict[str, list[dict]]:
 
 
 #: The summary's columns that the fixture predates.
-ADDED_COLUMNS = {"n_data_sets_with_interval", "n_data_sets_with_day_p"}
+ADDED_COLUMNS = {
+    "n_data_sets_with_interval",
+    "n_data_sets_with_day_p",
+    "fit_by",
+    "planted_unit",
+    "bias_unit",
+    "coverage_unit",
+    "coverage_unit_se",
+    "n_units_used_mean",
+    "share_sessions_unused",
+}
 
 
 @pytest.mark.slow
 def test_matches_the_fixed_seed_fixture() -> None:
     """The fixture's tables, to the tolerance of the solver's port
-    (``1e-11 + 1e-9 |b|``), with the counts exactly equal. The summary's two
-    counts added after the fixture was written (:data:`ADDED_COLUMNS`) are
-    not stored: every fixture data set with an estimate has an interval."""
+    (``1e-11 + 1e-9 |b|``), with the counts exactly equal. The summary's
+    columns added after the fixture was written (:data:`ADDED_COLUMNS`: two
+    counts, the unit of the fit with the unit's own target, and the share of
+    sessions unused) are not stored: every fixture data set with an estimate
+    has an interval, every fixture model is fitted by session, and the share
+    of sessions unused follows from the stored session counts."""
     stored = json.loads(FIXTURE.read_text())["tables"]
     for name, rows in reference_tables().items():
         assert len(rows) == len(stored[name])
         for got, want in zip(rows, stored[name], strict=True):
+            assert got["fit_by"] == "session"
             assert got.keys() - want.keys() == ADDED_COLUMNS
             assert want.keys() <= got.keys()
             n = got["n_data_sets_with_estimate"]
             assert got["n_data_sets_with_interval"] == n
             assert 0 <= got["n_data_sets_with_day_p"] <= n
+            assert got["share_sessions_unused"] == pytest.approx(
+                1 - want["n_sessions_used_mean"] / want["n_sessions"]
+            )
             for column, value in want.items():
                 if isinstance(value, float):
                     assert got[column] == pytest.approx(
@@ -789,6 +876,221 @@ def test_matches_the_fixed_seed_fixture() -> None:
                     ), (name, column)
                 else:
                     assert got[column] == value, (name, column)
+
+
+def _day_cohort(n_animals: int = 3, n_days: int = 2, n_sessions: int = 2) -> dict:
+    """``n_animals`` animals of ``n_days`` days of ``n_sessions`` sessions."""
+    return cohort(
+        lambda seed: rate_rows(seed, n_visits=30),
+        animals=[f"animal{a}" for a in range(n_animals)],
+        days=[f"2026{d + 1:04d}" for d in range(n_days)],
+        epochs=[f"0{2 * e + 2}_r1" for e in range(n_sessions)],
+        seed=lambda a, d, e: 100 * a + 10 * d + e,
+    )
+
+
+def unit_rate_model(sessions: dict, fit_by: str) -> Model:
+    """:func:`rate_model` with the intercept a baseline, fitted at ``fit_by``
+    and named by it."""
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [
+            Slope(REWARD, WEAK),
+            Smooth("time_since_s", *CLOCK, 8, 3.0),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    return Model(
+        f"rate_{fit_by}",
+        design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+        fit_by=fit_by,
+    )
+
+
+@pytest.fixture(scope="module")
+def day_cohort() -> dict:
+    return _day_cohort()
+
+
+@pytest.fixture(scope="module")
+def three_units(day_cohort) -> engine.SimulationResult:
+    """One run of the model at the session, the day and the animal unit on
+    the same data sets (2 data sets, 50 draws, seed 5)."""
+    models = [unit_rate_model(day_cohort, f) for f in ("session", "day", "animal")]
+    return engine.run(Simulation(models, day_cohort, [RATE_INSIDE], 2, 50, 5))
+
+
+def _of(table: pd.DataFrame, fit_by: str) -> pd.DataFrame:
+    return table[table["fit_by"] == fit_by]
+
+
+def test_same_seed_same_data_at_every_unit(monkeypatch, day_cohort) -> None:
+    """One run of the model at the three units draws each data set once: the
+    three fits of a data set see the same outcomes, and a run of one unit
+    alone draws the same data."""
+    models = [unit_rate_model(day_cohort, f) for f in ("session", "day", "animal")]
+    seen = _capture(monkeypatch)
+    engine.run(Simulation(models, day_cohort, [RATE_INSIDE], 2, 50, 5))
+    assert len(seen) == 6
+    seen_day = _capture(monkeypatch)
+    engine.run(Simulation(models[1:2], day_cohort, [RATE_INSIDE], 2, 50, 5))
+    for i in range(2):
+        for key in day_cohort:
+            counts = [seen[3 * i + m][key]["count"].to_numpy() for m in range(3)]
+            assert counts[0].tobytes() == counts[1].tobytes() == counts[2].tobytes()
+            assert seen_day[i][key]["count"].to_numpy().tobytes() == counts[0].tobytes()
+
+
+def test_unit_target_equals_planted_when_sessions_agree(three_units) -> None:
+    """Planted coefficients, the same in every session: at each unit the
+    unit's own target equals the planted value (the model holds the truth)."""
+    result = three_units
+    for _, row in result.data_sets.iterrows():
+        assert row["planted"] == pytest.approx(0.5)
+        assert row["planted_unit"] == pytest.approx(0.5, abs=1e-6), row["model"]
+    assert set(result.summary["fit_by"]) == {"session", "day", "animal"}
+
+
+def _unequal_effects(sessions, rng):
+    """The reward effect 0.2 in the first session, 1.0 in the second."""
+    out = {}
+    for k, (key, rows) in enumerate(sessions.items()):
+        effect = (0.2, 1.0)[k]
+        log_rate = np.log(0.8) + effect * rows[REWARD].to_numpy()
+        out[key] = rows["exposure"].to_numpy() * np.exp(log_rate)
+    return out
+
+
+def test_two_targets_differ_when_information_differs() -> None:
+    """Two sessions of one animal, of 120 and 15 visits, with reward effects
+    0.2 and 1.0: the present target is their plain mean, 0.6; the animal fit's
+    own target lies between them, near the larger session's effect."""
+    sessions = {
+        ("animal0", "20260001", "02_r1"): rate_rows(0, n_visits=120),
+        ("animal0", "20260001", "04_r2"): rate_rows(1, n_visits=15),
+    }
+    model = unit_rate_model(sessions, "animal")
+    scenario = OutsideScenario("unequal", _unequal_effects, planted={"reward": 0.6})
+    result = engine.run(Simulation([model], sessions, [scenario], 2, 50, 5))
+    row = result.summary.iloc[0]
+    assert row["planted"] == 0.6
+    assert 0.2 < row["planted_unit"] < 0.45
+    np.testing.assert_allclose(
+        result.data_sets["planted_unit"], row["planted_unit"], rtol=1e-12
+    )
+
+
+def test_unit_rows_and_counts(three_units) -> None:
+    """At the day unit the ``sessions`` table has one row per (estimand, day)
+    with its sessions and events; a data set counts the units and sessions
+    behind its estimate."""
+    sessions = _of(three_units.sessions, "day")
+    units = sessions[sessions["data_set"] == 0]
+    assert len(units) == 6 and set(units["model"]) == {"rate_day"}
+    assert (units["epoch"] == "").all() and (units["n_sessions"] == 2).all()
+    assert (units["n_events"] > 0).all()
+    data_sets = _of(three_units.data_sets, "day")
+    assert len(data_sets) == 2
+    assert (data_sets["n_units_used"] == 6).all()
+    assert (data_sets["n_sessions_used"] == 12).all()
+    assert _of(three_units.summary, "day").iloc[0]["n_units_used_mean"] == 6
+
+
+def test_animal_unit_has_no_day_test(three_units) -> None:
+    """At the animal unit no data set has a day-level p, and the interval is
+    the t interval over the animals."""
+    data_sets = _of(three_units.data_sets, "animal")
+    assert len(data_sets) == 2 and data_sets["day_p"].isna().all()
+    row = _of(three_units.summary, "animal").iloc[0]
+    assert row["n_data_sets_with_day_p"] == 0 and row["reject_day"] == 0.0
+    assert row["n_data_sets_with_interval"] == 2
+
+
+def test_a_session_dropped_from_a_day_is_counted() -> None:
+    """5 animals, each with two sessions on its first day and one on its
+    second (15 sessions); one session of animal0's first day has the last
+    outcome missing on every row. At the session unit that session has no
+    value; at the day unit its day keeps a value from the other session, so
+    no unit lacks one (``share_without_value`` is over the units of the fit),
+    and ``share_sessions_unused`` is 1/15 at both units."""
+    sessions, seed = {}, 0
+    for a in range(5):
+        for day, epochs in (("20260001", ("02_r1", "04_r2")), ("20260002", ("02_r1",))):
+            for epoch in epochs:
+                sessions[f"animal{a}", day, epoch] = rate_rows(seed, 40).assign(
+                    animal=f"animal{a}", session_date=day, epoch=epoch
+                )
+                seed += 1
+    models = [unit_rate_model(sessions, fit_by) for fit_by in ("session", "day")]
+    dropped = ("animal0", "20260001", "04_r2")
+    sessions[dropped] = sessions[dropped].assign(**{REWARD: np.nan})
+    result = engine.run(Simulation(models, sessions, [RATE_INSIDE], 2, 50, 5))
+    table = result.summary.set_index("fit_by")
+    assert table.loc["session", "share_without_value"] == pytest.approx(1 / 15)
+    assert table.loc["day", "share_without_value"] == 0.0
+    assert (table["n_sessions_used_min"] == 14).all()
+    np.testing.assert_allclose(table["share_sessions_unused"], 1 / 15)
+
+
+def test_an_estimand_on_a_baseline_is_refused(day_cohort) -> None:
+    model = unit_rate_model(day_cohort, "day")
+    c = coefficient_contrast(model.design.coef_names, ["(Intercept)"])
+    with pytest.raises(ValueError, match="reads the baseline"):
+        Model("m", model.design, Poisson(), "count", "well_visit_id", {"b": c})
+
+
+def test_the_unit_target_is_the_unpenalized_fit_by_hand() -> None:
+    """Two sessions of 120 and 15 visits with reward effects 0.2 and 1.0 at
+    the animal unit, a model of per-session intercepts and one slope:
+    ``planted_unit`` is the slope of the unpenalized fit to the expected
+    counts, by Newton's method by hand, to 1e-8, and not the weakly penalized
+    one."""
+    sessions = {
+        ("animal0", "20260001", "02_r1"): rate_rows(0, n_visits=120),
+        ("animal0", "20260001", "04_r2"): rate_rows(1, n_visits=15),
+    }
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = build_design(
+        [Slope(REWARD, WEAK), Offset("exposure")],
+        pooled,
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+    model = Model(
+        "rate_animal",
+        design,
+        Poisson(),
+        "count",
+        "well_visit_id",
+        {"reward": coefficient_contrast(design.coef_names, [REWARD])},
+        fit_by="animal",
+    )
+    scenario = OutsideScenario("unequal", _unequal_effects, planted={"reward": 0.6})
+    result = engine.run(Simulation([model], sessions, [scenario], 2, 50, 5))
+    session = np.repeat([0, 1], [len(r) for r in sessions.values()])
+    reward = pooled[REWARD].to_numpy()
+    X = np.column_stack([session == 0, session == 1, reward]).astype(float)
+    offset = np.log(pooled["exposure"].to_numpy())
+    y = np.concatenate(list(_unequal_effects(sessions, None).values()))
+
+    def slope(lam):
+        b = np.zeros(3)
+        for _ in range(100):
+            mu = np.exp(X @ b + offset)
+            g = X.T @ (y - mu) - lam * np.r_[0.0, 0.0, b[2]]
+            H = X.T @ (X * mu[:, None]) + np.diag([0.0, 0.0, lam])
+            b = b + np.linalg.solve(H, g)
+        return b[2]
+
+    np.testing.assert_allclose(result.data_sets["planted_unit"], slope(0.0), atol=1e-8)
+    assert abs(slope(np.exp(WEAK)) - slope(0.0)) > 1e-4
 
 
 if __name__ == "__main__":

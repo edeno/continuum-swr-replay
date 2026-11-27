@@ -20,21 +20,28 @@ its ``attrs``: ``model``, ``seed``, ``n_data_sets``, ``n_draws``,
 ``log_penalties`` (each model's ``Design.log_penalty_record``: the declared
 penalties), the simulation's own ``attrs`` and ``seconds``. The table is
 printed, with a warning line for each scenario, model and estimand in which
-a session fit did not converge or a session has no value.
+a fit of a unit did not converge, a unit has no value or an estimate left out
+a session.
 ``--reference PATH`` writes the table and its ``attrs`` as JSON as well, the
-form of a fixed-seed test fixture.
+form of a fixed-seed test fixture. ``--config PATH`` reads a JSON object and
+passes it to the module's ``simulation`` as ``config`` (for a module whose
+list has several runs); the table is then ``<model>_<config file stem>.parquet``
+and the configuration is in its ``attrs`` (``config``).
 
 ::
 
     python scripts/checks/run_simulations.py --model declared_penalty --quick
     python scripts/checks/run_simulations.py --model declared_penalty \\
         --workers 6 --output-dir OUT
+    python scripts/checks/run_simulations.py --model visit_rate \\
+        --config swr_edf6.json --workers 16 --output-dir OUT
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib
+import inspect
 import json
 import sys
 import time
@@ -61,6 +68,7 @@ MODELS = {
     "role_content": (
         "continuum_swr_replay.analysis.replay_models.content.role_content_simulation"
     ),
+    "visit_rate": "continuum_swr_replay.analysis.replay_models.rate.visit_rate_simulation",
 }
 
 
@@ -77,11 +85,24 @@ def run(
     n_data_sets: int | None = None,
     seed: int | None = None,
     workers: int = 1,
+    config: dict | None = None,
 ) -> pd.DataFrame:
     """The table of model ``name`` with its ``attrs`` (module docstring)."""
     started = time.perf_counter()
     module = importlib.import_module(MODELS[name])
-    simulation = module.simulation(quick, workers)
+    if (
+        config is not None
+        and "config" not in inspect.signature(module.simulation).parameters
+    ):
+        raise ValueError(
+            f"model {name!r}: its scenario list ({MODELS[name]}) takes no "
+            "configuration; run it without --config"
+        )
+    simulation = (
+        module.simulation(quick, workers)
+        if config is None
+        else module.simulation(quick, workers, config=config)
+    )
     if n_data_sets is not None:
         simulation = replace(simulation, n_data_sets=n_data_sets)
     if seed is not None:
@@ -110,26 +131,35 @@ def run(
 
 
 def warnings(summary: pd.DataFrame) -> list[str]:
-    """One line for each row of the engine's summary in which a session fit
-    did not converge or a session has no value."""
+    """One line for each row of the engine's summary in which a fit of a
+    unit of the fit (a session, a day or an animal) did not converge, and one
+    for each in which a unit has no value or an estimate left out a session
+    (also a session dropped from a day or an animal that keeps a value)."""
     out = []
     for row in summary.itertuples():
         where = f"scenario {row.scenario}, model {row.model}, estimand {row.estimand}"
         if row.share_not_converged > 0:
             out.append(
                 f"warning: {where}: {100 * row.share_not_converged:.1f} % of the "
-                "session fits tried did not converge"
+                "unit fits tried did not converge"
             )
-        if row.share_without_value > 0:
+        if row.share_without_value > 0 or row.n_sessions_used_min < row.n_sessions:
             causes = ", ".join(
                 f"{column.removeprefix('without_value_')} {100 * share:.1f} %"
                 for column, share in row._asdict().items()
                 if column.startswith("without_value_") and share > 0
             )
+            without = (
+                f"{100 * row.share_without_value:.1f} % of the units of the fit "
+                f"have no value ({causes}); "
+                if row.share_without_value > 0
+                else ""
+            )
             out.append(
-                f"warning: {where}: {100 * row.share_without_value:.1f} % of the "
-                f"sessions have no value ({causes}); an estimate used as few as "
-                f"{row.n_sessions_used_min} of the {row.n_sessions} sessions"
+                f"warning: {where}: {without}an estimate used as few as "
+                f"{row.n_sessions_used_min} of the {row.n_sessions} sessions "
+                f"({100 * row.share_sessions_unused:.1f} % of the sessions unused, "
+                "mean over the data sets)"
             )
     return out
 
@@ -145,7 +175,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--reference", type=Path, default=None)
+    parser.add_argument("--config", type=Path, default=None)
     args = parser.parse_args(argv)
+    config = None if args.config is None else json.loads(args.config.read_text())
     table = run(
         args.model,
         quick=args.quick,
@@ -153,8 +185,10 @@ def main(argv: list[str] | None = None) -> None:
         n_data_sets=args.n_data_sets,
         seed=args.seed,
         workers=args.workers,
+        config=config,
     )
-    path = write_table(table, (args.output_dir or output_dir()) / args.model)
+    stem = args.model if args.config is None else f"{args.model}_{args.config.stem}"
+    path = write_table(table, (args.output_dir or output_dir()) / stem)
     with pd.option_context("display.width", 200, "display.max_columns", 60):
         print(table.round(4).to_string(index=False))
     for line in table.attrs["warnings"]:

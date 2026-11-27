@@ -12,8 +12,8 @@ allowed at each time bin, ``a_t`` in {0, 1}^S:
   the non-local states, outside SWRs only the local states: the SWR times set
   the state;
 - ``full``: every state at every bin (the paper's decoder);
-- ``swr_allowed``, scored only when asked for (not one of :data:`MODELS`):
-  every state inside an SWR bin, only the local states outside SWRs. The SWR
+- ``swr_allowed`` (not one of :data:`MODELS`, the three the decoder comparison
+  contrasts): every state inside an SWR bin, only the local states outside SWRs. The SWR
   times allow the non-local states but do not force them.
 
 **The restricted model.** State bins s = 1..N (the track-interior bins of every
@@ -159,12 +159,12 @@ from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 MODELS = ("none", "swr", "full")
-"""The three models: never non-local, non-local exactly in SWRs, unrestricted.
-The canonical run scores these and only these."""
+"""The three models: never non-local, non-local exactly in SWRs, unrestricted;
+the decoder comparison's contrasts."""
 
 SWR_ALLOWED = "swr_allowed"
 """The fourth model: every state allowed inside SWRs, only the local states
-outside them. Scored only when asked for (:data:`ALL_MODELS`)."""
+outside them (:data:`ALL_MODELS`)."""
 
 ALL_MODELS = (*MODELS, SWR_ALLOWED)
 """Every model :func:`allowed_states` knows, in column order."""
@@ -1400,8 +1400,7 @@ def stored_score_differences(
         The stored run's per-bin table of the same epoch: ``time``, ``block``,
         ``in_swr`` and the score columns.
     models : sequence of str
-        The models scored again; only those of :data:`MODELS` (the stored
-        run's) are compared.
+        The models scored again; only those of :data:`MODELS` are compared.
 
     Returns
     -------
@@ -1563,7 +1562,8 @@ def fold_fit_scores(
         rebuilds each fold's fit from a stored record instead of running EM.
     models : sequence of str
         The models scored (of :data:`ALL_MODELS`; ``full`` must be one, for
-        the state summary); by default :data:`MODELS`, the canonical run's.
+        the state summary); by default :data:`MODELS` (the restriction run
+        scores :data:`ALL_MODELS`).
     log : callable
 
     Returns

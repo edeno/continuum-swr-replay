@@ -62,6 +62,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [2026-11-11-paper-development-plan.md](design/2026-11-11-paper-development-plan.md) — proposed scientific plan for the paper.
   - [2026-11-12-paper-question-outline.md](design/2026-11-12-paper-question-outline.md) — proposed questions and subquestions of the paper.
   - [2026-11-20-regression-convention-and-figure04.md](design/2026-11-20-regression-convention-and-figure04.md) — one convention for every regression model, the shared fitter, and the plan of Figure 4, with the lead's decisions.
+  - [2026-11-24-unit-of-fit.md](design/2026-11-24-unit-of-fit.md) — the unit of the fit of the behavior models: one fit for each recording day and for each animal, a baseline for each session (design C), with the lead's decision and the simulation evidence.
   - [content_model_design.md](design/content_model_design.md) — the `is_swr` content ladder.
   - [content_estimator_comparison.md](design/content_estimator_comparison.md) — three content estimators compared on one cohort.
   - [pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md) — the mPFC unit GLM, its held-out test, and its bundles.
@@ -90,6 +91,8 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [contains_path_length_confound.md](known_issues/contains_path_length_confound.md) — `contains_path_to_next` depends on trip length.
   - [degenerate_mua_events.md](known_issues/degenerate_mua_events.md) — *open*: a few ContFrag MUA events span seconds.
   - [nonlocal_minimum_duration_rounding.md](known_issues/nonlocal_minimum_duration_rounding.md) — the 15 ms minimum is 7 samples.
+  - [smooth_by_a_thin_level.md](known_issues/smooth_by_a_thin_level.md) — *open*: a smooth by a level has no support count.
+  - [penalized_level_split_by_its_prior.md](known_issues/penalized_level_split_by_its_prior.md) — *open*: with a baseline intercept per session, a penalized level a session holds alone is split by its prior.
 - [history/2026-module-moves.md](history/2026-module-moves.md) — *history*: where moved code and data went in 2026, and the dated audits the docs once cited.
 
 ## Code layout
@@ -126,7 +129,7 @@ violation fails.
 
 | Stage | Package (`analysis/`) | Owns | Does not own |
 |---|---|---|---|
-| Fit | `regression/` | the shared fitter: the likelihoods and their derivatives, the penalized Newton fit, the penalty strengths by pooled REML, the P-spline basis and penalty, the model terms and their design, the support and collinearity rules, the per-session loop and its record, contrasts, folds and bands, and the fitter's numerical rules (`constants.py`) | which columns and rows a model uses |
+| Fit | `regression/` | the shared fitter: the likelihoods and their derivatives, the penalized Newton fit, the penalty strengths by pooled REML, the P-spline basis and penalty, the model terms and their design, the support and collinearity rules, the loop over the units of the fit and its record, contrasts, folds and bands, and the fitter's numerical rules (`constants.py`) | which columns and rows a model uses |
 | Rule | `event_definition/` | analyzed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
 | Find | `detection/` | the algorithms that produce inventories: the SWR and Carey detectors, rule R-T, the artifact detector, the memoryless sequence detector, the paper's non-local detector applied to a decode (`nonlocal_events.py`), and the simulated run Figure 1 shows it on (`simulated_run.py`) | which inventory is canonical; comparing inventories |
 | Compare | `detector_comparison/` | the inventories brought onto one schema and compared on the same recordings: overlap, exposure, counts, event features, held-out evidence | running a detector |
@@ -146,7 +149,7 @@ violation fails.
 | Part 3, behavior | `behavior`, `event_tables`, `replay_models` | `scripts/behavior/`, `scripts/tables/`, `scripts/replay_models/` | `paper/reported/behavior.json` |
 | Part 4, mPFC | `pfc` | `scripts/pfc/` | `paper/reported/mpfc.json` |
 
-The summary names follow the paper's parts, not the package names: `reported/events.py`
+The summary names follow the paper's parts, not the package names: `reported/events/`
 builds Part 2's summary from three packages, and `reported/detection.py` Part 1's from
 two.
 

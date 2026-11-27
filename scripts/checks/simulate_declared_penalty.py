@@ -378,6 +378,8 @@ def simulation(
     full :class:`Config`), one model per target at its declared penalty, and
     the two curves. The targets are calibrated in up to ``workers`` ``spawn``
     processes; each target's calibration is in ``attrs``."""
+    if config is not None and not isinstance(config, Config):
+        config = Config(**config)
     config = config or (QUICK if quick else Config())
     sessions = cohort(config)
     pooled = pd.concat(sessions.values(), ignore_index=True)

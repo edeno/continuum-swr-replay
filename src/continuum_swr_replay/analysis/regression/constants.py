@@ -21,7 +21,9 @@ MAX_STEP_LENGTH = 10.0
 
 # A decrement below the tolerance is a finite maximum only if its Newton step
 # moves the linear predictor by at most NO_MAXIMUM_ETA_STEP on every row
-# (``max |X @ step|``, on the link scale, whatever the columns' units). Where
+# (``max |X @ step|``, on the link scale, whatever the columns' units; for the
+# grouped softmax, ``X @ step`` less each group's mean, the movement its
+# softmax sees). Where
 # the likelihood has no finite maximum along a direction (a 0/1 column whose
 # rows all have y = 1, a Poisson cell with no events), the decrement goes to
 # zero while each step still moves eta by about one. Not applied to a quadratic
@@ -57,6 +59,14 @@ NAMED_SHARE = 0.1
 # asymmetry and its most negative eigenvalue are at most PENALTY_ROUNDING_TOL
 # times its largest absolute entry and eigenvalue.
 PENALTY_ROUNDING_TOL = 1e-10
+
+# A Gaussian fit reproduces its outcome exactly, and has no scale to profile,
+# when its penalized residual sum of squares ``D_p`` is at most
+# EXACT_FIT_RESIDUAL**2 times the outcome's sum of squares about its mean
+# (``n var(y)``): the outcome fitted to ten significant digits. Rounding leaves
+# about 1e-32 of it, exactly zero on some machines' linear-algebra kernels and
+# not on others, so the test cannot be ``D_p > 0``.
+EXACT_FIT_RESIDUAL = 1e-10
 
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)

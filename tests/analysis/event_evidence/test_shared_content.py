@@ -73,8 +73,9 @@ def test_the_agreement_by_width_is_the_gain_statistic_per_bin():
     assert narrow["share_positive"] == pytest.approx((5 / 6 + 1 / 3) / 2)
     assert narrow["share_positive_animal_min"] == pytest.approx(1 / 3)
     assert narrow["share_positive_animal_max"] == pytest.approx(5 / 6)
-    # 8 of the 11 scored no-SWR events are narrow
-    assert narrow["share_of_events"] == pytest.approx(8 / 11)
+    # each epoch's share, each animal's mean, the mean over animals (pooled, 8
+    # of the 11 scored no-SWR events are narrow)
+    assert narrow["share_of_events"] == pytest.approx((7 / 8 + 3 / 5) / 2)
     # per epoch: a1 3 of 4, a2 2 of 2, b1 3 of 5; a's mean 7/8, b's 3/5
     np.testing.assert_allclose(narrow["share_of_events_animals"], [7 / 8, 3 / 5])
     assert narrow["share_of_events_animal_mean"] == pytest.approx((7 / 8 + 3 / 5) / 2)
@@ -83,7 +84,7 @@ def test_the_agreement_by_width_is_the_gain_statistic_per_bin():
     wide = stats.loc[("≥200", "no SWR")]
     # a: -1; b: median of -3 and 1 is -1
     assert wide["estimate"] == pytest.approx(-1.0)
-    assert wide["share_of_events"] == pytest.approx(3 / 11)
+    assert wide["share_of_events"] == pytest.approx((1 / 8 + 2 / 5) / 2)
     # a1 1 of 4 (a2 none: 0), so a's mean 1/8; b1 2 of 5
     assert wide["share_of_events_animal_mean"] == pytest.approx((1 / 8 + 2 / 5) / 2)
     assert wide["n_epochs"] == 2
@@ -168,3 +169,18 @@ def test_the_reference_is_read_over_the_donors_of_the_same_width():
         windows, n_boot=20, column="agreement_null_per_spike"
     )
     assert unmatched.loc[narrow, "estimate"] == pytest.approx(-0.3)
+
+
+def test_the_share_above_zero_is_the_mean_of_an_animals_epochs():
+    """Narrow no-SWR events: a's epochs a1 (1, 2, -1: 2/3 above zero), a2
+    (3, 5: 1) and a3 (-1: 0) -> a's mean 5/9 (its median would be 2/3); b's
+    one epoch (0.5, -0.5, -2: 1/3). The mean over animals is 4/9."""
+    windows = pd.concat(
+        [_windows(), _windows().iloc[[2]].assign(epoch_id="a3")], ignore_index=True
+    )
+    narrow = agreement_by_width_statistics(windows, n_boot=20, seed=1).loc[
+        ("<25", "no SWR")
+    ]
+    assert narrow["share_positive"] == pytest.approx((5 / 9 + 1 / 3) / 2)
+    assert narrow["share_positive_animal_min"] == pytest.approx(1 / 3)
+    assert narrow["share_positive_animal_max"] == pytest.approx(5 / 9)

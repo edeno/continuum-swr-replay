@@ -79,18 +79,16 @@ ALLOWED_FORKING_POOLS: dict[str, str] = {
     "scripts/detector_comparison/add_state_shares.py": _PARENT_ONLY,
     "scripts/detector_comparison/measure_exposure_in_well_visits.py": _PARENT_ONLY,
     "scripts/event_properties/_epoch_counts.py": (
-        f"{_PARENT_ONLY} The one pool of the three counts runners "
+        f"{_PARENT_ONLY} The one pool of the counts runners "
         "(measure_nonlocal_by_signal.py, measure_state_by_signal.py, "
-        "decoding/measure_nonlocal_probability.py), whose workers count decode "
-        "bins with NumPy."
+        "measure_trigger_windows.py, decoding/measure_nonlocal_probability.py), "
+        "whose workers count decode bins and cut windows with NumPy."
     ),
     "scripts/event_properties/measure_brain_state_reference.py": _PARENT_ONLY,
-    "scripts/event_properties/measure_content_along_arms.py": _PARENT_ONLY,
     "scripts/event_properties/measure_event_gamma.py": _PARENT_ONLY,
     "scripts/event_properties/measure_event_start_and_rest_theta.py": _PARENT_ONLY,
     "scripts/event_properties/measure_ripple_class_structure.py": _PARENT_ONLY,
     "scripts/event_properties/sweep_event_rule.py": _PARENT_ONLY,
-    "scripts/figures/generate_supp_figure02.py": _PARENT_ONLY,
 }
 """The modules that import JAX and make a pool with no start method, allowed
 for now, each with its reason."""

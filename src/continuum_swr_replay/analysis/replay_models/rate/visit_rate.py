@@ -120,7 +120,8 @@ __all__ = [
     "STRETCH",
     "TIME_RANGE_CAPS_S",
     "UNIT",
-    "WEAK_PRIOR_SDS",
+    "WEAK_PRIOR_SD",
+    "WEAK_PRIOR_SD_SENSITIVITY",
     "CohortRows",
     "ThirdClockDecision",
     "VisitRateFit",
@@ -199,18 +200,25 @@ REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
 
 # --- OPEN (lead): the settings of the model's form --------------------------
 #
-# Each setting below is an open question of the project lead. None is decided
-# here; the model builds and fits for each allowed value. The defaults are the
+# Each setting below is an open question of the project lead, except where it
+# is marked DECIDED; the model builds and fits for each allowed value. The defaults are the
 # declared form and decide nothing: no real fit runs on the provisional
 # penalties.
 
-#: OPEN (lead): the prior SD of the weak penalty on every simple tested
-#: coefficient, in its reported unit (here a 0/1 step on the log rate); the
-#: log penalty is ``log(1 / SD^2)`` (``terms.log_penalty_from_prior_sd``).
-#: The candidates of the running simulation. The default
-#: (:class:`VisitRateSettings`) is the middle one, 2; the fit is also
-#: reported over the strength (a sensitivity analysis).
-WEAK_PRIOR_SDS: tuple[float, ...] = (1.0, 2.0, 4.0)
+#: DECIDED (lead, 2026-11-23, twenty-fifth round): the weak penalty stays on
+#: the reward coefficient and on every simple tested coefficient of the rate
+#: model, at whatever unit the model is fitted (the unit of the fit is the
+#: twenty-fourth round's: a recording day and an animal). The penalty is a
+#: Normal prior of mean 0 on the log rate ratio after a reward; its SD is this value, the author's call
+#: under the lead's "pick a penalty that's reasonable", not a number the lead
+#: chose. An SD of 2 says that a rate ratio within a factor of about 50 either
+#: way is plausible (``exp(1.96 * 2)``). The log penalty is ``log(1 / SD^2)``
+#: (``terms.log_penalty_from_prior_sd``).
+WEAK_PRIOR_SD = 2.0
+
+#: The stiffer and looser prior SDs reported beside :data:`WEAK_PRIOR_SD`
+#: (the convention's sensitivity pair).
+WEAK_PRIOR_SD_SENSITIVITY: tuple[float, float] = (1.0, 4.0)
 
 #: OPEN (lead): the clock penalty setting. Each clock's declared log penalty
 #: is to be set by ``calibration.log_penalty_for_edf`` on this model's own real
@@ -259,9 +267,19 @@ PROVISIONAL_USES: tuple[str, ...] = ("test", "simulation")
 #: leaving the cap removes (:func:`cohort_rows`).
 TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 
-#: OPEN (lead): the form of the reward effect. ``"coefficient"`` (the
-#: default, the declared Q2): one coefficient, and one arrival curve for both
-#: outcomes. ``"time_varying"``: the same coefficient and a second arrival
+#: DECIDED (lead, 2026-11-25), NOT YET BUILT: the reward effect is read from
+#: an arrival curve for each outcome, each penalized on its own (``outcome +
+#: s(arrival, by = outcome)``), with the leaving curve shared by both
+#: outcomes; two declared window contrasts (the outcome term plus the mean
+#: over the window of the rewarded arrival curve minus the omitted one): Q2
+#: over 4 to 10 s after arrival, and the onset over 2 to 4 s. The one
+#: coefficient stays as a secondary value. That form replaces
+#: ``"time_varying"`` below (a shared curve plus a difference curve, read
+#: over the rewarded rows) when it is built.
+#:
+#: The forms built today. ``"coefficient"`` (the default, the declared Q2
+#: until the decided form is built): one coefficient, and one arrival curve
+#: for both outcomes. ``"time_varying"``: the same coefficient and a second arrival
 #: curve for the rows after a reward (a smooth ``by`` the last outcome,
 #: sum-to-zero over the rewarded rows of the design), so the effect may change
 #: with time since arrival. The form changes the meaning of Q1 as well as of
@@ -316,7 +334,8 @@ class VisitRateSettings:
     Attributes
     ----------
     weak_prior_sd : float
-        The weak penalty's prior SD (:data:`WEAK_PRIOR_SDS`; any positive
+        The weak penalty's prior SD: the decided :data:`WEAK_PRIOR_SD`, or
+        one of :data:`WEAK_PRIOR_SD_SENSITIVITY` (any positive
         value for a sensitivity analysis).
     clock_penalty : {"declared", "stiffer", "looser"}
         Which of :data:`CLOCK_LOG_PENALTIES` the curves take.
@@ -345,7 +364,7 @@ class VisitRateSettings:
         passes its own calibrated values.
     """
 
-    weak_prior_sd: float = 2.0
+    weak_prior_sd: float = WEAK_PRIOR_SD
     clock_penalty: Literal["declared", "stiffer", "looser"] = "declared"
     max_time_since_arrival_s: float | None = None
     reward_form: Literal["coefficient", "time_varying"] = "coefficient"

@@ -26,14 +26,16 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
 )
 from continuum_swr_replay.visualization.palettes import (
     COLORS,
+    EVENT_KINDS,
     REFERENCE_COLOR,
     readable_text_color,
 )
-from continuum_swr_replay.visualization.simulated_run_panels import SMALL_SIZE
+from continuum_swr_replay.visualization.publication_style import SMALL_SIZE
 
-GROUP_COLORS = {SWR_LABELS[False]: COLORS["No SWR"], SWR_LABELS[True]: COLORS["SWR"]}
-"""Each group's color, in the figures' order: no-SWR events, then SWR events."""
-GROUP_NAMES = {SWR_LABELS[False]: "No SWR", SWR_LABELS[True]: "SWR"}
+GROUP_COLORS = {SWR_LABELS[is_swr]: color for is_swr, (_, color) in EVENT_KINDS.items()}
+"""Each group's color (``palettes.EVENT_KINDS``) by its label in the held-out
+runs, in the figures' order: no-SWR events, then SWR events."""
+GROUP_NAMES = {SWR_LABELS[is_swr]: name for is_swr, (name, _) in EVENT_KINDS.items()}
 """The name of each group of :data:`GROUP_COLORS` in a panel's text."""
 
 
@@ -46,6 +48,28 @@ def name_groups(ax: Axes, x: float, top: float, step: float, ha: str) -> None:
             x, top - step * k, GROUP_NAMES[group], transform=ax.transAxes, ha=ha,
             va="top", fontsize=SMALL_SIZE, color=readable_text_color(color),
         )  # fmt: skip
+
+
+def draw_cumulative_by_animal(ax: Axes, distribution: pd.DataFrame) -> None:
+    """For each group of :data:`GROUP_COLORS`, the percent of its events at or
+    below each bin's high edge: a thin line per animal and their mean in bold,
+    in the group's color.
+
+    Parameters
+    ----------
+    ax : Axes
+    distribution : pd.DataFrame
+        One row per animal, group and bin, with ``animal``, ``group``,
+        ``bin_high`` and ``percent`` (``event_statistics.property_distribution``).
+    """
+    for group, color in GROUP_COLORS.items():
+        mine = distribution[distribution["group"] == group]
+        within = mine.pivot(
+            index="bin_high", columns="animal", values="percent"
+        ).cumsum()
+        edges = within.index.to_numpy()
+        ax.plot(edges, within.to_numpy(), color=color, lw=0.5, alpha=0.5)
+        ax.plot(edges, within.mean(axis=1).to_numpy(), color=color, lw=1.2)
 
 
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
@@ -232,15 +256,17 @@ DIFFERENCE_LABELS = {
     "inside_swr": "Inside\nSWRs",
     "outside_swr": "Outside\nSWRs",
 }
-"""An axis of differences between decoders (Figure 2's supplement, panel l): over all the immobile time, over its bins inside SWRs and
-over its bins outside SWRs, left to right; horizontal, on two lines."""
+"""An axis of differences between decoders (Figure 2k's first axis, Figure 2's
+supplement, panels i and l): over all the immobile time, over its bins inside
+SWRs and over its bins outside SWRs, left to right; horizontal, on two lines."""
 EVENTS_LABELS = {
-    "in_events": "In no-SWR\nevents",
-    "outside_events": "Outside\nevents",
+    "in_events": "No-SWR\nevents",
+    "outside_events": "Other\ntime",
 }
-"""The axis of a difference outside SWRs in the held-out events (Figure 2's
-supplement, panel l, third axis): inside the no-SWR events detected
-from the held-out decode and outside every held-out event, left to right."""
+"""The axis of a difference outside SWRs in and outside the held-out events
+(Figure 2k's second axis, Figure 2's supplement, panel l, third axis): inside
+the no-SWR events detected from the held-out decode and the other time outside
+SWRs, left to right."""
 EVENTS_TITLE = "Outside SWRs,\nheld-out events"
 
 DECODER_STYLES = {

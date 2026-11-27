@@ -14,6 +14,10 @@ basenames (:data:`CANONICAL_TABLE_BASENAMES`), ``tables.io.SWR_SOURCE_TABLES``
 and the covariate registry's row keys follow from it. :func:`table_path` turns
 a name and a root into the file, and refuses a name outside the registry.
 
+The pinned runs, which stored run of each analysis is the canonical one, are
+here too, in one block beside the roots they select (:data:`SWR_INVENTORY_RUN`
+and the others ending in ``_RUN``).
+
 The upper-case names this module once bound at import (``REPLAY_CONTENT_DIR``
 and the rest of :data:`_LEGACY_ROOTS`) still resolve, through the module's
 ``__getattr__``, for notebooks and exploratory scripts; library code and
@@ -28,15 +32,21 @@ from pathlib import Path
 
 __all__ = [
     "ROOT_DIR",
+    "ARTIFACT_INTERVALS_RUN",
     "BASENAME_TO_TABLE",
     "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
+    "EVENT_FEATURES_RUN",
     "MANUSCRIPT",
+    "MEMORYLESS_PILOT_RUN",
     "MODEL_SUBDIRS",
     "PROCESSED_DATA_DIR_ENV",
     "QVALS_STANDARDIZATION_REFERENCE",
     "STANDARDIZATION_REFERENCE",
+    "STATE_EVIDENCE_RUN",
+    "STATE_SPACE_FEATURES_RUN",
     "SUMMARY_DIR",
+    "SWR_INVENTORY_RUN",
     "TEX_PATH",
     "artifact_intervals_root",
     "carey_root",
@@ -136,6 +146,93 @@ def content_occupancy_dir() -> Path:
     return processed_data_dir() / "content_occupancy"
 
 
+# The pinned runs: which stored run of each analysis is the canonical one. A run
+# folder is named by the commit its runner ran at (the first 12 characters, with
+# a seed when the runner takes one) or by a dated name. Each pin is a folder name
+# under the root its docstring names, and changing a pin is the whole switch to
+# another run. Code that a test patches reads a pin when called, as
+# ``paths.<PIN>``, not by importing the name.
+SWR_INVENTORY_RUN = "056eee0dcb5a"
+"""The SWR runner's run folder every analysis reads its SWRs from, under
+:func:`swr_inventory_root`.
+
+The run of ``scripts/detection/run_swr_detection.py`` made on 2026-10-10 at
+commit ``056eee0dcb5a`` (the runner names a run by its commit's first 12
+characters): all 255 epochs ``ok`` (the register's 242 analyzed and its 13
+``SUSTAINED_NOISE``), masked by the artifact run :data:`ARTIFACT_INTERVALS_RUN`,
+with each detector's pinned ``swr_detectors.DETECTOR_SETTINGS`` and, for all
+four detectors, the CA1 tetrodes kept by rule R-T
+(``ripple_tetrodes.select_ripple_tetrodes``). The run's ``manifest.json``
+records its settings and each epoch's provenance.
+``analysis/event_definition/swr_source.py`` reads it; the decoders, the other
+detectors and the detector comparison record it. To replace it, rerun the
+runner (``python scripts/detection/run_swr_detection.py --n-workers 8``) and
+set this constant to the new run's id. With :data:`ARTIFACT_INTERVALS_RUN`, it
+names the SWR source ``kay@056eee0dcb5a+artifacts@fbbff144a123``
+(``swr_source.swr_source_name``).
+"""
+
+ARTIFACT_INTERVALS_RUN: str | None = "fbbff144a123"
+"""The artifact detector's run whose intervals drop overlapping SWRs and leave
+the coverage, under :func:`artifact_intervals_root`.
+
+The run of ``scripts/detection/run_artifact_detection.py`` made on 2026-10-10
+at commit ``fbbff144a123`` over all 255 epochs (the run id is the commit's first
+12 characters), with the detector's constants in
+``analysis/detection/artifacts/detect.py`` at that commit; the run's
+``manifest.json`` records them. ``analysis/event_definition/swr_source.py``
+reads it, and through it the SWR runner, MUA detection, the decoders and every
+analysis. To replace it, rerun that script, set this constant to the new run's
+id, then rerun the SWR runner (which reads this constant when it starts) and set
+:data:`SWR_INVENTORY_RUN` to its run, so the SWRs are masked by the same
+artifact run. None would mean no artifact is masked (``artifacts@none``). The
+folder, ``artifact_intervals_root() / <run id>``, holds ``manifest.json`` and
+one ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
+cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing
+file is an error, not an epoch without artifacts.
+"""
+
+EVENT_FEATURES_RUN = "e2331f976fd1"
+"""The event features run the events summary reads, under
+:func:`event_features_root` (242 epochs, all ``ok``).
+
+Made by ``scripts/detector_comparison/run_event_features.py`` on the inventory
+comparison run ``e2331f976fd1`` and the memoryless run
+``e2331f976fd1-seed20260922`` (the 5 ms step, its own running-only encoding
+model). The events summary's inputs (``reported/inputs.py``) and
+``scripts/figures/generate_figure02.py`` read it."""
+
+STATE_SPACE_FEATURES_RUN = "30cf1cc432e9"
+"""The event features run, under :func:`event_features_root`, that the scripts
+measuring the events summary's derived inputs read
+(``scripts/event_properties/measure_event_start_and_rest_theta.py``,
+``scripts/event_properties/measure_ripple_class_structure.py``,
+``scripts/event_properties/measure_content_along_arms.py``): each epoch's
+decode sha256 and the ``state_space`` rows' ripple power and spike counts, none
+of which depend on the memoryless run. Made by
+``scripts/detector_comparison/run_event_features.py``, it is the run before
+:data:`EVENT_FEATURES_RUN`; in all 242 epochs the two record the same decode
+sha256 and the same ``state_space`` rows of those columns (checked 2026-11-14),
+so the derived measures were not remeasured after the memoryless rerun."""
+
+STATE_EVIDENCE_RUN = "_refresh_20261016"
+"""The held-out tetrode run, under the processed-data root, that the detection
+and events summaries read (242 epochs, all ``ok``). Its folder
+:data:`STATE_EVIDENCE_DIR` holds what
+``scripts/event_evidence/run_state_evidence.py`` wrote;
+``scripts/event_evidence/summarize_state_calibration_in_visits.py`` reads it
+too."""
+
+MEMORYLESS_PILOT_RUN = "e2331f976fd1-seed20260922"
+"""The memoryless run, under :func:`memoryless_root`, whose pilot epoch
+(chimi20200225_02_r1, the epoch of the detector's first real-data pilot) the
+caption's stray-window note reads: the main cohort run of
+``scripts/detection/run_memoryless_detection.py``, at the 5 ms step on its own
+running-only encoding model. The detection summary (``reported/detection.py``)
+reads it. The note first read the October pilot,
+``0c2548cacf2d-seed20260922``."""
+
+
 # The events measurements' folders, under the processed-data root: each is
 # written by its script and read by the events summary.
 BRAIN_STATE_REFERENCE_DIR = "brain_state_reference"
@@ -153,6 +250,17 @@ STATE_BY_SIGNAL_DIR = "state_by_signal"
 """Each epoch's immobile time bins inside the well visits by ripple power and
 by MUA and by decoder state class
 (``scripts/event_properties/measure_state_by_signal.py``)."""
+EXAMPLE_SESSION_DIR = "example_session"
+"""The recording of a session a figure draws whole, beside its decode: one
+folder per epoch, ``<epoch_id>/`` (``scripts/decoding/store_example_session.py``)."""
+EVENT_GAMMA_TRIGGER_WINDOWS_DIR = "event_gamma_trigger_windows"
+"""Slow and fast gamma around event starts, every window
+(``scripts/event_properties/measure_gamma_trigger_windows.py``)."""
+
+EVENT_TRIGGER_WINDOWS_DIR = "event_trigger_windows"
+"""Each epoch's windows of the per-time-bin signals around its non-local events'
+starts and its No-Spike periods' starts, Figure 2g's and its supplement's
+(``scripts/event_properties/measure_trigger_windows.py``)."""
 NONLOCAL_PROBABILITY_DIR = "nonlocal_probability"
 """Each epoch's immobile time bins inside the well visits by non-local
 probability, in 50 equal bins
@@ -163,9 +271,15 @@ rule (``scripts/event_properties/sweep_event_rule.py``)."""
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
 (``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""
+EVENT_SPEED_DIR = "event_speed"
+"""Each event's MAP line-fit speed and transport-slope speed
+(``scripts/event_properties/measure_event_speed.py``)."""
 CONTENT_ALONG_ARMS_DIR = "content_along_arms"
 """Each event time bin's arm and place along it
 (``scripts/event_properties/measure_content_along_arms.py``)."""
+CONTENT_MASS_ALONG_ARMS_DIR = "content_mass_along_arms"
+"""Each event's posterior mass at each place along the arms
+(``scripts/event_properties/measure_content_mass_along_arms.py``)."""
 EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
 """The event properties' bootstrap intervals
 (``scripts/event_properties/bootstrap_event_properties.py``)."""
@@ -175,9 +289,6 @@ DECODER_QUALITY_DIR = "decoder_quality"
 STATE_EVIDENCE_DIR = "state_evidence"
 """A held-out tetrode run's folder inside its run directory
 (``scripts/event_evidence/run_state_evidence.py``); the detection summary reads it."""
-STATE_EVIDENCE_RUN = "_refresh_20261016"
-"""The held-out tetrode run, under the processed-data root, that the detection
-and events summaries read (242 epochs, all ``ok``)."""
 STATE_CALIBRATION_IN_VISITS_DIR = "state_calibration_in_visits"
 """The held-out state calibration over the immobile windows inside the well
 visits, summarized from the held-out tetrode run's stored windows
@@ -191,29 +302,20 @@ EVENT_LIKELIHOOD_ADVANTAGE_DIR = "event_likelihood_advantage"
 non-local events, under the processed-data root
 (``scripts/event_evidence/score_event_likelihood_advantage.py``)."""
 EVENT_TETRODE_HOLDOUT_DIR = "event_tetrode_holdout"
-"""The held-out tetrode score of the canonical non-local events and their
-Local-rest controls, under the processed-data root
-(``scripts/event_evidence/score_tetrode_holdout.py``)."""
-EVENT_TETRODE_HOLDOUT_EXTRA_DIR = "event_tetrode_holdout_extra"
-"""The held-out tetrode run of ``EVENT_TETRODE_HOLDOUT_DIR`` made again with its
-extra scores (``tetrode_holdout.EXTRA_COLUMNS``: the 95 % HPD length, the
-shuffled-event reference, the rate and mark parts, the place information),
-under the processed-data root (``scripts/event_evidence/score_tetrode_holdout.py
---extra-scores --null-seed 0``)."""
+"""The held-out tetrode run, under the processed-data root
+(``scripts/event_evidence/score_tetrode_holdout.py``, null seed 0): each
+canonical non-local event's and its Local-rest control's held-out tetrode
+score, with the 95 % HPD length, the shuffled-event reference, the rate and
+mark parts and the place information (``tetrode_holdout.RUN_COLUMNS``)."""
 EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
-"""The per-bin scores of the three non-local restriction models (``none``,
-``swr``, ``full``) on every analyzed epoch, each fold scored under a decoder
+"""The restriction run, under the processed-data root
+(``scripts/event_evidence/score_nonlocal_restriction.py``): the per-bin scores
+of the four non-local restriction models (``none``, ``swr``, ``full`` and
+``swr_allowed``) on every analyzed epoch, each fold scored under a decoder
 whose place-field encodings were fit on the decode's training bins of the other
 folds (more than 1 s from the fold) and whose discrete transitions and initial
-conditions were fit by EM with the fold's bins missing, under the processed-data
-root (``scripts/event_evidence/score_nonlocal_restriction.py``)."""
-EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR = "event_nonlocal_restriction_swr_allowed"
-"""The restriction models scored again with the fourth model (``swr_allowed``:
-every state inside SWRs, the local states outside them), each fold under the
-fold fit a stored restriction run recorded (no EM), under the processed-data
-root (``scripts/event_evidence/score_nonlocal_restriction.py
---from-stored-fit``). Its tables are the restriction run's, with the fourth
-model's columns."""
+conditions were fit by EM with the fold's bins missing; each epoch's record
+holds every fold's fit."""
 EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
 """The non-local restriction models' per-bin scores summed over each canonical
 non-local event and its Local-rest control (the windows of the held-out tetrode
@@ -227,22 +329,6 @@ held-out state probabilities, the restriction scores summed over each, which
 events of it and of the canonical table share a bin, and each epoch's time sums
 with those events' windows, under the processed-data root
 (``scripts/event_evidence/detect_heldout_events.py``)."""
-EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_HELDOUT_EVENTS_DIR = (
-    "event_nonlocal_restriction_swr_allowed_heldout_events"
-)
-"""The held-out events and time sums of
-``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``, made from the restriction run
-with the fourth model (``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), so they
-carry its columns, under the processed-data root
-(``scripts/event_evidence/detect_heldout_events.py --restriction-dir``)."""
-EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_WINDOWS_DIR = (
-    "event_nonlocal_restriction_swr_allowed_windows"
-)
-"""The window sums of ``EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``, made from the
-restriction run with the fourth model
-(``EVENT_NONLOCAL_RESTRICTION_SWR_ALLOWED_DIR``), under the processed-data root
-(``scripts/event_evidence/sum_nonlocal_restriction_windows.py
---restriction-dir``)."""
 EVENT_BIN_FACTS_DIR = "event_bin_facts"
 """Each analyzed epoch's per-decode-bin facts, under the processed-data root: the
 spikes of every tetrode in the bin and whether it is inside a well visit

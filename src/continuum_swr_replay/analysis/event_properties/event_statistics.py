@@ -31,12 +31,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM
-from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
-    likelihood_advantage_statistics,
-)
 from continuum_swr_replay.analysis.shared_statistics import (
+    animal_medians,
     animal_session_values,
-    session_median_statistics,
+    session_value_statistics,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
@@ -145,12 +143,13 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``n_events``: the events.
         - ``n_non_swr``, ``n_swr_contained``, ``n_swr_partial``: the events of
           each class.
-        - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
-        - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
-          lying inside an SWR and overlapping one in part, pooled the same way.
+        - ``non_swr_fraction``, ``swr_contained_fraction``,
+          ``swr_partial_fraction``: the share overlapping no SWR, lying inside
+          an SWR and overlapping one in part, event -> epoch -> animal: the
+          mean over animals of each animal's own share of the class (Figure
+          2d's bars).
         - ``non_swr_fraction_animal_mean``, ``swr_contained_fraction_animal_mean``,
-          ``swr_partial_fraction_animal_mean``: the mean over animals of each
-          animal's own share of the class (Figure 2d's bars).
+          ``swr_partial_fraction_animal_mean``: the same numbers.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -186,11 +185,9 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "n_non_swr": counts["non_swr"],
         "n_swr_contained": counts["swr_contained"],
         "n_swr_partial": counts["swr_partial"],
-        "non_swr_fraction": counts["non_swr"] / counts["total"],
-        "swr_contained_fraction": counts["swr_contained"] / counts["total"],
-        "swr_partial_fraction": counts["swr_partial"] / counts["total"],
         **{
-            f"{overlap_class}_fraction_animal_mean": shares[overlap_class].mean()
+            f"{overlap_class}_fraction{suffix}": shares[overlap_class].mean()
+            for suffix in ("", "_animal_mean")
             for overlap_class in OVERLAP_CLASSES
         },
         "non_swr_fraction_animal_min": non_swr.min(),
@@ -298,33 +295,116 @@ OFFSET_TAILS_S = {"ten_ms": 0.010, "fifty_ms": 0.050}
 tail (:func:`boundary_offset_statistics`), by the name its statistic carries."""
 
 
-def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
+OFFSET_BIN_EDGES_S = np.arange(-100, 101, 5) / 1000
+"""The bins of each event bound's offset from its SWR's (s): 5 ms wide, from
+-100 to 100 ms."""
+
+
+def boundary_offset_distribution(
+    offsets: pd.DataFrame,
+    events: pd.DataFrame,
+    edges: np.ndarray = OFFSET_BIN_EDGES_S,
+) -> pd.DataFrame:
+    """Each animal's distribution of its events' start and end offsets from
+    their SWR's.
+
+    An animal's percent in a bin is the mean over its epochs of each epoch's
+    percent of its event-SWR pairs in the bin (pair -> epoch -> animal); an
+    epoch's percent counts all its pairs, those beyond the bins too.
+
+    Parameters
+    ----------
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges (s); a bin holds its low edge and not its high
+        one, the last bin its high edge too.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per bound, animal and bin: ``bound`` (``"start"``,
+        ``"end"``), ``animal``, ``bin_low``, ``bin_high`` and ``percent``.
+    """
+    sessions = events.loc[offsets.index]
+    rows = []
+    for bound in ("start", "end"):
+        bins = pd.cut(
+            offsets[f"{bound}_offset_s"],
+            edges,
+            right=False,
+            labels=False,
+            include_lowest=True,
+        )
+        # the last bin holds its high edge, as np.histogram's does
+        bins = bins.mask(offsets[f"{bound}_offset_s"] == edges[-1], len(edges) - 2)
+        for k in range(len(edges) - 1):
+            per_animal = animal_session_values(
+                100 * (bins == k).astype(float),
+                sessions["animal"],
+                sessions[_WITHIN_ANIMAL],
+                "mean",
+            )
+            rows.append(
+                pd.DataFrame(
+                    {
+                        "bound": bound,
+                        "animal": per_animal.index,
+                        "bin_low": edges[k],
+                        "bin_high": edges[k + 1],
+                        "percent": per_animal.to_numpy(),
+                    }
+                )
+            )
+    return pd.concat(rows, ignore_index=True)
+
+
+def boundary_offset_statistics(
+    offsets: pd.DataFrame, events: pd.DataFrame
+) -> dict[str, float]:
     """The typical offset of an SWR-overlapping event's bounds from its SWR's.
+
+    Every statistic is event -> epoch -> animal: each epoch's value over its
+    SWR-overlapping events, each animal's value over its epochs with such an
+    event (the median for an offset, the mean for a share), then the mean over
+    animals.
 
     Parameters
     ----------
     offsets : pd.DataFrame, shape (n_overlapping_events, 2)
         The SWR-overlapping events' :func:`boundary_offsets`.
+    events : pd.DataFrame
+        Each event's ``animal`` and session columns, indexed as ``offsets``
+        (or a superset of it).
 
     Returns
     -------
     statistics : dict
         ``n_overlapping``, the events overlapping an SWR;
-        ``start_offset_median_s`` and ``end_offset_median_s``, the medians of
-        their offsets; and, for each bound and each of :data:`OFFSET_TAILS_S`,
+        ``start_offset_median_s`` and ``end_offset_median_s``, the median
+        offsets; and, for each bound and each of :data:`OFFSET_TAILS_S`,
         ``{bound}_offset_beyond_{name}_fraction``, the share of the events whose
         offset is larger than that in magnitude.
     """
+    sessions = events.loc[offsets.index]
+    animal, session = sessions["animal"], sessions[_WITHIN_ANIMAL]
+
+    def animal_mean(values: pd.Series, statistic: str) -> float:
+        return float(animal_session_values(values, animal, session, statistic).mean())
+
     statistics = {
         "n_overlapping": len(offsets),
-        "start_offset_median_s": offsets["start_offset_s"].median(),
-        "end_offset_median_s": offsets["end_offset_s"].median(),
+        "start_offset_median_s": animal_mean(offsets["start_offset_s"], "median"),
+        "end_offset_median_s": animal_mean(offsets["end_offset_s"], "median"),
     }
     for bound in ("start", "end"):
         magnitude_us = _offset_us(offsets[f"{bound}_offset_s"]).abs()
         for name, tail_s in OFFSET_TAILS_S.items():
-            statistics[f"{bound}_offset_beyond_{name}_fraction"] = float(
-                (magnitude_us > round(1e6 * tail_s)).mean()
+            statistics[f"{bound}_offset_beyond_{name}_fraction"] = animal_mean(
+                (magnitude_us > round(1e6 * tail_s)).astype(float), "mean"
             )
     return statistics
 
@@ -399,7 +479,8 @@ def boundary_timing_statistics(
         Indexed by ``start`` and ``end`` (each of :data:`TIMING_CLASSES`, in
         order): ``share_animal_mean``, the mean over animals of each animal's
         share; ``animal_min`` and ``animal_max``, the lowest and highest
-        animal's share; ``share``, pooled over every event; ``n_events``, the
+        animal's share; ``share``, the same number as ``share_animal_mean``
+        (the headline share is animal-first); ``n_events``, the
         events in the cell; ``animals`` and ``animal_names``, each animal's
         share and its name, in sorted order. An animal's share of a cell is
         the mean over its epochs of each epoch's share of its pairs (event ->
@@ -428,7 +509,7 @@ def boundary_timing_statistics(
             "share_animal_mean": per_animal.mean(axis=1),
             "animal_min": per_animal.min(axis=1),
             "animal_max": per_animal.max(axis=1),
-            "share": counts / counts.sum(),
+            "share": per_animal.mean(axis=1),
             "n_events": counts,
             "animals": [row.to_numpy() for _, row in per_animal.iterrows()],
             "animal_names": [per_animal.columns.to_numpy()] * len(per_animal),
@@ -484,26 +565,40 @@ def boundary_both_ends_differ_statistics(
 def reference_medians(reference: pd.DataFrame, signals: list[str]) -> pd.DataFrame:
     """The typical running and quiet-rest level of each signal.
 
+    Epoch -> animal -> mean over animals: each animal's median over its epochs
+    of the epoch's level, then the mean over animals.
+
     Parameters
     ----------
     reference : pd.DataFrame, shape (n_epochs, n_columns)
-        The brain-state reference: for each signal, each epoch's median while
-        running (``<signal>_running_median``) and in quiet rest
-        (``<signal>_rest_median``), z-scored within the epoch.
+        The brain-state reference: ``animal`` and, for each signal, each
+        epoch's median while running (``<signal>_running_median``) and in
+        quiet rest (``<signal>_rest_median``), z-scored within the epoch.
     signals : list of str
         The signals (``"theta"``, ``"ripple"``, ...).
 
     Returns
     -------
     medians : pd.DataFrame, shape (n_signals, 2)
-        ``running`` and ``rest``: the median over epochs of each, by signal.
+        ``running`` and ``rest``: the mean over animals of each animal's
+        median over its epochs, by signal. An epoch with no level is not one
+        of its animal's epochs.
     """
     return pd.DataFrame(
         {
-            "running": {s: reference[f"{s}_running_median"].median() for s in signals},
-            "rest": {s: reference[f"{s}_rest_median"].median() for s in signals},
+            regime: {
+                s: _animal_median_mean(reference, f"{s}_{regime}_median")
+                for s in signals
+            }
+            for regime in ("running", "rest")
         }
     )
+
+
+def _animal_median_mean(reference: pd.DataFrame, column: str) -> float:
+    """The mean over animals of each animal's median over its epochs of
+    ``column`` (an epoch with no value left out)."""
+    return float(animal_medians(reference[column], reference["animal"]).mean())
 
 
 _CLASS_WORDS = {False: "non_swr", True: "swr"}
@@ -519,21 +614,25 @@ def matched_reference_medians(
     Parameters
     ----------
     reference : pd.DataFrame, shape (n_epochs, n_columns)
-        For each signal, class (``swr``, ``non_swr``) and regime, each epoch's
-        ``<signal>_<regime>_matched_<class>`` (``gamma_power.matched_level``).
+        ``animal`` and, for each signal, class (``swr``, ``non_swr``) and
+        regime, each epoch's ``<signal>_<regime>_matched_<class>``
+        (``gamma_power.matched_level``).
     signals : list of str
 
     Returns
     -------
     medians : pd.DataFrame, shape (2 * n_signals, 2)
-        ``running`` and ``rest``, indexed by signal and ``is_swr``: the median
-        over the epochs that have the level (an epoch with no event of the class
-        has none).
+        ``running`` and ``rest``, indexed by signal and ``is_swr``: the mean
+        over animals of each animal's median over its epochs that have the
+        level (an epoch with no event of the class has none, and is not one of
+        its animal's epochs for that class).
     """
     return pd.DataFrame.from_dict(
         {
             (signal, is_swr): {
-                regime: reference[f"{signal}_{regime}_matched_{word}"].median()
+                regime: _animal_median_mean(
+                    reference, f"{signal}_{regime}_matched_{word}"
+                )
                 for regime in ("running", "rest")
             }
             for signal in signals
@@ -583,7 +682,9 @@ def event_signal_statistics(
     statistics : pd.DataFrame, shape (2 * n_signals, 4)
         Indexed by signal and ``is_swr``:
 
-        - ``median``: the median event value, z, over the class's events.
+        - ``median``: the class's event value, z, event -> epoch -> animal:
+          the mean over animals of each animal's median over its epochs with an
+          event of the class of each epoch's median event value.
         - ``n_animals_below_running``: animals, of those with an event of the
           class, whose value is below the median running level of the same
           epochs.
@@ -591,7 +692,9 @@ def event_signal_statistics(
           class, whose value is above the median quiet-rest level of the same
           epochs.
         - ``reaches_running_fraction``: the share of the class's events whose
-          value reaches their own epoch's median running level.
+          value reaches their own epoch's running level (median, or matched),
+          event -> epoch -> animal: each epoch's share, the mean over the
+          animal's epochs with an event of the class, the mean over animals.
 
     Raises
     ------
@@ -606,17 +709,21 @@ def event_signal_statistics(
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
             per_animal = levels.loc[is_swr]
+            reaches = animal_session_values(
+                (group[column] >= group["running_level"]).astype(float),
+                group["animal"],
+                group[_WITHIN_ANIMAL],
+                "mean",
+            )
             rows[(signal, is_swr)] = {
-                "median": group[column].median(),
+                "median": per_animal["event"].mean(),
                 "n_animals_below_running": (
                     per_animal["event"] < per_animal["running"]
                 ).sum(),
                 "n_animals_above_rest": (
                     per_animal["event"] > per_animal["rest"]
                 ).sum(),
-                "reaches_running_fraction": (
-                    group[column] >= group["running_level"]
-                ).mean(),
+                "reaches_running_fraction": reaches.mean(),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
         ["signal", "is_swr"]
@@ -751,9 +858,9 @@ def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.Dat
     Returns
     -------
     statistics : pd.DataFrame, shape (2 * n_bands, 2)
-        Indexed by band and ``is_swr``: ``median`` over epochs, and
-        ``n_animals_above_rest``, the animals whose median over their epochs is
-        above 0 dB.
+        Indexed by band and ``is_swr``: ``median``, each animal's median over
+        its epochs, then the mean over animals; and ``n_animals_above_rest``,
+        the animals whose median over their epochs is above 0 dB.
 
     Raises
     ------
@@ -768,10 +875,10 @@ def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.Dat
                 raise ValueError(
                     f"{int(reference[column].isna().sum())} epochs have no {column}"
                 )
-            summary = session_median_statistics(reference[column], reference["animal"])
+            per_animal = animal_medians(reference[column], reference["animal"])
             rows[(band, is_swr)] = {
-                "median": summary["median"],
-                "n_animals_above_rest": summary["n_animals_positive"],
+                "median": float(per_animal.mean()),
+                "n_animals_above_rest": int((per_animal > 0).sum()),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(["band", "is_swr"])
 
@@ -781,9 +888,8 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     An event, or a quiet-rest window, is theta-like when its mean theta reaches
     its epoch's median running theta. Each event has windows of quiet rest with
-    as many bins as it has; the reference share of a class is the mean over its
-    events of their windows' theta-like share, so it carries the class's
-    durations.
+    as many bins as it has; the reference share of a class is taken over its
+    events' windows' theta-like shares, so it carries the class's durations.
 
     Parameters
     ----------
@@ -797,8 +903,10 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     statistics : pd.DataFrame, shape (2, 2)
-        Indexed by ``is_swr``: ``rest_theta_like_fraction``, the mean over the
-        class's events of ``rest_theta_like_share``, and
+        Indexed by ``is_swr``: ``rest_theta_like_fraction``, event -> epoch ->
+        animal: each epoch's mean over the class's events of
+        ``rest_theta_like_share``, each animal's mean over its epochs with an
+        event of the class, the mean over animals; and
         ``n_animals_above_rest``, the animals, of those with an event of the
         class, whose share of theta-like events is above their reference
         share. Both are event -> epoch -> animal: the mean over the animal's
@@ -846,7 +954,7 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
             }
         )
         rows[is_swr] = {
-            "rest_theta_like_fraction": group.rest_theta_like_share.mean(),
+            "rest_theta_like_fraction": per_animal.rest.mean(),
             "n_animals_above_rest": (per_animal.events > per_animal.rest).sum(),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis("is_swr")
@@ -858,8 +966,9 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
 def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFrame:
     """Each group's spike evidence, against matched quiet windows.
 
-    Event-level medians, pooled over epochs; the animals' medians go through
-    their epochs.
+    Every median is row -> epoch -> animal: each epoch's median, each
+    animal's median over its epochs with a row of the group, the mean over
+    animals.
 
     Parameters
     ----------
@@ -880,7 +989,8 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         - ``n_scored``: rows scored.
         - ``spikes_median`` (spikes), ``tetrodes_median`` (tetrodes),
           ``dll_per_spike_median`` (nats per spike), ``gpi_distance_median_cm``
-          (cm): medians over the group's rows.
+          (cm): the group's medians, row -> epoch -> animal, then the mean over
+          animals.
         - ``n_epochs_scored``: epochs with a row of the group.
         - ``n_epochs_above_baseline``, ``n_animals_above_baseline``: of the
           epochs (animals) with a row of the group, those whose median
@@ -897,9 +1007,9 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         window to be compared with.
     """
 
-    def per_animal(rows: pd.DataFrame) -> pd.Series:
+    def per_animal(rows: pd.DataFrame, column: str = "dll_per_spike") -> pd.Series:
         return animal_session_values(
-            rows["dll_per_spike"], rows["animal"], rows["epoch_id"], "median"
+            rows[column], rows["animal"], rows["epoch_id"], "median"
         )
 
     base = metrics[metrics["group"] == baseline]
@@ -918,10 +1028,12 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         is_baseline = group == baseline
         rows[group] = {
             "n_scored": len(group_rows),
-            "spikes_median": group_rows["n_spikes"].median(),
-            "tetrodes_median": group_rows["n_tetrodes"].median(),
-            "dll_per_spike_median": group_rows["dll_per_spike"].median(),
-            "gpi_distance_median_cm": group_rows["dist_to_gpi_peak"].median(),
+            "spikes_median": float(per_animal(group_rows, "n_spikes").mean()),
+            "tetrodes_median": float(per_animal(group_rows, "n_tetrodes").mean()),
+            "dll_per_spike_median": float(animal_median.mean()),
+            "gpi_distance_median_cm": float(
+                per_animal(group_rows, "dist_to_gpi_peak").mean()
+            ),
             "n_epochs_scored": len(epoch_median),
             "n_epochs_above_baseline": np.nan
             if is_baseline
@@ -989,52 +1101,60 @@ def peak_ripple_mode_statistics(
     }
 
 
-def animal_signal_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
-    """Each animal's time bins, and its non-local ones, by the level of a signal
-    (ripple power or MUA).
+def animal_signal_shares(epoch_counts: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's shares of its time bins by the level of a signal (ripple
+    power or MUA), epoch -> animal: each epoch's share, then the mean over the
+    animal's epochs.
 
     Parameters
     ----------
     epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
-        One row per epoch and signal bin (``nonlocal_by_signal.nonlocal_counts``),
-        with ``animal``, ``signal_low``, ``signal_high``, ``n_bins`` and
-        ``n_nonlocal``.
+        One row per epoch and signal bin (``nonlocal_by_signal.nonlocal_counts``,
+        every signal bin of every epoch), with ``epoch_id``, ``animal``,
+        ``signal_low``, ``signal_high``, ``n_bins`` and ``n_nonlocal``.
 
     Returns
     -------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, 7)
+    shares : pd.DataFrame, shape (n_animals * n_signal_bins, 6)
         One row per animal and signal bin, in that order: ``animal``,
-        ``signal_low``, ``signal_high``, ``n_bins`` and ``n_nonlocal`` summed
-        over the animal's epochs, ``share`` (the non-local share of the bin's
-        time bins, NaN where the animal has none) and ``nonlocal_fraction``
-        (the bin's share of the animal's non-local bins).
+        ``signal_low``, ``signal_high``, ``share`` (the mean over the animal's
+        epochs with a time bin in the signal bin of each epoch's non-local
+        share of them; NaN where the animal has no such epoch),
+        ``nonlocal_fraction`` (the mean over the animal's epochs with a
+        non-local bin of each epoch's share of its non-local bins in the signal
+        bin, 0 where the epoch has none there) and ``n_epochs`` (the epochs
+        with a time bin in the signal bin).
     """
-    counts = epoch_counts.groupby(
-        ["animal", "signal_low", "signal_high"], as_index=False
-    )[["n_bins", "n_nonlocal"]].sum()
-    counts["share"] = counts["n_nonlocal"] / counts["n_bins"].where(
-        counts["n_bins"] > 0
+    epochs = epoch_counts.assign(
+        share=epoch_counts["n_nonlocal"]
+        / epoch_counts["n_bins"].where(epoch_counts["n_bins"] > 0),
+        has_bins=epoch_counts["n_bins"] > 0,
     )
-    counts["nonlocal_fraction"] = counts["n_nonlocal"] / counts.groupby("animal")[
-        "n_nonlocal"
-    ].transform("sum")
-    return counts
+    total = epochs.groupby("epoch_id")["n_nonlocal"].transform("sum")
+    epochs["nonlocal_fraction"] = epochs["n_nonlocal"] / total.where(total > 0)
+    # pandas' mean leaves out NaN: an epoch with no time bin (no non-local
+    # bin) is not one of the animal's epochs for that share
+    return epochs.groupby(["animal", "signal_low", "signal_high"], as_index=False).agg(
+        share=("share", "mean"),
+        nonlocal_fraction=("nonlocal_fraction", "mean"),
+        n_epochs=("has_bins", "sum"),
+    )
 
 
-def _require_edge(counts: pd.DataFrame, threshold: float) -> None:
-    if not (counts["signal_low"] == threshold).any():
+def _require_edge(table: pd.DataFrame, threshold: float) -> None:
+    if not (table["signal_low"] == threshold).any():
         raise ValueError(f"{threshold} is not an edge of the signal's bins")
 
 
 def nonlocal_below_threshold_statistics(
-    counts: pd.DataFrame, threshold: float
+    shares: pd.DataFrame, threshold: float
 ) -> dict[str, float]:
     """How much of the non-local time has a signal below a threshold.
 
     Parameters
     ----------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
-        :func:`animal_signal_counts`.
+    shares : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
+        :func:`animal_signal_shares`.
     threshold : float
         The signal's level, z; an edge of its bins.
 
@@ -1042,7 +1162,8 @@ def nonlocal_below_threshold_statistics(
     -------
     statistics : dict
         - ``fraction_animal_mean``: the mean over animals of each animal's
-          share of its non-local time bins whose signal is below ``threshold``.
+          share of its non-local time bins whose signal is below ``threshold``:
+          the mean over its epochs with a non-local bin of each epoch's share.
         - ``fraction_animal_min``, ``fraction_animal_max``: the lowest and
           highest of the animals' shares.
         - ``n_animals``: the animals.
@@ -1052,9 +1173,11 @@ def nonlocal_below_threshold_statistics(
     ValueError
         If ``threshold`` is not an edge of the signal's bins.
     """
-    _require_edge(counts, threshold)
+    _require_edge(shares, threshold)
+    # the mean over epochs of each bin's fraction, summed over the bins below,
+    # is the mean over the same epochs of each epoch's fraction below
     below = (
-        counts[counts["signal_high"] <= threshold]
+        shares[shares["signal_high"] <= threshold]
         .groupby("animal")["nonlocal_fraction"]
         .sum()
     )
@@ -1067,23 +1190,24 @@ def nonlocal_below_threshold_statistics(
 
 
 def nonlocal_share_above_statistics(
-    counts: pd.DataFrame, threshold: float
+    epoch_counts: pd.DataFrame, threshold: float
 ) -> dict[str, float]:
     """The share of the time bins with a signal at or above a level that are
     decoded non-local.
 
     Parameters
     ----------
-    counts : pd.DataFrame, shape (n_animals * n_signal_bins, n_columns)
-        :func:`animal_signal_counts`.
+    epoch_counts : pd.DataFrame, shape (n_epochs * n_signal_bins, n_columns)
+        As :func:`animal_signal_shares` takes them.
     threshold : float
         The level, z; an edge of the signal's bins.
 
     Returns
     -------
     statistics : dict
-        - ``share_animal_mean``: the mean over animals of each animal's
-          non-local bins at or above ``threshold`` over its bins there.
+        - ``share_animal_mean``: the mean over animals of each animal's share:
+          the mean over its epochs with a time bin at or above ``threshold`` of
+          each epoch's non-local bins there over its bins there.
         - ``share_animal_min``, ``share_animal_max``: the lowest and highest
           animal.
         - ``n_animals``: the animals.
@@ -1093,13 +1217,14 @@ def nonlocal_share_above_statistics(
     ValueError
         If ``threshold`` is not an edge of the signal's bins.
     """
-    _require_edge(counts, threshold)
+    _require_edge(epoch_counts, threshold)
     above = (
-        counts[counts["signal_low"] >= threshold]
-        .groupby("animal")[["n_nonlocal", "n_bins"]]
+        epoch_counts[epoch_counts["signal_low"] >= threshold]
+        .groupby(["animal", "epoch_id"])[["n_nonlocal", "n_bins"]]
         .sum()
     )
-    share = above["n_nonlocal"] / above["n_bins"]
+    above = above[above["n_bins"] > 0]
+    share = (above["n_nonlocal"] / above["n_bins"]).groupby(level="animal").mean()
     return {
         "share_animal_mean": float(share.mean()),
         "share_animal_min": float(share.min()),
@@ -1213,13 +1338,14 @@ def most_steps(
 def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     """A per-event property's median in non-SWR and in SWR events.
 
-    Plain medians of all events with a value, pooled over epochs and animals;
-    not duration-controlled.
+    Event -> epoch -> animal: the mean over animals of each animal's median
+    of the class (:func:`animal_class_medians`: the median over its epochs of
+    the epoch's median); not duration-controlled.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``is_swr`` and ``column``.
+        As :func:`animal_class_medians` takes them.
     column : str
         The property.
 
@@ -1228,8 +1354,11 @@ def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     statistics : dict
         ``median_non_swr`` and ``median_swr``.
     """
-    median = events.dropna(subset=[column]).groupby("is_swr")[column].median()
-    return {"median_non_swr": median[False], "median_swr": median[True]}
+    medians = animal_class_medians(events, column)
+    return {
+        "median_non_swr": float(medians["non_swr"].mean()),
+        "median_swr": float(medians["swr"].mean()),
+    }
 
 
 def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -1296,12 +1425,21 @@ def _class_distribution(
 ) -> pd.DataFrame:
     """Each animal's distribution of a per-event property, by class: one row
     per animal, class and bin, with ``animal``, ``group``, ``bin_low``,
-    ``bin_high`` and ``percent`` (the percent of the animal's events of the
-    class in the bin; a bin holds its low edge and not its high one)."""
+    ``bin_high`` and ``percent``.
+
+    An animal's percent in a bin is the mean over its epochs of each epoch's
+    percent of its events of the class in the bin (event -> epoch -> animal); an
+    epoch with no event of the class is not one of the animal's epochs for that
+    class. An epoch's percent counts all its events of the class, those beyond
+    the bins too. A bin holds its low edge and not its high one, the last bin
+    its high edge too (``np.histogram``'s bins)."""
     table = _class_table(events, column)
     rows = []
     for (animal, group), mine in table.groupby(["animal", "group"]):
-        counts, _ = np.histogram(mine[column], bins=edges)
+        per_epoch = [
+            100 * np.histogram(epoch[column], bins=edges)[0] / len(epoch)
+            for _, epoch in mine.groupby("epoch_id")
+        ]
         rows.append(
             pd.DataFrame(
                 {
@@ -1309,11 +1447,36 @@ def _class_distribution(
                     "group": group,
                     "bin_low": edges[:-1],
                     "bin_high": edges[1:],
-                    "percent": 100 * counts / len(mine),
+                    "percent": np.mean(per_epoch, axis=0),
                 }
             )
         )
     return pd.concat(rows, ignore_index=True)
+
+
+def property_distribution(
+    events: pd.DataFrame, column: str, edges: np.ndarray
+) -> pd.DataFrame:
+    """Each animal's distribution of a per-event property, by class, as
+    :func:`hpd_distribution` takes the HPD coverage.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``animal``, the session columns, ``is_swr`` and
+        ``column`` (an event without a value is left out).
+    column : str
+        The property.
+    edges : np.ndarray, shape (n_edges,)
+        Ascending bin edges, in the property's unit.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
+        ``bin_high`` and ``percent``.
+    """
+    return _class_distribution(events, column, edges)
 
 
 def hpd_distribution(
@@ -1335,8 +1498,9 @@ def hpd_distribution(
     -------
     pd.DataFrame
         One row per animal, class and bin: ``animal``, ``group``, ``bin_low``,
-        ``bin_high`` and ``percent`` (the percent of the animal's events of the
-        class in the bin).
+        ``bin_high`` and ``percent`` (the mean over the animal's epochs of each
+        epoch's percent of its events of the class in the bin,
+        :func:`_class_distribution`).
     """
     return _class_distribution(events, "hpd_coverage_cm", edges)
 
@@ -1350,12 +1514,11 @@ def hpd_tight_share_statistics(
 ) -> dict:
     """The share of each class's events whose HPD coverage is below a cut.
 
-    Each epoch's share of its events of the class below ``cut_cm`` is reduced
-    as the project reduces a per-epoch share
-    (``likelihood_advantage.likelihood_advantage_statistics`` over one row per
-    epoch, as ``restriction_totals.outside_swr_gain_statistics`` reduces its
-    shares): each animal's median over its epochs, the mean over animals and
-    its 95 % nested bootstrap interval.
+    Each epoch's share of its events of the class below ``cut_cm``, each
+    animal's mean over its epochs with an event of the class, then the mean
+    over animals, with its 95 % interval from the nested bootstrap of the
+    animals and their epochs whose replicates take the same estimator
+    (``shared_statistics.session_value_statistics``).
 
     Parameters
     ----------
@@ -1367,10 +1530,11 @@ def hpd_tight_share_statistics(
     Returns
     -------
     dict
-        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``), with
-        ``likelihood_advantage_statistics``' columns; and
-        ``n_animals_non_swr_higher``: the animals whose no-SWR share is above
-        their SWR share.
+        ``rows``: indexed by group (``"no SWR"``, ``"SWR"``): ``animals`` (the
+        animals' shares, sorted animal order), ``animal_names``, ``estimate``,
+        ``ci_low``, ``ci_high``, ``n_epochs`` and ``n_animals``; and
+        ``n_animals_non_swr_higher``: the animals whose no-SWR share (the mean
+        over their epochs) is above their SWR share.
     """
     table = _class_table(events, "hpd_coverage_cm")
     shares = (
@@ -1378,9 +1542,26 @@ def hpd_tight_share_statistics(
         .groupby(["animal", "epoch_id", "group"], as_index=False)["tight"]
         .mean()
     )
-    rows = likelihood_advantage_statistics(
-        shares, column="tight", n_boot=n_boot, seed=seed
-    ).loc[["no SWR", "SWR"]]
+    rows = {}
+    for group in ("no SWR", "SWR"):
+        mine = shares[shares["group"] == group].sort_values(["animal", "epoch_id"])
+        result = session_value_statistics(
+            mine["tight"].to_numpy(dtype=float),
+            mine["animal"].to_numpy(),
+            statistic="mean",
+            n_boot=n_boot,
+            rng=np.random.default_rng(seed),
+        )
+        rows[group] = {
+            "animals": result.per_animal.to_numpy(),
+            "animal_names": result.per_animal.index.to_numpy(),
+            "estimate": result.estimate,
+            "ci_low": result.interval.low,
+            "ci_high": result.interval.high,
+            "n_epochs": len(mine),
+            "n_animals": len(result.per_animal),
+        }
+    rows = pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
     by_group = {
         group: pd.Series(rows.loc[group, "animals"], rows.loc[group, "animal_names"])
         for group in rows.index
@@ -1436,6 +1617,14 @@ def content_distance_distribution(
     return _class_distribution(events, DISTANCE_COLUMN, edges)
 
 
+TRANSPORT_SPEED_COLUMN = "transport_slope_speed_cm_s"
+"""Each event's transport-slope speed (``event_speed.transport_slope_speed``)."""
+
+TRANSPORT_SPEED_BIN_EDGES_CM_S = np.arange(0.0, 1001.0, 25.0)
+"""The speed bins of the transport-speed panel (cm/s); an event faster than the
+last edge is in no bin, so the percents of a class sum to less than 100."""
+
+
 def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """The share of each class's events whose content lies in each distance
     band from the animal (:data:`DISTANCE_BANDS_CM`).
@@ -1454,9 +1643,8 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         Indexed by ``group`` (``"no SWR"``, ``"SWR"``) and ``band`` (the keys
-        of :data:`DISTANCE_BANDS_CM`, in order): ``share_animal_mean``, the
-        mean over animals of the animals' shares; ``animal_min`` and
-        ``animal_max``; ``share``, pooled over the class's events;
+        of :data:`DISTANCE_BANDS_CM`, in order): ``share``, the mean over
+        animals of the animals' shares; ``animal_min`` and ``animal_max``;
         ``n_animals`` and ``n_events`` (the class's events).
     """
     table = _class_table(events, DISTANCE_COLUMN)
@@ -1472,10 +1660,9 @@ def content_distance_band_statistics(events: pd.DataFrame) -> pd.DataFrame:
                 {
                     "group": group,
                     "band": band,
-                    "share_animal_mean": float(per_animal.mean()),
+                    "share": float(per_animal.mean()),
                     "animal_min": float(per_animal.min()),
                     "animal_max": float(per_animal.max()),
-                    "share": float(inside.mean()),
                     "n_animals": len(per_animal),
                     "n_events": len(mine),
                 }
@@ -1536,7 +1723,9 @@ AT_WELL_CM = 20.0
 at a well."""
 
 
-def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, float]:
+def quadrant_fractions(
+    d_animal: np.ndarray, d_well: np.ndarray, weights: np.ndarray | None = None
+) -> dict[str, float]:
     """Fraction of content *timebins* in each (far × at-well) quadrant.
 
     Timebin-weighted (where the decoded content spends its time), not
@@ -1552,19 +1741,27 @@ def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, fl
     d_well : np.ndarray, shape (n_bins,)
         The same bins' track distance (cm) from the content to the nearest
         reward well. At a well means below :data:`AT_WELL_CM`.
+    weights : np.ndarray, shape (n_bins,), optional
+        How much content time each row stands for (the posterior mass of a
+        place, summed over time bins); every row counts once when None.
 
     Returns
     -------
     dict of str to float
-        The share of the bins in each of :data:`OCCUPANCY_QUADRANTS`.
+        The share of the bins (of the weight) in each of
+        :data:`OCCUPANCY_QUADRANTS`.
     """
     far = d_animal > FAR_CM
     at_well = d_well < AT_WELL_CM
+
+    def share(mask: np.ndarray) -> float:
+        return float(np.average(mask, weights=weights))
+
     return {
-        "remote_well": float((far & at_well).mean()),
-        "own_well": float((~far & at_well).mean()),
-        "remote_path": float((far & ~at_well).mean()),
-        "near_off": float((~far & ~at_well).mean()),
+        "remote_well": share(far & at_well),
+        "own_well": share(~far & at_well),
+        "remote_path": share(far & ~at_well),
+        "near_off": share(~far & ~at_well),
     }
 
 

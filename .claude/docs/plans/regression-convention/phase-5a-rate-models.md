@@ -63,10 +63,18 @@ solver, this phase's fits are rerun once to confirm equality. CPU only.
   rate scenario list (Phase 2b's engine) checks the penalty: the reward ratio's bias and the interval's
   coverage under the null and a planted effect, at the declared width and at the widths of the
   sensitivity analysis.
-- **OPEN (lead): penalty width** (design, "Open after the twenty-third round", g). The one declared prior
-  SD of the weak penalty, in the reported unit (here a 0/1 step on the log rate); the log penalty is
-  `log(1 / SD^2)` (`terms.log_penalty_from_prior_sd`). A simulation with SD 1, 2 and 4 is running. Ask
-  before the first real fit; the fit is also reported over the strength (a sensitivity analysis).
+- **The reward term and its penalty width** (decided; design, twenty-fifth round, 2026-11-23). The lead,
+  19:19, about one coefficient per animal: "I just feel like once we start this, then we have to do it
+  for every type of model"; 19:27, about an unpenalized fit: "it's not consistent to have no penalty";
+  19:34: "lets just pick a penalty that's reasonable". So the reward coefficient is fitted per session
+  with the weak penalty (superseded: the twenty-fourth round fits per recording day and per animal, the
+  weak penalty kept; the twenty-sixth round reads the reward effect from an arrival curve for each
+  outcome over two windows); the prior SD is 2 on the log rate ratio (the author's call, not the lead's
+  number: a rate ratio within a factor of about 50 either way is plausible), with SD 1 and 4 reported
+  beside it (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`); the log penalty is `log(1 / SD^2)`.
+  The values are the author's, per model (rate SD 2, content SD 8 with 4 and 16 beside it); no single SD
+  was decided for every family. (The author's text, not the lead's:) the simulation measures the error the
+  paper states beside the number; it does not veto the term.
 - **OPEN (lead): rate model form** (b). Diagnostics on the real bins (pooled; not results): omission
   visits have a median of 0.9 s against 5.4 s; SWR events almost never start in the first second after
   arrival after either outcome (none in 93 % of sessions), so Q1's reference window `[0, 1] s` is empty

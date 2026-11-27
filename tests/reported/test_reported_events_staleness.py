@@ -14,18 +14,24 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     session_cache_record,
 )
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.reported import events
-from continuum_swr_replay.reported.events import (
-    _PROPERTIES,
+from continuum_swr_replay.reported import inputs as stored_inputs
+from continuum_swr_replay.reported.events.class_structure import (
     class_step_values_with_staleness,
-    default_inputs,
-    event_table_staleness,
-    gamma_db_values,
+    spike_evidence_staleness,
+)
+from continuum_swr_replay.reported.events.properties import (
+    _PROPERTIES,
     property_interval_values,
     rest_theta_values,
+)
+from continuum_swr_replay.reported.events.restriction import (
     restriction_window_values,
-    spike_evidence_staleness,
     window_run_note_staleness,
+)
+from continuum_swr_replay.reported.events.signals import gamma_db_values
+from continuum_swr_replay.reported.inputs import (
+    default_inputs,
+    event_table_staleness,
 )
 from continuum_swr_replay.reported.values import Value, pend
 from continuum_swr_replay.runs.io import sha256_file
@@ -351,8 +357,8 @@ def _read_heldout(runs, monkeypatch):
         read.append((folder, name, epochs))
         return tables[name]
 
-    monkeypatch.setattr(events, "read_complete_run", read_complete_run)
-    heldout = events.read_heldout_restriction(
+    monkeypatch.setattr(stored_inputs, "read_complete_run", read_complete_run)
+    heldout = stored_inputs.read_heldout_restriction(
         runs["heldout"], runs["restriction"], runs["facts"], iter(["e1", "e2"]), CURRENT
     )
     assert read == [

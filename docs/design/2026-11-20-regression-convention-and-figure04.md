@@ -294,6 +294,10 @@ then we can filter, we can always choose to add them later or analyze them as gr
 - One rule for a term that cannot be estimated: decided from the data before the fit (the term varies in too
   few units with events on each side), stated per term and session, and stored. A term that fails it in more
   than a stated share of sessions leaves the per-session model and is asked in a pooled model instead.
+  (Not applied to the support rule: no fit read that share, and its function,
+  `support.terms_failing_share`, was removed on 2026-11-24, the lead's choice. The constant
+  `MAX_FAILING_SHARE` remains: the penalty search and the rate model's third-clock decision,
+  `visit_rate.third_clock_decision`, read it.)
 
 ### 4.4 Folds
 
@@ -736,6 +740,7 @@ terms. The lead: "I don't want one curve for each animal. This is a whole new de
   average recover the planted shape, and at which strength.
 - The shared fitter is corrected for the failures that the content design showed (sessions with no finite
   maximum, fits at very strong penalties, a flat score); its merge waits for that.
+- Changed on 2026-11-24 for the behavior models: see the twenty-fourth round ("the unit of the fit").
 
 ### Fifteenth round (2026-11-21): the shared fitter on master; two questions open with the lead
 
@@ -809,6 +814,8 @@ The author's reading of these two answers (**call**). The author told the lead t
 - A target does not carry from one model to another. Simulation: the same target (6 effective
   parameters) gave different log penalties in two designs (about 3.4 for one arrival curve alone, about
   1.8 with two clocks and the reward term), and biases of the Q1 contrast of opposite sign.
+- Changed on 2026-11-24 for the behavior models: "one fit for each session" gives way to one fit for each
+  recording day and for each animal (the twenty-fourth round, "the unit of the fit").
 
 ### Eighteenth round (lead, 2026-11-23, 09:52): no bias-reduced fit
 
@@ -990,6 +997,57 @@ words:
   visited arm, so "current arm" cannot be separated from "most recently visited arm".
 
 The other content questions stay open as they are (Phase 6a's list).
+### Twenty-fifth round (lead, 2026-11-23, 19:19 to 19:34): the reward term of the rate model
+
+(Master's twenty-fourth round is the unit of the fit, 2026-11-24, below; this round is placed by its
+date, before it. The content model's recency round, numbered twenty-fourth on the branch
+`role-content-models`, is renumbered when that branch merges.)
+
+What was shown to the lead: the realistic simulation of the weak penalty at prior SD 4, 2 and 1
+(`.claude/research/2026-11-20-regression-prototypes/proto_rate_realistic/REPORT.md`: every session gets
+a value, but the result on the reward coefficient depends on the SD more than on the data, because a
+session expects only 2 to 6 SWR events after an omitted reward); a toy calculation with two Poisson counts
+that gives the same pattern (`proto_rate_realistic/weak_penalty_toy/`); and the literature's advice to fit
+one model over sparse units (one reward coefficient per animal, shared by its sessions, unpenalized).
+(The author's reading, not the lead's words: the lead heard that advice and set it aside for consistency
+across the model families.)
+
+The lead's words, in order:
+
+- About one coefficient per animal (19:19): "I just feel like once we start this, then we have to do it
+  for every type of model".
+- About an unpenalized per-session fit (19:27): "it's not consistent to have no penalty".
+- (19:34): "lets just pick a penalty that's reasonable".
+
+So:
+
+- Decided by the lead: the reward coefficient keeps the weak penalty in each session, as every simple
+  tested coefficient does, at a reasonable declared value. There is no unpenalized fit.
+- (The author's reading at the time, not the lead's decision; superseded by the twenty-fourth round)
+  There is no per-animal coefficient as the method. The lead's words at 19:19 ("I just feel like once we
+  start this, then we have to do it for every type of model") are a hesitation, not a refusal, and the
+  twenty-fourth round did exactly that for every behavior model: one fit for each recording day and for
+  each animal.
+- (**call**, the author's, not values the lead chose) The values are declared per model, because the unit
+  of the coefficient differs: prior SD 2 on the rate model's log rate ratio (a rate ratio between about
+  1/50 and 50 is plausible, `exp(1.96 x 2)` is about 50), with SD 1 and 4 reported beside it
+  (`visit_rate.WEAK_PRIOR_SD`, `WEAK_PRIOR_SD_SENSITIVITY`); prior SD 8 on the content model's
+  coefficients, with 4 and 16 beside it (the author's pick from the content validation, told to the lead
+  on 2026-11-23). No single SD was decided for every family; the other families' values are not picked
+  yet.
+- (The author's text, not the lead's) A family's simulation measures the error that the paper states
+  beside the number (bias, spread, coverage and false-positive rate at the declared SD and at the pair
+  beside it); it does not veto a term.
+- The per-animal fit built for the comparison (`visit_rate.fit_animal_rewards`, `reward_level="animal"`)
+  is a check, not the paper's method; whether it stays in the code is a question for the lead.
+
+Later rounds change this one. The twenty-fourth round (2026-11-24) fits the behavior models for each
+recording day and for each animal (design C), so the reward coefficient is no longer fitted in each
+session alone; the weak penalty stays on it. The twenty-sixth round (2026-11-25) reads the reward effect
+from an arrival curve for each outcome over two windows and keeps the one coefficient as a secondary value.
+The per-animal check was removed on 2026-11-26, when the branch took master, by task 12 of
+`.claude/docs/plans/regression-convention/phase-4b-unit-of-fit.md`: a fit at `fit_by="animal"` with the
+shared curves replaces it. The lead was not asked the question of the bullet above again.
 
 ### Open after the twenty-third round
 
@@ -1007,9 +1065,10 @@ b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled;
    6 s and about 1 beyond 10 s, so it is not constant. Visits longer than 10 s are 705 of 44,435; ten
    sessions hold 72 % of that time, and that time holds 56 % of the SWR events after an omission. The two
    clocks add from 2 s on, but not between 1 and 2 s. A simulation with planted curves shaped like the
-   real ones is running (scratch `proto_rate_realistic/`). Open: whether the model covers a declared
-   time range; whether the reward effect may change with time since arrival; the reference window of
-   Q1; the value of each clock's penalty.
+   real ones is running (scratch `proto_rate_realistic/`). The reward term itself is decided (twenty-fifth
+   round). Open: the reference window of Q1; the flexibility (penalty) of the leaving clock, and of the
+   other clocks; the reward effect as one coefficient or as a contrast of two arrival curves (whether it
+   may change with time since arrival); whether the model covers a declared time range.
 c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
 d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
    has an absolute floor.)*
@@ -1018,9 +1077,144 @@ e. **The penalties of the mPFC models and of the history kernels.** Whether a pe
 f. **A support rule per grid point** for curves averaged over sessions (an idea of the author; not built,
    not decided). Simulation: few sessions have bins near the 20 s end of the arrival clock, and the
    average curve is far off there.
-g. **The width of the weak penalty.** One declared prior SD for all models, in the reported unit. Not
-   chosen. A simulation with SD 1, 2 and 4 is running. Each family reports a sensitivity analysis over the
-   strength (Greenland and Mansournia 2015).
+g. *(Decided in the twenty-fifth round: the reward coefficient per session with the weak penalty. The
+   values are the author's, per model: SD 2 on the rate model's log rate ratio, with 1 and 4 beside it;
+   SD 8 on the content model's coefficients, with 4 and 16 beside it.)* Each family reports
+   a sensitivity analysis over the strength (Greenland and Mansournia 2015).
+   (Superseded in part: the twenty-fourth round fits per day and per animal, not per session, with the
+   weak penalty kept; the twenty-sixth round reads the reward effect from an arrival curve for each
+   outcome over two windows, the one coefficient kept as a secondary value.)
+
+### Twenty-fourth round (lead, 2026-11-24, 02:09 to 09:55): the unit of the fit
+
+This round's number is settled when the unmerged branches merge: they hold rounds of their own with the
+same numbers. The record is `docs/design/2026-11-24-unit-of-fit.md` (sections 2 and 11).
+
+The lead's words, 2026-11-24:
+
+- 02:09 and 02:10: "I'd like to be consistent with what we do with the behavior models" / "By behavior
+  models, I mean rate, content, etc"
+- 02:14: "Does not include the mpfc models for now."
+- 03:13: "I'm inclined to do C and then attempt D as we are doing C, but we will see if it is
+  prohibitive"
+- 03:33: "Maybe we make it easy in the code to do day or animal grouping"
+- 09:47: "I suspect with will end up doing design C for all. And then running both the day and animal
+  model and compare"
+- 09:48: "I think there will be a decent amount of variation from day to day (or even session to
+  session) from learning, motivation, etc."
+- 09:49: "So maybe design C with day and animal model and then design D later to check."
+- 09:55: "I did say maybe, lets just make this the decision now and we can change if the evidence is
+  against it"
+
+What the lead decided (only what the quoted words carry):
+
+- **Design C, with the day and the animal model, both run and compared**: one fit for each recording day
+  and one for each animal (`analysis/replay_models/fit_by.py`, `BEHAVIOR_FIT_BY = ("day", "animal")`).
+  In design C each session in the unit keeps a baseline of its own (the intercept of a rate model, the
+  arm effects of a content model) and the tested terms are shared. One fit for each session stays in the
+  code for the validation and for comparison.
+- Design D (random session effects, their strengths selected by REML) later, as a check on the same
+  mechanism.
+- The decision changes if the evidence is against it.
+- Consistent across the behavior models ("rate, content, etc"); not the mPFC models for now.
+
+What the author decided or read (labeled; not the lead's words):
+
+- **Fixed, declared penalties: the author's decision**, on "Should we keep the fixed penalty?" / "Ok decide
+  then" (03:18, 03:20), from the evidence in the design note, section 11.2. The weak penalty on every
+  simple tested coefficient is the lead's decision of the twenty-second round.
+- **The curves are among the terms shared inside a unit: the author's reading.** The author's message to
+  the lead just before 09:55 said that design C shares the curves inside a unit, that the lead had
+  declined "one curve for each animal" on 2026-11-21 for the per-session design, and that the author read
+  the lead's messages of that morning as changing that for design C. The lead's next message was "I did
+  say maybe, lets just make this the decision now and we can change if the evidence is against it". The
+  rate model's clock curves are the point that the running scenario may change (the design note, 11.4).
+- **Which models: the author's reading.** That "etc" means the choice, stay-or-leave and ripple-power
+  models is the author's reading, stated to the lead several times and not contradicted.
+
+This round changes two earlier rounds. The fourteenth round kept one fit for each session and declined
+one curve for each animal (2026-11-21, for the per-session design); that the shared curves of design C
+replace that decline is the author's reading above. The seventeenth round kept one fit
+for each session for every model (2026-11-22).
+
+The evidence (simulation numbers; the design note, section 11.2): with nothing planted, the content
+model's per-session estimates are off by up to 0.47 (Q3a -0.22 / -0.15, Q7b -0.34 / -0.47, Q5b-var
++0.26 / +0.25, No SWR / SWR), and one fit per animal takes these to 0.03 or less; one fit per day takes
+them to between 0.03 and 0.18. The rate model's reward coefficient goes from +0.11 / +0.09 per session to
++0.011 / +0.006 per animal. Per-session arm effects gave a smaller largest bias than shared ones (0.035
+against 0.062), and penalties selected by REML over-smoothed the curves that the tests read at their ends.
+The reports are `.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/REPORT.md`,
+`.../design_d_trial/content/REPORT.md` and `.../content_validation/unit_of_fit/tables.md`.
+
+Open (the design note, section 11.4): whether the rate model's clock curves are shared inside a unit or
+are per session; the rate model at the day unit and the declared penalties of its clocks at a larger unit;
+which target the paper states when sessions differ; which unit the headline values come from.
+
+### Twenty-sixth round (lead, 2026-11-25, 14:54 and 15:07 EST): the form of the rate model's reward effect
+
+(The twenty-fifth round, the reward coefficient's weak penalty, 2026-11-23, is above, before the
+twenty-fourth by its date.)
+
+What was shown to the lead: the rate follow-up's later-onset scenario
+(`.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/followup/REPORT.md`, section 3;
+simulation numbers, `mgcv::bam`, the animal unit). With a later onset after an omission and no reward
+ratio planted, the one reward coefficient came out at 0.20 (SWR) and 0.17 (No SWR) and excluded zero in
+every data set; an arrival curve for each outcome read over a window returned the planted shape (4 to
+10 s: -0.057 against a planted -0.053 for SWR; 2 to 4 s: 0.27 / 0.22 against 0.23 / 0.155). Under a
+constant ratio every window recovered it. The windows' costs, with nothing planted: intervals excluding
+zero 2 to 4 s 0 % / 5 %, 4 to 10 s 15 % / 5 %, 1 to 2 s 0 % / 20 % (and biased +0.05 / +0.06); half-widths
+against the one coefficient 15 to 45 % wider at 2 to 4 s, two to three times at 4 to 10 s. The window
+contrast is unusable at the day unit (+0.10 to +0.5 with nothing planted).
+
+The lead's words, 2026-11-25:
+
+- 14:54: "okay so no interaction of outcome of leaving"
+- 15:07: "agree", to the author's recommendation below.
+
+What the lead decided:
+
+- **The leaving curve is shared by both outcomes**: no interaction of the outcome with the time until
+  leaving, in any form of the model.
+- **The reward effect is read from an arrival curve for each outcome** (the author's recommendation,
+  agreed): `outcome + session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)`, Poisson,
+  fitted per animal (and per day, under the twenty-fourth round) and per kind, the two arrival curves
+  penalized each on its own (the form the follow-up simulated, its form O), not the shared curve plus a
+  difference curve of `visit_rate.REWARD_FORMS`' `"time_varying"`.
+- **Two declared tests**, each the outcome term plus the mean over the window of the rewarded arrival
+  curve minus the omitted one (log rate ratio):
+  - Q2, the reward effect on the rate once events are going: the window 4 to 10 s after arrival;
+  - a new question, the reward effect on when events start: the window 2 to 4 s after arrival.
+- **The difference curve** (rewarded minus omitted, over the time since arrival, with its band) is shown,
+  not tested.
+- **The one reward coefficient stays as a secondary value**, for comparison with other studies, described
+  as mixing the timing with the rate.
+
+These windows are declared before any real arrival curve by outcome is looked at; the real curves are a
+check on this choice, not a way to choose it.
+
+**What the window tests compare (added 2026-11-25, with the lead's "ok").** A visit after an omission
+is short (median 0.9 s, against 5.4 s after a reward; item b above), so the omission side of each
+window comes only from the omission visits that last into it. Each test is therefore worded as the rate
+after a reward against after an omission, at the same time since arrival and before leaving, among
+visits that last into the window; the visits that linger after an omission may differ from the rest,
+and the paper says so. The support (counts of the input tables, not results; model A's at-risk bins of
+the 242 sessions, by each bin's last outcome; no event counted;
+`.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/omission_support/`): per animal,
+146 to 429 omission visits have bins at 4 to 10 s (208 to 620 at-risk seconds, against 3,321 to 4,669
+rewarded visits), and 375 to 955 at 2 to 4 s; per session a median of 4 at 4 to 10 s (10 % of sessions
+2 or fewer), which is why the window tests are read per animal, not per day. An animal or kind whose
+window lacks support under the support rule is reported as unsupported; the windows are not moved to
+fit the data. What follows for the builder (in order): the form and the
+window contrast in `analysis/replay_models/rate/visit_rate.py` at `fit_by="animal"`, with the declared
+tests in `declared_tests.py`; the rate validation through the project's simulation engine, with more data
+sets for the rates of excluding zero (the follow-up's 15 % for SWR at 4 to 10 s rests on few) and with a
+declared penalty for each clock curve (about 15 effective parameters for each arrival curve, 10 or more
+for the leaving curve; not yet run); then the real fits. Under this form Q1 is read from the arrival
+curve after an omission.
+
+This round changes the declared Q2, which was the one coefficient (`declared_tests.py`), and decides the
+open "form of the reward effect" of `visit_rate.REWARD_FORMS` and of item b above (whether the reward
+effect may change with time since arrival: it may, along the arrival clock only).
 
 ## 10. Left to the builder
 

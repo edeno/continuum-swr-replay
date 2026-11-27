@@ -206,11 +206,11 @@ def test_a_session_without_a_converged_fit_is_counted_and_warned(
     assert len(warnings) == 4
     assert warnings[0] == (
         "warning: scenario rise, model target_edf_6, estimand Q1: 10.0 % of the "
-        "session fits tried did not converge"
+        "unit fits tried did not converge"
     )
     assert warnings[1].startswith(
         "warning: scenario rise, model target_edf_6, estimand Q1: 10.0 % of the "
-        "sessions have no value (other_status 10.0 %)"
+        "units of the fit have no value (other_status 10.0 %)"
     )
 
 

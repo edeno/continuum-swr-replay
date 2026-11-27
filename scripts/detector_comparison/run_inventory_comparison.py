@@ -9,7 +9,7 @@ per-detector denominators. Design:
 The roster (:data:`ROSTER`):
 
 - the SWR detectors ``kay``, ``karlsson``, ``yu`` and ``zugaro`` (the SWR
-  source run, ``swr_source.SWR_INVENTORY_RUN_ID``) and ``carey``
+  source run, ``paths.SWR_INVENTORY_RUN``) and ``carey``
   (``--carey-run-id``), the five SWR definitions;
 - ``mua`` and ``state_space``, from the canonical decode frame;
 - ``memoryless`` (cohort ``published``) and ``memoryless_criteria`` (cohort
@@ -89,6 +89,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detector_comparison.adapters import (
     NATIVE_IS_ELIGIBLE,
 )
@@ -170,7 +171,7 @@ def bounds_mismatch(identifier: str, bounds: tuple[float, float]) -> str | None:
     return (
         f"The decode grid spans {bounds[0]!r} to {bounds[1]!r} s, not the position "
         f"span {span[0]!r} to {span[1]!r} s SWR run "
-        f"{swr_source.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
+        f"{paths.SWR_INVENTORY_RUN} cut its band to; the detectors would "
         "not share one epoch."
     )
 
@@ -291,10 +292,10 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
     settings: dict = json_ready(
         {
             "input_runs": {
-                "swr": swr_source.SWR_INVENTORY_RUN_ID,
+                "swr": paths.SWR_INVENTORY_RUN,
                 "carey": carey_run_id,
                 "memoryless": memoryless_run_id,
-                "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+                "artifacts": paths.ARTIFACT_INTERVALS_RUN,
             },
             "swr_source": swr_source.swr_source_name(),
             "roster": ROSTER,

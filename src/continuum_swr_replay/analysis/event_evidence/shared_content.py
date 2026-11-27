@@ -7,8 +7,7 @@ is where the others point. Over all events it is near zero, because in many
 events the others' distribution is spread over much of the track and there is
 nothing specific to agree with. This module groups the events by that width.
 
-An event's width is its ``hpd_cm`` from ``tetrode_holdout.window_scores`` (a
-run made with ``--extra-scores``): the mean over its left-out tetrodes of the
+An event's width is its ``hpd_cm`` from ``tetrode_holdout.window_scores``: the mean over its left-out tetrodes of the
 mean over the window's scored bins of the 95 % HPD length of the other
 tetrodes' position distribution (``tetrode_holdout.hpd_lengths``). The mean
 over tetrodes is the natural summary: each left-out tetrode has its own
@@ -128,11 +127,10 @@ def agreement_by_width_statistics(
           epoch without one has no row);
         - ``share_positive``, ``share_positive_animal_min``,
           ``share_positive_animal_max``: the share of events with a score
-          above zero, per epoch, then each animal's median, then the mean over
-          animals, and the lowest and highest animal;
-        - ``share_of_events``: the share of the group's scored events that fall
-          in the bin, pooled over every event;
-        - ``share_of_events_animal_mean``, ``share_of_events_animal_min``,
+          above zero, per epoch, then each animal's mean over its epochs, then
+          the mean over animals, and the lowest and highest animal;
+        - ``share_of_events`` and ``share_of_events_animal_mean`` (the same
+          number), ``share_of_events_animal_min``,
           ``share_of_events_animal_max`` and ``share_of_events_animals``: that
           share per epoch (of the epoch's scored events of the group), each
           animal's mean over its epochs
@@ -144,7 +142,6 @@ def agreement_by_width_statistics(
     scored = windows.dropna(subset=[column]).assign(
         width_bin=lambda t: width_bins(t[WIDTH_COLUMN])
     )
-    totals = scored.groupby("group").size()
     rows = []
     for label in WIDTH_BIN_LABELS:
         mine = scored[scored["width_bin"] == label]
@@ -155,12 +152,7 @@ def agreement_by_width_statistics(
             events = mine[mine["group"] == group]
             positive = (events[column] > 0).astype(float)
             per_animal = animal_session_values(
-                positive.groupby([events["animal"], events["epoch_id"]]).transform(
-                    "mean"
-                ),
-                events["animal"],
-                events["epoch_id"],
-                "median",
+                positive, events["animal"], events["epoch_id"], "mean"
             )
             everyone = scored[scored["group"] == group]
             # every animal of the group: one with no event in the bin has 0
@@ -179,7 +171,7 @@ def agreement_by_width_statistics(
                     "share_positive": float(per_animal.mean()),
                     "share_positive_animal_min": float(per_animal.min()),
                     "share_positive_animal_max": float(per_animal.max()),
-                    "share_of_events": len(events) / totals[group],
+                    "share_of_events": float(shares.mean()),
                     "share_of_events_animal_mean": float(shares.mean()),
                     "share_of_events_animal_min": float(shares.min()),
                     "share_of_events_animal_max": float(shares.max()),
@@ -213,8 +205,8 @@ def shared_content_statistics(
     Parameters
     ----------
     windows : pd.DataFrame
-        ``tetrode_holdout.window_scores`` of a run with ``--extra-scores``, the
-        events only (with ``hpd_null_cm``).
+        ``tetrode_holdout.window_scores``, the events only (with
+        ``hpd_null_cm``).
     n_boot, seed : int, optional
         The bootstrap's replicates and seed, the same for every row.
     """

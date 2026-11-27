@@ -26,8 +26,11 @@ each scenario gives both (:class:`Planted`):
   ``f_u``. Q2 is the model's coefficient: the rewarded arrival curve sums to
   zero over the rewarded rows of the design, so the coefficient is the mean of
   ``g`` over those rows (one weight per row, the arrival clock clamped at its
-  basis range). It is computed on the rows given, so it equals the model's
-  value for a design built on these rows alone (one session's fit).
+  basis range). It is computed on the rows given (one session's). The run
+  builds the design on the pooled rows of every session
+  (``visit_rate_simulation``), so the rewarded curve sums to zero over the
+  pooled rewarded rows and this value is the model's only approximately
+  (exactly where ``g`` is constant).
 - ``pooled``, the truth of ``reward_form="coefficient"``. That form fits ONE
   arrival curve and ONE leaving curve for both outcomes and one coefficient,
   so where ``g`` changes with time the shared curves absorb the part of the
@@ -37,9 +40,12 @@ each scenario gives both (:class:`Planted`):
   (:func:`poisson_projection`): ``log mu = log mu_ref + a(arrival cell) +
   b(leaving cell) + beta * rewarded``, fitted exactly to the session's own
   expected counts, with ``mu_ref`` the omission side's planted rate and ``a``,
-  ``b`` steps on cells of ``ARRIVAL_CELL_S`` and ``LEAVING_CELL_S``. It is the
-  limit of the model's fit on unlimited data, with the curves' flexibility
-  set by the cells (the stretch clock, if planted, held at its curve).
+  ``b`` steps on cells of ``ARRIVAL_CELL_S`` and ``LEAVING_CELL_S`` (the
+  stretch clock, if planted, held at its curve). It is a projection onto
+  those cell steps, not onto the model's penalized splines, so it is not the
+  model's own limit; that is the engine's unit target, ``planted_unit`` (the
+  model fitted to the expected counts with the weak penalty off,
+  ``regression.simulation``).
   Pooled Q1 is the range contrast of ``f_s + a``, pooled Q7a that of ``f_u +
   b``, pooled Q2 is ``beta``. Where ``g`` is constant, both truths are the
   planted curves' contrasts and ``g``.
@@ -51,15 +57,21 @@ The range contrasts are the means of ``visit_rate.declared_contrasts``'s
 windows on the same grid (``contrasts.range_grid``), so a curve's additive
 constant cancels. Q1's reference window is an argument (the declared ``(0,
 1)`` by default). Where the outcomes differ only in their arrival curve (a
-later onset after an omission), there is no planted reward ratio: Q2 is NaN in
-both truths. The rate table (:func:`rate_table_truth`) plants no curve: both
-of its truths are projections (see there).
+later onset after an omission), there is no planted reward ratio: Q2, the
+single reward coefficient, is NaN in both truths. Under the decided window
+form (the convention's twenty-sixth round) such a scenario has a real,
+nonzero window truth (the difference of the two arrival curves over the
+window), which the next step computes. The rate table (:func:`rate_table_truth`) plants no curve: both
+of its truths are projections (see there). Given a table tabulated from real
+counts (as ``visit_rate_simulation`` does), its planted rate and its truths
+are the real data's pooled model-free values, not a chosen truth.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from typing import NamedTuple
 
 import numpy as np
@@ -118,9 +130,13 @@ TRUTH_OF_FORM: dict[str, str] = {
 }
 
 #: The projection's convergence: the largest log ratio of a margin's planted
-#: to fitted expected events, and the sweeps allowed.
+#: to fitted expected events, and the sweeps allowed. One real session of
+#: the 242 (chimi 20200225 08_r4, SWR rows: its omission visits all end
+#: before 1.9 s after arrival) needs more than 20,000 sweeps; at 200,000 it
+#: converges to the planted log ratio. A session that converges sooner stops
+#: at the same sweep, so the limit changes no other value.
 _PROJECTION_TOL = 1e-11
-_PROJECTION_MAX_SWEEPS = 20_000
+_PROJECTION_MAX_SWEEPS = 200_000
 
 
 def interpolated_curve(x: np.ndarray, log_rate: np.ndarray) -> LogCurve:
@@ -135,13 +151,15 @@ def interpolated_curve(x: np.ndarray, log_rate: np.ndarray) -> LogCurve:
     Returns
     -------
     callable
-        Clock values -> log rate, the same shape.
+        Clock values -> log rate, the same shape. It can be pickled (a
+        ``functools.partial`` of ``numpy.interp``), so a process pool can
+        send it.
     """
     x = np.asarray(x, dtype=float)
     log_rate = np.asarray(log_rate, dtype=float)
     if x.ndim != 1 or x.shape != log_rate.shape or np.any(np.diff(x) <= 0):
         raise ValueError("x ascending, one log rate per point")
-    return lambda values: np.interp(np.asarray(values, dtype=float), x, log_rate)
+    return partial(np.interp, xp=x, fp=log_rate)
 
 
 @dataclass(frozen=True)
@@ -347,6 +365,28 @@ def poisson_projection(
     ]
     if not by_outcome:
         groups.append((rewarded, 2))
+    planted, steps = _proportional_fit(expected, reference, groups)
+    arrival = np.where(planted[0] > 0, steps[0], np.nan).reshape(n_outcomes, n_arrival)
+    leaving = np.where(planted[1] > 0, steps[1], np.nan)
+    beta = np.nan if by_outcome else float(steps[2][1])
+    return Projection(arrival, leaving, beta, arrival_edges, leaving_edges)
+
+
+def _proportional_fit(
+    expected: np.ndarray,
+    reference: np.ndarray,
+    groups: list[tuple[np.ndarray, int]],
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """Iterative proportional fitting of ``reference * exp(sum of steps)`` to
+    ``expected``: one step per level of each group (codes, number of
+    levels), the third group, if any, the 0/1 reward whose level 0 is held at
+    zero. Returns each group's planted expected events and its steps.
+
+    Raises
+    ------
+    RuntimeError
+        If the fit does not converge in the sweeps allowed.
+    """
     planted = [np.bincount(g, expected, n) for g, n in groups]
     steps = [np.zeros(n) for _, n in groups]
     for _ in range(_PROJECTION_MAX_SWEEPS):
@@ -364,13 +404,8 @@ def poisson_projection(
             steps[k] += update
             largest = max(largest, float(np.max(np.abs(update))))
         if largest < _PROJECTION_TOL:
-            break
-    else:
-        raise RuntimeError("the projection did not converge")
-    arrival = np.where(planted[0] > 0, steps[0], np.nan).reshape(n_outcomes, n_arrival)
-    leaving = np.where(planted[1] > 0, steps[1], np.nan)
-    beta = np.nan if by_outcome else float(steps[2][1])
-    return Projection(arrival, leaving, beta, arrival_edges, leaving_edges)
+            return planted, steps
+    raise RuntimeError("the projection did not converge")
 
 
 def _projected_contrasts(
@@ -571,8 +606,11 @@ def later_onset_after_omission(
 
     The omission side's arrival curve is the delayed one, so the time-varying
     form's Q1 is the delayed curve's; the coefficient form's is the
-    projection's (module docstring). No reward ratio is planted: Q2 is NaN
-    in both truths.
+    projection's (module docstring). Q2 is NaN in both truths: Q2 here is
+    the single reward coefficient, and no constant ratio is planted. Under
+    the decided window form (twenty-sixth round) this scenario has a real,
+    nonzero window truth, the difference of the two arrival curves over the
+    window, which the next step computes; it is not computed here.
     """
 
     def delayed(s: np.ndarray) -> np.ndarray:
@@ -762,6 +800,13 @@ def rate_table_truth(
       cell (the time-varying form's coefficient).
 
     A value whose window or rows fall in a cell without exposure is NaN.
+
+    The truth is only as chosen as the table. ``visit_rate_simulation``
+    tabulates the REAL counts (``rate_table_from_bins`` on the real rows), so
+    there the planted rate is the real data's, and Q1, Q2 and Q7a are an
+    unpenalized Poisson projection of the model's coefficient form onto it: in
+    substance the real data's pooled model-free values. They are not a result
+    of the simulation and are not to be quoted as one.
     """
     outcome, arrival_cell, leaving_cell = table.cells(rows)
     expected = _scaled(

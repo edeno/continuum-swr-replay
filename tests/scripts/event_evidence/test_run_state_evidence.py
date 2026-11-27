@@ -896,3 +896,40 @@ def test_main_raises_the_open_file_limit_before_its_workers_start(
 
     assert events == ["limit", "workers"]
     assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out
+
+
+def test_summary_only_remakes_the_pooled_outputs_of_the_ok_epochs(
+    tmp_path, monkeypatch
+):
+    """--summary-only runs no epoch: it summarizes the stored windows of the
+    epochs the manifest marks ok, with the manifest's window-level setting,
+    appends a dated note to the README and leaves the manifest as it was."""
+    manifest = {
+        "window_level_stats": False,
+        "epochs": {
+            "b_02_r1_HPC": {"status": "ok"},
+            "a_02_r1_HPC": {"status": "ok"},
+            "a_04_r2_HPC": {"status": "failed"},
+        },
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    (tmp_path / "README.md").write_text("# earlier\n")
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "summarize",
+        lambda output_dir, epochs, *, window_level: calls.append(
+            (output_dir, epochs, window_level)
+        ),
+    )
+    monkeypatch.setattr(
+        runner, "provenance_record", lambda root: {"commit": "abc123", "dirty": False}
+    )
+
+    runner.main(["--output-dir", str(tmp_path), "--summary-only"])
+
+    assert calls == [(tmp_path.resolve(), ["a_02_r1_HPC", "b_02_r1_HPC"], False)]
+    readme = (tmp_path / "README.md").read_text()
+    assert readme.startswith("# earlier\n")
+    assert "rewritten at commit abc123" in readme and "of the 2 ok epochs" in readme
+    assert json.loads((tmp_path / "manifest.json").read_text()) == manifest

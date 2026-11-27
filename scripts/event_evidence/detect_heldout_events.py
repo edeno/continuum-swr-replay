@@ -28,7 +28,7 @@ those labels are the event table's events of the epoch, and unless, for each of
 those events, the rule's SWR group is the table's ``is_swr`` and its start
 inside a well visit is what ``cohort_selection.select_visit_context`` gives.
 
-``--restriction-dir`` reads another restriction run, ``--bin-facts-dir``
+``--restriction-dir`` reads another restriction run (a trial), ``--bin-facts-dir``
 another per-bin facts run, and ``--output-dir`` writes elsewhere; by default
 the canonical restriction and per-bin facts runs and
 ``EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR``.

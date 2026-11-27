@@ -11,8 +11,10 @@ for the rate questions, a simulation package, one JAX fitter for every family, f
 port's acceptance rule, a weak penalty on every simple tested coefficient, and the order of the port
 (design, seventeenth to twenty-third rounds; [overview.md](overview.md#status)). Next: Phase 2b, the
 simulation engine; then, in parallel on separate branches, Phase 5a and Phase 2c, the JAX port; the port
-then replaces the solver and every fit is rerun once to confirm equality. Open questions b, e, f and g
-(the width of the weak penalty) are listed in the overview.
+then replaces the solver and every fit is rerun once to confirm equality. Open questions b, e and f are
+listed in the overview; g (the weak penalty) is decided: the rule by the lead (2026-11-23, 19:34, "lets just
+pick a penalty that's reasonable"), the value per model by the author (rate 2, with 1 and 4; content 8, with
+4 and 16; the other families not picked yet).
 
 This plan builds the approved design `docs/design/2026-11-20-regression-convention-and-figure04.md`
 (read all of it; its decision rounds in section 9 override earlier text). It does two things, in the

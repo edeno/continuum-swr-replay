@@ -88,6 +88,10 @@ prototype; they take most of a summary's time (about an hour for every epoch).
 
 It writes nothing outside ``--output-dir``. Per-epoch logs go to its ``logs/``.
 
+``--summary-only`` runs no epoch: it re-makes the pooled outputs of
+``--output-dir`` from its stored per-epoch windows (the summary code may have
+changed since they were written) and adds a dated note to its README.
+
 Usage:
     python scripts/event_evidence/run_state_evidence.py --n-workers 16
     python scripts/event_evidence/run_state_evidence.py --epochs chimi20200225_02_r1_HPC \\
@@ -1102,7 +1106,9 @@ def figure_bouts(windows: pd.DataFrame, bouts: pd.DataFrame, path: Path) -> None
 
     Per state x regime, two columns: the bouts' values and their paired
     differences from their matched windows. A dot is one animal's summary
-    (the mean of its epochs' medians or means, by metric); the diamond is the
+    (the median of its epochs' medians for a log-likelihood ratio, the mean of
+    its epochs' means for a count, share or distance:
+    ``state_evidence.summary.animal_step``); the diamond is the
     mean over animals with its 95 % interval, hollow with no bar when there
     is none; the faint bars are the windows' 5-95 % and 25-75 % ranges.
 
@@ -1261,8 +1267,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nheld-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        "mean posterior\nMean over animals of each animal's mean epoch bin median "
-        "(log-likelihood ratios) or mean (shares); 95 % nested-bootstrap interval; "
+        "mean posterior\nMean over animals of each animal's median epoch bin median "
+        "(log-likelihood ratios) or mean epoch bin mean (shares); 95 % "
+        "nested-bootstrap interval; "
         f"bins with < {MIN_BIN_WINDOWS} windows omitted",
         fontsize=9,
     )
@@ -1456,6 +1463,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--overwrite", action="store_true", help="Recompute epochs already written."
     )
     parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Run no epoch: re-make the pooled outputs (the summary CSVs and the "
+        "three figures) of --output-dir from its stored per-epoch windows, over "
+        "the epochs its manifest.json marks ok and with that manifest's "
+        "window-level setting, and add a dated note to its README.md. Decodes "
+        "nothing; manifest.json and the per-epoch files are not changed.",
+    )
+    parser.add_argument(
         "--window-level-stats",
         action="store_true",
         help="Also compute the window-level columns (*_window_level), which treat "
@@ -1465,9 +1481,49 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def resummarize(output_dir: Path) -> None:
+    """Re-make ``output_dir``'s pooled outputs from its stored per-epoch windows
+    (``--summary-only``): :func:`summarize` over the epochs its manifest marks
+    ok, with the manifest's window-level setting, then a dated note at the end
+    of its README. Decodes nothing and writes nothing else."""
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+    ok = sorted(k for k, r in manifest["epochs"].items() if r["status"] == "ok")
+    window_level = bool(manifest.get("window_level_stats", False))
+    written = [
+        output_dir / name
+        for name in (
+            "bout_stats.csv", "calibration_stats.csv", "trend_stats.csv",
+            "rate_calibration.csv", "silence_stats.csv", "fig_bouts_vs_matched.png",
+            "fig_calibration.png", "fig_coordinated_silence.png", "README.md",
+        )
+    ]  # fmt: skip
+    print("writes:", *(str(path.resolve()) for path in written), sep="\n  ")
+    summarize(output_dir, ok, window_level=window_level)
+    provenance = provenance_record(ROOT_DIR)
+    note = (
+        f"\n{date.today():%Y-%m-%d}: the summary CSVs and the three figures were "
+        f"rewritten at commit {provenance['commit']}"
+        f"{' (uncommitted changes)' if provenance['dirty'] else ''} from the stored "
+        f"per-epoch windows of the {len(ok)} ok epochs (`run_state_evidence.py "
+        "--summary-only`; no epoch recomputed). An animal's value is the median of "
+        "its epochs' values for the log-likelihood ratios and their calibration "
+        "slopes and the mean for counts, shares and distances "
+        "(`state_evidence.summary.animal_step`); every interval is "
+        "`state_evidence.summary.nested_intervals`' (the nested bootstrap of the "
+        "animals and their epochs, every drawn copy apart, each replicate with the "
+        "same estimator). The caveat above that calls an animal's summary the mean "
+        "of its epochs' values describes the earlier rule.\n"
+    )
+    readme = output_dir / "README.md"
+    readme.write_text(readme.read_text() + note)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.summary_only:
+        resummarize(args.output_dir.resolve())
+        return
     decode_dir, output_dir = args.decode_dir.resolve(), args.output_dir.resolve()
     if output_dir == decode_dir:
         parser.error("--output-dir must not be the decode folder itself")

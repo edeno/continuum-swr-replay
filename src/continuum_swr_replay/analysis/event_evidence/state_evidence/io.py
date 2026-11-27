@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition.decode_masks import (
     require_saved_decode_masks,
 )
@@ -75,8 +75,8 @@ def saved_decode_masks(results_path: Path) -> dict:
         require_saved_decode_masks(attrs, str(results_path))
     except ValueError as error:
         configured = {
-            "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-            "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+            "swr_inventory_run_id": paths.SWR_INVENTORY_RUN,
+            "artifact_run_id": paths.ARTIFACT_INTERVALS_RUN,
         }
         stamp = attrs.get("decode_masks")
         if stamp is None:

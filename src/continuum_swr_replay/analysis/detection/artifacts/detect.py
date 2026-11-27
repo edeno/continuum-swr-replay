@@ -153,7 +153,7 @@ T_SPK_FRAC = 0.40
 in bins with OOD marks (a thin 1.10x margin), and the spike-only lines sit at
 0.50-0.55, so no value has a 1.5x margin and still catches them. It rests on 3
 model-reviewed lines; every spike-only core of the full 255-epoch run
-(``swr_source.ARTIFACT_INTERVALS_RUN_ID``) was inspected when the run was
+(``paths.ARTIFACT_INTERVALS_RUN``) was inspected when the run was
 accepted."""
 T_SPK_MIN_TETRODES = 3
 """A line needs at least 3 tetrodes: the prototype's line table kept bins with
@@ -163,7 +163,7 @@ T_SPK_OOD = 0.20
 """OOD fraction of the bin's spikes. Off rule P: the calibration SWR set's
 maximum is 0, so it sits 1.35x below the smallest model-reviewed spike-only
 line (0.27). It rests on those 3 lines; every spike-only core of the full
-255-epoch run (``swr_source.ARTIFACT_INTERVALS_RUN_ID``) was inspected when the
+255-epoch run (``paths.ARTIFACT_INTERVALS_RUN``) was inspected when the
 run was accepted."""
 T_SPK_OOD_NN = 4.0
 """A mark is OOD when its nearest reference mark is more than 4 x the decoder's

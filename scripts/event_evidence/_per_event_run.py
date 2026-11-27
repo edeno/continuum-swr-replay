@@ -103,9 +103,8 @@ def run_input(run_dir: Path) -> dict[str, str]:
 def restriction_bin_columns(path: Path, columns: Sequence[str]) -> list[str]:
     """``columns`` of a restriction run's per-bin table and the score columns
     of every other model the table holds
-    (``nonlocal_restriction.table_score_columns``): a run that scored the
-    fourth model (``swr_allowed``) is read with its columns, the canonical run
-    as before."""
+    (``nonlocal_restriction.table_score_columns``): the fourth model's
+    (``swr_allowed``) with the three's."""
     import pyarrow.parquet as pq
 
     from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
@@ -189,12 +188,12 @@ def add_restriction_dir_argument(parser: argparse.ArgumentParser) -> None:
         "--restriction-dir",
         type=Path,
         default=None,
-        help="the restriction run to read; default the canonical one under --data-dir",
+        help="the restriction run to read; default the one under --data-dir",
     )
 
 
 def restriction_run_dir(args: argparse.Namespace, data_dir: Path) -> Path:
-    """``--restriction-dir``, or by default the canonical restriction run under
+    """``--restriction-dir``, or by default the restriction run under
     ``data_dir``."""
     return args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
 

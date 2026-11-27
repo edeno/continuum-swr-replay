@@ -1,21 +1,44 @@
 """Log-likelihoods of the shared fitter and their derivatives on the eta scale.
 
-Each family is a small stateless class with the same five methods. ``eta`` is
-the linear predictor ``X @ beta``, shape ``(n_rows,)``; ``aux`` is the family's
-extra data (below), passed to every method so that one object serves every
-session and, for the Gaussian, every scale.
+Each family is a small stateless class. ``eta`` is the linear predictor
+``X @ beta``, shape ``(n_rows,)``; ``aux`` is the family's extra data (below),
+passed to every method so that one object serves every session and, for the
+Gaussian, every scale. Two families are equal when they are of the same class,
+so that a family can be a static argument of a jitted kernel: the kernels of
+one class are compiled once and shared by its objects. A family therefore
+keeps no parameter on the object; anything that changes its result travels in
+``aux``. A family object with an attribute of its own is refused
+(``TypeError``) when a kernel would key on it.
+
+The methods that take NumPy arrays:
 
 - ``check(y, aux)``: raise ``ValueError``, naming the problem, when the
   response or ``aux`` is outside what the family takes (the fit calls it once,
   at its entry, after checking that ``y`` is finite).
-- ``loglik(eta, y, aux)``: the log-likelihood, a float.
-- ``score_eta(eta, y, aux)``: ``dl/deta``, shape ``(n_rows,)``; the coefficient
-  gradient is ``X.T @ score_eta``.
-- ``information(X, eta, y, aux)``: ``-d2l/dbeta2``, shape ``(p, p)``.
-- ``dinformation(X, eta, y, aux, d)``: the derivative of ``information`` when
-  ``eta`` moves along ``d`` (shape ``(n_rows,)``), shape ``(p, p)``.
-- ``d2information(X, eta, y, aux, d1, d2)``: the second derivative of
-  ``information`` along ``d1`` and ``d2``, shape ``(p, p)``.
+- ``identifying_design(X, aux)``: the design whose column space the likelihood
+  identifies (the design check reads it).
+- ``pad(X, y, aux)``: the rows padded to their bucket (``padding``), as the
+  kernels take them (:class:`Rows`).
+- ``weighted_design(X, y, aux, eta)``: the design weighted by the information,
+  ``X~`` with ``X~' X~`` the information, shape ``(n_rows, p)`` (what
+  ``collinearity`` measures on). It runs in float64
+  (``runtime.in_float64``): it pads the rows and runs one jitted kernel.
+
+The Newton and REML kernels compute from the family's JAX functions:
+``_jax_loglik`` (the log-likelihood), ``_jax_score`` (``dl/deta``, shape
+``(n_rows,)``; the coefficient gradient is ``X.T @ score``),
+``_jax_information`` (``-d2l/dbeta2``, shape ``(p, p)``),
+``_jax_dinformation`` (its derivative when ``eta`` moves along a direction
+``d``, shape ``(n_rows,)``), ``_jax_d2information`` (the second derivative
+along ``d1`` and ``d2``), ``_jax_weighted_design`` and
+``_jax_information_traces`` (the traces of the information's derivatives
+against a matrix, which REML's derivatives read). Each takes the padded rows
+and their ``weight`` (1 on a real row, 0 on a padded one) and multiplies every
+row's term by it, so a padded row adds exactly 0. A likelihood made for a test
+follows the protocol by overriding these. ``_jax_identified_change(d, aux)``
+is ``identifying_design`` applied to a change ``d`` of the padded rows'
+``eta`` (``X @ step``): the change the likelihood sees, which the Newton fit's
+no-finite-maximum rule measures.
 
 The information is the observed information. For the three diagonal families it
 is ``X' diag(w) X`` with weights ``w(eta)`` that do not depend on ``y``; their
@@ -30,10 +53,12 @@ Gaussian           phi, the scale (float)                 1 / phi       0       
 =================  =====================================  ============  ==========  ==========
 
 The grouped softmax (one group per event, one row per candidate) takes the
-group id of each row as ``aux``, sorted so that a group's rows are contiguous.
+group id of each row as ``aux``, sorted so that a group's rows are contiguous;
+its kernels sum over groups by ``jax.ops.segment_sum``.
 Constants are left out where they do not depend on ``beta``: the Poisson
 ``-log y!`` and the multinomial coefficient. The Gaussian keeps its
-normalizing constant, which depends on the scale.
+normalizing constant, which depends on the scale (and on the number of real
+rows, not the padded count).
 
 A family's ``name`` is how a fit record names it. Its ``quadratic`` is True
 when its log-likelihood is quadratic in ``eta`` (the Gaussian): one full Newton
@@ -43,10 +68,24 @@ cap on its length.
 
 from __future__ import annotations
 
-from typing import Protocol
+import functools
+from typing import Any, Protocol
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 from scipy.special import expit
+
+from .padding import (
+    Groups,
+    Rows,
+    group_sizes,
+    group_starts,
+    pad_groups,
+    pad_rows,
+    pad_values,
+)
+from .runtime import float64_kernel, in_float64
 
 __all__ = [
     "Bernoulli",
@@ -56,11 +95,17 @@ __all__ = [
     "Poisson",
     "draw",
     "group_starts",
+    "mean",
 ]
 
 
+jax.tree_util.register_dataclass(
+    Groups, data_fields=["index"], meta_fields=["n_groups"]
+)
+
+
 class Likelihood(Protocol):
-    """The interface the Newton fit and REML read."""
+    """The interface the Newton fit, REML and the collinearity measures read."""
 
     #: The family's name in a fit record.
     name: str
@@ -70,67 +115,226 @@ class Likelihood(Protocol):
 
     def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray: ...
 
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float: ...
+    def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows: ...
 
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray: ...
-
-    def information(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object
+    def weighted_design(
+        self, X: np.ndarray, y: np.ndarray, aux: object, eta: np.ndarray
     ) -> np.ndarray: ...
 
-    def dinformation(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object, d: np.ndarray
-    ) -> np.ndarray: ...
+    def _jax_loglik(self, eta: Any, y: Any, aux: Any, weight: Any) -> Any: ...
 
-    def d2information(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: object,
-        d1: np.ndarray,
-        d2: np.ndarray,
-    ) -> np.ndarray: ...
+    def _jax_score(self, eta: Any, y: Any, aux: Any, weight: Any) -> Any: ...
+
+    def _jax_information(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any
+    ) -> Any: ...
+
+    def _jax_dinformation(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, d: Any
+    ) -> Any: ...
+
+    def _jax_d2information(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, d1: Any, d2: Any
+    ) -> Any: ...
+
+    def _jax_weighted_design(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any
+    ) -> Any: ...
+
+    def _jax_information_traces(
+        self, X: Any, eta: Any, y: Any, aux: Any, weight: Any, M: Any, D: Any, E: Any
+    ) -> tuple[Any, Any]: ...
+
+    def _jax_identified_change(self, d: Any, aux: Any) -> Any: ...
 
 
-def _weighted_gram(X: np.ndarray, weights: np.ndarray) -> np.ndarray:
-    """``X' diag(weights) X``, shape ``(p, p)``."""
-    return (X.T * weights) @ X
+# The kernel of the public method: one program per family and padded shape.
 
 
-class _DiagonalFamily:
+@float64_kernel(static_argnames=("lik",))
+def _weighted_design_kernel(lik, X, eta, y, aux, weight):
+    return lik._jax_weighted_design(X, eta, y, aux, weight)
+
+
+def _one_axis(values: object, name: str) -> np.ndarray:
+    """`values` as float64, refused (``ValueError``) unless it has one axis: a
+    column of shape ``(n, 1)`` would broadcast against the padded rows."""
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1:
+        raise ValueError(
+            f"{name} of shape {values.shape}: one value per row, on one axis"
+        )
+    return values
+
+
+def _gram(X: Any, weights: Any) -> Any:
+    """``X' diag(weights) X``, shape ``(p, p)``, for weights of either sign.
+
+    Written ``X.T @ (weights[:, None] * X)``: XLA folds that transpose into
+    the product. ``(X.T * weights) @ X`` made it copy the transposed design,
+    which took about half of a Newton iteration at the rate model's size.
+    """
+    return X.T @ (weights[:, None] * X)
+
+
+def _upper_pairs(m: int) -> tuple[Any, Any, Any]:
+    """The pairs ``j <= k`` of ``m`` items, as two index arrays, and whether
+    each is a diagonal pair."""
+    j, k = jnp.triu_indices(m)
+    return j, k, j == k
+
+
+def _mirrored(upper: Any, j: Any, k: Any, m: int) -> Any:
+    """The symmetric ``(m, m)`` matrix whose entries ``j <= k`` are ``upper``."""
+    return jnp.zeros((m, m), upper.dtype).at[j, k].set(upper).at[k, j].set(upper)
+
+
+@functools.cache
+def _can_keep_state(cls: type) -> bool:
+    """Whether a family class defines ``__init__`` or a
+    ``functools.cached_property`` (itself or a base), either of which can put
+    an attribute on an object after it is made."""
+    return cls.__init__ is not object.__init__ or any(
+        isinstance(value, functools.cached_property)
+        for klass in cls.__mro__
+        for value in vars(klass).values()
+    )
+
+
+class _Family:
+    """The public method of every family, on its JAX functions."""
+
+    def __eq__(self, other: object) -> bool:
+        return type(other) is type(self) and self._stateless()
+
+    def __hash__(self) -> int:
+        self._stateless()
+        return hash(type(self))
+
+    def _stateless(self) -> bool:
+        """True; raise ``TypeError`` when the object keeps an attribute of its
+        own, which the kernels, keyed on the class, would not see, or when its
+        class could put one there (:func:`_can_keep_state`). Checked at every
+        hash and every public call."""
+        if _can_keep_state(type(self)):
+            raise TypeError(
+                f"{type(self).__name__} can keep state on its objects (it defines "
+                "__init__ or a cached property): a family is keyed on its class in "
+                "the compiled kernels, so whatever changes its result goes in aux"
+            )
+        attributes = sorted(vars(self))
+        if attributes:
+            raise TypeError(
+                f"{type(self).__name__} keeps {attributes} on the object: a family "
+                "is keyed on its class in the compiled kernels, so whatever changes "
+                "its result goes in aux"
+            )
+        return True
+
+    @in_float64
+    def weighted_design(
+        self, X: np.ndarray, y: np.ndarray, aux: object, eta: np.ndarray
+    ) -> np.ndarray:
+        """The design weighted by the information at ``eta``.
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (n_rows, p)
+        y : np.ndarray, shape (n_rows,)
+            The response (the softmax's group totals weight its groups).
+        aux : object
+            The family's aux; the Gaussian ignores it.
+        eta : np.ndarray, shape (n_rows,)
+            ``X @ beta`` at the fit.
+
+        Returns
+        -------
+        np.ndarray, shape (n_rows, p)
+            ``X~``, with ``X~' X~`` the information (the Gaussian's at unit
+            scale, so ``X~ = X``).
+        """
+        self._stateless()
+        r = self.pad(X, _one_axis(y, "y"), aux)
+        eta = pad_values(_one_axis(eta, "eta"), r.n_real, r.y.size, "eta")
+        weighted = _weighted_design_kernel(self, r.X, eta, r.y, r.aux, r.weight)
+        return np.array(weighted)[: r.n_real]
+
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of the information's derivatives against ``M``.
+
+        ``M`` is a symmetric ``(p, p)`` matrix, ``D`` has shape ``(n_rows, k)``
+        and ``E`` shape ``(n_rows, m)``, each column a direction of ``eta``.
+        Returns ``tr(M _jax_dinformation(D[:, a]))`` for each column ``a``,
+        shape ``(k,)``, and ``tr(M _jax_d2information(E[:, j], E[:, l]))`` for
+        each pair,
+        shape ``(m, m)``, symmetric. Here each derivative is made and
+        multiplied by ``M``, one at a time (``jax.lax.map``): one
+        ``(p, p)`` product with the design per column and per pair ``j <= l``.
+        """
+
+        def against_M(information):
+            return jnp.sum(M * information)
+
+        def first(a):
+            d = jax.lax.dynamic_index_in_dim(D, a, axis=1, keepdims=False)
+            return against_M(self._jax_dinformation(X, eta, y, aux, weight, d))
+
+        m = E.shape[1]
+        rows, columns, _ = _upper_pairs(m)
+
+        def second(pair):
+            j, k = pair
+            e_j = jax.lax.dynamic_index_in_dim(E, j, axis=1, keepdims=False)
+            e_k = jax.lax.dynamic_index_in_dim(E, k, axis=1, keepdims=False)
+            return against_M(self._jax_d2information(X, eta, y, aux, weight, e_j, e_k))
+
+        upper = jax.lax.map(second, (rows, columns))
+        return (
+            jax.lax.map(first, jnp.arange(D.shape[1])),
+            _mirrored(upper, rows, columns, m),
+        )
+
+
+class _DiagonalFamily(_Family):
     """A family whose information is ``X' diag(w(eta)) X``."""
 
     def identifying_design(self, X: np.ndarray, aux: object) -> np.ndarray:
         """The design whose column space the likelihood identifies: ``X``."""
         return X
 
-    def _weights(
-        self, eta: np.ndarray, aux: object
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _jax_identified_change(self, d: Any, aux: Any) -> Any:
+        """A change ``d`` of the padded rows' ``eta`` as the likelihood sees
+        it: ``d`` itself."""
+        return d
+
+    def _jax_weights(self, eta: Any, aux: Any) -> tuple[Any, Any, Any]:
         """``(w, dw/deta, d2w/deta2)``, each shape ``(n_rows,)``."""
         raise NotImplementedError
 
-    def information(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object
-    ) -> np.ndarray:
-        return _weighted_gram(X, self._weights(eta, aux)[0])
+    def _jax_information(self, X, eta, y, aux, weight):
+        return _gram(X, weight * self._jax_weights(eta, aux)[0])
 
-    def dinformation(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: object, d: np.ndarray
-    ) -> np.ndarray:
-        return _weighted_gram(X, self._weights(eta, aux)[1] * d)
+    def _jax_dinformation(self, X, eta, y, aux, weight, d):
+        return _gram(X, weight * self._jax_weights(eta, aux)[1] * d)
 
-    def d2information(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: object,
-        d1: np.ndarray,
-        d2: np.ndarray,
-    ) -> np.ndarray:
-        return _weighted_gram(X, self._weights(eta, aux)[2] * d1 * d2)
+    def _jax_d2information(self, X, eta, y, aux, weight, d1, d2):
+        return _gram(X, weight * self._jax_weights(eta, aux)[2] * d1 * d2)
+
+    def _jax_weighted_design(self, X, eta, y, aux, weight):
+        return X * jnp.sqrt(weight * self._jax_weights(eta, aux)[0])[:, None]
+
+    def _jax_information_traces(self, X, eta, y, aux, weight, M, D, E):
+        """The traces of :meth:`_Family._jax_information_traces`, without
+        making the derivatives: with ``h_i = x_i' M x_i``,
+        ``tr(M X' diag(c) X) = sum_i c_i h_i``, so the traces are
+        ``(weight w' h) @ D`` and ``E' diag(weight w'' h) E``. One product of
+        the design with ``M`` in all; read from ``_jax_weights``, as the
+        directional derivatives are. The second is mirrored from its upper
+        triangle, so that it is exactly symmetric."""
+        _, w1, w2 = self._jax_weights(eta, aux)
+        h = jnp.sum((X @ M) * X, axis=1)
+        second = _gram(E, weight * w2 * h)
+        return (weight * w1 * h) @ D, jnp.triu(second) + jnp.triu(second, 1).T
 
 
 class Poisson(_DiagonalFamily):
@@ -160,17 +364,25 @@ class Poisson(_DiagonalFamily):
                 f"offset not finite on {np.sum(~np.isfinite(offset))} rows"
             )
 
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> float:
+    def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
+        """The rows padded to their bucket (``padding.pad_rows``), the offset
+        0 on a padded row; a single offset is every row's."""
+        if aux is None:
+            raise TypeError("the Poisson offset is None: give log(exposure)")
+        offset = np.asarray(aux, dtype=float)
+        if offset.ndim == 0:  # one offset for every row
+            offset = np.full(np.shape(y), float(offset))
+        return pad_rows(X, y, _one_axis(offset, "offset"))
+
+    def _jax_loglik(self, eta, y, aux, weight):
         log_mu = eta + aux
-        return float(y @ log_mu - np.exp(log_mu).sum())
+        return jnp.sum(weight * (y * log_mu - jnp.exp(log_mu)))
 
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> np.ndarray:
-        return y - np.exp(eta + aux)
+    def _jax_score(self, eta, y, aux, weight):
+        return weight * (y - jnp.exp(eta + aux))
 
-    def _weights(
-        self, eta: np.ndarray, aux: object
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        mu = np.exp(eta + aux)
+    def _jax_weights(self, eta, aux):
+        mu = jnp.exp(eta + aux)
         return mu, mu, mu
 
 
@@ -192,16 +404,18 @@ class Bernoulli(_DiagonalFamily):
                 "(it takes 0/1 outcomes, not proportions)"
             )
 
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float:
-        return float(y @ eta - np.logaddexp(0.0, eta).sum())
+    def pad(self, X: np.ndarray, y: np.ndarray, aux: object) -> Rows:
+        """The rows padded to their bucket (``padding.pad_rows``); no aux."""
+        return pad_rows(X, y)
 
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: object) -> np.ndarray:
-        return y - expit(eta)
+    def _jax_loglik(self, eta, y, aux, weight):
+        return jnp.sum(weight * (y * eta - jnp.logaddexp(0.0, eta)))
 
-    def _weights(
-        self, eta: np.ndarray, aux: object
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        mu = expit(eta)
+    def _jax_score(self, eta, y, aux, weight):
+        return weight * (y - jax.nn.sigmoid(eta))
+
+    def _jax_weights(self, eta, aux):
+        mu = jax.nn.sigmoid(eta)
         w = mu * (1.0 - mu)
         return w, w * (1.0 - 2.0 * mu), w * (1.0 - 6.0 * w)
 
@@ -209,7 +423,7 @@ class Bernoulli(_DiagonalFamily):
 class Gaussian(_DiagonalFamily):
     """Normal responses with an identity link and scale ``aux = phi``.
 
-    ``l = -sum (y - eta)^2 / (2 phi) - n/2 log(2 pi phi)``.
+    ``l = -sum (y - eta)^2 / (2 phi) - n/2 log(2 pi phi)``, ``n`` the real rows.
     """
 
     name = "gaussian"
@@ -222,41 +436,29 @@ class Gaussian(_DiagonalFamily):
                 f"the Gaussian scale must be finite and positive, not {aux}"
             )
 
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: float) -> float:
+    def pad(self, X: np.ndarray, y: np.ndarray, aux: float | None) -> Rows:
+        """The rows padded to their bucket (``padding.pad_rows``); the scale
+        as a float64 (None stays None: the weighted design does not read it)."""
+        return pad_rows(X, y)._replace(aux=None if aux is None else np.float64(aux))
+
+    def _jax_loglik(self, eta, y, aux, weight):
         residual = y - eta
-        return float(
-            -(residual @ residual) / (2.0 * aux)
-            - 0.5 * y.size * np.log(2.0 * np.pi * aux)
-        )
+        return -((weight * residual) @ residual) / (2.0 * aux) - 0.5 * jnp.sum(
+            weight
+        ) * jnp.log(2.0 * jnp.pi * aux)
 
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: float) -> np.ndarray:
-        return (y - eta) / aux
+    def _jax_score(self, eta, y, aux, weight):
+        return weight * (y - eta) / aux
 
-    def _weights(
-        self, eta: np.ndarray, aux: float
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        zero = np.zeros_like(eta)
-        return np.full_like(eta, 1.0 / aux), zero, zero
+    def _jax_weights(self, eta, aux):
+        zero = jnp.zeros_like(eta)
+        return jnp.full_like(eta, 1.0 / aux), zero, zero
 
-
-def group_starts(groups: np.ndarray) -> np.ndarray:
-    """Index of each group's first row, shape ``(n_groups,)``.
-
-    Raises
-    ------
-    ValueError
-        If ``groups`` is empty or not sorted (a group's rows must be
-        contiguous).
-    """
-    groups = np.asarray(groups)
-    if groups.size == 0:
-        raise ValueError("no rows")
-    if np.any(groups[1:] < groups[:-1]):
-        raise ValueError("group ids must be sorted so each group's rows are contiguous")
-    return np.flatnonzero(np.r_[True, groups[1:] != groups[:-1]])
+    def _jax_weighted_design(self, X, eta, y, aux, weight):
+        return X * weight[:, None]
 
 
-class GroupedSoftmax:
+class GroupedSoftmax(_Family):
     """A softmax over each group's rows; ``aux`` is the sorted group id per row.
 
     For group ``g`` with response ``y_gk`` (a fraction summing to one, or a
@@ -273,7 +475,9 @@ class GroupedSoftmax:
 
     It is the conditional Poisson likelihood of a fixed group total. A constant
     within a group cancels, so a group-level column is not identified and must
-    not be in ``X``.
+    not be in ``X``. In a kernel the per-group sums are segment sums over
+    :class:`Groups`; a group with no rows (``n_g = 0``, its ``log(sum exp)``
+    minus infinity) is read by no row and adds 0.
     """
 
     name = "grouped_softmax"
@@ -303,97 +507,127 @@ class GroupedSoftmax:
         likelihood sees only variation within a group, so a combination of
         columns constant within every group is not identified."""
         starts = group_starts(aux)
-        sizes = np.diff(starts, append=X.shape[0])
+        sizes = group_sizes(starts, X.shape[0])
         means = np.add.reduceat(X, starts, axis=0) / sizes[:, None]
         return X - np.repeat(means, sizes, axis=0)
 
-    @staticmethod
-    def _parts(
-        eta: np.ndarray, y: np.ndarray, groups: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """``(starts, sizes, p, total)``: ``p`` per row, shape ``(n_rows,)``;
-        the group total ``n_g`` per group, shape ``(n_groups,)``."""
-        starts = group_starts(groups)
-        sizes = np.diff(starts, append=eta.size)
-        top = np.maximum.reduceat(eta, starts)
-        weight = np.exp(eta - np.repeat(top, sizes))
-        p = weight / np.repeat(np.add.reduceat(weight, starts), sizes)
-        return starts, sizes, p, np.add.reduceat(y, starts)
+    def _jax_identified_change(self, d: Any, aux: Groups) -> Any:
+        """A change ``d`` of the padded rows' ``eta`` as the likelihood sees
+        it: ``d`` less its group's mean, shape ``(n_rows,)``, since a change
+        common to a group's rows cancels in its softmax. A padded row's ``d``
+        is 0 (its design row is zero), and so is its group's mean."""
+        rows = self._per_group(jnp.ones_like(d), aux)
+        means = self._per_group(d, aux) / jnp.maximum(rows, 1.0)
+        return d - means[aux.index]
 
-    def loglik(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> float:
-        starts = group_starts(aux)
-        sizes = np.diff(starts, append=eta.size)
-        top = np.maximum.reduceat(eta, starts)
-        shifted = eta - np.repeat(top, sizes)
-        log_norm = np.log(np.add.reduceat(np.exp(shifted), starts))
-        return float(y @ shifted - np.add.reduceat(y, starts) @ log_norm)
-
-    def score_eta(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> np.ndarray:
-        _, sizes, p, total = self._parts(eta, y, aux)
-        return y - np.repeat(total, sizes) * p
+    def pad(self, X: np.ndarray, y: np.ndarray, aux: np.ndarray) -> Rows:
+        """The rows and groups padded (``padding.pad_groups``)."""
+        return pad_groups(X, y, aux)
 
     @staticmethod
-    def _sandwich(
-        X: np.ndarray,
-        starts: np.ndarray,
-        sizes: np.ndarray,
-        total: np.ndarray,
-        diagonal: np.ndarray,
-        pairs: list[tuple[np.ndarray, np.ndarray]],
-    ) -> np.ndarray:
-        """``sum_g n_g X_g' (diag(a) - sum_(u, v) u v') X_g`` for a per-row
-        ``a`` and per-row vector pairs ``(u, v)``, shape ``(p, p)``."""
-        out = _weighted_gram(X, np.repeat(total, sizes) * diagonal)
-        for u, v in pairs:
-            Xu = np.add.reduceat(u[:, None] * X, starts)
-            Xv = np.add.reduceat(v[:, None] * X, starts)
-            out -= (Xu.T * total) @ Xv
-        return out
-
-    def information(
-        self, X: np.ndarray, eta: np.ndarray, y: np.ndarray, aux: np.ndarray
-    ) -> np.ndarray:
-        starts, sizes, p, total = self._parts(eta, y, aux)
-        return self._sandwich(X, starts, sizes, total, p, [(p, p)])
-
-    def dinformation(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: np.ndarray,
-        d: np.ndarray,
-    ) -> np.ndarray:
-        starts, sizes, p, total = self._parts(eta, y, aux)
-        v = self._g_times(p, d, starts, sizes)
-        return self._sandwich(X, starts, sizes, total, v, [(v, p), (p, v)])
-
-    def d2information(
-        self,
-        X: np.ndarray,
-        eta: np.ndarray,
-        y: np.ndarray,
-        aux: np.ndarray,
-        d1: np.ndarray,
-        d2: np.ndarray,
-    ) -> np.ndarray:
-        starts, sizes, p, total = self._parts(eta, y, aux)
-        v1 = self._g_times(p, d1, starts, sizes)
-        v2 = self._g_times(p, d2, starts, sizes)
-        # q = (D_d2 G) d1 = v2 * d1 - v2 (p'd1) - p (v2'd1), per group.
-        p_d1 = np.repeat(np.add.reduceat(p * d1, starts), sizes)
-        v2_d1 = np.repeat(np.add.reduceat(v2 * d1, starts), sizes)
-        q = v2 * (d1 - p_d1) - p * v2_d1
-        return self._sandwich(
-            X, starts, sizes, total, q, [(q, p), (p, q), (v1, v2), (v2, v1)]
+    def _per_group(values: Any, groups: Groups) -> Any:
+        """Sums over each group's rows, shape ``(n_groups, ...)``."""
+        return jax.ops.segment_sum(
+            values, groups.index, num_segments=groups.n_groups, indices_are_sorted=True
         )
 
-    @staticmethod
-    def _g_times(
-        p: np.ndarray, d: np.ndarray, starts: np.ndarray, sizes: np.ndarray
-    ) -> np.ndarray:
+    def _jax_parts(self, eta, y, groups, weight):
+        """``(shifted, norm, p, total)``: ``eta`` less its group's largest,
+        ``sum exp(shifted)`` and ``n_g`` per group, ``p`` per row."""
+        top = jax.ops.segment_max(
+            eta, groups.index, num_segments=groups.n_groups, indices_are_sorted=True
+        )
+        shifted = eta - top[groups.index]
+        exp_shifted = jnp.exp(shifted)
+        norm = self._per_group(exp_shifted, groups)
+        p = exp_shifted / norm[groups.index]
+        return shifted, norm, p, self._per_group(weight * y, groups)
+
+    def _jax_loglik(self, eta, y, aux, weight):
+        shifted, norm, _, _ = self._jax_parts(eta, y, aux, weight)
+        # y log p summed by row: a group with no rows (norm 0, log -inf) is
+        # read by no row, so it adds nothing (a per-group sum would give
+        # n_g log(norm) = 0 * -inf there).
+        return jnp.sum(weight * y * (shifted - jnp.log(norm)[aux.index]))
+
+    def _jax_score(self, eta, y, aux, weight):
+        _, _, p, total = self._jax_parts(eta, y, aux, weight)
+        return weight * (y - total[aux.index] * p)
+
+    def _sandwich(self, X, groups, weight, total, diagonal, pairs):
+        """``sum_g n_g X_g' (diag(a) - sum_(u, v) u v') X_g`` for a per-row
+        ``a`` and per-row vector pairs ``(u, v)``, shape ``(p, p)``."""
+        out = _gram(X, weight * total[groups.index] * diagonal)
+        for u, v in pairs:
+            Xu = self._per_group((weight * u)[:, None] * X, groups)
+            Xv = self._per_group((weight * v)[:, None] * X, groups)
+            out = out - Xu.T @ (total[:, None] * Xv)
+        return out
+
+    def _g_times(self, p, d, groups, weight):
         """``G d = p (d - p'd)`` per group, shape ``(n_rows,)``."""
-        return p * (d - np.repeat(np.add.reduceat(p * d, starts), sizes))
+        return p * (d - self._per_group(weight * p * d, groups)[groups.index])
+
+    def _jax_information(self, X, eta, y, aux, weight):
+        _, _, p, total = self._jax_parts(eta, y, aux, weight)
+        return self._sandwich(X, aux, weight, total, p, [(p, p)])
+
+    def _jax_dinformation(self, X, eta, y, aux, weight, d):
+        _, _, p, total = self._jax_parts(eta, y, aux, weight)
+        v = self._g_times(p, d, aux, weight)
+        return self._sandwich(X, aux, weight, total, v, [(v, p), (p, v)])
+
+    def _jax_d2information(self, X, eta, y, aux, weight, d1, d2):
+        _, _, p, total = self._jax_parts(eta, y, aux, weight)
+        v1 = self._g_times(p, d1, aux, weight)
+        v2 = self._g_times(p, d2, aux, weight)
+        # q = (D_d2 G) d1 = v2 * d1 - v2 (p'd1) - p (v2'd1), per group.
+        p_d1 = self._per_group(weight * p * d1, aux)[aux.index]
+        v2_d1 = self._per_group(weight * v2 * d1, aux)[aux.index]
+        q = v2 * (d1 - p_d1) - p * v2_d1
+        return self._sandwich(
+            X, aux, weight, total, q, [(q, p), (p, q), (v1, v2), (v2, v1)]
+        )
+
+    def _jax_weighted_design(self, X, eta, y, aux, weight):
+        """Per group ``sqrt(n_g) diag(sqrt(p_g)) (X_g - 1 p_g' X_g)``."""
+        _, _, p, total = self._jax_parts(eta, y, aux, weight)
+        means = self._per_group((weight * p)[:, None] * X, aux)
+        centered = X - means[aux.index]
+        return centered * jnp.sqrt(weight * total[aux.index] * p)[:, None]
+
+
+def mean(lik: Likelihood, eta: np.ndarray, aux: object) -> np.ndarray:
+    """The expected outcome at a linear predictor, the mean that each draw of
+    :func:`draw` has.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    eta : np.ndarray, shape (n_rows,)
+    aux : object
+        As :func:`draw`: the Poisson offset; under the grouped softmax the
+        sorted group id of each row; not read otherwise.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+        ``exp(eta + aux)`` (Poisson), ``expit(eta)`` (Bernoulli), ``eta``
+        (Gaussian), each group's ``softmax(eta)`` (grouped softmax).
+    """
+    eta = np.asarray(eta, dtype=float)
+    if lik.name == "poisson":
+        return np.exp(eta + np.asarray(aux, dtype=float))
+    if lik.name == "bernoulli":
+        return expit(eta)
+    if lik.name == "grouped_softmax":
+        starts = group_starts(np.asarray(aux))
+        sizes = group_sizes(starts, eta.size)
+        weight = np.exp(eta - np.repeat(np.maximum.reduceat(eta, starts), sizes))
+        return weight / np.repeat(np.add.reduceat(weight, starts), sizes)
+    if lik.name == "gaussian":
+        return eta
+    raise ValueError(f"no mean for the likelihood {lik.name!r}")
 
 
 def draw(
@@ -433,7 +667,9 @@ def draw(
          Variance ``p (1 - p) (n + a) / (n (1 + a))``: that of (1) times
          ``(n + a) / (n (1 + a))``, between ``1 / n`` (large ``a``, no
          overdispersion) and 1 (small ``a``); for large ``n`` it tends to
-         ``1 / (1 + a)``.
+         ``1 / (1 + a)``. The Dirichlet is drawn in log space, so that a
+         small shape ``a p`` does not underflow to zero on every row of a
+         group.
 
       Each choice is the Gumbel-max draw: the row of the largest
       ``log p + Gumbel`` noise.
@@ -462,6 +698,9 @@ def draw(
         softmax, if ``n_trials`` is not a whole number of at least one or a
         concentration is not finite and positive, or either has the wrong
         number of groups, or a group has no finite ``eta``.
+    RuntimeError
+        Under the grouped softmax, if a group's drawn shares do not sum to
+        one.
     """
     eta = np.asarray(eta, dtype=float)
     if lik.name == "poisson":
@@ -492,7 +731,7 @@ def _softmax_draw(
 ) -> np.ndarray:
     """The grouped softmax's shares (:func:`draw`), shape ``(n_rows,)``."""
     starts = group_starts(groups)
-    sizes = np.diff(starts, append=eta.size)
+    sizes = group_sizes(starts, eta.size)
     n = _per_group(n_trials, starts.size, "n_trials")
     if np.any(n < 1) or np.any(n != np.round(n)):
         raise ValueError(f"n_trials must be whole numbers of at least one, not {n}")
@@ -509,16 +748,55 @@ def _softmax_draw(
             raise ValueError("a concentration must be finite and positive")
         weight = np.exp(eta - np.repeat(np.maximum.reduceat(eta, starts), sizes))
         p = weight / np.repeat(np.add.reduceat(weight, starts), sizes)
-        gamma = rng.gamma(np.repeat(a, sizes) * p)
-        with np.errstate(divide="ignore"):
-            logits = np.log(gamma / np.repeat(np.add.reduceat(gamma, starts), sizes))
+        logits = _log_dirichlet(np.repeat(a, sizes) * p, starts, sizes, rng)
     chosen = np.zeros(eta.size)
     for trial in range(int(n.max())):
         noisy = logits + rng.gumbel(size=eta.size)
         top = noisy == np.repeat(np.maximum.reduceat(noisy, starts), sizes)
         # One row per group: the first at the maximum (a tie has probability
-        # zero unless every weight of a group underflowed to zero).
+        # zero).
         before = np.cumsum(top) - top
         first = top & (before == np.repeat(before[starts], sizes))
         chosen += first & np.repeat(trial < n, sizes)
+    lost = np.flatnonzero(np.add.reduceat(chosen, starts) != n)
+    if lost.size:
+        raise RuntimeError(
+            f"the drawn shares of {lost.size} groups do not sum to one (the first, "
+            f"group {lost[0]})"
+        )
     return chosen / np.repeat(n, sizes)
+
+
+def _log_dirichlet(
+    shape: np.ndarray,
+    starts: np.ndarray,
+    sizes: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """The log of a Dirichlet draw within each group, shape ``(n_rows,)``.
+
+    Each row's Gamma of shape ``k`` is drawn in log space, ``log G(k) = log
+    G(k + 1) + log(U) / k`` with ``U`` uniform, so that a small shape does not
+    underflow to zero; each group is then normalized by its log-sum-exp. A
+    row of shape zero has log share minus infinity.
+
+    Parameters
+    ----------
+    shape : np.ndarray, shape (n_rows,)
+        Each row's Gamma shape, ``a p``.
+    starts : np.ndarray, shape (n_groups,)
+        Each group's first row.
+    sizes : np.ndarray, shape (n_groups,)
+        Each group's rows.
+    rng : np.random.Generator
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+    """
+    boosted = rng.gamma(shape + 1.0)
+    uniform = rng.random(shape.size)
+    with np.errstate(divide="ignore"):
+        log_gamma = np.log(boosted) + np.log(uniform) / shape
+    shifted = log_gamma - np.repeat(np.maximum.reduceat(log_gamma, starts), sizes)
+    return shifted - np.repeat(np.log(np.add.reduceat(np.exp(shifted), starts)), sizes)

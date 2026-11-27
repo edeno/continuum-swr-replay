@@ -2,9 +2,9 @@
 
 Each member is a scalar estimand of one model, a linear functional of the
 model's coefficients
-(:mod:`continuum_swr_replay.analysis.regression.contrasts`), so its variance in a session is
+(:mod:`continuum_swr_replay.analysis.regression.contrasts`), so its variance in a fit is
 exact. Each estimand is tested for SWR events, for No SWR events and for their
-difference (the difference of the two kinds' session estimates, reduced like
+difference (the difference of the two kinds' unit estimates, reduced like
 any other estimand): :data:`DECLARED_TESTS` is every (estimand, tested) pair,
 and the false discovery rate is controlled over all of them. The list is read
 from here only; no other code holds its length.
@@ -53,6 +53,7 @@ import numpy as np
 
 __all__ = [
     "DECLARED_TESTS",
+    "BASELINES",
     "DIFFERENCE",
     "ESTIMANDS",
     "KINDS",
@@ -158,6 +159,16 @@ class Estimand:
     contrast: CurveContrast | SDChangeContrast | CoefficientContrast
     scale: Literal["log rate ratio", "log share ratio"]
 
+
+BASELINES: dict[str, tuple[str, ...]] = {
+    "visit_rate_A": ("(Intercept)",),
+    "role_content": ("candidate_arm",),
+    "role_content_uncertainty": ("candidate_arm",),
+    "role_content_next": ("candidate_arm",),
+}
+"""Each declared model's baseline terms, copied for each session in a fit of
+several sessions (``regression.terms``, "Baselines"): the rate model's
+intercept, the content models' arm category. No declared contrast reads one."""
 
 _ARRIVAL = "s(time_since_visit_start_s)"
 _LEAVING = "s(time_until_visit_end_s)"

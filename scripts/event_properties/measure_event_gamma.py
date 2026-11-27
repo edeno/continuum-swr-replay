@@ -54,6 +54,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
@@ -297,7 +298,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         {
             "produced_by": produced_by(__file__),
             "commit": described_commit(),
-            "swr_run": swr_source.SWR_INVENTORY_RUN_ID,
+            "swr_run": paths.SWR_INVENTORY_RUN,
             "event_table": {"path": str(event_table), "sha256": event_table_sha256},
             "subset": ANALYZED_SUBSET,
             "session_cache": session_cache_record(

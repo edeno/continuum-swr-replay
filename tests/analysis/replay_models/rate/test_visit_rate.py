@@ -121,6 +121,15 @@ def test_model_terms_follow_the_settings() -> None:
     assert not any(isinstance(t, Slope) for t in terms_d)
 
 
+def test_the_weak_penalty_is_decided() -> None:
+    """The reward coefficient's prior SD is the decided 2 (log penalty
+    log(1/4)), with 1 and 4 beside it."""
+    assert vr.WEAK_PRIOR_SD == 2.0
+    assert vr.WEAK_PRIOR_SD_SENSITIVITY == (1.0, 4.0)
+    assert DEFAULT.weak_prior_sd == vr.WEAK_PRIOR_SD
+    assert DEFAULT.weak_log_penalty == pytest.approx(np.log(1.0 / 4.0))
+
+
 @pytest.mark.parametrize(
     "bad",
     [
@@ -547,7 +556,10 @@ def test_model_d_recovers_a_lag_one_effect(make_visit_rows, cohort_of) -> None:
 
 
 SETTINGS = (
-    [vr.VisitRateSettings(weak_prior_sd=sd) for sd in vr.WEAK_PRIOR_SDS]
+    [
+        vr.VisitRateSettings(weak_prior_sd=sd)
+        for sd in (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
+    ]
     + [vr.VisitRateSettings(clock_penalty=p) for p in vr.CLOCK_PENALTY_SETTINGS]
     + [
         vr.VisitRateSettings(max_time_since_arrival_s=10.0),

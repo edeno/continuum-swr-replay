@@ -652,24 +652,42 @@ def test_the_event_gallery_catalogs_against_the_source(source, tmp_path, offline
     }
 
 
+#: Each figure script, the file that builds its ``data``, and the call there.
 FIGURE_SCRIPTS = (
-    "scripts/figures/generate_figure02.py",
-    "scripts/figures/generate_event_gallery.py",
+    (
+        "scripts/figures/generate_figure02.py",
+        "src/continuum_swr_replay/reported/inputs.py",
+        "read_example_decode(",
+    ),
+    (
+        "scripts/figures/generate_event_gallery.py",
+        "scripts/figures/generate_event_gallery.py",
+        None,
+    ),
 )
 
 
-@pytest.mark.parametrize("script", FIGURE_SCRIPTS)
-def test_the_figures_draw_the_sources_intervals(script):
+@pytest.mark.parametrize(("script", "builder", "call"), FIGURE_SCRIPTS)
+def test_the_figures_draw_the_sources_intervals(script, builder, call):
     text = (REPO / script).read_text()
+    built = (REPO / builder).read_text()
 
-    # The plotted ``data["ripple_times"]`` is replaced by the session's source
-    # intervals from the source-read frame, before anything draws or gates it ...
-    assert re.search(r'data\["ripple_times"\] = swr_intervals\(', text)
-    # ... and load_data's stored ripples are never re-gated or unpickled around it.
-    assert not re.search(
-        r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', text
+    # The plotted ``data["ripple_times"]`` is the session's source intervals from
+    # the source-read frame, before anything draws or gates it: the gallery
+    # replaces ``load_data``'s entry, and Figure 2, which reads stored outputs
+    # alone, takes its ``data`` from ``reported.inputs.read_example_decode``,
+    # which builds it with them ...
+    if call is not None:
+        assert call in text
+    assert re.search(
+        r'(data\["ripple_times"\] = |"ripple_times": )swr_intervals\(', built
     )
-    assert "pd.read_pickle(" not in text
+    # ... and load_data's stored ripples are never re-gated or unpickled around it.
+    for source in (text, built):
+        assert not re.search(
+            r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', source
+        )
+        assert "pd.read_pickle(" not in source
 
 
 # --------------------------------------------------------------------------
@@ -722,6 +740,9 @@ STORED_RIPPLE_READERS = {
     # (test_the_figures_draw_the_sources_intervals pins that).
     "scripts/figures/generate_figure02.py": "replaced by swr_intervals",
     "scripts/figures/generate_event_gallery.py": "replaced by swr_intervals",
+    # the example session of the example-event columns (Figure 3's supplement):
+    # its ``ripple_times`` is ``swr_intervals`` of the source-read frame
+    "src/continuum_swr_replay/reported/inputs.py": "replaced by swr_intervals",
 }
 
 #: Files that unpickle a decode frame without the source, and why none of them reads its SWRs.
@@ -763,6 +784,12 @@ DECODE_FRAME_READERS = {
         "reads it through with_swr_source; read_pickle reads the environment"
     ),
     "scripts/event_properties/measure_content_along_arms.py": (
+        "reads it through with_swr_source; read_pickle reads the environment"
+    ),
+    "scripts/event_properties/measure_content_mass_along_arms.py": (
+        "reads it through with_swr_source; read_pickle reads the environment"
+    ),
+    "scripts/event_properties/measure_event_speed.py": (
         "reads it through with_swr_source; read_pickle reads the environment"
     ),
 }

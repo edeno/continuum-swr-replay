@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.immobility import (
     event_speeds_are_immobile,
@@ -522,10 +523,10 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         # a candidate in excluded time is not analyzed: in no cohort
         # not in place: the flag's array can be the caller's column itself
         selected = selected & table["artifact_drop_reason"].isna().to_numpy()
-    elif swr_source.ARTIFACT_INTERVALS_RUN_ID is not None:
+    elif paths.ARTIFACT_INTERVALS_RUN is not None:
         raise ValueError(
             "The memoryless table has no artifact_drop_reason column, but the "
-            f"artifact run {swr_source.ARTIFACT_INTERVALS_RUN_ID!r} is "
+            f"artifact run {paths.ARTIFACT_INTERVALS_RUN!r} is "
             "configured: a table made before the analyzed-time rule would read "
             "its candidates in excluded time as kept. Rerun the detector."
         )

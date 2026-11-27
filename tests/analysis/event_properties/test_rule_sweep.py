@@ -97,12 +97,12 @@ def _counts() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_sweep_statistics_pool_the_events_and_average_each_animals_epochs():
+def test_sweep_statistics_average_each_animals_epochs_then_the_animals():
     stats = sweep.sweep_statistics(_counts()).set_index(["setting", "value"])
     assert len(stats) == sum(len(v) for v in sweep.SETTINGS.values())
     rule = stats.loc[("probability_threshold", 0.8)]
     assert rule["is_rule"] and rule["n_events"] == 40
-    assert rule["no_swr_fraction"] == pytest.approx(20 / 40)
+    assert rule["no_swr_fraction"] == pytest.approx(0.5)
     # a: mean of 0.5 and 0.3; b: 0.6
     np.testing.assert_allclose(rule["animals"], [0.4, 0.6])
     assert rule["no_swr_fraction_animal_mean"] == pytest.approx(0.5)
@@ -111,7 +111,9 @@ def test_sweep_statistics_pool_the_events_and_average_each_animals_epochs():
     high = stats.loc[("probability_threshold", 0.9)]
     assert not high["is_rule"]
     assert high["events_vs_rule"] == pytest.approx(30 / 40)
-    assert high["no_swr_fraction"] == pytest.approx(16 / 30)
+    # a: e1 4/8, e2 2/6 -> 5/12; b: 10/16 (pooled over the events: 16/30)
+    assert high["no_swr_fraction"] == pytest.approx((5 / 12 + 10 / 16) / 2)
+    assert high["no_swr_fraction"] == high["no_swr_fraction_animal_mean"]
     # a's e2 has no event at 25 samples: a's share is e1's alone
     longest = stats.loc[("minimum_samples", 25.0)]
     np.testing.assert_allclose(longest["animals"], [0.5, 10 / 16])
@@ -128,3 +130,28 @@ def test_sweep_statistics_refuse_counts_made_with_other_settings():
     ]
     with pytest.raises(ValueError, match="minimum_samples 50.*sweep_event_rule"):
         sweep.sweep_statistics(old)
+
+
+def test_criterion_agreement_is_each_epochs_share_then_the_animals():
+    """At the rule: a's e1 agrees on 9 of 10 events and e2 on 1 of 2 (a 0.7),
+    a's e3 has no event and is not one of its epochs; b's one epoch 20 of 20.
+    The mean over animals is 0.85; pooled over the 32 events it would be
+    30 / 32."""
+    rows = [
+        ("a", "e1", 10, 9),
+        ("a", "e2", 2, 1),
+        ("a", "e3", 0, 0),
+        ("b", "e1", 20, 20),
+    ]
+    counts = pd.DataFrame(
+        [
+            {
+                "epoch_id": f"{animal}{epoch}", "animal": animal, "session_date": 1,
+                "epoch": epoch, "setting": "swr_threshold_z",
+                "value": float(sweep.RULE["swr_threshold_z"]), "n_events": n,
+                "n_no_swr": 0, "n_criterion_agrees": k,
+            }
+            for animal, epoch, n, k in rows
+        ]
+    )  # fmt: skip
+    assert sweep.criterion_agreement(counts) == pytest.approx((0.7 + 1.0) / 2)

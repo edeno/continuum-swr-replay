@@ -102,8 +102,8 @@ class Value:
         The file, run or table it was computed from, and the selection.
     function : str
         The function that made it, in its summary's builder
-        (``event_cohort_values`` of ``reported/events.py``; a builder split by
-        subject, such as ``reported/behavior/``, holds it in one of its
+        (``event_cohort_values`` of ``reported/events/cohort.py``: a builder
+        split by subject, such as ``reported/events/``, holds it in one of its
         modules). That function
         names and describes the value; the statistic is computed by the
         ``analysis`` function it calls.

@@ -101,7 +101,7 @@ and after the port); the lead was told it and did not object (design, twenty-fir
     "The weak-penalty rule"): baselines are not penalized (the intercept, the arm effects, other nuisance
     categories; Greenland and Mansournia 2015); the support rule reads the design only, never the outcome
     ("No rule reads the event counts before a fit"); each fit records the edf of each penalized simple
-    coefficient; the width is one declared prior SD for all models, in the reported unit, log penalty
+    coefficient; the width is a declared prior SD per model (item g), in the reported unit, log penalty
     `log(1 / SD^2)`. Built: `weak-penalty`, aa8f8425.
 11. **The JAX port goes ahead without blocking Figure 4** (twenty-third round). The lead, 12:34: "I think I
     would in general prefer one fitter, but if there's a good reason not to, then that's fine". After the
@@ -123,22 +123,23 @@ depends on one names it with `OPEN (lead): <name>`):
 
 - a. Decided (items 9 and 10 above): a weak penalty on the reward coefficient; the support rule reads the
   design.
-- b. `OPEN (lead): rate model form`: a declared time range, a reward effect that may change with time
-  since arrival, Q1's reference window (empty for SWR events), each clock's penalty. A realistic
-  simulation is running (scratch `proto_rate_realistic/`). Phase 5a.
+- b. `OPEN (lead): rate model form`: Q1's reference window (empty for SWR events), the flexibility of the
+  leaving clock (each clock's penalty), the reward effect as one coefficient or a contrast of two arrival
+  curves, a declared time range. The reward term itself is decided (g). Phase 5a.
 - c. Decided (item 6 above).
 - d. Decided (item 11 above).
 - e. `OPEN (lead): mPFC and history penalties`: a penalty chosen over the units of one session, or the
   declared-penalty rule. Phases 8 and 11.
 - f. `OPEN (lead): grid-point support`: a support rule per grid point for curves averaged over sessions
   (an author's idea; not built). Phases 9 and 10.
-- g. `OPEN (lead): penalty width`: the declared prior SD of the weak penalty (in the reported unit). The
-  lead decided that the reward term of the rate model keeps the weak penalty per session (2026-11-23,
-  19:34: "lets just pick a penalty that's reasonable"; recorded as the twenty-fifth round on
-  `visit-rate-validation`); its value, SD 2, is the author's call. The content model's width, SD 8, is the
-  author's pick from its validation (`content_validation/REPORT.md` in the scratch folder), told to the
-  lead, not the lead's choice. Every phase with a penalized simple term (5a, 5b, 6a, 7, 8, 11) reads a
-  width; each family's simulation checks it before use.
+- g. Decided (design, twenty-fifth round, 2026-11-23): the reward coefficient is fitted per session with
+  the weak penalty, like every simple tested coefficient (the lead); the values are the author's, per model: rate SD 2 (1, 4), content SD 8 (4, 16), the others not picked yet.
+  No per-animal coefficient, no unpenalized fit. (The author's text:) each family's
+  simulation measures the error the paper states beside the number; it does not veto a term. Every phase
+  with a penalized simple term (5a, 5b, 6a, 7, 8, 11) reads it.
+  (Superseded in part: "fitted per session" and "no per-animal coefficient" by the twenty-fourth round,
+  one fit per recording day and per animal with the weak penalty kept; the one coefficient as Q2 by the
+  twenty-sixth round, an arrival curve for each outcome read over two windows.)
 - h. Decided (item 12 above): the rows of the content models' recency curve.
 
 Calls of the author still to confirm with the lead, each at its phase: at Phase 5a, the events that start
@@ -176,7 +177,7 @@ reward-fraction smooth, and the trial number defined as the number of visits arr
 C3 ──> 3, 4;  other session's merge ──> 4         5a, 6a ──┘
 2c runs in parallel with the Figure 4 chain (5a, 5b, 6a, 6b, 7, 9, 10), on its own branch (twenty-third round);
 it replaces the solver at the end, and every fit is then rerun once to confirm that it is equal
-5a's real fits wait for open question b and the penalty width (g); 6a's for the uncertainty-measure gate
+5a's real fits wait for open question b; 6a's for the uncertainty-measure gate
 ```
 
 Parallel tracks: Phases 1, 3 and 4 can run at the same time (1 reads no table; 3 and 4 touch different

@@ -582,7 +582,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # a run in which an epoch has no quiet window to compare with
     statistics = event_statistics.spike_evidence_statistics(metrics, "baseline")
     print(
-        "\nEach group against the matched quiet windows: pooled medians, and the "
+        "\nEach group against the matched quiet windows: animal-first medians, and the "
         "epochs and animals whose median dLL/spike is above their own baseline's "
         "(event_statistics.spike_evidence_statistics):"
     )

@@ -26,6 +26,13 @@ forms:
   is ``|t|`` with ``A - 1`` degrees of freedom, so the band is the scalar
   interval.
 
+  A fit of a larger unit gives one curve per unit, and the same function takes
+  one row per unit (``units.unit_summary`` has the scalar rule): a
+  recording day is passed as a row with its own day label (day -> animal), and
+  an animal as a row whose day label is the animal (the plain mean of the
+  animals' curves, whose half width at one point is about the t interval of
+  ``shared_statistics.animal_mean_interval``).
+
 What the across-session band reaches in simulation, and where it falls below
 95 %, is measured in ``docs/design/regression_fitter.md``, "Bands".
 
@@ -42,7 +49,10 @@ import numpy as np
 
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_bootstrap,
+    draws_sd_scale,
 )
+
+from .contrasts import used_coefficients
 
 __all__ = [
     "BAND_DRAWS",
@@ -154,7 +164,7 @@ def simultaneous_band(
         standard error is zero at a grid point.
     """
     C = np.asarray(curve_matrix, dtype=float)
-    used = np.flatnonzero(np.any(C != 0.0, axis=0))
+    used = used_coefficients(C)
     beta_used = np.asarray(beta, dtype=float)[used]
     V = np.asarray(covariance, dtype=float)[np.ix_(used, used)]
     if not (np.isfinite(beta_used).all() and np.isfinite(V).all()):
@@ -259,7 +269,7 @@ def across_session_band(
         n_animals,
         np.random.default_rng((seed, 1)),
     )
-    half = critical * sd * np.sqrt(n_animals / (n_animals - 1))
+    half = critical * sd * draws_sd_scale(n_animals)
     return Band(
         boot.estimate,
         boot.estimate - half,

@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     fit_at_penalties,
 )
 from continuum_swr_replay.analysis.regression.terms import (
+    INTERCEPT,
     SMALLEST_COLUMN_SIZE,
     Category,
     DesignTerm,
@@ -30,8 +31,8 @@ from continuum_swr_replay.analysis.regression.terms import (
     _refuse_small,
     _small_terms,
     build_design,
+    copy_name,
     log_penalty_from_prior_sd,
-    prior_sd_from_log_penalty,
     standardization,
 )
 
@@ -95,7 +96,7 @@ def test_prior_sd_and_log_penalty() -> None:
     for sd in (0.5, 1.0, 2.0, 4.0):
         rho = log_penalty_from_prior_sd(sd)
         assert rho == pytest.approx(np.log(1.0 / sd**2), abs=1e-15)
-        assert prior_sd_from_log_penalty(rho) == pytest.approx(sd, rel=1e-15)
+        assert np.exp(-0.5 * rho) == pytest.approx(sd, rel=1e-15)
     assert log_penalty_from_prior_sd(1.0) == 0.0
     for bad in (0.0, -1.0, np.inf, np.nan):
         with pytest.raises(ValueError, match="prior SD"):
@@ -602,3 +603,119 @@ def test_the_columns_a_design_reads(rate_sessions, content_sessions) -> None:
         np.testing.assert_array_equal(full.missing, only.missing)
         if full.offset is not None:
             np.testing.assert_array_equal(full.offset, only.offset)
+
+
+def test_baseline_copies_per_session() -> None:
+    """In a fit of two sessions the intercept and each coded level of a
+    baseline category have one copy per session, named by the session, zero
+    on the other session's rows; the shared terms are the design's own. In a
+    fit of one session nothing is copied."""
+    rows = pd.DataFrame(
+        {
+            "arm": ["a", "b", "c", "a", "b", "c"],
+            "x": [0.5, 1.0, 2.0, 1.5, -1.0, 0.0],
+        }
+    )
+    arm = Category("arm", ("a", "b", "c"), reference="a", penalty="none")
+    design = build_design(
+        [arm, Slope("x", 0.0)], rows, intercept=True, baseline=("(Intercept)", "arm")
+    )
+    keys = [("an", "d1", "e1"), ("an", "d1", "e2")]
+    assert design.for_sessions(keys[:1]) is design
+    unit = design.for_sessions(keys)
+    s1, s2 = "an/d1/e1", "an/d1/e2"
+    assert unit.coef_names == (
+        f"(Intercept)@{s1}",
+        f"(Intercept)@{s2}",
+        f"arm[b]@{s1}",
+        f"arm[b]@{s2}",
+        f"arm[c]@{s1}",
+        f"arm[c]@{s2}",
+        "x",
+    )
+    session = np.array([0, 0, 0, 1, 1, 1])
+    built = unit.build(rows, session)
+    base = design.build(rows).X
+    expected = np.column_stack(
+        [
+            session == 0,
+            session == 1,
+            base[:, 1] * (session == 0),
+            base[:, 1] * (session == 1),
+            base[:, 2] * (session == 0),
+            base[:, 2] * (session == 1),
+            base[:, 3],
+        ]
+    ).astype(float)
+    np.testing.assert_array_equal(built.X, expected)
+    copies = [t for t in unit.terms if t.session is not None]
+    assert [t.kind for t in copies] == ["level"] * 6
+    assert all(t.dependents == () for t in copies)
+    np.testing.assert_array_equal(
+        built.level_rows[("arm", "b", keys[1])],
+        [False, False, False, False, True, False],
+    )
+    np.testing.assert_array_equal(
+        built.level_rows[("(Intercept)", keys[0])], session == 0
+    )
+    assert {k: v.tolist() for k, v in unit.term_columns.items()} == {"x": [6]}
+    assert unit.projected_columns == [0, 1, 2, 3, 4, 5]
+    assert unit.session_baselines() == {
+        keys[0]: [f"(Intercept)@{s1}", f"arm[b]@{s1}", f"arm[c]@{s1}"],
+        keys[1]: [f"(Intercept)@{s2}", f"arm[b]@{s2}", f"arm[c]@{s2}"],
+    }
+    assert [b.columns.tolist() for b in unit.blocks] == [[6]]
+    with pytest.raises(ValueError, match="session"):
+        unit.build(rows)
+
+
+def test_a_baseline_is_the_intercept_or_a_category() -> None:
+    rows = pd.DataFrame({"arm": ["a", "b"], "x": [0.5, 1.0]})
+    arm = Category("arm", ("a", "b"), reference="a", penalty="none")
+    for baseline, intercept in ((("x",), True), (("(Intercept)",), False)):
+        with pytest.raises(ValueError, match="a baseline is the intercept"):
+            build_design(
+                [arm, Slope("x", 0.0)], rows, intercept=intercept, baseline=baseline
+            )
+
+
+def test_a_term_by_a_baseline_category_is_refused() -> None:
+    """A term fitted for a level of a baseline category would have to leave
+    one session's rows when that session's copy of the level fails, which a
+    shared term cannot: build_design refuses it. A penalized baseline is
+    refused too (a copy carries no penalty block)."""
+    rows = pd.DataFrame({"arm": ["a", "b", "a", "b"], "x": [0.5, 1.0, 2.0, -1.0]})
+    arm = Category("arm", ("a", "b"), reference="a", penalty="none")
+    with pytest.raises(ValueError, match="by the baseline category"):
+        build_design(
+            [arm, Slope("x", 0.0, by=arm)], rows, intercept=True, baseline=("arm",)
+        )
+    weak = Category("arm", ("a", "b"), reference="a", penalty=0.0)
+    with pytest.raises(ValueError, match="no penalty"):
+        build_design([weak], rows, intercept=True, baseline=("arm",))
+    # Not a baseline: both are allowed.
+    build_design([arm, Slope("x", 0.0, by=arm)], rows, intercept=True)
+
+
+def test_a_copy_is_named_by_its_session() -> None:
+    key = ("an", "d1", "e1")
+    assert copy_name("arm[b]", key) == "arm[b]@an/d1/e1"
+    assert copy_name(INTERCEPT, key) == "(Intercept)@an/d1/e1"
+
+
+def test_a_contrast_on_a_unit_fit() -> None:
+    """A contrast over the design's coefficients, mapped onto a unit fit's
+    coefficients by name; a contrast that reads a baseline is refused."""
+    rows = pd.DataFrame({"x": [0.5, 1.0, 2.0, -1.0], "z": [1.0, 0.0, 1.0, 0.0]})
+    design = build_design(
+        [Slope("x", 0.0), Slope("z", 0.0)], rows, intercept=True, baseline=(INTERCEPT,)
+    )
+    keys = [("an", "d1", "e1"), ("an", "d1", "e2")]
+    unit = design.for_sessions(keys)
+    c = np.array([0.0, 1.0, -2.0])  # x - 2 z over (Intercept), x, z
+    np.testing.assert_array_equal(design.contrast_on(c, unit.coef_names), [0, 0, 1, -2])
+    np.testing.assert_array_equal(design.contrast_on(c, design.coef_names), c)
+    assert design.baseline_read(c) == []
+    assert design.baseline_read(np.array([1.0, 0.0, 0.0])) == [INTERCEPT]
+    with pytest.raises(ValueError, match="reads the baseline"):
+        design.contrast_on(np.array([1.0, 1.0, 0.0]), unit.coef_names)

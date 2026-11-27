@@ -74,6 +74,7 @@ import scipy
 from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay import paths
 from continuum_swr_replay.analysis.detection.detection_inputs import (
     MARKS_RULE,
     carey_output_paths,
@@ -217,7 +218,7 @@ def _detect(
     ripple_band = inputs["ripple_band"][samples]
 
     swr_run = fetch_swr_inputs(identifier)
-    swr_run_id = swr_source.SWR_INVENTORY_RUN_ID
+    swr_run_id = paths.SWR_INVENTORY_RUN
     electrode_ids = np.asarray(inputs["electrode_ids"], dtype=np.int64)
     kept_ids = np.asarray(swr_run["kept_electrode_ids"], dtype=np.int64)
     kept = np.isin(electrode_ids, kept_ids)
@@ -447,7 +448,7 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
             "carey_settings": CAREY_SETTINGS,
             "adaptations": ADAPTATIONS,
             "ripple_detection_commit": provenance["ripple_detection_commit"],
-            "swr_run_id": swr_source.SWR_INVENTORY_RUN_ID,
+            "swr_run_id": paths.SWR_INVENTORY_RUN,
             "artifacts": {"run_id": artifact_run_id, "padding_s": PADDING_S},
             "marks_rule": MARKS_RULE,
             "grid": GRID,

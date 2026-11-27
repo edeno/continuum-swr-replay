@@ -41,7 +41,7 @@ rest of the old event-source suite.
   trial's well when it is neither current nor previous (`is_next_arm`, `candidate_arm.py:192`); the
   estimand is the `next` role minus `other_leaf`, per kind and difference, length-adjusted and unadjusted;
   support rule on the role, read from the design (events with a candidate row in the role). The role
-  level is a simple tested coefficient at the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`), checked by the
+  level is a simple tested coefficient at the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width: the rule decided by the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"; the value declared per model by the author from its simulation, with a stiffer and a looser value: rate 2 (1, 4), content 8 (4, 16), the other families not picked yet), checked by the
   family's simulation before use. Fit with Phase 6a's runner as an added model.
 - **Choice** (`analysis/replay_models/choice/visit_choice.py`, new): one row per (visit, candidate next
   arm), the grouped softmax over the candidates of `build_choice_dataset` (reuse its candidate set and

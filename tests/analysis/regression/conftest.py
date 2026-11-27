@@ -1,4 +1,5 @@
-"""Synthetic sessions for the convention's tools (terms, support, the loop).
+"""Synthetic sessions for the convention's tools (terms, support, the loop),
+and the likelihoods' JAX functions called on NumPy rows (:func:`family_kernel`).
 
 Two kinds of rows, each built from a fixed seed:
 
@@ -18,6 +19,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.regression.padding import pad_values
+from continuum_swr_replay.analysis.regression.reml import PenaltyBlock
+from continuum_swr_replay.analysis.regression.runtime import float64_kernel, in_float64
 from continuum_swr_replay.analysis.regression.terms import Category
 from scripts.checks.compare_regression_to_mgcv import bins_of
 
@@ -25,6 +29,112 @@ N_LAGS = 10
 ROLES = ("current", "previous", "other", "trunk")
 #: The content rows' role category, the "other" leaf arm its reference.
 ROLE = Category("role", ROLES, reference="other", penalty="none")
+
+
+def relative_error(analytic: np.ndarray, numeric: np.ndarray) -> float:
+    """``||analytic - numeric|| / ||numeric||``; zero when both are zero."""
+    gap = float(np.linalg.norm(np.asarray(analytic) - np.asarray(numeric)))
+    return gap / float(np.linalg.norm(numeric)) if gap > 0 else 0.0
+
+
+def numeric_gradient(f, point: np.ndarray, h: float) -> np.ndarray:
+    """Central differences of ``f`` at ``point`` with step ``h``, one per
+    coordinate of ``point`` (each the shape of ``f``'s value)."""
+    unit = np.eye(point.size)
+    return np.array([(f(point + h * e) - f(point - h * e)) / (2 * h) for e in unit])
+
+
+def numeric_hessian(f, point: np.ndarray, h: float) -> np.ndarray:
+    """Central second differences of a scalar ``f`` at ``point`` with step
+    ``h``, shape ``(m, m)``."""
+    unit = np.eye(point.size)
+    return np.array(
+        [
+            [
+                (
+                    f(point + h * (a + c))
+                    - f(point + h * (a - c))
+                    - f(point - h * (a - c))
+                    + f(point - h * (a + c))
+                )
+                / (4 * h * h)
+                for c in unit
+            ]
+            for a in unit
+        ]
+    )
+
+
+def stack_smooths(*parts) -> tuple[np.ndarray, list[PenaltyBlock]]:
+    """A design of ``parts`` side by side, and a penalty block on each smooth.
+
+    Parameters
+    ----------
+    *parts : np.ndarray or tuple
+        A column, shape ``(n_rows,)``, or columns, shape ``(n_rows, k)``; or a
+        smooth, the pair ``(design, penalty)`` of a constrained P-spline.
+
+    Returns
+    -------
+    X : np.ndarray, shape (n_rows, p)
+    blocks : list of PenaltyBlock
+        One per smooth, on its columns.
+    """
+    columns, blocks, start = [], [], 0
+    for part in parts:
+        if isinstance(part, tuple):
+            design, penalty = part
+            blocks.append(
+                PenaltyBlock(np.arange(start, start + design.shape[1]), penalty)
+            )
+        else:
+            design = np.asarray(part, dtype=float).reshape(np.shape(part)[0], -1)
+        columns.append(design)
+        start += design.shape[1]
+    return np.column_stack(columns), blocks
+
+
+@float64_kernel(static_argnames=("lik", "name"))
+def jax_family(lik, name, *arrays):
+    """``lik._jax_<name>(*arrays)``, jitted as the fitter's kernels are."""
+    return getattr(lik, f"_jax_{name}")(*arrays)
+
+
+@in_float64
+def family_kernel(lik, name, X, eta, y, aux, *directions):
+    """A family's JAX function ``_jax_<name>`` on NumPy rows, in float64.
+
+    The rows are padded by ``lik.pad``; ``eta`` and each direction (``d``, or
+    ``d1`` and ``d2``) by ``padding.pad_values``.
+
+    Parameters
+    ----------
+    lik : Likelihood
+    name : {"loglik", "score", "information", "dinformation", "d2information"}
+    X : np.ndarray, shape (n_rows, p), or None
+        None for ``loglik`` and ``score``, which take no design.
+    eta, y : np.ndarray, shape (n_rows,)
+    aux : object
+        The family's aux, as ``lik.pad`` takes it.
+    *directions : np.ndarray, shape (n_rows,)
+
+    Returns
+    -------
+    float or np.ndarray
+        The log-likelihood; the score on the real rows, shape ``(n_rows,)``;
+        or a matrix, shape ``(p, p)``.
+    """
+    rows = lik.pad(np.empty((np.size(y), 0)) if X is None else X, y, aux)
+    eta, *directions = (
+        pad_values(v, rows.n_real, rows.y.size) for v in (eta, *directions)
+    )
+    design = () if X is None else (rows.X,)
+    out = jax_family(
+        lik, name, *design, eta, rows.y, rows.aux, rows.weight, *directions
+    )
+    if name == "loglik":
+        return float(out)
+    return np.array(out)[: rows.n_real] if name == "score" else np.array(out)
 
 
 def rate_rows(seed: int, n_visits: int = 60) -> pd.DataFrame:
@@ -152,6 +262,33 @@ def draw_response(
             float
         )
     return np.concatenate([rng.dirichlet(total * row) for row in p])
+
+
+def cohort(make, *, animals, days, epochs, seed) -> dict:
+    """Sessions of ``animals`` x ``days`` x ``epochs``, in that order, each
+    with the rows ``make(seed(a, d, e))`` and its key in its session columns.
+
+    Parameters
+    ----------
+    make : callable
+        A seed -> one session's rows.
+    animals, days, epochs : sequence of str
+    seed : callable
+        ``(animal place, day place, epoch place) -> int``.
+
+    Returns
+    -------
+    dict of (animal, session_date, epoch) to pd.DataFrame
+    """
+    out = {}
+    for a, animal in enumerate(animals):
+        for d, day in enumerate(days):
+            for e, epoch in enumerate(epochs):
+                key = (animal, day, epoch)
+                out[key] = make(seed(a, d, e)).assign(
+                    animal=animal, session_date=day, epoch=epoch
+                )
+    return out
 
 
 def by_session(frames: list[pd.DataFrame]) -> dict[tuple[str, str, str], pd.DataFrame]:

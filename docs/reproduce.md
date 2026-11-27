@@ -52,8 +52,8 @@ after a change to fitting code only, start at step 6.
 2. **Artifacts and SWRs.**
    - Run `detection/run_artifact_detection.py` (the artifact mask), then `detection/run_swr_detection.py` (the
      four SWR inventories).
-   - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
-     `src/continuum_swr_replay/analysis/event_definition/swr_source.py`. A decode refuses to start without them.
+   - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN` and `SWR_INVENTORY_RUN` in
+     `src/continuum_swr_replay/paths.py`. A decode refuses to start without them.
 3. **Decodes.** `decoding/run_decoding_bandit.py` (non-local detector) and `decoding/run_decoding_contfrag.py`
    (ContFrag), on GPUs.
 4. **Tables**, in this order:
@@ -68,8 +68,10 @@ after a change to fitting code only, start at step 6.
    the supplements). The runs behind Figure 2j and 2k and the restriction
    and held-out tetrode values of the events summary go in this order (in `scripts/event_evidence/` unless
    named otherwise; the two GPU runners need `--gpus`):
-   1. `score_nonlocal_restriction.py --gpus <cards>`: the three restriction decoders, each fold fit by EM on
-      the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR source);
+   1. `score_nonlocal_restriction.py --gpus <cards>`: the four restriction decoders (local-only, SWR-only,
+      full and SWR-allowed: every state inside SWRs, only the local states outside them), each fold fit by EM
+      on the other folds (reads the decodes, the detectors, the trials through `load_data` and the SWR
+      source);
    2. `measure_bin_facts.py`: each bin's spikes, well-visit flag and SWR-observed flag (reads run 1's
       records, the decodes, the SWR source and the session cache);
    3. `detect_heldout_events.py`: the events detected from the held-out decode and the time sums, by
@@ -77,13 +79,18 @@ after a change to fitting code only, start at step 6.
       (needs 1 and 2; reads the event table);
    4. `measure_event_participation.py`: the Local-rest controls (reads the event table, the decodes and the
       session cache);
-   5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score (needs 4; reads the event table,
-      the decodes, the detectors and the trials);
+   5. `score_tetrode_holdout.py --gpus <cards>`: the held-out tetrode score, with its extra scores (the
+      95 % HPD length, the shuffled-event reference, the rate and mark parts, the place information; needs 4;
+      reads the event table, the decodes, the detectors and the trials);
    6. `sum_nonlocal_restriction_windows.py`: the restriction scores over the canonical windows (needs 1, 2,
       4 and 5);
    7. on the CPU, from stored outputs only: `scripts/event_properties/measure_nonlocal_by_signal.py`
       (Figure 2i and the MUA panel of its supplement), `scripts/event_properties/measure_state_by_signal.py`
-      (their top strips, by decoder state), `scripts/decoding/measure_nonlocal_probability.py`
+      (their top strips, by decoder state), `scripts/event_properties/measure_trigger_windows.py`
+      (the windows around event starts and No-Spike starts of Figure 2g and its supplement, and the
+      frames' event counts), `scripts/decoding/store_example_session.py` (the example epoch's ripple
+      trace and HPC spikes for Figure 2's panels a and b, read once from the lab database),
+      `scripts/decoding/measure_nonlocal_probability.py`
       (the immobile time by non-local probability, panel c of Figure 2's supplement), `scripts/event_properties/sweep_event_rule.py`
       (the event rule's sensitivity check; reads the event table) and
       `summarize_state_calibration_in_visits.py` (the state calibration inside the well visits, from
@@ -104,6 +111,8 @@ after a change to fitting code only, start at step 6.
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_nonlocal_by_signal.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/decoding/measure_nonlocal_probability.py --event-features-run e2331f976fd1 --n-workers 8
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_state_by_signal.py --event-features-run e2331f976fd1 --n-workers 8
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_trigger_windows.py --event-features-run e2331f976fd1 --n-workers 8
+   JAX_PLATFORMS=cpu uv run --frozen python scripts/decoding/store_example_session.py
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/sweep_event_rule.py --event-features-run e2331f976fd1 --n-workers 16
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/summarize_state_calibration_in_visits.py
    JAX_PLATFORMS=cpu uv run --frozen python scripts/event_properties/measure_content_place_rate.py --workers 8
@@ -114,23 +123,15 @@ after a change to fitting code only, start at step 6.
    Steps 3 and 6 read another per-bin facts run with `--bin-facts-dir` (and another restriction run with
    `--restriction-dir`); with `--output-dir`, a trial of the CPU steps writes nothing under the data root.
 
-   The fourth restriction decoder (SWR-allowed: every state inside SWRs, only the local states outside
-   them), compared with the other three in the events summary and in panel n of Figure 2's supplement,
-   is scored after step 6 in three runs of its own: all four decoders scored again under step 1's stored
-   fold fits (no EM), then steps 3 and 6 on that run, each into its own folder:
+   The restriction run in `Processed-Data/event_nonlocal_restriction` was made in two passes: the three
+   decoders fit by EM, then all four scored again under those stored fold fits (no EM), the pass that is
+   the run (its records hold each fold's fit). The same pass scores a new decoder under the run's fits
+   into a folder of its own:
 
    ```bash
-   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit Processed-Data/event_nonlocal_restriction --gpus 1 2 4 5
-   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/detect_heldout_events.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_heldout_events
-   JAX_PLATFORMS=cpu uv run --frozen python scripts/event_evidence/sum_nonlocal_restriction_windows.py --restriction-dir Processed-Data/event_nonlocal_restriction_swr_allowed --output-dir Processed-Data/event_nonlocal_restriction_swr_allowed_windows
+   uv run --frozen python scripts/event_evidence/score_nonlocal_restriction.py --from-stored-fit Processed-Data/event_nonlocal_restriction --output-dir <new folder> --gpus 1 2 4 5
    ```
 
-   Figure 2j's comparison with another event's place, Figure 2's supplement, panel i, the parts of the held-out tetrode evidence and the low-rate events read step 5 made again with its extra scores (the 95 % HPD length, the shuffled-event
-   reference, the rate and mark parts, the place information), into its own folder:
-
-   ```bash
-   uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py --extra-scores --null-seed 0 --output-dir Processed-Data/event_tetrode_holdout_extra --gpus 1 2 4 5
-   ```
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
    `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.

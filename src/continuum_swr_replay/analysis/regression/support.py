@@ -21,7 +21,10 @@ model, an event for a content model).
 A slope passes when both counts are at least ``MIN_UNITS``, a level when its
 own count is. The rule holds for every simple term, penalized or not. A
 smooth and a lag functional have no counts; like every term they are judged
-by the design check (:meth:`.terms.Design.small_terms`).
+by the design check (:meth:`.terms.Design.small_terms`), and one whose
+columns are zero on every row of the session (a smooth by a level the
+session has no rows of, a lag functional whose lags are all zero) fails the
+support rule there: its columns could not be estimated.
 
 Under the grouped softmax every candidate row belongs to an event, so the
 counts are those of the event-based rule this one replaces. Under the Poisson
@@ -47,22 +50,16 @@ by that level leaves the session with them (the level's
 ``DesignTerm.dependents``; :mod:`.sessions` applies the rule). The
 same row rule holds for a level made inactive because the session has no
 finite maximum along it.
-
-A term that fails in more than ``MAX_FAILING_SHARE`` (the fitter's, 20 %) of
-the sessions with a fit leaves the per-session model
-(:func:`terms_failing_share`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
-from typing import NamedTuple, Protocol
+from typing import NamedTuple
 
 import numpy as np
 
-from .constants import MAX_FAILING_SHARE
-from .newton import CONVERGED
 from .terms import Design
 
 __all__ = [
@@ -74,7 +71,6 @@ __all__ = [
     "level_support",
     "require_tested_penalized",
     "slope_support",
-    "terms_failing_share",
 ]
 
 #: The fewest units with a row on each side for a column to pass.
@@ -84,7 +80,8 @@ MIN_UNITS = 5
 class Removed(StrEnum):
     """Why a term is inactive in a session's fit (a record's ``left_out``)."""
 
-    #: Fewer than ``MIN_UNITS`` units with a row on a side (the support rule).
+    #: Fewer than ``MIN_UNITS`` units with a row on a side, or a smooth's or a
+    #: lag functional's columns zero on every row (the support rule).
     SUPPORT = "support"
     #: Below ``SMALLEST_COLUMN_SIZE`` on the session's rows (the design check).
     TOO_SMALL = "too_small"
@@ -101,8 +98,8 @@ class Support(NamedTuple):
     ----------
     n_low, n_high : int or None
         Units with a row on each side (0 and 1; below and above the median;
-        another level and the level); None for a smooth term that failed the
-        design check.
+        another level and the level); None for a smooth or a lag functional
+        that fails.
     reason : str
         Why it fails: ``Removed.SUPPORT`` or ``Removed.TOO_SMALL``; empty when
         it passes.
@@ -222,9 +219,10 @@ def design_support(
         Term name -> its support, for the terms with a support rule (a level,
         a 0/1 slope, a continuous slope), in column order; then, for a smooth
         or a lag functional that fails the design check in the session
-        (:meth:`.terms.Design.small_terms`), its name -> a failing entry
-        without counts. A slope that fails the design check fails, with that
-        reason.
+        (:meth:`.terms.Design.small_terms`) or whose columns are zero on
+        every row, its name -> a failing entry without counts
+        (``Removed.TOO_SMALL`` or ``Removed.SUPPORT``), in column order. A
+        slope that fails the design check fails, with that reason.
     """
     small = design.small_terms(X)
     out = {}
@@ -243,8 +241,11 @@ def design_support(
                 reason=Removed.TOO_SMALL, size=small.pop(term.name)
             )
         out[term.name] = counted
-    for name, size in small.items():  # the smooths and lag functionals
-        out[name] = Support(None, None, Removed.TOO_SMALL, size)
+    for term in design.terms:  # the smooths and lag functionals
+        if term.name in small:
+            out[term.name] = Support(None, None, Removed.TOO_SMALL, small[term.name])
+        elif term.kind in ("smooth", "lag") and not np.any(X[:, term.columns]):
+            out[term.name] = Support(None, None, Removed.SUPPORT)
     return out
 
 
@@ -295,37 +296,3 @@ def require_tested_penalized(design: Design, tested: Iterable[str]) -> None:
         )
     if problems:
         raise ValueError("; ".join(problems))
-
-
-class _Record(Protocol):
-    status: str
-    support: Mapping[str, Mapping[str, object]]
-
-
-def terms_failing_share(records: Sequence[_Record]) -> dict[str, float]:
-    """The columns that fail the support rule in too many sessions.
-
-    Parameters
-    ----------
-    records : sequence of fit records
-        One per session (:class:`.record.FitRecord`): ``status`` and
-        ``support`` are read. Only the sessions with a fit (status
-        "converged") count.
-
-    Returns
-    -------
-    dict of str to float
-        Coefficient name -> the share of the sessions with a fit in which it
-        fails, for those whose share is above ``MAX_FAILING_SHARE``.
-    """
-    fitted = [r for r in records if r.status == CONVERGED]
-    names = {name for r in fitted for name in r.support}
-    out = {}
-    for name in sorted(names):
-        failing = sum(
-            not r.support[name]["passes"] for r in fitted if name in r.support
-        )
-        share = failing / len(fitted)
-        if share > MAX_FAILING_SHARE:
-            out[name] = share
-    return out

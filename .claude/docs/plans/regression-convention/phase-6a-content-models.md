@@ -149,7 +149,7 @@ identifiability test" below), since scratch is not kept.
   the sample count (Phase 3's column) and the trial number in the epoch (Phase 3's `n_visits_arrived`), each
   a pooled-SD slope per role, with the recency curve fitted as the gate decides.
   Each simple tested coefficient (a role level that a declared test reads, a role slope, the uncertainty
-  slopes) has the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width `OPEN (lead): penalty width`). The arm fixed effects and other nuisance
+  slopes) has the declared weak penalty (design, twenty-second round: the lead, 2026-11-23, 13:02, "yes" to the same weak penalty on every simple tested coefficient; width: the rule decided by the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"; the value declared per model by the author from its simulation, with a stiffer and a looser value: rate 2 (1, 4), content 8 (4, 16), the other families not picked yet). The arm fixed effects and other nuisance
   categories are baselines and are not penalized (**call**). The nine-arm scenario list below checks the
   penalty before the fit is used.
 - **Nine-arm simulation first** (design 4.2: "the nine-arm design goes through the same simulations

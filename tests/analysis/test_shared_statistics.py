@@ -947,3 +947,76 @@ def test_a_missing_label_is_refused_by_name(column):
             stats.animal_balanced_bootstrap(
                 t.value, t.animal, t.day, n_draws=10, seed=0
             )
+
+
+def test_animal_mean_is_the_mean_over_the_animals_with_a_value_at_each_level():
+    from continuum_swr_replay.analysis.shared_statistics import animal_mean
+
+    table = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c"],
+            "bin_low": [0.0, 1.0, 0.0, 1.0, 0.0],
+            "percent": [10.0, 90.0, 30.0, 70.0, np.nan],
+        }
+    )
+    means = animal_mean(table, "bin_low", "percent")
+    # bin 0: a 10, b 30 (c has no value) -> 20; bin 1: a 90, b 70 -> 80
+    assert means.index.tolist() == [0.0, 1.0]
+    assert means.tolist() == pytest.approx([20.0, 80.0])
+    with pytest.raises(ValueError):
+        animal_mean(pd.concat([table, table.iloc[[0]]]), "bin_low", "percent")
+
+
+def test_session_value_statistics_take_each_animals_mean_or_median_of_its_sessions():
+    """a: sessions 1, 1 and 0 (mean 2/3, median 1); b: one session, 0.5. The
+    mean over animals of the means is 7/12, of the medians 3/4."""
+    from continuum_swr_replay.analysis.shared_statistics import session_value_statistics
+
+    values, animal = [1.0, 1.0, 0.0, 0.5], ["a", "a", "a", "b"]
+    mean = session_value_statistics(
+        values, animal, statistic="mean", n_boot=200, rng=np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(mean.per_animal.to_numpy(), [2 / 3, 0.5])
+    assert mean.estimate == pytest.approx(7 / 12)
+    assert mean.interval.low <= mean.estimate <= mean.interval.high
+    median = session_value_statistics(
+        values, animal, statistic="median", n_boot=200, rng=np.random.default_rng(0)
+    )
+    assert median.estimate == pytest.approx(0.75)
+    # the same replicates (one seed): each slot's copies of the sessions
+    np.testing.assert_array_equal(
+        np.isnan(mean.copy_values), np.isnan(median.copy_values)
+    )
+
+
+def test_session_value_statistics_of_equal_values_have_no_spread():
+    from continuum_swr_replay.analysis.shared_statistics import session_value_statistics
+
+    result = session_value_statistics(
+        [0.3] * 5, ["a", "a", "b", "c", "c"], statistic="median", n_boot=100,
+        rng=np.random.default_rng(1),
+    )  # fmt: skip
+    assert result.estimate == pytest.approx(0.3)
+    assert (result.interval.low, result.interval.high) == pytest.approx((0.3, 0.3))
+    with pytest.raises(ValueError, match="'mean' or 'median'"):
+        session_value_statistics(
+            [1.0], ["a"], statistic="sum", n_boot=1, rng=np.random.default_rng(0)
+        )
+    with pytest.raises(ValueError, match="finite"):
+        session_value_statistics(
+            [np.nan], ["a"], statistic="mean", n_boot=1, rng=np.random.default_rng(0)
+        )
+
+
+# --- the mean over animals with the t interval -------------------------------------
+
+
+def test_animal_mean_interval_needs_two_animals_for_an_interval():
+    one = stats.animal_mean_interval(pd.Series([0.7], index=["a"]))
+    assert one["estimate"] == pytest.approx(0.7)
+    assert np.isnan(one["low"]) and np.isnan(one["high"]) and np.isnan(one["se"])
+    assert one["n_animals"] == 1
+    none = stats.animal_mean_interval(pd.Series([NAN], index=["a"]))
+    assert np.isnan(none["estimate"]) and none["n_animals"] == 0
+    with pytest.raises(ValueError, match="one value per animal"):
+        stats.animal_mean_interval(pd.Series([1.0, 2.0], index=["a", "a"]))

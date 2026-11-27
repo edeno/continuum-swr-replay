@@ -82,7 +82,7 @@ direction). `in_null_space(session, blocks)` flags, per block, a term shrunk to 
 straight line). `search` is a `PenaltySearch` (None from `fit_at_penalties`): `reference_rho`, `in_choice`
 (the sessions whose scores chose the penalties; `PooledFit.score` is over these only), `set_aside`
 (`SetAsideSession`s with `reference`, `refits`, `left_out`, `reason` and `fitted`), `grid_failures` per
-status, `n_outer_steps`, `at_boundary` per term and `share_without_fit`. A set-aside session has its refit
+status, `n_outer_steps`, `at_boundary` per term and `share_without_fit` (removed 2026-11-24: the share of `set_aside` not `fitted`). A set-aside session has its refit
 in `sessions`, NaN at the columns left out, or NaN values when it has no fit.
 
 **Statuses** (`newton.FitStatus`; `NewtonFit.converged` is true only for the first): "converged", "design
@@ -176,15 +176,18 @@ design only is the author's call). As built on branch `weak-penalty`, aa8f8425:
   penalty, a Normal prior of mean 0 on the coefficient in the reported unit (a 0/1 step; one pooled SD),
   `rho = log(1 / SD^2)` (`terms.log_penalty_from_prior_sd`). Baselines are not penalized (the intercept, the
   arm effects, other nuisance categories). Each record holds the edf of each penalized simple coefficient.
-  The SD is one declared number for all models; **its value is open** (design, "Open after the
-  twenty-third round", g; a simulation with SD 1, 2 and 4 is running). Each family's simulation checks the
+  The rule is decided (the lead, 2026-11-23, 19:34, "lets just pick a penalty that's reasonable"); the SD is
+  declared per model by the author from that model's simulation, with a stiffer and a looser value: rate 2
+  (1, 4), content 8 (4, 16), the other families not picked yet. Each family's simulation checks the
   penalty before the family's fit is used.
 - The guard (**call**, the author's, not the lead's words): each model module calls
   `support.require_tested_penalized(design, tested)` with the coefficients of its declared tests; it
   raises an error that names every tested coefficient or term without a fixed penalty.
 - A term that fails in more than 20 % of sessions with a fit (the value of the fitter's
   `MAX_FAILING_SHARE`) leaves the per-session model. The design says it is then asked in a pooled model;
-  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead.
+  that model is stage 3, outside this plan, so the phase stops and reports the term to the lead. (Not
+  applied: no fit read the share, and `support.terms_failing_share` was removed on 2026-11-24, the lead's
+  choice.)
 - A term that fails in a session is made inactive there (`SessionData.active`). When the term is a 0/1 role
   column (a role category, such as the previous arm), the rows with that role are dropped from that
   session's fit and counted, not merged into the reference role. Found by simulation (scratch
