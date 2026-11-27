@@ -205,10 +205,11 @@ REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
 # declared form and decide nothing: no real fit runs on the provisional
 # penalties.
 
-#: DECIDED (lead, 2026-11-23, twenty-fifth round): the reward coefficient is
-#: fitted in each session with the weak penalty, like every simple tested
-#: coefficient of every model. The penalty is a Normal prior of mean 0 on the
-#: log rate ratio after a reward; its SD is this value, the author's call
+#: DECIDED (lead, 2026-11-23, twenty-fifth round): the weak penalty stays on
+#: the reward coefficient and on every simple tested coefficient of the rate
+#: model, at whatever unit the model is fitted (the unit of the fit is the
+#: twenty-fourth round's: a recording day and an animal). The penalty is a
+#: Normal prior of mean 0 on the log rate ratio after a reward; its SD is this value, the author's call
 #: under the lead's "pick a penalty that's reasonable", not a number the lead
 #: chose. An SD of 2 says that a rate ratio within a factor of about 50 either
 #: way is plausible (``exp(1.96 * 2)``). The log penalty is ``log(1 / SD^2)``
