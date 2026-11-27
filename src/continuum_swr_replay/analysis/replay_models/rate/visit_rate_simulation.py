@@ -107,6 +107,7 @@ from continuum_swr_replay.analysis.regression.newton import (
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
 from continuum_swr_replay.analysis.regression.simulation import (
+    Difference,
     Model,
     OutsideScenario,
     Simulation,
@@ -120,22 +121,27 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from continuum_swr_replay.runs.threads import pool_context
 
+from ..declared_tests import DIFFERENCE, KINDS
 from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import REWARD_LAG_COLUMNS
 from . import visit_rate as vr
 from . import visit_rate_scenarios as sc
 
 __all__ = [
+    "BOTH",
     "CALIBRATION_SEED",
     "CLOCK_TARGETS",
     "DATA_SEED",
     "FIT_BYS",
+    "KIND_COLUMN",
+    "PAIR_SCENARIOS",
     "PRIOR_SDS",
     "SCENARIOS",
     "VALIDATION_COHORT",
     "TRUTH_FROM_REAL_COUNTS",
     "Config",
     "calibrate_clocks",
+    "difference_simulation",
     "real_cohort",
     "shaped_clocks",
     "simulation",
@@ -238,6 +244,38 @@ SCENARIOS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+#: ``Config.kind`` of the difference run: both kinds in one run, and their
+#: difference (:func:`difference_simulation`).
+BOTH = "both"
+#: The column of the difference run's rows that names each row's kind.
+KIND_COLUMN = "event_kind"
+#: The difference run's scenarios, in the list's order (the order fixes the
+#: seeds): each kind's single-kind scenario and the kind whose planted
+#: constants it takes (:data:`LOG_RATIO`; for ``differing_ratio`` the mean
+#: of the session log ratios, whose deviations come from
+#: :data:`DIFFERING_SEED` in both kinds):
+#:
+#: - ``no_effect``: no reward effect in either kind (planted difference 0);
+#: - ``same_ratio``: SWR's constant ratio (log 2.5) in both kinds, an effect
+#:   in each and a planted difference of exactly 0;
+#: - ``swr_ratio``: SWR's constant ratio in SWR only (the planted difference
+#:   is the SWR truth);
+#: - ``shared_session_deviations``: the differing ratios about SWR's mean,
+#:   the same session deviations in both kinds (a planted difference of 0,
+#:   with a positive dependence between the kinds through the means).
+PAIR_SCENARIOS: dict[str, dict[str, tuple[str, str]]] = {
+    "no_effect": {"SWR": ("no_effect", "SWR"), "No SWR": ("no_effect", "No SWR")},
+    "same_ratio": {
+        "SWR": ("constant_ratio", "SWR"),
+        "No SWR": ("constant_ratio", "SWR"),
+    },
+    "swr_ratio": {"SWR": ("constant_ratio", "SWR"), "No SWR": ("no_effect", "No SWR")},
+    "shared_session_deviations": {
+        "SWR": ("differing_ratio", "SWR"),
+        "No SWR": ("differing_ratio", "SWR"),
+    },
+}
+
 #: The quick configuration's synthetic cohort: animals, days per animal,
 #: sessions per day, visits per session, events per session, the range of a
 #: visit's length (s) and that after an omission (None: the same).
@@ -269,7 +307,9 @@ class Config:
 
     Attributes
     ----------
-    kind : {"SWR", "No SWR"}
+    kind : {"SWR", "No SWR", "both"}
+        The kind of the run's events; ``"both"`` (:data:`BOTH`) is the
+        difference run (:func:`difference_simulation`).
     reward_form : {"by_outcome", "coefficient"}
         The form of the run's models (``visit_rate.REWARD_FORMS``).
     fit_by : tuple of str
@@ -284,7 +324,9 @@ class Config:
     prior_sds : tuple of float
         The weak penalty's prior SDs, one model each at each unit.
     calibration_path : str or None
-        Where the calibrated log penalties are kept (read when it exists).
+        Where the calibrated log penalties are kept (read when it exists); in
+        the difference run each kind's are kept beside it, at the path with
+        ``_<kind>`` added to its stem (a space as ``_``).
     synthetic : tuple or None
         A synthetic cohort of this shape (as :data:`QUICK_COHORT`, for
         example :data:`VALIDATION_COHORT`) and :data:`QUICK_CLOCKS` in place
@@ -1015,6 +1057,37 @@ def _planted_task(args) -> dict[str, dict]:
     return _session_planted(*args)
 
 
+def _kind_cohort(
+    kind: str, config: Config, workers: int
+) -> tuple[dict[SessionKey, vr.CohortRows], dict, sc.PlantedClocks]:
+    """A kind's rows (synthetic, or of the real cohort), their record, and
+    its planted clock curves (module docstring)."""
+    if config.synthetic is not None:
+        cohort = _synthetic_cohort(kind, config.synthetic)
+        return (
+            cohort,
+            {"rows": "synthetic", "shape": list(config.synthetic)},
+            QUICK_CLOCKS,
+        )
+    from continuum_swr_replay.paths import replay_content_dir
+
+    cohort, record = real_cohort(kind, config.sessions_per_animal, workers)
+    clocks = shaped_clocks(kind, pd.read_parquet(replay_content_dir() / DESCRIPTIVE))
+    return cohort, record, clocks
+
+
+def _truths(by_session: Mapping[SessionKey, dict]) -> dict[str, dict[str, float]]:
+    """A scenario's truths of both forms, each session's
+    (:func:`_session_planted`) reduced over the sessions (:func:`_balanced`)."""
+    return {
+        form: {
+            e: _balanced({k: v[form][e] for k, v in by_session.items()})
+            for e in next(iter(by_session.values()))[form]
+        }
+        for form in ("by_outcome", "pooled")
+    }
+
+
 def simulation(
     quick: bool, workers: int, config: Mapping[str, object] | None = None
 ) -> Simulation:
@@ -1040,19 +1113,11 @@ def simulation(
     config = Config(**dict(config or {}))
     if quick:
         config = replace(QUICK, kind=config.kind, reward_form=config.reward_form)
+    if config.kind == BOTH:
+        return difference_simulation(config, workers)
     kind = config.kind
     names = SCENARIOS[kind]
-    if config.synthetic is not None:
-        cohort = _synthetic_cohort(kind, config.synthetic)
-        record = {"rows": "synthetic", "shape": list(config.synthetic)}
-        clocks = QUICK_CLOCKS
-    else:
-        from continuum_swr_replay.paths import replay_content_dir
-
-        cohort, record = real_cohort(kind, config.sessions_per_animal, workers)
-        clocks = shaped_clocks(
-            kind, pd.read_parquet(replay_content_dir() / DESCRIPTIVE)
-        )
+    cohort, record, clocks = _kind_cohort(kind, config, workers)
     sessions = {key: rows.rows["A"] for key, rows in cohort.items()}
     totals = {key: float(rows[vr.RESPONSE].sum()) for key, rows in sessions.items()}
     table_rates = _rate_table(sessions)
@@ -1087,14 +1152,7 @@ def simulation(
     form = sc.TRUTH_OF_FORM[config.reward_form]
     scenarios, truths = [], {}
     for name in names:
-        by_session = {key: planted[key][name] for key in sessions}
-        truth = {
-            form: {
-                e: _balanced({k: v[form][e] for k, v in by_session.items()})
-                for e in next(iter(by_session.values()))[form]
-            }
-            for form in ("by_outcome", "pooled")
-        }
+        truth = _truths({key: planted[key][name] for key in sessions})
         truths[name] = truth
         planted_values = {
             e: partial(_planted_of, values={m.name: truth[form][e] for m in models})
@@ -1162,7 +1220,9 @@ def simulation(
 
 
 def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
-    """The engine's summary with the run's kind, reward form and calibration,
+    """The engine's summary with the run's kind (in the difference run, each
+    row's: ``SWR``, ``No SWR`` or ``declared_tests.DIFFERENCE``), reward form
+    and calibration,
     each model's prior SD (its unit is the engine's ``fit_by``), the truths of
     both forms beside the planted value (``truth_by_outcome``,
     ``truth_pooled``; NaN where a form has no such estimand),
@@ -1173,7 +1233,12 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     config = simulation.attrs["config"]
     truths = simulation.attrs["truths"]
     out = result.summary.copy()
-    out.insert(0, "kind", config["kind"])
+    both = config["kind"] == BOTH
+    out.insert(
+        0,
+        "kind",
+        [m.partition("/")[0] for m in out["model"]] if both else config["kind"],
+    )
     out.insert(1, "reward_form", config["reward_form"])
     out.insert(2, "calibrate", config["calibrate"])
     out["prior_sd"] = [float(m.rpartition("_sd")[2]) for m in out["model"]]
@@ -1184,7 +1249,216 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
     ]
     for name in ("by_outcome", "pooled"):
         out[f"truth_{name}"] = [
-            truths[s][name].get(e, np.nan)
-            for s, e in zip(out["scenario"], out["estimand"], strict=True)
+            (truths[s][k] if both else truths[s])[name].get(e, np.nan)
+            for s, k, e in zip(
+                out["scenario"], out["kind"], out["estimand"], strict=True
+            )
         ]
     return out
+
+
+# --- The difference run -------------------------------------------------------------
+
+
+def _pair_planted(
+    rows: pd.DataFrame,
+    kind: str,
+    clocks: sc.PlantedClocks,
+    total: float,
+    log_ratios: Mapping[str, Mapping[SessionKey, float]],
+    table: sc.RateTable,
+) -> dict[str, dict]:
+    """One session's planted values of a kind under each pair scenario
+    (:data:`PAIR_SCENARIOS`), as :func:`_session_planted` gives them;
+    ``log_ratios``, the differing ratios about each kind's mean."""
+    out = {}
+    for pair, spec in PAIR_SCENARIOS.items():
+        name, constants = spec[kind]
+        out[pair] = _session_planted(
+            rows, [name], clocks, constants, total, log_ratios[constants], table
+        )[name]
+    return out
+
+
+def _pair_planted_task(args) -> dict[str, dict]:
+    return _pair_planted(*args)
+
+
+def _kind_calibration_path(path: str | None, kind: str) -> str | None:
+    """A kind's calibration file in the difference run (``Config``)."""
+    if path is None:
+        return None
+    path = Path(path)
+    return str(path.with_name(f"{path.stem}_{kind.replace(' ', '_')}{path.suffix}"))
+
+
+def difference_simulation(config: Config, workers: int) -> Simulation:
+    """The difference run: both kinds' rows in each session, the models of
+    each kind, and their difference, SWR less No SWR, at each unit and prior
+    SD (``regression.simulation``, "Two models' difference").
+
+    Each kind's rows, planted curves, totals, calibration and models are
+    those of its single-kind run (:func:`simulation`); each kind's models
+    are named ``<kind>/<model_name>`` and read their kind's rows
+    (:data:`KIND_COLUMN`), and each difference is named
+    ``<declared_tests.DIFFERENCE>/<model_name>``. The scenarios are
+    :data:`PAIR_SCENARIOS`, each an outside scenario whose expected count of
+    a row is its own kind's: the kinds' counts are drawn independently given
+    those means (the engine's rule), so a dependence between them is only
+    what a scenario plants (``shared_session_deviations``). Each kind keeps
+    its own penalties, as the real fits of the two kinds do. The single-kind
+    runs are unchanged; this run's draws of a kind are not theirs.
+
+    Returns
+    -------
+    Simulation
+        Its ``attrs`` as :func:`simulation`'s, by kind where a kind's differ
+        (``rows``, ``calibration``), and ``truths`` of each pair by kind and
+        for the difference.
+    """
+    inputs = {kind: _kind_cohort(kind, config, workers) for kind in KINDS}
+    keys = [list(inputs[kind][0]) for kind in KINDS]
+    if keys[0] != keys[1]:
+        raise ValueError("the two kinds' cohorts do not have the same sessions")
+    kind_rows, planted, calibration, models, differences = {}, {}, {}, [], []
+    for kind in KINDS:
+        cohort, record, clocks = inputs[kind]
+        sessions = {key: rows.rows["A"] for key, rows in cohort.items()}
+        keys_frame = pd.DataFrame(
+            list(sessions), columns=["animal", "session_date", "epoch"]
+        )
+        log_ratios = {
+            constants: sc.session_log_ratios(
+                keys_frame,
+                mean=LOG_RATIO[constants],
+                animal_sd=DIFFERING_SD[0],
+                session_sd=DIFFERING_SD[1],
+                seed=DIFFERING_SEED,
+            )
+            for constants in KINDS
+        }
+        table_rates = _rate_table(sessions)
+        tasks = [
+            (
+                rows,
+                kind,
+                clocks,
+                float(rows[vr.RESPONSE].sum()),
+                log_ratios,
+                table_rates,
+            )
+            for rows in sessions.values()
+        ]
+        if workers > 1 and config.synthetic is None:
+            with pool_context().Pool(workers) as pool:
+                found = pool.map(_pair_planted_task, tasks, chunksize=1)
+        else:
+            found = [_pair_planted_task(task) for task in tasks]
+        planted[kind] = dict(zip(sessions, found, strict=True))
+        kind_config = replace(
+            config,
+            kind=kind,
+            calibration_path=_kind_calibration_path(config.calibration_path, kind),
+        )
+        calibrated = _calibrated(cohort, kind, kind_config, clocks, record, workers)
+        calibration[kind] = calibrated
+        pooled = pd.concat(list(sessions.values()), ignore_index=True)
+        models += [
+            replace(m, name=f"{kind}/{m.name}", rows_where=(KIND_COLUMN, kind))
+            for m in _models(kind, pooled, config, calibrated)
+        ]
+        kind_rows[kind] = sessions
+    for fit_by in config.fit_by:
+        for sd in config.prior_sds:
+            name = model_name(fit_by, sd)
+            differences.append(
+                Difference(
+                    f"{DIFFERENCE}/{name}", f"{KINDS[0]}/{name}", f"{KINDS[1]}/{name}"
+                )
+            )
+    rows_out = {}
+    for key in kind_rows[KINDS[0]]:
+        parts = [
+            kind_rows[kind][key].assign(
+                **{KIND_COLUMN: kind},
+                **{
+                    f"expected_{pair}": planted[kind][key][pair]["expected"]
+                    for pair in PAIR_SCENARIOS
+                },
+            )
+            for kind in KINDS
+        ]
+        rows = pd.concat(parts, ignore_index=True)
+        rows[KIND_COLUMN] = pd.Categorical(rows[KIND_COLUMN], categories=list(KINDS))
+        rows_out[key] = rows
+    form = sc.TRUTH_OF_FORM[config.reward_form]
+    scenarios, truths = [], {}
+    for pair in PAIR_SCENARIOS:
+        truth = {
+            kind: _truths({key: p[pair] for key, p in planted[kind].items()})
+            for kind in KINDS
+        }
+        truth[DIFFERENCE] = {
+            f: {
+                e: truth[KINDS[0]][f][e] - truth[KINDS[1]][f][e]
+                for e in truth[KINDS[0]][f]
+            }
+            for f in ("by_outcome", "pooled")
+        }
+        truths[pair] = truth
+        values = {m.name: truth[m.rows_where[1]][form] for m in models}
+        scenarios.append(
+            OutsideScenario(
+                pair,
+                partial(_expected_column, column=f"expected_{pair}"),
+                planted={
+                    e: partial(_planted_of, values={n: v[e] for n, v in values.items()})
+                    for e in truth[KINDS[0]][form]
+                },
+                columns=(f"expected_{pair}",),
+            )
+        )
+    attrs = {
+        "config": {
+            **dict(config.__dict__),
+            "prior_sds": list(config.prior_sds),
+            "fit_by": list(config.fit_by),
+            "synthetic": None if config.synthetic is None else list(config.synthetic),
+        },
+        "rows": {kind: inputs[kind][1] for kind in KINDS},
+        "calibration": {
+            kind: {
+                fit_by: {
+                    c: {"log_penalty": p.log_penalty, "target_edf": p.target_edf}
+                    for (_, c), p in penalties.items()
+                }
+                for fit_by, penalties in calibration[kind].items()
+                if penalties is not None
+            }
+            for kind in KINDS
+        },
+        "allow_provisional": None if config.calibrate else "simulation",
+        "truths": truths,
+        "pair_scenarios": {pair: dict(spec) for pair, spec in PAIR_SCENARIOS.items()},
+        "draws": (
+            "each kind's counts drawn independently given its expected counts "
+            "(the engine's rule, the coordinator's call); a dependence only "
+            "where a scenario plants it through the means"
+        ),
+        "truth_from_real_counts": {"scenarios": [], "note": "no pair scenario"},
+        "planted_constants": {
+            "log_ratio": dict(LOG_RATIO),
+            "differing_sd": list(DIFFERING_SD),
+            "differing_seed": DIFFERING_SEED,
+        },
+    }
+    return Simulation(
+        models,
+        rows_out,
+        scenarios,
+        config.n_data_sets,
+        config.n_draws,
+        DATA_SEED,
+        attrs,
+        differences,
+    )

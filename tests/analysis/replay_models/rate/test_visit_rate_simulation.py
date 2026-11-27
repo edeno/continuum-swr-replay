@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.regression.simulation import (
     OutsideScenario,
     Simulation,
 )
+from continuum_swr_replay.analysis.replay_models.declared_tests import DIFFERENCE
 from continuum_swr_replay.analysis.replay_models.rate import visit_rate as vr
 from continuum_swr_replay.analysis.replay_models.rate import (
     visit_rate_scenarios as sc,
@@ -318,3 +319,117 @@ def test_the_drop_before_small_movements_is_in_the_list() -> None:
     run = vs.simulation(True, 1)
     truth = run.attrs["truths"]["drop_before_small_movements"]["by_outcome"]
     assert truth["Q7a"] == 0.0 and truth["Q2"] == 0.0
+
+
+# --- The difference run (both kinds, SWR less No SWR) ------------------------------
+
+
+@pytest.fixture(scope="module")
+def both() -> Simulation:
+    return vs.simulation(True, 1, {"kind": vs.BOTH})
+
+
+@pytest.fixture(scope="module")
+def both_result(both):
+    return engine.run(both)
+
+
+def test_the_difference_run_has_both_kinds_and_their_difference(both) -> None:
+    """The quick difference run: each kind's model, named for its kind and
+    reading its kind's rows, and their difference named for the statistics'
+    label; each session holds both kinds' identical synthetic rows; the pair
+    scenarios in their order."""
+    assert [m.name for m in both.models] == ["SWR/session_sd2", "No SWR/session_sd2"]
+    assert [m.rows_where for m in both.models] == [
+        (vs.KIND_COLUMN, "SWR"),
+        (vs.KIND_COLUMN, "No SWR"),
+    ]
+    (difference,) = both.differences
+    assert difference.name == f"{DIFFERENCE}/session_sd2"
+    assert (difference.first, difference.second) == tuple(m.name for m in both.models)
+    assert [s.name for s in both.scenarios] == list(vs.PAIR_SCENARIOS)
+    assert list(vs.PAIR_SCENARIOS) == [
+        "no_effect",
+        "same_ratio",
+        "swr_ratio",
+        "shared_session_deviations",
+    ]
+    rows = next(iter(both.sessions.values()))
+    swr, no_swr = (rows[rows[vs.KIND_COLUMN] == k] for k in ("SWR", "No SWR"))
+    columns = [vr.ARRIVAL, vr.LEAVING, vr.REWARD, vr.EXPOSURE]
+    np.testing.assert_array_equal(swr[columns].to_numpy(), no_swr[columns].to_numpy())
+
+
+def test_the_pair_scenarios_planted_values(both) -> None:
+    """Each pair's planted values by kind: nothing in either kind; SWR's
+    constant ratio in both (a difference of exactly 0); in SWR only (the
+    difference is SWR's truth); the differing ratios with the same session
+    deviations in both kinds (a difference of exactly 0)."""
+    log_ratio = vs.LOG_RATIO["SWR"]
+    swr, no_swr = both.models
+    by_name = {s.name: s for s in both.scenarios}
+
+    def planted(pair, model, estimand="Q2"):
+        return engine.planted_value(by_name[pair], model, estimand)
+
+    assert planted("no_effect", swr) == 0.0 and planted("no_effect", no_swr) == 0.0
+    assert planted("same_ratio", swr) == pytest.approx(log_ratio)
+    assert planted("same_ratio", no_swr) == planted("same_ratio", swr)
+    assert planted("swr_ratio", swr) == pytest.approx(log_ratio)
+    assert planted("swr_ratio", no_swr) == 0.0
+    shared = planted("shared_session_deviations", swr)
+    assert shared != pytest.approx(log_ratio)
+    assert planted("shared_session_deviations", no_swr) == shared
+    truths = both.attrs["truths"]
+    assert truths["swr_ratio"][DIFFERENCE]["by_outcome"]["Q2"] == pytest.approx(
+        log_ratio
+    )
+    for pair in ("no_effect", "same_ratio", "shared_session_deviations"):
+        assert truths[pair][DIFFERENCE]["by_outcome"]["Q2"] == 0.0
+
+
+def test_the_quick_difference_run(both, both_result) -> None:
+    """Through the engine: three rows per (scenario, estimand), one per kind
+    and one for the difference, whose planted value is the kinds'
+    difference; the kinds' counts on identical rows differ (drawn apart);
+    the table names each row's kind and keeps ``declared_test``."""
+    summary = both_result.summary
+    table = vs.table(both_result, both)
+    assert list(dict.fromkeys(table["kind"])) == ["SWR", "No SWR", DIFFERENCE]
+    counts = table.groupby(["scenario", "estimand"])["kind"].agg(list)
+    assert all(kinds == ["SWR", "No SWR", DIFFERENCE] for kinds in counts)
+    rows = summary.set_index(["scenario", "model", "estimand"])
+    for pair in vs.PAIR_SCENARIOS:
+        for estimand in ("Q2", "Q7a"):
+            swr = rows.loc[(pair, "SWR/session_sd2", estimand), "planted"]
+            no_swr = rows.loc[(pair, "No SWR/session_sd2", estimand), "planted"]
+            diff = rows.loc[(pair, f"{DIFFERENCE}/session_sd2", estimand), "planted"]
+            assert diff == swr - no_swr
+    assert rows.loc[("no_effect", f"{DIFFERENCE}/session_sd2", "Q2"), "planted"] == 0
+    events = both_result.sessions.query("scenario == 'no_effect' and estimand == 'Q7a'")
+    by_kind = events.groupby("model")["n_events"].apply(list)
+    assert by_kind["SWR/session_sd2"] != by_kind["No SWR/session_sd2"]
+    assert "declared_test" in table.columns
+    declared = table.set_index(["kind", "estimand"])["declared_test"]
+    assert not declared.loc[(DIFFERENCE, "Q2")].any()  # a window test, at a session
+    assert declared.loc[(DIFFERENCE, "Q7a")].all()
+    assert (summary["share_not_converged"] == 0.0).all()
+
+
+def test_the_single_kind_run_is_unchanged_by_the_difference_run(quick) -> None:
+    """The single-kind quick run keeps its models, names and scenarios, and
+    no difference."""
+    assert [m.name for m in quick.models] == ["session_sd2"]
+    assert all(m.rows_where is None for m in quick.models)
+    assert quick.differences == ()
+    assert [s.name for s in quick.scenarios] == list(vs.SCENARIOS["SWR"])
+
+
+def test_each_kind_keeps_its_calibration_file(tmp_path) -> None:
+    """In the difference run each kind's calibrated penalties are kept in a
+    file of their own beside the configured path."""
+    path = str(tmp_path / "calibration.json")
+    assert vs._kind_calibration_path(path, "No SWR") == str(
+        tmp_path / "calibration_No_SWR.json"
+    )
+    assert vs._kind_calibration_path(None, "SWR") is None
