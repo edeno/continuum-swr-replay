@@ -1198,9 +1198,14 @@ out. [...] Do you want the third clock in the model?"
 
 The lead's words: "no just two".
 
-What the lead decided: the rate model's clocks are the time since arrival and the time until leaving. The
-third clock (the time until the end of the immobile stretch, `f_m`) and its drop rule
-(`visit_rate.third_clock_decision`) leave the model, with the scenario that planted a curve on it.
+What the lead decided: the rate model's clocks are the time since arrival and the time until leaving.
+What follows in the code (the coordinator's, not the lead's words): the third clock (the time until the
+end of the immobile stretch, `f_m`) and its drop rule (`visit_rate.third_clock_decision`) leave the model.
+The validation scenario of a drop before every small movement (`drop_before_small_movements`) stays: it
+checks the two-clock model on data it cannot represent (removed in e680cffd and restored on 2026-11-26).
+With two clocks, Q7a cannot tell a drop before leaving from a drop before any movement: a visit's last
+immobile stretch ends at the final poke-out, so the scenario measures how much of a drop before small
+movements Q7a reads as a drop before leaving.
 
 What it changes: the third-clock question of item b of "Open after the twenty-third round" and of the
 plan (`phase-5a-rate-models.md`, the rule for the third clock) is decided. The twenty-sixth round's formula

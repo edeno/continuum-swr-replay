@@ -191,7 +191,7 @@ LOG_RATIO: dict[str, float] = {"SWR": float(np.log(2.5)), "No SWR": float(np.log
 FADE_S = (6.0, 10.0)
 #: The later onset after an omission (s).
 DELAY_S = 0.5
-#: The drop before leaving: log rate and width (s).
+#: The drops before leaving and before small movements: log rate and width (s).
 DROP = 1.0
 DROP_WIDTH_S = 0.3
 #: The animal and session SDs of the differing log ratios.
@@ -222,11 +222,13 @@ SCENARIOS: dict[str, tuple[str, ...]] = {
         "differing_ratio",
         "later_onset",
         "drop_before_leaving",
+        "drop_before_small_movements",
     ),
     "No SWR": (
         "no_effect",
         "constant_ratio",
         "rate_table",
+        "drop_before_small_movements",
     ),
 }
 
@@ -332,7 +334,8 @@ def synthetic_visit_rows(
 
     Visits of random length, each one or two immobile stretches (with a 0.3 s
     movement between them), bins of ``bin_s`` from each stretch's start, the
-    model's two clocks at the bin center, and an outcome history with ten known
+    model's two clocks and the time until the end of the stretch (a column
+    of the time-bin table that no model reads) at the bin center, and an outcome history with ten known
     outcomes in every bin. The counts are zero.
 
     Parameters
@@ -387,6 +390,7 @@ def synthetic_visit_rows(
                     "count": 0.0,
                     vr.ARRIVAL: center,
                     vr.LEAVING: length - center,
+                    sc.STRETCH_COLUMN: end - center,
                 }
             )
             for column, outcome in zip(REWARD_LAG_COLUMNS, history, strict=True):
@@ -657,6 +661,10 @@ def _scenario_truth(
         return sc.later_onset_after_omission(rows, clocks, delay_s=DELAY_S, **common)
     if name == "drop_before_leaving":
         return sc.drop_before_leaving(
+            rows, clocks.arrival, drop=DROP, width_s=DROP_WIDTH_S, **common
+        )
+    if name == "drop_before_small_movements":
+        return sc.drop_before_small_movements(
             rows, clocks.arrival, drop=DROP, width_s=DROP_WIDTH_S, **common
         )
     raise ValueError(f"no scenario {name!r}")

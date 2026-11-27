@@ -255,3 +255,24 @@ def test_a_rate_table_truth(make_visit_rows) -> None:
         rows, arrival_edges, leaving_edges, shrink_s=50.0, floor=5e-4
     )
     assert (floored.rates == 5e-4).all()
+
+
+def test_a_drop_before_small_movements(rows) -> None:
+    """A drop on the time until the end of the immobile stretch only (a
+    column no model reads): the rate drops in the last 0.3 s of every
+    stretch, the leaving curve is flat, so the planted Q7a is 0, Q1 the
+    arrival curve's, and no reward effect is planted. It checks the
+    two-clock model on data it cannot represent."""
+    stretch = scenarios.drop_before_small_movements(
+        rows, LINEAR.arrival, drop=1.2, width_s=0.3
+    )
+    s = rows[vr.ARRIVAL].to_numpy()
+    m = rows[scenarios.STRETCH_COLUMN].to_numpy()
+    exposure = rows[vr.EXPOSURE].to_numpy()
+    assert stretch.expected == pytest.approx(
+        exposure * np.exp(0.4 * s - 1.2 * (m < 0.3))
+    )
+    assert stretch.by_outcome == pytest.approx(
+        {"Q1": 1.0, "Q7a": 0.0, **_windows(0.0)}, abs=1e-9
+    )
+    assert stretch.pooled == pytest.approx({COEF: 0.0}, abs=1e-9)

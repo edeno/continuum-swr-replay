@@ -95,6 +95,7 @@ __all__ = [
     "constant_ratio",
     "differing_ratio",
     "drop_before_leaving",
+    "drop_before_small_movements",
     "fading_ratio",
     "interpolated_curve",
     "later_onset_after_omission",
@@ -654,6 +655,41 @@ def drop_before_leaving(
         total=total,
         q1_reference_s=q1_reference_s,
     )
+
+
+#: The time-bin table's time until the end of the immobile stretch (s): no
+#: model reads it (the rate model has two clocks, the twenty-seventh round);
+#: :func:`drop_before_small_movements` plants a drop on it.
+STRETCH_COLUMN = "time_until_stretch_end_s"
+
+
+def drop_before_small_movements(
+    rows: pd.DataFrame,
+    arrival: LogCurve,
+    *,
+    drop: float,
+    width_s: float = 0.3,
+    total: float | None = None,
+    q1_reference_s: tuple[float, float] = _Q1.second,
+) -> Planted:
+    """A drop of the log rate by ``drop`` in the last ``width_s`` of every
+    immobile stretch (``time_until_stretch_end_s``), with a flat leaving curve
+    and no reward effect: data the two-clock model cannot represent.
+
+    ``f_m(m) = -drop`` for ``m < width_s``; the leaving curve is flat, so the
+    planted Q7a is 0, Q1 the arrival curve's and the window truths and the
+    coefficient 0. A visit's last stretch ends at the final poke-out, so the
+    rate drops before leaving too: with two clocks Q7a cannot tell a drop
+    before leaving from a drop before any movement, and this scenario
+    measures how much of the drop it reads (the engine's ``planted_unit`` is
+    the model's own projection of it).
+    """
+    base = no_effect(rows, PlantedClocks(arrival, _zero), q1_reference_s=q1_reference_s)
+    m = rows[STRETCH_COLUMN].to_numpy(dtype=float)
+    log_rate = PlantedClocks(arrival, _zero).log_rate(rows) + np.where(
+        m < width_s, -float(drop), 0.0
+    )
+    return Planted(_scaled(rows, log_rate, total), base.by_outcome, base.pooled)
 
 
 # --- The rate table --------------------------------------------------------------

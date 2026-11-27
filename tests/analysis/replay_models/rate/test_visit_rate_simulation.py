@@ -307,3 +307,14 @@ def test_the_engine_reads_the_window_support_rule() -> None:
     assert summary.loc["Q2", "without_value_support"] == 1.0
     assert summary.loc["Q2", "share_without_value"] == 1.0
     assert summary.loc["Q2-onset", "share_without_value"] == 0.0
+
+
+def test_the_drop_before_small_movements_is_in_the_list() -> None:
+    """The scenario of a drop before every small movement is in both kinds'
+    lists, last (so that the other scenarios keep their seeds), with Q7a
+    planted at 0."""
+    for kind in ("SWR", "No SWR"):
+        assert vs.SCENARIOS[kind][-1] == "drop_before_small_movements"
+    run = vs.simulation(True, 1)
+    truth = run.attrs["truths"]["drop_before_small_movements"]["by_outcome"]
+    assert truth["Q7a"] == 0.0 and truth["Q2"] == 0.0
