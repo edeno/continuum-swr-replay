@@ -22,7 +22,7 @@ Two models, each in two variants:
   variance, the sample count and the trial number in the epoch.
 
 The ``unadjusted`` variant is as above. The ``length_adjusted`` variant adds,
-for the current and previous roles (penalized) and the trunk role (a baseline),
+for the current and previous roles (penalized) and the trunk role (unpenalized),
 a slope on ``log(event duration) - L0``, and for every role slope a slope on the
 product of its covariate with ``log(event duration) - L0``. ``L0`` is the
 median log duration over the cohort's events of both kinds, fixed and stored.

@@ -11,8 +11,10 @@ A truth (:class:`Truth`) is written in the model's own coordinates, so that
 its planted values are the estimands themselves:
 
 - arm effects (a baseline);
-- role levels against the other-leaf role (``current``, ``previous``,
-  ``trunk``);
+- role levels against the other-leaf role (``current``, ``previous``). A
+  ``trunk`` level may be planted, but it is not a coefficient of the model:
+  the trunk role holds exactly on the trunk arms, so the trunk arms' effects
+  absorb it, and no estimand reads it;
 - slopes per pooled SD of a covariate on the rows of one leaf role, centered at
   the pooled reference, as the model centers a slope by role;
 - curves of a covariate on the rows of one role, centered on the pooled rows
